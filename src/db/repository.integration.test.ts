@@ -427,6 +427,18 @@ describe('repository layer against a real local Supabase', () => {
       expect(headRows).toMatchObject([{ element_id: mainElementId, name: 'Tenant Portal' }]);
     });
 
+    it('createTag refuses a commit whose materialised elements_head has been corrupted (P-7)', async () => {
+      const { error: corruptError } = await service.from('elements_head').update({ name: 'Corrupted Name' }).eq('commit_id', mainCommitId).eq('element_id', mainElementId);
+      if (corruptError) throw new Error(`corrupting elements_head: ${corruptError.message}`);
+
+      await expect(createTag(alice.client, { id: randomUUID(), orgId, modelId, name: 'corrupted-attempt', commitId: mainCommitId, createdBy: alice.id })).rejects.toThrow(/does not match its delta history/);
+
+      // Repair before any later test relies on this commit's projection
+      // being correct — the same repair path SPEC §6.6 names for exactly
+      // this situation, and already proven correct by the next test.
+      await rebuildHead(service, modelId);
+    });
+
     it("rebuildHead recomputes main's head independently and matches exactly, byte for byte (SPEC §6.6's head == fold(deltas))", async () => {
       // The independent half: fold from genesis ourselves, without going
       // through rebuildHead, so this isn't just checking rebuildHead

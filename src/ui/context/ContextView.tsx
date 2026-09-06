@@ -1,8 +1,8 @@
 import { Link } from 'react-router';
 import type { RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
-import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
+import { LinkButton } from '../components/Button/LinkButton';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
@@ -53,9 +53,9 @@ export function ContextView({ group, orgSlug, modelSlug, refParam }: ContextView
           {hubExternal && <Chip tone="neutral">external</Chip>}
         </div>
         {/* The one "descend a level" affordance this view offers (UI-principles §2.1's semantic zoom, as a discrete link rather than a continuous gesture this sprint doesn't build — see CapabilityMapView's own "→ Landscape" link for the same pattern one level up). */}
-        <Link to={containersHref}>
-          <Button variant="secondary">Containers →</Button>
-        </Link>
+        <LinkButton to={containersHref} variant="secondary">
+          Containers →
+        </LinkButton>
       </div>
 
       {group.owners.length > 0 && (

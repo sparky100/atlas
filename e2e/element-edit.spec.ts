@@ -10,12 +10,24 @@
  * UI (there's no "create a system" flow yet — Sprint U1 only builds editing
  * an element already on the page), then drives the actual edit through the
  * browser.
+ *
+ * `commit_deltas` cannot create a model's genesis commit at all (its
+ * branch/depth lookup requires a real existing base commit — see
+ * supabase/migrations/20260906120000_seed_from_map.sql's own comment on why
+ * that function is separate), and `atlas.seed_from_map` — the one thing
+ * that *can* — is capability-map-specific (Sprint U2 §5.1), not a generic
+ * "first commit is anything" mechanism. A System-only model like this one
+ * has no product path to a first commit yet, so this fixture bootstraps
+ * its genesis commit as service_role, same as
+ * e2e/fixtures/landscapeFixture.ts's sibling spec and
+ * src/db/repository.integration.test.ts's beforeAll did before
+ * seed_from_map existed for the capability-map case.
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import type { CommitEnvelope } from '../src/contracts/delta';
 import { getMainBranch } from '../src/db/branches';
-import { createSupabaseClient } from '../src/db/client';
+import { createServiceRoleClient, createSupabaseClient } from '../src/db/client';
 import { commitToBranch } from '../src/db/commits';
 import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
@@ -56,7 +68,16 @@ test('an owner edits a System attribute on main and sees the new value with its 
   await createModel(signedIn, { id: modelId, orgId, name: 'Edit Test Model', slug: modelSlug, createdBy: userId });
 
   const main = await getMainBranch(signedIn, modelId);
-  if (!main?.head_commit_id) throw new Error('main branch was not auto-created with a genesis commit');
+  if (!main) throw new Error('main branch was not auto-created');
+
+  const service = createServiceRoleClient(env);
+  const genesisCommitId = randomUUID();
+  const { error: genesisError } = await service
+    .from('commits')
+    .insert({ id: genesisCommitId, org_id: orgId, model_id: modelId, branch_id: main.id, parent_commit_id: null, kind: 'manual', message: 'seed', author_id: userId, depth: 0 });
+  if (genesisError) throw new Error(`genesis commit: ${genesisError.message}`);
+  const { error: headError } = await service.from('branches').update({ head_commit_id: genesisCommitId }).eq('id', main.id);
+  if (headError) throw new Error(`advancing main head: ${headError.message}`);
 
   const { error: sourceError } = await signedIn.from('sources').insert({ id: randomUUID(), org_id: orgId, model_id: modelId, kind: 'manual', name: 'Seed', user_id: userId, created_by: userId });
   if (sourceError) throw new Error(`seed source: ${sourceError.message}`);
@@ -67,7 +88,7 @@ test('an owner edits a System attribute on main and sees the new value with its 
   const envelope: CommitEnvelope = {
     id: randomUUID(),
     branchId: main.id,
-    parentCommitId: main.head_commit_id,
+    parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
     message: 'seed Billing Service',
@@ -86,7 +107,7 @@ test('an owner edits a System attribute on main and sees the new value with its 
       },
     ],
   };
-  const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: main.head_commit_id, envelope });
+  const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });
   if (!seedResult.ok) throw new Error(`seeding Billing Service: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}`);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyHead } from './deltas';
-import { serializeHeadProjection } from './projection';
+import { headHash } from './head';
+import { deserializeHeadProjection, serializeHeadProjection } from './projection';
 
 describe('serializeHeadProjection', () => {
   it('serialises elements and relationships verbatim, with attributes carried through', () => {
@@ -45,5 +46,40 @@ describe('serializeHeadProjection', () => {
 
   it('produces empty arrays for an empty head', () => {
     expect(serializeHeadProjection(emptyHead())).toEqual({ elementsHead: [], relationshipsHead: [], facts: [] });
+  });
+});
+
+describe('deserializeHeadProjection', () => {
+  it('round-trips through serializeHeadProjection with the same head_hash (SPEC §6.6\'s tag-creation check depends on this)', () => {
+    const head = emptyHead();
+    head.elements.set('el-1', { elementType: 'system', name: 'Housing Options', parentId: null, attributes: { lifecycleStatus: 'active' }, existsDeltaId: 'd1' });
+    head.elements.set('el-2', { elementType: 'capability', name: 'Housing', parentId: null, attributes: {}, existsDeltaId: 'd2' });
+    head.relationships.set('rel-1', { relationshipType: 'supports', fromElementId: 'el-1', toElementId: 'el-2', attributes: {}, existsDeltaId: 'd3' });
+    head.facts.set('el-1 name', { subjectId: 'el-1', attribute: 'name', deltaId: 'd1', sourceId: 'src-1', confidence: 1, authorId: 'u1', createdAt: '2026-01-01T00:00:00Z', value: 'Housing Options' });
+    head.facts.set('el-1 $exists', { subjectId: 'el-1', attribute: '$exists', deltaId: 'd1', sourceId: 'src-1', sourceRef: 'sheet1!A1', effectiveDate: '2026-01-01', confidence: 0.9, authorId: 'u1', createdAt: '2026-01-01T00:00:00Z', value: null });
+
+    const projection = serializeHeadProjection(head);
+    const roundTripped = deserializeHeadProjection(projection.elementsHead, projection.relationshipsHead, projection.facts);
+
+    expect(headHash(roundTripped)).toBe(headHash(head));
+  });
+
+  it('produces an empty head from empty rows', () => {
+    const head = deserializeHeadProjection([], [], []);
+    expect(head.elements.size).toBe(0);
+    expect(head.relationships.size).toBe(0);
+    expect(head.facts.size).toBe(0);
+  });
+
+  it('produces a different head_hash when a materialised row has been tampered with (the corruption tag creation must catch)', () => {
+    const head = emptyHead();
+    head.elements.set('el-1', { elementType: 'system', name: 'Housing Options', parentId: null, attributes: {}, existsDeltaId: 'd1' });
+    const projection = serializeHeadProjection(head);
+    const tampered = projection.elementsHead.map((row) => ({ ...row, name: 'Corrupted Name' }));
+
+    const honest = deserializeHeadProjection(projection.elementsHead, projection.relationshipsHead, projection.facts);
+    const corrupted = deserializeHeadProjection(tampered, projection.relationshipsHead, projection.facts);
+
+    expect(headHash(corrupted)).not.toBe(headHash(honest));
   });
 });

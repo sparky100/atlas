@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Link } from 'react-router';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
@@ -51,6 +51,7 @@ export interface CapabilityMapViewProps {
 export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, modelSlug, refParam, addCapability }: CapabilityMapViewProps) {
   const [colourBy, setColourBy] = useState<ColourByMode>('none');
   const [expanded, setExpanded] = useState<Set<UUID>>(new Set());
+  const colourById = useId();
 
   function toggleExpanded(id: UUID): void {
     setExpanded((prev) => {
@@ -77,10 +78,12 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, m
   return (
     <div>
       <div className={styles.toolbar}>
-        <Text as="label" size="sm" tone="muted">
-          Colour by
-        </Text>
-        <select className={styles.select} value={colourBy} onChange={(e) => { setColourBy(e.target.value as ColourByMode); }}>
+        <label htmlFor={colourById}>
+          <Text as="span" size="sm" tone="muted">
+            Colour by
+          </Text>
+        </label>
+        <select id={colourById} className={styles.select} value={colourBy} onChange={(e) => { setColourBy(e.target.value as ColourByMode); }}>
           <option value="none">None</option>
           {COLOUR_BY_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>

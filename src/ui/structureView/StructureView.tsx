@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 import type { RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
-import { Button } from '../components/Button/Button';
+import { LinkButton } from '../components/Button/LinkButton';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
@@ -58,9 +58,9 @@ export function StructureView({ kind, group, orgSlug, modelSlug, refParam }: Str
                 </Link>
               </div>
               {kind === 'container' && (
-                <Link to={componentsHref(child.element_id)}>
-                  <Button variant="ghost">Components →</Button>
-                </Link>
+                <LinkButton to={componentsHref(child.element_id)} variant="ghost">
+                  Components →
+                </LinkButton>
               )}
             </div>
           ))}
