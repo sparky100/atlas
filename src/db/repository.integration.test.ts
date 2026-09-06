@@ -23,6 +23,7 @@ import type { Delta } from '../contracts/delta';
 import { foldFromGenesis, headHash } from '../engine/head';
 import { serializeHeadProjection } from '../engine/projection';
 import { createChangeBranch, getBranch, getMainBranch, listBranchesForModel } from './branches';
+import { listCapabilityMapItems } from './capabilityMapTemplates';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { buildCommitLoader } from './commitLoader';
@@ -31,6 +32,7 @@ import { createModel, getModelBySlug, listModelsForOrg } from './models';
 import { loadEnv } from './env';
 import { createOrganisation, getMyMembership, getOrganisationBySlug, listOrganisationsForUser } from './organisations';
 import { rebuildHead } from './rebuildHead';
+import { seedModelFromCapabilityMap } from './seedFromMap';
 import { createTag, listTagsForModel } from './tags';
 import { getUserPreferences, upsertUserPreferences } from './userPreferences';
 
@@ -68,6 +70,7 @@ describe('repository layer against a real local Supabase', () => {
   let modelId: string;
   let modelSlug: string;
   let mainGenesisCommitId: string;
+  let capabilityMapId: string;
 
   beforeAll(async () => {
     alice = await createSignedInUser('alice');
@@ -83,19 +86,41 @@ describe('repository layer against a real local Supabase', () => {
     modelSlug = `test-landscape-${modelId.slice(0, 8)}`;
     await createModel(alice.client, { id: modelId, orgId, name: 'Test Landscape', slug: modelSlug, createdBy: alice.id });
 
-    // Bootstrap main's genesis commit as service_role — standing in for the
-    // not-yet-built atlas.seed_from_map (Sprint F1's src/engine covers
-    // fold/merge; actually writing main's first commit is future work, per
-    // this file's own module comment and the note in Sprint F1 step 2).
-    const main = await getMainBranch(service, modelId);
+    // A minimal published capability map, inserted as service_role —
+    // standing in for scripts/loadCapabilityMaps.ts, which is the one that
+    // really writes these tables (RLS grants authenticated select only).
+    // Two levels, so the genesis seed below actually exercises parent
+    // linking, not just a single root.
+    capabilityMapId = randomUUID();
+    const rootItemId = randomUUID();
+    const childItemId = randomUUID();
+    const { error: mapError } = await service
+      .from('capability_maps')
+      .insert({ id: capabilityMapId, sector: 'generic', version: 1, status: 'published', source_description: 'Integration test fixture', published_at: new Date().toISOString() });
+    if (mapError) throw new Error(`capability_maps fixture: ${mapError.message}`);
+    const { error: itemsError } = await service.from('capability_map_items').insert([
+      { id: rootItemId, map_id: capabilityMapId, code: '1', parent_code: null, name: 'Root Capability', level: 1 },
+      { id: childItemId, map_id: capabilityMapId, code: '1.1', parent_code: '1', name: 'Child Capability', level: 2 },
+    ]);
+    if (itemsError) throw new Error(`capability_map_items fixture: ${itemsError.message}`);
+
+    // Main's genesis commit through the real tailoring-flow "import" path
+    // (Sprint U2 step 2), replacing the former service-role stand-in insert
+    // this beforeAll used before atlas.seed_from_map existed.
+    const main = await getMainBranch(alice.client, modelId);
     if (!main) throw new Error('main branch was not auto-created');
-    mainGenesisCommitId = randomUUID();
-    const { error: genesisError } = await service
-      .from('commits')
-      .insert({ id: mainGenesisCommitId, org_id: orgId, model_id: modelId, branch_id: main.id, parent_commit_id: null, kind: 'template_seed', message: 'seed', author_id: alice.id, depth: 0 });
-    if (genesisError) throw new Error(`genesis commit: ${genesisError.message}`);
-    const { error: headError } = await service.from('branches').update({ head_commit_id: mainGenesisCommitId }).eq('id', main.id);
-    if (headError) throw new Error(`advancing main head: ${headError.message}`);
+    const items = await listCapabilityMapItems(alice.client, capabilityMapId);
+    const seedResult = await seedModelFromCapabilityMap(alice.client, {
+      modelId,
+      branchId: main.id,
+      authorId: alice.id,
+      capabilityMapId,
+      sector: 'generic',
+      version: 1,
+      items,
+    });
+    if (!seedResult.ok) throw new Error(`seedModelFromCapabilityMap: ${seedResult.message}`);
+    mainGenesisCommitId = seedResult.commitId;
   });
 
   afterAll(async () => {
@@ -117,6 +142,69 @@ describe('repository layer against a real local Supabase', () => {
   it('bob (not a member) sees none of it', async () => {
     expect(await getBranch(bob.client, mainGenesisCommitId)).toBeNull();
     expect(await listBranchesForModel(bob.client, modelId)).toEqual([]);
+  });
+
+  // Sprint U2 step 2: atlas.seed_from_map, exercised for real by this
+  // file's own beforeAll (see above). RT-4 (SPEC-data-model.md §9's
+  // round-trip suite): every seeded element carries attributes.templateRef
+  // and a template_code alias, and the seed itself is provenance-recorded
+  // as a `sources` row of kind template.
+  describe('atlas.seed_from_map / capability-map import (Sprint U2 step 2, RT-4)', () => {
+    it('seeds one capability element per map item, correctly parented', async () => {
+      const { data: elementsHead, error } = await service
+        .from('elements_head')
+        .select('element_id, name, parent_id, attributes')
+        .eq('commit_id', mainGenesisCommitId)
+        .eq('element_type', 'capability');
+      if (error) throw new Error(`reading elements_head: ${error.message}`);
+      expect(elementsHead).toHaveLength(2);
+
+      const root = elementsHead.find((r) => r.name === 'Root Capability');
+      const child = elementsHead.find((r) => r.name === 'Child Capability');
+      expect(root?.parent_id).toBeNull();
+      expect(child?.parent_id).toBe(root?.element_id);
+    });
+
+    it('every seeded element has attributes.code/templateRef and a matching template_code alias (RT-4)', async () => {
+      const { data: elementsHead, error } = await service
+        .from('elements_head')
+        .select('element_id, attributes')
+        .eq('commit_id', mainGenesisCommitId)
+        .eq('element_type', 'capability');
+      if (error) throw new Error(`reading elements_head: ${error.message}`);
+
+      const { data: aliasRows, error: aliasError } = await service.from('aliases').select('element_id, alias_value, alias_type').eq('model_id', modelId);
+      if (aliasError) throw new Error(`reading aliases: ${aliasError.message}`);
+
+      for (const row of elementsHead) {
+        const attrs = row.attributes as { code: string; templateRef: string };
+        expect(attrs.code).toEqual(expect.any(String));
+        expect(attrs.templateRef).toEqual(expect.any(String));
+        expect(aliasRows).toContainEqual({ element_id: row.element_id, alias_value: attrs.code, alias_type: 'template_code' });
+      }
+    });
+
+    it('records provenance as a `sources` row of kind template, pointing at the capability map used', async () => {
+      const { data: sourceRows, error } = await service.from('sources').select('kind, capability_map_id').eq('model_id', modelId).eq('kind', 'template');
+      if (error) throw new Error(`reading sources: ${error.message}`);
+      expect(sourceRows).toEqual([{ kind: 'template', capability_map_id: capabilityMapId }]);
+    });
+
+    it('a second seed attempt on an already-seeded model is rejected (a model is seeded at most once, SPEC §5.1)', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main) throw new Error('main branch not found');
+      const items = await listCapabilityMapItems(alice.client, capabilityMapId);
+      const result = await seedModelFromCapabilityMap(alice.client, {
+        modelId,
+        branchId: main.id,
+        authorId: alice.id,
+        capabilityMapId,
+        sector: 'generic',
+        version: 1,
+        items,
+      });
+      expect(result.ok).toBe(false);
+    });
   });
 
   it('alice forks a change branch and commits to it successfully', async () => {
