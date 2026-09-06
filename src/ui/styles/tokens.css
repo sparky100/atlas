@@ -1,0 +1,158 @@
+/**
+ * Design tokens (UI-principles.md §8.1-§8.4). This file is the single
+ * source of truth for every colour, size, and spacing value in the app —
+ * components reference `var(--token)` and never a raw hex or px value
+ * (CLAUDE.md rule 2's "colours must be CSS variables" applies to every
+ * token here, not just colour). Nothing else may restate these numbers.
+ *
+ * Theme: `data-theme="light"|"dark"` on <html> is set synchronously by the
+ * inline script in index.html before first paint (no flash). The
+ * `prefers-color-scheme` media query below is a fallback for contexts that
+ * skip that script (a Storybook story rendered without the decorator, JS
+ * disabled) — three layers, in increasing precedence: this file's bare
+ * `:root` (light), the media query, then the explicit attribute.
+ *
+ * Density: `data-density="comfortable"|"compact"` on <html>, same
+ * mechanism. Type sizes do NOT change between modes (§8.3) — only spacing.
+ */
+
+:root {
+  /* ---- Typography (§8.1) ---- */
+  --font-sans: Inter, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-xs-size: 11px;
+  --text-xs-lh: 16px;
+  --text-sm-size: 13px;
+  --text-sm-lh: 20px;
+  --text-md-size: 14px;
+  --text-md-lh: 22px;
+  --text-lg-size: 16px;
+  --text-lg-lh: 24px;
+  --text-xl-size: 20px;
+  --text-xl-lh: 28px;
+  --text-2xl-size: 24px;
+  --text-2xl-lh: 32px;
+  --text-3xl-size: 32px;
+  --text-3xl-lh: 40px;
+
+  /* ---- Spacing (§8.2) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  --border-width: 1px;
+  --border-width-emphasis: 2px;
+
+  /* ---- Density (§8.3) — comfortable is the default ---- */
+  --row-height: 40px;
+  --attribute-row-height: 36px;
+  --canvas-node-min-height: 48px;
+  --panel-padding: var(--space-4);
+
+  /* ---- Colour: surfaces and text, light (§8.4) ---- */
+  --bg: #ffffff;
+  --bg-subtle: #f6f7f9;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-raised-shadow: 0 1px 3px rgba(20, 24, 31, 0.12), 0 1px 2px rgba(20, 24, 31, 0.08);
+  --border: #d9dee5;
+  --border-strong: #b8c0cc;
+  --text: #14181f;
+  --text-muted: #5b6472;
+  --text-faint: #8a93a1;
+  --accent: #0b5fff;
+  --accent-fg: #ffffff;
+  --focus: #0b5fff;
+
+  /* ---- Colour: diff (Okabe-Ito derived, §6.3/§8.4) ---- */
+  --diff-added: #0072b2;
+  --diff-removed: #d55e00;
+  --diff-changed: #e69f00;
+  /* Derived from --border, not hardcoded per theme (SPEC §6.3: "`--border`
+     at 60% opacity" in both light and dark) — recomputed from whichever
+     --border is active, so it can't drift out of sync with it. */
+  --diff-none: rgb(from var(--border) r g b / 60%);
+
+  /* ---- Colour: status (§8.4) ---- */
+  --status-ok: #009e73;
+  --status-warn: #e69f00;
+  --status-danger: #d55e00;
+  --status-info: #0072b2;
+  --status-neutral: #8a93a1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0f1115;
+    --bg-subtle: #161a21;
+    --surface: #1b2029;
+    --surface-raised: #222834;
+    --surface-raised-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --border: #2e3644;
+    --border-strong: #465063;
+    --text: #e6e9ef;
+    --text-muted: #9aa4b4;
+    --text-faint: #6b7585;
+    --accent: #6ea0ff;
+    --accent-fg: #0f1115;
+    --focus: #6ea0ff;
+
+    --diff-added: #7fbde9;
+    --diff-removed: #f2a162;
+    --diff-changed: #f3c64c;
+    /* --diff-none is not redeclared: it derives from --border (above),
+       and CSS variable resolution follows the cascade, so it already
+       tracks whichever --border wins here. */
+
+    --status-ok: #5fd3a9;
+    --status-warn: #f3c64c;
+    --status-danger: #f2a162;
+    --status-info: #7fbde9;
+    --status-neutral: #6b7585;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0f1115;
+  --bg-subtle: #161a21;
+  --surface: #1b2029;
+  --surface-raised: #222834;
+  --surface-raised-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --border: #2e3644;
+  --border-strong: #465063;
+  --text: #e6e9ef;
+  --text-muted: #9aa4b4;
+  --text-faint: #6b7585;
+  --accent: #6ea0ff;
+  --accent-fg: #0f1115;
+  --focus: #6ea0ff;
+
+  --diff-added: #7fbde9;
+  --diff-removed: #f2a162;
+  --diff-changed: #f3c64c;
+  /* See the comment in the prefers-color-scheme block above: --diff-none
+     derives from --border and needs no redeclaration here. */
+
+  --status-ok: #5fd3a9;
+  --status-warn: #f3c64c;
+  --status-danger: #f2a162;
+  --status-info: #7fbde9;
+  --status-neutral: #6b7585;
+}
+
+:root[data-density='compact'] {
+  --row-height: 28px;
+  --attribute-row-height: 26px;
+  --canvas-node-min-height: 36px;
+  --panel-padding: var(--space-2);
+}

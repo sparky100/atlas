@@ -1,0 +1,63 @@
+/**
+ * Minimal reset plus the base type/colour rendering rules from
+ * UI-principles.md §8.1. Component-level styles are CSS Modules that
+ * reference tokens.css's custom properties — nothing here is component
+ * styling, only page-wide defaults.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-lh);
+  /* "tabular numerals on" (§8.1) — ids, counts, dates line up in columns
+     wherever they appear, not just in components that opt in. */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+img,
+svg {
+  max-width: 100%;
+  display: block;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* Visible focus ring on everything focusable (§8.7) — components may
+   restyle within this budget but never remove it outright. */
+:focus-visible {
+  outline: var(--border-width-emphasis) solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

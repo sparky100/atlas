@@ -2,10 +2,13 @@
 import { defineConfig } from 'eslint/config';
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 export default defineConfig(
   {
-    ignores: ['dist/**', 'node_modules/**', 'supabase/.temp/**', 'coverage/**'],
+    ignores: ['dist/**', 'node_modules/**', 'supabase/.temp/**', 'coverage/**', 'storybook-static/**'],
   },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
@@ -47,6 +50,39 @@ export default defineConfig(
     rules: {
       // Property tests legitimately want loose-typed generators; keep the bar
       // at "no accidental any", not "no test ergonomics".
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+    },
+  },
+  // src/ui only: React + accessibility rules. WCAG 2.2 AA is a stated
+  // requirement (UI-principles.md §8.7), so jsx-a11y runs from the first
+  // component, not bolted on once violations have accumulated.
+  {
+    files: ['src/ui/**/*.tsx', '.storybook/**/*.tsx'],
+    plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh, 'jsx-a11y': jsxA11y },
+    rules: {
+      ...reactHooks.configs['recommended-latest'].rules,
+      ...jsxA11y.flatConfigs.recommended.rules,
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    },
+  },
+  {
+    files: ['**/*.stories.tsx', '.storybook/**/*.ts', '.storybook/**/*.tsx'],
+    rules: {
+      // Story titles/args and Storybook's own config shape make several
+      // strict-type-checked rules noisy for no real safety gain here.
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+    },
+  },
+  {
+    // This file itself: it's a *.js file, so parserOptions.projectService's
+    // allowDefaultProject above gives it a synthetic, type-info-poor
+    // program — eslint-plugin-jsx-a11y's exports resolve to `any` under
+    // that program even though they're perfectly typed under the real
+    // tsconfig. A tooling-config quirk, not a real type-safety gap.
+    files: ['eslint.config.js'],
+    rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
     },

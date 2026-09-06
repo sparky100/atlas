@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "moduleDetection": "force",
@@ -20,8 +20,9 @@
     "esModuleInterop": true,
     "allowJs": false,
     "noEmit": true,
-    "types": ["node"]
+    "jsx": "react-jsx",
+    "types": ["node", "vite/client"]
   },
-  "include": ["src/**/*.ts", "vitest.config.ts", "vitest.integration.config.ts", "eslint.config.js"],
-  "exclude": ["node_modules", "dist", "supabase/.temp"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "vitest.config.ts", "vitest.integration.config.ts", "eslint.config.js", ".storybook/**/*.ts", ".storybook/**/*.tsx"],
+  "exclude": ["node_modules", "dist", "storybook-static", "supabase/.temp"]
 }

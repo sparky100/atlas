@@ -1,0 +1,41 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 20px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-lh);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.glyph {
+  display: inline-flex;
+  font-size: var(--text-xs-size);
+}
+
+/* Each tone: a tinted background derived from the status colour at low
+   opacity, full-strength text/border in the status colour — readable in
+   both themes, and never the same treatment as a diff marker (§8.4). */
+.ok {
+  color: var(--status-ok);
+  background: color-mix(in srgb, var(--status-ok) 16%, transparent);
+}
+.warn {
+  color: var(--status-warn);
+  background: color-mix(in srgb, var(--status-warn) 16%, transparent);
+}
+.danger {
+  color: var(--status-danger);
+  background: color-mix(in srgb, var(--status-danger) 16%, transparent);
+}
+.info {
+  color: var(--status-info);
+  background: color-mix(in srgb, var(--status-info) 16%, transparent);
+}
+.neutral {
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+}

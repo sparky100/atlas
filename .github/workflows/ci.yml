@@ -46,6 +46,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
+  build:
+    name: App and Storybook build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # Every primitive under src/ui needs a story (Sprint U1 step 1); this
+      # catches a story that no longer typechecks/builds, which
+      # `pnpm typecheck`/`pnpm lint` alone don't fully exercise (addon
+      # wiring, story-level render errors at build time).
+      - run: pnpm build-storybook
+
   database:
     name: Fresh-database migration check and integration tests
     runs-on: ubuntu-latest
