@@ -22,7 +22,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Delta } from '../contracts/delta';
 import { foldFromGenesis, headHash } from '../engine/head';
 import { serializeHeadProjection } from '../engine/projection';
-import { createChangeBranch, getBranch, getMainBranch, listBranchesForModel } from './branches';
+import { createChangeBranch, getBranch, getMainBranch, listBranchesForModel, updateBranchMetadata } from './branches';
 import { listCapabilityMapItems } from './capabilityMapTemplates';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
@@ -33,6 +33,7 @@ import { loadEnv } from './env';
 import { createOrganisation, getMyMembership, getOrganisationBySlug, listOrganisationsForUser } from './organisations';
 import { rebuildHead } from './rebuildHead';
 import { seedModelFromCapabilityMap } from './seedFromMap';
+import { getOrCreateManualSource } from './sources';
 import { createTag, listTagsForModel } from './tags';
 import { getUserPreferences, upsertUserPreferences } from './userPreferences';
 
@@ -58,8 +59,11 @@ async function createSignedInUser(label: string): Promise<TestUser> {
   return { id: created.user.id, email, client: signIn };
 }
 
-function makeCreateDelta(id: string, elementId: string, name: string): Delta {
-  return { kind: 'element.create', id, elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: 'manual', confidence: 1 };
+// sourceId must be a real `sources` row id (deltas.source_id is uuid, not
+// null, cast straight through by atlas.commit_deltas — see
+// getOrCreateManualSource below) — never the source *kind* string 'manual'.
+function makeCreateDelta(id: string, elementId: string, name: string, sourceId: string): Delta {
+  return { kind: 'element.create', id, elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId, confidence: 1 };
 }
 
 describe('repository layer against a real local Supabase', () => {
@@ -71,6 +75,7 @@ describe('repository layer against a real local Supabase', () => {
   let modelSlug: string;
   let mainGenesisCommitId: string;
   let capabilityMapId: string;
+  let aliceManualSourceId: string;
 
   beforeAll(async () => {
     alice = await createSignedInUser('alice');
@@ -85,6 +90,13 @@ describe('repository layer against a real local Supabase', () => {
     modelId = randomUUID();
     modelSlug = `test-landscape-${modelId.slice(0, 8)}`;
     await createModel(alice.client, { id: modelId, orgId, name: 'Test Landscape', slug: modelSlug, createdBy: alice.id });
+
+    // makeCreateDelta's deltas need a real `sources` row (deltas.source_id
+    // is uuid, not the source *kind* string 'manual') — the same
+    // getOrCreateManualSource every editing hook calls (src/ui/elements/
+    // useElementEditor.ts and friends).
+    const manualSource = await getOrCreateManualSource(alice.client, { id: randomUUID(), orgId, modelId, userId: alice.id });
+    aliceManualSourceId = manualSource.id;
 
     // A minimal published capability map, inserted as service_role —
     // standing in for scripts/loadCapabilityMaps.ts, which is the one that
@@ -231,7 +243,7 @@ describe('repository layer against a real local Supabase', () => {
         mergedBranchHeadCommitId: null,
         kind: 'manual',
         message: 'add Housing Options',
-        deltas: [makeCreateDelta(randomUUID(), elementId, 'Housing Options')],
+        deltas: [makeCreateDelta(randomUUID(), elementId, 'Housing Options', aliceManualSourceId)],
       },
     });
     expect(result).toMatchObject({ ok: true });
@@ -257,7 +269,7 @@ describe('repository layer against a real local Supabase', () => {
       mergedBranchHeadCommitId: null,
       kind: 'manual' as const,
       message: name,
-      deltas: [makeCreateDelta(randomUUID(), randomUUID(), name)],
+      deltas: [makeCreateDelta(randomUUID(), randomUUID(), name, aliceManualSourceId)],
     });
 
     const first = await commitToBranch(alice.client, {
@@ -414,7 +426,7 @@ describe('repository layer against a real local Supabase', () => {
       expect(error).not.toBeNull();
     });
 
-    it("commit_deltas rejects kind 'merge' on a change branch (Sprint H1 item 3: change branches take manual only — no refresh UI exists yet)", async () => {
+    it("commit_deltas rejects kind 'capture' and 'template_seed' on a change branch (only manual/merge are allowed there)", async () => {
       const branch = await createChangeBranch(alice.client, {
         id: randomUUID(),
         orgId,
@@ -423,17 +435,41 @@ describe('repository layer against a real local Supabase', () => {
         createdBy: alice.id,
         mainHeadCommitId: mainGenesisCommitId,
       });
-      const { error } = await alice.client.rpc('commit_deltas', {
+      for (const kind of ['capture', 'template_seed']) {
+        const { error } = await alice.client.rpc('commit_deltas', {
+          p_commit_id: randomUUID(),
+          p_model_id: modelId,
+          p_branch_id: branch.id,
+          p_base_commit_id: mainGenesisCommitId,
+          p_kind: kind,
+          p_message: `${kind} kind on a change branch`,
+          p_deltas: [],
+        });
+        expect(error).not.toBeNull();
+      }
+    });
+
+    it("commit_deltas now accepts kind 'merge' on a change branch — a refresh pulling main into the branch (Sprint C1, S-11; lifts Sprint H1 item 3's restriction now that the review queue is the product path)", async () => {
+      const branch = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'refresh-kind-check',
+        createdBy: alice.id,
+        mainHeadCommitId: mainGenesisCommitId,
+      });
+      const { data, error } = await alice.client.rpc('commit_deltas', {
         p_commit_id: randomUUID(),
         p_model_id: modelId,
         p_branch_id: branch.id,
         p_base_commit_id: mainGenesisCommitId,
         p_kind: 'merge',
-        p_message: 'merge kind on a change branch',
+        p_message: 'refresh: pull main into the branch',
         p_deltas: [],
         p_merged_branch_head_commit_id: mainGenesisCommitId,
       });
-      expect(error).not.toBeNull();
+      expect(error).toBeNull();
+      expect(data).toMatchObject({ kind: 'merge', merged_branch_head_commit_id: mainGenesisCommitId });
     });
 
     it('alice (owner) commits directly to main; elements_head and facts materialise for the new head', async () => {
@@ -449,7 +485,7 @@ describe('repository layer against a real local Supabase', () => {
           mergedBranchHeadCommitId: null,
           kind: 'manual',
           message: 'add Tenant Portal directly to main',
-          deltas: [makeCreateDelta(randomUUID(), mainElementId, 'Tenant Portal')],
+          deltas: [makeCreateDelta(randomUUID(), mainElementId, 'Tenant Portal', aliceManualSourceId)],
         },
       });
       expect(result).toMatchObject({ ok: true });
@@ -517,6 +553,361 @@ describe('repository layer against a real local Supabase', () => {
       const before = await rebuildHead(service, modelId);
       const after = await rebuildHead(service, modelId);
       expect(after).toEqual(before);
+    });
+  });
+
+  // Sprint C1 step 2: merge_requests and the five atlas.* review-queue
+  // functions (ADR-006, SPEC §7). Each `it` forks its own branch off
+  // whatever main's current head happens to be at that point in the file —
+  // deliberately, so these tests don't depend on running in a particular
+  // order relative to the describe block above.
+  describe('merge_requests / review queue workflow (Sprint C1 step 2, ADR-006, SPEC §7)', () => {
+    it('submit_merge_request moves the branch to proposed and records the request; re-submitting a non-draft branch is rejected', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const branch = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'submit-check',
+        createdBy: alice.id,
+        mainHeadCommitId: main.head_commit_id,
+      });
+
+      const requestId = randomUUID();
+      const { data, error } = await alice.client.rpc('submit_merge_request', {
+        p_id: requestId,
+        p_branch_id: branch.id,
+        p_classification: { hasBlockingConflict: false },
+      });
+      expect(error).toBeNull();
+      expect(data).toMatchObject({ id: requestId, branch_id: branch.id, status: 'pending' });
+      expect((await getBranch(alice.client, branch.id))?.status).toBe('proposed');
+
+      const { error: resubmitError } = await alice.client.rpc('submit_merge_request', { p_id: randomUUID(), p_branch_id: branch.id, p_classification: {} });
+      expect(resubmitError).not.toBeNull();
+    });
+
+    it('approve_merge_request refuses a blocking conflict and refuses a non-owner/architect reviewer', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const branch = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'approve-check',
+        createdBy: alice.id,
+        mainHeadCommitId: main.head_commit_id,
+      });
+      const requestId = randomUUID();
+      await alice.client.rpc('submit_merge_request', { p_id: requestId, p_branch_id: branch.id, p_classification: { hasBlockingConflict: true } });
+
+      const { error: blockedError } = await alice.client.rpc('approve_merge_request', { p_merge_request_id: requestId });
+      expect(blockedError).not.toBeNull();
+
+      const { error: inviteError } = await alice.client.from('members').insert({ org_id: orgId, user_id: bob.id, role: 'contributor', invited_by: alice.id });
+      if (inviteError) throw new Error(`inviting bob: ${inviteError.message}`);
+      const { error: contributorError } = await bob.client.rpc('approve_merge_request', { p_merge_request_id: requestId });
+      expect(contributorError).not.toBeNull();
+      const { error: removeError } = await alice.client.from('members').delete().eq('org_id', orgId).eq('user_id', bob.id);
+      if (removeError) throw new Error(`removing bob: ${removeError.message}`);
+    });
+
+    it('the full submit -> approve -> merge path: the branch becomes merged, and its element lands on main via the merge commit', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const branch = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'full-merge-path',
+        createdBy: alice.id,
+        mainHeadCommitId: main.head_commit_id,
+      });
+      if (!branch.head_commit_id) throw new Error('branch has no head at creation');
+
+      const elementId = randomUUID();
+      const commitResult = await commitToBranch(alice.client, {
+        modelId,
+        branchId: branch.id,
+        expectedHeadCommitId: branch.head_commit_id,
+        envelope: {
+          id: randomUUID(),
+          branchId: branch.id,
+          parentCommitId: branch.head_commit_id,
+          mergedBranchHeadCommitId: null,
+          kind: 'manual',
+          message: 'add Resident Portal',
+          deltas: [makeCreateDelta(randomUUID(), elementId, 'Resident Portal', aliceManualSourceId)],
+        },
+      });
+      expect(commitResult).toMatchObject({ ok: true });
+      const branchAfterCommit = await getBranch(alice.client, branch.id);
+      if (!branchAfterCommit?.head_commit_id) throw new Error('branch has no head after commit');
+
+      const requestId = randomUUID();
+      const { error: submitError } = await alice.client.rpc('submit_merge_request', {
+        p_id: requestId,
+        p_branch_id: branch.id,
+        p_classification: { hasBlockingConflict: false },
+      });
+      expect(submitError).toBeNull();
+
+      const { error: approveError } = await alice.client.rpc('approve_merge_request', { p_merge_request_id: requestId });
+      expect(approveError).toBeNull();
+
+      // The final merge carries zero deltas (SPEC §7.1: once mergeBase(B) ==
+      // main.head, there's nothing left to resolve) — its resulting head is
+      // exactly the branch's own folded head, computed the same way
+      // commitToBranch already computes any main commit's projection.
+      const loader = await buildCommitLoader(alice.client, modelId);
+      const mergedHead = foldFromGenesis(branchAfterCommit.head_commit_id, loader);
+      const projection = serializeHeadProjection(mergedHead);
+      const mergeCommitId = randomUUID();
+
+      const { data: mergeData, error: mergeError } = await alice.client.rpc('merge_branch', {
+        p_merge_request_id: requestId,
+        p_commit_id: mergeCommitId,
+        p_message: 'merge full-merge-path',
+        p_elements_head: projection.elementsHead,
+        p_relationships_head: projection.relationshipsHead,
+        p_facts: projection.facts,
+        p_head_hash: headHash(mergedHead),
+      });
+      expect(mergeError).toBeNull();
+      expect(mergeData).toMatchObject({ id: mergeCommitId, kind: 'merge', merged_branch_head_commit_id: branchAfterCommit.head_commit_id });
+
+      expect((await getBranch(alice.client, branch.id))?.status).toBe('merged');
+      expect((await getMainBranch(alice.client, modelId))?.head_commit_id).toBe(mergeCommitId);
+
+      const { data: headRow, error: headError } = await service.from('elements_head').select('element_id, name').eq('commit_id', mergeCommitId).eq('element_id', elementId);
+      if (headError) throw new Error(`reading elements_head: ${headError.message}`);
+      expect(headRow).toMatchObject([{ element_id: elementId, name: 'Resident Portal' }]);
+    });
+
+    it('atlas.commit_deltas writes resolved_conflicts atomically alongside the resolving commit (ADR-007, SPEC §7.4)', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const branch = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'resolved-conflicts-check',
+        createdBy: alice.id,
+        mainHeadCommitId: main.head_commit_id,
+      });
+      if (!branch.head_commit_id) throw new Error('branch has no head at creation');
+
+      // Seed an element whose name-setting delta stands in as the "losing"
+      // side of a field conflict a refresh is about to resolve.
+      const elementId = randomUUID();
+      const losingDeltaId = randomUUID();
+      const seedResult = await commitToBranch(alice.client, {
+        modelId,
+        branchId: branch.id,
+        expectedHeadCommitId: branch.head_commit_id,
+        envelope: {
+          id: randomUUID(),
+          branchId: branch.id,
+          parentCommitId: branch.head_commit_id,
+          mergedBranchHeadCommitId: null,
+          kind: 'manual',
+          message: 'seed an element to conflict over',
+          deltas: [makeCreateDelta(losingDeltaId, elementId, 'Contested System', aliceManualSourceId)],
+        },
+      });
+      expect(seedResult).toMatchObject({ ok: true });
+      const branchAfterSeed = await getBranch(alice.client, branch.id);
+      if (!branchAfterSeed?.head_commit_id) throw new Error('branch has no head after seeding');
+
+      // A refresh (kind = 'merge' on the branch, S-11) carrying one
+      // resolution delta and its resolved_conflicts row, exactly as SPEC
+      // §7.4's field-conflict actions describe.
+      const winningDeltaId = randomUUID();
+      const mergeCommitId = randomUUID();
+      const { data: refreshCommit, error: refreshError } = await alice.client.rpc('commit_deltas', {
+        p_commit_id: mergeCommitId,
+        p_model_id: modelId,
+        p_branch_id: branch.id,
+        p_base_commit_id: branchAfterSeed.head_commit_id,
+        p_kind: 'merge',
+        p_message: 'refresh: resolve a field conflict on name',
+        p_deltas: [
+          {
+            id: winningDeltaId,
+            kind: 'element_update',
+            subject_id: elementId,
+            attribute: 'name',
+            value: 'Resolved Name',
+            previous_delta_id: losingDeltaId,
+            source_id: aliceManualSourceId,
+            confidence: 1,
+          },
+        ],
+        p_merged_branch_head_commit_id: branchAfterSeed.head_commit_id,
+        // A typed-in value's winning_delta_id IS the resolution delta
+        // itself (SPEC §7.4: "the chosen one or the resolution delta itself
+        // for a typed-in value") — unlike "keep this change"/"keep main",
+        // which would cite an existing side's delta id instead.
+        p_resolved_conflicts: [{ winning_delta_id: winningDeltaId, discarded_delta_id: losingDeltaId, resolution_delta_id: winningDeltaId, rationale: "kept the branch's name over main's" }],
+      });
+      expect(refreshError).toBeNull();
+      expect(refreshCommit).toMatchObject({ id: mergeCommitId, kind: 'merge' });
+
+      const { data: resolvedRows, error: resolvedError } = await service
+        .from('resolved_conflicts')
+        .select('winning_delta_id, discarded_delta_id, resolution_delta_id, rationale')
+        .eq('winning_delta_id', winningDeltaId);
+      if (resolvedError) throw new Error(`reading resolved_conflicts: ${resolvedError.message}`);
+      expect(resolvedRows).toMatchObject([{ winning_delta_id: winningDeltaId, discarded_delta_id: losingDeltaId, resolution_delta_id: winningDeltaId, rationale: "kept the branch's name over main's" }]);
+    });
+
+    it("merge_branch reports REFRESH_REQUIRED — via a null return, not a thrown error, so its own reset to pending/proposed isn't rolled back — when main moved after approval", async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const branch = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'stale-approval-check',
+        createdBy: alice.id,
+        mainHeadCommitId: main.head_commit_id,
+      });
+      const requestId = randomUUID();
+      await alice.client.rpc('submit_merge_request', { p_id: requestId, p_branch_id: branch.id, p_classification: { hasBlockingConflict: false } });
+      const { error: approveError } = await alice.client.rpc('approve_merge_request', { p_merge_request_id: requestId });
+      expect(approveError).toBeNull();
+
+      // Move main directly (as owner), out from under the already-approved
+      // request, without the branch ever refreshing onto the new head.
+      const mainMoveResult = await commitToBranch(alice.client, {
+        modelId,
+        branchId: main.id,
+        expectedHeadCommitId: main.head_commit_id,
+        envelope: {
+          id: randomUUID(),
+          branchId: main.id,
+          parentCommitId: main.head_commit_id,
+          mergedBranchHeadCommitId: null,
+          kind: 'manual',
+          message: 'move main out from under the approval',
+          deltas: [makeCreateDelta(randomUUID(), randomUUID(), 'Unrelated System', aliceManualSourceId)],
+        },
+      });
+      expect(mainMoveResult).toMatchObject({ ok: true });
+
+      const { data: mergeData, error: mergeError } = await alice.client.rpc('merge_branch', {
+        p_merge_request_id: requestId,
+        p_commit_id: randomUUID(),
+        p_message: 'stale merge attempt',
+      });
+      expect(mergeError).toBeNull();
+      expect(mergeData).toBeNull();
+
+      const { data: reqRow, error: reqError } = await service.from('merge_requests').select('status').eq('id', requestId).single();
+      if (reqError) throw new Error(`reading merge_requests: ${reqError.message}`);
+      expect(reqRow.status).toBe('pending');
+      expect((await getBranch(alice.client, branch.id))?.status).toBe('proposed');
+    });
+
+    it('request_changes reopens a proposed branch for edits; reject_merge_request closes a request permanently', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+
+      const branchA = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'request-changes-check',
+        createdBy: alice.id,
+        mainHeadCommitId: main.head_commit_id,
+      });
+      const requestA = randomUUID();
+      await alice.client.rpc('submit_merge_request', { p_id: requestA, p_branch_id: branchA.id, p_classification: {} });
+      const { error: rcError } = await alice.client.rpc('request_changes', { p_merge_request_id: requestA, p_review_notes: 'please split the retract out' });
+      expect(rcError).toBeNull();
+      expect((await getBranch(alice.client, branchA.id))?.status).toBe('draft');
+      const { data: reqARow, error: reqAError } = await service.from('merge_requests').select('status, review_notes').eq('id', requestA).single();
+      if (reqAError) throw new Error(`reading merge_requests: ${reqAError.message}`);
+      expect(reqARow).toMatchObject({ status: 'changes_requested', review_notes: 'please split the retract out' });
+
+      const branchB = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'reject-check',
+        createdBy: alice.id,
+        mainHeadCommitId: main.head_commit_id,
+      });
+      const requestB = randomUUID();
+      await alice.client.rpc('submit_merge_request', { p_id: requestB, p_branch_id: branchB.id, p_classification: {} });
+      const { error: rejectError } = await alice.client.rpc('reject_merge_request', { p_merge_request_id: requestB, p_review_notes: 'superseded' });
+      expect(rejectError).toBeNull();
+      expect((await getBranch(alice.client, branchB.id))?.status).toBe('rejected');
+    });
+  });
+
+  // Sprint C1 step 2: description/target_date/split_from round-trip
+  // (CLAUDE.md rule 1 — migration, contract type, and round-trip test
+  // together).
+  describe('branches.description / target_date / split_from (Sprint C1 step 2, SPEC §3.4)', () => {
+    it('createChangeBranch persists description and target_date; a split branch records split_from', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+
+      const original = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'metadata-check',
+        title: 'Retire the legacy CRM',
+        description: 'Decommission System X and move its data flows to the new CRM.',
+        targetDate: '2026-12-01',
+        createdBy: alice.id,
+        mainHeadCommitId: main.head_commit_id,
+      });
+      expect(original).toMatchObject({ description: 'Decommission System X and move its data flows to the new CRM.', target_date: '2026-12-01', split_from: null });
+
+      await updateBranchMetadata(alice.client, original.id, { description: 'Decommission System X.', targetDate: '2027-01-15' });
+      const updated = await getBranch(alice.client, original.id);
+      expect(updated).toMatchObject({ description: 'Decommission System X.', target_date: '2027-01-15' });
+
+      // split_from is schema-only at this point (ADR-006 amendment, SPEC §1
+      // S-22) — the split-branch mechanic itself is Sprint C1's review-queue
+      // step, not yet built — so this exercises only the column round-trip
+      // via a plain insert, the way a future atlas.split_branch will write it.
+      const splitId = randomUUID();
+      const { error: splitError } = await alice.client
+        .from('branches')
+        .insert({
+          id: splitId,
+          org_id: orgId,
+          model_id: modelId,
+          name: 'metadata-check-split',
+          kind: 'change',
+          status: 'draft',
+          base_commit_id: main.head_commit_id,
+          head_commit_id: main.head_commit_id,
+          split_from: original.id,
+          created_by: alice.id,
+        });
+      if (splitError) throw new Error(`inserting split branch: ${splitError.message}`);
+      expect((await getBranch(alice.client, splitId))?.split_from).toBe(original.id);
+    });
+
+    it('split_from is rejected on a non-change branch (branches_split_from_is_change)', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const other = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'split-from-target',
+        createdBy: alice.id,
+        mainHeadCommitId: main.head_commit_id,
+      });
+      const { error } = await service.from('branches').update({ split_from: other.id }).eq('id', main.id);
+      expect(error).not.toBeNull();
     });
   });
 });

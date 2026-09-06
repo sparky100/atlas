@@ -43,7 +43,14 @@ export interface ModelRow {
 export type BranchKind = 'main' | 'change' | 'capture_draft';
 export type BranchStatus = 'draft' | 'proposed' | 'in_review' | 'approved' | 'merged' | 'rejected' | 'archived';
 
-/** The literal shape of a row in `branches` (supabase/migrations/20260906071400_history.sql). */
+/**
+ * The literal shape of a row in `branches`
+ * (supabase/migrations/20260906071400_history.sql,
+ * 20260906160000_branches_change_metadata.sql). `base_commit_id` tracks
+ * `mergeBase(B)` for a change branch — set at fork, moved to `main`'s head
+ * on every successful refresh (SPEC §1 S-11, ADR-005 amendment) — never the
+ * original fork point forever.
+ */
 export interface BranchRow {
   id: UUID;
   org_id: UUID;
@@ -55,8 +62,48 @@ export interface BranchRow {
   head_commit_id: UUID | null;
   shared_for_review: boolean;
   title: string | null;
+  /** Change branches: free-text description of the change, set at creation. */
+  description: string | null;
+  /** Change branches: the intended delivery date shown on the change page and roadmap. */
+  target_date: string | null;
+  /** Set only on a branch created by partial acceptance in the review queue (ADR-006 amendment, SPEC §1 S-22) — the branch it was split out of. */
+  split_from: UUID | null;
   created_by: UUID;
   updated_at: string;
+}
+
+export type MergeRequestStatus = 'pending' | 'changes_requested' | 'approved' | 'merged' | 'rejected';
+
+/** The literal shape of a row in `merge_requests` (SPEC §3.7, ADR-006) — written only by the atlas.* review-queue functions in supabase/migrations/20260906161000_merge_review_queue.sql, never a raw insert/update. */
+export interface MergeRequestRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  branch_id: UUID;
+  requested_head_commit_id: UUID;
+  main_head_commit_id: UUID;
+  status: MergeRequestStatus;
+  requested_by: UUID;
+  reviewed_by: UUID | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  merge_commit_id: UUID | null;
+  /** The engine-computed §7 output (threeWayDiff + classifyMerge), cached at request and at each refresh. */
+  classification: Record<string, unknown>;
+  created_at: string;
+}
+
+/** The literal shape of a row in `resolved_conflicts` (SPEC §3.6, ADR-007) — a human's choice between two disagreeing facts, written only by atlas.commit_deltas alongside the resolving commit. */
+export interface ResolvedConflictRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  winning_delta_id: UUID;
+  discarded_delta_id: UUID;
+  resolution_delta_id: UUID | null;
+  resolved_by: UUID;
+  rationale: string | null;
+  created_at: string;
 }
 
 /** The literal shape of a row in `tags`. */

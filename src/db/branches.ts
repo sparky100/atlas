@@ -23,6 +23,10 @@ export interface CreateChangeBranchInput {
   modelId: UUID;
   name: string;
   title?: string;
+  /** Free-text description of the change (SPEC §3.4) — the "create change" form's second field. */
+  description?: string;
+  /** The intended delivery date, shown on the change page and roadmap (SPEC §3.4). ISO `date` string (`YYYY-MM-DD`). */
+  targetDate?: string;
   createdBy: UUID;
   /** The main branch's current head — becomes both `base_commit_id` and `head_commit_id` (SPEC §3.4: a fresh branch starts with head equal to base). */
   mainHeadCommitId: UUID;
@@ -39,6 +43,8 @@ export async function createChangeBranch(supabase: Client, input: CreateChangeBr
     base_commit_id: input.mainHeadCommitId,
     head_commit_id: input.mainHeadCommitId,
     title: input.title ?? null,
+    description: input.description ?? null,
+    target_date: input.targetDate ?? null,
     created_by: input.createdBy,
   };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
@@ -68,20 +74,27 @@ export async function listBranchesForModel(supabase: Client, modelId: UUID): Pro
 }
 
 /**
- * The only two columns an authenticated user can update directly
- * (supabase/migrations/20260906071400_history.sql's column grant) —
- * everything else, `head_commit_id` included, goes through
- * src/db/commits.ts's compare-and-swap, never a plain update.
+ * The columns an authenticated user can update directly on their own
+ * (title/shared_for_review from supabase/migrations/20260906071400_history.sql,
+ * description/target_date from 20260906160000_branches_change_metadata.sql)
+ * — everything else (`head_commit_id`, `status`, `base_commit_id`) goes
+ * through a security-definer function (`atlas.commit_deltas` or one of the
+ * review-queue functions in 20260906161000_merge_review_queue.sql), never a
+ * plain update.
  */
 export interface UpdateBranchMetadataInput {
   title?: string | null;
   sharedForReview?: boolean;
+  description?: string | null;
+  targetDate?: string | null;
 }
 
 export async function updateBranchMetadata(supabase: Client, branchId: UUID, input: UpdateBranchMetadataInput): Promise<void> {
   const patch: Record<string, unknown> = {};
   if (input.title !== undefined) patch.title = input.title;
   if (input.sharedForReview !== undefined) patch.shared_for_review = input.sharedForReview;
+  if (input.description !== undefined) patch.description = input.description;
+  if (input.targetDate !== undefined) patch.target_date = input.targetDate;
   if (Object.keys(patch).length === 0) return;
   const { error } = await supabase.from('branches').update(patch).eq('id', branchId);
   if (error) throw new Error(`updateBranchMetadata: ${error.message}`);
