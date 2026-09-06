@@ -657,6 +657,8 @@ C6 is the one that turns concurrent editing into a rejected commit rather than a
 
 The two-round-trip design's orphaned-commit tradeoff (a lost race leaving a permanent, harmless, unreferenced commit row) no longer applies: a lost race now fails the whole function call, and nothing is written at all, because a PL/pgSQL function body is one transaction.
 
+**`p_kind` restriction (Sprint H1 item 3 — `supabase/migrations/20260906140000_commit_deltas_kind_restriction.sql`):** `atlas.commit_deltas` originally placed no restriction on `p_kind` at all — the `kind in ('manual', 'merge')` check on `commits_insert` (§9.3) only ever applied to a direct table insert, which this security-definer function bypasses. It now rejects `p_kind` values that don't fit the branch: `main` accepts `manual`/`merge`/`template_seed`; `change` accepts `manual` only. `merge` on `change` (a "refresh," S-11) is real design with no product path yet (no branch/review-queue UI); allowing it here ahead of anything that would produce one is deferred along with the rest of that UI, not silently permitted meanwhile.
+
 ---
 
 ## 6. Head rebuild and its proof

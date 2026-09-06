@@ -401,6 +401,41 @@ describe('repository layer against a real local Supabase', () => {
       if (removeError) throw new Error(`removing bob: ${removeError.message}`);
     });
 
+    it("commit_deltas rejects kind 'capture' on main (Sprint H1 item 3: only manual/merge/template_seed are allowed there)", async () => {
+      const { error } = await alice.client.rpc('commit_deltas', {
+        p_commit_id: randomUUID(),
+        p_model_id: modelId,
+        p_branch_id: mainBranchId,
+        p_base_commit_id: mainGenesisCommitId,
+        p_kind: 'capture',
+        p_message: 'capture kind on main',
+        p_deltas: [],
+      });
+      expect(error).not.toBeNull();
+    });
+
+    it("commit_deltas rejects kind 'merge' on a change branch (Sprint H1 item 3: change branches take manual only — no refresh UI exists yet)", async () => {
+      const branch = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'kind-restriction-check',
+        createdBy: alice.id,
+        mainHeadCommitId: mainGenesisCommitId,
+      });
+      const { error } = await alice.client.rpc('commit_deltas', {
+        p_commit_id: randomUUID(),
+        p_model_id: modelId,
+        p_branch_id: branch.id,
+        p_base_commit_id: mainGenesisCommitId,
+        p_kind: 'merge',
+        p_message: 'merge kind on a change branch',
+        p_deltas: [],
+        p_merged_branch_head_commit_id: mainGenesisCommitId,
+      });
+      expect(error).not.toBeNull();
+    });
+
     it('alice (owner) commits directly to main; elements_head and facts materialise for the new head', async () => {
       mainCommitId = randomUUID();
       const result = await commitToBranch(alice.client, {
