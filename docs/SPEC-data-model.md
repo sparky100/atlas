@@ -1,7 +1,7 @@
 # SPEC: Data model and delta specification
 
 **Status:** Proposed
-**Depends on:** `docs/ADR-000-foundations.md` (ADR-001 … ADR-014)
+**Depends on:** `docs/ADR-000-foundations.md` (ADR-001 … ADR-017)
 **Companion:** `src/contracts/delta.ts` (the delta and commit wire contract)
 
 This document turns the ADRs into tables, a wire format, and algorithms precise enough to test against. It contains no UI and no engine code: the TypeScript is types only, the SQL is DDL-shaped table descriptions plus real RLS policies, the algorithms are pseudocode.
@@ -1049,9 +1049,11 @@ alter table models force row level security;
 -- (Sprint H1 note — docs/AUDIT-2026-09-U2.md §2.E.3 item 3): `model_shares`
 -- (§3.6) and `atlas.model_shared_with_me` don't exist yet. The migrated
 -- policy is `using (atlas.is_member(org_id))` alone — no cross-org sharing
--- is possible until ADR-014's identity/tenancy question is answered
--- (docs/ADR-000-foundations.md's "Deferred to follow-up ADRs"; no target
--- sprint named).
+-- is possible until `model_shares` is built; no target sprint named. (This
+-- is unrelated to ADR-014/ADR-017's identity/tenancy question, which is
+-- about whether Atlas shares its *identity tables* with a different
+-- product entirely — `model_shares.shared_with_org_id` only ever
+-- references another organisation inside this same product.)
 create policy models_select on models
   for select to authenticated
   using (atlas.is_member(org_id) or atlas.model_shared_with_me(id));
