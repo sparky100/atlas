@@ -147,6 +147,8 @@ When multi-branch composition is built, **conflict** is defined as one of three 
 
 **Consequences.** Product copy should say "this change's to-be view," singular and branch-scoped, and avoid implying a combined future-state view exists until multi-branch composition actually ships.
 
+**Amendment (Sprint C1): `base_commit_id` moves on refresh.** This decision's original phrasing — "a branch's as-is view is the materialised state at its `base_commit_id`" — read as if `base_commit_id` were fixed forever at the branch's original fork point. It isn't: `head(mergeBase(B))` is what actually governs the As-is view (SPEC §7.1's `mergeBase`, UI-principles §6.2), and once refresh/rebase exists (Sprint C1), a branch's fork point and its current merge base are no longer always the same commit. The two are reconciled, not left to diverge: `base_commit_id` is fixed *between* refreshes, not forever — a refresh (ADR-006, SPEC §7.5) moves it to `main`'s head at the moment it succeeds, so `base_commit_id` continues to equal `mergeBase(B)` and folding at it remains a correct, O(1) way to compute As-is, with no DAG walk needed on every read. The original fork point is not lost, but it is not a stored field or a selectable view either — it stays discoverable only via commit ancestry, as the parent of the branch's first own commit. See SPEC §1 S-11 for the matching schema-level statement.
+
 ---
 
 ## ADR-006: Merge review queue
@@ -160,6 +162,17 @@ When multi-branch composition is built, **conflict** is defined as one of three 
 - *Fast-forward with no merge commit* — loses the explicit "this reviewed change, by whom, on what date, became reality" marker the whole product is meant to preserve.
 
 **Consequences.** "Your branch is behind `main`, please refresh" is a real, expected UX state, not an edge case — the product should show the requester what changed on `main` since they branched, using the two-way (branch vs. main) case of ADR-005's conflict taxonomy, which is simpler than full N-branch composition and should ship in v1 even though general composition doesn't.
+
+**Amendment (Sprint C1): partial delivery is a split branch, not a partial merge commit.** ADR-002's merge-commit model is all-or-nothing — a merge commit's second parent is the whole branch head, so there is no mechanic for merging "some but not all" of a branch's own deltas in one merge commit. Rather than weaken that append-only guarantee, per-element accept/skip in the review queue is defined as follows:
+
+1. Accepting a subset of a branch's elements/relationships in the review queue moves that accepted set into a **new** branch (`kind = 'change'`, `status = 'approved'`, `split_from` = the original branch's id, same target date as the original), which is then merged whole, in the same review action, using the ordinary all-or-nothing merge of ADR-006. The remainder — everything not accepted — stays on the original branch, whose own `status` is unchanged (still `proposed`/`in_review` as appropriate; it is not implicitly closed by a partial acceptance).
+2. The split respects dependencies, computed before it is offered for confirmation: accepting a relationship whose endpoint is an unaccepted new element pulls that element into the split too, and the review queue shows this pulled-in closure before the reviewer confirms. Retracting an element that other, unaccepted deltas on the branch still depend on is blocked, with the dependency named as the reason, rather than silently splitting it away.
+3. The change page (UI-principles) treats an original branch and every branch it has been split into as **one logical change**, shown as a single item with a "delivered / remaining" breakdown (what has merged via its splits, what is still open on the original branch); the roadmap view does the same — a split is bookkeeping for partial delivery, not a second change for a stakeholder to track.
+4. `branches.split_from` (nullable, → `branches.id`) records this lineage; see SPEC §3.4 for the column and §1 for the corresponding decision entry.
+
+**Alternatives rejected (amendment).**
+- *A merge commit that cherry-picks a subset of the branch's own deltas* — falsifies the branch's own append-only history (ADR-002) by making its merged form disagree with what it actually contained when reviewed.
+- *Two-phase commit that edits the original branch's deltas after acceptance* — deltas are never mutated post-hoc (ADR-002); a split branch is a new set of pointers over the same immutable delta rows, not a rewrite.
 
 ---
 

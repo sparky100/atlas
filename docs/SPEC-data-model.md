@@ -24,7 +24,7 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | S-8 | **`facts` is a materialised projection at attribute grain**, retained with the same rule as heads. `deltas` remains the only source of truth. | ADR-007's per-field provenance needs a cheap lookup; three-way merge needs `facts[commit][key]` in O(1). |
 | S-9 | **`element.restore` / `relationship.restore` exist.** A retract is reversible by a new delta, never by deleting the retract. | Keeps history append-only on draft branches too (ADR-002). |
 | S-10 | **Existence is a fact** with reserved attribute `$exists`; `previous_delta_id` on retract/restore points at the existence chain. | One supersession mechanism for everything. |
-| S-11 | **Refresh = merge main into the branch** (a `merge` commit on the branch whose second parent is a main commit). The merge base is computed from the DAG, not stored. `branches.base_commit_id` is the fork point, for display only. | ADR-006's "refresh or rebase" becomes one mechanism with the same conflict rules as the final merge. |
+| S-11 | **Refresh = merge main into the branch** (a `merge` commit on the branch whose second parent is a main commit). The merge base is computed from the DAG, not stored, and is always the authority for As-is (§6.2, §7.1). **Amended (Sprint C1, ADR-005 amendment):** `branches.base_commit_id` is not the original fork point forever — it is set to `main`'s head at fork and moves to `main`'s (new) head on every successful refresh, so it stays equal to `mergeBase(B)` between refreshes and folding at `base_commit_id` is a correct, O(1) way to compute As-is without a DAG walk on every read. It is display data derived from `mergeBase(B)`, kept in sync by refresh, not an independent source of truth the DAG could disagree with. The original fork point is not itself stored or selectable after a refresh moves it forward; it stays discoverable only via commit ancestry — the `parent_commit_id` of the branch's first own commit. | ADR-006's "refresh or rebase" becomes one mechanism with the same conflict rules as the final merge; ADR-005's amendment keeps its as-is definition and this row from silently disagreeing once refresh exists. |
 | S-12 | **A merge commit carries only resolution deltas** (C15). A field conflict with no resolution delta is a rejected commit; there is no "theirs wins by default". | ADR-005: conflicts are surfaced, never silently resolved. |
 | S-13 | **Identity conflicts are advisory** in the review queue; they do not block a merge. Structural and field conflicts do. | ADR-005(c): identity is resolved via `element_merges` after the fact; blocking on a fuzzy match would stall every capture. |
 | S-14 | **Validation has two levels.** *Structural* (V2, V4, V5, V6) is required on every commit of every branch kind except `capture_draft`. *Schema* (V1, V3) is required on main and to approve a merge request; on change branches it is reported, not enforced. `capture_draft` requires only C1–C6. | ADR-001: drafts may be temporarily invalid; ADR-003: main never is. |
@@ -35,6 +35,7 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | S-19 | **`users` is Supabase `auth.users`.** No local users table; `members.user_id` references `auth.users(id)`. | Working assumption in ADR-000. If wrong, only `members` and the RLS helpers change. |
 | S-20 | **Every table carries `org_id`**, including projections and deltas, even where derivable through joins. | RLS policies stay one predicate, and never need a join to decide. |
 | S-21 | Table renames relative to the ADR: `organisation_members` → `members`; `element_aliases` → `aliases`; `merges` → `element_merges`; `capability_map_templates` → `capability_maps`; `capability_map_template_items` → `capability_map_items`. | The brief's requested names; the ADR's were descriptive placeholders. |
+| S-22 | **Partial delivery is a split branch, never a partial merge commit** (ADR-006 amendment, Sprint C1). Accepting a subset of a branch's elements/relationships in the review queue creates a new `change` branch with `split_from` = the original branch's id, carrying only the accepted (dependency-closed) subset, merged whole in the same action; the remainder stays on the original branch. `branches.split_from` (nullable, → `branches.id`) records this. An original branch and its splits are one logical change for the change page and roadmap (§3.4). | ADR-002's merge commit is all-or-nothing (second parent = the whole branch head); a split branch keeps that guarantee instead of weakening it to support partial acceptance. |
 
 ---
 
@@ -206,14 +207,17 @@ A named mutable pointer to a commit (ADR-002).
 | `name` | text | not null; `unique (model_id, name)` |
 | `kind` | branch_kind | not null |
 | `status` | branch_status | not null default `draft` |
-| `base_commit_id` | uuid | → `commits(id)`, nullable only for main |
+| `base_commit_id` | uuid | → `commits(id)`, nullable only for main; for a `change` branch, kept equal to `mergeBase(B)` — set at fork, moved to `main`'s head on every successful refresh (§1 S-11, ADR-005 amendment) |
 | `head_commit_id` | uuid | → `commits(id)`, nullable only before the genesis commit |
 | `shared_for_review` | boolean | not null default false — makes the head visible to viewers (ADR-009) |
 | `title` | text | change branches: the solution design title |
+| `description` | text | nullable; change branches: free-text description of the change, set at creation |
+| `target_date` | date | nullable; change branches: the intended delivery date shown on the change page and roadmap |
+| `split_from` | uuid | → `branches(id)`, nullable; set only on a branch created by partial acceptance in the review queue (§1 S-22, ADR-006 amendment) — the branch it was split out of |
 | `created_by` | uuid | → `auth.users(id)` |
 | `updated_at` | timestamptz | not null |
 
-Partial unique index `(model_id) where kind = 'main'`. Index `(model_id, status)`. Check: `kind = 'main'` ⇒ `status = 'draft'` (main is always open) and `base_commit_id is null`. Check: `kind = 'capture_draft'` ⇒ `status in ('draft','archived')`.
+Partial unique index `(model_id) where kind = 'main'`. Index `(model_id, status)`. Index `(split_from) where split_from is not null`. Check: `kind = 'main'` ⇒ `status = 'draft'` (main is always open) and `base_commit_id is null`. Check: `kind = 'capture_draft'` ⇒ `status in ('draft','archived')`. Check: `split_from is not null` ⇒ `kind = 'change'`.
 
 #### `commits`
 An ordered batch of deltas on a branch. Ancestry is a DAG: two parents on a merge (ADR-002).
