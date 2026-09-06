@@ -15,6 +15,7 @@ import type { Delta, UUID } from '../contracts/delta';
 import type { CommitRow } from '../contracts/rows';
 import type { ElementRow, FactRow, Head, RelationshipRow } from './deltas';
 import { cloneHead, emptyHead, fold } from './deltas';
+import { EngineError } from './errors';
 
 /** A commit plus its own deltas (already ordered by `seq`) — everything `foldFromGenesis` needs about one commit. */
 export interface CommitNode extends CommitRow {
@@ -24,13 +25,13 @@ export interface CommitNode extends CommitRow {
 /** Looks up a commit by id. Returns `undefined` only for a truly unknown id — never for "no more ancestors" (that's `parentCommitId === null`, not a missing node). */
 export type CommitLoader = (commitId: UUID) => CommitNode | undefined;
 
-class EngineError extends Error {}
-
-function load(id: UUID, loader: CommitLoader): CommitNode {
+/** `loader(id)`, throwing a clear `EngineError` instead of returning `undefined` for a truly unknown commit. Exported so branch.ts/merge.ts share the same lookup behaviour rather than re-deriving it. */
+export function mustLoadCommit(id: UUID, loader: CommitLoader): CommitNode {
   const node = loader(id);
   if (!node) throw new EngineError(`unknown commit ${id}`);
   return node;
 }
+const load = mustLoadCommit;
 
 // ---------------------------------------------------------------------------
 // ancestry / exclusive / topo (SPEC §6.1)
