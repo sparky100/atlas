@@ -133,6 +133,17 @@ jobs:
           echo "VITE_SUPABASE_URL=$(pnpm exec supabase status -o env | grep '^API_URL=' | cut -d= -f2-)" >> "$GITHUB_ENV"
           echo "VITE_SUPABASE_ANON_KEY=$(pnpm exec supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2-)" >> "$GITHUB_ENV"
 
+      # e2e/landscape-perf.spec.ts (Sprint U1 step 4b) seeds its 2,000-
+      # system/4,000-edge fixture from Node, not through the browser (typing
+      # 2,000 elements through a form would test nothing this sprint hasn't
+      # already covered) — the same non-VITE_ variables the `database` job
+      # writes for the integration tests, needed here too.
+      - name: Write server-side environment
+        run: |
+          echo "SUPABASE_URL=$(pnpm exec supabase status -o env | grep '^API_URL=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$(pnpm exec supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(pnpm exec supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+
       - run: pnpm build
 
       # Chromium ships with the `@playwright/test` devDependency's own
@@ -144,7 +155,9 @@ jobs:
       # e2e/auth-theme.spec.ts (Sprint U1 step 2a) — real sign-up, real
       # theme toggle, a reload with localStorage cleared first so the
       # assertion can only pass via user_preferences round-tripping through
-      # Supabase, not a client-side cache alone.
+      # Supabase, not a client-side cache alone. e2e/landscape-perf.spec.ts
+      # (step 4b) — the required 2,000-system/4,000-edge fps budget, plus
+      # the commit_deltas payload-size assertion ADR-015 committed to.
       - name: Run Playwright tests
         run: pnpm test:e2e
 

@@ -6,7 +6,8 @@ import { listLandscapeEdges, listSupportsEdgesForSystems, listSystemsForLandscap
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
 import { clearViewLayouts, getOrCreateModelView, listViewLayouts, upsertViewLayouts } from '../../db/views';
 import type { ViewRow } from '../../db/types';
-import { computeLandscapeLayout, type LandscapeLayout } from './layout';
+import type { LandscapeLayout } from './layout';
+import { computeLandscapeLayoutInWorker } from './layoutWorkerClient';
 import { supabase } from '../supabaseClient';
 
 export interface LandscapeData {
@@ -73,7 +74,8 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
           .map((row) => [row.subject_id, row]),
       );
 
-      const computed = computeLandscapeLayout(systems, supportsEdges, capabilitiesById);
+      // UI-principles §8.6: layout runs off the main thread.
+      const computed = await computeLandscapeLayoutInWorker(systems, supportsEdges, capabilitiesById);
       const nodes = computed.nodes.map((node) => {
         const saved = savedById.get(node.elementId);
         return saved ? { elementId: node.elementId, x: saved.x, y: saved.y } : node;
