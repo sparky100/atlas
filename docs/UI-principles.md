@@ -85,7 +85,7 @@ Element ids in URLs resolve through `aliases` of type `merged_id` (ADR-008): a l
 
 ## 3. The two front doors
 
-Same model, same data, different first screen. Which door a user gets is stored per user (`home_mode: director | architect`) and switchable from the top bar with one click; the switch is a preference, not a permission. **Spec addition required:** a `user_preferences` table (`user_id`, `org_id`, `home_mode`, `density`, `theme`) — not in SPEC-data-model §3; to be added with a migration, contract type and RT test per CLAUDE.md.
+Same model, same data, different first screen. Which door a user gets is stored per user (`home_mode: director | architect`) and switchable from the top bar with one click; the switch is a preference, not a permission. Preferences live in `user_preferences` (SPEC §3.2), keyed on `user_id` alone — they belong to the person and follow them across organisations. Added in the first UI migration.
 
 Default: Owners and Architects get the architect door; Contributors and Viewers get the director door.
 
@@ -96,9 +96,9 @@ Opens on **the capability map at `main`**, with three overlays and nothing else:
 1. **The capability map itself** — the sector map as tailored, level 1 and 2 visible, level 3 on zoom. Each capability tile carries a count of supporting systems and, if any, a change-in-flight marker.
 2. **Health** — derived only from facts the model actually has. Atlas does not score maturity (ADR-000 preface #6), so "health" means:
    - **Coverage**: capabilities with no `supports` relationship (nothing runs this).
-   - **Staleness**: capabilities where the newest fact on any supporting system is older than 12 months.
-   - **Confidence**: share of facts on supporting systems with `confidence < 0.7`.
-   - **Lifecycle exposure**: a supporting system is `retiring` or `retired` with no `planned` replacement in any approved change.
+   - **Staleness**: capabilities where the newest fact on any supporting system is older than `STALE_AFTER_MONTHS` (§8.9).
+   - **Confidence**: share of facts on supporting systems below `CONFIDENCE_MEDIUM` (§8.9).
+   - **Lifecycle exposure**: a supporting system is `retiring` or `retired` and has no **planned replacement**. A planned replacement is: a system added (`element.create`) in a change branch with status `approved` (approved-not-yet-merged is "in delivery" — merging is what marks a change delivered, ADR-006), that `supports` the same capability, **where the same branch also contains an `element.retract` for the exposed system**. Adding a system beside an ageing one is not replacing it; without the retract delta the chip is shown, not weakened.
    - **Open questions**: linked assumptions `invalidated`, decisions `proposed` past 30 days.
    Each is a filter chip, not a score. Toggling a chip highlights matching tiles; the tile's tooltip lists the specific systems and facts. There is no traffic light on the whole organisation, because the model cannot honestly produce one.
 3. **Changes in flight** — a right-hand list of change branches with status `proposed | in_review | approved`, each with title, the capabilities it touches, and a one-line to-be summary (counts of systems added/retired). Clicking opens the branch's to-be view scoped to the director's current zoom, not the review queue.
@@ -165,8 +165,8 @@ Owner         → Housing Digital (team)        [▤ 14mo · ●●○]  (relati
 
 Badge anatomy, fixed width so columns align:
 - **Source kind glyph**: `▤` spreadsheet, `▣` document/PDF, `🗣` interview, `👤` manual, `⚙` capture job, `⌂` template, `⇄` merge resolution. Glyphs are from the icon set, not emoji, in production.
-- **Age**: time since `facts.effective_date` if set, else the delta's commit time. `< 1mo`, `Nmo`, `Ny`. Turns to the warning colour at 12 months (staleness threshold, configurable per model later; fixed at 12 for v1).
-- **Confidence**: three dots, filled by band: `●●●` ≥ 0.9, `●●○` 0.7–0.9, `●○○` < 0.7. Human assertion is 1.0 and reads `●●●`.
+- **Age**: time since `facts.effective_date` if set, else the delta's commit time. `< 1mo`, `Nmo`, `Ny`. Turns to the warning colour at `STALE_AFTER_MONTHS` (§8.9).
+- **Confidence**: three dots, filled by band: `●●●` ≥ `CONFIDENCE_HIGH`, `●●○` ≥ `CONFIDENCE_MEDIUM`, `●○○` below (§8.9). Human assertion is 1.0 and reads `●●●`.
 
 Hover (or focus) on a badge opens a **provenance card**: source name with link, source kind, `source_ref` (e.g. `Applications.xlsx › Sheet 1 › C14`, `page 7`), effective date, recorded date, recorded by, confidence as a number, and **the supersession chain**: `Previously: "Civica" (▤ 3y · ●○○) → superseded 14mo ago`. Chain entries link to the delta and to the commit. This card is the answer to "why do we believe this", and it is one hover away from every value on every screen — canvas tooltips reuse it.
 
@@ -344,7 +344,7 @@ One panel, right-docked, toggled with `c`, the same everywhere:
 
 ### 7.3 Unresolved counts
 
-Shown at every scope where a person makes a decision: element header, canvas node markers, view title, branch row in the queue and dashboards, merge-request summary. A merge request's summary shows `n unresolved` and the `Merge` button's disabled reason includes it when > 0 — comments do not block merge by rule (that would be a spec change), but the reviewer is told.
+Shown at every scope where a person makes a decision: element header, canvas node markers, view title, branch row in the queue and dashboards, merge-request summary. A merge request's summary shows `n unresolved`, and the `Merge` button's tooltip lists it alongside the real disabled reasons when > 0. **Comments never block a merge.** Comments are conversation; a gate needs an explicit mechanism (a blocking flag or a required approval), which would be a separate decision. ADR-006 stands as written.
 
 ---
 
@@ -419,7 +419,7 @@ Semantic tokens only; components never reference a raw hex. Light / dark values;
 | Token | Meaning | Light | Dark |
 |---|---|---|---|
 | `--status-ok` | validation pass, `active`, `accepted`, `validated` | #009E73 | #5FD3A9 |
-| `--status-warn` | stale (>12 mo), low confidence, `retiring`, `proposed` > 30 d, `invalidated` assumption | #E69F00 | #F3C64C |
+| `--status-warn` | stale (> `STALE_AFTER_MONTHS`), low confidence, `retiring`, `proposed` > 30 d, `invalidated` assumption | #E69F00 | #F3C64C |
 | `--status-danger` | validation fail, blocking conflict, missing source, `rejected` | #D55E00 | #F2A162 |
 | `--status-info` | `planned`, `in_review`, identity warning | #0072B2 | #7FBDE9 |
 | `--status-neutral` | `retired`, `archived`, `draft`, resolved comment | #8A93A1 | #6B7585 |
@@ -496,6 +496,18 @@ Review queue: §5.2.
 
 All shortcuts are single-key where safe, and every one is discoverable in the palette and the `?` legend. No shortcut is ever the only way to do something.
 
+### 8.9 Thresholds
+
+Three constants, global for v1, defined once in `src/contracts/thresholds.ts` and imported by engine, UI and tests. Nothing else may restate the numbers.
+
+| Constant | Value | Used by |
+|---|---|---|
+| `STALE_AFTER_MONTHS` | 12 | badge age colour (§4.3), staleness health chip (§3.1), `--status-warn` |
+| `CONFIDENCE_HIGH` | 0.9 | `●●●` band |
+| `CONFIDENCE_MEDIUM` | 0.7 | `●●○` band, confidence health chip |
+
+If per-model thresholds are ever wanted, they become a settings row plus a lookup that falls back to these constants — not a refactor. There is no evidence yet that organisations want different thresholds, and per-model settings would cost a UI and tests.
+
 ---
 
 ## 9. What we will not build
@@ -512,9 +524,11 @@ Stated so that a feature request has to argue against a written decision:
 
 ---
 
-## 10. Open items for the human
+## 10. Decisions recorded
 
-1. `user_preferences` table (home mode, density, theme) is a spec addition; confirm before the first UI migration.
-2. Staleness threshold (12 months) and confidence bands (0.9 / 0.7) are fixed in this document; confirm they should be per-model settings later or stay global.
-3. Comments are shown as a disabled-reason on `Merge` but do not block it. If unresolved comments should block, that is an ADR-006 change, not a UI one.
-4. The health chip "lifecycle exposure" needs a definition of "planned replacement" — currently "a `planned` system in an approved change that `supports` the same capability". Confirm or refine.
+Raised as open items in the first draft; resolved by the product owner and now binding:
+
+1. **`user_preferences` is its own table, keyed on `user_id`**, not folded into `members`. Preferences belong to the person and follow them across organisations; `members` is per-organisation and would duplicate them. Added in the first UI migration (SPEC §3.2).
+2. **Staleness and confidence thresholds are global for v1**, in one config module (§8.9). Per-model settings, if ever wanted, are a settings row plus a lookup, not a refactor.
+3. **Unresolved comments do not block a merge** (§7.3). A gate needs an explicit mechanism and is a separate decision if it ever comes up. ADR-006 unchanged.
+4. **"Planned replacement" requires a retract delta** in the same approved change (§3.1). A new system beside an ageing one is not a replacement. With no retract delta, the exposure chip is shown, not weakened.

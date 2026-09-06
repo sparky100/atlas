@@ -135,6 +135,19 @@ Cross-org read grant on a model, optionally pinned to one tag (ADR-009).
 
 Unique `(model_id, shared_with_org_id, tag_id)` (nulls distinct). Index `(shared_with_org_id)`.
 
+#### `user_preferences`
+Per-person UI preferences. Keyed on the user, not the membership: preferences follow the person across organisations (UI-principles §3, §10). Ships in the first UI migration.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `user_id` | uuid | pk → `auth.users(id)` on delete cascade |
+| `home_mode` | text | not null default `'director'`, `check (home_mode in ('director','architect'))` |
+| `density` | text | not null default `'comfortable'`, `check (density in ('comfortable','compact'))` |
+| `theme` | text | not null default `'system'`, `check (theme in ('system','light','dark'))` |
+| `updated_at` | timestamptz | not null default now() |
+
+No `org_id` (exception to S-20: the row is not org-bearing). RLS: `user_id = auth.uid()` for select, insert, update; no delete policy (a row is reset, not removed). Defaults in the UI when no row exists: architect door for `owner`/`architect` members, director door otherwise; the row is created on first change, not on sign-up.
+
 ### 3.3 Schema registry
 
 #### `type_schemas`
@@ -1143,6 +1156,8 @@ Every remaining table uses one of three templates, chosen per table:
 
 `element_merges` and `resolved_conflicts`: member-scoped select, insert via procedure only.
 
+`user_preferences`: **user-scoped** — `user_id = auth.uid()` on select/insert/update, no delete. The only table not scoped by `org_id`.
+
 ---
 
 ## 10. Tests that must exist before any UI is built
@@ -1161,6 +1176,7 @@ All property tests use generated inputs (fast-check or equivalent) with shrinkin
 | RT-6 | `atlas.merge_elements(a, b)` then resolve `a` and `b` through `aliases` → same survivor; `deltas` and `relationships_head` rows that referenced `b` before the merge are byte-identical after it (history untouched); the survivor carries every relationship `b` had, deduplicated per S-6. |
 | RT-7 | For an arbitrary `views` row: node and edge set returned by the view query is identical before and after deleting all `view_layouts` and `view_annotations` rows for it. |
 | RT-8 | Comment anchored to a delta on a change branch → merge the branch → the anchor resolves to the same `deltas` row, now reachable from main's ancestry; comment count on the element unchanged. |
+| RT-9 | Arbitrary `UserPreferences` → `user_preferences` row → `UserPreferences` is deep-equal; a user reads only their own row and cannot read, write or delete another user's (P-22 style matrix, user-scoped). |
 
 ### 10.2 Properties — fold and materialisation
 
@@ -1220,4 +1236,4 @@ All property tests use generated inputs (fast-check or equivalent) with shrinkin
 | P-27 | Capability map upgrade: seed v1, rename and re-parent arbitrary items, publish v2 with arbitrary additions/renames; the computed upgrade diff matches every renamed item through its `template_code` alias and creates no duplicates. |
 | P-28 | `owns` cardinality: at most one `primary = true` owner per target survives V3; a second is a cardinality conflict at merge and a V3 failure on commit. |
 
-A UI ticket may not be opened until RT-1…RT-8 and P-1…P-28 exist and pass in CI.
+A UI ticket may not be opened until RT-1…RT-9 and P-1…P-28 exist and pass in CI.
