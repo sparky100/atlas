@@ -10,7 +10,8 @@
  * in tests it's backed by a plain Map.
  */
 
-import { createHash } from 'node:crypto';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import type { Delta, UUID } from '../contracts/delta';
 import type { CommitRow } from '../contracts/rows';
 import type { ElementRow, FactRow, Head, RelationshipRow } from './deltas';
@@ -184,9 +185,20 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** SHA-256 of the canonical head, hex-encoded (SPEC §6.4, S-15's `commits.head_hash`). */
+/**
+ * SHA-256 of the canonical head, hex-encoded (SPEC §6.4, S-15's
+ * `commits.head_hash`). `@noble/hashes`, not Node's `node:crypto`: this
+ * function runs from the browser now too (Sprint U1 step 5 — editing calls
+ * `commitToBranch`, which computes this for every commit to `main`), and
+ * `node:crypto` has no browser implementation — Vite silently externalises
+ * it to an empty module, which would throw the moment this actually ran in
+ * a browser, not just fail to build. One dependency-free, isomorphic
+ * implementation used everywhere avoids two hash implementations (Node's
+ * native one, plus whatever the browser would otherwise need) ever having
+ * a chance to disagree.
+ */
 export function headHash(head: Head): string {
-  return createHash('sha256').update(stableStringify(canonicalizeHead(head)), 'utf8').digest('hex');
+  return bytesToHex(sha256(new TextEncoder().encode(stableStringify(canonicalizeHead(head)))));
 }
 
 // ---------------------------------------------------------------------------

@@ -44,3 +44,16 @@ export function useMembership(orgId: UUID | null, userId: UUID | null): UseMembe
 export function canCreateModel(role: MemberRole | null): boolean {
   return role === 'owner' || role === 'architect';
 }
+
+/**
+ * Mirrors `atlas.commit_deltas`'s main-only role gate (ADR-015: "only
+ * owners and architects may commit directly to main") — for showing/hiding
+ * `Edit` at `main` (UI-principles §4.2). A contributor gets no edit
+ * affordance at all in Sprint U1 rather than an inert `Propose a change…`
+ * (there is no branch UI yet for that to open) — the same "no demo
+ * shortcut" call the element page already made for every role before this
+ * step existed.
+ */
+export function canEditOnMain(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'architect';
+}

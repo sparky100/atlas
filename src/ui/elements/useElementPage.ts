@@ -47,8 +47,15 @@ async function loadFacts(commitId: UUID, subjectId: UUID): Promise<Map<string, F
   return new Map(rows.map((row) => [row.attribute, row]));
 }
 
-export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): ElementPageState {
+export interface UseElementPageResult {
+  state: ElementPageState;
+  /** Re-fetches everything at the current ref — used after a successful edit (Sprint U1 step 5) so the page shows the commit it just made, provenance and history included, rather than patching local state by hand. */
+  reload: () => void;
+}
+
+export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): UseElementPageResult {
   const [state, setState] = useState<ElementPageState>({ status: 'loading' });
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,7 +120,12 @@ export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): Elemen
     // the real dependency; `ref` itself is still read from the closure
     // (always the latest one, since the effect body re-runs whenever the
     // string does).
-  }, [modelId, elementId, refParamOf(ref)]);
+  }, [modelId, elementId, refParamOf(ref), reloadToken]);
 
-  return state;
+  return {
+    state,
+    reload: () => {
+      setReloadToken((t) => t + 1);
+    },
+  };
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ElementsHeadRow } from '../../../contracts/rows';
 import type { AliasRow, SourceRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
+import { Button } from '../Button/Button';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { FactBadge } from '../FactBadge/FactBadge';
@@ -15,17 +16,26 @@ export interface ElementHeaderProps {
   existsSource: SourceRow | undefined;
   aliases: AliasRow[];
   aliasSources: Map<string, SourceRow>;
+  /**
+   * `Edit` (§4.2), shown only when the caller has already established both
+   * halves of its gate: owner/architect role (ADR-015) and `ref === main`
+   * (a tag is never editable, and Sprint U1 has no `Propose a change…` to
+   * open for anyone else — no branch UI yet). Omitted entirely otherwise,
+   * not shown disabled: CLAUDE.md rule 7 rules out a button with nothing
+   * behind it.
+   */
+  onEdit?: (() => void) | undefined;
 }
 
 const LIFECYCLE_TONE = { planned: 'info', active: 'ok', retiring: 'warn', retired: 'neutral' } as const;
 
 /**
- * The identity header (§4.2). No `Edit`/`Propose a change…` affordance
- * yet — Sprint U1 step 5 is what makes editing real; a button with
- * nothing behind it would be exactly the demo shortcut CLAUDE.md rules
- * out (rule 7).
+ * The identity header (§4.2). `Propose a change…` (the contributor path at
+ * `main`/a tag) still isn't built — there is no branch UI yet — so `Edit`
+ * only ever appears for the one role/ref combination Sprint U1 actually
+ * supports: owner/architect, at `main` (ADR-015).
  */
-export function ElementHeader({ element, existsFact, existsSource, aliases, aliasSources }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, aliases, aliasSources, onEdit }: ElementHeaderProps) {
   const [copied, setCopied] = useState(false);
   const attrs = attributesRecord(element.attributes);
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
@@ -100,6 +110,11 @@ export function ElementHeader({ element, existsFact, existsSource, aliases, alia
             />
           </span>
         ))}
+        {onEdit && (
+          <Button variant="ghost" onClick={onEdit}>
+            ✎ Edit
+          </Button>
+        )}
       </div>
     </header>
   );
