@@ -19,6 +19,12 @@ export interface CapabilityMapData {
 
 export type CapabilityMapState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: CapabilityMapData };
 
+export interface UseCapabilityMapResult {
+  state: CapabilityMapState;
+  /** Re-fetches everything at the current ref — used after a successful import/add (Sprint U2 step 2), same purpose as useElementPage.ts's `reload`. */
+  reload: () => void;
+}
+
 /**
  * Loads the capability map's data (UI-principles §6.1, §3.1). Unlike the
  * landscape (src/ui/landscape/useLandscape.ts), this never reads or writes
@@ -29,8 +35,9 @@ export type CapabilityMapState = { status: 'loading' } | { status: 'error'; mess
  * itself ("a view is a saved query", ADR-011), which is what a future
  * feature (per-user expand state, annotations) would hang off later.
  */
-export function useCapabilityMap(modelId: UUID, orgId: UUID, userId: UUID | null, ref: Ref): CapabilityMapState {
+export function useCapabilityMap(modelId: UUID, orgId: UUID, userId: UUID | null, ref: Ref): UseCapabilityMapResult {
   const [state, setState] = useState<CapabilityMapState>({ status: 'loading' });
+  const [reloadToken, setReloadToken] = useState(0);
   const refParam = refParamOf(ref);
 
   useEffect(() => {
@@ -67,7 +74,12 @@ export function useCapabilityMap(modelId: UUID, orgId: UUID, userId: UUID | null
     };
     // Same pitfall/fix as useElementPage.ts / useLandscape.ts: `refParam`
     // (a stable string) is the real dependency, not `ref` itself.
-  }, [modelId, orgId, userId, refParam]);
+  }, [modelId, orgId, userId, refParam, reloadToken]);
 
-  return state;
+  return {
+    state,
+    reload: () => {
+      setReloadToken((t) => t + 1);
+    },
+  };
 }

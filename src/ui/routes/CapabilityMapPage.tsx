@@ -3,8 +3,10 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useModels } from '../models/useModels';
+import { canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { parseRefParam } from '../../db/ref';
+import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
 import { useCapabilityMap } from '../capabilityMap/useCapabilityMap';
 import styles from './CapabilityMapPage.module.css';
@@ -17,6 +19,11 @@ import styles from './CapabilityMapPage.module.css';
  * `capability_map`. No zoom into a landscape scoped to a tile's supporting
  * systems yet (that's this sprint's zoom-chain step); clicking a tile
  * today goes straight to its element page, same as every other view.
+ *
+ * Sprint U2 step 2's tailoring flow lives here too: `refNotFound` (a model
+ * with no commits at all) is the empty scaffold's "import" moment — owner/
+ * architect only, same gate as `Edit` (ADR-015) — and a ready map gets the
+ * "add capability" form once main's branch id is known.
  */
 export function CapabilityMapPage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
@@ -27,8 +34,10 @@ export function CapabilityMapPage() {
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
+  const { role } = useMembership(organisation?.id ?? null, userId);
+  const canEdit = ref.kind === 'main' && canEditOnMain(role);
 
-  const state = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref);
+  const { state, reload } = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -53,9 +62,17 @@ export function CapabilityMapPage() {
 
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
-        {state.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
+        {state.status === 'refNotFound' && canEdit && <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reload} />}
+        {state.status === 'refNotFound' && !canEdit && <Text as="p">This model has no commits yet at this ref.</Text>}
         {state.status === 'ready' && (
-          <CapabilityMapView tree={state.data.tree} supportsEdges={state.data.supportsEdges} systemsById={state.data.systemsById} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+          <CapabilityMapView
+            tree={state.data.tree}
+            supportsEdges={state.data.supportsEdges}
+            systemsById={state.data.systemsById}
+            orgSlug={organisation?.slug ?? ''}
+            modelSlug={model.slug}
+            addCapability={canEdit ? { modelId: model.id, orgId: organisation?.id ?? '', userId, expectedHeadCommitId: state.data.commitId, onCreated: reload } : undefined}
+          />
         )}
       </main>
     </div>

@@ -6,6 +6,7 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { AttributeEditRow } from '../components/AttributeEditRow/AttributeEditRow';
 import { AttributeRow } from '../components/AttributeRow/AttributeRow';
 import { Button } from '../components/Button/Button';
+import { CapabilityTailoringActions } from '../components/CapabilityTailoringActions/CapabilityTailoringActions';
 import { ChangesTouchingSection } from '../components/ChangesTouchingSection/ChangesTouchingSection';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { ElementHeader } from '../components/ElementHeader/ElementHeader';
@@ -97,6 +98,18 @@ export function ElementPage() {
               aliasSources={state.data.aliasSources}
               onEdit={canEdit && editor.status === 'idle' ? editor.startEditing : undefined}
             />
+            {canEdit && state.data.element.element_type === 'capability' && (
+              <CapabilityTailoringActions
+                modelId={model.id}
+                orgId={organisation?.id ?? ''}
+                userId={userId}
+                element={state.data.element}
+                facts={state.data.facts}
+                expectedHeadCommitId={state.data.commitId}
+                canRetract={state.data.children.length === 0 && state.data.relationships.length === 0}
+                onChanged={reload}
+              />
+            )}
             <div className={styles.columns}>
               <div className={styles.leftColumn}>
                 <CollapsibleSection title="Attributes">

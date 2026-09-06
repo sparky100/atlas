@@ -5,6 +5,7 @@ import type { UUID } from '../../contracts/delta';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
+import { CapabilityMapAddForm } from './CapabilityMapAddForm';
 import { COLOUR_BY_OPTIONS, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
 import type { CapabilityMapTree, L1Column, L2Card } from './layout';
 import styles from './CapabilityMapView.module.css';
@@ -15,6 +16,13 @@ export interface CapabilityMapViewProps {
   systemsById: Map<UUID, ElementsHeadRow>;
   orgSlug: string;
   modelSlug: string;
+  /**
+   * The tailoring flow's "add" action (§4.2-style gate: owner/architect, at
+   * `main` — ADR-015). Omitted entirely, not shown disabled, when the
+   * caller hasn't established both halves — same convention as
+   * ElementHeader's `onEdit`.
+   */
+  addCapability?: { modelId: UUID; orgId: UUID; userId: UUID | null; expectedHeadCommitId: UUID; onCreated: () => void } | undefined;
 }
 
 /**
@@ -31,7 +39,7 @@ export interface CapabilityMapViewProps {
  * expanding an L2 to reveal L3, and a colour-by switch actually changing
  * a tile's tone — not skipped, scheduled for that step specifically.
  */
-export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, modelSlug }: CapabilityMapViewProps) {
+export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, modelSlug, addCapability }: CapabilityMapViewProps) {
   const [colourBy, setColourBy] = useState<ColourByMode>('none');
   const [expanded, setExpanded] = useState<Set<UUID>>(new Set());
 
@@ -45,7 +53,16 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, m
   }
 
   if (tree.l1.length === 0 && tree.orphans.length === 0) {
-    return <EmptyState>No capabilities yet. A capability map has nothing to show until at least one Capability element exists.</EmptyState>;
+    return (
+      <div>
+        <EmptyState>No capabilities yet. A capability map has nothing to show until at least one Capability element exists.</EmptyState>
+        {addCapability && (
+          <div className={styles.toolbar}>
+            <CapabilityMapAddForm tree={tree} {...addCapability} />
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -62,6 +79,7 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, m
             </option>
           ))}
         </select>
+        {addCapability && <CapabilityMapAddForm tree={tree} {...addCapability} />}
       </div>
 
       {tree.l1.length > 0 && (
