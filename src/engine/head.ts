@@ -5,9 +5,11 @@
  * walks `parent_commit_id` / `merged_branch_head_commit_id` across commits.
  *
  * Pure and synchronous, like deltas.ts: `CommitLoader` is a plain lookup
- * function. In production it's backed by whatever range of commits src/db
- * has already fetched from Postgres into memory (a later Sprint F1 step);
- * in tests it's backed by a plain Map.
+ * function. In production it's backed by whatever range of commits
+ * `src/db/commitLoader.ts`'s `buildCommitLoader` has already fetched from
+ * Postgres into memory (that module's own comment explains the "fetch
+ * everything for the model" tradeoff, SPEC §6.5); in tests it's backed by
+ * a plain Map.
  */
 
 import { sha256 } from '@noble/hashes/sha2.js';

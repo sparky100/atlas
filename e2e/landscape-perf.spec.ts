@@ -76,9 +76,17 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
       const modelSlug = `perf-landscape-${modelId.slice(0, 8)}`;
       await createModel(signedIn, { id: modelId, orgId, name: 'Perf Landscape', slug: modelSlug, createdBy: userId });
 
-      // Bootstraps main's genesis commit as service_role — standing in for
-      // the not-yet-built atlas.seed_from_map, same as
-      // src/db/repository.integration.test.ts's own beforeAll.
+      // Bootstraps main's genesis commit as service_role. Not a stand-in
+      // for atlas.seed_from_map any more — that function exists now
+      // (supabase/migrations/20260906120000_seed_from_map.sql) — but it
+      // seeds a model from a capability_maps template, which can only ever
+      // produce `capability` elements; this fixture needs an arbitrary
+      // System-only generated landscape (SYSTEM_COUNT/EDGE_COUNT below),
+      // which no product code path can create a genesis commit for yet
+      // (docs/AUDIT-2026-09-U2.md's cross-cutting finding: there is still
+      // no way to get a model's first commit outside a capability-map
+      // import). Same bootstrap as src/db/repository.integration.test.ts's
+      // own beforeAll, for the same reason.
       const main = await getMainBranch(service, modelId);
       if (!main) throw new Error('main branch was not auto-created');
       const genesisCommitId = randomUUID();

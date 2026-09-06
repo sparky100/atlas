@@ -43,10 +43,11 @@ export interface CapabilityMapViewProps {
  * (src/ui/capabilityMap/metrics.ts's `supportingSystemIds`). A tile with
  * zero supporting systems gets no link — there's nowhere to zoom to.
  *
- * No Playwright test yet: deferred to Sprint U2's versions step (step 5)
- * at the user's own request, covering a two-level tree with an orphan,
+ * Playwright coverage: e2e/capability-map.spec.ts (Sprint U2 step 4 —
+ * deferred there from step 1 at the user's own request, one step later
+ * than originally scheduled), covering a two-level tree with an orphan,
  * expanding an L2 to reveal L3, and a colour-by switch actually changing
- * a tile's tone — not skipped, scheduled for that step specifically.
+ * a tile's tone.
  */
 export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, modelSlug, refParam, addCapability }: CapabilityMapViewProps) {
   const [colourBy, setColourBy] = useState<ColourByMode>('none');
