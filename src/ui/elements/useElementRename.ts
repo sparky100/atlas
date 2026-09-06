@@ -2,9 +2,9 @@ import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
 import { createAlias } from '../../db/aliases';
-import { getMainBranch } from '../../db/branches';
 import { commitToBranch } from '../../db/commits';
 import { getOrCreateManualSource } from '../../db/sources';
+import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 
 export type ElementRenameStatus = 'idle' | 'renaming' | 'submitting';
@@ -25,14 +25,16 @@ export interface UseElementRenameInput {
   userId: UUID | null;
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
+  /** Which branch this rename commits to — see useElementEditor.ts's `branch` doc comment (Sprint C1). */
+  branch: BranchRow;
   expectedHeadCommitId: UUID;
   onSaved: () => void;
 }
 
 /**
- * Owner/architect renaming at `main` (same gate as useElementEditor.ts;
- * `name` just isn't one of that hook's schema-driven fields — it's a
- * promoted column, not a `CapabilityAttributes` key, per
+ * Editing at `main` or on a draft change branch (same gate as
+ * useElementEditor.ts; `name` just isn't one of that hook's schema-driven
+ * fields — it's a promoted column, not a `CapabilityAttributes` key, per
  * src/contracts/attributeSchema.ts). Renaming during tailoring must not
  * make the old wording unmatchable by capture: alongside the
  * `element.update` delta, this records the *old* name as a `name`-type
@@ -43,7 +45,7 @@ export interface UseElementRenameInput {
  * landed with its old identifier unrecoverable for capture matching.
  */
 export function useElementRename(input: UseElementRenameInput): UseElementRenameResult {
-  const { modelId, orgId, userId, element, facts, expectedHeadCommitId, onSaved } = input;
+  const { modelId, orgId, userId, element, facts, branch, expectedHeadCommitId, onSaved } = input;
   const [status, setStatus] = useState<ElementRenameStatus>('idle');
   const [value, setValueState] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -81,9 +83,6 @@ export function useElementRename(input: UseElementRenameInput): UseElementRename
     setStatus('submitting');
 
     try {
-      const main = await getMainBranch(supabase, modelId);
-      if (!main?.head_commit_id) throw new Error('main branch has no commits yet');
-
       const source = await getOrCreateManualSource(supabase, { id: crypto.randomUUID(), orgId, modelId, userId });
 
       await createAlias(supabase, {
@@ -111,7 +110,7 @@ export function useElementRename(input: UseElementRenameInput): UseElementRename
 
       const envelope: CommitEnvelope = {
         id: crypto.randomUUID(),
-        branchId: main.id,
+        branchId: branch.id,
         parentCommitId: expectedHeadCommitId,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
@@ -119,7 +118,7 @@ export function useElementRename(input: UseElementRenameInput): UseElementRename
         deltas: [delta],
       };
 
-      const result = await commitToBranch(supabase, { modelId, branchId: main.id, expectedHeadCommitId, envelope });
+      const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });
       if (!result.ok) {
         setStatus('renaming');
         setSubmitError(
@@ -136,7 +135,7 @@ export function useElementRename(input: UseElementRenameInput): UseElementRename
       setStatus('renaming');
       setSubmitError(e instanceof Error ? e.message : 'Could not rename.');
     }
-  }, [value, element, facts, modelId, orgId, userId, expectedHeadCommitId, onSaved]);
+  }, [value, element, facts, modelId, orgId, userId, branch, expectedHeadCommitId, onSaved]);
 
   return { status, value, submitError, startRenaming, cancelRenaming, setValue, save };
 }

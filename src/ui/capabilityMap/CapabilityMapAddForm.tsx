@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { UUID } from '../../contracts/delta';
+import type { BranchRow } from '../../db/types';
 import { Button } from '../components/Button/Button';
 import { Text } from '../components/Text/Text';
 import type { CapabilityMapTree } from './layout';
@@ -11,6 +12,8 @@ export interface CapabilityMapAddFormProps {
   modelId: UUID;
   orgId: UUID;
   userId: UUID | null;
+  /** Which branch this create commits to — see src/ui/elements/useElementEditor.ts's `branch` doc comment (Sprint C1). */
+  branch: BranchRow;
   expectedHeadCommitId: UUID;
   onCreated: () => void;
 }
@@ -23,7 +26,7 @@ export interface CapabilityMapAddFormProps {
  * to render; such a capability would just fall into `tree.orphans` next
  * load, which is a worse experience than the picker simply not offering it.
  */
-export function CapabilityMapAddForm({ tree, modelId, orgId, userId, expectedHeadCommitId, onCreated }: CapabilityMapAddFormProps) {
+export function CapabilityMapAddForm({ tree, modelId, orgId, userId, branch, expectedHeadCommitId, onCreated }: CapabilityMapAddFormProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState<string>('');
@@ -31,6 +34,7 @@ export function CapabilityMapAddForm({ tree, modelId, orgId, userId, expectedHea
     modelId,
     orgId,
     userId,
+    branch,
     expectedHeadCommitId,
     onCreated: () => {
       setOpen(false);

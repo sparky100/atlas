@@ -3,8 +3,8 @@ import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow, Json } from '../../contracts/rows';
 import { ATTRIBUTE_SCHEMA_BY_TYPE, validateAttributeValue } from '../../contracts/attributeSchema';
 import { commitToBranch } from '../../db/commits';
-import { getMainBranch } from '../../db/branches';
 import { getOrCreateManualSource } from '../../db/sources';
+import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 
 /** A field's draft value in the edit form — always a plain string except for `boolean` fields, which a checkbox produces directly. */
@@ -54,13 +54,24 @@ export interface UseElementEditorInput {
   userId: UUID | null;
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
-  /** The commit the page currently believes is main's head — becomes `expectedHeadCommitId` (C13's optimistic-concurrency check). */
+  /**
+   * Which branch this edit commits to — `main` (owner/architect,
+   * UI-principles §4.2) or a draft change branch (contributor+, ADR-009,
+   * Sprint C1). `facts` must already reflect this branch's own current
+   * head (src/db/branchFacts.ts's `loadFactsForSubjectAtBranch` for
+   * anything other than main, since a change branch's head is never
+   * materialised — SPEC §1 S-2), not main's, or `previousDeltaId` below
+   * would supersede the wrong fact.
+   */
+  branch: BranchRow;
+  /** The commit the page currently believes `branch`'s head is — becomes `expectedHeadCommitId` (C13's optimistic-concurrency check). */
   expectedHeadCommitId: UUID;
   onSaved: () => void;
 }
 
 /**
- * Owner/architect editing at `main` (UI-principles §4.2, ADR-015). One
+ * Editing at `main` or on a draft change branch (UI-principles §4.2,
+ * ADR-015, ADR-009 — Sprint C1 generalises this beyond main-only). One
  * commit per save, one `element.update` delta per field that actually
  * changed — an untouched field never becomes a delta just because the
  * form rendered it. Every delta shares one commit's provenance: the
@@ -70,7 +81,7 @@ export interface UseElementEditorInput {
  * which is exactly when this was learned).
  */
 export function useElementEditor(input: UseElementEditorInput): UseElementEditorResult {
-  const { modelId, orgId, userId, element, facts, expectedHeadCommitId, onSaved } = input;
+  const { modelId, orgId, userId, element, facts, branch, expectedHeadCommitId, onSaved } = input;
   const [status, setStatus] = useState<ElementEditorStatus>('idle');
   const [values, setValues] = useState<Record<string, DraftValue>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -123,9 +134,6 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
     setStatus('submitting');
 
     try {
-      const main = await getMainBranch(supabase, modelId);
-      if (!main?.head_commit_id) throw new Error('main branch has no commits yet');
-
       const source = await getOrCreateManualSource(supabase, { id: crypto.randomUUID(), orgId, modelId, userId });
 
       // Built from runtime data (`key` is a string, not one of
@@ -151,7 +159,7 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
 
       const envelope: CommitEnvelope = {
         id: crypto.randomUUID(),
-        branchId: main.id,
+        branchId: branch.id,
         parentCommitId: expectedHeadCommitId,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
@@ -159,7 +167,7 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
         deltas,
       };
 
-      const result = await commitToBranch(supabase, { modelId, branchId: main.id, expectedHeadCommitId, envelope });
+      const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });
       if (!result.ok) {
         setStatus('editing');
         setSubmitError(
@@ -176,7 +184,7 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
       setStatus('editing');
       setSubmitError(e instanceof Error ? e.message : 'Could not save.');
     }
-  }, [values, facts, element, modelId, orgId, userId, expectedHeadCommitId, onSaved]);
+  }, [values, facts, element, modelId, orgId, userId, branch, expectedHeadCommitId, onSaved]);
 
   return { status, values, fieldErrors, submitError, hasChanges, startEditing, cancelEditing, setValue, save };
 }

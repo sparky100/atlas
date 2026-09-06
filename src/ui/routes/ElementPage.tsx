@@ -1,7 +1,7 @@
 import { useParams, useSearchParams } from 'react-router';
 import { ATTRIBUTE_SCHEMA_BY_TYPE } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
-import type { SourceRow } from '../../db/types';
+import type { BranchRow, SourceRow } from '../../db/types';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { AttributeEditRow } from '../components/AttributeEditRow/AttributeEditRow';
 import { AttributeRow } from '../components/AttributeRow/AttributeRow';
@@ -18,6 +18,7 @@ import { RelationshipsSection } from '../components/RelationshipGroup/Relationsh
 import { StructureSection } from '../components/StructureSection/StructureSection';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import { useMainBranch } from '../branches/useMainBranch';
 import { useModels } from '../models/useModels';
 import { canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -53,6 +54,7 @@ export function ElementPage() {
 
   const { state, reload } = useElementPage(model?.id ?? '', elementId ?? '', ref);
   const canEdit = ref.kind === 'main' && canEditOnMain(role);
+  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
 
   const data = state.status === 'ready' ? state.data : null;
   const editor = useElementEditor({
@@ -61,6 +63,7 @@ export function ElementPage() {
     userId,
     element: data?.element ?? PLACEHOLDER_ELEMENT,
     facts: data?.facts ?? EMPTY_FACTS,
+    branch: mainBranch ?? PLACEHOLDER_BRANCH,
     expectedHeadCommitId: data?.commitId ?? '',
     onSaved: reload,
   });
@@ -113,6 +116,7 @@ export function ElementPage() {
                 userId={userId}
                 element={state.data.element}
                 facts={state.data.facts}
+                branch={mainBranch ?? PLACEHOLDER_BRANCH}
                 expectedHeadCommitId={state.data.commitId}
                 canRetract={state.data.children.length === 0 && state.data.relationships.length === 0}
                 onChanged={reload}
@@ -171,6 +175,27 @@ const EMPTY_FACTS = new Map<string, FactsRow>();
 // render, not conditionally — always has an ElementsHeadRow to close over
 // while data is still loading.
 const PLACEHOLDER_ELEMENT: ElementsHeadRow = { element_id: '', element_type: 'system', name: '', parent_id: null, attributes: {}, exists_delta_id: '' };
+// Same reasoning as PLACEHOLDER_ELEMENT above: the editing hooks need a
+// branch to close over on every render, including before useMainBranch has
+// resolved one — canEdit gates the affordance itself, so this is never
+// actually committed to.
+const PLACEHOLDER_BRANCH: BranchRow = {
+  id: '',
+  org_id: '',
+  model_id: '',
+  name: '',
+  kind: 'main',
+  status: 'draft',
+  base_commit_id: null,
+  head_commit_id: null,
+  shared_for_review: false,
+  title: null,
+  description: null,
+  target_date: null,
+  split_from: null,
+  created_by: '',
+  updated_at: '',
+};
 
 function AttributesTable({ element, facts, sources }: { element: ElementsHeadRow; facts: Map<string, FactsRow>; sources: Map<string, SourceRow> }) {
   const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type];

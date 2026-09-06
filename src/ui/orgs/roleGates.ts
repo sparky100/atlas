@@ -1,0 +1,55 @@
+/**
+ * Pure role/branch → boolean gates, split out from useMembership.ts so they
+ * can be unit-tested with no Supabase client in the import graph at all
+ * (useMembership.ts's own `useMembership` hook pulls in src/ui/supabaseClient.ts,
+ * which throws at import time without VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY
+ * set — exactly the environment a plain `vitest run` unit test doesn't have).
+ * Re-exported from useMembership.ts, so every existing import site is
+ * unaffected — this is a location split, not a public API change.
+ */
+import type { BranchRow, MemberRole } from '../../db/types';
+
+/** Mirrors `models_insert`'s RLS check (`atlas.has_role(org_id, 'owner', 'architect')`, supabase/migrations/20260906071300_models.sql) — for showing/hiding the affordance; the database enforces the real rule regardless of what this returns. */
+export function canCreateModel(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'architect';
+}
+
+/**
+ * Mirrors `atlas.commit_deltas`'s main-only role gate (ADR-015: "only
+ * owners and architects may commit directly to main") — for showing/hiding
+ * `Edit` at `main` (UI-principles §4.2). A contributor gets no edit
+ * affordance at all in Sprint U1 rather than an inert `Propose a change…`
+ * (there is no branch UI yet for that to open) — the same "no demo
+ * shortcut" call the element page already made for every role before this
+ * step existed.
+ */
+export function canEditOnMain(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'architect';
+}
+
+/**
+ * Mirrors `branches_insert`'s RLS check (`atlas.has_role(org_id, 'owner',
+ * 'architect', 'contributor')`, supabase/migrations/20260906071400_history.sql)
+ * and ADR-009's "Contributor: can create/edit change branches... cannot
+ * merge to main" — a viewer gets no "New change" affordance at all.
+ */
+export function canCreateChangeBranch(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'architect' || role === 'contributor';
+}
+
+/**
+ * Mirrors `atlas.commit_deltas`'s own branch-kind gate (Sprint C1 step 2,
+ * `supabase/migrations/20260906161000_merge_review_queue.sql`): `main`
+ * takes owner/architect only (`canEditOnMain`); a `change` branch takes
+ * owner/architect/contributor, but only while it's still `draft` — once
+ * `proposed`/`approved`/etc. it's under review (S-18: new commits are
+ * accepted only while `status = 'draft'`) and needs `atlas.request_changes`
+ * to reopen it before anything can edit it again; `capture_draft` is never
+ * edited from this affordance at all (ADR-004 — a human triages it, one
+ * delta at a time, not via the element page's editor).
+ */
+export function canEditBranch(role: MemberRole | null, branch: BranchRow): boolean {
+  if (branch.kind === 'main') return canEditOnMain(role);
+  if (branch.kind === 'change') return branch.status === 'draft' && canCreateChangeBranch(role);
+  return false;
+}

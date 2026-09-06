@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
-import { getMainBranch } from '../../db/branches';
 import { commitToBranch } from '../../db/commits';
 import { getOrCreateManualSource } from '../../db/sources';
+import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 
 export type ElementRetractStatus = 'idle' | 'retracting';
@@ -20,12 +20,15 @@ export interface UseElementRetractInput {
   userId: UUID | null;
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
+  /** Which branch this retract commits to — see useElementEditor.ts's `branch` doc comment (Sprint C1). */
+  branch: BranchRow;
   expectedHeadCommitId: UUID;
   onRetracted: () => void;
 }
 
 /**
- * Owner/architect retracting at `main` (same gate as edit/rename, ADR-015).
+ * Retracting at `main` or on a draft change branch (same gate as
+ * edit/rename, ADR-015/ADR-009).
  * A single `element.retract` delta — no cascade. C8 (src/contracts/delta.ts
  * COMMIT_INVARIANTS) requires every relationship touching the element and
  * every child re-parented or retracted in the *same* commit; this hook
@@ -38,7 +41,7 @@ export interface UseElementRetractInput {
  * never has to translate a C8 rejection into UI copy.
  */
 export function useElementRetract(input: UseElementRetractInput): UseElementRetractResult {
-  const { modelId, orgId, userId, element, facts, expectedHeadCommitId, onRetracted } = input;
+  const { modelId, orgId, userId, element, facts, branch, expectedHeadCommitId, onRetracted } = input;
   const [status, setStatus] = useState<ElementRetractStatus>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -51,9 +54,6 @@ export function useElementRetract(input: UseElementRetractInput): UseElementRetr
     setStatus('retracting');
 
     try {
-      const main = await getMainBranch(supabase, modelId);
-      if (!main?.head_commit_id) throw new Error('main branch has no commits yet');
-
       const source = await getOrCreateManualSource(supabase, { id: crypto.randomUUID(), orgId, modelId, userId });
 
       const delta: Delta = {
@@ -68,7 +68,7 @@ export function useElementRetract(input: UseElementRetractInput): UseElementRetr
 
       const envelope: CommitEnvelope = {
         id: crypto.randomUUID(),
-        branchId: main.id,
+        branchId: branch.id,
         parentCommitId: expectedHeadCommitId,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
@@ -76,7 +76,7 @@ export function useElementRetract(input: UseElementRetractInput): UseElementRetr
         deltas: [delta],
       };
 
-      const result = await commitToBranch(supabase, { modelId, branchId: main.id, expectedHeadCommitId, envelope });
+      const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });
       if (!result.ok) {
         setStatus('idle');
         setError(
@@ -93,7 +93,7 @@ export function useElementRetract(input: UseElementRetractInput): UseElementRetr
       setStatus('idle');
       setError(e instanceof Error ? e.message : 'Could not retract.');
     }
-  }, [element, facts, modelId, orgId, userId, expectedHeadCommitId, onRetracted]);
+  }, [element, facts, modelId, orgId, userId, branch, expectedHeadCommitId, onRetracted]);
 
   return { status, error, retract };
 }

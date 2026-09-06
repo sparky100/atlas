@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { Link } from 'react-router';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
+import type { BranchRow } from '../../db/types';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
@@ -24,7 +25,7 @@ export interface CapabilityMapViewProps {
    * caller hasn't established both halves — same convention as
    * ElementHeader's `onEdit`.
    */
-  addCapability?: { modelId: UUID; orgId: UUID; userId: UUID | null; expectedHeadCommitId: UUID; onCreated: () => void } | undefined;
+  addCapability?: { modelId: UUID; orgId: UUID; userId: UUID | null; branch: BranchRow; expectedHeadCommitId: UUID; onCreated: () => void } | undefined;
 }
 
 /**
