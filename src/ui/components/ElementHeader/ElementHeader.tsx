@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ElementsHeadRow } from '../../../contracts/rows';
 import type { AliasRow, SourceRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
+import { lifecycleToneFor } from '../../elements/lifecycleTone';
 import { Button } from '../Button/Button';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
@@ -27,8 +28,6 @@ export interface ElementHeaderProps {
   onEdit?: (() => void) | undefined;
 }
 
-const LIFECYCLE_TONE = { planned: 'info', active: 'ok', retiring: 'warn', retired: 'neutral' } as const;
-
 /**
  * The identity header (§4.2). `Propose a change…` (the contributor path at
  * `main`/a tag) still isn't built — there is no branch UI yet — so `Edit`
@@ -39,6 +38,7 @@ export function ElementHeader({ element, existsFact, existsSource, aliases, alia
   const [copied, setCopied] = useState(false);
   const attrs = attributesRecord(element.attributes);
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
+  const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
   const isExternal = attrs.isExternal === true;
   const externalOrganisation = typeof attrs.externalOrganisation === 'string' ? attrs.externalOrganisation : null;
 
@@ -62,9 +62,7 @@ export function ElementHeader({ element, existsFact, existsSource, aliases, alia
         <Text as="h1" size="2xl">
           {element.name}
         </Text>
-        {lifecycleStatus !== null && lifecycleStatus in LIFECYCLE_TONE && (
-          <Chip tone={LIFECYCLE_TONE[lifecycleStatus as keyof typeof LIFECYCLE_TONE]}>{lifecycleStatus}</Chip>
-        )}
+        {lifecycleStatus !== null && lifecycleTone !== undefined && <Chip tone={lifecycleTone}>{lifecycleStatus}</Chip>}
         {isExternal && <Chip tone="neutral">{externalOrganisation ? `external (${externalOrganisation})` : 'external'}</Chip>}
       </div>
       <div className={styles.metaRow}>

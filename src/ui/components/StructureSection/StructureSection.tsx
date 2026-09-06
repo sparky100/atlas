@@ -5,6 +5,7 @@ import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { Text } from '../Text/Text';
 import { attributesRecord } from '../../elements/attributesRecord';
+import { lifecycleToneFor } from '../../elements/lifecycleTone';
 import styles from './StructureSection.module.css';
 
 export interface StructureSectionProps {
@@ -13,8 +14,6 @@ export interface StructureSectionProps {
   parent: ElementsHeadRow | null;
   children: ElementsHeadRow[];
 }
-
-const LIFECYCLE_TONE = { planned: 'info', active: 'ok', retiring: 'warn', retired: 'neutral' } as const;
 
 function lifecycleOf(row: ElementsHeadRow): string | null {
   const value = attributesRecord(row.attributes).lifecycleStatus;
@@ -57,11 +56,12 @@ export function StructureSection({ orgSlug, modelSlug, parent, children }: Struc
 
 function ElementLink({ orgSlug, modelSlug, element }: { orgSlug: string; modelSlug: string; element: ElementsHeadRow }) {
   const lifecycle = lifecycleOf(element);
+  const tone = lifecycle !== null ? lifecycleToneFor(lifecycle) : undefined;
   return (
     <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${element.element_id}`} className={styles.link}>
       <ElementTypeGlyph type={element.element_type} />
       <Text as="span">{element.name}</Text>
-      {lifecycle !== null && lifecycle in LIFECYCLE_TONE && <Chip tone={LIFECYCLE_TONE[lifecycle as keyof typeof LIFECYCLE_TONE]}>{lifecycle}</Chip>}
+      {lifecycle !== null && tone !== undefined && <Chip tone={tone}>{lifecycle}</Chip>}
     </Link>
   );
 }

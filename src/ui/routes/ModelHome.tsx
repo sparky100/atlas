@@ -7,9 +7,10 @@ import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 
 /**
  * Model home. Honest placeholder (CLAUDE.md rule 7) for what's still
- * missing: the two front doors and the capability map aren't built yet.
- * The landscape view (Sprint U1 step 4a) is real now, so it's a link, not a
- * line of "not built yet" prose.
+ * missing: the two front doors (§3) and a way to browse into an individual
+ * element from here aren't built yet. Landscape (Sprint U1 step 4a) and
+ * the capability map (Sprint U2 step 1) are real now, so they're links,
+ * not lines of "not built yet" prose.
  */
 export function ModelHome() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
@@ -34,10 +35,13 @@ export function ModelHome() {
             </Text>
             <Panel>
               <Text as="p">
+                <Link to={`/o/${organisation?.slug ?? ''}/m/${model.slug}/capability-map`}>Capability map →</Link>
+              </Text>
+              <Text as="p">
                 <Link to={`/o/${organisation?.slug ?? ''}/m/${model.slug}/landscape`}>Landscape →</Link>
               </Text>
               <Text as="p" tone="muted">
-                The capability map and a way to browse into an individual element from here are not built yet.
+                A way to browse into an individual element from here is not built yet.
               </Text>
             </Panel>
           </>
