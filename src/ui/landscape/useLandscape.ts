@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
+import { listSupportsEdgesForCapabilities } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
 import { listLandscapeEdges, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
@@ -16,6 +17,18 @@ export interface LandscapeData {
   systemsById: Map<UUID, ElementsHeadRow>;
   edges: RelationshipsHeadRow[];
   layout: LandscapeLayout;
+}
+
+/**
+ * The systems supporting exactly `capabilityId` — the same exact-match
+ * relationship a capability tile's own supporting-system count already
+ * uses (src/ui/capabilityMap/metrics.ts's `supportingSystemIds`), so
+ * "zoom into this tile's landscape" always shows exactly the systems the
+ * tile's own count named, never a parent/child-aggregated superset.
+ */
+async function loadSupportingSystemIds(commitId: UUID, capabilityId: UUID): Promise<Set<UUID>> {
+  const edges = await listSupportsEdgesForCapabilities(supabase, commitId, [capabilityId]);
+  return new Set(edges.map((edge) => edge.from_element_id));
 }
 
 export type LandscapeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: LandscapeData };
@@ -42,8 +55,16 @@ export interface UseLandscapeResult {
  * previously-saved `view_layouts` positions and persisting whatever's newly
  * computed — so a second visit renders the same picture until someone
  * resets it (UI-principles §6.4).
+ *
+ * `capabilityId`, when given, is the "optional capability filter"
+ * UI-principles §6.1's Landscape row itself names — *not* a separate view:
+ * `scope_element_id` must be null for `landscape` (SPEC §3.9's own check
+ * constraint), so a filtered landscape is still the model's one landscape
+ * `views` row, just rendering a subset of its systems. Positions saved
+ * under the unfiltered view are reused as-is for whichever of them are
+ * currently in scope.
  */
-export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, ref: Ref): UseLandscapeResult {
+export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, ref: Ref, capabilityId: UUID | null = null): UseLandscapeResult {
   const [state, setState] = useState<LandscapeState>({ status: 'loading' });
   const [resetToken, setResetToken] = useState(0);
   const refParam = refParamOf(ref);
@@ -61,7 +82,9 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
         return;
       }
 
-      const systems = await listSystemsForLandscape(supabase, commitId);
+      const allSystems = await listSystemsForLandscape(supabase, commitId);
+      const supportingIds = capabilityId ? await loadSupportingSystemIds(commitId, capabilityId) : null;
+      const systems = supportingIds ? allSystems.filter((s) => supportingIds.has(s.element_id)) : allSystems;
       const systemIds = systems.map((s) => s.element_id);
       const [edges, supportsEdges] = await Promise.all([listLandscapeEdges(supabase, commitId, systemIds), listSupportsEdgesForSystems(supabase, commitId, systemIds)]);
       const capabilitiesById = await loadCapabilitiesById(commitId, supportsEdges);
@@ -104,7 +127,7 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
     // `ref`'s string form (`refParam`) is the real dependency, same pitfall
     // and same fix as useElementPage.ts — `ref` itself is read from the
     // closure, always the latest one.
-  }, [modelId, orgId, userId, refParam, resetToken]);
+  }, [modelId, orgId, userId, refParam, resetToken, capabilityId]);
 
   const resetLayout = useCallback(() => {
     setState((prev) => {

@@ -16,6 +16,8 @@ export interface CapabilityMapViewProps {
   systemsById: Map<UUID, ElementsHeadRow>;
   orgSlug: string;
   modelSlug: string;
+  /** `?ref=...` — carried into every "→ Landscape" zoom link so it lands on the same ref the map itself is showing (§2.4's deep-link rule). */
+  refParam: string;
   /**
    * The tailoring flow's "add" action (§4.2-style gate: owner/architect, at
    * `main` — ADR-015). Omitted entirely, not shown disabled, when the
@@ -34,12 +36,19 @@ export interface CapabilityMapViewProps {
  * supporting-system count as text regardless (§4.3-style "never
  * colour-only").
  *
+ * Sprint U2 step 3: every tile's supporting-system count is now also the
+ * zoom chain's entry point — a link to the landscape filtered to exactly
+ * those systems (UI-principles §2.1's "capability map → landscape"), the
+ * same exact-match set the count itself already names
+ * (src/ui/capabilityMap/metrics.ts's `supportingSystemIds`). A tile with
+ * zero supporting systems gets no link — there's nowhere to zoom to.
+ *
  * No Playwright test yet: deferred to Sprint U2's versions step (step 5)
  * at the user's own request, covering a two-level tree with an orphan,
  * expanding an L2 to reveal L3, and a colour-by switch actually changing
  * a tile's tone — not skipped, scheduled for that step specifically.
  */
-export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, modelSlug, addCapability }: CapabilityMapViewProps) {
+export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, modelSlug, refParam, addCapability }: CapabilityMapViewProps) {
   const [colourBy, setColourBy] = useState<ColourByMode>('none');
   const [expanded, setExpanded] = useState<Set<UUID>>(new Set());
 
@@ -85,7 +94,7 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, m
       {tree.l1.length > 0 && (
         <div className={styles.columns}>
           {tree.l1.map((column) => (
-            <L1ColumnView key={column.capability.element_id} column={column} colourBy={colourBy} supportsEdges={supportsEdges} systemsById={systemsById} orgSlug={orgSlug} modelSlug={modelSlug} expanded={expanded} onToggleExpand={toggleExpanded} />
+            <L1ColumnView key={column.capability.element_id} column={column} colourBy={colourBy} supportsEdges={supportsEdges} systemsById={systemsById} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} expanded={expanded} onToggleExpand={toggleExpanded} />
           ))}
         </div>
       )}
@@ -108,6 +117,19 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, m
   );
 }
 
+/** The "→ Landscape" zoom link every tile shows next to its supporting-system count — `null` (rendered as nothing) when there are none to zoom into. */
+function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, refParam }: { capabilityId: UUID; count: number; orgSlug: string; modelSlug: string; refParam: string }) {
+  if (count === 0) return null;
+  const href = `/o/${orgSlug}/m/${modelSlug}/landscape?${new URLSearchParams({ ref: refParam, capability: capabilityId }).toString()}`;
+  return (
+    <Link to={href} className={styles.zoomLink}>
+      <Text as="span" tone="faint" size="sm">
+        {count} system{count === 1 ? '' : 's'} →
+      </Text>
+    </Link>
+  );
+}
+
 function L1ColumnView({
   column,
   colourBy,
@@ -115,6 +137,7 @@ function L1ColumnView({
   systemsById,
   orgSlug,
   modelSlug,
+  refParam,
   expanded,
   onToggleExpand,
 }: {
@@ -124,9 +147,11 @@ function L1ColumnView({
   systemsById: Map<UUID, ElementsHeadRow>;
   orgSlug: string;
   modelSlug: string;
+  refParam: string;
   expanded: Set<UUID>;
   onToggleExpand: (id: UUID) => void;
 }) {
+  const count = supportingSystemIds(column.capability.element_id, supportsEdges).length;
   return (
     <div className={styles.column}>
       <div className={styles.columnHeader}>
@@ -135,9 +160,10 @@ function L1ColumnView({
             {column.capability.name}
           </Text>
         </Link>
+        <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
       </div>
       {column.l2.map((card) => (
-        <L2CardView key={card.capability.element_id} card={card} colourBy={colourBy} supportsEdges={supportsEdges} systemsById={systemsById} orgSlug={orgSlug} modelSlug={modelSlug} expanded={expanded.has(card.capability.element_id)} onToggleExpand={onToggleExpand} />
+        <L2CardView key={card.capability.element_id} card={card} colourBy={colourBy} supportsEdges={supportsEdges} systemsById={systemsById} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} expanded={expanded.has(card.capability.element_id)} onToggleExpand={onToggleExpand} />
       ))}
     </div>
   );
@@ -150,6 +176,7 @@ function L2CardView({
   systemsById,
   orgSlug,
   modelSlug,
+  refParam,
   expanded,
   onToggleExpand,
 }: {
@@ -159,6 +186,7 @@ function L2CardView({
   systemsById: Map<UUID, ElementsHeadRow>;
   orgSlug: string;
   modelSlug: string;
+  refParam: string;
   expanded: boolean;
   onToggleExpand: (id: UUID) => void;
 }) {
@@ -172,11 +200,7 @@ function L2CardView({
           <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`}>
             <Text as="span">{card.capability.name}</Text>
           </Link>
-          {colourBy !== 'metric:supportingSystemCount' && (
-            <Text as="span" tone="faint" size="sm">
-              ({count})
-            </Text>
-          )}
+          <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
           {colour.tone !== undefined && colour.label !== undefined && <Chip tone={colour.tone}>{colour.label}</Chip>}
         </div>
         {card.l3.length > 0 && (
@@ -189,13 +213,17 @@ function L2CardView({
         <div className={styles.l3Tiles}>
           {card.l3.map((leaf) => {
             const leafColour = tileColourFor(colourBy, leaf.element_id, supportsEdges, systemsById);
+            const leafCount = supportingSystemIds(leaf.element_id, supportsEdges).length;
             return (
-              <Link key={leaf.element_id} to={`/o/${orgSlug}/m/${modelSlug}/e/${leaf.element_id}`} className={styles.l3Tile}>
-                <Text as="span" size="sm">
-                  {leaf.name}
-                </Text>
+              <div key={leaf.element_id} className={styles.l3Tile}>
+                <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${leaf.element_id}`}>
+                  <Text as="span" size="sm">
+                    {leaf.name}
+                  </Text>
+                </Link>
+                <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
                 {leafColour.tone !== undefined && leafColour.label !== undefined && <Chip tone={leafColour.tone}>{leafColour.label}</Chip>}
-              </Link>
+              </div>
             );
           })}
         </div>

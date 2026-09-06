@@ -26,6 +26,11 @@ export function refParamOf(ref: Ref): string {
   return ref.kind === 'main' ? 'main' : `tag:${ref.name}`;
 }
 
+/** The `[ref]` chip's text (UI-principles §2.2) — `main`, or a tag's own name. There's no `branch:` case yet: `parseRefParam` never produces one (see its own comment). */
+export function refLabelOf(ref: Ref): string {
+  return ref.kind === 'main' ? 'main' : ref.name;
+}
+
 /** The commit_id a ref resolves to, or `null` if it doesn't resolve (an unknown tag name, or a model with no commits yet). */
 export async function resolveRef(supabase: Client, modelId: UUID, ref: Ref): Promise<UUID | null> {
   if (ref.kind === 'main') {

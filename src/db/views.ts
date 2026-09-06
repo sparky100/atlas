@@ -61,6 +61,48 @@ export async function getOrCreateModelView(supabase: Client, input: GetOrCreateV
   return data as ViewRow;
 }
 
+export interface GetOrCreateScopedViewInput extends GetOrCreateViewInput {
+  /** Required for `context`/`container`/`component` (SPEC §3.9's own check constraint on `views`) — the one System/Container this view is scoped to. */
+  scopeElementId: UUID;
+}
+
+/**
+ * Same get-or-create shape as `getOrCreateModelView`, for the three view
+ * kinds that are scoped to one element rather than the whole model
+ * (Context/Container/Component, UI-principles §6.1) — a separate function,
+ * not an optional parameter on that one, so a landscape/capability_map call
+ * site can't accidentally pass a scope that the DB would reject anyway.
+ */
+export async function getOrCreateScopedView(supabase: Client, input: GetOrCreateScopedViewInput): Promise<ViewRow> {
+  const existing = await supabase
+    .from('views')
+    .select('*')
+    .eq('model_id', input.modelId)
+    .eq('kind', input.kind)
+    .eq('scope_element_id', input.scopeElementId)
+    .is('branch_id', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (existing.error) throw new Error(`getOrCreateScopedView: ${existing.error.message}`);
+  if (existing.data) return existing.data as ViewRow;
+
+  const row = {
+    id: input.id,
+    org_id: input.orgId,
+    model_id: input.modelId,
+    name: input.name,
+    kind: input.kind,
+    scope_element_id: input.scopeElementId,
+    branch_id: null,
+    created_by: input.createdBy,
+  };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.from('views').insert(row).select('*').single();
+  if (error) throw new Error(`getOrCreateScopedView: ${error.message}`);
+  return data as ViewRow;
+}
+
 export async function listViewLayouts(supabase: Client, viewId: UUID): Promise<ViewLayoutRow[]> {
   const { data, error } = await supabase.from('view_layouts').select('*').eq('view_id', viewId);
   if (error) throw new Error(`listViewLayouts: ${error.message}`);

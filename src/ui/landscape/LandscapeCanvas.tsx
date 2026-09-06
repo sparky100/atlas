@@ -12,8 +12,8 @@ export interface LandscapeCanvasProps {
   layout: LandscapeLayout;
   systemsById: Map<UUID, ElementsHeadRow>;
   edges: RelationshipsHeadRow[];
-  orgSlug: string;
-  modelSlug: string;
+  /** Where clicking a node navigates to — Sprint U2 step 3's zoom chain: a system's next level down is its Context view, not its element page directly (UI-principles §2.1's "semantic zoom", as a discrete link). Takes the clicked system's id. */
+  nodeHref: (elementId: UUID) => string;
 }
 
 interface Transform {
@@ -112,10 +112,14 @@ function rectIntersects(rect: WorldRect, x: number, y: number, w: number, h: num
  *
  * Full keyboard node-by-node traversal is not built here: §8.7 is explicit
  * that "the element page and the relationships list *are* the accessible
- * view of any diagram" — clicking a node navigates to exactly that page.
- * `+`/`-`/`0` (§8.8's canvas key table) zoom/fit, which this does implement.
+ * view of any diagram" — clicking a node still navigates somewhere
+ * accessible, just to its Context view (`nodeHref`) rather than its
+ * element page directly, since Sprint U2 step 3's zoom chain makes Context
+ * the landscape's next level down (UI-principles §2.1); the element page
+ * itself is one link away from there. `+`/`-`/`0` (§8.8's canvas key
+ * table) zoom/fit, which this does implement.
  */
-export function LandscapeCanvas({ layout, systemsById, edges, orgSlug, modelSlug }: LandscapeCanvasProps) {
+export function LandscapeCanvas({ layout, systemsById, edges, nodeHref }: LandscapeCanvasProps) {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -316,7 +320,7 @@ export function LandscapeCanvas({ layout, systemsById, edges, orgSlug, modelSlug
     dragRef.current = null;
     if (drag?.moved) return;
     const elementId = nodeAt(screenX, screenY);
-    if (elementId) void navigate(`/o/${orgSlug}/m/${modelSlug}/e/${elementId}`);
+    if (elementId) void navigate(nodeHref(elementId));
   }
 
   function zoomBy(factor: number, center?: { x: number; y: number }): void {

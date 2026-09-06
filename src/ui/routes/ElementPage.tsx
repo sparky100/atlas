@@ -5,6 +5,7 @@ import type { SourceRow } from '../../db/types';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { AttributeEditRow } from '../components/AttributeEditRow/AttributeEditRow';
 import { AttributeRow } from '../components/AttributeRow/AttributeRow';
+import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { Button } from '../components/Button/Button';
 import { CapabilityTailoringActions } from '../components/CapabilityTailoringActions/CapabilityTailoringActions';
 import { ChangesTouchingSection } from '../components/ChangesTouchingSection/ChangesTouchingSection';
@@ -20,7 +21,8 @@ import { useAuth } from '../auth/useAuth';
 import { useModels } from '../models/useModels';
 import { canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
-import { parseRefParam } from '../../db/ref';
+import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
+import { elementBreadcrumbSegments } from '../nav/elementBreadcrumbSegments';
 import { useElementPage } from '../elements/useElementPage';
 import { useElementEditor, type DraftValue } from '../elements/useElementEditor';
 import styles from './ElementPage.module.css';
@@ -90,6 +92,12 @@ export function ElementPage() {
         )}
         {state.status === 'ready' && (
           <>
+            <Breadcrumb
+              org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
+              model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
+              refLabel={refLabelOf(ref)}
+              segments={elementBreadcrumbSegments(state.data.element, state.data.parent, orgSlug ?? '', model.slug, refParamOf(ref))}
+            />
             <ElementHeader
               element={state.data.element}
               existsFact={state.data.facts.get('$exists')}

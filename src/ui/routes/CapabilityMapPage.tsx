@@ -1,11 +1,12 @@
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
+import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useModels } from '../models/useModels';
 import { canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
-import { parseRefParam } from '../../db/ref';
+import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
 import { useCapabilityMap } from '../capabilityMap/useCapabilityMap';
@@ -14,11 +15,11 @@ import styles from './CapabilityMapPage.module.css';
 /**
  * The capability map (UI-principles §6.1, §3.1 — Sprint U2 step 1): the
  * model's own capability elements, nested by nothing more than
- * `parent_id`. Context/container/component and the landscape were built
- * in Sprint U1; this is the first of the five view kinds to render
- * `capability_map`. No zoom into a landscape scoped to a tile's supporting
- * systems yet (that's this sprint's zoom-chain step); clicking a tile
- * today goes straight to its element page, same as every other view.
+ * `parent_id`. This is the zoom chain's first stop (§2.1): every tile's
+ * supporting-system count is also a link into the landscape filtered to
+ * exactly those systems (Sprint U2 step 3 — see CapabilityMapView.tsx's
+ * own comment); from there, Context, Container and Component are the
+ * remaining four levels.
  *
  * Sprint U2 step 2's tailoring flow lives here too: `refNotFound` (a model
  * with no commits at all) is the empty scaffold's "import" moment — owner/
@@ -50,10 +51,17 @@ export function CapabilityMapPage() {
     );
   }
 
+  const refParam = refParamOf(ref);
+
   return (
     <div>
       <AppHeader />
       <main className={styles.main}>
+        <Breadcrumb
+          org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
+          model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
+          refLabel={refLabelOf(ref)}
+        />
         <div className={styles.header}>
           <Text as="h1" size="2xl">
             Capability map
@@ -71,6 +79,7 @@ export function CapabilityMapPage() {
             systemsById={state.data.systemsById}
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}
+            refParam={refParam}
             addCapability={canEdit ? { modelId: model.id, orgId: organisation?.id ?? '', userId, expectedHeadCommitId: state.data.commitId, onCreated: reload } : undefined}
           />
         )}
