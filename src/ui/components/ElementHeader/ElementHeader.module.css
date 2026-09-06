@@ -1,0 +1,36 @@
+.header {
+  padding-bottom: var(--space-4);
+  border-bottom: var(--border-width) solid var(--border);
+  margin-bottom: var(--space-4);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.idButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.alias {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}

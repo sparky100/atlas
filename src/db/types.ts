@@ -6,6 +6,7 @@
  * live here, next to the repository code that's their only consumer.
  */
 import type { UUID } from '../contracts/delta';
+import type { SourceKind } from '../contracts/sources';
 
 export type MemberRole = 'owner' | 'architect' | 'contributor' | 'viewer';
 
@@ -66,6 +67,38 @@ export interface TagRow {
   name: string;
   commit_id: UUID;
   description: string | null;
+  created_by: UUID;
+  created_at: string;
+}
+
+/** The literal shape of a row in `sources` (SPEC §3.6, ADR-007) — what a provenance badge's hover card names as "where this came from." */
+export interface SourceRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  kind: SourceKind;
+  name: string;
+  uri: string | null;
+  captured_at: string | null;
+  capture_job_id: UUID | null;
+  capability_map_id: UUID | null;
+  user_id: UUID | null;
+  created_by: UUID;
+  created_at: string;
+}
+
+export type AliasType = 'name' | 'code' | 'external_ref' | 'source_system_key' | 'template_code' | 'merged_id';
+
+/** The literal shape of a row in `aliases` (SPEC §3.6, ADR-008) — not commit-scoped, unlike elements_head/relationships_head/facts. */
+export interface AliasRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  element_id: UUID;
+  alias_value: string;
+  alias_type: AliasType;
+  source_id: UUID;
+  confidence: number;
   created_by: UUID;
   created_at: string;
 }

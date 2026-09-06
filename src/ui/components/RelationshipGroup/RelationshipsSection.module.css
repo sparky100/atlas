@@ -1,0 +1,38 @@
+.typeGroup {
+  margin-bottom: var(--space-4);
+}
+
+.directionGroup + .directionGroup {
+  margin-top: var(--space-2);
+}
+
+.groupLabel {
+  margin: 0 0 var(--space-1) 0;
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--row-height);
+  padding-left: var(--space-4);
+}
+
+.arrow {
+  color: var(--text-faint);
+  width: 1em;
+  text-align: center;
+}
+
+.endpointLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.endpointLink:hover {
+  text-decoration: underline;
+}
