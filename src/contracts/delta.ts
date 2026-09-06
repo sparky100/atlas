@@ -28,6 +28,35 @@ export type ElementType = (typeof ELEMENT_TYPES)[number];
 export const RELATIONSHIP_TYPES = ['supports', 'uses', 'owns', 'flows_to'] as const;
 export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
 
+/**
+ * Explicitly not types (ADR-001 preface). Not a runtime list — there is
+ * nothing to validate against — but named here, next to the real taxonomy,
+ * so a request to add one of these has to argue against a written decision
+ * rather than accrete quietly: business processes/workflow steps
+ * (BPMN-shaped), logical data entities (ERD-shaped), infrastructure/network
+ * topology, projects/programmes as landscape elements (a programme is a
+ * change branch's metadata, not a fact), goals/strategy/KPIs, requirements/
+ * user stories, cost/budget figures, risk register entries, service-
+ * catalogue entries (model as a capability tag, not a type), maturity/heat-
+ * map ratings, and org-chart reporting lines beyond a flat Actor. "External"
+ * is deliberately an attribute (`isExternal`) on System/Container/Actor, not
+ * a sixth element type; "contains" is deliberately structural (`parentId`),
+ * not a seventh relationship type — see ADR-001's Alternatives Rejected.
+ */
+export const DELIBERATELY_NOT_MODELLED = [
+  'business-process',
+  'data-entity',
+  'infrastructure-topology',
+  'project-or-programme',
+  'goal-strategy-kpi',
+  'requirement-or-user-story',
+  'cost-or-budget',
+  'risk-register-entry',
+  'service-catalogue-entry',
+  'maturity-rating',
+  'org-chart-reporting-line',
+] as const;
+
 export type LifecycleStatus = 'planned' | 'active' | 'retiring' | 'retired';
 export type ActorSubtype = 'person' | 'team';
 export type DataClassification = 'public' | 'official' | 'official_sensitive' | 'special_category';
