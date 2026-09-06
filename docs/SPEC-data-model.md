@@ -75,7 +75,7 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | `comment_visibility` | `team`, `internal` |
 | `comment_status` | `open`, `resolved` |
 | `anchor_type` | `element`, `relationship`, `delta`, `branch`, `decision` |
-| `view_kind` | `landscape`, `context`, `container`, `component` |
+| `view_kind` | `landscape`, `context`, `container`, `component`, `capability_map` |
 | `annotation_kind` | `text`, `highlight`, `arrow` |
 | `map_status` | `draft`, `published`, `deprecated` |
 | `validation_level` | `structural`, `schema` |
@@ -479,9 +479,19 @@ A saved query, not a drawing (ADR-011).
 | `model_id` | uuid | → `models(id)` |
 | `name` | text | not null |
 | `kind` | view_kind | not null |
-| `scope_element_id` | uuid | nullable; required for `context`/`container`/`component`, must be null for `landscape` |
+| `scope_element_id` | uuid | nullable; required for `context`/`container`/`component`, must be null for `landscape`/`capability_map` |
 | `branch_id` | uuid | → `branches(id)`, nullable = main |
 | `created_by` | uuid | not null |
+
+`capability_map` is a view kind like the other four: it renders the model's
+own `capability`-typed elements (containment via `parent_id`, `supports`
+edges into them from systems) at the chosen branch's head, the same as any
+other view — it is not the `capability_maps`/`capability_map_items` content
+in §3.10. Those are versioned, product-owned starter content (ADR-012) used
+to *seed* a model's capability elements via a `template_seed` commit; once
+seeded, they are ordinary elements and are rendered, like everything else,
+through a `views` row. Building the `capability_map` view kind's renderer is
+Sprint U2, not U1.
 
 #### `view_layouts`
 Per-view position hints. Deleting all rows for a view is lossless.
@@ -510,6 +520,13 @@ Presentational markup that is never a fact (ADR-011).
 | `created_by` | uuid | not null |
 
 ### 3.10 Starter content
+
+Starter map source data (the sector maps' items and citations, before
+they're seeded into any model) lives under `content/` in the repository —
+versioned, reviewed text, not inline in application code (CLAUDE.md rule 7)
+— and is loaded into the `capability_maps`/`capability_map_items`/
+`capability_map_sources` tables below by Sprint U2's seeding job. Nothing in
+Sprint U1 reads or writes these tables.
 
 #### `capability_maps`
 A versioned sector starter map (ADR-012).

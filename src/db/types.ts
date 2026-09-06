@@ -102,3 +102,54 @@ export interface AliasRow {
   created_by: UUID;
   created_at: string;
 }
+
+/**
+ * Landscape and capability_map are whole-model queries; context/container/
+ * component scope to one element (SPEC §3.9). Sprint U1 step 4 only ever
+ * creates `landscape` rows — the other four are real schema, not yet a
+ * built renderer.
+ */
+export type ViewKind = 'landscape' | 'context' | 'container' | 'component' | 'capability_map';
+
+/** The literal shape of a row in `views` (SPEC §3.9, ADR-011) — a saved query, not a saved drawing. */
+export interface ViewRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  name: string;
+  kind: ViewKind;
+  scope_element_id: UUID | null;
+  /** Which branch's folded state to render; null = main's head. Always null in Sprint U1 — no branch UI yet (ADR-015). */
+  branch_id: UUID | null;
+  created_by: UUID;
+  created_at: string;
+}
+
+export type LayoutSubjectType = 'element' | 'relationship';
+
+/** The literal shape of a row in `view_layouts` — a position hint (ADR-011), never model data. */
+export interface ViewLayoutRow {
+  org_id: UUID;
+  view_id: UUID;
+  subject_type: LayoutSubjectType;
+  subject_id: UUID;
+  x: number | null;
+  y: number | null;
+  bends: { x: number; y: number }[] | null;
+  updated_by: UUID;
+  updated_at: string;
+}
+
+export type AnnotationKind = 'text' | 'highlight' | 'arrow';
+
+/** The literal shape of a row in `view_annotations` — free-form presentational markup, never a fact (ADR-011). Sprint U1 step 4a creates the table but has no writer for it yet. */
+export interface ViewAnnotationRow {
+  id: UUID;
+  org_id: UUID;
+  view_id: UUID;
+  kind: AnnotationKind;
+  geometry: Record<string, unknown>;
+  text: string | null;
+  created_by: UUID;
+  created_at: string;
+}

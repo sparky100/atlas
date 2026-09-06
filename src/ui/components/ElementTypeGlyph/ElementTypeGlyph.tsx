@@ -1,18 +1,6 @@
 import type { ActorSubtype, ElementType } from '../../../contracts/delta';
+import { elementTypeGlyph } from './elementTypeGlyph';
 import styles from './ElementTypeGlyph.module.css';
-
-const GLYPH: Record<ElementType, string> = {
-  capability: '◫',
-  system: '▣',
-  container: '▢',
-  component: '▫',
-  actor: '◉', // overridden for subtype 'team' below
-};
-
-const ACTOR_GLYPH: Record<ActorSubtype, string> = {
-  person: '◉',
-  team: '◎',
-};
 
 export interface ElementTypeGlyphProps {
   type: ElementType;
@@ -28,10 +16,11 @@ export interface ElementTypeGlyphProps {
  * One fixed glyph per type (§8.5) — there is no icon library and no
  * per-element shape picker (§9 "what we will not build"). This is the only
  * place glyph-per-type mapping is decided; breadcrumbs, canvas nodes,
- * lists and badges all render through this component.
+ * lists and badges all render through this component or its sibling
+ * `elementTypeGlyph()` function.
  */
 export function ElementTypeGlyph({ type, actorSubtype, external = false, label }: ElementTypeGlyphProps) {
-  const glyph = type === 'actor' && actorSubtype ? ACTOR_GLYPH[actorSubtype] : GLYPH[type];
+  const glyph = elementTypeGlyph(type, actorSubtype);
   const accessibleLabel = label ?? (type === 'actor' && actorSubtype ? actorSubtype : type);
   const classes = [styles.glyph, external ? styles.external : ''].filter(Boolean).join(' ');
   return (

@@ -1,4 +1,4 @@
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
@@ -6,11 +6,10 @@ import { useModels } from '../models/useModels';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 
 /**
- * Model home. Honest placeholder (CLAUDE.md rule 7): the two front doors,
- * the element page, and the landscape view are the product's actual
- * content and are named as later Sprint U1 steps in the brief — nothing
- * here fakes them. This step's job was proving the URL resolves to a real
- * model, through real auth and RLS.
+ * Model home. Honest placeholder (CLAUDE.md rule 7) for what's still
+ * missing: the two front doors and the capability map aren't built yet.
+ * The landscape view (Sprint U1 step 4a) is real now, so it's a link, not a
+ * line of "not built yet" prose.
  */
 export function ModelHome() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
@@ -34,8 +33,11 @@ export function ModelHome() {
               {model.name}
             </Text>
             <Panel>
+              <Text as="p">
+                <Link to={`/o/${organisation?.slug ?? ''}/m/${model.slug}/landscape`}>Landscape →</Link>
+              </Text>
               <Text as="p" tone="muted">
-                The capability map, the element page, and the landscape view are not built yet — Sprint U1 steps 3 and 4.
+                The capability map and a way to browse into an individual element from here are not built yet.
               </Text>
             </Panel>
           </>

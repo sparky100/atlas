@@ -283,7 +283,7 @@ The centre pane for a merge request follows SPEC §7.4: summary row, then confli
 
 ## 6. Views
 
-### 6.1 The four view kinds
+### 6.1 The five view kinds
 
 | Kind | Scope | Nodes | Edges | Layout |
 |---|---|---|---|---|
@@ -294,6 +294,8 @@ The centre pane for a merge request follows SPEC §7.4: summary row, then confli
 | **Component** | one container | its components, plus containers they `uses` | `uses` | same as container |
 
 All five (component included) are the *same* renderer with a different query and layout preset. Nothing is drawn; a view with zero results says so.
+
+Sprint U1 step 4 builds the renderer and the **Landscape** kind end to end. Context, Container and Component reuse the same renderer with their own query and layout preset in a later step. Capability map is Sprint U2 — it renders the model's own capability elements (SPEC §3.9), not the versioned starter-content maps (SPEC §3.10, ADR-012) used to seed them.
 
 ### 6.2 As-is / to-be selector
 
