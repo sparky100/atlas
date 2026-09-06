@@ -167,6 +167,9 @@ Versioned JSON Schema per element/relationship type. The thing `attributes` json
 Primary key `(subject_type, type_name, schema_version)`. No `org_id`: this is product content, readable by every authenticated user, writable only by the service role. The checked-in generator derives `json_schema` from `src/contracts/delta.ts` (test RT-5).
 
 #### `relationship_type_rules`
+
+**Superseded by a constant, not a migrated table (Sprint H1).** Unlike `type_schemas` above, this table's content was fully known from ADR-001 from the start and simply had no runtime enforcement anywhere in the codebase — not a table, not an engine check, not an application-level validation (flagged in docs/AUDIT-2026-09-U2.md §6.2/§6.3). Sprint H1 closes that gap with `RELATIONSHIP_TYPE_RULES`, a constant in `src/contracts/relationshipTypeRules.ts`: the seed rows below are that constant's content, kept here as the documented reference, not read from a live table at runtime. C9 and V3 are both checked against the constant — in `src/engine/deltas.ts`'s `apply()` (so every caller of `fold`, including `commitToBranch`, inherits the check), and therefore at the commit boundary in `src/db/commits.ts`. Migrating this to a real table remains available later if it's ever needed as editable product content (e.g. an admin screen for adjusting rules without a code change); nothing today requires that.
+
 Which `(relationship_type, from_type, to_type)` triples are legal, and cardinality (ADR-001).
 
 | Column | Type | Constraints |

@@ -56,6 +56,8 @@ Attribute sets per type (required fields marked *req*):
 
 A `relationship_type_rules` table constrains what's legal: columns `relationship_type`, `allowed_source_types` (array), `allowed_target_types` (array), `max_cardinality_per_source` (nullable — e.g. `owns` may cap at one *primary* owner without forbidding secondary owners). This is the enforcement point that stops nonsense like "Actor uses Capability."
 
+*(Sprint H1 amendment.)* This constraint shipped as `RELATIONSHIP_TYPE_RULES`, a constant in `src/contracts/relationshipTypeRules.ts` (SPEC-data-model.md §3.3), rather than as a migrated table — see that section's own note for why. `src/engine/deltas.ts`'s `apply()` checks every `relationship.create` against it, so "Actor uses Capability" is now a rejected commit, not just a documented intention.
+
 *Explicit non-types* — deliberately excluded from the taxonomy, named here so a future feature request has to argue against a written decision rather than just accreting: business processes/workflow steps (BPMN-shaped), logical data entities (ERD-shaped), infrastructure/network topology (racks, subnets, firewalls), projects/programmes as landscape elements (a programme is the subject of a change branch's metadata, not a landscape fact), goals/strategy/KPIs (a layer above capability), requirements/user stories, cost/budget figures, risk register entries, service-catalogue entries (see Preface #5), maturity/heat-map ratings (see Preface #6), and org-chart reporting lines beyond a flat Actor.
 
 **Alternatives rejected.**

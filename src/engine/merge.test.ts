@@ -30,7 +30,7 @@ function retract(id: UUID, elementId: UUID, previousDeltaId: UUID): Delta {
   return { kind: 'element.retract', id, elementId, elementType: 'system', previousDeltaId, sourceId: 'src', confidence: 1 };
 }
 
-function createRel(id: UUID, relationshipId: UUID, relationshipType: 'uses' | 'owns', fromElementId: UUID, toElementId: UUID, attributes: Record<string, unknown> = {}): Delta {
+function createRel(id: UUID, relationshipId: UUID, relationshipType: 'uses' | 'owns' | 'flows_to', fromElementId: UUID, toElementId: UUID, attributes: Record<string, unknown> = {}): Delta {
   return { kind: 'relationship.create', id, relationshipId, relationshipType, fromElementId, toElementId, attributes: attributes as never, sourceId: 'src', confidence: 1 };
 }
 
@@ -123,10 +123,14 @@ describe('structural: duplicate-relationship', () => {
   });
 
   it('relationships of different types between the same pair are not a duplicate', () => {
+    // Both `uses` and `flows_to` allow (system, system) as a triple (Sprint
+    // H1's RELATIONSHIP_TYPE_RULES) — `owns` doesn't (it needs an actor
+    // source), so this test uses `flows_to` as its second type rather than
+    // `owns` as it did before that rule was enforced.
     const input = scenario(
       [createEl('d0', 'a', 'A'), createEl('d1', 'b', 'B')],
       [createRel('d-ours', 'rel-ours', 'uses', 'a', 'b')],
-      [createRel('d-theirs', 'rel-theirs', 'owns', 'a', 'b', { primary: true })],
+      [createRel('d-theirs', 'rel-theirs', 'flows_to', 'a', 'b')],
     );
     const result = classifyMerge(input);
     expect(result.findings.filter((f) => f.class === 'structural:duplicate-relationship')).toEqual([]);
