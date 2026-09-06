@@ -46,7 +46,7 @@ Attribute sets per type (required fields marked *req*):
 
 | Type | Key fields |
 |---|---|
-| Capability | `name` *req*, `description`, `level` *req* (1–3), `parent_capability_id`, `code` (reference code from a starter map), `template_ref` (nullable, links back to `capability_map_template_items`) |
+| Capability | `name` *req*, `description`, ~~`level` *req* (1–3)~~ (ADR-016: computed from `parent_capability_id` depth, not a stored attribute), `parent_capability_id`, `code` (reference code from a starter map), `template_ref` (nullable, links back to `capability_map_template_items`) |
 | System | `name` *req*, `description`, `lifecycle_status` *req* (`planned`/`active`/`retiring`/`retired`), `vendor`, `is_external`, `external_organisation`, `introduced` (date, when it went live), `planned_end` (date, planned decommission — independent of `lifecycle_status`; a system can have a known end date well before it actually reaches `retired`) |
 | Container | `name` *req*, `description`, `technology`, `parent_system_id` *req*, `is_external`, `introduced`, `planned_end` |
 | Component | `name` *req*, `description`, `technology`, `parent_container_id` *req* |
@@ -336,6 +336,22 @@ In one transaction: insert the commit and its deltas, advance `branches.head_com
 - *Make `commit_deltas` an ordinary (non-`security definer`) function and separately loosen the RLS policies on `elements_head`/`relationships_head`/`facts`/`commits` for `main`* — would let any authenticated session with the right role write projection rows directly, without going through a fold at all; the whole point of those tables having no `authenticated` write grant is that nothing but the engine's own fold output should ever land in them.
 
 **Consequences.** `src/db/rebuildHead.ts` (the repair/verification path, SPEC §6.6's integrity job) reuses `atlas.replace_main_head_projection` from a service-role context, driven by the same engine (`foldFromGenesis`) rather than a SQL-side refold — built alongside this ADR, not deferred; its head-equals-fold comparison lives in `src/db/repository.integration.test.ts`, the same file every other real-Supabase check in this codebase lives in, rather than waiting for a later sprint's own integration-test file. `type_schemas` (ADR-001, SPEC §3.3) is deferred to Sprint K1 rather than migrated now: as SPEC literally specifies it (a full TypeScript-type-to-JSON-Schema generator plus a checked-in seed and validator, RT-5), it is real schema-validation infrastructure the element page never needed — attribute order and per-type definitions live in `src/contracts` as code instead, and Sprint K1's capture edge function, the first consumer outside the TypeScript runtime, is what will actually need the generator.
+
+---
+
+## ADR-016: Capability `level` is computed from `parent_id` depth, never a stored attribute
+
+**Context.** ADR-001 originally gave Capability a required `level` (1–3) attribute alongside `parent_capability_id`. SPEC §6.3's V2 validation rule only ever checked that a capability's parent, if any, is itself a capability — it never checked that a stored `level` value actually matched real nesting depth. Sprint U2's capability map (ADR-011's `capability_map` view kind) renders L1/L2/L3 straight from the `parent_id` chain (src/ui/capabilityMap/layout.ts), not from `attributes.level` — so the two could silently disagree the moment anyone edited `level` independently of moving an element, and any future code that trusted `level` for a structural decision would be trusting a fact that isn't guaranteed to be one.
+
+**Decision.** `level` is removed from `CapabilityAttributes` entirely (src/contracts/delta.ts) — it is never stored, never part of an `element.create`/`element.update` delta, and never independently editable. A capability's level is always `1 + the number of capability ancestors above it`, computed on read from the real `parent_id` chain (src/ui/elements/capabilityDepth.ts), capped at 3 — a chain that doesn't resolve cleanly within that cap (too deep, or a parent reference that doesn't terminate) computes to `null` and is shown as a gap, the same stance src/ui/capabilityMap/layout.ts already takes on a malformed chain, rather than either guessing or hiding it.
+
+The element page's Structure section (§4.5: "For a capability: level, parent capability, child capabilities…") shows the computed level as a plain value with no provenance badge — it isn't a fact asserted by any source, so it gets none, the same way "children" and "parent" are shown structurally without one.
+
+**Alternatives rejected.**
+- *Keep `level` as a stored, editable attribute and add a validation gate checking it matches nesting depth* — still leaves two representations of the same information that a validation bug could let drift apart; computing it removes the possibility entirely rather than policing it.
+- *Drop the concept of "level" altogether* — UI-principles §3.1/§6.1 and the element page's own Structure section spec name "level" directly; the concept is real, only its storage as an independent fact was the trap.
+
+**Consequences.** A starter capability map's `capability_map_items.level` (SPEC §3.10, ADR-012) remains a real column on the *template* content — that's about the template's own authored structure, reviewed once by a domain expert, not a live organisation's model, so it isn't subject to the same drift risk and is unaffected by this decision.
 
 ---
 

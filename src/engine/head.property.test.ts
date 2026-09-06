@@ -40,7 +40,7 @@ function makeCreate(id: UUID, elementId: UUID): Delta {
     elementType: 'capability',
     name: elementId,
     parentId: null,
-    attributes: { level: 1 },
+    attributes: {},
     sourceId: 'src',
     confidence: 1,
   };

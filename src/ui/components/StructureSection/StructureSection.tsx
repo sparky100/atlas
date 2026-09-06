@@ -12,6 +12,8 @@ export interface StructureSectionProps {
   orgSlug: string;
   modelSlug: string;
   parent: ElementsHeadRow | null;
+  /** Capability only — computed from `parent_id` depth (ADR-016), `undefined` for every other element type. `null` means the chain doesn't resolve to a clean level 1–3 (shown as a gap, not hidden). */
+  capabilityLevel?: number | null | undefined;
   children: ElementsHeadRow[];
 }
 
@@ -20,14 +22,22 @@ function lifecycleOf(row: ElementsHeadRow): string | null {
   return typeof value === 'string' ? value : null;
 }
 
-/** §4.5: parent and children. For a capability, the systems it supports repeat here too — not yet built (needs the "supports" group's own data, wired once the landscape view's capability lens exists in step 4). */
-export function StructureSection({ orgSlug, modelSlug, parent, children }: StructureSectionProps) {
-  if (!parent && children.length === 0) {
+/** §4.5: level (capability only, computed — see capabilityLevel prop), parent and children. For a capability, the systems it supports repeat here too — not yet built (needs the "supports" group's own data). */
+export function StructureSection({ orgSlug, modelSlug, parent, capabilityLevel, children }: StructureSectionProps) {
+  if (capabilityLevel === undefined && !parent && children.length === 0) {
     return <EmptyState>No parent or children — this element stands alone in the structure.</EmptyState>;
   }
 
   return (
     <div className={styles.section}>
+      {capabilityLevel !== undefined && (
+        <div className={styles.group}>
+          <Text tone="muted" size="sm" as="span">
+            Level
+          </Text>
+          <Text as="span">{capabilityLevel ?? '— not a clean level 1–3 chain'}</Text>
+        </div>
+      )}
       {parent && (
         <div className={styles.group}>
           <Text tone="muted" size="sm" as="span">

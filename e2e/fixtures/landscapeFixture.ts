@@ -47,7 +47,7 @@ export function generateLandscapeFixture(sourceId: string): Delta[] {
       elementType: 'capability',
       name: `Capability ${String(c)}`,
       parentId: null,
-      attributes: { level: 1 },
+      attributes: {},
       sourceId,
       confidence: 1,
     });

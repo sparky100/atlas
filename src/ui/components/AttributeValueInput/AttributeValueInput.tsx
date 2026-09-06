@@ -71,21 +71,6 @@ export function AttributeValueInput({ id, field, value, onChange, invalid }: Att
     );
   }
 
-  if (field.kind === 'number') {
-    return (
-      <input
-        id={id}
-        type="number"
-        className={styles.input}
-        value={stringValue}
-        onChange={(e) => {
-          onChange(e.target.value);
-        }}
-        aria-invalid={invalid}
-      />
-    );
-  }
-
   return (
     <input
       id={id}

@@ -21,14 +21,17 @@ describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
     expect(required.sort()).toEqual(['isExternal', 'lifecycleStatus']);
   });
 
-  it('every field declares a kind, and enum/number fields declare their allowed values', () => {
+  it('every field declares a kind, and enum fields declare their allowed values', () => {
     for (const type of ELEMENT_TYPES) {
       for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[type]) {
         expect(field.kind).toBeTruthy();
         if (field.kind === 'enum') expect(field.options?.length ?? 0).toBeGreaterThan(0);
-        if (field.kind === 'number' && field.allowedNumbers) expect(field.allowedNumbers.length).toBeGreaterThan(0);
       }
     }
+  });
+
+  it('has no `level` field on capability — it is computed from parent_id depth (ADR-016), never a stored, independently-editable attribute', () => {
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.capability.some((f) => f.key === 'level')).toBe(false);
   });
 });
 
@@ -69,11 +72,5 @@ describe('validateAttributeValue', () => {
   it('validates enum fields against the declared options', () => {
     expect(validateAttributeValue('system', 'lifecycleStatus', 'active')).toEqual({ ok: true, value: 'active' });
     expect(validateAttributeValue('system', 'lifecycleStatus', 'deprecated')).toMatchObject({ ok: false });
-  });
-
-  it('validates a number field against its allowed set (Capability.level)', () => {
-    expect(validateAttributeValue('capability', 'level', '2')).toEqual({ ok: true, value: 2 });
-    expect(validateAttributeValue('capability', 'level', 4)).toMatchObject({ ok: false });
-    expect(validateAttributeValue('capability', 'level', 'not a number')).toMatchObject({ ok: false });
   });
 });

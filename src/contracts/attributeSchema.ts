@@ -31,7 +31,7 @@ import type {
 } from './delta';
 import type { Json } from './rows';
 
-export type AttributeKind = 'text' | 'boolean' | 'date' | 'enum' | 'number';
+export type AttributeKind = 'text' | 'boolean' | 'date' | 'enum';
 
 export interface AttributeFieldMeta {
   label: string;
@@ -39,8 +39,6 @@ export interface AttributeFieldMeta {
   kind: AttributeKind;
   /** `kind: 'enum'` only — the exact allowed values. */
   options?: readonly string[];
-  /** `kind: 'number'` only — a discrete allowed set (e.g. Capability's `level`), rather than any finite number. */
-  allowedNumbers?: readonly number[];
   /** False only for a field no one sets by hand (Capability.templateRef, seed-derived) — excluded from the edit form entirely. Defaults to true. */
   editable?: boolean;
 }
@@ -54,12 +52,11 @@ function schemaOf<T extends string>(order: readonly T[], meta: Record<T, Attribu
 }
 
 const CAPABILITY_META: Record<keyof CapabilityAttributes, AttributeFieldMeta> = {
-  level: { label: 'Level', required: true, kind: 'number', allowedNumbers: [1, 2, 3] },
   code: { label: 'Code', required: false, kind: 'text' },
   description: { label: 'Description', required: false, kind: 'text' },
   templateRef: { label: 'Template reference', required: false, kind: 'text', editable: false },
 };
-const CAPABILITY_ORDER: (keyof CapabilityAttributes)[] = ['level', 'code', 'description', 'templateRef'];
+const CAPABILITY_ORDER: (keyof CapabilityAttributes)[] = ['code', 'description', 'templateRef'];
 
 const LIFECYCLE_STATUS_OPTIONS = ['planned', 'active', 'retiring', 'retired'] as const;
 
@@ -162,14 +159,6 @@ export function validateAttributeValue(elementType: ElementType, key: string, ra
         return { ok: false, error: `${field.label} must be one of: ${field.options?.join(', ') ?? ''}` };
       }
       return { ok: true, value: raw };
-    }
-    case 'number': {
-      const num = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
-      if (!Number.isFinite(num)) return { ok: false, error: `${field.label} must be a number` };
-      if (field.allowedNumbers && !field.allowedNumbers.includes(num)) {
-        return { ok: false, error: `${field.label} must be one of: ${field.allowedNumbers.join(', ')}` };
-      }
-      return { ok: true, value: num };
     }
   }
 }

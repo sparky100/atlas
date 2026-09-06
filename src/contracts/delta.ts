@@ -61,10 +61,20 @@ export type LifecycleStatus = 'planned' | 'active' | 'retiring' | 'retired';
 export type ActorSubtype = 'person' | 'team';
 export type DataClassification = 'public' | 'official' | 'official_sensitive' | 'special_category';
 
-/** Attributes stored in `elements_head.attributes` (jsonb). `name` and `parentId` are promoted columns and are NOT in this object. */
+/**
+ * Attributes stored in `elements_head.attributes` (jsonb). `name` and
+ * `parentId` are promoted columns and are NOT in this object.
+ *
+ * No `level` here (ADR-016, amending ADR-001): SPEC §6.3's V2 validates
+ * that a capability's parent, if any, is another capability, but never
+ * that a stored `level` value matches actual `parent_id` nesting depth —
+ * a capability's real level is always `1 + the number of capability
+ * ancestors above it`, computed from structure, never stored as an
+ * independently-editable fact that could drift out of sync with it. See
+ * src/ui/elements/capabilityDepth.ts for the computation.
+ */
 export interface CapabilityAttributes {
   description?: string;
-  level: 1 | 2 | 3;
   /** Reference code from a starter capability map, e.g. "2.3". */
   code?: string;
   /** `capability_map_items.id` this capability was seeded from. */

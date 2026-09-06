@@ -25,6 +25,11 @@ export interface CapabilityMapViewProps {
  * toolbar toggle, defaulting to `none`; every mode still shows the
  * supporting-system count as text regardless (§4.3-style "never
  * colour-only").
+ *
+ * No Playwright test yet: deferred to Sprint U2's versions step (step 5)
+ * at the user's own request, covering a two-level tree with an orphan,
+ * expanding an L2 to reveal L3, and a colour-by switch actually changing
+ * a tile's tone — not skipped, scheduled for that step specifically.
  */
 export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, modelSlug }: CapabilityMapViewProps) {
   const [colourBy, setColourBy] = useState<ColourByMode>('none');
@@ -51,14 +56,10 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, m
         </Text>
         <select className={styles.select} value={colourBy} onChange={(e) => { setColourBy(e.target.value as ColourByMode); }}>
           <option value="none">None</option>
-          {(['Attribute', 'Metric'] as const).map((group) => (
-            <optgroup key={group} label={group}>
-              {COLOUR_BY_OPTIONS.filter((o) => o.group === group).map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </optgroup>
+          {COLOUR_BY_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
           ))}
         </select>
       </div>

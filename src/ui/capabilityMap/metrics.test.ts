@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { mostlyExternal, oldestLifecycleStage, supportingSystemIds, tileColourFor } from './metrics';
+import { lifecycleExposure, oldestLifecycleStage, supportingSystemIds, tileColourFor } from './metrics';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 
-function system(id: string, lifecycleStatus?: string, isExternal = false): ElementsHeadRow {
-  const attrs: Record<string, Json> = { isExternal };
+function system(id: string, lifecycleStatus?: string, plannedEnd?: string): ElementsHeadRow {
+  const attrs: Record<string, Json> = { isExternal: false };
   if (lifecycleStatus !== undefined) attrs.lifecycleStatus = lifecycleStatus;
+  if (plannedEnd !== undefined) attrs.plannedEnd = plannedEnd;
   return { element_id: id, element_type: 'system', name: id, parent_id: null, attributes: attrs, exists_delta_id: `d-${id}` };
 }
 
 function supports(systemId: string, capabilityId: string): RelationshipsHeadRow {
   return { relationship_id: `r-${systemId}-${capabilityId}`, relationship_type: 'supports', from_element_id: systemId, to_element_id: capabilityId, attributes: {}, exists_delta_id: `d-r-${systemId}` };
 }
+
+const NOW = new Date('2026-06-15T00:00:00Z');
 
 describe('supportingSystemIds', () => {
   it('finds every system with a supports edge into the capability, ignoring edges into other capabilities', () => {
@@ -39,28 +42,29 @@ describe('oldestLifecycleStage', () => {
   });
 });
 
-describe('mostlyExternal', () => {
-  it('is true when a strict majority of supporting systems are external', () => {
-    const systemsById = new Map([
-      ['sys-1', system('sys-1', undefined, true)],
-      ['sys-2', system('sys-2', undefined, true)],
-      ['sys-3', system('sys-3', undefined, false)],
-    ]);
-    const edges = ['sys-1', 'sys-2', 'sys-3'].map((s) => supports(s, 'cap-1'));
-    expect(mostlyExternal('cap-1', edges, systemsById)).toBe(true);
+describe('lifecycleExposure', () => {
+  it('is true when a supporting system plans to end within the next STALE_AFTER_MONTHS (12) months', () => {
+    const systemsById = new Map([['sys-1', system('sys-1', 'retiring', '2027-01-01')]]); // ~6.5 months out
+    expect(lifecycleExposure('cap-1', [supports('sys-1', 'cap-1')], systemsById, NOW)).toBe(true);
   });
 
-  it('is null on an exact tie, not an arbitrary pick', () => {
-    const systemsById = new Map([
-      ['sys-1', system('sys-1', undefined, true)],
-      ['sys-2', system('sys-2', undefined, false)],
-    ]);
-    const edges = ['sys-1', 'sys-2'].map((s) => supports(s, 'cap-1'));
-    expect(mostlyExternal('cap-1', edges, systemsById)).toBeNull();
+  it('is true when a supporting system is already past its planned end (more exposed, not less)', () => {
+    const systemsById = new Map([['sys-1', system('sys-1', 'retired', '2026-01-01')]]);
+    expect(lifecycleExposure('cap-1', [supports('sys-1', 'cap-1')], systemsById, NOW)).toBe(true);
   });
 
-  it('is null with no supporting systems', () => {
-    expect(mostlyExternal('cap-1', [], new Map())).toBeNull();
+  it('is false when the only planned end is well beyond the 12-month horizon', () => {
+    const systemsById = new Map([['sys-1', system('sys-1', 'active', '2030-01-01')]]);
+    expect(lifecycleExposure('cap-1', [supports('sys-1', 'cap-1')], systemsById, NOW)).toBe(false);
+  });
+
+  it('is false when no supporting system has a plannedEnd at all', () => {
+    const systemsById = new Map([['sys-1', system('sys-1', 'active')]]);
+    expect(lifecycleExposure('cap-1', [supports('sys-1', 'cap-1')], systemsById, NOW)).toBe(false);
+  });
+
+  it('is false for a capability with no supporting systems', () => {
+    expect(lifecycleExposure('cap-1', [], new Map(), NOW)).toBe(false);
   });
 });
 
@@ -86,10 +90,13 @@ describe('tileColourFor', () => {
     expect(tileColourFor('metric:oldestLifecycleStage', 'cap-1', [supports('sys-1', 'cap-1')], systemsById)).toEqual({ tone: 'neutral', label: 'retired' });
   });
 
-  it('colours by isExternal only when supporting systems are mostly external', () => {
-    const systemsById = new Map([['sys-1', system('sys-1', undefined, true)]]);
-    expect(tileColourFor('attribute:isExternal', 'cap-1', [supports('sys-1', 'cap-1')], systemsById)).toEqual({ tone: 'neutral', label: 'mostly external' });
-    const internalById = new Map([['sys-1', system('sys-1', undefined, false)]]);
-    expect(tileColourFor('attribute:isExternal', 'cap-1', [supports('sys-1', 'cap-1')], internalById)).toEqual({ tone: undefined, label: undefined });
+  it('colours lifecycle exposure danger only once a supporting system is actually exposed', () => {
+    const soon = new Date();
+    soon.setMonth(soon.getMonth() + 1);
+    const exposedById = new Map([['sys-1', system('sys-1', 'retiring', soon.toISOString().slice(0, 10))]]);
+    expect(tileColourFor('metric:lifecycleExposure', 'cap-1', [supports('sys-1', 'cap-1')], exposedById)).toEqual({ tone: 'danger', label: 'exposed' });
+
+    const notExposedById = new Map([['sys-1', system('sys-1', 'active')]]);
+    expect(tileColourFor('metric:lifecycleExposure', 'cap-1', [supports('sys-1', 'cap-1')], notExposedById)).toEqual({ tone: undefined, label: undefined });
   });
 });

@@ -19,7 +19,7 @@ describe('one worked example per DeltaKind', () => {
       elementType: 'capability',
       name: 'Revenues and Benefits',
       parentId: null,
-      attributes: { level: 1 },
+      attributes: { code: '1.0' },
       sourceId: 'src-1',
       confidence: 1,
     };

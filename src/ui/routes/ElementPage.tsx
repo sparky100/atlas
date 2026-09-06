@@ -118,7 +118,7 @@ export function ElementPage() {
                   />
                 </CollapsibleSection>
                 <CollapsibleSection title="Structure">
-                  <StructureSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} parent={state.data.parent} children={state.data.children} />
+                  <StructureSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} parent={state.data.parent} capabilityLevel={state.data.capabilityLevel} children={state.data.children} />
                 </CollapsibleSection>
               </div>
               <div className={styles.rightColumn}>

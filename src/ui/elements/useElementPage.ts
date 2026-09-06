@@ -15,6 +15,7 @@ import {
 } from '../../db/elements';
 import type { AliasRow, BranchRow, SourceRow } from '../../db/types';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
+import { capabilityLevel } from './capabilityDepth';
 import { supabase } from '../supabaseClient';
 
 export interface ElementPageData {
@@ -22,6 +23,8 @@ export interface ElementPageData {
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
   parent: ElementsHeadRow | null;
+  /** Capability only — computed, not a fact (see capabilityLevel's own comment). Always `undefined` for every other element type. */
+  capabilityLevel: number | null | undefined;
   children: ElementsHeadRow[];
   relationships: RelationshipsHeadRow[];
   /** The other endpoint of each relationship in `relationships` — never this element itself. */
@@ -85,6 +88,16 @@ export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): UseEle
       const parent = element.parent_id ? await getElementHead(supabase, commitId, element.parent_id) : null;
       const children = await listChildrenOf(supabase, commitId, elementId);
 
+      // Capability only, and only as deep as the level computation needs
+      // (at most a grandparent — nesting is capped at 3 levels): a plain
+      // structural value, not a fact, so it gets no badge and lives
+      // outside `facts` entirely.
+      let elementCapabilityLevel: number | null | undefined;
+      if (element.element_type === 'capability') {
+        const grandparent = parent?.parent_id ? await getElementHead(supabase, commitId, parent.parent_id) : null;
+        elementCapabilityLevel = capabilityLevel(parent, grandparent);
+      }
+
       const otherEndpointIds = relationships.map((rel) => (rel.from_element_id === elementId ? rel.to_element_id : rel.from_element_id));
       const [relationshipEndpoints, relationshipFactsList] = await Promise.all([
         getElementsByIds(supabase, commitId, otherEndpointIds),
@@ -101,7 +114,7 @@ export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): UseEle
       if (!cancelled) {
         setState({
           status: 'ready',
-          data: { commitId, element, facts, parent, children, relationships, relationshipEndpoints, relationshipFacts, aliases, aliasSources, sources, history, inFlightBranches },
+          data: { commitId, element, facts, parent, capabilityLevel: elementCapabilityLevel, children, relationships, relationshipEndpoints, relationshipFacts, aliases, aliasSources, sources, history, inFlightBranches },
         });
       }
     }

@@ -45,8 +45,8 @@ const lifecycleStatus: LifecycleStatus[] = ['planned', 'active', 'retiring', 're
 const dataClassification: DataClassification[] = ['public', 'official', 'official_sensitive', 'special_category'];
 
 const capabilityAttributes: fc.Arbitrary<CapabilityAttributes> = fc.record(
-  { description: fc.string(), level: fc.constantFrom(1 as const, 2 as const, 3 as const), code: fc.string({ minLength: 1, maxLength: 6 }) },
-  { requiredKeys: ['level'] },
+  { description: fc.string(), code: fc.string({ minLength: 1, maxLength: 6 }) },
+  { requiredKeys: [] },
 );
 const systemAttributes: fc.Arbitrary<SystemAttributes> = fc.record(
   {
