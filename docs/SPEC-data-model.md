@@ -626,8 +626,12 @@ C6 is the one that turns concurrent editing into a rejected commit rather than a
 | Branch kind | Writer | Path |
 |---|---|---|
 | `capture_draft` | capture worker (service role) | direct insert, then `branches.head_commit_id` update |
-| `change` | contributor+ via API | RLS-permitted insert (§9) inside `atlas.commit(envelope)` which runs the C-checks in one transaction |
+| `change` | contributor+ via API | RLS-permitted insert (§9), C-checks run application-side — see implementation note below |
 | `main` | nobody directly | `atlas.merge_branch`, `atlas.seed_from_map` (security definer) |
+
+**Implementation note (Sprint F1 step 6):** the `change`-branch path above was originally imagined as a single `atlas.commit(envelope)` security-definer function running every C-check inside one transaction. What `src/db/commits.ts` actually builds is two round trips instead: (1) fold the branch's current head, check the proposed deltas against it with the same `apply`/`fold` the engine already has, insert the commit row, insert its deltas; (2) compare-and-swap `branches.head_commit_id` from the caller's believed head to the new commit. `atlas.guard_branch_head_advance` (added in `20260906071800_branch_head_advance.sql`) backs this at the database layer regardless of caller — it rejects any `head_commit_id` update whose new value isn't a real commit on that branch, whose parent isn't the branch's *current* head, or where the branch isn't still `draft` (S-18) — so the invariant holds even against a client that skips the CAS pattern. A lost race (two commits both built against the same stale head) is caught even before the trigger runs, by the unique `(branch_id, parent_commit_id)` index on `commits` (§3.4) rejecting the second insert outright.
+
+The tradeoff of two round trips instead of one atomic procedure: if the CAS update in step (2) loses the race, or the deltas insert in step (1) fails after the commit insert succeeded, the just-inserted commit row is left behind as a permanent orphan — never deleted (append-only), never pointed to by any branch, never reached by `foldFromGenesis`. This is harmless (no fact it carries is ever read) and is an accepted tradeoff for this product's actual contention level (one or two architects on a branch at a time), not a data-loss path. A single security-definer procedure doing both round trips atomically — closer to the `atlas.commit(envelope)` originally sketched here — is named as the natural future optimisation if contention ever grows past that.
 
 ---
 
