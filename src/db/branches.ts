@@ -73,6 +73,13 @@ export async function listBranchesForModel(supabase: Client, modelId: UUID): Pro
   return data as BranchRow[];
 }
 
+/** Every change branch on a model — main excluded — newest-updated first, for the "Changes" list (UI-principles §2.4's `/changes` route). */
+export async function listChangeBranches(supabase: Client, modelId: UUID): Promise<BranchRow[]> {
+  const { data, error } = await supabase.from('branches').select('*').eq('model_id', modelId).eq('kind', 'change').order('updated_at', { ascending: false });
+  if (error) throw new Error(`listChangeBranches: ${error.message}`);
+  return data as BranchRow[];
+}
+
 /**
  * The columns an authenticated user can update directly on their own
  * (title/shared_for_review from supabase/migrations/20260906071400_history.sql,

@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { CapabilityMapPage } from './routes/CapabilityMapPage';
+import { ChangePage } from './routes/ChangePage';
+import { ChangesPage } from './routes/ChangesPage';
 import { ComponentPage } from './routes/ComponentPage';
 import { ContainerPage } from './routes/ContainerPage';
 import { ContextPage } from './routes/ContextPage';
@@ -35,6 +37,8 @@ export function App() {
           <Route path="/o/:orgSlug/m/:modelSlug/container/:systemId" element={<ContainerPage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/component/:containerId" element={<ComponentPage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/versions" element={<VersionsPage />} />
+          <Route path="/o/:orgSlug/m/:modelSlug/changes" element={<ChangesPage />} />
+          <Route path="/o/:orgSlug/m/:modelSlug/changes/:branchId" element={<ChangePage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/diff" element={<VersionDiffPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

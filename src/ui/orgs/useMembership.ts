@@ -57,3 +57,13 @@ export function canCreateModel(role: MemberRole | null): boolean {
 export function canEditOnMain(role: MemberRole | null): boolean {
   return role === 'owner' || role === 'architect';
 }
+
+/**
+ * Mirrors `branches_insert`'s RLS check (`atlas.has_role(org_id, 'owner',
+ * 'architect', 'contributor')`, supabase/migrations/20260906071400_history.sql)
+ * and ADR-009's "Contributor: can create/edit change branches... cannot
+ * merge to main" — a viewer gets no "New change" affordance at all.
+ */
+export function canCreateChangeBranch(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'architect' || role === 'contributor';
+}
