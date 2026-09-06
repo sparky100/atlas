@@ -368,3 +368,46 @@ export function envelopeToDeltaRows(
     toDeltaRow(delta, { ...ctx, commitId: envelope.id, seq }),
   );
 }
+
+// ---------------------------------------------------------------------------
+// Materialised projections (SPEC §3.5, §6.5) — the shapes
+// src/engine/projection.ts serialises a folded Head into, and
+// atlas.replace_main_head_projection (Sprint U1 step 3a) writes verbatim.
+// `commit_id`/`org_id`/`model_id` are omitted here: the SQL function fills
+// them in from its own parameters, not from these row bodies.
+// ---------------------------------------------------------------------------
+
+/** One row of `elements_head`, minus the columns the writer supplies. */
+export interface ElementsHeadRow {
+  element_id: UUID;
+  element_type: ElementType;
+  name: string;
+  parent_id: UUID | null;
+  attributes: Json;
+  exists_delta_id: UUID;
+}
+
+/** One row of `relationships_head`, minus the columns the writer supplies. */
+export interface RelationshipsHeadRow {
+  relationship_id: UUID;
+  relationship_type: RelationshipType;
+  from_element_id: UUID;
+  to_element_id: UUID;
+  attributes: Json;
+  exists_delta_id: UUID;
+}
+
+/** One row of `facts`, minus the `commit_id` column the writer supplies. */
+export interface FactsRow {
+  subject_type: SubjectType;
+  subject_id: UUID;
+  attribute: string;
+  value: Json | null;
+  delta_id: UUID;
+  source_id: UUID;
+  source_ref: string | null;
+  effective_date: string | null;
+  confidence: number;
+  asserted_by: UUID;
+  asserted_at: string;
+}

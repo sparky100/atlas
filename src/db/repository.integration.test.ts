@@ -129,7 +129,6 @@ describe('repository layer against a real local Supabase', () => {
 
     const elementId = randomUUID();
     const result = await commitToBranch(alice.client, {
-      orgId,
       modelId,
       branchId: branch.id,
       expectedHeadCommitId: mainGenesisCommitId,
@@ -143,7 +142,6 @@ describe('repository layer against a real local Supabase', () => {
         authorId: alice.id,
         deltas: [makeCreateDelta(randomUUID(), elementId, 'Housing Options')],
       },
-      createdBy: alice.id,
     });
     expect(result).toMatchObject({ ok: true });
 
@@ -173,12 +171,10 @@ describe('repository layer against a real local Supabase', () => {
     });
 
     const first = await commitToBranch(alice.client, {
-      orgId,
       modelId,
       branchId: branch.id,
       expectedHeadCommitId: mainGenesisCommitId,
       envelope: buildEnvelope('First commit'),
-      createdBy: alice.id,
     });
     expect(first.ok).toBe(true);
 
@@ -186,12 +182,10 @@ describe('repository layer against a real local Supabase', () => {
     // already moved past it. This is exactly what a second browser tab, or
     // a stale in-memory head, would send.
     const second = await commitToBranch(alice.client, {
-      orgId,
       modelId,
       branchId: branch.id,
       expectedHeadCommitId: mainGenesisCommitId,
       envelope: buildEnvelope('Second, conflicting commit'),
-      createdBy: alice.id,
     });
     expect(second).toMatchObject({ ok: false, reason: 'conflict' });
 

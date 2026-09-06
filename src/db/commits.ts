@@ -2,23 +2,32 @@
  * Committing a `CommitEnvelope` to a branch — the one place this repository
  * implements optimistic concurrency (SPEC-data-model.md §5.2's C13, C6).
  *
- * Two round trips, not one atomic stored procedure: insert the commit (and
- * its deltas), then compare-and-swap `branches.head_commit_id` from the
- * caller's believed current head to the new commit. If another commit won
- * the race in between, the swap affects zero rows and this returns a
- * `conflict` result — the just-inserted commit row is left in place,
- * append-only (deltas/commits are never deleted, SPEC §2), as a harmless
- * orphan no branch ever points to and no fold ever reaches. A single
- * security-definer procedure doing this atomically in one round trip is a
- * reasonable future optimisation (it would avoid the orphan entirely) but
- * isn't needed for this product's actual contention level — one or two
- * architects on one branch at a time — so it isn't built here.
+ * Sprint U1 step 3a: this used to be two round trips (insert the commit and
+ * its deltas, then compare-and-swap `branches.head_commit_id`), leaving a
+ * lost race's just-inserted commit as a harmless but permanent orphan. It's
+ * now one call to `atlas.commit_deltas`, a Postgres function that does all
+ * of that — plus, when the branch is `main`, materialising
+ * `elements_head`/`relationships_head`/`facts` for the new head — inside a
+ * single transaction. A lost race now means the whole call fails and
+ * nothing was written, not an orphan row. commits.ts computes the fold
+ * result and its projection (reusing the same tested engine that already
+ * did this for validation) and hands the RPC the data to write; the engine
+ * stays the one place fold/apply is defined (see supabase/migrations/
+ * 20260906090000_facts_and_commit_deltas.sql's module comment for why that
+ * split, not a PL/pgSQL reimplementation, was the right call).
+ *
+ * `orgId`/`createdBy` are gone from `CommitToBranchInput`: the RPC derives
+ * `org_id` from `modelId` and `author_id`/`created_by` from `auth.uid()`
+ * itself, never from a client-supplied value — there's no longer a
+ * parameter here for a caller to even get wrong.
  */
 import type { UUID } from '../contracts/delta';
-import { toCommitRow, envelopeToDeltaRows, type CommitRow } from '../contracts/rows';
+import { envelopeToDeltaRows, type CommitRow } from '../contracts/rows';
 import type { CommitEnvelope } from '../contracts/delta';
 import { cloneHead, fold } from '../engine/deltas';
-import { foldFromGenesis } from '../engine/head';
+import { foldFromGenesis, headHash } from '../engine/head';
+import { serializeHeadProjection } from '../engine/projection';
+import { getBranch } from './branches';
 import type { Client } from './client';
 import { buildCommitLoader } from './commitLoader';
 
@@ -28,14 +37,12 @@ export type CommitResult =
   | { ok: false; reason: 'conflict'; message: string };
 
 export interface CommitToBranchInput {
-  orgId: UUID;
   modelId: UUID;
   branchId: UUID;
   /** The commit this caller last saw as the branch's head. The commit-writing engine's C13: a stale value here is exactly what turns a concurrent edit into a rejected commit instead of a lost update. */
   expectedHeadCommitId: UUID;
   /** `envelope.parentCommitId` must equal `expectedHeadCommitId` — both are required, rather than deriving one from the other, so a caller can't accidentally commit against a head it never actually fetched. */
   envelope: CommitEnvelope;
-  createdBy: UUID;
 }
 
 /** Exported for direct unit testing — the only part of commitToBranch that needs no database at all. */
@@ -64,6 +71,12 @@ export function shapeErrors(envelope: CommitEnvelope, expectedHeadCommitId: UUID
   return errors;
 }
 
+/** Postgres error codes atlas.commit_deltas can raise (or that fire via the triggers/constraints it relies on) that mean "the caller's believed head was stale" rather than "the request itself was invalid." */
+const CONFLICT_ERROR_CODES = new Set([
+  '23505', // unique_violation on (branch_id, parent_commit_id) — another commit already claimed this parent.
+  '23514', // check_violation from atlas.guard_branch_head_advance — wrong parent or non-draft branch.
+]);
+
 /**
  * Commits `input.envelope` to `input.branchId`, provided nothing else has
  * advanced the branch past `input.expectedHeadCommitId` in the meantime.
@@ -72,13 +85,21 @@ export function shapeErrors(envelope: CommitEnvelope, expectedHeadCommitId: UUID
  * — reusing the same engine `apply` that would reject an update targeting
  * a missing subject, a restore of something not retracted, and so on
  * (SPEC §6.2's own preconditions), rather than re-implementing them here.
+ * If the branch is `main`, the resulting head is also serialised and sent
+ * along so `atlas.commit_deltas` can materialise it in the same
+ * transaction.
  */
 export async function commitToBranch(supabase: Client, input: CommitToBranchInput): Promise<CommitResult> {
-  const { orgId, modelId, branchId, expectedHeadCommitId, envelope, createdBy } = input;
+  const { modelId, branchId, expectedHeadCommitId, envelope } = input;
 
   const structuralErrors = shapeErrors(envelope, expectedHeadCommitId);
   if (structuralErrors.length > 0) {
     return { ok: false, reason: 'invalid', message: structuralErrors.join('; ') };
+  }
+
+  const branch = await getBranch(supabase, branchId);
+  if (!branch) {
+    return { ok: false, reason: 'invalid', message: `branch ${branchId} not found` };
   }
 
   const loader = await buildCommitLoader(supabase, modelId);
@@ -94,40 +115,64 @@ export async function commitToBranch(supabase: Client, input: CommitToBranchInpu
     return { ok: false, reason: 'invalid', message: `could not compute the current head: ${(e as Error).message}` };
   }
 
+  let newHead;
   try {
-    fold(cloneHead(currentHead), envelope.deltas, { authorId: envelope.authorId, createdAt: new Date().toISOString() });
+    newHead = fold(cloneHead(currentHead), envelope.deltas, { authorId: envelope.authorId, createdAt: new Date().toISOString() });
   } catch (e) {
     return { ok: false, reason: 'invalid', message: (e as Error).message };
   }
 
-  const commitRow = toCommitRow(envelope, { orgId, modelId, depth: parentNode.depth + 1 });
-  const { error: commitInsertError } = await supabase.from('commits').insert(commitRow satisfies Omit<CommitRow, 'head_hash' | 'created_at'>);
-  if (commitInsertError) {
-    // Either RLS denied it (not this user's branch, branch not draft, ...)
-    // or the unique (branch_id, parent_commit_id) index caught a lost race
-    // at insert time already — either way, nothing was written.
-    return { ok: false, reason: 'conflict', message: commitInsertError.message };
-  }
+  // orgId/modelId/createdBy are throwaway here — atlas.commit_deltas fills
+  // in the real org_id/model_id/created_by (from its own params and
+  // auth.uid()) itself, and never trusts a client-supplied value for them.
+  // envelopeToDeltaRows still needs *something* structurally; the map below
+  // strips all five DB-assigned fields (those three plus commit_id/seq)
+  // back out before this goes into the RPC call.
+  const deltaRows = envelopeToDeltaRows(envelope, { orgId: '', modelId: '', createdBy: '' }).map((row) => ({
+    id: row.id,
+    kind: row.kind,
+    subject_id: row.subject_id,
+    attribute: row.attribute,
+    element_type: row.element_type,
+    relationship_type: row.relationship_type,
+    name: row.name,
+    parent_id: row.parent_id,
+    from_element_id: row.from_element_id,
+    to_element_id: row.to_element_id,
+    value: row.value,
+    previous_delta_id: row.previous_delta_id,
+    source_id: row.source_id,
+    source_ref: row.source_ref,
+    effective_date: row.effective_date,
+    confidence: row.confidence,
+  }));
 
-  const deltaRows = envelopeToDeltaRows(envelope, { orgId, modelId, createdBy });
-  if (deltaRows.length > 0) {
-    const { error: deltasInsertError } = await supabase.from('deltas').insert(deltaRows);
-    if (deltasInsertError) {
-      // The commit row above is now an orphan — see the module comment.
-      return { ok: false, reason: 'invalid', message: deltasInsertError.message };
+  const isMain = branch.kind === 'main';
+  const projection = isMain ? serializeHeadProjection(newHead) : null;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.rpc('commit_deltas', {
+    p_commit_id: envelope.id,
+    p_model_id: modelId,
+    p_branch_id: branchId,
+    p_base_commit_id: expectedHeadCommitId,
+    p_kind: envelope.kind,
+    p_message: envelope.message,
+    p_deltas: deltaRows,
+    p_merged_branch_head_commit_id: envelope.mergedBranchHeadCommitId,
+    p_elements_head: projection?.elementsHead ?? null,
+    p_relationships_head: projection?.relationshipsHead ?? null,
+    p_facts: projection?.facts ?? null,
+    p_head_hash: isMain ? headHash(newHead) : null,
+  } satisfies Record<string, unknown>);
+
+  if (error) {
+    if (CONFLICT_ERROR_CODES.has(error.code)) {
+      return { ok: false, reason: 'conflict', message: error.message };
     }
+    return { ok: false, reason: 'invalid', message: error.message };
   }
 
-  const { data: advanced, error: advanceError } = await supabase
-    .from('branches')
-    .update({ head_commit_id: envelope.id })
-    .eq('id', branchId)
-    .eq('head_commit_id', expectedHeadCommitId)
-    .select('id');
-  if (advanceError) return { ok: false, reason: 'conflict', message: advanceError.message };
-  if (advanced.length === 0) {
-    return { ok: false, reason: 'conflict', message: 'the branch head moved since it was last read; refresh and retry' };
-  }
-
-  return { ok: true, commitId: envelope.id };
+  const commitRow = data as CommitRow;
+  return { ok: true, commitId: commitRow.id };
 }
