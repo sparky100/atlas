@@ -1,0 +1,101 @@
+import { useCallback, useEffect, useState } from 'react';
+import type { UUID } from '../../contracts/delta';
+import { getMainBranch } from '../../db/branches';
+import { getCapabilityMap, listCapabilityMapItems, listPublishedCapabilityMaps, type CapabilityMapRow } from '../../db/capabilityMapTemplates';
+import { seedModelFromCapabilityMap } from '../../db/seedFromMap';
+import { supabase } from '../supabaseClient';
+
+export type CapabilityImportStatus = 'loadingMaps' | 'idle' | 'seeding';
+
+export interface UseCapabilityImportResult {
+  status: CapabilityImportStatus;
+  maps: CapabilityMapRow[];
+  error: string | null;
+  /** Seeds `modelId`'s (empty) main branch from `mapId` — the tailoring flow's "import" action. */
+  importMap: (mapId: UUID) => Promise<void>;
+}
+
+export interface UseCapabilityImportInput {
+  modelId: UUID;
+  userId: UUID | null;
+  onImported: () => void;
+}
+
+/**
+ * The tailoring flow's "import" action (Sprint U2 step 2): lists the
+ * published starter maps for the picker, then seeds the chosen one via
+ * atlas.seed_from_map (src/db/seedFromMap.ts). Only reachable while a
+ * model's main branch has no commits at all (SPEC §5.1's "first commit of
+ * a model") — src/ui/routes/CapabilityMapPage.tsx only renders this while
+ * `useCapabilityMap` reports `refNotFound`, and `seed_from_map` itself
+ * re-checks the same precondition server-side regardless.
+ */
+export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabilityImportResult {
+  const { modelId, userId, onImported } = input;
+  const [status, setStatus] = useState<CapabilityImportStatus>('loadingMaps');
+  const [maps, setMaps] = useState<CapabilityMapRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listPublishedCapabilityMaps(supabase)
+      .then((rows) => {
+        if (!cancelled) {
+          setMaps(rows);
+          setStatus('idle');
+        }
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Could not load starter capability maps.');
+          setStatus('idle');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const importMap = useCallback(
+    async (mapId: UUID) => {
+      if (!userId) {
+        setError('You must be signed in to import a capability map.');
+        return;
+      }
+      setError(null);
+      setStatus('seeding');
+
+      try {
+        const main = await getMainBranch(supabase, modelId);
+        if (!main) throw new Error('main branch was not found for this model');
+        const map = await getCapabilityMap(supabase, mapId);
+        if (!map) throw new Error('This capability map no longer exists.');
+        const items = await listCapabilityMapItems(supabase, mapId);
+
+        const result = await seedModelFromCapabilityMap(supabase, {
+          modelId,
+          branchId: main.id,
+          authorId: userId,
+          capabilityMapId: mapId,
+          sector: map.sector,
+          version: map.version,
+          items,
+        });
+        if (!result.ok) {
+          setStatus('idle');
+          setError(`Could not import: ${result.message}`);
+          return;
+        }
+
+        setStatus('idle');
+        onImported();
+      } catch (e) {
+        setStatus('idle');
+        setError(e instanceof Error ? e.message : 'Could not import capability map.');
+      }
+    },
+    [modelId, userId, onImported],
+  );
+
+  return { status, maps, error, importMap };
+}

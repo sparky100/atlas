@@ -1,0 +1,174 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  unit-test:
+    name: Unit and property tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+  build:
+    name: App and Storybook build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # Every primitive under src/ui needs a story (Sprint U1 step 1); this
+      # catches a story that no longer typechecks/builds, which
+      # `pnpm typecheck`/`pnpm lint` alone don't fully exercise (addon
+      # wiring, story-level render errors at build time).
+      - run: pnpm build-storybook
+
+  database:
+    name: Fresh-database migration check and integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Uses the `supabase` devDependency pinned in package.json, not a
+      # separately-versioned GitHub Action, so CI and local `pnpm db:start`
+      # are always running the same CLI. `supabase start` pulls a fresh set
+      # of images and brings up Postgres with the same `auth`/`storage`
+      # schemas a real project has, from nothing — every run is a clean
+      # database, which is what "fresh-database migration check" means
+      # (CLAUDE.md's definition of done).
+      - name: Start local Supabase
+        run: pnpm exec supabase start
+
+      # `db reset` replays every file in supabase/migrations against that
+      # fresh database in order. Any migration that only worked because an
+      # earlier manual fix-up was applied by hand fails right here.
+      - name: Apply all migrations to a fresh database
+        run: pnpm exec supabase db reset
+
+      - name: Write integration test environment
+        run: |
+          echo "SUPABASE_URL=$(pnpm exec supabase status -o env | grep '^API_URL=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$(pnpm exec supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(pnpm exec supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+
+      # src/db/repository.integration.test.ts (Sprint F1 step 6) runs here,
+      # against the database `db reset` just built — real auth (service-role
+      # createUser + signInWithPassword), real RLS, no shortcuts.
+      - name: Run integration tests
+        run: pnpm test:integration
+
+      - name: Stop local Supabase
+        if: always()
+        run: pnpm exec supabase stop --no-backup
+
+  e2e:
+    name: Playwright smoke (UI Definition of Done)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Start local Supabase
+        run: pnpm exec supabase start
+
+      - name: Apply all migrations to a fresh database
+        run: pnpm exec supabase db reset
+
+      # The browser bundle only ever sees VITE_-prefixed variables
+      # (src/ui/env.ts) — never the service-role key.
+      - name: Write browser environment
+        run: |
+          echo "VITE_SUPABASE_URL=$(pnpm exec supabase status -o env | grep '^API_URL=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_ANON_KEY=$(pnpm exec supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+
+      # e2e/landscape-perf.spec.ts (Sprint U1 step 4b) seeds its 2,000-
+      # system/4,000-edge fixture from Node, not through the browser (typing
+      # 2,000 elements through a form would test nothing this sprint hasn't
+      # already covered) — the same non-VITE_ variables the `database` job
+      # writes for the integration tests, needed here too.
+      - name: Write server-side environment
+        run: |
+          echo "SUPABASE_URL=$(pnpm exec supabase status -o env | grep '^API_URL=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$(pnpm exec supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(pnpm exec supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+
+      - run: pnpm build
+
+      # Chromium ships with the `@playwright/test` devDependency's own
+      # postinstall on a normal `pnpm install` in CI (unlike this repo's
+      # authoring sandbox, which pre-provisions it and skips the download).
+      - name: Install Playwright's browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      # e2e/auth-theme.spec.ts (Sprint U1 step 2a) — real sign-up, real
+      # theme toggle, a reload with localStorage cleared first so the
+      # assertion can only pass via user_preferences round-tripping through
+      # Supabase, not a client-side cache alone. e2e/landscape-perf.spec.ts
+      # (step 4b) — the required 2,000-system/4,000-edge fps budget, plus
+      # the commit_deltas payload-size assertion ADR-015 committed to.
+      - name: Run Playwright tests
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Stop local Supabase
+        if: always()
+        run: pnpm exec supabase stop --no-backup

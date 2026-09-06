@@ -1,0 +1,47 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 20px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-lh);
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.marker {
+  display: inline-flex;
+  font-size: var(--text-xs-size);
+}
+
+.unchanged {
+  color: var(--text-muted);
+  background: transparent;
+  border-color: var(--diff-none);
+  opacity: 0.6;
+}
+
+.added {
+  color: var(--diff-added);
+  background: color-mix(in srgb, var(--diff-added) 12%, transparent);
+  border-color: var(--diff-added);
+  border-style: solid;
+}
+
+.removed {
+  color: var(--diff-removed);
+  background: color-mix(in srgb, var(--diff-removed) 12%, transparent);
+  border-color: var(--diff-removed);
+  border-style: dashed;
+}
+
+.changed,
+.moved {
+  color: var(--diff-changed);
+  background: color-mix(in srgb, var(--diff-changed) 12%, transparent);
+  border-color: var(--diff-changed);
+  border-style: solid;
+}

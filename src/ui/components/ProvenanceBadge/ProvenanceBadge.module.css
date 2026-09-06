@@ -1,0 +1,25 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-lh);
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  /* Fixed-ish width so badge columns align down an attribute list (§4.3);
+     content-driven, but the mono font plus gap keeps rows visually level. */
+  white-space: nowrap;
+}
+
+.age {
+  color: var(--text-muted);
+}
+
+.staleAge {
+  color: var(--status-warn);
+  font-weight: 600;
+}
+
+.separator {
+  color: var(--border-strong);
+}

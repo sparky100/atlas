@@ -1,0 +1,51 @@
+import { useCallback, useEffect, useState } from 'react';
+import { createOrganisation, listOrganisationsForUser } from '../../db/organisations';
+import type { OrganisationRow } from '../../db/types';
+import { supabase } from '../supabaseClient';
+
+export interface UseOrganisationsResult {
+  organisations: OrganisationRow[];
+  loading: boolean;
+  error: string | null;
+  /** Re-fetches the list — call after creating an organisation. */
+  refresh: () => void;
+  createOrganisation: (name: string, slug: string, createdBy: string) => Promise<OrganisationRow>;
+}
+
+/** Organisations the signed-in user belongs to (RLS scopes the query — see organisations.ts's module comment). */
+export function useOrganisations(): UseOrganisationsResult {
+  const [organisations, setOrganisations] = useState<OrganisationRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [generation, setGeneration] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    listOrganisationsForUser(supabase)
+      .then((rows) => {
+        if (!cancelled) setOrganisations(rows);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load organisations');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [generation]);
+
+  const refresh = useCallback(() => {
+    setGeneration((g) => g + 1);
+  }, []);
+
+  const create = useCallback(async (name: string, slug: string, createdBy: string) => {
+    const org = await createOrganisation(supabase, { id: crypto.randomUUID(), name, slug, createdBy });
+    setOrganisations((prev) => [...prev, org].sort((a, b) => a.name.localeCompare(b.name)));
+    return org;
+  }, []);
+
+  return { organisations, loading, error, refresh, createOrganisation: create };
+}

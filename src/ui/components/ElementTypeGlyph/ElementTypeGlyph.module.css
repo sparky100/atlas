@@ -1,0 +1,14 @@
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2em;
+  font-size: var(--text-lg-size);
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.external {
+  border: 1px dotted var(--border-strong);
+  border-radius: var(--radius-sm);
+}

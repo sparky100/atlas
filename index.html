@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atlas</title>
+    <!--
+      Runs before any stylesheet or the app bundle, synchronously, so
+      data-theme/data-density are on <html> before first paint — UI-
+      principles.md §3's "applied on load before first paint (no flash)".
+      Kept tiny and dependency-free on purpose: this is the one place in the
+      app that must run before React, before Supabase, before anything.
+      src/ui/theme/resolvePreferences.ts is the same logic, exported for the
+      ThemeProvider and for a unit test to check they can't drift apart.
+    -->
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem('atlas:theme') || 'system';
+          var density = localStorage.getItem('atlas:density') || 'comfortable';
+          var resolvedTheme =
+            theme === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme;
+          var root = document.documentElement;
+          root.setAttribute('data-theme', resolvedTheme);
+          root.setAttribute('data-theme-preference', theme);
+          root.setAttribute('data-density', density === 'compact' ? 'compact' : 'comfortable');
+        } catch (e) {
+          // localStorage can throw (private mode, disabled storage). Falling
+          // through to the CSS defaults (light, comfortable) is correct
+          // behaviour, not an error to surface.
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/src/ui/styles/tokens.css" />
+    <link rel="stylesheet" href="/src/ui/styles/global.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/ui/main.tsx"></script>
+  </body>
+</html>

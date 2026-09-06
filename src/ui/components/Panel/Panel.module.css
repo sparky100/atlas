@@ -1,0 +1,12 @@
+.panel {
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--panel-padding);
+}
+
+.raised {
+  background: var(--surface-raised);
+  box-shadow: var(--surface-raised-shadow);
+  border-color: transparent;
+}

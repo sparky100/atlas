@@ -1,0 +1,126 @@
+import { useState } from 'react';
+import type { SubmitEvent } from 'react';
+import { Link } from 'react-router';
+import { useAuth } from '../auth/useAuth';
+import { AppHeader } from '../components/AppHeader/AppHeader';
+import { Button } from '../components/Button/Button';
+import { Panel } from '../components/Panel/Panel';
+import { Text } from '../components/Text/Text';
+import { useOrganisations } from '../orgs/useOrganisations';
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** The signed-in landing page: every organisation the user belongs to, plus creating a new one. Which organisation/model to open next is the user's own click — no auto-redirect invented for the one-org case. */
+export function Home() {
+  const { userId } = useAuth();
+  const { organisations, loading, error, createOrganisation } = useOrganisations();
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  async function handleCreate(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!userId) return;
+    setSubmitting(true);
+    setCreateError(null);
+    try {
+      await createOrganisation(name.trim(), slugify(name), userId);
+      setName('');
+      setCreating(false);
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : 'Failed to create organisation');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div>
+      <AppHeader />
+      <main style={{ padding: 'var(--space-8)', maxWidth: 640, margin: '0 auto' }}>
+        <Text as="h1" size="2xl">
+          Your organisations
+        </Text>
+        {loading && (
+          <Text tone="muted" as="p">
+            Loading…
+          </Text>
+        )}
+        {error !== null && (
+          <Text tone="default" as="p">
+            {error}
+          </Text>
+        )}
+        {!loading && organisations.length === 0 && (
+          <Panel>
+            <Text as="p" tone="muted">
+              You're not a member of any organisation yet. Create one to get started — you'll be its owner.
+            </Text>
+          </Panel>
+        )}
+        {organisations.length > 0 && (
+          <ul style={{ listStyle: 'none', margin: 'var(--space-4) 0', padding: 0 }}>
+            {organisations.map((org) => (
+              <li key={org.id} style={{ marginBottom: 'var(--space-2)' }}>
+                <Link to={`/o/${org.slug}`}>
+                  <Text size="lg">{org.name}</Text>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div style={{ marginTop: 'var(--space-4)' }}>
+          {creating ? (
+            <form onSubmit={(e) => void handleCreate(e)} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+              <input
+                placeholder="Organisation name"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                }}
+                style={{
+                  height: 'var(--row-height)',
+                  padding: '0 var(--space-3)',
+                  borderRadius: 'var(--radius-md)',
+                  border: 'var(--border-width) solid var(--border-strong)',
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                  minWidth: 240,
+                }}
+              />
+              <Button type="submit" variant="primary" disabled={submitting || name.trim().length === 0}>
+                Create
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setCreating(false);
+                }}
+              >
+                Cancel
+              </Button>
+              {createError !== null && <Text tone="default">{createError}</Text>}
+            </form>
+          ) : (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setCreating(true);
+              }}
+            >
+              New organisation
+            </Button>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
