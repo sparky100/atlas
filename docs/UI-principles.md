@@ -149,7 +149,7 @@ Two columns on desktop (≥ 1024 px), stacked on narrower screens. Left column ~
 - The id, truncated, with copy-to-clipboard.
 - Aliases (`aliases` rows other than `merged_id`), inline, each with its provenance badge on hover.
 - "in N views" links to the list of saved views whose query includes this element at the current ref.
-- `Edit` is present only for contributor+ and only when the ref is a draft change branch; at `main` or a tag it reads `Propose a change…` and opens the branch picker. **There is no editing at main. Ever.**
+- `Edit`: for a **contributor**, present only when the ref is a draft change branch; at `main` or a tag it reads `Propose a change…` and opens the branch picker — a contributor never edits main directly. For an **architect or owner**, `Edit` is also available directly at `main` (ADR-015, SPEC §5.3) — the same action, going straight to a commit on main rather than a change branch, since those two roles are the ones a commit to main is actually gated on. At a tag, for any role, it is always `Propose a change…`: a tag is never itself editable.
 
 ### 4.3 Attributes with provenance badges
 
@@ -532,3 +532,4 @@ Raised as open items in the first draft; resolved by the product owner and now b
 2. **Staleness and confidence thresholds are global for v1**, in one config module (§8.9). Per-model settings, if ever wanted, are a settings row plus a lookup, not a refactor.
 3. **Unresolved comments do not block a merge** (§7.3). A gate needs an explicit mechanism and is a separate decision if it ever comes up. ADR-006 unchanged.
 4. **"Planned replacement" requires a retract delta** in the same approved change (§3.1). A new system beside an ageing one is not a replacement. With no retract delta, the exposure chip is shown, not weakened.
+5. **A contributor never commits to main; an architect or owner may, directly** (§4.2, ADR-015, SPEC §5.3). This is a permanent role rule, not a placeholder for a not-yet-built review queue — once branches and a review queue exist in the UI, a contributor's route to main is still always through one, but an architect or owner committing directly to main was never gated on that queue existing in the first place.

@@ -20,28 +20,27 @@
 --    is one transaction.
 --
 --    Security definer, with its own authorization check, because it has to
---    do something the plain `commits_insert`/`branches` RLS policies
---    deliberately never allowed: advance `main`. commits_insert requires
---    `branch.kind = 'change'` and never `main` (S-17's original "no direct
---    writes to main" reading) — Sprint U1's brief is explicit that this
---    sprint has no branches or review queue in the UI yet ("no branches in
---    UI yet"), so step 5's editing has nowhere to commit *but* main. This
---    function is that sanctioned, narrow path, and it re-derives the same
---    role check `commits_insert` used to make (owner/architect/contributor)
---    rather than trusting anything the caller claims. UI-principles.md
---    §4.2's "no editing at main, ever" describes the eventual product, once
---    branches and a review queue exist; it is not yet buildable this
---    sprint and does not apply to what step 5 has to do instead.
+--    do something the plain `commits_insert`/`branches` RLS policies never
+--    allowed: advance `main`. This is a permanent product decision (ADR-015,
+--    UI-principles.md §4.2), not a sprint-scoped workaround: contributors
+--    never commit to main, whether or not a branch/review-queue UI exists —
+--    only owner/architect may. A `change` branch still takes
+--    owner/architect/contributor, matching commits_insert's original rule,
+--    and still must be `draft`.
 --
 -- 3. `atlas.replace_main_head_projection` — the actual projection writer,
---    factored out so both `commit_deltas` and a future `rebuildHead` (a
+--    factored out so both `commit_deltas` and `src/db/rebuildHead.ts` (a
 --    TypeScript-driven full refold, for repair/verification — SPEC §6.6's
 --    integrity job) share one write path. Not granted to `authenticated`
 --    at all: `commit_deltas` calls it as its own owner (a security-definer
 --    function's internal calls run with the *definer's* privileges, which
 --    always include execute on functions it owns, regardless of grants to
 --    other roles) — an authenticated user has no way to call this directly
---    with arbitrary data for an org they don't belong to.
+--    with arbitrary data for an org they don't belong to. Idempotent for a
+--    single commit_id (always clears that commit's own rows before
+--    inserting, whether or not it's tagged) — rebuildHead deliberately
+--    re-runs this for a commit whose projection already exists, main's
+--    current head included, to verify it's still correct.
 --
 -- Why the fold/apply logic itself isn't reimplemented in SQL: src/engine
 -- already has ~450 lines of tested `apply`/`fold` covering all 8 delta
@@ -52,13 +51,24 @@
 -- validation) and serialises it into the jsonb arrays these functions take
 -- — the engine stays the one place fold/apply is defined, and this
 -- migration's job is only to write the result atomically.
+--
+-- The real cost of that choice: the *whole* materialised projection for
+-- the new head crosses the wire on every main commit, not just the
+-- touched rows — a one-element edit on a 2,000-element landscape still
+-- sends all 2,000 elements back. Deliberate for now (SPEC §6.5's own
+-- "fetch everything" allowance; this product's stated scale is one or two
+-- architects, not a live-editing crowd), with delta-apply directly against
+-- the existing projection rows named as the upgrade path if that payload
+-- ever needs it (ADR-015) — measured, not guessed, by Sprint U1 step 4's
+-- Playwright perf test against a generated 2,000-element model.
 
 -- Every prior atlas.* function was only ever invoked implicitly, through an
 -- RLS policy or trigger expression compiled at creation time by the
 -- migration role — those don't re-check schema USAGE per call. This
 -- migration is the first time a client calls into the schema directly
--- (`select atlas.commit_deltas(...)`), which does need it.
-grant usage on schema atlas to authenticated;
+-- (`select atlas.commit_deltas(...)`, and `rebuildHead`'s direct call to
+-- atlas.replace_main_head_projection as service_role), which does need it.
+grant usage on schema atlas to authenticated, service_role;
 
 create table facts (
   commit_id uuid not null references commits (id) on delete cascade,
@@ -112,10 +122,19 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  -- gcOldHeads (SPEC §6.5): drop the previous head's projection rows unless
-  -- a tag still cites them — the one thing that keeps a tagged version's
-  -- projection queryable without ever walking deltas for it.
-  if p_old_commit_id is not null and not exists (select 1 from tags t where t.commit_id = p_old_commit_id) then
+  -- Always clear the target commit's own rows first — idempotent even if
+  -- called twice for the same commit_id (rebuildHead's repair path
+  -- deliberately re-runs this for a commit that may already be
+  -- materialised, tagged or not, to verify it's still correct).
+  delete from elements_head where commit_id = p_new_commit_id;
+  delete from relationships_head where commit_id = p_new_commit_id;
+  delete from facts where commit_id = p_new_commit_id;
+
+  -- gcOldHeads (SPEC §6.5): drop the *previous* head's projection rows too,
+  -- unless a tag still cites them or it's the same commit just cleared
+  -- above — the one thing that keeps a tagged version's projection
+  -- queryable without ever walking deltas for it.
+  if p_old_commit_id is not null and p_old_commit_id <> p_new_commit_id and not exists (select 1 from tags t where t.commit_id = p_old_commit_id) then
     delete from elements_head where commit_id = p_old_commit_id;
     delete from relationships_head where commit_id = p_old_commit_id;
     delete from facts where commit_id = p_old_commit_id;
@@ -181,15 +200,14 @@ begin
     raise exception 'commit_deltas: model % not found', p_model_id using errcode = '22023';
   end if;
 
-  -- The same role check commits_insert used to make (Sprint F1 step 2) —
-  -- re-derived here, not trusted from the caller, because this function
-  -- bypasses that policy by being security definer.
-  -- `is not true`, not `not ...`: atlas.has_role returns NULL (not false)
-  -- for a non-member, since atlas.member_role's underlying query finds no
-  -- row. `if not null then` is `if null then`, which PL/pgSQL treats as
-  -- false and silently skips the branch — exactly backwards from "deny by
-  -- default." Found by testing a non-member's call directly, not by
-  -- inspection: it succeeded silently before this fix.
+  -- General gate first, before this function reveals anything about
+  -- whether p_branch_id/p_base_commit_id even exist: any real membership at
+  -- all. `is not true`, not `not ...`: atlas.has_role returns NULL (not
+  -- false) for a non-member, since atlas.member_role's underlying query
+  -- finds no row. `if not null then` is `if null then`, which PL/pgSQL
+  -- treats as false and silently skips the branch — exactly backwards from
+  -- "deny by default." Found by testing a non-member's call directly, not
+  -- by inspection: it succeeded silently before this fix.
   if atlas.has_role(v_org_id, 'owner', 'architect', 'contributor') is not true then
     raise exception 'commit_deltas: insufficient role in this organisation' using errcode = '42501';
   end if;
@@ -201,10 +219,14 @@ begin
     raise exception 'commit_deltas: base_commit_id % is not a known commit on branch %', p_base_commit_id, p_branch_id using errcode = '22023';
   end if;
 
-  -- Sprint U1 has no branches or review queue in the UI yet, so `main` is
-  -- the only branch step 5's editing can commit to; a `change` branch must
-  -- still be `draft`, matching commits_insert's original rule.
-  if v_branch_kind = 'change' and not exists (select 1 from branches b where b.id = p_branch_id and b.status = 'draft') then
+  -- Permanent product decision (ADR-015, UI-principles.md §4.2): a
+  -- contributor never commits to main, whether or not a branch/review-queue
+  -- UI exists — only owner/architect may. A `change` branch keeps the
+  -- broader role set (matching commits_insert's original rule) and must
+  -- still be `draft`.
+  if v_branch_kind = 'main' and atlas.has_role(v_org_id, 'owner', 'architect') is not true then
+    raise exception 'commit_deltas: only owners and architects may commit directly to main' using errcode = '42501';
+  elsif v_branch_kind = 'change' and not exists (select 1 from branches b where b.id = p_branch_id and b.status = 'draft') then
     raise exception 'commit_deltas: branch % is not a draft change branch', p_branch_id using errcode = '42501';
   elsif v_branch_kind not in ('main', 'change') then
     raise exception 'commit_deltas: cannot commit directly to a % branch', v_branch_kind using errcode = '42501';

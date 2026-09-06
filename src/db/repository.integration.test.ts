@@ -20,13 +20,17 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Delta } from '../contracts/delta';
+import { foldFromGenesis, headHash } from '../engine/head';
+import { serializeHeadProjection } from '../engine/projection';
 import { createChangeBranch, getBranch, getMainBranch, listBranchesForModel } from './branches';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
+import { buildCommitLoader } from './commitLoader';
 import { commitToBranch } from './commits';
 import { createModel, getModelBySlug, listModelsForOrg } from './models';
 import { loadEnv } from './env';
 import { createOrganisation, getMyMembership, getOrganisationBySlug, listOrganisationsForUser } from './organisations';
+import { rebuildHead } from './rebuildHead';
 import { createTag, listTagsForModel } from './tags';
 import { getUserPreferences, upsertUserPreferences } from './userPreferences';
 
@@ -259,6 +263,118 @@ describe('repository layer against a real local Supabase', () => {
     it("bob cannot read alice's preferences, and cannot write a row under her id (RLS is user-scoped, not org-scoped)", async () => {
       expect(await getUserPreferences(bob.client, alice.id)).toBeNull();
       await expect(upsertUserPreferences(bob.client, { userId: alice.id, theme: 'light' })).rejects.toThrow();
+    });
+  });
+
+  // Sprint U1 step 3a: atlas.commit_deltas and head materialisation.
+  // rebuildHead and the head==fold comparison live here (not deferred to a
+  // later sprint), per the amendment to keep them alongside every other
+  // real-Supabase check this file already makes.
+  describe('atlas.commit_deltas / head materialisation (Sprint U1 step 3a)', () => {
+    let mainBranchId: string;
+    let mainCommitId: string;
+    const mainElementId = randomUUID();
+
+    it('a non-member cannot call commit_deltas at all (the NULL-vs-false has_role bug this caught during development)', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main) throw new Error('main branch not found');
+      mainBranchId = main.id;
+
+      // bob is not a member of orgId at this point in the file (removed by
+      // the earlier "a contributor cannot create a model" test) — this is
+      // the exact scenario that caught atlas.has_role returning NULL, not
+      // false, for a non-member (see the migration's own comment).
+      const { error } = await bob.client.rpc('commit_deltas', {
+        p_commit_id: randomUUID(),
+        p_model_id: modelId,
+        p_branch_id: mainBranchId,
+        p_base_commit_id: mainGenesisCommitId,
+        p_kind: 'manual',
+        p_message: 'non-member tries main',
+        p_deltas: [],
+      });
+      expect(error).not.toBeNull();
+    });
+
+    it('a contributor cannot commit directly to main (ADR-015: owner/architect only, permanently)', async () => {
+      const { error: inviteError } = await alice.client.from('members').insert({ org_id: orgId, user_id: bob.id, role: 'contributor', invited_by: alice.id });
+      if (inviteError) throw new Error(`inviting bob as contributor: ${inviteError.message}`);
+
+      const { error } = await bob.client.rpc('commit_deltas', {
+        p_commit_id: randomUUID(),
+        p_model_id: modelId,
+        p_branch_id: mainBranchId,
+        p_base_commit_id: mainGenesisCommitId,
+        p_kind: 'manual',
+        p_message: 'contributor tries main',
+        p_deltas: [],
+      });
+      expect(error).not.toBeNull();
+
+      const { error: removeError } = await alice.client.from('members').delete().eq('org_id', orgId).eq('user_id', bob.id);
+      if (removeError) throw new Error(`removing bob: ${removeError.message}`);
+    });
+
+    it('alice (owner) commits directly to main; elements_head and facts materialise for the new head', async () => {
+      mainCommitId = randomUUID();
+      const result = await commitToBranch(alice.client, {
+        modelId,
+        branchId: mainBranchId,
+        expectedHeadCommitId: mainGenesisCommitId,
+        envelope: {
+          id: mainCommitId,
+          branchId: mainBranchId,
+          parentCommitId: mainGenesisCommitId,
+          mergedBranchHeadCommitId: null,
+          kind: 'manual',
+          message: 'add Tenant Portal directly to main',
+          authorId: alice.id,
+          deltas: [makeCreateDelta(randomUUID(), mainElementId, 'Tenant Portal')],
+        },
+      });
+      expect(result).toMatchObject({ ok: true });
+
+      const { data: headRows, error } = await service.from('elements_head').select('element_id, name').eq('commit_id', mainCommitId);
+      if (error) throw new Error(`reading elements_head: ${error.message}`);
+      expect(headRows).toMatchObject([{ element_id: mainElementId, name: 'Tenant Portal' }]);
+    });
+
+    it("rebuildHead recomputes main's head independently and matches exactly, byte for byte (SPEC §6.6's head == fold(deltas))", async () => {
+      // The independent half: fold from genesis ourselves, without going
+      // through rebuildHead, so this isn't just checking rebuildHead
+      // agrees with itself.
+      const loader = await buildCommitLoader(service, modelId);
+      const expectedHead = foldFromGenesis(mainCommitId, loader);
+      const expected = serializeHeadProjection(expectedHead);
+
+      const result = await rebuildHead(service, modelId);
+      expect(result.commitId).toBe(mainCommitId);
+      expect(result.headHash).toBe(headHash(expectedHead));
+      expect(result.elementCount).toBe(expected.elementsHead.length);
+
+      const { data: elementsHead, error: elementsError } = await service
+        .from('elements_head')
+        .select('element_id, element_type, name, parent_id, attributes, exists_delta_id')
+        .eq('commit_id', mainCommitId);
+      if (elementsError) throw new Error(`reading elements_head: ${elementsError.message}`);
+      const byElementId = (rows: { element_id: string }[]) => [...rows].sort((a, b) => a.element_id.localeCompare(b.element_id));
+      expect(byElementId(elementsHead)).toEqual(byElementId(expected.elementsHead));
+
+      const { data: factsRows, error: factsError } = await service
+        .from('facts')
+        .select('subject_type, subject_id, attribute, value, delta_id, source_id, confidence, asserted_by')
+        .eq('commit_id', mainCommitId);
+      if (factsError) throw new Error(`reading facts: ${factsError.message}`);
+      const byFactKey = (rows: { subject_id: string; attribute: string }[]) => [...rows].sort((a, b) => `${a.subject_id} ${a.attribute}`.localeCompare(`${b.subject_id} ${b.attribute}`));
+      expect(byFactKey(factsRows)).toEqual(
+        byFactKey(expected.facts.map(({ source_ref: _sourceRef, effective_date: _effectiveDate, asserted_at: _assertedAt, ...rest }) => rest)),
+      );
+    });
+
+    it('rebuildHead is idempotent: running it again on an already-correct head changes nothing observable', async () => {
+      const before = await rebuildHead(service, modelId);
+      const after = await rebuildHead(service, modelId);
+      expect(after).toEqual(before);
     });
   });
 });
