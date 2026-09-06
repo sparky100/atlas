@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  unit-test:
+    name: Unit and property tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+  database:
+    name: Fresh-database migration check and integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Uses the `supabase` devDependency pinned in package.json, not a
+      # separately-versioned GitHub Action, so CI and local `pnpm db:start`
+      # are always running the same CLI. `supabase start` pulls a fresh set
+      # of images and brings up Postgres with the same `auth`/`storage`
+      # schemas a real project has, from nothing — every run is a clean
+      # database, which is what "fresh-database migration check" means
+      # (CLAUDE.md's definition of done).
+      - name: Start local Supabase
+        run: pnpm exec supabase start
+
+      # `db reset` replays every file in supabase/migrations against that
+      # fresh database in order. Any migration that only worked because an
+      # earlier manual fix-up was applied by hand fails right here.
+      - name: Apply all migrations to a fresh database
+        run: pnpm exec supabase db reset
+
+      - name: Write integration test environment
+        run: |
+          echo "SUPABASE_URL=$(pnpm exec supabase status -o env | grep '^API_URL=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$(pnpm exec supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(pnpm exec supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2-)" >> "$GITHUB_ENV"
+
+      # No integration test files exist yet in this sprint (src/db lands in
+      # Sprint F1 step 6); vitest.integration.config.ts has
+      # passWithNoTests: true so this step is a genuine pass, not a skip
+      # dressed up as one. Once src/db/*.integration.test.ts exist, this
+      # step is what runs them, against the database `db reset` just built.
+      - name: Run integration tests
+        run: pnpm test:integration
+
+      - name: Stop local Supabase
+        if: always()
+        run: pnpm exec supabase stop --no-backup
