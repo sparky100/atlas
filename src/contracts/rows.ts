@@ -317,6 +317,17 @@ export interface CommitRowContext {
   modelId: UUID;
   /** 1 + the parent's depth; 0 for a model's genesis commit (SPEC §3.4). */
   depth: number;
+  /**
+   * `commits.author_id` is a real, not-null column, but (Sprint H1)
+   * `CommitEnvelope` no longer carries an author claim of its own — the
+   * real value only ever comes from `auth.uid()` inside `atlas.commit_deltas`.
+   * This context field exists purely so `toCommitRow` can still produce a
+   * complete `CommitRow` for the RT-2 round-trip test; no production caller
+   * of `toCommitRow` exists (`src/db/commits.ts` never calls it — it goes
+   * straight to the RPC), so there is nowhere a real value would come from
+   * outside a test.
+   */
+  authorId: UUID;
 }
 
 /** `CommitEnvelope` → the row `commits` stores it as (without its deltas — those are separate rows, see `toDeltaRow`). */
@@ -330,7 +341,7 @@ export function toCommitRow(envelope: CommitEnvelope, ctx: CommitRowContext): Co
     merged_branch_head_commit_id: envelope.mergedBranchHeadCommitId,
     kind: envelope.kind,
     message: envelope.message,
-    author_id: envelope.authorId,
+    author_id: ctx.authorId,
     depth: ctx.depth,
   };
 }
@@ -338,10 +349,10 @@ export function toCommitRow(envelope: CommitEnvelope, ctx: CommitRowContext): Co
 /**
  * The row `commits` stores, plus its `deltas` rows (already ordered by
  * `seq`, or not — this sorts) → the `CommitEnvelope` they came from.
- * `head_hash`/`created_at`/`org_id`/`model_id`/`depth` have no home on
- * `CommitEnvelope` and are dropped, matching `CommitEnvelope`'s own shape
- * (SPEC §5.1) — that's a one-way loss on the row's *extra* fields, not on
- * anything the envelope itself carries, so `fromCommitRow(toCommitRow(e,
+ * `head_hash`/`created_at`/`org_id`/`model_id`/`depth`/`author_id` have no
+ * home on `CommitEnvelope` and are dropped, matching `CommitEnvelope`'s own
+ * shape (SPEC §5.1) — that's a one-way loss on the row's *extra* fields,
+ * not on anything the envelope itself carries, so `fromCommitRow(toCommitRow(e,
  * ctx), deltaRows) deep-equals e` whenever `deltaRows` reconstructs `e`'s
  * own deltas exactly.
  */
@@ -354,7 +365,6 @@ export function fromCommitRow(row: CommitInsertRow | CommitRow, deltaRows: reado
     mergedBranchHeadCommitId: row.merged_branch_head_commit_id,
     kind: row.kind,
     message: row.message,
-    authorId: row.author_id,
     deltas: orderedDeltas.map(fromDeltaRow),
   };
 }

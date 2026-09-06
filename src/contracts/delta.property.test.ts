@@ -265,14 +265,13 @@ describe('CommitEnvelope <-> commits+deltas rows round trip (RT-2, contract leve
       mergedBranchHeadCommitId: fc.constant(null),
       kind: fc.constantFrom('manual' as const, 'capture' as const, 'template_seed' as const),
       message: fc.string({ minLength: 1, maxLength: 80 }),
-      authorId: uuid,
       deltas: fc.array(deltaArb, { minLength: 0, maxLength: 6 }),
     });
 
   it('fromCommitRow(toCommitRow(e), envelopeToDeltaRows(e)) is deep-equal to e', () => {
     fc.assert(
-      fc.property(envelopeArb, fc.uuid(), fc.uuid(), fc.integer({ min: 0, max: 100 }), fc.uuid(), (envelope, orgId, modelId, depth, createdBy) => {
-        const commitRow = toCommitRow(envelope, { orgId, modelId, depth });
+      fc.property(envelopeArb, fc.uuid(), fc.uuid(), fc.integer({ min: 0, max: 100 }), fc.uuid(), fc.uuid(), (envelope, orgId, modelId, depth, authorId, createdBy) => {
+        const commitRow = toCommitRow(envelope, { orgId, modelId, depth, authorId });
         const deltaRows = envelopeToDeltaRows(envelope, { orgId, modelId, createdBy });
         const back = fromCommitRow(commitRow, deltaRows);
         expect(back).toEqual(envelope);
@@ -288,8 +287,9 @@ describe('CommitEnvelope <-> commits+deltas rows round trip (RT-2, contract leve
         fc.uuid(),
         fc.integer({ min: 0, max: 100 }),
         fc.uuid(),
-        (envelope, orgId, modelId, depth, createdBy) => {
-          const commitRow = toCommitRow(envelope, { orgId, modelId, depth });
+        fc.uuid(),
+        (envelope, orgId, modelId, depth, authorId, createdBy) => {
+          const commitRow = toCommitRow(envelope, { orgId, modelId, depth, authorId });
           const deltaRows = [...envelopeToDeltaRows(envelope, { orgId, modelId, createdBy })].reverse();
           const back = fromCommitRow(commitRow, deltaRows);
           expect(back).toEqual(envelope);

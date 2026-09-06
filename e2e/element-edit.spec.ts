@@ -92,7 +92,6 @@ test('an owner edits a System attribute on main and sees the new value with its 
     mergedBranchHeadCommitId: null,
     kind: 'manual',
     message: 'seed Billing Service',
-    authorId: userId,
     deltas: [
       {
         kind: 'element.create',

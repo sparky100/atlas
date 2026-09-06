@@ -73,7 +73,6 @@ export function useElementRetract(input: UseElementRetractInput): UseElementRetr
         mergedBranchHeadCommitId: null,
         kind: 'manual',
         message: `Retract ${element.name}`,
-        authorId: userId,
         deltas: [delta],
       };
 

@@ -100,7 +100,6 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
         mergedBranchHeadCommitId: null,
         kind: 'manual',
         message: `generated ${String(SYSTEM_COUNT)}-system/${String(EDGE_COUNT)}-edge landscape fixture`,
-        authorId: userId,
         deltas: generateLandscapeFixture(sourceId),
       };
       const commitResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });

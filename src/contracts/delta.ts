@@ -343,6 +343,16 @@ export function factKeyOf(d: Delta): { subjectId: UUID; attribute: string } {
 
 export type CommitKind = 'manual' | 'capture' | 'merge' | 'template_seed';
 
+/**
+ * No `authorId` field (Sprint H1, docs/AUDIT-2026-09-U2.md §2.E.3 item 15):
+ * `atlas.commit_deltas` has always derived `commits.author_id`/
+ * `deltas.created_by` from `auth.uid()`, never from anything the client
+ * claims — a wire-supplied author field here would only ever have been
+ * decorative for those two, and was in fact the untrusted source of
+ * `facts.asserted_by`/`facts.asserted_at` (SPEC §3.5), which is now fixed
+ * the same way. Nobody composing a `CommitEnvelope` has any authority over
+ * who it says wrote it; `auth.uid()` is the only source, everywhere.
+ */
 export interface CommitEnvelope {
   id: UUID;
   branchId: UUID;
@@ -356,8 +366,6 @@ export interface CommitEnvelope {
   mergedBranchHeadCommitId: UUID | null;
   kind: CommitKind;
   message: string;
-  /** `auth.users.id` for manual/merge; the capture worker's service identity for capture. */
-  authorId: UUID;
   /** Ordered. Index in this array is `deltas.seq`. */
   deltas: Delta[];
 }

@@ -75,7 +75,6 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
           mergedBranchHeadCommitId: null,
           kind: 'manual',
           message: `Add capability "${trimmed}"`,
-          authorId: userId,
           deltas: [delta],
         };
 

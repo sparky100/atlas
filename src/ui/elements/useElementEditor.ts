@@ -156,7 +156,6 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
         mergedBranchHeadCommitId: null,
         kind: 'manual',
         message: `Edit ${element.name}`,
-        authorId: userId,
         deltas,
       };
 

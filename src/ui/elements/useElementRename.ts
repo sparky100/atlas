@@ -116,7 +116,6 @@ export function useElementRename(input: UseElementRenameInput): UseElementRename
         mergedBranchHeadCommitId: null,
         kind: 'manual',
         message: `Rename "${element.name}" to "${trimmed}"`,
-        authorId: userId,
         deltas: [delta],
       };
 

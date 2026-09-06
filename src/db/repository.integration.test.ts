@@ -231,7 +231,6 @@ describe('repository layer against a real local Supabase', () => {
         mergedBranchHeadCommitId: null,
         kind: 'manual',
         message: 'add Housing Options',
-        authorId: alice.id,
         deltas: [makeCreateDelta(randomUUID(), elementId, 'Housing Options')],
       },
     });
@@ -258,7 +257,6 @@ describe('repository layer against a real local Supabase', () => {
       mergedBranchHeadCommitId: null,
       kind: 'manual' as const,
       message: name,
-      authorId: alice.id,
       deltas: [makeCreateDelta(randomUUID(), randomUUID(), name)],
     });
 
@@ -416,8 +414,7 @@ describe('repository layer against a real local Supabase', () => {
           mergedBranchHeadCommitId: null,
           kind: 'manual',
           message: 'add Tenant Portal directly to main',
-          authorId: alice.id,
-          deltas: [makeCreateDelta(randomUUID(), mainElementId, 'Tenant Portal')],
+            deltas: [makeCreateDelta(randomUUID(), mainElementId, 'Tenant Portal')],
         },
       });
       expect(result).toMatchObject({ ok: true });
