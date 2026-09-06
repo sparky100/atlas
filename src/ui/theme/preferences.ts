@@ -7,19 +7,31 @@
  * than a flash-of-wrong-theme bug found by a person.
  *
  * Sprint U1 step 2a wires `user_preferences` (SPEC §3.2) as the source of
- * truth when signed in; localStorage stays as the pre-paint cache the
- * inline script reads (a network fetch can't complete before first paint).
+ * truth when signed in (see ThemeProvider's `userId` prop); localStorage
+ * stays as the pre-paint cache the inline script reads (a network fetch
+ * can't complete before first paint).
+ *
+ * `ThemePreference`/`DensityPreference` are re-exported from
+ * src/contracts/userPreferences.ts, not redefined here — one enum, shared
+ * by the wire contract and the UI that renders it.
  */
 
-export type ThemePreference = 'system' | 'light' | 'dark';
+import {
+  DEFAULT_DENSITY,
+  DEFAULT_THEME,
+  DENSITY_PREFERENCES,
+  THEME_PREFERENCES,
+  type DensityPreference,
+  type ThemePreference,
+} from '../../contracts/userPreferences';
+
+export type { DensityPreference, ThemePreference };
 export type ResolvedTheme = 'light' | 'dark';
-export type DensityPreference = 'comfortable' | 'compact';
 
 export const THEME_STORAGE_KEY = 'atlas:theme';
 export const DENSITY_STORAGE_KEY = 'atlas:density';
 
-export const DEFAULT_THEME: ThemePreference = 'system';
-export const DEFAULT_DENSITY: DensityPreference = 'comfortable';
+export { DEFAULT_THEME, DEFAULT_DENSITY };
 
 export function resolveTheme(preference: ThemePreference, systemPrefersDark: boolean): ResolvedTheme {
   if (preference === 'system') return systemPrefersDark ? 'dark' : 'light';
@@ -27,11 +39,11 @@ export function resolveTheme(preference: ThemePreference, systemPrefersDark: boo
 }
 
 export function isThemePreference(value: string | null): value is ThemePreference {
-  return value === 'system' || value === 'light' || value === 'dark';
+  return (THEME_PREFERENCES as readonly string[]).includes(value ?? '');
 }
 
 export function isDensityPreference(value: string | null): value is DensityPreference {
-  return value === 'comfortable' || value === 'compact';
+  return (DENSITY_PREFERENCES as readonly string[]).includes(value ?? '');
 }
 
 /** Reads localStorage defensively — private-mode/disabled storage throws, and that's not an error worth surfacing (falls back to the documented defaults, SPEC §3.2). */

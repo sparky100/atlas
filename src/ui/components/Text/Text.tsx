@@ -12,7 +12,11 @@ export interface TextProps {
   mono?: boolean;
   /** The rendered element. Defaults to `span`; pass `h1`/`p`/etc. for real document structure — Text never decides semantics for you. */
   as?: ElementType;
-  className?: string;
+  // Explicitly `| undefined` (not just optional) so callers can pass a CSS
+  // Modules lookup straight through — those type as `string | undefined`
+  // under noUncheckedIndexedAccess, and exactOptionalPropertyTypes treats
+  // "optional" and "may be undefined" as different things.
+  className?: string | undefined;
   children: ReactNode;
 }
 

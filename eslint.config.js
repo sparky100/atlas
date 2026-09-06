@@ -8,7 +8,7 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 export default defineConfig(
   {
-    ignores: ['dist/**', 'node_modules/**', 'supabase/.temp/**', 'coverage/**', 'storybook-static/**'],
+    ignores: ['dist/**', 'node_modules/**', 'supabase/.temp/**', 'coverage/**', 'storybook-static/**', 'playwright-report/**', 'test-results/**'],
   },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,

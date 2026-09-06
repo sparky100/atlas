@@ -1,0 +1,22 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 0 var(--space-6);
+  height: 56px;
+  border-bottom: var(--border-width) solid var(--border);
+  background: var(--surface);
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.brand {
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 600;
+}

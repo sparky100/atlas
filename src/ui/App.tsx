@@ -1,25 +1,28 @@
-import { Text } from './components/Text/Text';
-import { ThemeDensityToggle } from './components/ThemeDensityToggle/ThemeDensityToggle';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { Home } from './routes/Home';
+import { ModelHome } from './routes/ModelHome';
+import { OrgHome } from './routes/OrgHome';
+import { RequireAuth } from './routes/RequireAuth';
+import { SignIn } from './routes/SignIn';
 
 /**
- * Placeholder root, honestly labelled as one (CLAUDE.md rule 7: an unbuilt
- * feature is absent, not faked). Auth, the organisation switcher, and the
- * model list are Sprint U1 step 2 — there is no login form or fake org data
- * here standing in for them.
+ * Sprint U1 step 2: auth, the organisation switcher, and the model list.
+ * No capture, no branches, no element page or landscape view yet (those
+ * are steps 3-5) — routes for them don't exist, rather than existing as
+ * placeholders that look finished.
  */
 export function App() {
   return (
-    <main style={{ padding: 'var(--space-8)', maxWidth: 640 }}>
-      <Text as="h1" size="2xl">
-        Atlas
-      </Text>
-      <Text as="p" tone="muted">
-        Sprint U1 step 1: design tokens and base components. Auth, the organisation switcher, and the model list are not built
-        yet — see Storybook for the primitives this step delivers.
-      </Text>
-      <div style={{ marginTop: 'var(--space-6)' }}>
-        <ThemeDensityToggle />
-      </div>
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/sign-in" element={<SignIn />} />
+        <Route element={<RequireAuth />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/o/:orgSlug" element={<OrgHome />} />
+          <Route path="/o/:orgSlug/m/:modelSlug" element={<ModelHome />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }

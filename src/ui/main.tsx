@@ -1,15 +1,15 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { App } from './App';
-import { ThemeProvider } from './theme/ThemeProvider';
+import { AuthProvider } from './auth/AuthProvider';
+import { ThemedApp } from './ThemedApp';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('#root element not found');
 
 createRoot(container).render(
   <StrictMode>
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemedApp />
+    </AuthProvider>
   </StrictMode>,
 );

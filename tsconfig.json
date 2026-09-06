@@ -23,6 +23,17 @@
     "jsx": "react-jsx",
     "types": ["node", "vite/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "vitest.config.ts", "vitest.integration.config.ts", "eslint.config.js", ".storybook/**/*.ts", ".storybook/**/*.tsx"],
-  "exclude": ["node_modules", "dist", "storybook-static", "supabase/.temp"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "e2e/**/*.ts",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "vitest.integration.config.ts",
+    "playwright.config.ts",
+    "eslint.config.js",
+    ".storybook/**/*.ts",
+    ".storybook/**/*.tsx"
+  ],
+  "exclude": ["node_modules", "dist", "storybook-static", "playwright-report", "test-results", "supabase/.temp"]
 }

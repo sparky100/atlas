@@ -24,8 +24,11 @@ import { createChangeBranch, getBranch, getMainBranch, listBranchesForModel } fr
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { commitToBranch } from './commits';
+import { createModel, getModelBySlug, listModelsForOrg } from './models';
 import { loadEnv } from './env';
+import { createOrganisation, getMyMembership, getOrganisationBySlug, listOrganisationsForUser } from './organisations';
 import { createTag, listTagsForModel } from './tags';
+import { getUserPreferences, upsertUserPreferences } from './userPreferences';
 
 const env = loadEnv();
 const service = createServiceRoleClient(env);
@@ -57,7 +60,9 @@ describe('repository layer against a real local Supabase', () => {
   let alice: TestUser;
   let bob: TestUser;
   let orgId: string;
+  let orgSlug: string;
   let modelId: string;
+  let modelSlug: string;
   let mainGenesisCommitId: string;
 
   beforeAll(async () => {
@@ -65,14 +70,14 @@ describe('repository layer against a real local Supabase', () => {
     bob = await createSignedInUser('bob');
 
     orgId = randomUUID();
-    const { error: orgError } = await alice.client.from('organisations').insert({ id: orgId, name: 'Test Council', slug: `test-council-${orgId.slice(0, 8)}`, created_by: alice.id });
-    if (orgError) throw new Error(`org setup: ${orgError.message}`);
+    orgSlug = `test-council-${orgId.slice(0, 8)}`;
+    // Through src/db/organisations.ts, not a raw insert — Sprint U1 step 2's
+    // repository layer is exactly what real app code calls.
+    await createOrganisation(alice.client, { id: orgId, name: 'Test Council', slug: orgSlug, createdBy: alice.id });
 
     modelId = randomUUID();
-    const { error: modelError } = await alice.client
-      .from('models')
-      .insert({ id: modelId, org_id: orgId, name: 'Test Landscape', slug: `test-landscape-${modelId.slice(0, 8)}`, schema_version: 1, created_by: alice.id });
-    if (modelError) throw new Error(`model setup: ${modelError.message}`);
+    modelSlug = `test-landscape-${modelId.slice(0, 8)}`;
+    await createModel(alice.client, { id: modelId, orgId, name: 'Test Landscape', slug: modelSlug, createdBy: alice.id });
 
     // Bootstrap main's genesis commit as service_role — standing in for the
     // not-yet-built atlas.seed_from_map (Sprint F1's src/engine covers
@@ -199,5 +204,67 @@ describe('repository layer against a real local Supabase', () => {
     const tag = await createTag(alice.client, { id: randomUUID(), orgId, modelId, name: 'v1', commitId: mainGenesisCommitId, createdBy: alice.id });
     expect(tag.commit_id).toBe(mainGenesisCommitId);
     expect(await listTagsForModel(bob.client, modelId)).toEqual([]);
+  });
+
+  // Sprint U1 step 2: organisations/models repository, the org switcher and
+  // model list's actual data source.
+  it('alice lists her own organisation and resolves it by slug; bob sees neither', async () => {
+    const aliceOrgs = await listOrganisationsForUser(alice.client);
+    expect(aliceOrgs.map((o) => o.id)).toContain(orgId);
+    expect(await getOrganisationBySlug(alice.client, orgSlug)).toMatchObject({ id: orgId });
+
+    const bobOrgs = await listOrganisationsForUser(bob.client);
+    expect(bobOrgs.map((o) => o.id)).not.toContain(orgId);
+    expect(await getOrganisationBySlug(bob.client, orgSlug)).toBeNull();
+  });
+
+  it('alice lists her model and resolves it by slug; bob sees neither', async () => {
+    const aliceModels = await listModelsForOrg(alice.client, orgId);
+    expect(aliceModels.map((m) => m.id)).toContain(modelId);
+    expect(await getModelBySlug(alice.client, orgId, modelSlug)).toMatchObject({ id: modelId });
+
+    // Bob isn't a member, so RLS hides the org's models from him entirely —
+    // listModelsForOrg(bob.client, orgId) returns [], not an error.
+    expect(await listModelsForOrg(bob.client, orgId)).toEqual([]);
+    expect(await getModelBySlug(bob.client, orgId, modelSlug)).toBeNull();
+  });
+
+  it("a contributor cannot create a model (mirrors models_insert's RLS, which is the real gate)", async () => {
+    // Promote bob to contributor on alice's org so this actually exercises
+    // "wrong role", not "not a member at all" (already covered above).
+    const { error: inviteError } = await alice.client.from('members').insert({ org_id: orgId, user_id: bob.id, role: 'contributor', invited_by: alice.id });
+    if (inviteError) throw new Error(`inviting bob as contributor: ${inviteError.message}`);
+
+    await expect(createModel(bob.client, { id: randomUUID(), orgId, name: 'Should not exist', slug: `nope-${randomUUID().slice(0, 8)}`, createdBy: bob.id })).rejects.toThrow();
+
+    const { error: removeError } = await alice.client.from('members').delete().eq('org_id', orgId).eq('user_id', bob.id);
+    if (removeError) throw new Error(`removing bob: ${removeError.message}`);
+  });
+
+  it("alice's own membership row reports her role; a non-member's lookup finds nothing", async () => {
+    const aliceMembership = await getMyMembership(alice.client, orgId, alice.id);
+    expect(aliceMembership?.role).toBe('owner');
+    expect(await getMyMembership(bob.client, orgId, bob.id)).toBeNull();
+  });
+
+  // Sprint U1 step 2a: user_preferences.
+  describe('user_preferences', () => {
+    it('has no row until the first change (SPEC §3.2)', async () => {
+      expect(await getUserPreferences(alice.client, alice.id)).toBeNull();
+    });
+
+    it('is created by the first upsert, and updated by the next one', async () => {
+      const created = await upsertUserPreferences(alice.client, { userId: alice.id, theme: 'dark' });
+      expect(created).toMatchObject({ user_id: alice.id, theme: 'dark', density: 'comfortable', home_mode: 'director' });
+
+      const updated = await upsertUserPreferences(alice.client, { userId: alice.id, density: 'compact' });
+      // theme survives the second upsert untouched — this is a merge, not a replace.
+      expect(updated).toMatchObject({ user_id: alice.id, theme: 'dark', density: 'compact' });
+    });
+
+    it("bob cannot read alice's preferences, and cannot write a row under her id (RLS is user-scoped, not org-scoped)", async () => {
+      expect(await getUserPreferences(bob.client, alice.id)).toBeNull();
+      await expect(upsertUserPreferences(bob.client, { userId: alice.id, theme: 'light' })).rejects.toThrow();
+    });
   });
 });
