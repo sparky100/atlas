@@ -8,6 +8,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
+  DELIBERATELY_NOT_MODELLED,
   ELEMENT_TYPES,
   RELATIONSHIP_TYPES,
   type ActorAttributes,
@@ -23,11 +24,12 @@ import {
   type SupportsAttributes,
   type SystemAttributes,
   type UsesAttributes,
+  type UUID,
   factKeyOf,
   subjectOf,
 } from './delta';
 import { envelopeToDeltaRows, fromCommitRow, fromDeltaRow, toCommitRow, toDeltaRow } from './rows';
-import type { CommitEnvelope } from './delta';
+import type { CommitEnvelope, CommitKind } from './delta';
 
 const uuid = fc.uuid();
 const isoDate = fc
@@ -45,7 +47,7 @@ const lifecycleStatus: LifecycleStatus[] = ['planned', 'active', 'retiring', 're
 const dataClassification: DataClassification[] = ['public', 'official', 'official_sensitive', 'special_category'];
 
 const capabilityAttributes: fc.Arbitrary<CapabilityAttributes> = fc.record(
-  { description: fc.string(), code: fc.string({ minLength: 1, maxLength: 6 }) },
+  { description: fc.string(), code: fc.string({ minLength: 1, maxLength: 6 }), templateRef: fc.uuid() },
   { requiredKeys: [] },
 );
 const systemAttributes: fc.Arbitrary<SystemAttributes> = fc.record(
@@ -148,9 +150,37 @@ const relationshipCreateArb: fc.Arbitrary<Delta> = fc.oneof(
   ),
 );
 
-const relationshipUpdateArb: fc.Arbitrary<Delta> = fc.tuple(provenanceBase, uuid, uuid, fc.boolean()).map(
-  ([base, relationshipId, previousDeltaId, value]) =>
-    ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'owns', attribute: 'primary', value, previousDeltaId }) satisfies Delta,
+/**
+ * One arbitrary per (relationshipType, attribute) pair — every attribute
+ * every relationship type actually has (Sprint H1: this used to generate
+ * only owns/primary, docs/AUDIT-2026-09-U2.md §3.1's ElementUpdate/
+ * RelationshipUpdate caveats), unioned exactly like elementUpdateArb above.
+ */
+const relationshipUpdateArb: fc.Arbitrary<Delta> = fc.oneof(
+  fc.tuple(provenanceBase, uuid, uuid, fc.option(fc.string(), { nil: null })).map(
+    ([base, relationshipId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'supports', attribute: 'description', value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.option(fc.string(), { nil: null })).map(
+    ([base, relationshipId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'uses', attribute: 'description', value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.option(fc.boolean(), { nil: null })).map(
+    ([base, relationshipId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'owns', attribute: 'primary', value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.option(fc.string(), { nil: null })).map(
+    ([base, relationshipId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'flows_to', attribute: 'description', value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.option(fc.constantFrom(...dataClassification), { nil: null })).map(
+    ([base, relationshipId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'flows_to', attribute: 'dataClassification', value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.option(fc.string(), { nil: null })).map(
+    ([base, relationshipId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'flows_to', attribute: 'protocol', value, previousDeltaId }) satisfies Delta,
+  ),
 );
 
 const relationshipRetractArb: fc.Arbitrary<Delta> = fc
@@ -183,6 +213,22 @@ const generatorsByKind: Record<DeltaKind, fc.Arbitrary<Delta>> = {
 
 /** Every DeltaKind, each with real generative coverage — the arbitrary this whole file's properties run against. */
 export const deltaArb: fc.Arbitrary<Delta> = fc.oneof(...Object.values(generatorsByKind));
+
+describe('DELIBERATELY_NOT_MODELLED (ADR-001 preface)', () => {
+  // Not a runtime-validated list (its own doc comment: "there is nothing to
+  // validate against") — this pins its shape instead of leaving it with
+  // zero test coverage at all (Sprint H1, docs/AUDIT-2026-09-U2.md §3.1).
+  it('is a real, non-empty list of distinct, non-empty entries', () => {
+    expect(DELIBERATELY_NOT_MODELLED.length).toBeGreaterThan(0);
+    for (const entry of DELIBERATELY_NOT_MODELLED) expect(entry.length).toBeGreaterThan(0);
+    expect(new Set(DELIBERATELY_NOT_MODELLED).size).toBe(DELIBERATELY_NOT_MODELLED.length);
+  });
+
+  it('names nothing that is actually a modelled ElementType or RelationshipType', () => {
+    const modelled = new Set<string>([...ELEMENT_TYPES, ...RELATIONSHIP_TYPES]);
+    for (const entry of DELIBERATELY_NOT_MODELLED) expect(modelled.has(entry)).toBe(false);
+  });
+});
 
 describe('Delta JSON round trip (RT-1)', () => {
   it('is deep-equal after JSON.stringify/parse for every generated kind', () => {
@@ -257,16 +303,27 @@ describe('Delta <-> deltas row round trip (RT-1, contract level)', () => {
 });
 
 describe('CommitEnvelope <-> commits+deltas rows round trip (RT-2, contract level)', () => {
+  // kind and mergedBranchHeadCommitId generated together, not independently
+  // (Sprint H1: this arbitrary used to never generate 'merge' at all,
+  // docs/AUDIT-2026-09-U2.md §3.1's CommitKind caveat) — C14 requires
+  // `kind === 'merge'` iff `mergedBranchHeadCommitId` is non-null, and a
+  // real 'merge' envelope needs a real second-parent id, not null.
+  const kindAndMerge: fc.Arbitrary<{ kind: CommitKind; mergedBranchHeadCommitId: UUID | null }> = fc.oneof(
+    fc.constantFrom('manual' as const, 'capture' as const, 'template_seed' as const).map((kind) => ({ kind, mergedBranchHeadCommitId: null })),
+    fc.uuid().map((mergedBranchHeadCommitId) => ({ kind: 'merge' as const, mergedBranchHeadCommitId })),
+  );
+
   const envelopeArb: fc.Arbitrary<CommitEnvelope> = fc
-    .record({
-      id: uuid,
-      branchId: uuid,
-      parentCommitId: fc.option(uuid, { nil: null }),
-      mergedBranchHeadCommitId: fc.constant(null),
-      kind: fc.constantFrom('manual' as const, 'capture' as const, 'template_seed' as const),
-      message: fc.string({ minLength: 1, maxLength: 80 }),
-      deltas: fc.array(deltaArb, { minLength: 0, maxLength: 6 }),
-    });
+    .tuple(uuid, uuid, fc.option(uuid, { nil: null }), kindAndMerge, fc.string({ minLength: 1, maxLength: 80 }), fc.array(deltaArb, { minLength: 0, maxLength: 6 }))
+    .map(([id, branchId, parentCommitId, { kind, mergedBranchHeadCommitId }, message, deltas]) => ({
+      id,
+      branchId,
+      parentCommitId,
+      mergedBranchHeadCommitId,
+      kind,
+      message,
+      deltas,
+    }));
 
   it('fromCommitRow(toCommitRow(e), envelopeToDeltaRows(e)) is deep-equal to e', () => {
     fc.assert(

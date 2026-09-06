@@ -292,16 +292,6 @@ export type RelationshipDelta = RelationshipCreate | RelationshipUpdate | Relati
 export type Delta = ElementDelta | RelationshipDelta;
 
 export type DeltaKind = Delta['kind'];
-export const DELTA_KINDS = [
-  'element.create',
-  'element.update',
-  'element.retract',
-  'element.restore',
-  'relationship.create',
-  'relationship.update',
-  'relationship.retract',
-  'relationship.restore',
-] as const satisfies readonly DeltaKind[];
 
 export type SubjectType = 'element' | 'relationship';
 
