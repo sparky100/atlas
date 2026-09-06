@@ -77,12 +77,20 @@ export interface SystemAttributes {
   vendor?: string;
   isExternal: boolean;
   externalOrganisation?: string;
+  /** When this system was introduced/went live. Distinct from a delta's own `effectiveDate` (when we learned the fact) — this is a fact about the system itself. */
+  introduced?: ISODate;
+  /** Planned decommission/retirement date, if one is known. Not the same as `lifecycleStatus: 'retired'` — a system can have a planned end date well before it actually retires. */
+  plannedEnd?: ISODate;
 }
 
 export interface ContainerAttributes {
   description?: string;
   technology?: string;
   isExternal: boolean;
+  /** See `SystemAttributes.introduced`. */
+  introduced?: ISODate;
+  /** See `SystemAttributes.plannedEnd`. */
+  plannedEnd?: ISODate;
 }
 
 export interface ComponentAttributes {

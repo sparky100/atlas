@@ -9,7 +9,7 @@
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { Delta, LifecycleStatus, UUID } from '../contracts/delta';
+import type { Delta, DeltaKind, LifecycleStatus, UUID } from '../contracts/delta';
 import type { Json } from '../contracts/rows';
 import { cloneHead, emptyHead, factMapKey, fold, invert, type CommitContext, type Head } from './deltas';
 import { canonicalizeHead, headHash } from './head';
@@ -18,7 +18,27 @@ const ctx: CommitContext = { authorId: 'author-1', createdAt: '2026-01-01T00:00:
 const uuid = fc.uuid();
 const lifecycleStatuses: LifecycleStatus[] = ['planned', 'active', 'retiring', 'retired'];
 
-/** One `system` element's life: a create, then a chain of updates with correctly-linked previousDeltaId, covering name/parentId/an-always-present attribute/an-optional-attribute-set-for-the-first-time. */
+// Values come back exactly after invert; provenance does not (a fresh
+// delta always gets a fresh deltaId/author/etc — see the long comment on
+// `invert` in deltas.ts). So comparisons after an invert use this —
+// elements/relationships only, never facts — not full canonicalizeHead
+// equality or headHash.
+function valuesOnly(head: Head) {
+  const { elements, relationships } = canonicalizeHead(head);
+  // existsDeltaId is the LAST entry in each canonical tuple (SPEC §6.4's
+  // ordering) and is provenance — which delta currently asserts this
+  // subject exists — not a value, exactly like a fact's deltaId. It always
+  // differs after a retract+restore (the restore mints its own id), so it
+  // has to be stripped here for the same reason facts are excluded
+  // entirely; this was found by this file's own exhaustive per-kind test
+  // failing on element.retract/relationship.retract until fixed.
+  return {
+    elements: elements.map(([id, elementType, name, parentId, attributes]) => [id, elementType, name, parentId, attributes]),
+    relationships: relationships.map(([id, relationshipType, fromElementId, toElementId, attributes]) => [id, relationshipType, fromElementId, toElementId, attributes]),
+  };
+}
+
+/** One `system` element's life: a create, then a chain of updates with correctly-linked previousDeltaId, covering name/parentId/an-always-present attribute/optional-attributes-set-for-the-first-time (vendor, introduced, plannedEnd — the last two added in the same amendment that added them to SystemAttributes/ContainerAttributes). */
 interface ElementScenario {
   elementId: UUID;
   deltas: Delta[];
@@ -35,7 +55,14 @@ const elementScenarioArb: fc.Arbitrary<ElementScenario> = fc
     updates: fc.array(
       fc.record({
         id: uuid,
-        target: fc.constantFrom('name' as const, 'lifecycleStatus' as const, 'vendor' as const, 'parentId' as const),
+        target: fc.constantFrom(
+          'name' as const,
+          'lifecycleStatus' as const,
+          'vendor' as const,
+          'parentId' as const,
+          'introduced' as const,
+          'plannedEnd' as const,
+        ),
         stringValue: fc.string({ minLength: 1, maxLength: 20 }),
         lifecycleValue: fc.constantFrom(...lifecycleStatuses),
         parentValue: fc.option(uuid, { nil: null }),
@@ -195,14 +222,6 @@ describe('retract/restore (P-4: reversible)', () => {
 });
 
 describe('invert', () => {
-  // Values come back exactly; provenance does not (a fresh delta always
-  // gets a fresh deltaId/author/etc — see the long comment on `invert` in
-  // deltas.ts). So this compares elements/relationships only, never facts.
-  function valuesOnly(head: Head) {
-    const { elements, relationships } = canonicalizeHead(head);
-    return { elements, relationships };
-  }
-
   it('apply(d) then apply(invert(d, headBefore)) restores the prior element/relationship values', () => {
     fc.assert(
       fc.property(elementScenarioArb, uuid, ({ deltas }, invertId) => {
@@ -243,6 +262,150 @@ describe('invert', () => {
         expect(inverse).toMatchObject({ kind: 'element.retract', elementId, previousDeltaId: create.id });
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Exhaustive, one-fixture-per-kind coverage of apply + invert.
+//
+// Everything above generates coherent *sequences* over a couple of
+// representative kinds (mostly element.create/update, since that's what a
+// realistic scenario looks like) — good for finding state-machine bugs, but
+// nothing forces every one of the eight DeltaKinds to actually be exercised
+// by fold/invert somewhere. `fixturesByKind` closes that gap: it is typed
+// `Record<DeltaKind, ...>`, so if `Delta` ever grows a ninth kind (the merge
+// delta this amendment deliberately does not add yet), this object literal
+// stops compiling until a fixture is added for it — and the test below
+// iterates this map's own keys, not a separately hand-typed list, so a new
+// fixture is automatically exercised the moment it's added.
+// ---------------------------------------------------------------------------
+
+interface KindFixture {
+  /** A minimal, valid `Head` for `delta` to be applied against. */
+  headBefore: Head;
+  delta: Delta;
+  /** What `invert(delta, ...)` must produce for this kind — checked directly, not just "doesn't throw". */
+  expectedInverseKind: DeltaKind;
+}
+
+const FIXTURE_SOURCE = 'fixture-src';
+
+function createSystemDelta(id: UUID, elementId: UUID): Delta {
+  return {
+    kind: 'element.create',
+    id,
+    elementId,
+    elementType: 'system',
+    name: 'Fixture System',
+    parentId: null,
+    attributes: { lifecycleStatus: 'active', isExternal: false },
+    sourceId: FIXTURE_SOURCE,
+    confidence: 1,
+  };
+}
+
+function createOwnsDelta(id: UUID, relationshipId: UUID): Delta {
+  return {
+    kind: 'relationship.create',
+    id,
+    relationshipId,
+    relationshipType: 'owns',
+    fromElementId: 'fixture-actor',
+    toElementId: 'fixture-target',
+    attributes: { primary: true },
+    sourceId: FIXTURE_SOURCE,
+    confidence: 1,
+  };
+}
+
+const fixturesByKind: Record<DeltaKind, () => KindFixture> = {
+  'element.create': () => ({
+    headBefore: emptyHead(),
+    delta: createSystemDelta('d-create', 'el-1'),
+    expectedInverseKind: 'element.retract',
+  }),
+  'element.update': () => ({
+    headBefore: fold(emptyHead(), [createSystemDelta('d-create', 'el-1')], ctx),
+    delta: {
+      kind: 'element.update',
+      id: 'd-update',
+      elementId: 'el-1',
+      elementType: 'system',
+      attribute: 'lifecycleStatus',
+      value: 'retiring',
+      previousDeltaId: 'd-create',
+      sourceId: FIXTURE_SOURCE,
+      confidence: 1,
+    },
+    expectedInverseKind: 'element.update',
+  }),
+  'element.retract': () => ({
+    headBefore: fold(emptyHead(), [createSystemDelta('d-create', 'el-1')], ctx),
+    delta: { kind: 'element.retract', id: 'd-retract', elementId: 'el-1', elementType: 'system', previousDeltaId: 'd-create', sourceId: FIXTURE_SOURCE, confidence: 1 },
+    expectedInverseKind: 'element.restore',
+  }),
+  'element.restore': () => ({
+    headBefore: fold(
+      emptyHead(),
+      [createSystemDelta('d-create', 'el-1'), { kind: 'element.retract', id: 'd-retract', elementId: 'el-1', elementType: 'system', previousDeltaId: 'd-create', sourceId: FIXTURE_SOURCE, confidence: 1 }],
+      ctx,
+    ),
+    delta: { kind: 'element.restore', id: 'd-restore', elementId: 'el-1', elementType: 'system', previousDeltaId: 'd-retract', sourceId: FIXTURE_SOURCE, confidence: 1 },
+    expectedInverseKind: 'element.retract',
+  }),
+  'relationship.create': () => ({
+    headBefore: emptyHead(),
+    delta: createOwnsDelta('d-rcreate', 'rel-1'),
+    expectedInverseKind: 'relationship.retract',
+  }),
+  'relationship.update': () => ({
+    headBefore: fold(emptyHead(), [createOwnsDelta('d-rcreate', 'rel-1')], ctx),
+    delta: {
+      kind: 'relationship.update',
+      id: 'd-rupdate',
+      relationshipId: 'rel-1',
+      relationshipType: 'owns',
+      attribute: 'primary',
+      value: false,
+      previousDeltaId: 'd-rcreate',
+      sourceId: FIXTURE_SOURCE,
+      confidence: 1,
+    },
+    expectedInverseKind: 'relationship.update',
+  }),
+  'relationship.retract': () => ({
+    headBefore: fold(emptyHead(), [createOwnsDelta('d-rcreate', 'rel-1')], ctx),
+    delta: { kind: 'relationship.retract', id: 'd-rretract', relationshipId: 'rel-1', relationshipType: 'owns', previousDeltaId: 'd-rcreate', sourceId: FIXTURE_SOURCE, confidence: 1 },
+    expectedInverseKind: 'relationship.restore',
+  }),
+  'relationship.restore': () => ({
+    headBefore: fold(
+      emptyHead(),
+      [createOwnsDelta('d-rcreate', 'rel-1'), { kind: 'relationship.retract', id: 'd-rretract', relationshipId: 'rel-1', relationshipType: 'owns', previousDeltaId: 'd-rcreate', sourceId: FIXTURE_SOURCE, confidence: 1 }],
+      ctx,
+    ),
+    delta: { kind: 'relationship.restore', id: 'd-rrestore', relationshipId: 'rel-1', relationshipType: 'owns', previousDeltaId: 'd-rretract', sourceId: FIXTURE_SOURCE, confidence: 1 },
+    expectedInverseKind: 'relationship.retract',
+  }),
+};
+
+describe('every DeltaKind: apply + invert (exhaustive over DeltaKind at compile time)', () => {
+  for (const kind of Object.keys(fixturesByKind) as DeltaKind[]) {
+    it(kind, () => {
+      const { headBefore, delta, expectedInverseKind } = fixturesByKind[kind]();
+
+      const headAfter = fold(cloneHead(headBefore), [delta], ctx);
+
+      const inverse = invert(delta, headBefore, { id: 'undo', sourceId: 'undo-source', confidence: 1 });
+      expect(inverse.kind).toBe(expectedInverseKind);
+
+      const headUndone = fold(cloneHead(headAfter), [inverse], ctx);
+      expect(valuesOnly(headUndone)).toEqual(valuesOnly(headBefore));
+    });
+  }
+
+  it('has exactly one fixture per DeltaKind (catches an accidentally-duplicated key silently shadowing another)', () => {
+    expect(Object.keys(fixturesByKind).length).toBe(8);
   });
 });
 

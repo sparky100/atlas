@@ -154,3 +154,47 @@ describe('EXISTS_ATTRIBUTE is the fact key for every non-update kind', () => {
     expect(EXISTS_ATTRIBUTE).toBe('$exists');
   });
 });
+
+describe('System/Container introduced and plannedEnd', () => {
+  it('are accepted at create, both optional, and survive the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-10',
+      elementId: 'el-1',
+      elementType: 'system',
+      name: 'Housing CRM',
+      parentId: null,
+      attributes: { lifecycleStatus: 'planned', isExternal: false, introduced: '2026-04-01', plannedEnd: '2031-04-01' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('a container can have plannedEnd set later via an update, with no introduced at create', () => {
+    const create: Delta = {
+      kind: 'element.create',
+      id: 'delta-11',
+      elementId: 'el-2',
+      elementType: 'container',
+      name: 'Integration Platform',
+      parentId: 'el-1',
+      attributes: { isExternal: false },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    const update: Delta = {
+      kind: 'element.update',
+      id: 'delta-12',
+      elementId: 'el-2',
+      elementType: 'container',
+      attribute: 'plannedEnd',
+      value: '2029-12-31',
+      previousDeltaId: 'delta-11',
+      sourceId: 'src-1',
+      confidence: 0.6,
+    };
+    expect(fromDeltaRow(toDeltaRow(create, ctx))).toEqual(create);
+    expect(fromDeltaRow(toDeltaRow(update, ctx))).toEqual(update);
+  });
+});

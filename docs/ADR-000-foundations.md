@@ -47,8 +47,8 @@ Attribute sets per type (required fields marked *req*):
 | Type | Key fields |
 |---|---|
 | Capability | `name` *req*, `description`, `level` *req* (1–3), `parent_capability_id`, `code` (reference code from a starter map), `template_ref` (nullable, links back to `capability_map_template_items`) |
-| System | `name` *req*, `description`, `lifecycle_status` *req* (`planned`/`active`/`retiring`/`retired`), `vendor`, `is_external`, `external_organisation` |
-| Container | `name` *req*, `description`, `technology`, `parent_system_id` *req*, `is_external` |
+| System | `name` *req*, `description`, `lifecycle_status` *req* (`planned`/`active`/`retiring`/`retired`), `vendor`, `is_external`, `external_organisation`, `introduced` (date, when it went live), `planned_end` (date, planned decommission — independent of `lifecycle_status`; a system can have a known end date well before it actually reaches `retired`) |
+| Container | `name` *req*, `description`, `technology`, `parent_system_id` *req*, `is_external`, `introduced`, `planned_end` |
 | Component | `name` *req*, `description`, `technology`, `parent_container_id` *req* |
 | Actor | `name` *req*, `subtype` *req* (`person`/`team`), `email` (person only), `org_unit`, `is_external`, `external_organisation` |
 

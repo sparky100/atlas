@@ -16,6 +16,7 @@ import {
   type ContainerAttributes,
   type Delta,
   type DataClassification,
+  type DeltaKind,
   type FlowsToAttributes,
   type LifecycleStatus,
   type OwnsAttributes,
@@ -48,11 +49,19 @@ const capabilityAttributes: fc.Arbitrary<CapabilityAttributes> = fc.record(
   { requiredKeys: ['level'] },
 );
 const systemAttributes: fc.Arbitrary<SystemAttributes> = fc.record(
-  { description: fc.string(), lifecycleStatus: fc.constantFrom(...lifecycleStatus), vendor: fc.string(), isExternal: fc.boolean(), externalOrganisation: fc.string() },
+  {
+    description: fc.string(),
+    lifecycleStatus: fc.constantFrom(...lifecycleStatus),
+    vendor: fc.string(),
+    isExternal: fc.boolean(),
+    externalOrganisation: fc.string(),
+    introduced: isoDate,
+    plannedEnd: isoDate,
+  },
   { requiredKeys: ['lifecycleStatus', 'isExternal'] },
 );
 const containerAttributes: fc.Arbitrary<ContainerAttributes> = fc.record(
-  { description: fc.string(), technology: fc.string(), isExternal: fc.boolean() },
+  { description: fc.string(), technology: fc.string(), isExternal: fc.boolean(), introduced: isoDate, plannedEnd: isoDate },
   { requiredKeys: ['isExternal'] },
 );
 const componentAttributes: fc.Arbitrary<ComponentAttributes> = fc.record({ description: fc.string(), technology: fc.string() }, { requiredKeys: [] });
@@ -106,15 +115,19 @@ const elementUpdateArb: fc.Arbitrary<Delta> = fc.oneof(
     ([base, elementId, previousDeltaId, value]) =>
       ({ ...base, kind: 'element.update', elementId, elementType: 'system', attribute: 'lifecycleStatus', value, previousDeltaId }) satisfies Delta,
   ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.constantFrom('introduced' as const, 'plannedEnd' as const), fc.option(isoDate, { nil: null })).map(
+    ([base, elementId, previousDeltaId, attribute, value]) =>
+      ({ ...base, kind: 'element.update', elementId, elementType: 'system', attribute, value, previousDeltaId }) satisfies Delta,
+  ),
 );
 
-const elementRetractOrRestoreArb: fc.Arbitrary<Delta> = fc.tuple(
-  provenanceBase,
-  uuid,
-  fc.constantFrom(...ELEMENT_TYPES),
-  uuid,
-  fc.constantFrom('element.retract' as const, 'element.restore' as const),
-).map(([base, elementId, elementType, previousDeltaId, kind]) => ({ ...base, kind, elementId, elementType, previousDeltaId }) satisfies Delta);
+const elementRetractArb: fc.Arbitrary<Delta> = fc
+  .tuple(provenanceBase, uuid, fc.constantFrom(...ELEMENT_TYPES), uuid)
+  .map(([base, elementId, elementType, previousDeltaId]) => ({ ...base, kind: 'element.retract', elementId, elementType, previousDeltaId }) satisfies Delta);
+
+const elementRestoreArb: fc.Arbitrary<Delta> = fc
+  .tuple(provenanceBase, uuid, fc.constantFrom(...ELEMENT_TYPES), uuid)
+  .map(([base, elementId, elementType, previousDeltaId]) => ({ ...base, kind: 'element.restore', elementId, elementType, previousDeltaId }) satisfies Delta);
 
 const relationshipCreateArb: fc.Arbitrary<Delta> = fc.oneof(
   fc.tuple(provenanceBase, uuid, uuid, uuid, supportsAttributes).map(
@@ -140,23 +153,36 @@ const relationshipUpdateArb: fc.Arbitrary<Delta> = fc.tuple(provenanceBase, uuid
     ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'owns', attribute: 'primary', value, previousDeltaId }) satisfies Delta,
 );
 
-const relationshipRetractOrRestoreArb: fc.Arbitrary<Delta> = fc.tuple(
-  provenanceBase,
-  uuid,
-  fc.constantFrom(...RELATIONSHIP_TYPES),
-  uuid,
-  fc.constantFrom('relationship.retract' as const, 'relationship.restore' as const),
-).map(([base, relationshipId, relationshipType, previousDeltaId, kind]) => ({ ...base, kind, relationshipId, relationshipType, previousDeltaId }) satisfies Delta);
+const relationshipRetractArb: fc.Arbitrary<Delta> = fc
+  .tuple(provenanceBase, uuid, fc.constantFrom(...RELATIONSHIP_TYPES), uuid)
+  .map(([base, relationshipId, relationshipType, previousDeltaId]) => ({ ...base, kind: 'relationship.retract', relationshipId, relationshipType, previousDeltaId }) satisfies Delta);
+
+const relationshipRestoreArb: fc.Arbitrary<Delta> = fc
+  .tuple(provenanceBase, uuid, fc.constantFrom(...RELATIONSHIP_TYPES), uuid)
+  .map(([base, relationshipId, relationshipType, previousDeltaId]) => ({ ...base, kind: 'relationship.restore', relationshipId, relationshipType, previousDeltaId }) satisfies Delta);
+
+/**
+ * One generator per `DeltaKind`, typed as `Record<DeltaKind, ...>` on
+ * purpose: if `Delta` ever grows a ninth kind, this object literal stops
+ * compiling until a generator is added for it, so the round-trip and
+ * "covers every kind" tests below can never silently go on exercising only
+ * the old kinds. `deltaArb` and the expected-kinds list are both derived
+ * from this map rather than hand-duplicated, so there is exactly one place
+ * that has to change when a kind is added.
+ */
+const generatorsByKind: Record<DeltaKind, fc.Arbitrary<Delta>> = {
+  'element.create': elementCreateArb,
+  'element.update': elementUpdateArb,
+  'element.retract': elementRetractArb,
+  'element.restore': elementRestoreArb,
+  'relationship.create': relationshipCreateArb,
+  'relationship.update': relationshipUpdateArb,
+  'relationship.retract': relationshipRetractArb,
+  'relationship.restore': relationshipRestoreArb,
+};
 
 /** Every DeltaKind, each with real generative coverage — the arbitrary this whole file's properties run against. */
-export const deltaArb: fc.Arbitrary<Delta> = fc.oneof(
-  elementCreateArb,
-  elementUpdateArb,
-  elementRetractOrRestoreArb,
-  relationshipCreateArb,
-  relationshipUpdateArb,
-  relationshipRetractOrRestoreArb,
-);
+export const deltaArb: fc.Arbitrary<Delta> = fc.oneof(...Object.values(generatorsByKind));
 
 describe('Delta JSON round trip (RT-1)', () => {
   it('is deep-equal after JSON.stringify/parse for every generated kind', () => {
@@ -169,25 +195,18 @@ describe('Delta JSON round trip (RT-1)', () => {
   });
 
   it('covers every DeltaKind at least once across a real sample (not just in principle)', () => {
-    const seen = new Set<Delta['kind']>();
+    const seen = new Set<DeltaKind>();
     fc.assert(
       fc.property(deltaArb, (delta) => {
         seen.add(delta.kind);
       }),
       { numRuns: 500 },
     );
-    expect([...seen].sort()).toEqual(
-      [
-        'element.create',
-        'element.retract',
-        'element.restore',
-        'element.update',
-        'relationship.create',
-        'relationship.retract',
-        'relationship.restore',
-        'relationship.update',
-      ].sort(),
-    );
+    // Derived from generatorsByKind, not hand-typed — see the comment on
+    // that Record for why: a hand-typed list here would just be wrong
+    // (silently short) the day a kind is added, never failing to compile.
+    const expectedKinds = Object.keys(generatorsByKind) as DeltaKind[];
+    expect([...seen].sort()).toEqual([...expectedKinds].sort());
   });
 });
 
