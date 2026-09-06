@@ -315,6 +315,8 @@ Attribute-grain provenance at a commit: which delta currently asserts each fact 
 | Column | Type | Constraints |
 |---|---|---|
 | `commit_id` | uuid | → `commits(id)` on delete cascade |
+| `org_id` | uuid | → `organisations(id)` — **added Sprint H1** (docs/AUDIT-2026-09-U2.md §2.E.3 item 1: this table was migrated without it, despite S-20 explicitly naming `facts` in its own carve-out list; backfilled from `commits.org_id`) |
+| `model_id` | uuid | → `models(id)` — **added Sprint H1**, same backfill, from `commits.model_id` |
 | `subject_type` | subject_type | not null |
 | `subject_id` | uuid | not null |
 | `attribute` | text | not null |
@@ -327,7 +329,9 @@ Attribute-grain provenance at a commit: which delta currently asserts each fact 
 | `asserted_by` | uuid | not null |
 | `asserted_at` | timestamptz | not null — the delta's commit `created_at` |
 
-Primary key `(commit_id, subject_id, attribute)`. Index `(commit_id, source_id)` ("what depends on this spreadsheet"). One row per live attribute including `$exists`; a create delta yields one `$exists` row plus one row per initial attribute, all pointing at the create delta. Attributes of retracted subjects are removed from `facts` (they come back on restore from the delta chain).
+Primary key `(commit_id, subject_id, attribute)`. Indexes `(commit_id, source_id)` ("what depends on this spreadsheet") and `(model_id, subject_id)` (added Sprint H1, alongside `org_id`/`model_id` above). One row per live attribute including `$exists`; a create delta yields one `$exists` row plus one row per initial attribute, all pointing at the create delta. Attributes of retracted subjects are removed from `facts` (they come back on restore from the delta chain).
+
+`org_id`/`model_id` are supplied by `atlas.replace_main_head_projection` from its own `p_org_id`/`p_model_id` parameters, exactly like `elements_head`/`relationships_head`'s own copies of those columns — constant for the whole call, never read per-row from `p_facts`, and so never something `src/engine/projection.ts`'s `serializeHeadProjection` or `FactRow` needed to carry either.
 
 ### 3.6 Provenance and identity
 

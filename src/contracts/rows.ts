@@ -407,7 +407,7 @@ export interface RelationshipsHeadRow {
   exists_delta_id: UUID;
 }
 
-/** One row of `facts`, minus the `commit_id` column the writer supplies. */
+/** One row of `facts`, minus `commit_id`/`org_id`/`model_id` (Sprint H1 added the latter two — see the header comment above; `atlas.replace_main_head_projection` fills in all three from its own parameters, the same as `ElementsHeadRow`/`RelationshipsHeadRow`). */
 export interface FactsRow {
   subject_type: SubjectType;
   subject_id: UUID;

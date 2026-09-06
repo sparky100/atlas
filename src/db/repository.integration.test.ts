@@ -449,7 +449,7 @@ describe('repository layer against a real local Supabase', () => {
           mergedBranchHeadCommitId: null,
           kind: 'manual',
           message: 'add Tenant Portal directly to main',
-            deltas: [makeCreateDelta(randomUUID(), mainElementId, 'Tenant Portal')],
+          deltas: [makeCreateDelta(randomUUID(), mainElementId, 'Tenant Portal')],
         },
       });
       expect(result).toMatchObject({ ok: true });
@@ -457,6 +457,16 @@ describe('repository layer against a real local Supabase', () => {
       const { data: headRows, error } = await service.from('elements_head').select('element_id, name').eq('commit_id', mainCommitId);
       if (error) throw new Error(`reading elements_head: ${error.message}`);
       expect(headRows).toMatchObject([{ element_id: mainElementId, name: 'Tenant Portal' }]);
+
+      // Sprint H1 item 4 (docs/AUDIT-2026-09-U2.md §2.E.3 item 1): facts.org_id/
+      // model_id are backfilled/populated columns now, not absent — every fact
+      // this commit asserted should carry the model's real org_id/model_id.
+      const { data: factRows, error: factsError } = await service.from('facts').select('org_id, model_id').eq('commit_id', mainCommitId).eq('subject_id', mainElementId);
+      if (factsError) throw new Error(`reading facts: ${factsError.message}`);
+      expect(factRows.length).toBeGreaterThan(0);
+      for (const row of factRows) {
+        expect(row).toMatchObject({ org_id: orgId, model_id: modelId });
+      }
     });
 
     it('createTag refuses a commit whose materialised elements_head has been corrupted (P-7)', async () => {
