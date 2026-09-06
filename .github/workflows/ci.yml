@@ -80,11 +80,9 @@ jobs:
           echo "SUPABASE_ANON_KEY=$(pnpm exec supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2-)" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_ROLE_KEY=$(pnpm exec supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2-)" >> "$GITHUB_ENV"
 
-      # No integration test files exist yet in this sprint (src/db lands in
-      # Sprint F1 step 6); vitest.integration.config.ts has
-      # passWithNoTests: true so this step is a genuine pass, not a skip
-      # dressed up as one. Once src/db/*.integration.test.ts exist, this
-      # step is what runs them, against the database `db reset` just built.
+      # src/db/repository.integration.test.ts (Sprint F1 step 6) runs here,
+      # against the database `db reset` just built — real auth (service-role
+      # createUser + signInWithPassword), real RLS, no shortcuts.
       - name: Run integration tests
         run: pnpm test:integration
 
