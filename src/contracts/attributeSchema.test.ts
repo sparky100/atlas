@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ELEMENT_TYPES } from './delta';
-import { ATTRIBUTE_SCHEMA_BY_TYPE, validateAttributeValue } from './attributeSchema';
+import { ATTRIBUTE_SCHEMA_BY_TYPE, defaultCreateAttributes, validateAttributeValue } from './attributeSchema';
 
 describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
   it('has a schema for every element type', () => {
@@ -72,5 +72,29 @@ describe('validateAttributeValue', () => {
   it('validates enum fields against the declared options', () => {
     expect(validateAttributeValue('system', 'lifecycleStatus', 'active')).toEqual({ ok: true, value: 'active' });
     expect(validateAttributeValue('system', 'lifecycleStatus', 'deprecated')).toMatchObject({ ok: false });
+  });
+});
+
+describe('defaultCreateAttributes', () => {
+  it('defaults every required boolean field to false and every other required enum to its schema-declared first option', () => {
+    expect(defaultCreateAttributes('container')).toEqual({ isExternal: false });
+    expect(defaultCreateAttributes('actor')).toEqual({ subtype: 'person', isExternal: false });
+  });
+
+  it('has no required fields to default for capability or component', () => {
+    expect(defaultCreateAttributes('capability')).toEqual({});
+    expect(defaultCreateAttributes('component')).toEqual({});
+  });
+
+  it("defaults a system's lifecycleStatus to active on main — an architect quick-adding it is recording an estate that already exists", () => {
+    expect(defaultCreateAttributes('system', { onMain: true })).toEqual({ lifecycleStatus: 'active', isExternal: false });
+  });
+
+  it("defaults a system's lifecycleStatus to planned off main — a system proposed on a change branch isn't live yet", () => {
+    expect(defaultCreateAttributes('system', { onMain: false })).toEqual({ lifecycleStatus: 'planned', isExternal: false });
+  });
+
+  it('defaults onMain to true when omitted', () => {
+    expect(defaultCreateAttributes('system')).toEqual({ lifecycleStatus: 'active', isExternal: false });
   });
 });
