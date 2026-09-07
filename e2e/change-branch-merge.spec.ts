@@ -62,7 +62,7 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   // Supabase's first real request; the overall 30s test timeout is the
   // real backstop.
   await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('Acme Corp')).toBeVisible();
+  await expect(page.getByText('Acme Corp')).toBeVisible({ timeout: 15_000 });
 
   // Main is untouched by the branch's own edit (baseline stays baseline
   // until merge) — the isolation the whole "changes as branches" model
