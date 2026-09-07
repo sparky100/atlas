@@ -35,7 +35,10 @@ export interface UseElementCreateInput {
  * generalised across every element type this control creates (system,
  * actor, container, component). `defaultCreateAttributes` fills in
  * whatever this type requires beyond a name (Blocking: element creation
- * never collects more than that at create time).
+ * never collects more than that at create time) — including, for a
+ * system, `lifecycleStatus` defaulting to `active` on `main` and
+ * `planned` on a change branch (`defaultCreateAttributes`'s own doc
+ * comment explains why), driven by `branch.kind` here.
  */
 export function useElementCreate(input: UseElementCreateInput): UseElementCreateResult {
   const { modelId, orgId, userId, elementType, parentId, branch, expectedHeadCommitId, onCreated } = input;
@@ -72,7 +75,7 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
           elementType,
           name: trimmed,
           parentId,
-          attributes: defaultCreateAttributes(elementType),
+          attributes: defaultCreateAttributes(elementType, { onMain: branch.kind === 'main' }),
           sourceId: source.id,
           confidence: 1,
         } as Delta;
