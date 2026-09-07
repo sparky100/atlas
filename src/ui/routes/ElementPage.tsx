@@ -19,6 +19,7 @@ import { StructureSection } from '../components/StructureSection/StructureSectio
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useEditingBranch } from '../branches/useEditingBranch';
+import { useMainBranch } from '../branches/useMainBranch';
 import { useModels } from '../models/useModels';
 import { canEditBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -67,7 +68,14 @@ export function ElementPage() {
 
   const { state, reload } = useElementPage(model?.id ?? '', elementId ?? '', ref);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
+  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
   const canEdit = editingBranch !== null && canEditBranch(role, editingBranch);
+  // See LandscapePage.tsx's identical comment: ADR-018 guarantees main's
+  // head is never null in practice; `BranchRow`'s own type hasn't been
+  // narrowed yet. `expectedHeadCommitId` for the relationship-add write
+  // itself reuses `state.data.commitId`, already established below.
+  const searchCommitId = mainBranch?.head_commit_id ?? null;
+  const canAddRelationship = canEdit && searchCommitId !== null;
 
   const data = state.status === 'ready' ? state.data : null;
   const editor = useElementEditor({
@@ -149,10 +157,24 @@ export function ElementPage() {
                     orgSlug={organisation?.slug ?? ''}
                     modelSlug={model.slug}
                     elementId={state.data.element.element_id}
+                    elementType={state.data.element.element_type}
                     relationships={state.data.relationships}
                     endpoints={state.data.relationshipEndpoints}
                     relationshipFacts={state.data.relationshipFacts}
                     sources={state.data.sources}
+                    addRelationship={
+                      canAddRelationship
+                        ? {
+                            modelId: model.id,
+                            orgId: organisation?.id ?? '',
+                            userId,
+                            searchCommitId,
+                            branch: editingBranch,
+                            expectedHeadCommitId: state.data.commitId,
+                            onCreated: reload,
+                          }
+                        : undefined
+                    }
                   />
                 </CollapsibleSection>
                 <CollapsibleSection title="Structure">

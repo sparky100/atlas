@@ -22,12 +22,45 @@
 -- columns set from the moment it exists, so the two old kind-conditional
 -- CHECKs collapse into one flat "always set" rule.
 --
--- Order of operations, all in this one transaction: backfill first (so the
--- NOT NULL/CHECK changes below never see a violating row), then the
--- trigger for future models, then the constraints, then seed_from_map.
+-- Order of operations, all in this one transaction: the old CHECK
+-- constraints first (a real hosted model can already have a null-head main
+-- branch, which the backfill below is about to give a real base/head — the
+-- old `kind = 'main' ⇒ base_commit_id IS NULL` CHECK would reject that
+-- update if it were still in force), then the backfill itself, then the
+-- trigger for future models, then the NOT NULL replacement, then
+-- seed_from_map.
 
 -- ---------------------------------------------------------------------------
--- 1. Backfill: any existing main branch with no head yet gets a genesis
+-- 1. branches: drop the two old kind-conditional CHECKs before anything
+--    below writes a real base/head into a main branch that (pre-ADR-018)
+--    they required to stay null.
+-- ---------------------------------------------------------------------------
+
+-- The two original CHECKs from 20260906071400_history.sql had no names of
+-- their own — Postgres auto-named them, and the exact rendering of
+-- pg_get_constraintdef (spacing, type-cast syntax) isn't worth hard-coding
+-- an exact match against — so find them by substring content instead and
+-- drop by whatever name this database actually assigned.
+do $$
+declare
+  v_conname text;
+begin
+  for v_conname in
+    select conname from pg_constraint
+    where conrelid = 'public.branches'::regclass
+      and contype = 'c'
+      and (
+        pg_get_constraintdef(oid) like '%base_commit_id IS NULL%'
+        or pg_get_constraintdef(oid) like '%base_commit_id IS NOT NULL%'
+      )
+  loop
+    execute format('alter table branches drop constraint %I', v_conname);
+  end loop;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 2. Backfill: any existing main branch with no head yet gets a genesis
 --    commit, exactly what atlas.on_model_created will now do at creation
 --    time. depth 0, no deltas, no head_hash (an empty fold has nothing to
 --    hash against — rebuildHead's own verification only ever runs from a
@@ -55,7 +88,7 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 2. atlas.on_model_created: every future model's main branch is born with
+-- 3. atlas.on_model_created: every future model's main branch is born with
 --    its genesis commit already attached, not created bare and fixed up
 --    later.
 --
@@ -97,34 +130,11 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 3. branches: base_commit_id/head_commit_id are now always set, for every
+-- 4. branches: base_commit_id/head_commit_id are now always set, for every
 --    kind — the old main-only exception is gone. NOT NULL replaces the old
---    kind-conditional CHECKs outright (the backfill above already made
---    every existing row satisfy this).
+--    kind-conditional CHECKs dropped in step 1 (the backfill above already
+--    made every existing row satisfy this).
 -- ---------------------------------------------------------------------------
-
--- The two original CHECKs from 20260906071400_history.sql had no names of
--- their own — Postgres auto-named them, and the exact rendering of
--- pg_get_constraintdef (spacing, type-cast syntax) isn't worth hard-coding
--- an exact match against — so find them by substring content instead and
--- drop by whatever name this database actually assigned.
-do $$
-declare
-  v_conname text;
-begin
-  for v_conname in
-    select conname from pg_constraint
-    where conrelid = 'public.branches'::regclass
-      and contype = 'c'
-      and (
-        pg_get_constraintdef(oid) like '%base_commit_id IS NULL%'
-        or pg_get_constraintdef(oid) like '%base_commit_id IS NOT NULL%'
-      )
-  loop
-    execute format('alter table branches drop constraint %I', v_conname);
-  end loop;
-end;
-$$;
 
 alter table branches
   alter column base_commit_id set not null,
@@ -134,7 +144,7 @@ comment on column branches.base_commit_id is 'Every branch''s fork point — for
 comment on column branches.head_commit_id is 'Every branch''s current tip — for a freshly created main, the same genesis commit as base_commit_id (ADR-018: never null).';
 
 -- ---------------------------------------------------------------------------
--- 4. atlas.seed_from_map: main's head is the genesis commit now, never
+-- 5. atlas.seed_from_map: main's head is the genesis commit now, never
 --    null, so this always has a real parent to attach to — the "genesis
 --    is structurally different, no base commit exists yet" reasoning in
 --    this function's own original module comment (20260906120000_seed_from_map.sql)

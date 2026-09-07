@@ -109,6 +109,33 @@ export function attributeFieldSchema(elementType: ElementType, key: string): Att
   return ATTRIBUTE_SCHEMA_BY_TYPE[elementType].find((field) => field.key === key);
 }
 
+/**
+ * The attributes a search-first "Add" (Blocking: element creation) supplies
+ * for a brand-new element, which only ever collects a name — every
+ * `required: true` field needs *some* value or the create is malformed
+ * (C3), so this fills each with its schema's own first sensible default
+ * (an enum's first option, `false` for a boolean) rather than leaving quick-
+ * create blocked on a form nobody asked for. Editable immediately after
+ * creation via the element page's own `Edit`, same as any other attribute.
+ * Driven by `ATTRIBUTE_SCHEMA_BY_TYPE` itself, not a second hard-coded list
+ * per type — a future required field defaults sensibly (enum/boolean) or,
+ * for a kind this function has no safe default for (text/date), is simply
+ * left unset, which C3 will then reject at commit time rather than this
+ * function inventing a wrong value.
+ */
+export function defaultCreateAttributes(elementType: ElementType): Record<string, Json> {
+  const attributes: Record<string, Json> = {};
+  for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[elementType]) {
+    if (!field.required) continue;
+    if (field.kind === 'boolean') attributes[field.key] = false;
+    else if (field.kind === 'enum' && field.options) {
+      const firstOption = field.options[0];
+      if (firstOption !== undefined) attributes[field.key] = firstOption;
+    }
+  }
+  return attributes;
+}
+
 /** ISO 8601 `YYYY-MM-DD`, and a real calendar date (rejects `2026-02-30`) — `Date.parse` alone accepts overflow by rolling it into March. */
 function isValidIsoDate(raw: string): boolean {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);

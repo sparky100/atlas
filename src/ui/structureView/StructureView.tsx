@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
@@ -19,6 +20,8 @@ export interface StructureViewProps {
   refParam: string;
   /** UI-principles §6.2/§6.3 — present only when a branch's Diff mode is active. Reuses `DiffBadge`, same call as ContextView.tsx's own comment explains for this family of DOM views. */
   diff?: VersionDiff | null;
+  /** Blocking: element creation's search-first "Add" control (an `ElementSearchAdd`, pre-built by the page with this frame's own `parentId`/branch already resolved) — omitted entirely, not shown disabled, when the caller hasn't established edit rights, same convention as `CapabilityMapView`'s `addCapability`. */
+  addChild?: ReactNode;
 }
 
 function diffBadge(diffById: Map<UUID, ElementVersionDiff> | null, elementId: UUID) {
@@ -39,7 +42,7 @@ function diffBadge(diffById: Map<UUID, ElementVersionDiff> | null, elementId: UU
  * five levels end there), so a component card is a plain link to its
  * element page, nothing more.
  */
-export function StructureView({ kind, group, orgSlug, modelSlug, refParam, diff = null }: StructureViewProps) {
+export function StructureView({ kind, group, orgSlug, modelSlug, refParam, diff = null, addChild }: StructureViewProps) {
   const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?ref=${refParam}`;
   const componentsHref = (containerId: UUID) => `/o/${orgSlug}/m/${modelSlug}/component/${containerId}?ref=${refParam}`;
   const parentExternal = attributesRecord(group.parent.attributes).isExternal === true;
@@ -56,9 +59,10 @@ export function StructureView({ kind, group, orgSlug, modelSlug, refParam, diff 
             </Text>
           </Link>
           {diffBadge(diffById, group.parent.element_id)}
+          {addChild}
         </div>
 
-        {group.children.length === 0 && <EmptyState>{kind === 'container' ? 'No containers yet.' : 'No components yet.'} Add one from the element page.</EmptyState>}
+        {group.children.length === 0 && <EmptyState>{kind === 'container' ? 'No containers yet.' : 'No components yet.'}</EmptyState>}
 
         <div className={styles.children}>
           {group.children.map((child) => (
