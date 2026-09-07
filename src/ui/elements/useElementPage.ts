@@ -107,7 +107,7 @@ function commitSource(commitId: UUID): ElementSource {
 async function resolveElementSource(modelId: UUID, ref: Ref): Promise<ElementSource | null> {
   if (ref.kind === 'branch') {
     const branch = await resolveBranchRef(supabase, ref);
-    if (!branch?.head_commit_id) return null;
+    if (!branch) return null;
     const projection = await loadProjectionAtCommit(supabase, modelId, branch.head_commit_id);
     return projectionSource(branch.head_commit_id, projection);
   }

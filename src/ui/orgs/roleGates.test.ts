@@ -10,7 +10,7 @@ function branch(overrides: Partial<BranchRow>): BranchRow {
     name: 'main',
     kind: 'main',
     status: 'draft',
-    base_commit_id: null,
+    base_commit_id: 'genesis-commit-1',
     head_commit_id: 'commit-1',
     shared_for_review: false,
     title: null,

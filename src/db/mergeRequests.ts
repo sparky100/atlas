@@ -72,14 +72,14 @@ export interface BranchMergeReview {
 /**
  * The engine's own §7 computation (threeWayDiff + classifyMerge) for a
  * branch against its model's current main — everything a submit, a review-
- * queue render, or a refresh's resubmit needs. `null` when the branch
- * hasn't forked from anything real yet, or main has no head commit
- * (nothing to compare against).
+ * queue render, or a refresh's resubmit needs. `null` when `main` itself
+ * can't be found for `modelId` (nothing to compare against) — every branch
+ * has a real head commit unconditionally now (ADR-018), so that's no
+ * longer a reason this can return `null`.
  */
 export async function computeMergeReviewForBranch(supabase: Client, modelId: UUID, branch: BranchRow): Promise<BranchMergeReview | null> {
-  if (!branch.head_commit_id) return null;
   const main = await getMainBranch(supabase, modelId);
-  if (!main?.head_commit_id) return null;
+  if (!main) return null;
 
   const [loader, aliasesByElementId] = await Promise.all([buildCommitLoader(supabase, modelId), listAliasesForModel(supabase, modelId)]);
   const review = computeMergeReview(branch.head_commit_id, main.head_commit_id, loader, { aliasesByElementId });
@@ -142,8 +142,6 @@ export type MergeApprovedResult = { ok: true; commitId: UUID } | { ok: false; re
  * already contains everything `theirs` has, plus the branch's own deltas.
  */
 export async function mergeApprovedRequest(supabase: Client, modelId: UUID, mergeRequestId: UUID, branch: BranchRow, message: string): Promise<MergeApprovedResult> {
-  if (!branch.head_commit_id) return { ok: false, reason: 'error', message: 'branch has no head commit' };
-
   const loader = await buildCommitLoader(supabase, modelId);
   const mergedHead = foldFromGenesis(branch.head_commit_id, loader);
   const projection = serializeHeadProjection(mergedHead);
@@ -197,9 +195,6 @@ export interface PushRefreshInput {
  */
 export async function pushRefresh(supabase: Client, input: PushRefreshInput): Promise<CommitResult> {
   const { modelId, orgId, userId, branch, mainHeadCommitId, review, choices } = input;
-  if (!branch.head_commit_id) {
-    return { ok: false, reason: 'invalid', message: 'branch has no head commit' };
-  }
 
   // SPEC §7.5's C15: every FIELD_CONFLICT key needs an explicit choice
   // before this refresh lands, or main's value would silently win with no
