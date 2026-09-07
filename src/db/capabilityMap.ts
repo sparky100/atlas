@@ -30,10 +30,21 @@ export async function listCapabilitiesForMap(supabase: Client, commitId: UUID): 
  * capability) instead of `from_element_id` (the system) — a `supports`
  * edge is directional (System → Capability, ADR-001), so these are
  * genuinely different queries, not the same one read backwards.
+ *
+ * Sprint C1-H item 1d (SPEC §6.7): `useCapabilityMap.ts` calls this with
+ * every capability in the map, which a real taxonomy can easily put past
+ * the `.in()`-filter-size limit (`src/db/inFilterLimit.ts`) — a capability
+ * map has no `landscape-perf.spec.ts`-sized fixture catching this today,
+ * but guarding this call without also fixing it would just trade a rare
+ * silent failure for a guaranteed loud one. Same rewrite as
+ * `listLandscapeEdges`/`listSupportsEdgesForSystems`: fetch every
+ * `supports` edge at this commit, narrow to `capabilityIds` in memory.
  */
 export async function listSupportsEdgesForCapabilities(supabase: Client, commitId: UUID, capabilityIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
   if (capabilityIds.length === 0) return [];
-  const { data, error } = await supabase.from('relationships_head').select(RELATIONSHIPS_HEAD_COLUMNS).eq('commit_id', commitId).eq('relationship_type', 'supports').in('to_element_id', capabilityIds);
+  const ids = new Set(capabilityIds);
+  const { data, error } = await supabase.from('relationships_head').select(RELATIONSHIPS_HEAD_COLUMNS).eq('commit_id', commitId).eq('relationship_type', 'supports');
   if (error) throw new Error(`listSupportsEdgesForCapabilities: ${error.message}`);
-  return data;
+  const rows = data as RelationshipsHeadRow[];
+  return rows.filter((r) => ids.has(r.to_element_id));
 }
