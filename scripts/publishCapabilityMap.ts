@@ -47,7 +47,7 @@ export async function publishCapabilityMap(supabase: Client, sector: string, ver
 
   const { data: sources, error: sourcesError } = await supabase.from('capability_map_sources').select('reviewed_by').eq('map_id', targetId);
   if (sourcesError) throw new Error(`reading sources for ${sector} v${String(version)}: ${sourcesError.message}`);
-  const sourceRows = (sources ?? []) as { reviewed_by: string }[];
+  const sourceRows = sources as { reviewed_by: string }[];
   if (sourceRows.length === 0) {
     throw new Error(`${sector} v${String(version)}: has no capability_map_sources row — a published map must cite at least one reviewed source.`);
   }
@@ -60,7 +60,7 @@ export async function publishCapabilityMap(supabase: Client, sector: string, ver
   const { data: otherPublished, error: otherError } = await supabase.from('capability_maps').select('id, version').eq('sector', sector).eq('status', 'published');
   if (otherError) throw new Error(`checking for an existing published ${sector} map: ${otherError.message}`);
   const deprecated: number[] = [];
-  for (const row of (otherPublished ?? []) as { id: string; version: number }[]) {
+  for (const row of otherPublished as { id: string; version: number }[]) {
     const { error: deprecateError } = await supabase.from('capability_maps').update({ status: 'deprecated' }).eq('id', row.id);
     if (deprecateError) throw new Error(`deprecating ${sector} v${String(row.version)}: ${deprecateError.message}`);
     deprecated.push(row.version);
