@@ -110,6 +110,22 @@ describe('repository layer against a real local Supabase', () => {
 
     orgId = randomUUID();
     orgSlug = `test-council-${orgId.slice(0, 8)}`;
+
+    // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once root-caused):
+    // re-check whoami on alice.client at the exact point of the failing
+    // call, and log the exact row about to be inserted, to rule out any
+    // drift between createSignedInUser's own diagnostic and here.
+    const { data: whoamiNow, error: whoamiNowError } = await alice.client.rpc('debug_whoami');
+    console.log(`[diag alice pre-insert]`, whoamiNowError ? `error: ${whoamiNowError.message}` : JSON.stringify(whoamiNow));
+    console.log(`[diag alice insert row]`, JSON.stringify({ id: orgId, name: 'Test Council', slug: orgSlug, created_by: alice.id }));
+    const { data: tryInsert, error: tryInsertError } = await alice.client.rpc('debug_try_insert_org', {
+      p_id: randomUUID(),
+      p_name: 'Debug Council',
+      p_slug: `debug-council-${randomUUID().slice(0, 8)}`,
+      p_created_by: alice.id,
+    });
+    console.log(`[diag alice try-insert-via-rpc]`, tryInsertError ? `error: ${tryInsertError.message}` : JSON.stringify(tryInsert));
+
     // Through src/db/organisations.ts, not a raw insert — Sprint U1 step 2's
     // repository layer is exactly what real app code calls.
     await createOrganisation(alice.client, { id: orgId, name: 'Test Council', slug: orgSlug, createdBy: alice.id });

@@ -25,3 +25,27 @@ as $$
 $$;
 
 grant execute on function public.debug_whoami() to authenticated;
+
+-- TEMPORARY (same cleanup as above): debug_whoami() proved auth.uid() and
+-- role are correct for an RPC call on this exact session, yet the same
+-- session's plain `.from('organisations').insert(...)` still hits
+-- organisations_insert's RLS check. This performs the identical insert
+-- from inside a security-invoker function instead of via PostgREST's own
+-- generated INSERT, to see whether the check behaves differently through
+-- this path, and to capture the raw exception if not.
+create or replace function public.debug_try_insert_org(p_id uuid, p_name text, p_slug text, p_created_by uuid)
+returns jsonb
+language plpgsql
+security invoker
+as $$
+declare
+  v_row organisations;
+begin
+  insert into organisations (id, name, slug, created_by) values (p_id, p_name, p_slug, p_created_by) returning * into v_row;
+  return jsonb_build_object('ok', true, 'auth_uid_at_insert', auth.uid(), 'row_created_by', v_row.created_by);
+exception when others then
+  return jsonb_build_object('ok', false, 'sqlstate', sqlstate, 'message', sqlerrm, 'auth_uid_at_insert', auth.uid(), 'p_created_by', p_created_by);
+end;
+$$;
+
+grant execute on function public.debug_try_insert_org(uuid, text, text, uuid) to authenticated;
