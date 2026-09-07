@@ -57,7 +57,11 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   await page.getByRole('button', { name: '✎ Edit' }).click();
   await page.getByLabel('Vendor').fill('Acme Corp');
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible();
+  // A real commit round trip (write the delta, re-fetch the element) — the
+  // default 5s expect timeout is tight for a freshly-started local
+  // Supabase's first real request; the overall 30s test timeout is the
+  // real backstop.
+  await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Acme Corp')).toBeVisible();
 
   // Main is untouched by the branch's own edit (baseline stays baseline

@@ -124,8 +124,12 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
       // Not just "the canvas exists" — the aria-label only reflects the
       // real node count once the worker's layout has actually landed
       // (useLandscape's `status: 'ready'`), so this is the real readiness
-      // signal, not a fixed sleep standing in for one.
-      await expect(canvas).toHaveAttribute('aria-label', new RegExp(`${String(SYSTEM_COUNT)} systems`), { timeout: 30_000 });
+      // signal, not a fixed sleep standing in for one. 90s, not the
+      // default: seeding this fixture is a single ~8MB commit_deltas
+      // payload (the sibling test's own measured baseline) inserting
+      // ~2,010 elements/6,000 relationships in one transaction — real
+      // headroom within this test's own 120s budget, not a flake cover-up.
+      await expect(canvas).toHaveAttribute('aria-label', new RegExp(`${String(SYSTEM_COUNT)} systems`), { timeout: 90_000 });
 
       const box = await canvas.boundingBox();
       if (!box) throw new Error('landscape canvas has no bounding box');

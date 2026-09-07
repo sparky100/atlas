@@ -119,7 +119,10 @@ test('selecting a system on the landscape zooms to its Context view and updates 
 
   await expect(page).toHaveURL(new RegExp(`/context/${systemId}\\?ref=main`));
   await expect(page.getByRole('heading', { name: 'Context' })).toBeVisible();
-  await expect(page.getByText(systemName)).toBeVisible();
+  // .first(): the name legitimately appears more than once on this page
+  // (e.g. the heading and the breadcrumb below) — this check only cares
+  // that it shows up somewhere; the breadcrumb-specific check follows.
+  await expect(page.getByText(systemName).first()).toBeVisible();
 
   // The breadcrumb had no such segment on the landscape page (no capability
   // filter was used, so it showed only Org › Model › [main]) — now it

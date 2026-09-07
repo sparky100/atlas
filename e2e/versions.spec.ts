@@ -130,6 +130,8 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
 
   await expect(page.getByRole('heading', { name: 'Diff: v1 → v2' })).toBeVisible();
   await expect(page.getByText('System B')).toBeVisible();
-  await expect(page.getByText('Added')).toBeVisible();
+  // .first(): the badge's accessible text duplicates across an icon +
+  // label pair in the same row — this checks the badge renders at all.
+  await expect(page.getByText('Added').first()).toBeVisible();
   await expect(page.getByText('System A')).toHaveCount(0);
 });

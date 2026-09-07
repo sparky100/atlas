@@ -90,7 +90,9 @@ test('descending the zoom chain: a system\'s context, its containers, and a cont
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/context/${systemId}`);
   await expect(page.getByRole('heading', { name: 'Context' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByText('Zoom Chain Test Model')).toBeVisible();
-  await expect(page.getByText('Billing Service')).toBeVisible();
+  // .first(): the system name legitimately appears more than once on this
+  // page (heading and breadcrumb) — this check only cares that it shows up.
+  await expect(page.getByText('Billing Service').first()).toBeVisible();
 
   await page.getByRole('link', { name: 'Containers →' }).click();
   await expect(page).toHaveURL(new RegExp(`/container/${systemId}`));

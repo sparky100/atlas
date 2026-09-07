@@ -37,11 +37,17 @@ test('switching theme persists across reload, including from user_preferences al
   await expect(page.getByRole('heading', { name: 'Your organisations' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
-  // Clear the localStorage cache and reload: this can only still be 'dark'
-  // if user_preferences.theme was actually persisted server-side and
-  // ThemeProvider loaded it back on sign-in.
+  // Clear the theme's own localStorage cache and reload: this can only
+  // still be 'dark' if user_preferences.theme was actually persisted
+  // server-side and ThemeProvider loaded it back on sign-in. A blanket
+  // localStorage.clear() would also wipe supabase-js's own session token
+  // (it persists there too, by default) and sign the user out — clearing
+  // only the pre-paint theme cache keys (src/ui/theme/preferences.ts's
+  // THEME_STORAGE_KEY/DENSITY_STORAGE_KEY) isolates the thing this
+  // assertion is actually testing.
   await page.evaluate(() => {
-    localStorage.clear();
+    localStorage.removeItem('atlas:theme');
+    localStorage.removeItem('atlas:density');
   });
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Your organisations' })).toBeVisible();
