@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff, VersionDiffState } from '../../engine/versionDiff';
-import { elementTypeGlyph } from '../components/ElementTypeGlyph/elementTypeGlyph';
+import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { NODE_HEIGHT, NODE_WIDTH, type LandscapeLayout } from './layout';
 import { quantizeScale } from './zoom';

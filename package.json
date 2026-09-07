@@ -24,7 +24,8 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:status": "supabase status",
-    "content:load-capability-maps": "node --experimental-strip-types scripts/loadCapabilityMaps.ts"
+    "content:load-capability-maps": "node --experimental-strip-types scripts/loadCapabilityMaps.ts",
+    "check:case-collisions": "node --experimental-strip-types scripts/checkCaseCollisions.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

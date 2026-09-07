@@ -16,6 +16,7 @@
 import type { RelationshipsHeadRow } from '../contracts/rows';
 import type { RelationshipType, UUID } from '../contracts/delta';
 import type { Client } from './client';
+import { selectAll } from './selectAll';
 
 const RELATIONSHIPS_HEAD_COLUMNS = 'relationship_id, relationship_type, from_element_id, to_element_id, attributes, exists_delta_id';
 
@@ -27,16 +28,28 @@ const RELATIONSHIPS_HEAD_COLUMNS = 'relationship_id, relationship_type, from_ele
  * caller can tell which is which by checking each endpoint against
  * `subjectIds` itself (src/ui/structureView/structureGrouping.ts does
  * exactly that).
+ *
+ * Sprint C1-H item 1 closing (c): rewritten the same shape as
+ * `listLandscapeEdges`/`listSupportsEdgesForSystems` (src/db/landscape.ts)
+ * — query the commit/type scope alone (no `subjectIds` in the request URL
+ * at all) and narrow to `subjectIds` client-side, in memory, after the
+ * round trip. `assertInFilterSize` no longer applies (there's no `.in()`
+ * filter left for it to guard) — this closes the gap this function's own
+ * comment used to flag rather than fix: the previous `.or(...in.(...))`
+ * put `subjectIds` directly in the URL, the exact SPEC §6.7 `.in()`-size
+ * risk `assertInFilterSize` guards everywhere else. Routed through
+ * `selectAll` (SPEC §6.7's other rule) as before, ordered by
+ * `relationship_id` for a stable, unique pagination order.
  */
 export async function listRelationshipsTouchingAny(supabase: Client, commitId: UUID, subjectIds: readonly UUID[], relationshipTypes: readonly RelationshipType[]): Promise<RelationshipsHeadRow[]> {
   if (subjectIds.length === 0) return [];
-  const idList = subjectIds.join(',');
-  const { data, error } = await supabase
+  const ids = new Set(subjectIds);
+  const query = supabase
     .from('relationships_head')
-    .select(RELATIONSHIPS_HEAD_COLUMNS)
+    .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
     .eq('commit_id', commitId)
     .in('relationship_type', relationshipTypes)
-    .or(`from_element_id.in.(${idList}),to_element_id.in.(${idList})`);
-  if (error) throw new Error(`listRelationshipsTouchingAny: ${error.message}`);
-  return data;
+    .order('relationship_id');
+  const rows = await selectAll<RelationshipsHeadRow>(query);
+  return rows.filter((r) => ids.has(r.from_element_id) || ids.has(r.to_element_id));
 }

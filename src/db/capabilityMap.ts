@@ -9,15 +9,27 @@
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { UUID } from '../contracts/delta';
 import type { Client } from './client';
+import { selectAll } from './selectAll';
 
 const ELEMENTS_HEAD_COLUMNS = 'element_id, element_type, name, parent_id, attributes, exists_delta_id';
 const RELATIONSHIPS_HEAD_COLUMNS = 'relationship_id, relationship_type, from_element_id, to_element_id, attributes, exists_delta_id';
 
-/** Every Capability at this commit — the map's tiles. */
+/**
+ * Every Capability at this commit — the map's tiles. Routed through
+ * `selectAll` (SPEC §6.7) like every other unbounded `elements_head`/
+ * `relationships_head` read — ordered by `element_id` in addition to `name`
+ * for a stable, unique pagination order (see `listSystemsForLandscape`'s
+ * identical comment, src/db/landscape.ts).
+ */
 export async function listCapabilitiesForMap(supabase: Client, commitId: UUID): Promise<ElementsHeadRow[]> {
-  const { data, error } = await supabase.from('elements_head').select(ELEMENTS_HEAD_COLUMNS).eq('commit_id', commitId).eq('element_type', 'capability').order('name');
-  if (error) throw new Error(`listCapabilitiesForMap: ${error.message}`);
-  return data;
+  const query = supabase
+    .from('elements_head')
+    .select(ELEMENTS_HEAD_COLUMNS, { count: 'exact' })
+    .eq('commit_id', commitId)
+    .eq('element_type', 'capability')
+    .order('name')
+    .order('element_id');
+  return selectAll<ElementsHeadRow>(query);
 }
 
 /**
@@ -43,8 +55,12 @@ export async function listCapabilitiesForMap(supabase: Client, commitId: UUID): 
 export async function listSupportsEdgesForCapabilities(supabase: Client, commitId: UUID, capabilityIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
   if (capabilityIds.length === 0) return [];
   const ids = new Set(capabilityIds);
-  const { data, error } = await supabase.from('relationships_head').select(RELATIONSHIPS_HEAD_COLUMNS).eq('commit_id', commitId).eq('relationship_type', 'supports');
-  if (error) throw new Error(`listSupportsEdgesForCapabilities: ${error.message}`);
-  const rows = data as RelationshipsHeadRow[];
+  const query = supabase
+    .from('relationships_head')
+    .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
+    .eq('commit_id', commitId)
+    .eq('relationship_type', 'supports')
+    .order('relationship_id');
+  const rows = await selectAll<RelationshipsHeadRow>(query);
   return rows.filter((r) => ids.has(r.to_element_id));
 }

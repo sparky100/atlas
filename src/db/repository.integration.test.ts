@@ -23,6 +23,7 @@ import type { Delta } from '../contracts/delta';
 import { foldFromGenesis, headHash } from '../engine/head';
 import { serializeHeadProjection } from '../engine/projection';
 import { createChangeBranch, getBranch, getMainBranch, listBranchesForModel, updateBranchMetadata } from './branches';
+import { resolveBranchModeProjection } from './branchProjection';
 import { listCapabilityMapItems } from './capabilityMapTemplates';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
@@ -687,6 +688,20 @@ describe('repository layer against a real local Supabase', () => {
       const { data: headRow, error: headError } = await service.from('elements_head').select('element_id, name').eq('commit_id', mergeCommitId).eq('element_id', elementId);
       if (headError) throw new Error(`reading elements_head: ${headError.message}`);
       expect(headRow).toMatchObject([{ element_id: elementId, name: 'Resident Portal' }]);
+
+      // rebuildHead recomputes the merge commit's head independently
+      // (fold from genesis, not trusting what merge_branch's own
+      // p_elements_head/p_relationships_head/p_facts payload wrote) and
+      // must match it byte for byte (SPEC §6.6's head == fold(deltas)) —
+      // the same check the "rebuildHead recomputes main's head
+      // independently..." test below runs for a plain commit, exercised
+      // here for a merge commit specifically, since a merge folds a
+      // second branch's exclusive commits in (SPEC §6.2's fold
+      // pseudocode) and that path deserves its own proof, not an
+      // inference from the plain-commit case.
+      const rebuildResult = await rebuildHead(service, modelId);
+      expect(rebuildResult.commitId).toBe(mergeCommitId);
+      expect(rebuildResult.headHash).toBe(headHash(mergedHead));
     });
 
     it('atlas.commit_deltas writes resolved_conflicts atomically alongside the resolving commit (ADR-007, SPEC §7.4)', async () => {
@@ -765,6 +780,77 @@ describe('repository layer against a real local Supabase', () => {
         .eq('winning_delta_id', winningDeltaId);
       if (resolvedError) throw new Error(`reading resolved_conflicts: ${resolvedError.message}`);
       expect(resolvedRows).toMatchObject([{ winning_delta_id: winningDeltaId, discarded_delta_id: losingDeltaId, resolution_delta_id: winningDeltaId, rationale: "kept the branch's name over main's" }]);
+    });
+
+    it("a refresh after main moved sets base_commit_id to main's new head, and resolveBranchModeProjection's As-is matches main's head fold (Sprint C1-H item 2)", async () => {
+      const mainBeforeFork = await getMainBranch(alice.client, modelId);
+      if (!mainBeforeFork?.head_commit_id) throw new Error('main branch not found');
+      const branch = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'base-commit-id-refresh-check',
+        createdBy: alice.id,
+        mainHeadCommitId: mainBeforeFork.head_commit_id,
+      });
+      if (!branch.base_commit_id || !branch.head_commit_id) throw new Error('branch has no base/head at creation');
+      expect(branch.base_commit_id).toBe(mainBeforeFork.head_commit_id);
+
+      // Move main out from under the branch's fork point, exactly like the
+      // REFRESH_REQUIRED test above — this is the state a refresh is
+      // supposed to catch base_commit_id up to.
+      const mainAdvanceResult = await commitToBranch(alice.client, {
+        modelId,
+        branchId: mainBeforeFork.id,
+        expectedHeadCommitId: mainBeforeFork.head_commit_id,
+        envelope: {
+          id: randomUUID(),
+          branchId: mainBeforeFork.id,
+          parentCommitId: mainBeforeFork.head_commit_id,
+          mergedBranchHeadCommitId: null,
+          kind: 'manual',
+          message: 'advance main past the branch fork point',
+          deltas: [makeCreateDelta(randomUUID(), randomUUID(), 'Refreshed-In System', aliceManualSourceId)],
+        },
+      });
+      expect(mainAdvanceResult).toMatchObject({ ok: true });
+      const mainAfterAdvance = await getMainBranch(alice.client, modelId);
+      if (!mainAfterAdvance?.head_commit_id) throw new Error('main branch not found after advancing');
+      expect(mainAfterAdvance.head_commit_id).not.toBe(mainBeforeFork.head_commit_id);
+
+      // The refresh itself: kind = 'merge' on the branch, pulling main's
+      // new head in. Zero deltas of its own — fold() (SPEC §6.2) walks
+      // mergedBranchHead's exclusive commits and applies their deltas;
+      // nothing here conflicts, so there's nothing to resolve (same shape
+      // as the "commit_deltas now accepts kind 'merge'" test above).
+      const { data: refreshCommit, error: refreshError } = await alice.client.schema('atlas').rpc('commit_deltas', {
+        p_commit_id: randomUUID(),
+        p_model_id: modelId,
+        p_branch_id: branch.id,
+        p_base_commit_id: branch.head_commit_id,
+        p_kind: 'merge',
+        p_message: 'refresh: pull main into the branch',
+        p_deltas: [],
+        p_merged_branch_head_commit_id: mainAfterAdvance.head_commit_id,
+      });
+      expect(refreshError).toBeNull();
+      expect(refreshCommit).toMatchObject({ kind: 'merge', merged_branch_head_commit_id: mainAfterAdvance.head_commit_id });
+
+      const branchAfterRefresh = await getBranch(alice.client, branch.id);
+      expect(branchAfterRefresh?.base_commit_id).toBe(mainAfterAdvance.head_commit_id);
+      if (!branchAfterRefresh) throw new Error('branch not found after refresh');
+
+      // resolveBranchModeProjection's As-is (branch.base_commit_id) must
+      // now fold to exactly the same projection as main's own head —
+      // fold's own determinism (P-1) means two separate fold() calls
+      // against the same commit id and the same commit/delta history
+      // produce byte-identical output, so a plain toEqual is a real
+      // equality check, not an approximation.
+      const loader = await buildCommitLoader(alice.client, modelId);
+      const expectedProjection = serializeHeadProjection(foldFromGenesis(mainAfterAdvance.head_commit_id, loader));
+      const asIs = await resolveBranchModeProjection(alice.client, modelId, branchAfterRefresh, 'asIs');
+      expect(asIs?.commitId).toBe(mainAfterAdvance.head_commit_id);
+      expect(asIs?.projection).toEqual(expectedProjection);
     });
 
     it("merge_branch reports REFRESH_REQUIRED — via a null return, not a thrown error, so its own reset to pending/proposed isn't rolled back — when main moved after approval", async () => {

@@ -9,6 +9,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  case-collisions:
+    name: No case-only path collisions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Pure Node + git ls-files, no dependencies — deliberately skips
+      # pnpm install so this fails fast on the exact class of bug
+      # (extension-less imports resolving to the wrong same-name file)
+      # that only surfaces on case-insensitive filesystems, e.g. Windows.
+      - run: node --experimental-strip-types scripts/checkCaseCollisions.ts
+
   lint:
     runs-on: ubuntu-latest
     steps:
