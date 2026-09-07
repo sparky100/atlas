@@ -9,6 +9,8 @@ import { EmptyState } from '../components/EmptyState/EmptyState';
 import { LinkButton } from '../components/Button/LinkButton';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { useAuth } from '../auth/useAuth';
+import { BranchRebasePanel } from '../reviews/BranchRebasePanel';
 import { branchStatusTone } from './branchStatus';
 import { describeDelta } from './changeSummaryFormat';
 import { useChange } from './useChange';
@@ -45,9 +47,19 @@ export interface ChangeViewProps {
  * approve, merge) lives on the review request's own page
  * (src/ui/reviews/ReviewRequestView.tsx) once a request exists — this page
  * only ever links to it.
+ *
+ * Sprint C1 step 8 adds a "rebase on main" panel (the user's brief:
+ * "Rebase branch on new main head with conflict surfacing") for a draft
+ * change that hasn't been submitted yet — so a long-lived branch can pull
+ * in main and see conflicts long before review, not just discover it's
+ * behind when it finally gets there. It's shown only while there is no
+ * open merge request: once one exists, refreshing goes through the review
+ * request's own page instead (it also has to resubmit the request's
+ * cached classification, which this panel has no request to update).
  */
 export function ChangeView({ modelId, branchId, orgSlug, modelSlug, canEdit }: ChangeViewProps) {
-  const { status, branch, error, updateMetadata } = useChange(branchId);
+  const { userId } = useAuth();
+  const { status, branch, error, updateMetadata, reload } = useChange(branchId);
   const summaryState = useChangeSummary(modelId, branch);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
@@ -82,6 +94,15 @@ export function ChangeView({ modelId, branchId, orgSlug, modelSlug, canEdit }: C
       </div>
 
       {error !== null && <Text as="p">{error}</Text>}
+
+      {branch.status === 'draft' && openRequest === null && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Rebase
+          </Text>
+          <BranchRebasePanel modelId={modelId} branch={branch} userId={userId} canEdit={canEdit} onRebased={reload} />
+        </Panel>
+      )}
 
       {(branch.status === 'draft' || openRequest !== null) && (
         <Panel>

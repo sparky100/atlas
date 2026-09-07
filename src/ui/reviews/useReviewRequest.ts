@@ -65,7 +65,7 @@ async function loadReviewRequestData(modelId: UUID, mergeRequestId: UUID): Promi
  * stale (SPEC §7.4's summary row: "a red 'refresh required' state when
  * mergeBase(B) != main.head").
  */
-export function useReviewRequest(modelId: UUID, mergeRequestId: UUID) {
+export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UUID | null) {
   const [state, setState] = useState<ReviewRequestState>({ status: 'loading' });
   const [reloadToken, setReloadToken] = useState(0);
   const [actionStatus, setActionStatus] = useState<ActionStatus>('idle');
@@ -136,14 +136,21 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID) {
   /** Pushes a refresh commit carrying every staged field-conflict choice (empty is a valid refresh — pulling in main with nothing to resolve), then recomputes and resubmits so the queue's cached classification stays current. Requires the branch to already be `draft` (reopen first if it isn't). */
   const pushRefreshAndResubmit = useCallback(async () => {
     if (state.status !== 'ready') return;
-    const { branch, request, mainHeadCommitId, review } = state;
+    if (!userId) {
+      setActionError('You must be signed in to push a refresh.');
+      return;
+    }
+    const { branch, mainHeadCommitId, review, request } = state;
     setActionError(null);
     setActionStatus('working');
     try {
       const commitResult = await pushRefresh(supabase, {
         modelId,
         orgId: branch.org_id,
-        userId: request.requested_by,
+        // The acting reviewer, not necessarily `request.requested_by` — a
+        // `sources` row's `created_by` must be `auth.uid()` (sources_insert's
+        // RLS), so this has to be whoever is actually pushing this refresh.
+        userId,
         branch,
         mainHeadCommitId,
         review,
@@ -170,7 +177,7 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID) {
     } finally {
       setActionStatus('idle');
     }
-  }, [state, modelId, fieldChoices, reload]);
+  }, [state, modelId, userId, fieldChoices, reload]);
 
   const approve = useCallback(async () => {
     if (state.status !== 'ready') return;
