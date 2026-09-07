@@ -49,3 +49,30 @@ export function findRelationshipTypeRule(relationshipType: RelationshipType, fro
 export function isRelationshipTripleAllowed(relationshipType: RelationshipType, fromType: ElementType, toType: ElementType): boolean {
   return findRelationshipTypeRule(relationshipType, fromType, toType) !== undefined;
 }
+
+/** One relationship "+ Add" slot (Blocking: element creation's relationship-add control, RelationshipsSection.tsx): a type plus every element type legally on the other end — more than one when the same `(relationshipType, direction)` allows different target types (e.g. a container `uses` either a container or a system). */
+export interface RelationshipGroupSlot {
+  relationshipType: RelationshipType;
+  targetTypes: ElementType[];
+}
+
+function groupSlotsFor(elementType: ElementType, thisSide: 'fromType' | 'toType', otherSide: 'fromType' | 'toType'): RelationshipGroupSlot[] {
+  const targetTypesByRelationship = new Map<RelationshipType, Set<ElementType>>();
+  for (const rule of RELATIONSHIP_TYPE_RULES) {
+    if (rule[thisSide] !== elementType) continue;
+    const set = targetTypesByRelationship.get(rule.relationshipType) ?? new Set<ElementType>();
+    set.add(rule[otherSide]);
+    targetTypesByRelationship.set(rule.relationshipType, set);
+  }
+  return [...targetTypesByRelationship.entries()].map(([relationshipType, targetTypes]) => ({ relationshipType, targetTypes: [...targetTypes] }));
+}
+
+/** Every relationship type `elementType` can be the *from* side of, with the legal target type(s) for the *to* side. */
+export function outboundRelationshipGroups(elementType: ElementType): RelationshipGroupSlot[] {
+  return groupSlotsFor(elementType, 'fromType', 'toType');
+}
+
+/** Every relationship type `elementType` can be the *to* side of, with the legal target type(s) for the *from* side. */
+export function inboundRelationshipGroups(elementType: ElementType): RelationshipGroupSlot[] {
+  return groupSlotsFor(elementType, 'toType', 'fromType');
+}
