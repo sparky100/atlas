@@ -223,6 +223,92 @@ describe('retract/restore (P-4: reversible)', () => {
   });
 });
 
+describe('C8: element.retract and live relationships (Sprint C1-H item 3)', () => {
+  /**
+   * One `system` element (`elementId`), between 1 and 4 `uses` relationships
+   * from it to distinct other `system` elements, and a per-relationship
+   * coin flip for whether that relationship is retracted *before*
+   * `elementId`'s own retract, all within one commit (one `fold` call, one
+   * delta array) — exactly the "earlier in the same commit" shape C8
+   * requires and `deltas.ts`'s own `element.retract` case now checks.
+   */
+  const retractScenarioArb = fc
+    .record({
+      elementId: uuid,
+      targetIds: fc.uniqueArray(uuid, { minLength: 1, maxLength: 4 }),
+      retractedBefore: fc.array(fc.boolean(), { minLength: 1, maxLength: 4 }),
+    })
+    .map(({ elementId, targetIds, retractedBefore }) => ({
+      elementId,
+      // One flag per target, regardless of which array fast-check made longer.
+      relationships: targetIds.map((toElementId, i) => ({ relationshipId: `rel-${String(i)}`, toElementId, retractBefore: retractedBefore[i % retractedBefore.length] ?? false })),
+    }))
+    .filter(({ elementId, relationships }) => !relationships.some((r) => r.toElementId === elementId)); // fromElementId !== toElementId — not what this test is about
+
+  function buildDeltas(elementId: UUID, relationships: { relationshipId: UUID; toElementId: UUID; retractBefore: boolean }[]): Delta[] {
+    const deltas: Delta[] = [{ kind: 'element.create', id: `create-${elementId}`, elementId, elementType: 'system', name: 'A', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: 'src', confidence: 1 }];
+    for (const r of relationships) {
+      deltas.push({
+        kind: 'element.create',
+        id: `create-${r.toElementId}`,
+        elementId: r.toElementId,
+        elementType: 'system',
+        name: 'B',
+        parentId: null,
+        attributes: { lifecycleStatus: 'active', isExternal: false },
+        sourceId: 'src',
+        confidence: 1,
+      });
+      deltas.push({
+        kind: 'relationship.create',
+        id: `create-${r.relationshipId}`,
+        relationshipId: r.relationshipId,
+        relationshipType: 'uses',
+        fromElementId: elementId,
+        toElementId: r.toElementId,
+        attributes: {},
+        sourceId: 'src',
+        confidence: 1,
+      });
+    }
+    // Retractions for the "before" subset, then the element's own retract —
+    // this ordering (not the relationships' creation order) is what makes
+    // this "earlier in the same commit" for C8's purposes.
+    for (const r of relationships) {
+      if (r.retractBefore) {
+        deltas.push({ kind: 'relationship.retract', id: `retract-${r.relationshipId}`, relationshipId: r.relationshipId, relationshipType: 'uses', previousDeltaId: `create-${r.relationshipId}`, sourceId: 'src', confidence: 1 });
+      }
+    }
+    deltas.push({ kind: 'element.retract', id: `retract-${elementId}`, elementId, elementType: 'system', previousDeltaId: `create-${elementId}`, sourceId: 'src', confidence: 1 });
+    return deltas;
+  }
+
+  it('rejects the retract whenever any relationship touching the element is still live at that point', () => {
+    fc.assert(
+      fc.property(retractScenarioArb, ({ elementId, relationships }) => {
+        fc.pre(relationships.some((r) => !r.retractBefore)); // at least one left live
+        const deltas = buildDeltas(elementId, relationships);
+        expect(() => fold(emptyHead(), deltas, ctx)).toThrow(/C8/);
+      }),
+    );
+  });
+
+  it('accepts the retract once every relationship touching the element was retracted earlier in the same commit', () => {
+    fc.assert(
+      fc.property(retractScenarioArb, ({ elementId, relationships }) => {
+        const allRetractedFirst = relationships.map((r) => ({ ...r, retractBefore: true }));
+        const deltas = buildDeltas(elementId, allRetractedFirst);
+        const after = fold(emptyHead(), deltas, ctx);
+        expect(after.elements.has(elementId)).toBe(false);
+        expect(after.retractedElements.has(elementId)).toBe(true);
+        for (const r of allRetractedFirst) {
+          expect(after.relationships.has(r.relationshipId)).toBe(false);
+        }
+      }),
+    );
+  });
+});
+
 describe('invert', () => {
   it('apply(d) then apply(invert(d, headBefore)) restores the prior element/relationship values', () => {
     fc.assert(
