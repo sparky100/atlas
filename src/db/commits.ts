@@ -49,6 +49,17 @@ export type CommitResult =
   | { ok: false; reason: 'invalid'; message: string }
   | { ok: false; reason: 'conflict'; message: string };
 
+/** One `resolved_conflicts` row (ADR-007, SPEC §7.4) to write alongside a resolution commit — `atlas.commit_deltas`'s own `p_resolved_conflicts`, camelCased. */
+export interface ResolvedConflictInput {
+  /** Minted by the caller (S-1), same convention as every other id in this codebase. */
+  id: UUID;
+  winningDeltaId: UUID;
+  discardedDeltaId: UUID;
+  /** The new delta this resolution commit itself asserts, if any — null when the winning side's own delta needed no restatement (not used by this sprint's field-conflict actions, which always write one; kept for a future resolution kind that might not). */
+  resolutionDeltaId: UUID | null;
+  rationale?: string;
+}
+
 export interface CommitToBranchInput {
   modelId: UUID;
   branchId: UUID;
@@ -56,6 +67,8 @@ export interface CommitToBranchInput {
   expectedHeadCommitId: UUID;
   /** `envelope.parentCommitId` must equal `expectedHeadCommitId` — both are required, rather than deriving one from the other, so a caller can't accidentally commit against a head it never actually fetched. */
   envelope: CommitEnvelope;
+  /** SPEC §7.4's field-conflict resolution actions: a `resolved_conflicts` row per resolved field, written in the same transaction as this commit. Omitted by every non-merge-review caller. */
+  resolvedConflicts?: ResolvedConflictInput[];
 }
 
 /** Exported for direct unit testing — the only part of commitToBranch that needs no database at all. */
@@ -103,7 +116,7 @@ const CONFLICT_ERROR_CODES = new Set([
  * transaction.
  */
 export async function commitToBranch(supabase: Client, input: CommitToBranchInput): Promise<CommitResult> {
-  const { modelId, branchId, expectedHeadCommitId, envelope } = input;
+  const { modelId, branchId, expectedHeadCommitId, envelope, resolvedConflicts } = input;
 
   const structuralErrors = shapeErrors(envelope, expectedHeadCommitId);
   if (structuralErrors.length > 0) {
@@ -177,6 +190,14 @@ export async function commitToBranch(supabase: Client, input: CommitToBranchInpu
     p_relationships_head: projection?.relationshipsHead ?? null,
     p_facts: projection?.facts ?? null,
     p_head_hash: isMain ? headHash(newHead) : null,
+    p_resolved_conflicts:
+      resolvedConflicts?.map((rc) => ({
+        id: rc.id,
+        winning_delta_id: rc.winningDeltaId,
+        discarded_delta_id: rc.discardedDeltaId,
+        resolution_delta_id: rc.resolutionDeltaId,
+        rationale: rc.rationale ?? null,
+      })) ?? null,
   } satisfies Record<string, unknown>);
 
   if (error) {

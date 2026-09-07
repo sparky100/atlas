@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
-import { canEditBranch } from './roleGates';
+import { canApproveOrMergeRequest, canEditBranch, canReviewMergeRequest } from './roleGates';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
   return {
@@ -53,5 +53,24 @@ describe('canEditBranch', () => {
     const captureDraft = branch({ kind: 'capture_draft', status: 'draft' });
     expect(canEditBranch('owner', captureDraft)).toBe(false);
     expect(canEditBranch('architect', captureDraft)).toBe(false);
+  });
+});
+
+describe('canReviewMergeRequest', () => {
+  it('owner/architect/contributor may reopen a request or push a refresh (mirrors atlas.request_changes)', () => {
+    expect(canReviewMergeRequest('owner')).toBe(true);
+    expect(canReviewMergeRequest('architect')).toBe(true);
+    expect(canReviewMergeRequest('contributor')).toBe(true);
+    expect(canReviewMergeRequest('viewer')).toBe(false);
+    expect(canReviewMergeRequest(null)).toBe(false);
+  });
+});
+
+describe('canApproveOrMergeRequest', () => {
+  it('owner/architect only (mirrors atlas.approve_merge_request/reject_merge_request/merge_branch)', () => {
+    expect(canApproveOrMergeRequest('owner')).toBe(true);
+    expect(canApproveOrMergeRequest('architect')).toBe(true);
+    expect(canApproveOrMergeRequest('contributor')).toBe(false);
+    expect(canApproveOrMergeRequest('viewer')).toBe(false);
   });
 });

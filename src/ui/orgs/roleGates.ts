@@ -53,3 +53,23 @@ export function canEditBranch(role: MemberRole | null, branch: BranchRow): boole
   if (branch.kind === 'change') return branch.status === 'draft' && canCreateChangeBranch(role);
   return false;
 }
+
+/**
+ * Mirrors `atlas.request_changes`' role check (Sprint C1 step 2,
+ * `supabase/migrations/20260906161000_merge_review_queue.sql`) — a
+ * contributor may resolve conflicts on their own (or anyone's) open request
+ * and push a refresh, same role floor as editing a draft change branch.
+ */
+export function canReviewMergeRequest(role: MemberRole | null): boolean {
+  return canCreateChangeBranch(role);
+}
+
+/**
+ * Mirrors `atlas.approve_merge_request`/`reject_merge_request`/
+ * `merge_branch`'s own role checks — "only owners and architects may
+ * approve/reject/merge" (SPEC §7.4's "the reviewer holds architect or
+ * owner").
+ */
+export function canApproveOrMergeRequest(role: MemberRole | null): boolean {
+  return canEditOnMain(role);
+}

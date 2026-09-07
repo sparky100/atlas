@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -13,6 +13,8 @@ import { branchStatusTone } from './branchStatus';
 import { describeDelta } from './changeSummaryFormat';
 import { useChange } from './useChange';
 import { useChangeSummary } from './useChangeSummary';
+import { useOpenMergeRequest } from './useOpenMergeRequest';
+import { useSubmitForReview } from './useSubmitForReview';
 import styles from './ChangeView.module.css';
 
 export interface ChangeViewProps {
@@ -35,9 +37,14 @@ export interface ChangeViewProps {
  * the capabilities it affects via `supports`, other open changes touching
  * the same subjects, and the delivered/remaining lineage (ADR-006
  * amendment — real once the review queue's split mechanic exists to
- * produce one; empty and said so until then). Still not built: the merge/
- * review actions themselves (submit, refresh, approve, merge) — a later
- * step.
+ * produce one; empty and said so until then).
+ *
+ * Sprint C1 step 7 adds the one merge action that belongs on the change
+ * page itself: submitting a draft for review (`draft -> proposed`,
+ * SPEC §3.4). Everything else the review queue does (refresh, resolve,
+ * approve, merge) lives on the review request's own page
+ * (src/ui/reviews/ReviewRequestView.tsx) once a request exists — this page
+ * only ever links to it.
  */
 export function ChangeView({ modelId, branchId, orgSlug, modelSlug, canEdit }: ChangeViewProps) {
   const { status, branch, error, updateMetadata } = useChange(branchId);
@@ -46,6 +53,9 @@ export function ChangeView({ modelId, branchId, orgSlug, modelSlug, canEdit }: C
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [targetDate, setTargetDate] = useState('');
+  const navigate = useNavigate();
+  const { request: openRequest } = useOpenMergeRequest(branchId);
+  const submission = useSubmitForReview(modelId, branch);
 
   if (status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (status === 'not_found' || !branch) return <Text as="p">No change found for this id.</Text>;
@@ -72,6 +82,48 @@ export function ChangeView({ modelId, branchId, orgSlug, modelSlug, canEdit }: C
       </div>
 
       {error !== null && <Text as="p">{error}</Text>}
+
+      {(branch.status === 'draft' || openRequest !== null) && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Review
+          </Text>
+          {openRequest === undefined && (
+            <Text tone="muted" size="sm">
+              Checking for an open review request…
+            </Text>
+          )}
+          {openRequest === null && branch.status === 'draft' && (
+            <>
+              <Text as="p" tone="muted" size="sm">
+                Submitting opens the review queue for this change (SPEC §7.4) — a reviewer sees every delta, conflict, and affected capability before it can merge into main.
+              </Text>
+              {canEdit && (
+                <Button
+                  variant="primary"
+                  disabled={submission.status === 'submitting'}
+                  onClick={() => {
+                    void submission.submit().then((mergeRequestId) => {
+                      if (mergeRequestId) void navigate(`/o/${orgSlug}/m/${modelSlug}/review/${mergeRequestId}`);
+                    });
+                  }}
+                >
+                  {submission.status === 'submitting' ? 'Submitting…' : 'Submit for review'}
+                </Button>
+              )}
+              {submission.error !== null && <Text as="p">{submission.error}</Text>}
+            </>
+          )}
+          {openRequest && (
+            <div className={styles.subjectTitle}>
+              <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
+              <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/${openRequest.id}`} variant="secondary">
+                Open review →
+              </LinkButton>
+            </div>
+          )}
+        </Panel>
+      )}
 
       {!editing ? (
         <Panel>

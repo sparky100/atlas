@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest';
 import type { Delta, UUID } from '../contracts/delta';
 import { diffFacts } from './branch';
 import { emptyHead, fold, type CommitContext, type Head } from './deltas';
-import { classifyMerge, type MergeClassifyInput } from './merge';
+import type { CommitLoader, CommitNode } from './head';
+import { classifyMerge, computeMergeReview, type MergeClassifyInput } from './merge';
 
 const ctx: CommitContext = { authorId: 'author-1', createdAt: '2026-01-01T00:00:00.000Z' };
 
@@ -215,5 +216,57 @@ describe('clean', () => {
     const result = classifyMerge(input);
     expect(result.clean).toContain('untouched');
     expect(result.findings.some((f) => f.subjectId === 'untouched')).toBe(false);
+  });
+});
+
+function commitNode(partial: Pick<CommitNode, 'id' | 'parent_commit_id' | 'depth' | 'deltas'> & Partial<CommitNode>): CommitNode {
+  return {
+    org_id: 'org',
+    model_id: 'model',
+    branch_id: 'unspecified',
+    merged_branch_head_commit_id: null,
+    kind: 'manual',
+    message: '',
+    author_id: 'author-1',
+    head_hash: null,
+    created_at: '2026-01-01T00:00:00.000Z',
+    ...partial,
+  };
+}
+
+describe('computeMergeReview', () => {
+  /**
+   * genesis(main) --main1(main)
+   *        \-- branch1(branch)
+   * genesis creates 'el'. main1 updates name -> 'Renamed by main'. branch1
+   * updates name -> 'Renamed by branch' — a real branch head vs. main head,
+   * not the Head-level fixtures `scenario()` builds above, since
+   * `computeMergeReview` takes commit ids and a `CommitLoader` and calls
+   * `threeWayDiff` itself (SPEC §7.1's mergeBase) before classifying.
+   */
+  function buildFixture() {
+    const nodes = new Map<UUID, CommitNode>();
+    const genesis = commitNode({ id: 'genesis', parent_commit_id: null, depth: 0, kind: 'template_seed', branch_id: 'main', deltas: [createEl('d0', 'el', 'X')] });
+    const main1 = commitNode({ id: 'main1', parent_commit_id: 'genesis', depth: 1, branch_id: 'main', deltas: [updateAttr('d-main', 'el', 'name', 'Renamed by main', 'd0')] });
+    const branch1 = commitNode({ id: 'branch1', parent_commit_id: 'genesis', depth: 1, branch_id: 'branch', deltas: [updateAttr('d-branch', 'el', 'name', 'Renamed by branch', 'd0')] });
+    for (const c of [genesis, main1, branch1]) nodes.set(c.id, c);
+    const loader: CommitLoader = (id) => nodes.get(id);
+    return { loader, genesis, main1, branch1 };
+  }
+
+  it('runs threeWayDiff then classifyMerge together, surfacing a field-conflict end to end from commit ids', () => {
+    const { loader, main1, branch1 } = buildFixture();
+    const review = computeMergeReview(branch1.id, main1.id, loader);
+    expect(review.threeWay.mergeBaseCommitId).toBe('genesis');
+    expect(review.classification.hasBlockingConflict).toBe(true);
+    expect(review.classification.findings).toEqual([expect.objectContaining({ class: 'field-conflict', subjectId: 'el', attribute: 'name' })]);
+  });
+
+  it('is clean, with no findings, when the branch has not diverged from main on any shared field', () => {
+    const { loader, genesis, branch1 } = buildFixture();
+    const review = computeMergeReview(branch1.id, genesis.id, loader);
+    expect(review.classification.hasBlockingConflict).toBe(false);
+    expect(review.classification.findings).toEqual([]);
+    expect(review.classification.clean).toContain('el');
   });
 });
