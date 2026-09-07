@@ -117,8 +117,16 @@ test('a field conflict renders with its three-way context, resolves with one cli
 
   // Main now carries the *chosen* value — not main's own, not a silent
   // overwrite (src/engine/mergeResolution.ts's own reasoning for why this
-  // needs an explicit resolution delta at all).
+  // needs an explicit resolution delta at all). `exact: true`, not a bare
+  // substring match: HistoryTimeline.tsx renders every delta ever asserted
+  // about this subject as `${attribute}: ${JSON.stringify(value)}` — both
+  // the branch's original edit and the merge's own resolution delta assert
+  // "Branch Value" (two rows), and main's own superseded edit still shows
+  // "Main Value" in that same audit trail (Playwright strict mode rejects
+  // a bare substring match resolving any of that); the exact node text is
+  // what actually distinguishes "the value now says this" from "some delta
+  // somewhere mentions this".
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}`);
-  await expect(page.getByText('Branch Value')).toBeVisible();
-  await expect(page.getByText('Main Value')).toHaveCount(0);
+  await expect(page.getByText('Branch Value', { exact: true })).toBeVisible();
+  await expect(page.getByText('Main Value', { exact: true })).toHaveCount(0);
 });

@@ -65,13 +65,25 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   // Supabase's first real request; the overall 30s test timeout is the
   // real backstop.
   await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('Acme Corp')).toBeVisible({ timeout: 15_000 });
+  // `exact: true`, not a bare substring match: HistoryTimeline.tsx renders
+  // every delta ever asserted about this subject — model-scoped, not
+  // filtered to the current ref (its own doc comment: "the audit trail",
+  // deliberately not a projection) — as `${attribute}: ${JSON.stringify(value)}`,
+  // so "Attributes" now genuinely reads `Acme Corp` while "History" reads
+  // `vendor: "Acme Corp"` on the very same page. A bare substring match
+  // resolves both (Playwright strict mode rejects that); the exact node
+  // text is what actually distinguishes "the value now says this" from
+  // "some delta somewhere mentions this".
+  await expect(page.getByText('Acme Corp', { exact: true })).toBeVisible({ timeout: 15_000 });
 
   // Main is untouched by the branch's own edit (baseline stays baseline
   // until merge) — the isolation the whole "changes as branches" model
-  // exists to guarantee.
+  // exists to guarantee. The branch's own delta already exists in the
+  // audit trail regardless of ref (same History caveat as above), so this
+  // checks the exact attribute value is absent, not that no delta
+  // anywhere mentions it.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}`);
-  await expect(page.getByText('Acme Corp')).toHaveCount(0);
+  await expect(page.getByText('Acme Corp', { exact: true })).toHaveCount(0);
 
   // 4. Every view can switch between As-is/To-be/Diff once a branch ref is
   // selected (the user's own brief, item 3) — the Landscape canvas itself
@@ -115,7 +127,7 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
 
   // 7. Main now has the merged value.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}`);
-  await expect(page.getByText('Acme Corp')).toBeVisible();
+  await expect(page.getByText('Acme Corp', { exact: true })).toBeVisible();
 });
 
 /**
