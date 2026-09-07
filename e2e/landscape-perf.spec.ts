@@ -90,26 +90,15 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
       const modelSlug = `perf-landscape-${modelId.slice(0, 8)}`;
       await createModel(signedIn, { id: modelId, orgId, name: 'Perf Landscape', slug: modelSlug, createdBy: userId });
 
-      // Bootstraps main's genesis commit as service_role. Not a stand-in
-      // for atlas.seed_from_map any more — that function exists now
-      // (supabase/migrations/20260906120000_seed_from_map.sql) — but it
-      // seeds a model from a capability_maps template, which can only ever
-      // produce `capability` elements; this fixture needs an arbitrary
-      // System-only generated landscape (SYSTEM_COUNT/EDGE_COUNT below),
-      // which no product code path can create a genesis commit for yet
-      // (docs/AUDIT-2026-09-U2.md's cross-cutting finding: there is still
-      // no way to get a model's first commit outside a capability-map
-      // import). Same bootstrap as src/db/repository.integration.test.ts's
-      // own beforeAll, for the same reason.
+      // main is never empty (ADR-018): atlas.on_model_created already gave
+      // it a genesis commit the instant createModel's insert fired, so
+      // there's nothing to bootstrap here any more — just read the head
+      // that's already there and commit this fixture's landscape on top
+      // of it, same as any other first edit to a fresh model.
       const main = await getMainBranch(service, modelId);
       if (!main) throw new Error('main branch was not auto-created');
-      const genesisCommitId = randomUUID();
-      const { error: genesisError } = await service
-        .from('commits')
-        .insert({ id: genesisCommitId, org_id: orgId, model_id: modelId, branch_id: main.id, parent_commit_id: null, kind: 'template_seed', message: 'seed', author_id: userId, depth: 0 });
-      if (genesisError) throw new Error(`genesis commit: ${genesisError.message}`);
-      const { error: headError } = await service.from('branches').update({ head_commit_id: genesisCommitId }).eq('id', main.id);
-      if (headError) throw new Error(`advancing main head: ${headError.message}`);
+      const genesisCommitId = main.head_commit_id;
+      if (!genesisCommitId) throw new Error('main branch has no head commit (ADR-018 violation)');
 
       const sourceId = randomUUID();
       const { error: sourceError } = await signedIn.from('sources').insert({ id: sourceId, org_id: orgId, model_id: modelId, kind: 'manual', name: 'Manual entry', user_id: userId, created_by: userId });

@@ -22,10 +22,16 @@ import styles from './CapabilityMapPage.module.css';
  * own comment); from there, Context, Container and Component are the
  * remaining four levels.
  *
- * Sprint U2 step 2's tailoring flow lives here too: `refNotFound` (a model
- * with no commits at all) is the empty scaffold's "import" moment — owner/
- * architect only, same gate as `Edit` (ADR-015) — and a ready map gets the
- * "add capability" form once main's branch id is known.
+ * Sprint U2 step 2's tailoring flow lives here too: `refNotFound` (an
+ * unknown tag or branch ref — never main any more, since ADR-018 gives
+ * every model's main branch a real genesis commit the instant it's
+ * created) still gets the import panel for that case. The empty-map
+ * moment that matters in practice — main resolves fine but has no
+ * capabilities yet — is `ready` with an empty tree: the import panel
+ * (seed from a starter map, the primary action once any map is published)
+ * and "Add a capability" (CapabilityMapView's own empty-state branch, the
+ * always-available fallback) both show there, owner/architect only, same
+ * gate as `Edit` (ADR-015).
  */
 export function CapabilityMapPage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
@@ -74,6 +80,9 @@ export function CapabilityMapPage() {
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && canEdit && <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reload} />}
         {state.status === 'refNotFound' && !canEdit && <Text as="p">This model has no commits yet at this ref.</Text>}
+        {state.status === 'ready' && state.data.tree.l1.length === 0 && state.data.tree.orphans.length === 0 && canEdit && (
+          <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reload} />
+        )}
         {state.status === 'ready' && (
           <CapabilityMapView
             tree={state.data.tree}

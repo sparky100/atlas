@@ -8,16 +8,16 @@
  * first screen a director sees; it should not be the one without an
  * end-to-end test."
  *
- * Same "needs a real Supabase" limitation, and the same genesis-commit
- * bootstrap, as e2e/element-edit.spec.ts (see that file's own comment for
- * why `commit_deltas`/`atlas.seed_from_map` can't be used for an arbitrary
- * fixture like this one).
+ * Same "needs a real Supabase" limitation as e2e/element-edit.spec.ts. No
+ * genesis-commit bootstrap any more (ADR-018): main already has a real
+ * head — its genesis commit, made by atlas.on_model_created — the instant
+ * createModel's insert fires, so this fixture just commits on top of it.
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import type { CommitEnvelope, Delta } from '../src/contracts/delta';
 import { getMainBranch } from '../src/db/branches';
-import { createServiceRoleClient, createSupabaseClient } from '../src/db/client';
+import { createSupabaseClient } from '../src/db/client';
 import { commitToBranch } from '../src/db/commits';
 import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
@@ -54,15 +54,8 @@ test('capability map: two-level tree with an orphan, L2→L3 expand, orphan flag
 
   const main = await getMainBranch(signedIn, modelId);
   if (!main) throw new Error('main branch was not auto-created');
-
-  const service = createServiceRoleClient(env);
-  const genesisCommitId = randomUUID();
-  const { error: genesisError } = await service
-    .from('commits')
-    .insert({ id: genesisCommitId, org_id: orgId, model_id: modelId, branch_id: main.id, parent_commit_id: null, kind: 'manual', message: 'seed', author_id: userId, depth: 0 });
-  if (genesisError) throw new Error(`genesis commit: ${genesisError.message}`);
-  const { error: headError } = await service.from('branches').update({ head_commit_id: genesisCommitId }).eq('id', main.id);
-  if (headError) throw new Error(`advancing main head: ${headError.message}`);
+  const genesisCommitId = main.head_commit_id;
+  if (!genesisCommitId) throw new Error('main branch has no head commit (ADR-018 violation)');
 
   const { error: sourceError } = await signedIn.from('sources').insert({ id: randomUUID(), org_id: orgId, model_id: modelId, kind: 'manual', name: 'Seed', user_id: userId, created_by: userId });
   if (sourceError) throw new Error(`seed source: ${sourceError.message}`);

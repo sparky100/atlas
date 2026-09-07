@@ -1,12 +1,14 @@
 /**
- * The tailoring flow's "import" action: seed a model's (empty) main branch
- * from a published starter capability map (SPEC-data-model.md §3.10/§5.1,
- * ADR-012). One `template_seed` commit — the model's genesis commit, the
- * only kind that can ever have a null `parentCommitId` — whose
- * `element.create` deltas carry `attributes.code`/`attributes.templateRef`,
- * plus one `sources` row (kind `template`) and one `aliases` row per
- * element (`template_code`, RT-4) recording which starter map and version
- * seeded this model.
+ * The tailoring flow's "import" action: seed a model's (still-empty-of-
+ * content) main branch from a published starter capability map
+ * (SPEC-data-model.md §3.10/§5.1, ADR-012). One `template_seed` commit,
+ * parented on main's existing genesis commit (ADR-018: main always has a
+ * real head, even before this runs — only the trigger-inserted `genesis`
+ * commit itself is ever allowed a null parent), whose `element.create`
+ * deltas carry `attributes.code`/`attributes.templateRef`, plus one
+ * `sources` row (kind `template`) and one `aliases` row per element
+ * (`template_code`, RT-4) recording which starter map and version seeded
+ * this model.
  *
  * Same division of labour as src/db/commits.ts: this builds the deltas and
  * folds them through the real engine (src/engine/deltas.ts's `fold`, from
@@ -100,11 +102,11 @@ export interface SeedModelFromCapabilityMapInput {
 export type SeedResult = { ok: true; commitId: UUID } | { ok: false; message: string };
 
 /**
- * Folds `input.items` into a genesis `template_seed` commit and persists it
- * via `atlas.seed_from_map`. `input.branchId` must be a model with no
- * commits yet at all — this is the model's first commit, never a later
- * addition (SPEC §5.1); later tailoring is ordinary `manual` commits
- * through src/db/commits.ts, not a second call here.
+ * Folds `input.items` into a `template_seed` commit and persists it via
+ * `atlas.seed_from_map`. `input.branchId` must still be at its genesis
+ * commit — no real content yet — since a model is seeded at most once
+ * (SPEC §5.1); later tailoring is ordinary `manual` commits through
+ * src/db/commits.ts, not a second call here.
  */
 export async function seedModelFromCapabilityMap(supabase: Client, input: SeedModelFromCapabilityMapInput): Promise<SeedResult> {
   const { modelId, branchId, authorId, capabilityMapId, sector, version, items } = input;
@@ -152,6 +154,11 @@ export async function seedModelFromCapabilityMap(supabase: Client, input: SeedMo
  * `parentCommitId`/`mergedBranchHeadCommitId` at all, genesis has neither) —
  * `commit_id` isn't part of the row itself: `seed_from_map` inserts every
  * delta under its own `p_commit_id` parameter, not a per-row value.
+ *
+ * `previous_delta_id: null` throughout: every delta here is an
+ * `element.create`, which never has a prior fact to reference regardless
+ * of whether its commit's own parent is a genesis commit or something
+ * later.
  */
 function deltaToRpcRow(delta: Delta): Record<string, unknown> {
   if (delta.kind !== 'element.create') throw new Error(`deltaToRpcRow: seeding only ever produces element.create deltas, got ${delta.kind}`);

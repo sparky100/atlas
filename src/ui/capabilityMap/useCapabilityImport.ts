@@ -24,11 +24,12 @@ export interface UseCapabilityImportInput {
 /**
  * The tailoring flow's "import" action (Sprint U2 step 2): lists the
  * published starter maps for the picker, then seeds the chosen one via
- * atlas.seed_from_map (src/db/seedFromMap.ts). Only reachable while a
- * model's main branch has no commits at all (SPEC §5.1's "first commit of
- * a model") — src/ui/routes/CapabilityMapPage.tsx only renders this while
- * `useCapabilityMap` reports `refNotFound`, and `seed_from_map` itself
- * re-checks the same precondition server-side regardless.
+ * atlas.seed_from_map (src/db/seedFromMap.ts). Reachable whenever the map
+ * has no capabilities yet — an unresolvable ref, or (the common case since
+ * ADR-018) main resolved fine but is still just its genesis commit —
+ * gated in src/ui/routes/CapabilityMapPage.tsx; `seed_from_map` itself
+ * re-checks the same "still at genesis" precondition server-side
+ * regardless.
  */
 export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabilityImportResult {
   const { modelId, userId, onImported } = input;

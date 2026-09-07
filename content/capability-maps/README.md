@@ -88,6 +88,38 @@ passes the parser can't fail the database):
   confirms nothing is copied verbatim. Licence for this content: CC BY 4.0.
 
 Run `pnpm content:load-capability-maps` after adding or editing a file.
-Re-running is safe: the loader upserts by `(sector, version)`, replacing
-that map's `capability_map_items`/`capability_map_sources` wholesale
-rather than accumulating duplicates.
+Re-running is safe **for a draft map**: the loader upserts by
+`(sector, version)`, replacing that map's `capability_map_items`/
+`capability_map_sources` wholesale rather than accumulating duplicates.
+Once a map is published (below), re-running the loader against its
+`(sector, version)` fails loudly instead — publish content by adding a
+new version, not by editing a version that's already out.
+
+## Publishing: draft → review doc → a human runs `content:publish-capability-map`
+
+A map stays `draft` — real, loaded, queryable, but not offered by the
+tailoring flow's import picker — until someone actually reviews it. The
+workflow:
+
+1. Load the map (`pnpm content:load-capability-maps`) and regenerate the
+   review document (`pnpm content:review-capability-maps`); read
+   `docs/review/capability-maps.md` for that sector.
+2. A human reviews the map (against the review document's flags, the
+   editorial conventions above, and their own domain knowledge) and edits
+   at least one of the map's `sources[].reviewedBy` entries in the JSON
+   file to their own name, replacing the drafting placeholder
+   ("Pending human review — drafted by Claude Code"). Re-run
+   `content:load-capability-maps` to pick up that edit — it's still a
+   draft map at this point, so the loader's normal wholesale-replace
+   still applies.
+3. That same human runs `pnpm content:publish-capability-map <sector> <version>`
+   (`scripts/publishCapabilityMap.ts`). It refuses to publish a map whose
+   sources are all still the placeholder, sets `status: published` and
+   `published_at`, and deprecates any earlier `published` version of the
+   same sector (a sector has at most one current published map).
+
+After that, `capability_map_items_guard_immutable`
+(`supabase/migrations/20260906190000_...sql`) rejects any further
+insert/update/delete against that map's items — a published map is fixed;
+a needed change is a new version (`<sector>/<version+1>.json`), reviewed
+and published the same way.

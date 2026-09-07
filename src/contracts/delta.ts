@@ -331,7 +331,7 @@ export function factKeyOf(d: Delta): { subjectId: UUID; attribute: string } {
 // Commit envelope
 // ---------------------------------------------------------------------------
 
-export type CommitKind = 'manual' | 'capture' | 'merge' | 'template_seed';
+export type CommitKind = 'genesis' | 'manual' | 'capture' | 'merge' | 'template_seed';
 
 /**
  * No `authorId` field (Sprint H1, docs/AUDIT-2026-09-U2.md §2.E.3 item 15):
@@ -346,7 +346,14 @@ export type CommitKind = 'manual' | 'capture' | 'merge' | 'template_seed';
 export interface CommitEnvelope {
   id: UUID;
   branchId: UUID;
-  /** Null only for the genesis commit of a model's main branch. */
+  /**
+   * Never null in a client-constructed envelope (ADR-018): a model's main
+   * branch always has a real head, even before anything has been committed
+   * to it — the initial genesis commit that makes that true is inserted
+   * only by `atlas.on_model_created`, never via `commit_deltas` or any
+   * other RPC a client calls, so `kind: 'genesis'` and a null parent never
+   * appear here.
+   */
   parentCommitId: UUID | null;
   /**
    * Second parent. Set only when kind === 'merge':

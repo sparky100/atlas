@@ -12,12 +12,16 @@ export interface CapabilityMapImportPanelProps {
 }
 
 /**
- * The empty scaffold's "import" affordance (Sprint U2 step 2): shown only
- * while a model's main branch has no commits at all (§5.1's "the first
- * commit of a model"), and only to owner/architect — the same gate as
- * every other write here (ADR-015). `content/capability-maps/` ships empty
- * this sprint (real sector maps are Prompt 9), so `maps` will usually be
- * empty too; that's shown plainly, not hidden, per CLAUDE.md rule 7.
+ * The empty scaffold's "import" affordance (Sprint U2 step 2, wiring
+ * updated for ADR-018): shown for an unresolvable ref (an unknown tag or
+ * branch) and, in the far more common case since main always has a real
+ * head now, whenever main resolves fine but has no capabilities yet — the
+ * primary action there, alongside "Add a capability" (CapabilityMapView's
+ * own empty-state form) as the always-available alternative. Owner/
+ * architect only, same gate as every other write here (ADR-015). A sector
+ * with no published starter map yet shows "No starter maps are published
+ * yet" plainly, not hidden, per CLAUDE.md rule 7 — "Add a capability" is
+ * still there either way.
  */
 export function CapabilityMapImportPanel({ modelId, userId, onImported }: CapabilityMapImportPanelProps) {
   const { status, maps, error, importMap } = useCapabilityImport({ modelId, userId, onImported });
