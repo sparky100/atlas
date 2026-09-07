@@ -20,23 +20,14 @@
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
+import type { CommitEnvelope } from '../src/contracts/delta';
+import { createChangeBranch } from '../src/db/branches';
+import { commitToBranch } from '../src/db/commits';
 import { loadEnv } from '../src/db/env';
 import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
 
 test('create a change, edit it on its own branch, view it, submit, approve, and merge', async ({ page }) => {
   const env = loadEnv();
-  // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once root-caused):
-  // useElementEditor.ts's save() sets a visible submitError and leaves the
-  // form open (status stays 'editing', so ✎ Edit never reappears) on a
-  // failed commit — surface that text plus any console/page error if the
-  // edit below doesn't complete in time, instead of a bare "not found".
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') console.log(`[diag page console error] ${msg.text()}`);
-  });
-  page.on('pageerror', (err) => {
-    console.log(`[diag page error] ${err.message}`);
-  });
-
   const fixture = await bootstrapChangeBranchFixture(page, env, 'cbmerge', 'Billing Service');
   const { orgSlug, modelSlug, systemId } = fixture;
 
@@ -73,13 +64,7 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   // default 5s expect timeout is tight for a freshly-started local
   // Supabase's first real request; the overall 30s test timeout is the
   // real backstop.
-  try {
-    await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible({ timeout: 15_000 });
-  } catch (e) {
-    const bodyText = await page.locator('body').innerText().catch(() => '<could not read body>');
-    console.log(`[diag] ✎ Edit never reappeared after Save. Page body text: ${bodyText.slice(0, 2000)}`);
-    throw e;
-  }
+  await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Acme Corp')).toBeVisible({ timeout: 15_000 });
 
   // Main is untouched by the branch's own edit (baseline stays baseline
@@ -131,4 +116,57 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   // 7. Main now has the merged value.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}`);
   await expect(page.getByText('Acme Corp')).toBeVisible();
+});
+
+/**
+ * Sprint C1-H item 1's own diagnostics into the spec above (change the
+ * branch, ✎ Edit never reappearing) traced back to `useElementPage.ts`
+ * reading `elements_head` by commit id for a branch ref — a real bug, now
+ * fixed (branch refs fold their head in memory instead, matching
+ * `useLandscape.ts`'s own fix for the identical gap; SPEC §1 S-2). But
+ * that investigation also surfaced a real gap in test coverage: nothing
+ * proved what a *rejected* save actually does in the UI, so a real bug
+ * there (e.g. `useElementEditor.ts`'s `save()` swallowing the error and
+ * leaving the editor hung) could have shipped unnoticed. C13's optimistic-
+ * concurrency check is the easiest real rejection to force outside a
+ * database fault: race the branch's head out from under the open editor
+ * (a direct `commitToBranch` call, exactly as a second real user editing
+ * the same branch concurrently would).
+ */
+test('a failed save surfaces its error in the UI instead of leaving the editor open with no signal', async ({ page }) => {
+  const env = loadEnv();
+  const fixture = await bootstrapChangeBranchFixture(page, env, 'cbmergeconflict', 'Support Portal');
+  const { signedIn, orgId, orgSlug, modelId, modelSlug, userId, seedCommitId, createDeltaId, seedSourceId, systemId } = fixture;
+
+  const branchId = randomUUID();
+  await createChangeBranch(signedIn, { id: branchId, orgId, modelId, name: 'race-vendor', title: 'Race the vendor field', createdBy: userId, mainHeadCommitId: seedCommitId });
+
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=branch:${branchId}`);
+  await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible();
+  await page.getByRole('button', { name: '✎ Edit' }).click();
+  await page.getByLabel('Vendor').fill('Page Value');
+
+  // Commit directly to the same branch out from under the open editor —
+  // it still holds `expectedHeadCommitId: seedCommitId` (the branch's head
+  // when the page loaded), which this makes stale before Save is ever
+  // clicked.
+  const raceEnvelope: CommitEnvelope = {
+    id: randomUUID(),
+    branchId,
+    parentCommitId: seedCommitId,
+    mergedBranchHeadCommitId: null,
+    kind: 'manual',
+    message: 'race: someone else edits the branch first',
+    deltas: [{ kind: 'element.update', id: randomUUID(), elementId: systemId, elementType: 'system', attribute: 'vendor', value: 'Someone Else Value', previousDeltaId: createDeltaId, sourceId: seedSourceId, confidence: 1 }],
+  };
+  const raceResult = await commitToBranch(signedIn, { modelId, branchId, expectedHeadCommitId: seedCommitId, envelope: raceEnvelope });
+  if (!raceResult.ok) throw new Error(`race commit: ${raceResult.message}`);
+
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  // The real point of this test: a rejected save must surface a visible
+  // error and hand control back to the user, not hang with a disabled
+  // Save button and no signal.
+  await expect(page.getByText('This element changed since you loaded it. Reload the page and try again.')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: 'Save' })).toBeEnabled();
 });

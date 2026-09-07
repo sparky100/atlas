@@ -31,14 +31,6 @@ import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
 
 test('a field conflict renders with its three-way context, resolves with one click, and the chosen value survives the merge', async ({ page }) => {
   const env = loadEnv();
-  // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once root-caused).
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') console.log(`[diag page console error] ${msg.text()}`);
-  });
-  page.on('pageerror', (err) => {
-    console.log(`[diag page error] ${err.message}`);
-  });
-
   const fixture = await bootstrapChangeBranchFixture(page, env, 'fieldconflict', 'Payments Service');
   const { signedIn, orgId, orgSlug, modelId, modelSlug, userId, main, seedCommitId, createDeltaId, seedSourceId, systemId } = fixture;
 
@@ -95,17 +87,23 @@ test('a field conflict renders with its three-way context, resolves with one cli
   const approveButton = page.getByRole('button', { name: 'Approve' });
   await expect(approveButton).toBeDisabled();
 
+  // Root-caused (Sprint C1-H item 1): a branch under review only accepts a
+  // new commit while `status = 'draft'` (SPEC S-18) — submitting moved it
+  // to `proposed`, and ReviewRequestView.tsx's own resubmit button is
+  // gated on that same `draft` status for the identical reason (the button
+  // simply doesn't render on a `proposed` branch, which is what a bare
+  // `getByRole('button', { name: /resubmit/ })` waiting forever turned out
+  // to mean — not a stagedChoiceCount/state-sync bug). "Keep this change"
+  // itself is plain client state and stages fine on a `proposed` branch,
+  // but pushing that resolution needs the branch reopened first, exactly
+  // as docs/SPEC-data-model.md's §7.4 implementation note and
+  // useReviewRequest.ts's own `pushRefreshAndResubmit` doc comment say.
+  await page.getByRole('button', { name: 'Reopen for edits' }).click();
+  await expect(page.getByText('changes requested', { exact: true })).toBeVisible();
+
   // One-click resolution: "keep this change" (SPEC §7.4's first action).
   await card.getByRole('button', { name: 'Keep this change' }).click();
   await expect(card.getByText('Staged: keep this change')).toBeVisible();
-  // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once root-caused):
-  // ReviewRequestView.tsx renders this button's text from
-  // rr.stagedChoiceCount, which shares state with the card's own "Staged:"
-  // text above — log its actual current text before asserting the exact
-  // count, since a mismatch there (vs. this button just being slow) points
-  // at two different bugs.
-  const resubmitButton = page.getByRole('button', { name: /resubmit/ });
-  console.log(`[diag] resubmit button text: ${String(await resubmitButton.textContent())}`);
   await page.getByRole('button', { name: /Push refresh \(1 resolved\) & resubmit/ }).click();
 
   // Refreshed: the conflict is gone, Approve is enabled.

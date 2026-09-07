@@ -21,7 +21,7 @@
  * the same input either way.
  */
 import type { RelationshipType, UUID } from '../contracts/delta';
-import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
+import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
 import { cloneHead, type Head } from '../engine/deltas';
 import { foldFromGenesis } from '../engine/head';
 import { serializeHeadProjection, type HeadProjection } from '../engine/projection';
@@ -116,6 +116,11 @@ export function projectionChildrenOf(projection: HeadProjection, parentId: UUID)
 /** Mirrors src/db/elements.ts's `listRelationshipsForElement` — both directions. */
 export function projectionRelationshipsForElement(projection: HeadProjection, elementId: UUID): RelationshipsHeadRow[] {
   return projection.relationshipsHead.filter((r) => r.from_element_id === elementId || r.to_element_id === elementId);
+}
+
+/** Mirrors src/db/elements.ts's `listFactsForSubject`, keyed the same way `useElementPage.ts`'s own `loadFacts` keys its result (by attribute). */
+export function projectionFactsForSubject(projection: HeadProjection, subjectId: UUID): Map<string, FactsRow> {
+  return new Map(projection.facts.filter((f) => f.subject_id === subjectId).map((f) => [f.attribute, f]));
 }
 
 /** Mirrors src/db/landscape.ts's `listSystemsForLandscape`, name-sorted to match. */

@@ -121,8 +121,23 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
       if (!commitResult.ok) throw new Error(`seeding the landscape fixture: ${commitResult.message}`);
       console.log(`[diag] fixture seeding took ${String(Date.now() - seedStart)}ms`);
 
+      // Sprint C1-H item 1: this test's failure traced (via these logs) to
+      // repeated "400 Bad Request"/"net::ERR_FAILED" console errors right
+      // after navigation, in a growing-interval pattern — the page never
+      // leaves its loading state within the 90s budget. Prime suspect,
+      // from reading src/db/landscape.ts alongside that evidence:
+      // `listLandscapeEdges`/`listSupportsEdgesForSystems` pass this
+      // fixture's full `systemIds` (2,000 uuids) into `.in()` twice each,
+      // and postgrest-js sends `.in()` filters as GET query parameters —
+      // a ~70KB+ URL for this fixture's scale, well past what most
+      // proxies/servers accept. Not yet fixed (a real scale decision, not
+      // a one-line change — chunking the `.in()` calls changes this
+      // query's shape) — left filtering to errors only, since the
+      // question this diagnostic still needs to answer (does the same
+      // failure recur, and does it start immediately on navigation) needs
+      // console errors, not every log/info message.
       page.on('console', (msg) => {
-        console.log(`[diag page console ${msg.type()}] ${msg.text()}`);
+        if (msg.type() === 'error') console.log(`[diag page console error] ${msg.text()}`);
       });
       page.on('pageerror', (err) => {
         console.log(`[diag page error] ${err.message}`);
