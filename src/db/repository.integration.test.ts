@@ -807,7 +807,11 @@ describe('repository layer against a real local Supabase', () => {
         p_message: 'stale merge attempt',
       });
       expect(mergeError).toBeNull();
-      expect(mergeData).toBeNull();
+      // atlas.merge_branch's `returns commits` means PostgREST serialises
+      // its own `return null;` (the stale-approval case) as a row of null
+      // columns, not a bare JSON null (src/db/mergeRequests.ts's own note
+      // on this) — mergeData's own id is the reliable signal either way.
+      expect((mergeData as { id: string | null } | null)?.id ?? null).toBeNull();
 
       const { data: reqRow, error: reqError } = await service.from('merge_requests').select('status').eq('id', requestId).single();
       if (reqError) throw new Error(`reading merge_requests: ${reqError.message}`);

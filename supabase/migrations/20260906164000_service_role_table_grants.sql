@@ -28,7 +28,9 @@
 -- needs to force a branch into an otherwise-unreachable state to prove the
 -- constraint rejects it); commits and deltas (the same
 -- rebuildHead/buildCommitLoader read, folding a model's full commit
--- history independently of any one branch's session).
+-- history independently of any one branch's session); resolved_conflicts
+-- (an assertion that a refresh's field-conflict resolution was actually
+-- recorded).
 
 grant delete on organisations to service_role;
 grant select on aliases to service_role;
@@ -39,3 +41,4 @@ grant select on merge_requests to service_role;
 grant select, update on branches to service_role;
 grant select on commits to service_role;
 grant select on deltas to service_role;
+grant select on resolved_conflicts to service_role;
