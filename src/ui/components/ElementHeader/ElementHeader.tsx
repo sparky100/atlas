@@ -18,21 +18,29 @@ export interface ElementHeaderProps {
   aliases: AliasRow[];
   aliasSources: Map<string, SourceRow>;
   /**
-   * `Edit` (§4.2), shown only when the caller has already established both
-   * halves of its gate: owner/architect role (ADR-015) and `ref === main`
-   * (a tag is never editable, and Sprint U1 has no `Propose a change…` to
-   * open for anyone else — no branch UI yet). Omitted entirely otherwise,
-   * not shown disabled: CLAUDE.md rule 7 rules out a button with nothing
-   * behind it.
+   * `Edit` (§4.2), shown only when the caller has already established its
+   * gate: `canEditBranch(role, editingBranch)` (src/ui/orgs/roleGates.ts) —
+   * owner/architect at `main`, or owner/architect/contributor on a `draft`
+   * change branch (Sprint C1 step 9 wired the branch half of this in;
+   * step 4 had already generalised the editing hooks themselves to take
+   * any branch, but no page actually picked one other than main until
+   * now). A tag is never editable either way. `Propose a change…` (the
+   * contributor path at `main`/a tag, opening a branch picker inline) still
+   * isn't built — a real, named gap, not this component's to fill: a
+   * contributor there gets no `Edit` affordance at all rather than an
+   * inert one (CLAUDE.md rule 7). Omitted entirely otherwise, not shown
+   * disabled, for the same reason.
    */
   onEdit?: (() => void) | undefined;
 }
 
 /**
  * The identity header (§4.2). `Propose a change…` (the contributor path at
- * `main`/a tag) still isn't built — there is no branch UI yet — so `Edit`
- * only ever appears for the one role/ref combination Sprint U1 actually
- * supports: owner/architect, at `main` (ADR-015).
+ * `main`/a tag, opening a branch picker inline) still isn't built — a real,
+ * named gap (see `onEdit`'s own comment) — so `Edit` only ever appears for
+ * the role/ref combinations `canEditBranch` actually allows: owner/architect
+ * at `main` (ADR-015), or owner/architect/contributor on a draft change
+ * branch (Sprint C1).
  */
 export function ElementHeader({ element, existsFact, existsSource, aliases, aliasSources, onEdit }: ElementHeaderProps) {
   const [copied, setCopied] = useState(false);

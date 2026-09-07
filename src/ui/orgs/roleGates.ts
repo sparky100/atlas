@@ -18,10 +18,12 @@ export function canCreateModel(role: MemberRole | null): boolean {
  * Mirrors `atlas.commit_deltas`'s main-only role gate (ADR-015: "only
  * owners and architects may commit directly to main") — for showing/hiding
  * `Edit` at `main` (UI-principles §4.2). A contributor gets no edit
- * affordance at all in Sprint U1 rather than an inert `Propose a change…`
- * (there is no branch UI yet for that to open) — the same "no demo
- * shortcut" call the element page already made for every role before this
- * step existed.
+ * affordance at all here rather than an inert `Propose a change…` — that
+ * flow (opening a branch picker inline from the element page) still isn't
+ * built even now that branch UI exists elsewhere (Changes, the review
+ * queue); a contributor's real path to editing is creating or opening a
+ * change branch first, then editing at `?ref=branch:...` (`canEditBranch`
+ * below), which this main-only gate deliberately has no opinion on.
  */
 export function canEditOnMain(role: MemberRole | null): boolean {
   return role === 'owner' || role === 'architect';
