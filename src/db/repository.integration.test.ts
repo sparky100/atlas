@@ -53,8 +53,27 @@ async function createSignedInUser(label: string): Promise<TestUser> {
   if (createError) throw new Error(`createSignedInUser(${label}): ${createError.message}`);
 
   const signIn = createSupabaseClient(env);
-  const { error: signInError } = await signIn.auth.signInWithPassword({ email, password });
+  const { data: signedIn, error: signInError } = await signIn.auth.signInWithPassword({ email, password });
   if (signInError) throw new Error(`createSignedInUser(${label}) sign-in: ${signInError.message}`);
+
+  // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once the organisations
+  // RLS failure is root-caused): decode the access token's own claims
+  // without verification, purely to compare against created.user.id and see
+  // what role/exp this real GoTrue instance actually issued.
+  const jwtPayload = signedIn.session.access_token.split('.')[1] ?? '';
+  const claims = JSON.parse(Buffer.from(jwtPayload, 'base64').toString('utf8')) as Record<string, unknown>;
+  const { data: sessionCheck } = await signIn.auth.getSession();
+  const diag = {
+    createdUserId: created.user.id,
+    jwtSub: claims.sub,
+    jwtRole: claims.role,
+    jwtAud: claims.aud,
+    jwtExp: claims.exp,
+    nowSeconds: Math.floor(Date.now() / 1000),
+    getSessionHasSession: sessionCheck.session !== null,
+    getSessionTokenMatches: sessionCheck.session?.access_token === signedIn.session.access_token,
+  };
+  console.log(`[diag ${label}]`, JSON.stringify(diag));
 
   return { id: created.user.id, email, client: signIn };
 }
