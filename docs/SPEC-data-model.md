@@ -544,7 +544,7 @@ A versioned sector starter map (ADR-012).
 
 | Column | Type | Constraints |
 |---|---|---|
-| `sector` | text | not null, `check (sector in ('local_government','nhs','housing','hei','generic'))` |
+| `sector` | text | not null. No database CHECK (dropped, `20260906180000_capability_maps_sector_taxonomy_in_code.sql`): the allowed values are `src/contracts/capabilityMapContent.ts`'s `SECTORS` — `local_government_scotland`, `local_government_england`, `nhs`, `housing`, `hei`, `public_body`, `utility`, `electricity_network` — taxonomy in code per ADR-001, validated by `parseCapabilityMapContent`, which is the only path to this column (the loader is its sole writer). The deprecated `local_government` parses as `local_government_scotland`. |
 | `version` | int | not null; `unique (sector, version)` |
 | `status` | map_status | not null default `draft` |
 | `source_description` | text | not null |

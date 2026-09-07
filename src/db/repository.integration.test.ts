@@ -109,7 +109,7 @@ describe('repository layer against a real local Supabase', () => {
     const childItemId = randomUUID();
     const { error: mapError } = await service
       .from('capability_maps')
-      .insert({ id: capabilityMapId, sector: 'generic', version: 1, status: 'published', source_description: 'Integration test fixture', published_at: new Date().toISOString() });
+      .insert({ id: capabilityMapId, sector: 'public_body', version: 1, status: 'published', source_description: 'Integration test fixture', published_at: new Date().toISOString() });
     if (mapError) throw new Error(`capability_maps fixture: ${mapError.message}`);
     const { error: itemsError } = await service.from('capability_map_items').insert([
       { id: rootItemId, map_id: capabilityMapId, code: '1', parent_code: null, name: 'Root Capability', level: 1 },
@@ -128,7 +128,7 @@ describe('repository layer against a real local Supabase', () => {
       branchId: main.id,
       authorId: alice.id,
       capabilityMapId,
-      sector: 'generic',
+      sector: 'public_body',
       version: 1,
       items,
     });
@@ -212,7 +212,7 @@ describe('repository layer against a real local Supabase', () => {
         branchId: main.id,
         authorId: alice.id,
         capabilityMapId,
-        sector: 'generic',
+        sector: 'public_body',
         version: 1,
         items,
       });

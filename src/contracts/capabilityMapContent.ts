@@ -3,14 +3,36 @@
  * (`content/capability-maps/<sector>/<version>.json`, SPEC-data-model.md
  * §3.10, ADR-012) — what scripts/loadCapabilityMaps.ts reads and validates
  * before writing anything to `capability_maps`/`capability_map_items`/
- * `capability_map_sources`. Sprint U2 ships the loader and this shape with
- * an empty `content/` scaffold; real sector content is Prompt 9's job, not
- * this one's — see content/capability-maps/README.md for the exact format
- * a future author writes against.
+ * `capability_map_sources`, and what scripts/reviewCapabilityMaps.ts reads
+ * through so the review document can never disagree with the loader.
+ *
+ * This file *is* the schema: there is deliberately no hand-written
+ * schema.json alongside the content. The sector list lives here, not in a
+ * database CHECK constraint — the same taxonomy-in-code choice ADR-001
+ * makes for element and relationship types, so adding a sector is one
+ * edit in one place with the tests that go with it, not a migration.
+ * `supabase/migrations/20260906180000_capability_maps_sector_taxonomy_in_code.sql`
+ * dropped the old CHECK that used to duplicate this list in the database.
  */
 import { z } from 'zod';
 
-export const SECTORS = ['local_government', 'nhs', 'housing', 'hei', 'generic'] as const;
+export const SECTORS = ['local_government_scotland', 'local_government_england', 'nhs', 'housing', 'hei', 'public_body', 'utility', 'electricity_network'] as const;
+
+export type Sector = (typeof SECTORS)[number];
+
+/**
+ * Deprecated sector names still accepted on the way in, mapped to their
+ * canonical value. `local_government` predates the Scotland/England split
+ * (its content was Scottish-authority-shaped); nothing writes it any more,
+ * and a content file must live under its canonical directory
+ * (`local_government_scotland/<version>.json`) — the loader checks the
+ * path against the *parsed* sector, so a file left at
+ * `local_government/1.json` still fails loudly there. The alias only
+ * keeps old raw JSON parseable; it is not a second spelling to write.
+ */
+export const LEGACY_SECTOR_ALIASES: Readonly<Record<string, Sector>> = { local_government: 'local_government_scotland' };
+
+const sectorSchema = z.preprocess((value) => (typeof value === 'string' && value in LEGACY_SECTOR_ALIASES ? LEGACY_SECTOR_ALIASES[value] : value), z.enum(SECTORS));
 
 const itemSchema = z.object({
   code: z.string().min(1),
@@ -29,7 +51,7 @@ const sourceSchema = z.object({
 
 export const capabilityMapContentSchema = z
   .object({
-    sector: z.enum(SECTORS),
+    sector: sectorSchema,
     version: z.number().int().positive(),
     status: z.enum(['draft', 'published', 'deprecated']),
     sourceDescription: z.string().min(1),
