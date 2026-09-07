@@ -50,6 +50,14 @@ export type BranchStatus = 'draft' | 'proposed' | 'in_review' | 'approved' | 'me
  * `mergeBase(B)` for a change branch — set at fork, moved to `main`'s head
  * on every successful refresh (SPEC §1 S-11, ADR-005 amendment) — never the
  * original fork point forever.
+ *
+ * `base_commit_id`/`head_commit_id` are `NOT NULL` (ADR-018,
+ * `supabase/migrations/20260906220000_main_always_has_head.sql`): every
+ * branch, `main` included, is born with a real commit already attached —
+ * `main`'s own genesis commit, inserted by `atlas.on_model_created` in the
+ * same transaction as the model itself, never a later fix-up. Before
+ * ADR-018 these were nullable for `main` specifically, until its first
+ * real commit landed; that state no longer exists.
  */
 export interface BranchRow {
   id: UUID;
@@ -58,8 +66,8 @@ export interface BranchRow {
   name: string;
   kind: BranchKind;
   status: BranchStatus;
-  base_commit_id: UUID | null;
-  head_commit_id: UUID | null;
+  base_commit_id: UUID;
+  head_commit_id: UUID;
   shared_for_review: boolean;
   title: string | null;
   /** Change branches: free-text description of the change, set at creation. */

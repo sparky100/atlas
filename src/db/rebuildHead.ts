@@ -39,7 +39,6 @@ export interface RebuildHeadResult {
 export async function rebuildHead(serviceRoleClient: Client, modelId: UUID): Promise<RebuildHeadResult> {
   const main = await getMainBranch(serviceRoleClient, modelId);
   if (!main) throw new Error(`rebuildHead: model ${modelId} has no main branch`);
-  if (!main.head_commit_id) throw new Error(`rebuildHead: model ${modelId}'s main branch has no commits yet`);
 
   const loader = await buildCommitLoader(serviceRoleClient, modelId);
   const head = foldFromGenesis(main.head_commit_id, loader);

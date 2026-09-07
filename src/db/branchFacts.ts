@@ -55,7 +55,6 @@ export async function loadFactsForSubjectAtBranch(
   subjectType: SubjectType,
   subjectId: UUID,
 ): Promise<Map<string, FactsRow>> {
-  if (!branch.head_commit_id) return new Map();
   if (branch.kind === 'main') {
     const rows = await listFactsForSubject(supabase, branch.head_commit_id, subjectId);
     return new Map(rows.map((row) => [row.attribute, row]));
