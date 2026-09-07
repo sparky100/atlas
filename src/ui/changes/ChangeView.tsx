@@ -1,15 +1,25 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
+import { ConfidenceDots } from '../components/ConfidenceDots/ConfidenceDots';
+import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
+import { EmptyState } from '../components/EmptyState/EmptyState';
+import { LinkButton } from '../components/Button/LinkButton';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { branchStatusTone } from './branchStatus';
+import { describeDelta } from './changeSummaryFormat';
 import { useChange } from './useChange';
+import { useChangeSummary } from './useChangeSummary';
 import styles from './ChangeView.module.css';
 
 export interface ChangeViewProps {
+  modelId: UUID;
   branchId: UUID;
+  orgSlug: string;
+  modelSlug: string;
   /** Contributor+ (ADR-009) — the same gate `ChangesView`'s create form uses; a viewer sees the change read-only. */
   canEdit: boolean;
 }
@@ -20,16 +30,18 @@ export interface ChangeViewProps {
  * since `branches` has no separate slug column of its own to route on,
  * unlike `organisations`/`models`).
  *
- * Honest placeholder (CLAUDE.md rule 7) for what later Sprint C1 steps
- * add: a summary of this change's own deltas grouped by element, the
- * capabilities it affects via `supports`, other open changes touching the
- * same elements, the As-is/To-be/Diff selector, and the merge/review
- * actions (submit, refresh, approve, merge). None of those exist yet —
- * this page is metadata (name, title, description, target date, status)
- * only, the foundation those steps build on.
+ * Sprint C1 step 6 fills in the sections step 3 left as honest
+ * placeholders: this change's own deltas grouped by element/relationship,
+ * the capabilities it affects via `supports`, other open changes touching
+ * the same subjects, and the delivered/remaining lineage (ADR-006
+ * amendment — real once the review queue's split mechanic exists to
+ * produce one; empty and said so until then). Still not built: the merge/
+ * review actions themselves (submit, refresh, approve, merge) — a later
+ * step.
  */
-export function ChangeView({ branchId, canEdit }: ChangeViewProps) {
+export function ChangeView({ modelId, branchId, orgSlug, modelSlug, canEdit }: ChangeViewProps) {
   const { status, branch, error, updateMetadata } = useChange(branchId);
+  const summaryState = useChangeSummary(modelId, branch);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -139,27 +151,113 @@ export function ChangeView({ branchId, canEdit }: ChangeViewProps) {
         <Text as="h2" size="lg">
           Deltas on this change
         </Text>
-        <Text as="p" tone="muted">
-          A summary of this change's own deltas, grouped by element, is not built yet — editing on a change branch is a later Sprint C1 step.
-        </Text>
+        {summaryState.status === 'loading' && <Text tone="muted">Loading…</Text>}
+        {summaryState.status === 'error' && <Text as="p">{summaryState.message}</Text>}
+        {summaryState.status === 'ready' && summaryState.summary.subjects.length === 0 && <EmptyState>No deltas yet — this change hasn't diverged from main.</EmptyState>}
+        {summaryState.status === 'ready' && summaryState.summary.subjects.length > 0 && (
+          <ul className={styles.subjectList}>
+            {summaryState.summary.subjects.map((subject) => (
+              <li key={subject.subjectId} className={styles.subjectRow}>
+                <div className={styles.subjectTitle}>
+                  {subject.subjectType === 'element' && <ElementTypeGlyph type={subject.elementType} />}
+                  <Text as="span" size="lg">
+                    {subject.name}
+                  </Text>
+                </div>
+                <ul className={styles.deltaList}>
+                  {subject.deltas.map((delta) => {
+                    const source = summaryState.summary.sourcesById.get(delta.sourceId);
+                    return (
+                      <li key={delta.id} className={styles.deltaRow}>
+                        <Text as="span" size="sm">
+                          {describeDelta(delta)}
+                        </Text>
+                        <Text as="span" tone="muted" size="sm">
+                          {source?.name ?? delta.sourceId}
+                        </Text>
+                        <ConfidenceDots confidence={delta.confidence} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        )}
       </Panel>
 
       <Panel>
         <Text as="h2" size="lg">
           Affected capabilities
         </Text>
-        <Text as="p" tone="muted">
-          Capabilities this change affects via `supports` are not shown yet — this needs the delta summary above first.
-        </Text>
+        {summaryState.status === 'ready' && summaryState.summary.affectedCapabilities.length === 0 && <EmptyState>No capabilities are affected by this change yet.</EmptyState>}
+        {summaryState.status === 'ready' && summaryState.summary.affectedCapabilities.length > 0 && (
+          <ul className={styles.capabilityList}>
+            {summaryState.summary.affectedCapabilities.map(({ capability, viaSystems }) => (
+              <li key={capability.element_id}>
+                <div className={styles.subjectTitle}>
+                  <ElementTypeGlyph type="capability" />
+                  <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${capability.element_id}`}>
+                    <Text as="span">{capability.name}</Text>
+                  </Link>
+                </div>
+                {viaSystems.length > 0 && (
+                  <Text as="p" tone="muted" size="sm">
+                    via {viaSystems.map((s) => s.name).join(', ')}
+                  </Text>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </Panel>
 
       <Panel>
         <Text as="h2" size="lg">
           Other open changes touching the same elements
         </Text>
-        <Text as="p" tone="muted">
-          Not built yet.
+        {summaryState.status === 'ready' && summaryState.summary.otherOpenChanges.length === 0 && <EmptyState>No other open change touches the same elements.</EmptyState>}
+        {summaryState.status === 'ready' && summaryState.summary.otherOpenChanges.length > 0 && (
+          <ul className={styles.branchList}>
+            {summaryState.summary.otherOpenChanges.map((other) => (
+              <li key={other.id} className={styles.branchRow}>
+                <Text as="span">{other.title ?? other.name}</Text>
+                <div className={styles.subjectTitle}>
+                  <Chip tone={branchStatusTone(other.status)}>{other.status}</Chip>
+                  <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${other.id}`} variant="secondary">
+                    Open →
+                  </LinkButton>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel>
+        <Text as="h2" size="lg">
+          Delivered / remaining
         </Text>
+        {summaryState.status === 'ready' && summaryState.lineage.splits.length === 0 && (
+          <Text as="p" tone="muted">
+            {branch.split_from ? 'This change was split from another one.' : 'Not split yet — everything is still on this branch.'}
+          </Text>
+        )}
+        {summaryState.status === 'ready' && summaryState.lineage.splits.length > 0 && (
+          <ul className={styles.branchList}>
+            {summaryState.lineage.splits.map((split) => (
+              <li key={split.id} className={styles.branchRow}>
+                <Text as="span">{split.title ?? split.name}</Text>
+                <div className={styles.subjectTitle}>
+                  <Chip tone={branchStatusTone(split.status)}>{split.status === 'merged' ? 'delivered' : split.status}</Chip>
+                  <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${split.id}`} variant="secondary">
+                    Open →
+                  </LinkButton>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </Panel>
     </div>
   );

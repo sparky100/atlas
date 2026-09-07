@@ -106,3 +106,30 @@ export async function updateBranchMetadata(supabase: Client, branchId: UUID, inp
   const { error } = await supabase.from('branches').update(patch).eq('id', branchId);
   if (error) throw new Error(`updateBranchMetadata: ${error.message}`);
 }
+
+/** Every branch split out of `branchId` (ADR-006 amendment, SPEC §1 S-22) — empty until the review queue's split-into-a-new-branch mechanic exists to create one. */
+export async function listSplitBranches(supabase: Client, branchId: UUID): Promise<BranchRow[]> {
+  const { data, error } = await supabase.from('branches').select('*').eq('split_from', branchId).order('updated_at', { ascending: false });
+  if (error) throw new Error(`listSplitBranches: ${error.message}`);
+  return data as BranchRow[];
+}
+
+export interface ChangeLineage {
+  /** The branch that started this logical change — itself, unless `branch.split_from` points further back (ADR-006 amendment: "the original and its splits are one logical change"). */
+  original: BranchRow;
+  /** Every branch split from `original` — empty today (see `listSplitBranches`), real once that mechanic exists. */
+  splits: BranchRow[];
+}
+
+/**
+ * The change page's "delivered / remaining" breakdown (Sprint C1 step 6):
+ * an original branch and every branch split from it, treated as one
+ * logical change (ADR-006 amendment, SPEC §1 S-22). `branch` itself may be
+ * the original or one of its splits — either way this resolves to the
+ * same lineage, so the change page looks the same from any of them.
+ */
+export async function resolveChangeLineage(supabase: Client, branch: BranchRow): Promise<ChangeLineage> {
+  const original = branch.split_from ? ((await getBranch(supabase, branch.split_from)) ?? branch) : branch;
+  const splits = await listSplitBranches(supabase, original.id);
+  return { original, splits };
+}

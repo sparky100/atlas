@@ -137,3 +137,34 @@ export async function listInFlightBranchesTouchingSubject(supabase: Client, mode
   if (branchError) throw new Error(`listInFlightBranchesTouchingSubject: ${branchError.message}`);
   return branchRows as BranchRow[];
 }
+
+/**
+ * Batched form of `listInFlightBranchesTouchingSubject` for the change
+ * page's "other open changes touching the same elements" (Sprint C1 step
+ * 6, UI-principles' change page spec) — a change branch typically touches
+ * several subjects at once, and this is one round trip per table rather
+ * than N. `excludeBranchId` drops the change's own branch from the
+ * result — it always touches its own subjects, which isn't "another" open
+ * change.
+ */
+export async function listInFlightBranchesTouchingSubjects(supabase: Client, modelId: UUID, subjectIds: readonly UUID[], excludeBranchId: UUID): Promise<BranchRow[]> {
+  if (subjectIds.length === 0) return [];
+  const { data: deltaRows, error: deltaError } = await supabase.from('deltas').select('commit_id').eq('model_id', modelId).in('subject_id', subjectIds);
+  if (deltaError) throw new Error(`listInFlightBranchesTouchingSubjects: ${deltaError.message}`);
+  const commitIds = [...new Set((deltaRows as { commit_id: UUID }[]).map((row) => row.commit_id))];
+  if (commitIds.length === 0) return [];
+
+  const { data: commitRows, error: commitError } = await supabase.from('commits').select('branch_id').in('id', commitIds);
+  if (commitError) throw new Error(`listInFlightBranchesTouchingSubjects: ${commitError.message}`);
+  const branchIds = [...new Set((commitRows as { branch_id: UUID }[]).map((row) => row.branch_id))].filter((id) => id !== excludeBranchId);
+  if (branchIds.length === 0) return [];
+
+  const { data: branchRows, error: branchError } = await supabase
+    .from('branches')
+    .select('*')
+    .in('id', branchIds)
+    .neq('kind', 'main')
+    .in('status', ['draft', 'proposed', 'in_review', 'approved']);
+  if (branchError) throw new Error(`listInFlightBranchesTouchingSubjects: ${branchError.message}`);
+  return branchRows as BranchRow[];
+}
