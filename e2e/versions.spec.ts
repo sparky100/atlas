@@ -3,14 +3,15 @@
  * main with a name and note, see it in the version list, open it read-only
  * at its own ref, and diff two tagged versions and see what changed.
  *
- * Same "needs a real Supabase" limitation, and the same genesis-commit
- * bootstrap, as e2e/element-edit.spec.ts (see that file's own comment).
+ * Same "needs a real Supabase" limitation as e2e/element-edit.spec.ts. No
+ * genesis-commit bootstrap (ADR-018): main already has a real head the
+ * instant createModel's insert fires.
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import type { CommitEnvelope, Delta } from '../src/contracts/delta';
 import { getMainBranch } from '../src/db/branches';
-import { createServiceRoleClient, createSupabaseClient } from '../src/db/client';
+import { createSupabaseClient } from '../src/db/client';
 import { commitToBranch } from '../src/db/commits';
 import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
@@ -47,15 +48,8 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
 
   const main = await getMainBranch(signedIn, modelId);
   if (!main) throw new Error('main branch was not auto-created');
-
-  const service = createServiceRoleClient(env);
-  const genesisCommitId = randomUUID();
-  const { error: genesisError } = await service
-    .from('commits')
-    .insert({ id: genesisCommitId, org_id: orgId, model_id: modelId, branch_id: main.id, parent_commit_id: null, kind: 'manual', message: 'seed', author_id: userId, depth: 0 });
-  if (genesisError) throw new Error(`genesis commit: ${genesisError.message}`);
-  const { error: headError } = await service.from('branches').update({ head_commit_id: genesisCommitId }).eq('id', main.id);
-  if (headError) throw new Error(`advancing main head: ${headError.message}`);
+  const genesisCommitId = main.head_commit_id;
+  if (!genesisCommitId) throw new Error('main branch has no head commit (ADR-018 violation)');
 
   const { error: sourceError } = await signedIn.from('sources').insert({ id: randomUUID(), org_id: orgId, model_id: modelId, kind: 'manual', name: 'Seed', user_id: userId, created_by: userId });
   if (sourceError) throw new Error(`seed source: ${sourceError.message}`);

@@ -2,18 +2,19 @@
  * Shared bootstrap for Sprint C1's change-branch specs
  * (e2e/change-branch-merge.spec.ts, e2e/merge-field-conflict.spec.ts):
  * sign up a fresh user through the real UI, create an org/model as them,
- * and seed a genesis commit plus one System. Factored out of the sign-up-
- * plus-genesis-commit boilerplate e2e/element-edit.spec.ts and
- * e2e/versions.spec.ts each already carry inline — see either file's own
- * module comment for exactly why the genesis commit needs a service-role
- * bootstrap (no product path creates a model's very first commit yet).
+ * and seed one System on top of main's existing genesis commit (ADR-018:
+ * main already has a real head — its genesis commit, made by
+ * atlas.on_model_created — the instant createModel's insert fires, so
+ * there's no bootstrap left to do here beyond reading it). Factored out of
+ * the sign-up-plus-seed boilerplate e2e/element-edit.spec.ts and
+ * e2e/versions.spec.ts each already carry inline.
  */
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import type { CommitEnvelope } from '../../src/contracts/delta';
 import { getMainBranch } from '../../src/db/branches';
-import { createServiceRoleClient, createSupabaseClient, type Client } from '../../src/db/client';
+import { createSupabaseClient, type Client } from '../../src/db/client';
 import { commitToBranch } from '../../src/db/commits';
 import type { Env } from '../../src/db/env';
 import { createModel } from '../../src/db/models';
@@ -22,7 +23,6 @@ import type { BranchRow } from '../../src/db/types';
 
 export interface ChangeBranchFixture {
   signedIn: Client;
-  service: Client;
   userId: string;
   orgId: string;
   orgSlug: string;
@@ -75,15 +75,8 @@ export async function bootstrapChangeBranchFixture(page: Page, env: Env, prefix:
 
   const main = await getMainBranch(signedIn, modelId);
   if (!main) throw new Error('main branch was not auto-created');
-
-  const service = createServiceRoleClient(env);
-  const genesisCommitId = randomUUID();
-  const { error: genesisError } = await service
-    .from('commits')
-    .insert({ id: genesisCommitId, org_id: orgId, model_id: modelId, branch_id: main.id, parent_commit_id: null, kind: 'manual', message: 'seed', author_id: userId, depth: 0 });
-  if (genesisError) throw new Error(`genesis commit: ${genesisError.message}`);
-  const { error: headError } = await service.from('branches').update({ head_commit_id: genesisCommitId }).eq('id', main.id);
-  if (headError) throw new Error(`advancing main head: ${headError.message}`);
+  const genesisCommitId = main.head_commit_id;
+  if (!genesisCommitId) throw new Error('main branch has no head commit (ADR-018 violation)');
 
   const { error: sourceError } = await signedIn.from('sources').insert({ id: randomUUID(), org_id: orgId, model_id: modelId, kind: 'manual', name: 'Seed', user_id: userId, created_by: userId });
   if (sourceError) throw new Error(`seed source: ${sourceError.message}`);
@@ -120,5 +113,5 @@ export async function bootstrapChangeBranchFixture(page: Page, env: Env, prefix:
   const refreshedMain = await getMainBranch(signedIn, modelId);
   if (!refreshedMain) throw new Error('main branch disappeared after seeding');
 
-  return { signedIn, service, userId, orgId, orgSlug, modelId, modelSlug, main: refreshedMain, genesisCommitId, seedSourceId, systemId, seedCommitId, createDeltaId };
+  return { signedIn, userId, orgId, orgSlug, modelId, modelSlug, main: refreshedMain, genesisCommitId, seedSourceId, systemId, seedCommitId, createDeltaId };
 }

@@ -62,7 +62,7 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | `relationship_type` | `supports`, `uses`, `owns`, `flows_to` |
 | `branch_kind` | `main`, `change`, `capture_draft` |
 | `branch_status` | `draft`, `proposed`, `in_review`, `approved`, `merged`, `rejected`, `archived` |
-| `commit_kind` | `manual`, `capture`, `merge`, `template_seed` |
+| `commit_kind` | `genesis`, `manual`, `capture`, `merge`, `template_seed` |
 | `delta_kind` | `element_create`, `element_update`, `element_retract`, `element_restore`, `relationship_create`, `relationship_update`, `relationship_retract`, `relationship_restore` |
 | `subject_type` | `element`, `relationship` |
 | `source_kind` | `document`, `spreadsheet`, `interview`, `capture_job`, `template`, `manual`, `merge_resolution` |
@@ -207,8 +207,8 @@ A named mutable pointer to a commit (ADR-002).
 | `name` | text | not null; `unique (model_id, name)` |
 | `kind` | branch_kind | not null |
 | `status` | branch_status | not null default `draft` |
-| `base_commit_id` | uuid | → `commits(id)`, nullable only for main; for a `change` branch, kept equal to `mergeBase(B)` — set at fork, moved to `main`'s head on every successful refresh (§1 S-11, ADR-005 amendment) |
-| `head_commit_id` | uuid | → `commits(id)`, nullable only before the genesis commit |
+| `base_commit_id` | uuid | → `commits(id)`, not null (ADR-018: for `main`, its own genesis commit, set the instant the model is created); for a `change` branch, kept equal to `mergeBase(B)` — set at fork, moved to `main`'s head on every successful refresh (§1 S-11, ADR-005 amendment) |
+| `head_commit_id` | uuid | → `commits(id)`, not null (ADR-018: never unset — a freshly created `main` starts pointed at its own genesis commit, the same row as `base_commit_id`) |
 | `shared_for_review` | boolean | not null default false — makes the head visible to viewers (ADR-009) |
 | `title` | text | change branches: the solution design title |
 | `description` | text | nullable; change branches: free-text description of the change, set at creation |
@@ -217,7 +217,7 @@ A named mutable pointer to a commit (ADR-002).
 | `created_by` | uuid | → `auth.users(id)` |
 | `updated_at` | timestamptz | not null |
 
-Partial unique index `(model_id) where kind = 'main'`. Index `(model_id, status)`. Index `(split_from) where split_from is not null`. Check: `kind = 'main'` ⇒ `status = 'draft'` (main is always open) and `base_commit_id is null`. Check: `kind = 'capture_draft'` ⇒ `status in ('draft','archived')`. Check: `split_from is not null` ⇒ `kind = 'change'`.
+Partial unique index `(model_id) where kind = 'main'`. Index `(model_id, status)`. Index `(split_from) where split_from is not null`. Check: `kind = 'main'` ⇒ `status = 'draft'` (main is always open). Check: `kind = 'capture_draft'` ⇒ `status in ('draft','archived')`. Check: `split_from is not null` ⇒ `kind = 'change'`. (ADR-018 removed the old kind-conditional `base_commit_id`/`head_commit_id` nullability checks — both columns are simply `not null` now, for every branch kind, so there is nothing left to check per-kind.)
 
 #### `commits`
 An ordered batch of deltas on a branch. Ancestry is a DAG: two parents on a merge (ADR-002).
@@ -225,8 +225,8 @@ An ordered batch of deltas on a branch. Ancestry is a DAG: two parents on a merg
 | Column | Type | Constraints |
 |---|---|---|
 | `model_id` | uuid | → `models(id)` |
-| `branch_id` | uuid | → `branches(id)` |
-| `parent_commit_id` | uuid | → `commits(id)`, null only for genesis |
+| `branch_id` | uuid | → `branches(id)`, `deferrable initially deferred` (ADR-018: `atlas.on_model_created` inserts a model's genesis commit and its main branch in one transaction, each naming the other's id, so this FK can't be checked row-by-row) |
+| `parent_commit_id` | uuid | → `commits(id)`, null only for `kind = 'genesis'` — the one commit per model ever allowed a null parent, inserted only by `atlas.on_model_created` (ADR-018), never by a client RPC |
 | `merged_branch_head_commit_id` | uuid | → `commits(id)`, nullable; `check ((kind = 'merge') = (merged_branch_head_commit_id is not null))` |
 | `kind` | commit_kind | not null |
 | `message` | text | not null |
@@ -548,7 +548,7 @@ A versioned sector starter map (ADR-012).
 | `version` | int | not null; `unique (sector, version)` |
 | `status` | map_status | not null default `draft` |
 | `source_description` | text | not null |
-| `published_at` | timestamptz | nullable; not null iff `status = 'published'` |
+| `published_at` | timestamptz | nullable; not null iff `status <> 'draft'` — set once, on first publish, and kept through a later `deprecated` transition (`20260906200000_capability_maps_deprecated_keeps_published_at.sql`): when a map was actually published is real provenance a supersession shouldn't erase. |
 
 No `org_id`; product content. Readable by all authenticated users; writable by service role.
 
@@ -635,9 +635,10 @@ Attribute keys inside `value` stay camelCase in jsonb (they are validated by `ty
 
 Kinds:
 
-- `manual` — a person's edit on a change branch.
+- `genesis` — the one commit every model's main branch is born with (ADR-018), zero deltas, `depth = 0`, the only kind ever allowed a null `parentCommitId`. Inserted only by `atlas.on_model_created`, in the same transaction as the model itself — never by a client RPC, never by `atlas.commit_deltas` or `atlas.seed_from_map` (both require a real parent, unconditionally).
+- `manual` — a person's edit on a change branch, or (owner/architect only, ADR-015) directly on main — including the model's first hand-added capability, which is an ordinary `manual` commit parented on the genesis commit like any other.
 - `capture` — output of a capture job, on a `capture_draft` branch. Exactly one per capture branch.
-- `template_seed` — the first commit of a model seeded from a capability map, on main. The only non-merge commit that can ever be on main.
+- `template_seed` — a model seeded from a capability map, on main, parented on the genesis commit — the model's first *content-bearing* commit, but not its first commit (that's genesis). A model is seeded at most once: allowed only while main's head is still the genesis commit itself.
 - `merge` — second parent set. On a change branch: a refresh (pull main in). On main: the merge of an approved change branch (created only by `atlas.merge_branch`).
 
 ### 5.2 Invariants
