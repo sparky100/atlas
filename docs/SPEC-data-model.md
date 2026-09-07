@@ -1,7 +1,7 @@
 # SPEC: Data model and delta specification
 
 **Status:** Proposed
-**Depends on:** `docs/ADR-000-foundations.md` (ADR-001 … ADR-014)
+**Depends on:** `docs/ADR-000-foundations.md` (ADR-001 … ADR-017)
 **Companion:** `src/contracts/delta.ts` (the delta and commit wire contract)
 
 This document turns the ADRs into tables, a wire format, and algorithms precise enough to test against. It contains no UI and no engine code: the TypeScript is types only, the SQL is DDL-shaped table descriptions plus real RLS policies, the algorithms are pseudocode.
@@ -15,7 +15,7 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | # | Choice | Why |
 |---|---|---|
 | S-1 | **Ids are UUID v7, minted by the writer** (client, capture worker, merge tool). The server enforces uniqueness; it does not assign. | A create followed by an update in the same branch needs the id before the round trip. v7 keeps indexes append-friendly. |
-| S-2 | **Head tables are keyed by `commit_id`, not `branch_id`.** `branches.head_commit_id` points at a materialised commit. Rows are retained for (a) every branch head, (b) every tagged commit, (c) nothing else. | One representation serves branch heads and tags (ADR-003). Old heads are garbage-collected, never authoritative. |
+| S-2 | **Head tables are keyed by `commit_id`, not `branch_id`.** ~~`branches.head_commit_id` points at a materialised commit. Rows are retained for (a) every branch head, (b) every tagged commit, (c) nothing else.~~ **Superseded by ADR-015 (Sprint H1 amendment — docs/AUDIT-2026-09-U2.md §2.E.3 item 17):** rows are retained only for `main`'s current head and every tag (which must resolve to a commit on `main`, S-21) — a `change` branch's head is never materialised at all, at any point in its life. See §3.5. | One representation serves `main`'s head and tags (ADR-003 as narrowed by ADR-015). Old main heads are garbage-collected unless tagged, never authoritative. |
 | S-3 | **One `parent_id` column on `elements_head`**, not three per-type columns. The parent's required type is a validation rule (V2). | ADR-001's three FK columns were shorthand; a discriminated single table wants one column. |
 | S-4 | **Promoted columns on `elements_head` are `name` and `parent_id` only.** Everything else lives in `attributes` jsonb. | Search, integrity and layout need those two; nothing else needs a column. |
 | S-5 | **Relationship endpoints are immutable.** To re-point, retract and create. | Keeps the fact key model simple; a moved edge is a different fact. |
@@ -24,24 +24,25 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | S-8 | **`facts` is a materialised projection at attribute grain**, retained with the same rule as heads. `deltas` remains the only source of truth. | ADR-007's per-field provenance needs a cheap lookup; three-way merge needs `facts[commit][key]` in O(1). |
 | S-9 | **`element.restore` / `relationship.restore` exist.** A retract is reversible by a new delta, never by deleting the retract. | Keeps history append-only on draft branches too (ADR-002). |
 | S-10 | **Existence is a fact** with reserved attribute `$exists`; `previous_delta_id` on retract/restore points at the existence chain. | One supersession mechanism for everything. |
-| S-11 | **Refresh = merge main into the branch** (a `merge` commit on the branch whose second parent is a main commit). The merge base is computed from the DAG, not stored. `branches.base_commit_id` is the fork point, for display only. | ADR-006's "refresh or rebase" becomes one mechanism with the same conflict rules as the final merge. |
+| S-11 | **Refresh = merge main into the branch** (a `merge` commit on the branch whose second parent is a main commit). The merge base is computed from the DAG, not stored, and is always the authority for As-is (§6.2, §7.1). **Amended (Sprint C1, ADR-005 amendment):** `branches.base_commit_id` is not the original fork point forever — it is set to `main`'s head at fork and moves to `main`'s (new) head on every successful refresh, so it stays equal to `mergeBase(B)` between refreshes and folding at `base_commit_id` is a correct, O(1) way to compute As-is without a DAG walk on every read. It is display data derived from `mergeBase(B)`, kept in sync by refresh, not an independent source of truth the DAG could disagree with. The original fork point is not itself stored or selectable after a refresh moves it forward; it stays discoverable only via commit ancestry — the `parent_commit_id` of the branch's first own commit. | ADR-006's "refresh or rebase" becomes one mechanism with the same conflict rules as the final merge; ADR-005's amendment keeps its as-is definition and this row from silently disagreeing once refresh exists. |
 | S-12 | **A merge commit carries only resolution deltas** (C15). A field conflict with no resolution delta is a rejected commit; there is no "theirs wins by default". | ADR-005: conflicts are surfaced, never silently resolved. |
 | S-13 | **Identity conflicts are advisory** in the review queue; they do not block a merge. Structural and field conflicts do. | ADR-005(c): identity is resolved via `element_merges` after the fact; blocking on a fuzzy match would stall every capture. |
 | S-14 | **Validation has two levels.** *Structural* (V2, V4, V5, V6) is required on every commit of every branch kind except `capture_draft`. *Schema* (V1, V3) is required on main and to approve a merge request; on change branches it is reported, not enforced. `capture_draft` requires only C1–C6. | ADR-001: drafts may be temporarily invalid; ADR-003: main never is. |
-| S-15 | **`commits.head_hash`** is the SHA-256 of the canonical head (§6.4). It is the proof that materialisation equals fold. | Makes "head == fold(deltas)" a checkable equation rather than a belief. |
+| S-15 | **`commits.head_hash`** is the SHA-256 of the canonical head (§6.4). It is the proof that materialisation equals fold. **Set only for commits on `main` (Sprint H1 clarification — docs/AUDIT-2026-09-U2.md §2.E.3 item 16); always `null` for `change`/`capture_draft` commits, which are never materialised (§3.5) and so have nothing to hash against.** | Makes "head == fold(deltas)" a checkable equation rather than a belief, on the one branch kind where a materialised head actually exists to check it against. |
 | S-16 | **One anchor per comment, stored inline** (`anchor_type`, `anchor_id` on `comments`). No `comment_anchors` join. | ADR-010 already fixed one anchor; a join table for a 1:1 is noise. |
-| S-17 | **Direct commits to main are impossible via RLS.** Main advances only through `atlas.merge_branch(merge_request_id)`, a security-definer procedure. | Makes ADR-006's gate structural, not conventional. |
+| S-17 | ~~**Direct commits to main are impossible via RLS.** Main advances only through `atlas.merge_branch(merge_request_id)`, a security-definer procedure.~~ **Superseded by ADR-015 (Sprint H1 amendment — docs/AUDIT-2026-09-U2.md §2.E.3 item 7):** `atlas.commit_deltas`, a security-definer function `authenticated` is granted execute on, lets an owner/architect commit directly to `main`. `atlas.merge_branch` does not exist and was never built — the real gate is role-based (owner/architect on `main`, permanently; a contributor is rejected inside `commit_deltas` itself, not by a policy it bypasses), not "no direct writes at all." | Makes ADR-006's gate structural (the contributor exclusion is enforced in the function body, not left to convention), not the unconditional block originally described. |
 | S-18 | **New commits are accepted only while `branches.status = 'draft'`.** Submitting a merge request moves the branch to `proposed`; `changes_requested` moves it back to `draft`. | Avoids "the reviewer approved a head that has since moved". |
 | S-19 | **`users` is Supabase `auth.users`.** No local users table; `members.user_id` references `auth.users(id)`. | Working assumption in ADR-000. If wrong, only `members` and the RLS helpers change. |
 | S-20 | **Every table carries `org_id`**, including projections and deltas, even where derivable through joins. | RLS policies stay one predicate, and never need a join to decide. |
 | S-21 | Table renames relative to the ADR: `organisation_members` → `members`; `element_aliases` → `aliases`; `merges` → `element_merges`; `capability_map_templates` → `capability_maps`; `capability_map_template_items` → `capability_map_items`. | The brief's requested names; the ADR's were descriptive placeholders. |
+| S-22 | **Partial delivery is a split branch, never a partial merge commit** (ADR-006 amendment, Sprint C1). Accepting a subset of a branch's elements/relationships in the review queue creates a new `change` branch with `split_from` = the original branch's id, carrying only the accepted (dependency-closed) subset, merged whole in the same action; the remainder stays on the original branch. `branches.split_from` (nullable, → `branches.id`) records this. An original branch and its splits are one logical change for the change page and roadmap (§3.4). | ADR-002's merge commit is all-or-nothing (second parent = the whole branch head); a split branch keeps that guarantee instead of weakening it to support partial acceptance. |
 
 ---
 
 ## 2. Conventions
 
 - Schema `public` for tables, schema `atlas` for helper functions and procedures.
-- Every table: `id uuid primary key`, `org_id uuid not null references organisations(id)`, `created_at timestamptz not null default now()`. These three are not repeated in the column lists below unless the type differs. This includes tables whose primary key is composite (`members`, `elements_head`, `relationships_head`, `facts`) — there `id` is dropped (the composite key replaces it) but `org_id` still applies, per S-20; §9's literal RLS SQL for `commits` reads `commits.org_id` directly, confirming the same holds for every history and projection table, not only the ones where a column list happens to repeat it. `organisations` (is the org) and `user_preferences` (explicitly user-scoped, §3.2) are the only tables without `org_id`.
+- Every table: `id uuid primary key`, `org_id uuid not null references organisations(id)`, `created_at timestamptz not null default now()`. These three are not repeated in the column lists below unless the type differs. This includes tables whose primary key is composite (`members`, `elements_head`, `relationships_head`, `facts`) — there `id` is dropped (the composite key replaces it) but `org_id` still applies, per S-20; §9's literal RLS SQL for `commits` reads `commits.org_id` directly, confirming the same holds for every history and projection table, not only the ones where a column list happens to repeat it. `organisations` (is the org) and `user_preferences` (explicitly user-scoped, §3.2) are the only tables without `org_id`. **`created_at` has its own named exceptions (Sprint H1 amendment, closing docs/AUDIT-2026-09-U2.md §2.E.3 item 2):** `branches` tracks `updated_at` instead — it's a mutable pointer (ADR-002), and "when did this pointer last move" is the more useful timestamp than "when was the row first inserted"; `members` tracks `joined_at` instead, the same value under a name that says what it actually means; `elements_head`, `relationships_head`, and `facts` have no timestamp column at all — a row in these commit-scoped projection tables is a disposable, GC'able re-derivation of `deltas` (§3.5), not an entity with a history of its own, so there is nothing for a `created_at` to record.
 - Per S-1, `id` on every table populated by client-composed envelopes (`models`, `branches`, `commits`, `deltas`, `tags`, `sources`, `aliases`, and every table in §3.7–3.10) is minted by the writer, not defaulted by the database. The exception is infrastructure rows the database creates as a side effect rather than a client ever composing them — the `main` branch row created by `atlas.on_model_created` — which may use `gen_random_uuid()`.
 - `→` in a column list means a foreign key.
 - Append-only tables (`commits`, `deltas`, `tags`, `element_merges`, `resolved_conflicts`) have no `update` or `delete` RLS policy for any application role, so those statements are denied outright. Only the service role and security-definer procedures can touch them, and those procedures only insert.
@@ -107,7 +108,7 @@ Who belongs to an organisation and with what role.
 | `joined_at` | timestamptz | not null default now() |
 
 Primary key `(org_id, user_id)`. Index on `(user_id)`.
-Trigger `atlas.on_organisation_created` inserts the creator as `owner`. Constraint trigger: an org must always have at least one `owner`.
+Trigger `atlas.on_organisation_created` inserts the creator as `owner`. `atlas.guard_last_owner`, an ordinary `before` row trigger — not a SQL `create constraint trigger` (Sprint H1 correction, docs/AUDIT-2026-09-U2.md §2.E.3 item 18: this deferrable-checking distinction isn't needed here — "no owners left" should reject the statement immediately, not at end of transaction) — stops an org losing its last `owner`.
 
 #### `models`
 A landscape. One org owns it; sharing is by grant (`model_shares`), never by moving it.
@@ -167,6 +168,9 @@ Versioned JSON Schema per element/relationship type. The thing `attributes` json
 Primary key `(subject_type, type_name, schema_version)`. No `org_id`: this is product content, readable by every authenticated user, writable only by the service role. The checked-in generator derives `json_schema` from `src/contracts/delta.ts` (test RT-5).
 
 #### `relationship_type_rules`
+
+**Superseded by a constant, not a migrated table (Sprint H1).** Unlike `type_schemas` above, this table's content was fully known from ADR-001 from the start and simply had no runtime enforcement anywhere in the codebase — not a table, not an engine check, not an application-level validation (flagged in docs/AUDIT-2026-09-U2.md §6.2/§6.3). Sprint H1 closes that gap with `RELATIONSHIP_TYPE_RULES`, a constant in `src/contracts/relationshipTypeRules.ts`: the seed rows below are that constant's content, kept here as the documented reference, not read from a live table at runtime. C9 and V3 are both checked against the constant — in `src/engine/deltas.ts`'s `apply()` (so every caller of `fold`, including `commitToBranch`, inherits the check), and therefore at the commit boundary in `src/db/commits.ts`. **Superseded, not deferred (§11 lists this alongside this document's genuinely-deferred items, marked "never"):** migrating this to a real table isn't scheduled anywhere and isn't expected to be — it would only be worth doing if the ruleset needed to become live-editable product content without a code change (e.g. an admin screen), and nothing today requires that.
+
 Which `(relationship_type, from_type, to_type)` triples are legal, and cardinality (ADR-001).
 
 | Column | Type | Constraints |
@@ -203,14 +207,17 @@ A named mutable pointer to a commit (ADR-002).
 | `name` | text | not null; `unique (model_id, name)` |
 | `kind` | branch_kind | not null |
 | `status` | branch_status | not null default `draft` |
-| `base_commit_id` | uuid | → `commits(id)`, nullable only for main |
+| `base_commit_id` | uuid | → `commits(id)`, nullable only for main; for a `change` branch, kept equal to `mergeBase(B)` — set at fork, moved to `main`'s head on every successful refresh (§1 S-11, ADR-005 amendment) |
 | `head_commit_id` | uuid | → `commits(id)`, nullable only before the genesis commit |
 | `shared_for_review` | boolean | not null default false — makes the head visible to viewers (ADR-009) |
 | `title` | text | change branches: the solution design title |
+| `description` | text | nullable; change branches: free-text description of the change, set at creation |
+| `target_date` | date | nullable; change branches: the intended delivery date shown on the change page and roadmap |
+| `split_from` | uuid | → `branches(id)`, nullable; set only on a branch created by partial acceptance in the review queue (§1 S-22, ADR-006 amendment) — the branch it was split out of |
 | `created_by` | uuid | → `auth.users(id)` |
 | `updated_at` | timestamptz | not null |
 
-Partial unique index `(model_id) where kind = 'main'`. Index `(model_id, status)`. Check: `kind = 'main'` ⇒ `status = 'draft'` (main is always open) and `base_commit_id is null`. Check: `kind = 'capture_draft'` ⇒ `status in ('draft','archived')`.
+Partial unique index `(model_id) where kind = 'main'`. Index `(model_id, status)`. Index `(split_from) where split_from is not null`. Check: `kind = 'main'` ⇒ `status = 'draft'` (main is always open) and `base_commit_id is null`. Check: `kind = 'capture_draft'` ⇒ `status in ('draft','archived')`. Check: `split_from is not null` ⇒ `kind = 'change'`.
 
 #### `commits`
 An ordered batch of deltas on a branch. Ancestry is a DAG: two parents on a merge (ADR-002).
@@ -224,10 +231,10 @@ An ordered batch of deltas on a branch. Ancestry is a DAG: two parents on a merg
 | `kind` | commit_kind | not null |
 | `message` | text | not null |
 | `author_id` | uuid | not null — `auth.users.id` or service identity |
-| `head_hash` | bytea | nullable until materialised; 32 bytes (§6.4) |
+| `head_hash` | bytea | nullable; set only for a commit on `main` (§3.5, S-15) — `atlas.commit_deltas` writes it iff the branch kind is `main`, never "once materialisation eventually happens" for any other branch kind; 32 bytes (§6.4) |
 | `depth` | int | not null — 1 + parent depth; genesis = 0. Used to bound replay and order topological sorts. |
 
-Indexes: `(branch_id, depth desc)`, `(parent_commit_id)`, `(merged_branch_head_commit_id)`, `(model_id, kind)`. Unique `(branch_id, parent_commit_id)` where `parent_commit_id is not null` — enforces linear history within a branch (C13). Append-only.
+Indexes: `(branch_id, depth desc)`, `(parent_commit_id)`, `(merged_branch_head_commit_id)` (partial, `where merged_branch_head_commit_id is not null` — Sprint H1 note, docs/AUDIT-2026-09-U2.md §2.E.3 item 10), `(model_id, kind)`. Unique `(branch_id, parent_commit_id)` where `parent_commit_id is not null` — enforces linear history within a branch (C13). Append-only.
 
 #### `deltas`
 One fact assertion (ADR-002, ADR-007). The only source of truth for model content.
@@ -238,7 +245,7 @@ One fact assertion (ADR-002, ADR-007). The only source of truth for model conten
 | `commit_id` | uuid | → `commits(id)` |
 | `seq` | int | not null; `unique (commit_id, seq)` |
 | `kind` | delta_kind | not null |
-| `subject_type` | subject_type | not null, generated from `kind` |
+| `subject_type` | subject_type | generated from `kind` (Sprint H1 note — docs/AUDIT-2026-09-U2.md §2.E.3 item 8: the migrated generated column has no explicit `not null`; its `case` expression has an `else` branch and so is total over every `delta_kind` value, making it non-null in practice without the constraint needing to say so) |
 | `subject_id` | uuid | not null — element id or relationship id |
 | `attribute` | text | not null; `'$exists'` for create/retract/restore, attribute name for update |
 | `element_type` | element_type | nullable; not null iff `subject_type = 'element'` |
@@ -255,7 +262,7 @@ One fact assertion (ADR-002, ADR-007). The only source of truth for model conten
 | `confidence` | numeric(3,2) | not null, `check (confidence between 0 and 1)` |
 | `created_by` | uuid | not null |
 
-Indexes: `(commit_id, seq)`, `(model_id, subject_id, attribute)`, `(previous_delta_id)`, `(source_id)`, `(model_id, from_element_id)`, `(model_id, to_element_id)`. Unique `(commit_id, subject_id, attribute)` (C4). Append-only. Per-kind check constraints encode the nullability rules above.
+Indexes: `(model_id, subject_id, attribute)`, `(previous_delta_id)` (partial, `where previous_delta_id is not null`), `(source_id)`, `(model_id, from_element_id)` (partial, `where from_element_id is not null`), `(model_id, to_element_id)` (partial, `where to_element_id is not null`) — Sprint H1 note (docs/AUDIT-2026-09-U2.md §2.E.3 items 9-10): `(commit_id, seq)` isn't a separate index, it's the `unique (commit_id, seq)` table constraint already named above (Postgres backs it with a unique index automatically, but it's one thing, not two); the three FK-shaped indexes above are `partial` on the migrated table, which is a strict improvement over an unqualified index for a nullable column, not a difference worth treating as a gap. Unique `(commit_id, subject_id, attribute)` (C4). Append-only. Per-kind check constraints encode the nullability rules above.
 
 #### `tags`
 Immutable pointer to a main commit; the product's "version" (ADR-002).
@@ -272,7 +279,7 @@ Check via trigger: `commit_id` is on the model's main branch. Insert-only, no up
 
 ### 3.5 Materialised projections
 
-Retention rule (S-2): rows exist for a `commit_id` iff that commit is some branch's `head_commit_id` or some tag's `commit_id`. A GC job deletes the rest. Projections are rebuildable from `deltas` at any time (§6).
+**Retention rule, main-only (Sprint H1 rewrite, superseding S-2 as originally written — docs/AUDIT-2026-09-U2.md §2.E.3 item 17; ADR-015).** Rows exist for a `commit_id` iff that commit is `main`'s current `head_commit_id`, or some tag's `commit_id` (tags only ever point at a commit on `main`, S-21). A `change` branch's head is **never** materialised into these tables, at any point in its life — not "not yet," structurally never: `atlas.commit_deltas` (§5.3) only calls the projection writer `atlas.replace_main_head_projection` when the committing branch's `kind = 'main'`. Reading a `change` branch's current state means folding it (§6) — via `foldFromGenesis`, which any UI page showing a change branch already has to call — not querying these tables. Every time `main` advances, `atlas.replace_main_head_projection` deletes the *previous* main head's rows unless a tag still cites them (`gcOldHeads`, below), then inserts fresh rows for the new head; it never leaves more than one untagged main-head generation lying around. Projections are rebuildable from `deltas` at any time (§6) — this is what makes deleting old, untagged generations safe rather than a loss.
 
 #### `elements_head`
 The folded element set at a commit.
@@ -288,7 +295,7 @@ The folded element set at a commit.
 | `attributes` | jsonb | not null default `'{}'` |
 | `exists_delta_id` | uuid | → `deltas(id)` — the create/restore currently asserting existence |
 
-Primary key `(commit_id, element_id)`. Indexes: `(commit_id, element_type)`, `(commit_id, parent_id)`, `(model_id, element_id)`, GIN `(attributes)`, GIN trigram on `lower(name)` (pg_trgm) for matching (§8).
+Primary key `(commit_id, element_id)`. Indexes: `(commit_id, element_type)`, `(commit_id, parent_id)` (partial, `where parent_id is not null` — Sprint H1 note, docs/AUDIT-2026-09-U2.md §2.E.3 item 10), `(model_id, element_id)`, GIN `(attributes)`, GIN trigram on `lower(name)` (pg_trgm) for matching (§8).
 
 #### `relationships_head`
 The folded relationship set at a commit.
@@ -312,6 +319,8 @@ Attribute-grain provenance at a commit: which delta currently asserts each fact 
 | Column | Type | Constraints |
 |---|---|---|
 | `commit_id` | uuid | → `commits(id)` on delete cascade |
+| `org_id` | uuid | → `organisations(id)` — **added Sprint H1** (docs/AUDIT-2026-09-U2.md §2.E.3 item 1: this table was migrated without it, despite S-20 explicitly naming `facts` in its own carve-out list; backfilled from `commits.org_id`) |
+| `model_id` | uuid | → `models(id)` — **added Sprint H1**, same backfill, from `commits.model_id` |
 | `subject_type` | subject_type | not null |
 | `subject_id` | uuid | not null |
 | `attribute` | text | not null |
@@ -324,7 +333,9 @@ Attribute-grain provenance at a commit: which delta currently asserts each fact 
 | `asserted_by` | uuid | not null |
 | `asserted_at` | timestamptz | not null — the delta's commit `created_at` |
 
-Primary key `(commit_id, subject_id, attribute)`. Index `(commit_id, source_id)` ("what depends on this spreadsheet"). One row per live attribute including `$exists`; a create delta yields one `$exists` row plus one row per initial attribute, all pointing at the create delta. Attributes of retracted subjects are removed from `facts` (they come back on restore from the delta chain).
+Primary key `(commit_id, subject_id, attribute)`. Indexes `(commit_id, source_id)` ("what depends on this spreadsheet") and `(model_id, subject_id)` (added Sprint H1, alongside `org_id`/`model_id` above). One row per live attribute including `$exists`; a create delta yields one `$exists` row plus one row per initial attribute, all pointing at the create delta. Attributes of retracted subjects are removed from `facts` (they come back on restore from the delta chain).
+
+`org_id`/`model_id` are supplied by `atlas.replace_main_head_projection` from its own `p_org_id`/`p_model_id` parameters, exactly like `elements_head`/`relationships_head`'s own copies of those columns — constant for the whole call, never read per-row from `p_facts`, and so never something `src/engine/projection.ts`'s `serializeHeadProjection` or `FactRow` needed to carry either.
 
 ### 3.6 Provenance and identity
 
@@ -338,7 +349,7 @@ Where a fact came from (S-7).
 | `name` | text | not null — "Application register 2025-Q3.xlsx", "Interview: Head of Digital, 4 Mar 2026" |
 | `uri` | text | nullable — storage pointer or URL |
 | `captured_at` | date | nullable — when the source was produced, not uploaded |
-| `capture_job_id` | uuid | → `capture_jobs(id)`, nullable; not null iff `kind = 'capture_job'` |
+| `capture_job_id` | uuid | → `capture_jobs(id)` **once that table exists (Sprint K1) — not migrated yet, so today this is a plain `uuid` column with only the CHECK half below** (Sprint H1 note, docs/AUDIT-2026-09-U2.md §2.E.3 item 11; same "add the FK in its own migration once the target exists" pattern `deltas.source_id`'s FK already used, `20260906071500_sources_and_aliases.sql`'s own comment), nullable; not null iff `kind = 'capture_job'` |
 | `capability_map_id` | uuid | → `capability_maps(id)`, nullable; not null iff `kind = 'template'` |
 | `user_id` | uuid | → `auth.users(id)`, nullable; not null iff `kind = 'manual'` |
 | `created_by` | uuid | not null |
@@ -481,7 +492,7 @@ A saved query, not a drawing (ADR-011).
 | `kind` | view_kind | not null |
 | `scope_element_id` | uuid | nullable; required for `context`/`container`/`component`, must be null for `landscape`/`capability_map` |
 | `branch_id` | uuid | → `branches(id)`, nullable = main |
-| `created_by` | uuid | not null |
+| `created_by` | uuid | → `auth.users(id)`, not null (Sprint H1 note, docs/AUDIT-2026-09-U2.md §2.E.3 item 12: the `→` was missing here — the migrated column is a real FK) |
 
 `capability_map` is a view kind like the other four: it renders the model's
 own `capability`-typed elements (containment via `parent_id`, `supports`
@@ -503,7 +514,7 @@ Per-view position hints. Deleting all rows for a view is lossless.
 | `subject_id` | uuid | not null |
 | `x`, `y` | double precision | nullable (elements) |
 | `bends` | jsonb | nullable (relationships: array of `{x,y}`) |
-| `updated_by` | uuid | not null |
+| `updated_by` | uuid | → `auth.users(id)`, not null (same Sprint H1 note as `views.created_by` above) |
 | `updated_at` | timestamptz | not null |
 
 Primary key `(view_id, subject_id)`.
@@ -517,7 +528,7 @@ Presentational markup that is never a fact (ADR-011).
 | `kind` | annotation_kind | not null |
 | `geometry` | jsonb | not null |
 | `text` | text | nullable |
-| `created_by` | uuid | not null |
+| `created_by` | uuid | → `auth.users(id)`, not null (same Sprint H1 note as `views.created_by` above) |
 
 ### 3.10 Starter content
 
@@ -618,7 +629,9 @@ Attribute keys inside `value` stay camelCase in jsonb (they are validated by `ty
 
 ### 5.1 Structure
 
-`CommitEnvelope` in `delta.ts`: `id`, `branchId`, `parentCommitId`, `mergedBranchHeadCommitId`, `kind`, `message`, `authorId`, `deltas[]`.
+`CommitEnvelope` in `delta.ts`: `id`, `branchId`, `parentCommitId`, `mergedBranchHeadCommitId`, `kind`, `message`, `deltas[]`.
+
+**`authorId` was removed from the wire contract in Sprint H1** (docs/AUDIT-2026-09-U2.md §2.E.3 item 15). It was never actually the source of `commits.author_id`/`deltas.created_by` — `atlas.commit_deltas` has always derived both from `auth.uid()`, ignoring whatever the envelope claimed — but it *was* still the untrusted source of `facts.asserted_by`/`facts.asserted_at` (§3.5), a real gap: a client could assert a fact under any identity it liked. `atlas.replace_main_head_projection` now derives both of those the same way everything else already did, joining each fact's `delta_id` back to `deltas.created_by`/`deltas.created_at` rather than trusting the payload. Nothing about who authored a commit is client-supplied anywhere in this product any more; `auth.uid()` is the only source, full stop.
 
 Kinds:
 
@@ -648,9 +661,11 @@ C6 is the one that turns concurrent editing into a rejected commit rather than a
 | `change` | contributor+ via API | `atlas.commit_deltas` (security definer) — see implementation note below |
 | `main` | owner/architect via API, permanently (ADR-015) | `atlas.commit_deltas`, same function, materialises the head too |
 
-**Implementation note (Sprint U1 step 3a, superseding Sprint F1 step 6's version of this note):** `atlas.commit_deltas` (`supabase/migrations/20260906090000_facts_and_commit_deltas.sql`) is now the one function that writes a commit, of either branch kind, replacing the two-round-trip insert-then-compare-and-swap this section previously described. In one transaction: insert the commit and its deltas, advance `branches.head_commit_id` (still checked by `atlas.guard_branch_head_advance`, unchanged since Sprint F1 step 6 — the actual concurrency guarantee, which a lost race's unique `(branch_id, parent_commit_id)` index violation (§3.4) or the trigger's own check catches before anything is left half-written), and — only when the branch is `main` — materialise `elements_head`/`relationships_head`/`facts` for the new head via `atlas.replace_main_head_projection`, a second, narrower security-definer function with no grant to `authenticated` at all. `src/db/commits.ts` computes the resulting `Head` with the existing engine (as it already did for validation) and serialises it (`src/engine/projection.ts`) into the jsonb this writes verbatim — the fold/apply algorithm itself is not reimplemented in SQL; delta-apply directly against the existing projection rows, rather than shipping the whole materialised set on every commit, is the named upgrade path if the payload this sends ever needs it (ADR-015). See ADR-015 for why this needed to be security definer (it advances `main`, which the plain `commits`/`branches` RLS was never written to allow), why owner/architect-only on `main` is a permanent rule and not a sprint-scoped one, and why the engine, not a second PL/pgSQL implementation, stays the one place fold/apply is defined.
+**Implementation note (Sprint U1 step 3a, superseding Sprint F1 step 6's version of this note):** `atlas.commit_deltas` (`supabase/migrations/20260906090000_facts_and_commit_deltas.sql`) is now the one function that writes a commit, of either branch kind, replacing the two-round-trip insert-then-compare-and-swap this section previously described. In one transaction: insert the commit and its deltas, advance `branches.head_commit_id` (still checked by `atlas.guard_branch_head_advance`, unchanged since Sprint F1 step 6 — the actual concurrency guarantee, which a lost race's unique `(branch_id, parent_commit_id)` index violation (§3.4) or the trigger's own check catches before anything is left half-written), and — only when the branch is `main` — materialise `elements_head`/`relationships_head`/`facts` for the new head via `atlas.replace_main_head_projection`, a second, narrower security-definer function with no grant to `authenticated` at all. `src/db/commits.ts` computes the resulting `Head` with the existing engine (as it already did for validation) and serialises it (`src/engine/projection.ts`) into the jsonb this writes verbatim — the fold/apply algorithm itself is not reimplemented in SQL; delta-apply directly against the existing projection rows, rather than shipping the whole materialised set on every commit, is the named upgrade path if the payload this sends ever needs it (ADR-015; §11 now gives it a firmer target than "if ever needed" — before Sprint K1's capture pipeline arrives). See ADR-015 for why this needed to be security definer (it advances `main`, which the plain `commits`/`branches` RLS was never written to allow), why owner/architect-only on `main` is a permanent rule and not a sprint-scoped one, and why the engine, not a second PL/pgSQL implementation, stays the one place fold/apply is defined.
 
 The two-round-trip design's orphaned-commit tradeoff (a lost race leaving a permanent, harmless, unreferenced commit row) no longer applies: a lost race now fails the whole function call, and nothing is written at all, because a PL/pgSQL function body is one transaction.
+
+**`p_kind` restriction (Sprint H1 item 3 — `supabase/migrations/20260906140000_commit_deltas_kind_restriction.sql`):** `atlas.commit_deltas` originally placed no restriction on `p_kind` at all — the `kind in ('manual', 'merge')` check on `commits_insert` (§9.3) only ever applied to a direct table insert, which this security-definer function bypasses. It now rejects `p_kind` values that don't fit the branch: `main` accepts `manual`/`merge`/`template_seed`; `change` accepts `manual` only. `merge` on `change` (a "refresh," S-11) is real design with no product path yet (no branch/review-queue UI); allowing it here ahead of anything that would produce one is deferred along with the rest of that UI, not silently permitted meanwhile.
 
 ---
 
@@ -771,6 +786,12 @@ The materialiser is trusted only because these three equalities are checked:
 
 Order-independence (P-3) is a second obligation: for commits whose delta fact-key sets are disjoint, applying them in either order yields the same `head_hash`. This is what makes `topo`'s tie-break irrelevant for correctness and only relevant for determinism.
 
+### 6.7 Reading a materialised head at scale
+
+`elements_head`/`relationships_head`/`facts` are keyed `(commit_id, ...)` (§3.5) — every read of them is already scoped to one commit. A read that also needs "only these particular subjects" (an element's own relationships, a landscape's edges among its systems) must not add that second scoping by handing an arbitrary, caller-sized id list to postgrest-js's `.in()`: `.in()` is sent as a GET query parameter, so its URL grows with the list — Sprint C1-H item 1 found this concretely (`docs/AUDIT-2026-09-C1.md` §1.4): a 2,000-system landscape's edge query, `.in('from_element_id', systemIds).in('to_element_id', systemIds)`, produced a ~70KB+ URL that a proxy/server rejects outright (400/`ERR_FAILED`), not a slow query — the read never completed at all.
+
+**Rule:** a `.in()` filter whose value list is caller-supplied and can grow with model size (element/subject/source/branch/commit ids — anything that isn't a small fixed enum like a status or type list) must stay at or under 50 values. `src/db/inFilterLimit.ts`'s `assertInFilterSize` enforces this at the point of call — a call site over the limit is a bug to fix, not a query to let run and hope stays small in practice. The fix is the same shape every time (`src/db/landscape.ts`'s `listLandscapeEdges`/`listSupportsEdgesForSystems`, rewritten this item): query the commit/model scope alone — no id-list filter at all — and narrow to the wanted subjects client-side, in memory, after the round trip. This trades a WHERE clause for a client-side `Set.has` filter; the row count fetched is the same order of magnitude either way (a commit's whole relationship set, not a per-subject slice), so this is a request-shape fix, not a data-volume one.
+
 ---
 
 ## 7. Merge algorithm
@@ -846,15 +867,25 @@ The queue renders `merge_requests.classification` (cached; recomputed on every p
 
 **Identity warnings** (one card per pair): both elements side by side with the match score and the matching context; actions: *merge now* (runs `atlas.merge_elements` on the branch, survivor chosen by the reviewer) or *keep both* (dismiss; recorded in `classification` so it does not reappear). Never blocks approval.
 
-**Approval** is enabled only when: no blocking class remains, `mergeBase(B) == main.head`, schema validation passes at the branch head, and the reviewer holds `architect` or `owner`. Approving sets `branches.status = 'approved'`; merging calls `atlas.merge_branch`, which re-checks all four conditions inside the transaction (they can go stale between the click and the commit), writes the `merge` commit on main, moves `branches.head_commit_id` for main, marks the request `merged` and the branch `merged`, and materialises the new main head. If main moved in between, the procedure fails with `REFRESH_REQUIRED` and the request returns to `pending`.
+**Approval** is enabled only when: no blocking class remains, `mergeBase(B) == main.head`, schema validation passes at the branch head, and the reviewer holds `architect` or `owner`. Approving sets `branches.status = 'approved'`; merging calls `atlas.merge_branch`, which re-checks all four conditions inside the transaction (they can go stale between the click and the commit), writes the `merge` commit on main, moves `branches.head_commit_id` for main, marks the request `merged` and the branch `merged`, and materialises the new main head. If main moved in between, the procedure returns without a commit and the request returns to `pending` (its branch to `proposed`) — see the implementation note below for why that's a `NULL` return, not a thrown `REFRESH_REQUIRED` error.
+
+**Implementation note (Sprint C1 step 2, `supabase/migrations/20260906161000_merge_review_queue.sql`):** the whole request lifecycle — submit, request changes, approve, reject, merge — is five security-definer functions (`atlas.submit_merge_request`/`request_changes`/`approve_merge_request`/`reject_merge_request`/`merge_branch`), each moving `merge_requests.status` and `branches.status` together in one transaction, for the same reason `atlas.commit_deltas` replaced a plain RLS-gated insert for `commits` (S-17): two separate client writes could partially fail and leave the two disagreeing about whether a branch is under review. `atlas.merge_branch`'s `REFRESH_REQUIRED` outcome is a `NULL` return, deliberately not a raised exception — an exception would roll back the same transaction's reset of the request to `pending` and the branch to `proposed`, undoing the very recovery it's meant to leave in place. It re-derives `mergeBase(B) == main.head` via `atlas.branch_reaches_commit(branch_id, commit_id)` (is `commit_id` in the branch head's own ancestry — the same DAG `parent_commit_id`/`merged_branch_head_commit_id` walk as `src/engine/head.ts`'s `ancestry`, expressed as a membership test) rather than trusting a client-supplied claim; schema validation at the branch head is trusted from the engine exactly as every other commit path already trusts it, per §6.5's implementation note.
+
+**Implementation note (Sprint C1 step 7, `src/db/mergeRequests.ts`, `src/engine/mergeResolution.ts`):** the review queue UI and its "resolve, refresh, resubmit" loop needed one function step 2 didn't have — `atlas.resubmit_merge_request` (`supabase/migrations/20260906162000_resubmit_merge_request.sql`) moves an already-open `changes_requested` request back to `pending` with a refreshed cached classification, since `submit_merge_request` can only ever *insert* a first row and the partial unique index on open `branch_id`s would reject a second one. `sources_insert`'s RLS (`20260906162100_merge_resolution_source.sql`) also needed extending to allow the `merge_resolution` kind the wire contract and `deltas.source_id` FK had already anticipated but nothing wrote until this step. Field-conflict resolution (the three-column card's "keep this change / keep main / enter a value") is a one-click action, built and unit-tested (`src/engine/mergeResolution.test.ts`) exactly per this section's wording, including C15 below (`unresolvedFieldConflictKeys` refuses a refresh with any FIELD_CONFLICT key left unresolved, rather than letting main's value silently win). The structural-conflict actions (keep retraction / keep element and their dependant cascade, duplicate-relationship survivor pick, cardinality primary pick) and identity's "merge now" (`atlas.merge_elements`, itself deferred past this sprint — §11) are not built this step: the dependency-closure cascade those need is a substantial, separable unit of work. The review UI gives a real path for every conflict class today regardless — reopen the branch (`request_changes`) and fix it with the ordinary branch editor (Sprint C1 steps 3-4), then push a refresh and resubmit — and names this explicitly on structural-conflict cards rather than omitting their actions silently. Partial merge (ADR-006 amendment's split-into-a-new-branch) is likewise not built this step; `atlas.merge_branch` always merges the branch's entire head.
+
+**Implementation note (Sprint C1 step 8, `src/ui/reviews/BranchRebasePanel.tsx`, `useBranchRebase.ts`):** the conflict cards moved out of `ReviewRequestView.tsx` into `src/ui/reviews/ConflictCards.tsx` so a draft change's own page (`src/ui/changes/ChangeView.tsx`) can render the identical findings, with the identical one-click field-conflict resolution, *before* a merge request exists at all — "rebase branch on new main head with conflict surfacing" doesn't have to wait for review to start. It calls the same `pushRefresh` (and the same C15 guard) as a review request's refresh, just without the merge_requests bookkeeping there's nothing yet to update; shown only while no merge request is open — once one exists, refreshing goes back through the review request's own page, since that's the one place also resubmitting the cached classification. This step also fixed a real bug the request-scoped refresh had: it passed `request.requested_by` as the merge-resolution source's `created_by`, which `sources_insert`'s RLS (`created_by = auth.uid()`) would reject the moment someone other than the original requester pushed the refresh — both refresh paths now use the actual signed-in user.
 
 ### 7.5 Refresh
 
-`atlas.refresh_branch(branch_id, resolutions[])` produces the `merge` commit on the branch: `parent = B.head`, `mergedBranchHead = main.head`, deltas = the supplied resolutions. C15 is checked: the set of fact keys in `resolutions` must equal the set of FIELD_CONFLICT keys (plus the deltas implied by structural choices). After refresh, `mergeBase(B) == main.head` by construction.
+Conceptually, `atlas.refresh_branch(branch_id, resolutions[])` produces the `merge` commit on the branch: `parent = B.head`, `mergedBranchHead = main.head`, deltas = the supplied resolutions. C15 is checked: the set of fact keys in `resolutions` must equal the set of FIELD_CONFLICT keys (plus the deltas implied by structural choices). After refresh, `mergeBase(B) == main.head` by construction.
+
+**Implementation note (Sprint C1 step 2):** this is not a distinct SQL procedure. A refresh is an ordinary commit through the same `src/db/commits.ts`/`atlas.commit_deltas` path every other commit takes — `commit_deltas` now accepts `kind = 'merge'` on a `change` branch (previously restricted to `manual` only, Sprint H1 item 3), so the client (having computed the resolution deltas and the resulting folded head with the engine, exactly as it already does for any commit) calls `commitToBranch` with `envelope.kind = 'merge'` and `mergedBranchHeadCommitId = main.head`. `atlas.guard_branch_head_advance`'s existing "only while `status = 'draft'`" check (S-18) is what actually gates this — a branch under review (`proposed`/`approved`) must first go through `atlas.request_changes` (§7.4's implementation note) to reopen it before a refresh commit is accepted, matching S-18's rule rather than adding a second one.
 
 ---
 
 ## 8. Matching (capture pipeline)
+
+**Deferred to C1/Q1, alongside `atlas.merge_elements` — see §11.** Nothing below is implemented: the capture pipeline this matching feeds (ADR-004) doesn't exist, so nothing yet produces a candidate for it to match. The GIN trigram index level 3 depends on is already migrated (`elements_head_name_trgm_idx`, §3.5).
 
 Order, first hit wins:
 
@@ -945,9 +976,14 @@ returns boolean
 language sql stable security definer
 set search_path = public, pg_temp
 as $$
+  -- Sprint H1 fix (docs/AUDIT-2026-09-U2.md §2.E.3 item 6): the stray `;`
+  -- inside this subquery made the quoted SQL invalid as written, even
+  -- though the actual migrated function (supabase/migrations/
+  -- 20260906071200_tenancy.sql and its sibling RLS migrations) never had
+  -- the bug — this was a transcription error in this document only.
   select exists (
     select 1 from branches b
-    where b.id = p_branch and (b.kind = 'main' or b.shared_for_review);
+    where b.id = p_branch and (b.kind = 'main' or b.shared_for_review)
   );
 $$;
 
@@ -979,9 +1015,16 @@ $$;
 alter table organisations enable row level security;
 alter table organisations force row level security;
 
+-- `or created_by = auth.uid()`: a creator can always see the organisation
+-- they just created, true by construction (the trigger below makes them
+-- its owner in the same transaction) — needed because
+-- `.insert(row).select('*').single()` requires the inserted row to satisfy
+-- this SELECT policy at RETURNING time, before that trigger has run
+-- (Sprint C1-H item 1; the RETURNING-time check raises the same "new row
+-- violates row-level security policy" error a failed WITH CHECK would).
 create policy organisations_select on organisations
   for select to authenticated
-  using (atlas.is_member(id));
+  using (atlas.is_member(id) or created_by = auth.uid());
 
 -- Anyone signed in may create an org; a trigger makes them its owner.
 create policy organisations_insert on organisations
@@ -1029,6 +1072,15 @@ create policy members_delete on members
 alter table models enable row level security;
 alter table models force row level security;
 
+-- The `or atlas.model_shared_with_me(id)` clause below is not migrated
+-- (Sprint H1 note — docs/AUDIT-2026-09-U2.md §2.E.3 item 3): `model_shares`
+-- (§3.6) and `atlas.model_shared_with_me` don't exist yet. The migrated
+-- policy is `using (atlas.is_member(org_id))` alone — no cross-org sharing
+-- is possible until `model_shares` is built; no target sprint named. (This
+-- is unrelated to ADR-014/ADR-017's identity/tenancy question, which is
+-- about whether Atlas shares its *identity tables* with a different
+-- product entirely — `model_shares.shared_with_org_id` only ever
+-- references another organisation inside this same product.)
 create policy models_select on models
   for select to authenticated
   using (atlas.is_member(org_id) or atlas.model_shared_with_me(id));
@@ -1053,6 +1105,9 @@ create policy models_delete on models
 alter table commits enable row level security;
 alter table commits force row level security;
 
+-- Same gap as models_select above (Sprint H1 note — item 4): the migrated
+-- policy has no `or atlas.commit_shared_with_me(id)` clause — that function
+-- and the `model_shares` table it would query don't exist yet.
 create policy commits_select on commits
   for select to authenticated
   using (
@@ -1068,13 +1123,21 @@ create policy commits_select on commits
   );
 
 -- Direct inserts: contributors and above, on a draft change branch they can see,
--- as the author. Never on main (S-17) and never on capture_draft (service role only).
+-- as the author. Never on main (this policy's own `b.kind = 'change'` check,
+-- not S-17 — see that row's Sprint H1 note in §1) and never on capture_draft
+-- (service role only). `atlas.commit_deltas` (§5.3) is a security-definer
+-- function and is how main actually advances; it bypasses this policy
+-- entirely rather than satisfying it, exactly like every other
+-- security-definer writer below.
 create policy commits_insert on commits
   for insert to authenticated
   with check (
     atlas.has_role(org_id, 'owner', 'architect', 'contributor')
     and author_id = auth.uid()
     and kind in ('manual', 'merge')
+    -- `atlas.commit_deltas` bypasses this policy (security definer) and, as
+    -- of Sprint H1, restricts `p_kind` itself instead — see §5.3's
+    -- implementation note (docs/AUDIT-2026-09-U2.md §2.E.3 item 14).
     and exists (
       select 1 from branches b
       where b.id = commits.branch_id
@@ -1086,8 +1149,11 @@ create policy commits_insert on commits
   );
 
 -- No update or delete policies: append-only for every application role.
--- atlas.merge_branch / atlas.seed_from_map are security definer and are the only
--- writers of commits whose branch is main.
+-- `atlas.commit_deltas` (§5.3, Sprint H1) and `atlas.seed_from_map` (§3.10)
+-- are security definer and are the only writers of commits whose branch is
+-- main. `atlas.merge_branch`, named here in earlier drafts, does not exist —
+-- ADR-005's multi-branch merge review workflow it would have belonged to is
+-- deferred (docs/ADR-000-foundations.md's "Deferred to follow-up ADRs").
 ```
 
 `deltas` follow `commits` exactly (select through the commit's visibility; insert only alongside a commit the same user may insert; no update/delete). The policy is the same predicate applied via `exists (select 1 from commits c where c.id = deltas.commit_id)` — the RLS on `commits` does the work.
@@ -1174,11 +1240,15 @@ Every remaining table uses one of three templates, chosen per table:
 
 | Template | Select | Insert/Update | Tables |
 |---|---|---|---|
-| **Member-scoped** | `is_member(org_id)` (+ viewer restriction where the row can reveal draft content) | `has_role(org_id, 'owner','architect')` or contributor+ per table | `branches`, `tags` (insert architect+, no update/delete), `sources`, `aliases`, `merge_requests`, `capture_jobs`, `decisions*`, `assumptions`, `evidence`, `views`, `view_layouts`, `view_annotations`, `validation_results` |
+| **Member-scoped** | `is_member(org_id)` (+ viewer restriction where the row can reveal draft content) | `has_role(org_id, 'owner','architect')` or contributor+ per table | `branches`, `tags`, `sources`, `aliases`, `views`, `view_annotations` (all five: insert-only, no update/delete policy or grant — Sprint H1 note, docs/AUDIT-2026-09-U2.md §2.E.3 item 19: this table originally called the carve-out out for `tags` alone, but the migrations apply it identically to `sources`/`aliases`/`views`/`view_annotations` too; only `view_layouts`, below, genuinely has an update policy, since a position hint is meant to change), `view_layouts` (update allowed — position hints are mutable), `merge_requests`, `capture_jobs`, `decisions*`, `assumptions`, `evidence`, `validation_results` |
 | **Commit-scoped** | visible iff `commits_select` would pass for `commit_id` | service role only | `elements_head`, `relationships_head`, `facts`, `deltas` |
 | **Product content** | `to authenticated using (true)` | service role only | `type_schemas`, `relationship_type_rules`, `capability_maps`, `capability_map_items`, `capability_map_sources` |
 
 `element_merges` and `resolved_conflicts`: member-scoped select, insert via procedure only.
+
+**`merge_requests`' insert/update is function-only, not a plain `has_role`/contributor+ policy (Sprint C1 amendment):** submitting a request has to move `branches.status` to `proposed` in the same transaction, and approving/rejecting/merging both a request and its branch's status together — two separate RLS-gated client writes could partially fail and leave the two disagreeing about whether a branch is under review. `atlas.submit_merge_request`/`request_changes`/`approve_merge_request`/`reject_merge_request`/`merge_branch` (§7.4, §7.5) are the only writers, each still deriving its own role check from `auth.uid()` rather than trusting a client-supplied one — the same reasoning, and the same precedent, as `atlas.commit_deltas` superseding a plain RLS-gated insert for `commits` (S-17). `merge_requests` therefore has a select policy only; no insert/update policy or grant exists for `authenticated`.
+
+**`tags`' select policy is exactly `using (atlas.is_member(org_id))`** (Sprint H1 note — docs/AUDIT-2026-09-U2.md §2.E.3 item 5), not yet the cross-org, tag-pinned sharing P-24 describes — the migration's own comment says as much: "Cross-org visibility of a specifically shared tag is added once model_shares lands." P-24 names the target behaviour once `model_shares` (§3.6) exists; until then it is not a passing test, it is a recorded intention, same as the `models_select`/`commits_select` gaps above.
 
 `user_preferences`: **user-scoped** — `user_id = auth.uid()` on select/insert/update, no delete. The only table not scoped by `org_id`.
 
@@ -1193,7 +1263,7 @@ All property tests use generated inputs (fast-check or equivalent) with shrinkin
 | Id | Test |
 |---|---|
 | RT-1 | For every `DeltaKind`: arbitrary `Delta` → JSON → `Delta` is deep-equal; `Delta` → `deltas` row → `Delta` is deep-equal (the §4.4 mapping is a bijection on valid deltas). |
-| RT-2 | Arbitrary valid `CommitEnvelope` → `atlas.commit` → read back commit + deltas ordered by `seq` → equals the envelope (ids and order preserved). |
+| RT-2 | Arbitrary valid `CommitEnvelope` → `atlas.commit_deltas` (Sprint H1 rename, matching the implementation — docs/AUDIT-2026-09-U2.md §2.E.3 item 13; this table named the aspirational `atlas.commit` before it existed) → read back commit + deltas ordered by `seq` → equals the envelope (ids and order preserved). |
 | RT-3 | Arbitrary model with a tag → export (elements, relationships, facts at the tag) → import into a fresh model preserving ids → `head_hash` equal. |
 | RT-4 | Seed a model from a `capability_maps` version → diff the seeded head against the map → empty; every seeded element has a `template_code` alias and `attributes.templateRef`. |
 | RT-5 | `type_schemas.json_schema` generated from `src/contracts/delta.ts` equals the checked-in seed, and every arbitrary `ElementAttributesByType[T]` validates against the schema for `T` (and an arbitrary object with one required key removed does not). |
@@ -1211,14 +1281,14 @@ All property tests use generated inputs (fast-check or equivalent) with shrinkin
 | P-3 | For two commits with disjoint fact-key sets, applying them in either order gives the same `head_hash`. |
 | P-4 | `apply(apply(H, retract(x)), restore(x))` has the same elements/relationships/facts for `x` as `H`, and the recovered facts keep their original `delta_id`/provenance (not the restore's). |
 | P-5 | For every live fact, following `previous_delta_id` terminates at a create delta for that subject; the chain length equals the number of updates to that key in the fact's ancestry; no chain has a cycle. |
-| P-6 | Snapshot-and-replay: after GC, every branch head and every tagged commit still has head rows; no other commit does; `replayFromNearestRetained(c)` for any commit equals `fold(c)`. |
+| P-6 | Snapshot-and-replay: after GC, `main`'s current head and every tagged commit still has head rows (Sprint H1 correction: not "every branch head" — a `change` branch is never materialised at all, §3.5); no other commit does; `replayFromNearestRetained(c)` for any commit equals `fold(c)`. |
 | P-7 | Tag creation recomputes from genesis: injecting a corrupted `elements_head` row for the tagged commit before tagging causes tag creation to fail. |
 
 ### 10.3 Properties — commit invariants and validation
 
 | Id | Property |
 |---|---|
-| P-8 | For each invariant C1–C16 there is a generator that produces an otherwise-valid envelope violating exactly that invariant, and `atlas.commit` rejects it naming that id. Valid envelopes are accepted. |
+| P-8 | For each invariant C1–C16 there is a generator that produces an otherwise-valid envelope violating exactly that invariant, and `atlas.commit_deltas` (Sprint H1 rename, see RT-2) rejects it naming that id. Valid envelopes are accepted. |
 | P-9 | For each rule V1–V6 there is a generator that mutates a valid head to violate exactly that rule, and the gate reports exactly that rule; the resulting head is refused on main and (structural rules) on change branches, and accepted on `capture_draft` with the finding recorded. |
 | P-10 | Concurrency: two envelopes with the same `parentCommitId` submitted to the same branch → exactly one succeeds (C13); two envelopes on sequential parents updating the same fact key with the same `previousDeltaId` → the second fails C6. |
 | P-11 | Id reuse: an `element.create` with an id that appears in any delta of the model on any branch (including a retracted or merged-away one) is rejected (C5). |
@@ -1261,3 +1331,18 @@ All property tests use generated inputs (fast-check or equivalent) with shrinkin
 | P-28 | `owns` cardinality: at most one `primary = true` owner per target survives V3; a second is a cardinality conflict at merge and a V3 failure on commit. |
 
 A UI ticket may not be opened until RT-1…RT-9 and P-1…P-28 exist and pass in CI.
+
+---
+
+## 11. Deferred
+
+Sprint H1 item 12 (docs/AUDIT-2026-09-U2.md's own deferred-items review, §7.2): every item this spec itself defers, in one place, rather than scattered across the sections that name them. Named explicitly so none is mistaken for settled, the same reasoning docs/ADR-000-foundations.md's own "Deferred to follow-up ADRs" section states for the ADR-level list.
+
+| Item | What's deferred | Target | Why |
+|---|---|---|---|
+| `type_schemas` (§3.3, ADR-001/ADR-015) | The full TypeScript-type-to-JSON-Schema generator plus checked-in seed and validator (RT-5) | Sprint K1 | Real schema-validation infrastructure the element page never needed; Sprint K1's capture edge function is the first consumer outside the TypeScript runtime that will actually need it. Already deferred inline at §3.3; listed here too for one-place discoverability. |
+| Delta-apply in SQL (§5.3's implementation note, ADR-015) | Teaching `atlas.commit_deltas` to apply just the *new* commit's deltas directly against the existing `elements_head`/`relationships_head`/`facts` rows, rather than receiving and replacing the whole materialised set on every commit | **Before Sprint K1** | The current design's real, measured cost (~8.45 MB per single-element edit against a 2,010-element/6,000-relationship/~16,000-fact model, budgeted at 12 MB — `e2e/landscape-perf.spec.ts`) is accepted today because this product's stated scale is one or two architects editing by hand, not a high-frequency writer. Sprint K1's capture pipeline is exactly that: an automated writer producing commits at a rate and volume manual editing never will. The payload-size tradeoff needs to be resolved *before* that new write pressure arrives, not discovered after a capture run is already timing out or exceeding the budget in production. |
+| `atlas.merge_elements` and §8's name+type+context trigram identity matching | The SQL procedure that actually executes an identity merge (RT-6), and the fuzzy-matching algorithm (trigram similarity ≥ 0.6, structural context, P-19) that would ever produce a candidate pair for it to merge | **C1/Q1** | Neither has a reason to exist independently of the other: `merge_elements` has nothing to merge until something proposes "these two elements might be the same," and the matching algorithm only matters once the capture pipeline (Sprint K1) produces draft elements to match against a model's existing ones. Both wait on that same upstream dependency, and both land together once whichever of C1/Q1 actually does the identity-matching work. The GIN trigram index this depends on (`elements_head_name_trgm_idx`, §3.5) is already migrated — the index exists; nothing queries it for matching purposes yet. |
+| `relationship_type_rules` as a migrated table (§3.3) | A real `relationship_type_rules` table, as originally specified below | **Superseded — never.** | Sprint H1's `RELATIONSHIP_TYPE_RULES` constant (`src/contracts/relationshipTypeRules.ts`) already fully enforces C9/V3 — see §3.3's own note on this table. A migrated table would only ever be worth building if the ruleset needed to become live-editable product content without a code change (e.g. an admin screen for adjusting rules) — nothing today requires that, and none is planned. This is not "not yet"; it is a permanent design choice, recorded so a future request to migrate it has to argue against this decision rather than treat the gap as an oversight. |
+
+Everything else this document defers is named at its point of use, not repeated here: SPEC §2's `created_at` exceptions, §9's `model_shares`-dependent RLS clauses (§9.2/§9.3/§9.5, all three annotated "pending `model_shares`, no target sprint named"), and §3.6's `capture_job_id` FK (pending `capture_jobs`, Sprint K1) are documentation of an absent dependency, not a scheduled follow-up in the sense this section means.

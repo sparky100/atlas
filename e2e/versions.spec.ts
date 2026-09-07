@@ -71,7 +71,6 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
     mergedBranchHeadCommitId: null,
     kind: 'manual',
     message: 'add System A',
-    authorId: userId,
     deltas: [
       { kind: 'element.create', id: randomUUID(), elementId: systemAId, elementType: 'system', name: 'System A', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
     ],
@@ -103,7 +102,6 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
     mergedBranchHeadCommitId: null,
     kind: 'manual',
     message: 'add System B',
-    authorId: userId,
     deltas: v2Deltas,
   };
   const v2Result = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: v1CommitId, envelope: v2Envelope });
@@ -132,6 +130,8 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
 
   await expect(page.getByRole('heading', { name: 'Diff: v1 → v2' })).toBeVisible();
   await expect(page.getByText('System B')).toBeVisible();
-  await expect(page.getByText('Added')).toBeVisible();
+  // .first(): the badge's accessible text duplicates across an icon +
+  // label pair in the same row — this checks the badge renders at all.
+  await expect(page.getByText('Added').first()).toBeVisible();
   await expect(page.getByText('System A')).toHaveCount(0);
 });

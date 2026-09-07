@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { CapabilityMapPage } from './routes/CapabilityMapPage';
+import { ChangePage } from './routes/ChangePage';
+import { ChangesPage } from './routes/ChangesPage';
 import { ComponentPage } from './routes/ComponentPage';
 import { ContainerPage } from './routes/ContainerPage';
 import { ContextPage } from './routes/ContextPage';
@@ -9,15 +11,16 @@ import { LandscapePage } from './routes/LandscapePage';
 import { ModelHome } from './routes/ModelHome';
 import { OrgHome } from './routes/OrgHome';
 import { RequireAuth } from './routes/RequireAuth';
+import { ReviewQueuePage } from './routes/ReviewQueuePage';
+import { ReviewRequestPage } from './routes/ReviewRequestPage';
 import { SignIn } from './routes/SignIn';
 import { VersionDiffPage } from './routes/VersionDiffPage';
 import { VersionsPage } from './routes/VersionsPage';
 
 /**
- * Sprint U2 step 4 adds versions: tag main with a name and note, open any
- * tag read-only (every view already takes `?ref=`, so "open" is just a
- * link), and diff two arbitrary refs (`?ref=&diff=`, UI-principles §6.2).
- * That completes this sprint's four steps.
+ * Sprint C1 step 7 adds the review queue (UI-principles §2.4's `/review`
+ * and `/review/{mergeRequestId}` routes, SPEC §7.4) — the last two routes
+ * below.
  */
 export function App() {
   return (
@@ -35,7 +38,11 @@ export function App() {
           <Route path="/o/:orgSlug/m/:modelSlug/container/:systemId" element={<ContainerPage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/component/:containerId" element={<ComponentPage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/versions" element={<VersionsPage />} />
+          <Route path="/o/:orgSlug/m/:modelSlug/changes" element={<ChangesPage />} />
+          <Route path="/o/:orgSlug/m/:modelSlug/changes/:branchId" element={<ChangePage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/diff" element={<VersionDiffPage />} />
+          <Route path="/o/:orgSlug/m/:modelSlug/review" element={<ReviewQueuePage />} />
+          <Route path="/o/:orgSlug/m/:modelSlug/review/:mergeRequestId" element={<ReviewRequestPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

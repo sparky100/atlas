@@ -9,8 +9,10 @@
 -- invariants (src/contracts/delta.ts) beyond what a per-row CHECK can
 -- express. Cross-row invariants (id-never-reused, previous_delta_id matching
 -- the parent head's live fact, sequencing, resulting-head validation) are
--- the job of the commit-writing engine (SPEC §5.3's atlas.commit, landing in
--- src/engine + src/db in later Sprint F1 steps), not a table constraint.
+-- the job of the commit-writing engine (SPEC §5.3's atlas.commit_deltas,
+-- src/engine + src/db) — landed in later Sprint F1 steps and rebuilt as a
+-- security-definer function in Sprint U1 step 3a (ADR-015) — not a table
+-- constraint.
 -- The RLS policies here are the coarse-grained authorization gate the spec
 -- calls for (role, branch status, authorship) — real and load-bearing, but
 -- not a substitute for that engine.
@@ -294,11 +296,11 @@ create policy branches_insert on branches
     )
   );
 
--- Only title and shared_for_review are directly editable today. Advancing
--- head_commit_id or status goes through the commit/merge engine landing in
--- later Sprint F1 steps — allowing a raw update to those now, with none of
--- the invariant-checking that engine will do, would be exactly the kind of
--- demo shortcut CLAUDE.md rules out.
+-- Only title and shared_for_review are directly editable via this policy.
+-- Advancing head_commit_id or status goes through atlas.commit_deltas
+-- (§5.3, ADR-015) and atlas.guard_branch_head_advance, not a raw update
+-- through here — allowing that, with none of the invariant-checking those
+-- do, would be exactly the kind of demo shortcut CLAUDE.md rules out.
 create policy branches_update on branches
   for update to authenticated
   using (atlas.has_role(org_id, 'owner', 'architect', 'contributor'))

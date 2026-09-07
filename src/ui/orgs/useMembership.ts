@@ -4,6 +4,10 @@ import type { MemberRole } from '../../db/types';
 import type { UUID } from '../../contracts/delta';
 import { supabase } from '../supabaseClient';
 
+// Re-exported for every existing import site (`import { canEditOnMain, useMembership } from '../orgs/useMembership'`)
+// — see roleGates.ts's own comment for why the gates themselves live there now.
+export { canApproveOrMergeRequest, canCreateChangeBranch, canCreateModel, canEditBranch, canEditOnMain, canReviewMergeRequest } from './roleGates';
+
 export interface UseMembershipResult {
   role: MemberRole | null;
   loading: boolean;
@@ -38,22 +42,4 @@ export function useMembership(orgId: UUID | null, userId: UUID | null): UseMembe
   }, [orgId, userId]);
 
   return { role, loading };
-}
-
-/** Mirrors `models_insert`'s RLS check (`atlas.has_role(org_id, 'owner', 'architect')`, supabase/migrations/20260906071300_models.sql) — for showing/hiding the affordance; the database enforces the real rule regardless of what this returns. */
-export function canCreateModel(role: MemberRole | null): boolean {
-  return role === 'owner' || role === 'architect';
-}
-
-/**
- * Mirrors `atlas.commit_deltas`'s main-only role gate (ADR-015: "only
- * owners and architects may commit directly to main") — for showing/hiding
- * `Edit` at `main` (UI-principles §4.2). A contributor gets no edit
- * affordance at all in Sprint U1 rather than an inert `Propose a change…`
- * (there is no branch UI yet for that to open) — the same "no demo
- * shortcut" call the element page already made for every role before this
- * step existed.
- */
-export function canEditOnMain(role: MemberRole | null): boolean {
-  return role === 'owner' || role === 'architect';
 }

@@ -43,6 +43,12 @@ export function ModelHome() {
               <Text as="p">
                 <Link to={`/o/${organisation?.slug ?? ''}/m/${model.slug}/versions`}>Versions →</Link>
               </Text>
+              <Text as="p">
+                <Link to={`/o/${organisation?.slug ?? ''}/m/${model.slug}/changes`}>Changes →</Link>
+              </Text>
+              <Text as="p">
+                <Link to={`/o/${organisation?.slug ?? ''}/m/${model.slug}/review`}>Review queue →</Link>
+              </Text>
               <Text as="p" tone="muted">
                 A way to browse into an individual element from here is not built yet.
               </Text>

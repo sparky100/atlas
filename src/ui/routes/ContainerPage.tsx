@@ -7,6 +7,9 @@ import { useAuth } from '../auth/useAuth';
 import { useModels } from '../models/useModels';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
+import { parseViewMode } from '../../db/viewMode';
+import { BranchViewModeControl } from '../branches/BranchViewModeControl';
+import { useBranchLabel } from '../branches/useBranchLabel';
 import { StructureView } from '../structureView/StructureView';
 import { useStructureView } from '../structureView/useStructureView';
 import { parseCapabilityParam } from '../nav/zoomParams';
@@ -20,8 +23,9 @@ import styles from './ViewPage.module.css';
  */
 export function ContainerPage() {
   const { orgSlug, modelSlug, systemId } = useParams<{ orgSlug: string; modelSlug: string; systemId: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const ref = parseRefParam(searchParams.get('ref'));
+  const mode = parseViewMode(searchParams.get('mode'));
   const capabilityId = parseCapabilityParam(searchParams.get('capability'));
   const { userId } = useAuth();
 
@@ -29,8 +33,9 @@ export function ContainerPage() {
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
   const capability = useBreadcrumbElement(model?.id ?? '', ref, capabilityId);
+  const { label: branchLabel } = useBranchLabel(ref);
 
-  const state = useStructureView('container', model?.id ?? '', organisation?.id ?? '', userId, systemId ?? '', ref);
+  const state = useStructureView('container', model?.id ?? '', organisation?.id ?? '', userId, systemId ?? '', ref, mode);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -56,7 +61,7 @@ export function ContainerPage() {
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
-          refLabel={refLabelOf(ref)}
+          refLabel={refLabelOf(ref, branchLabel)}
           segments={segments}
         />
         <div className={styles.header}>
@@ -64,6 +69,19 @@ export function ContainerPage() {
             Containers
           </Text>
         </div>
+
+        {ref.kind === 'branch' && (
+          <BranchViewModeControl
+            mode={mode}
+            onChange={(next) => {
+              setSearchParams((prev) => {
+                const updated = new URLSearchParams(prev);
+                updated.set('mode', next);
+                return updated;
+              });
+            }}
+          />
+        )}
 
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
@@ -75,7 +93,7 @@ export function ContainerPage() {
             </Text>
           </Panel>
         )}
-        {state.status === 'ready' && <StructureView kind="container" group={state.data.group} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} refParam={refParam} />}
+        {state.status === 'ready' && <StructureView kind="container" group={state.data.group} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} refParam={refParam} diff={state.data.diff} />}
       </main>
     </div>
   );

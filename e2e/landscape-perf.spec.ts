@@ -76,9 +76,17 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
       const modelSlug = `perf-landscape-${modelId.slice(0, 8)}`;
       await createModel(signedIn, { id: modelId, orgId, name: 'Perf Landscape', slug: modelSlug, createdBy: userId });
 
-      // Bootstraps main's genesis commit as service_role — standing in for
-      // the not-yet-built atlas.seed_from_map, same as
-      // src/db/repository.integration.test.ts's own beforeAll.
+      // Bootstraps main's genesis commit as service_role. Not a stand-in
+      // for atlas.seed_from_map any more — that function exists now
+      // (supabase/migrations/20260906120000_seed_from_map.sql) — but it
+      // seeds a model from a capability_maps template, which can only ever
+      // produce `capability` elements; this fixture needs an arbitrary
+      // System-only generated landscape (SYSTEM_COUNT/EDGE_COUNT below),
+      // which no product code path can create a genesis commit for yet
+      // (docs/AUDIT-2026-09-U2.md's cross-cutting finding: there is still
+      // no way to get a model's first commit outside a capability-map
+      // import). Same bootstrap as src/db/repository.integration.test.ts's
+      // own beforeAll, for the same reason.
       const main = await getMainBranch(service, modelId);
       if (!main) throw new Error('main branch was not auto-created');
       const genesisCommitId = randomUUID();
@@ -100,11 +108,40 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
         mergedBranchHeadCommitId: null,
         kind: 'manual',
         message: `generated ${String(SYSTEM_COUNT)}-system/${String(EDGE_COUNT)}-edge landscape fixture`,
-        authorId: userId,
         deltas: generateLandscapeFixture(sourceId),
       };
+      // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once root-caused):
+      // split the 90s canvas-ready wait's own time out into seeding vs.
+      // page-load/layout, and surface any error the page itself renders
+      // (LandscapePage.tsx only mounts <canvas> once status === 'ready' —
+      // an error or a still-loading state both look like "canvas not
+      // found" to a bare locator, indistinguishably) or logs to console.
+      const seedStart = Date.now();
       const commitResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });
       if (!commitResult.ok) throw new Error(`seeding the landscape fixture: ${commitResult.message}`);
+      console.log(`[diag] fixture seeding took ${String(Date.now() - seedStart)}ms`);
+
+      // Sprint C1-H item 1: this test's failure traced (via these logs) to
+      // repeated "400 Bad Request"/"net::ERR_FAILED" console errors right
+      // after navigation, in a growing-interval pattern — the page never
+      // leaves its loading state within the 90s budget. Prime suspect,
+      // from reading src/db/landscape.ts alongside that evidence:
+      // `listLandscapeEdges`/`listSupportsEdgesForSystems` pass this
+      // fixture's full `systemIds` (2,000 uuids) into `.in()` twice each,
+      // and postgrest-js sends `.in()` filters as GET query parameters —
+      // a ~70KB+ URL for this fixture's scale, well past what most
+      // proxies/servers accept. Not yet fixed (a real scale decision, not
+      // a one-line change — chunking the `.in()` calls changes this
+      // query's shape) — left filtering to errors only, since the
+      // question this diagnostic still needs to answer (does the same
+      // failure recur, and does it start immediately on navigation) needs
+      // console errors, not every log/info message.
+      page.on('console', (msg) => {
+        if (msg.type() === 'error') console.log(`[diag page console error] ${msg.text()}`);
+      });
+      page.on('pageerror', (err) => {
+        console.log(`[diag page error] ${err.message}`);
+      });
 
       await page.goto('/sign-in');
       await page.getByLabel('Email').fill(email);
@@ -112,13 +149,25 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
       await page.getByRole('button', { name: 'Sign in' }).click();
       await expect(page.getByRole('heading', { name: 'Your organisations' })).toBeVisible();
 
+      const navStart = Date.now();
       await page.goto(`/o/${orgSlug}/m/${modelSlug}/landscape`);
       const canvas = page.locator('canvas');
       // Not just "the canvas exists" — the aria-label only reflects the
       // real node count once the worker's layout has actually landed
       // (useLandscape's `status: 'ready'`), so this is the real readiness
-      // signal, not a fixed sleep standing in for one.
-      await expect(canvas).toHaveAttribute('aria-label', new RegExp(`${String(SYSTEM_COUNT)} systems`), { timeout: 30_000 });
+      // signal, not a fixed sleep standing in for one. 90s, not the
+      // default: seeding this fixture is a single ~8MB commit_deltas
+      // payload (the sibling test's own measured baseline) inserting
+      // ~2,010 elements/6,000 relationships in one transaction — real
+      // headroom within this test's own 120s budget, not a flake cover-up.
+      try {
+        await expect(canvas).toHaveAttribute('aria-label', new RegExp(`${String(SYSTEM_COUNT)} systems`), { timeout: 90_000 });
+      } catch (e) {
+        const bodyText = await page.locator('body').innerText().catch(() => '<could not read body>');
+        console.log(`[diag] canvas never became ready after ${String(Date.now() - navStart)}ms. Page body text: ${bodyText.slice(0, 2000)}`);
+        throw e;
+      }
+      console.log(`[diag] canvas ready after ${String(Date.now() - navStart)}ms`);
 
       const box = await canvas.boundingBox();
       if (!box) throw new Error('landscape canvas has no bounding box');

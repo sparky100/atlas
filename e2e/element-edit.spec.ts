@@ -92,7 +92,6 @@ test('an owner edits a System attribute on main and sees the new value with its 
     mergedBranchHeadCommitId: null,
     kind: 'manual',
     message: 'seed Billing Service',
-    authorId: userId,
     deltas: [
       {
         kind: 'element.create',
@@ -126,10 +125,14 @@ test('an owner edits a System attribute on main and sees the new value with its 
   // badge (AttributeRow only renders one when a `facts` row exists), not a
   // value patched into local state by hand.
   await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible();
-  await expect(page.getByText('Acme Corp')).toBeVisible();
+  // .first(): the value's accessible text duplicates (the attribute row
+  // plus its provenance badge) — this checks the new value shows up at all.
+  await expect(page.getByText('Acme Corp').first()).toBeVisible();
 
   // Surviving an unrelated full reload proves it round-tripped through
   // Supabase, not just React state left over from the save.
   await page.reload();
-  await expect(page.getByText('Acme Corp')).toBeVisible();
+  // .first(): the value's accessible text duplicates (the attribute row
+  // plus its provenance badge) — this checks the new value shows up at all.
+  await expect(page.getByText('Acme Corp').first()).toBeVisible();
 });

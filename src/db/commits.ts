@@ -16,10 +16,11 @@
  * 20260906090000_facts_and_commit_deltas.sql's module comment for why that
  * split, not a PL/pgSQL reimplementation, was the right call).
  *
- * `orgId`/`createdBy` are gone from `CommitToBranchInput`: the RPC derives
- * `org_id` from `modelId` and `author_id`/`created_by` from `auth.uid()`
- * itself, never from a client-supplied value — there's no longer a
- * parameter here for a caller to even get wrong.
+ * `orgId`/`createdBy` are gone from `CommitToBranchInput`, and (Sprint H1)
+ * `authorId` is gone from `CommitEnvelope` itself: the RPC derives `org_id`
+ * from `modelId` and `author_id`/`created_by`/`facts.asserted_by` from
+ * `auth.uid()` itself, never from a client-supplied value — there's no
+ * longer a parameter anywhere in this path for a caller to even get wrong.
  */
 import type { UUID } from '../contracts/delta';
 import { envelopeToDeltaRows, type CommitRow } from '../contracts/rows';
@@ -31,10 +32,33 @@ import { getBranch } from './branches';
 import type { Client } from './client';
 import { buildCommitLoader } from './commitLoader';
 
+/**
+ * `fold`'s `ctx.authorId` only feeds transient `FactRow` bookkeeping for
+ * the new head being folded locally — nothing about this value is trusted
+ * or persisted. It isn't part of `headHash` (`canonicalizeHead` excludes
+ * `FactRow.authorId`/`createdAt` entirely — src/engine/head.ts), and
+ * `atlas.replace_main_head_projection` (Sprint H1) derives every fact's
+ * real `asserted_by`/`asserted_at` by joining back to `deltas.created_by`/
+ * `deltas.created_at`, not from anything this payload says. This
+ * placeholder is never read back, hashed, or written to the database.
+ */
+const PENDING_AUTHOR_PLACEHOLDER: UUID = 'server-assigned';
+
 export type CommitResult =
   | { ok: true; commitId: UUID }
   | { ok: false; reason: 'invalid'; message: string }
   | { ok: false; reason: 'conflict'; message: string };
+
+/** One `resolved_conflicts` row (ADR-007, SPEC §7.4) to write alongside a resolution commit — `atlas.commit_deltas`'s own `p_resolved_conflicts`, camelCased. */
+export interface ResolvedConflictInput {
+  /** Minted by the caller (S-1), same convention as every other id in this codebase. */
+  id: UUID;
+  winningDeltaId: UUID;
+  discardedDeltaId: UUID;
+  /** The new delta this resolution commit itself asserts, if any — null when the winning side's own delta needed no restatement (not used by this sprint's field-conflict actions, which always write one; kept for a future resolution kind that might not). */
+  resolutionDeltaId: UUID | null;
+  rationale?: string;
+}
 
 export interface CommitToBranchInput {
   modelId: UUID;
@@ -43,6 +67,8 @@ export interface CommitToBranchInput {
   expectedHeadCommitId: UUID;
   /** `envelope.parentCommitId` must equal `expectedHeadCommitId` — both are required, rather than deriving one from the other, so a caller can't accidentally commit against a head it never actually fetched. */
   envelope: CommitEnvelope;
+  /** SPEC §7.4's field-conflict resolution actions: a `resolved_conflicts` row per resolved field, written in the same transaction as this commit. Omitted by every non-merge-review caller. */
+  resolvedConflicts?: ResolvedConflictInput[];
 }
 
 /** Exported for direct unit testing — the only part of commitToBranch that needs no database at all. */
@@ -90,7 +116,7 @@ const CONFLICT_ERROR_CODES = new Set([
  * transaction.
  */
 export async function commitToBranch(supabase: Client, input: CommitToBranchInput): Promise<CommitResult> {
-  const { modelId, branchId, expectedHeadCommitId, envelope } = input;
+  const { modelId, branchId, expectedHeadCommitId, envelope, resolvedConflicts } = input;
 
   const structuralErrors = shapeErrors(envelope, expectedHeadCommitId);
   if (structuralErrors.length > 0) {
@@ -117,7 +143,7 @@ export async function commitToBranch(supabase: Client, input: CommitToBranchInpu
 
   let newHead;
   try {
-    newHead = fold(cloneHead(currentHead), envelope.deltas, { authorId: envelope.authorId, createdAt: new Date().toISOString() });
+    newHead = fold(cloneHead(currentHead), envelope.deltas, { authorId: PENDING_AUTHOR_PLACEHOLDER, createdAt: new Date().toISOString() });
   } catch (e) {
     return { ok: false, reason: 'invalid', message: (e as Error).message };
   }
@@ -150,8 +176,13 @@ export async function commitToBranch(supabase: Client, input: CommitToBranchInpu
   const isMain = branch.kind === 'main';
   const projection = isMain ? serializeHeadProjection(newHead) : null;
 
+  // .schema('atlas'): every RPC this repo calls lives in the atlas schema
+  // (SPEC §2), not public — supabase.rpc() defaults to whatever schema the
+  // client itself is scoped to (public), and PostgREST only resolves an
+  // unqualified RPC name against the schema the request's Accept-Profile
+  // header names, so this override is required, not stylistic.
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.rpc('commit_deltas', {
+  const { data, error } = await supabase.schema('atlas').rpc('commit_deltas', {
     p_commit_id: envelope.id,
     p_model_id: modelId,
     p_branch_id: branchId,
@@ -164,6 +195,14 @@ export async function commitToBranch(supabase: Client, input: CommitToBranchInpu
     p_relationships_head: projection?.relationshipsHead ?? null,
     p_facts: projection?.facts ?? null,
     p_head_hash: isMain ? headHash(newHead) : null,
+    p_resolved_conflicts:
+      resolvedConflicts?.map((rc) => ({
+        id: rc.id,
+        winning_delta_id: rc.winningDeltaId,
+        discarded_delta_id: rc.discardedDeltaId,
+        resolution_delta_id: rc.resolutionDeltaId,
+        rationale: rc.rationale ?? null,
+      })) ?? null,
   } satisfies Record<string, unknown>);
 
   if (error) {

@@ -109,8 +109,19 @@ alter table sources add constraint sources_capability_map_id_fkey foreign key (c
 -- ---------------------------------------------------------------------------
 -- RLS: product content, not tenant content. Readable by every authenticated
 -- user (SPEC §3.10: "Readable by all authenticated users; writable by
--- service role"); no insert/update/delete grant to authenticated at all —
--- the loader runs as service_role, which bypasses RLS entirely.
+-- service role"); no insert/update/delete *policy* for authenticated at
+-- all — the loader (scripts/loadCapabilityMaps.ts) runs as service_role,
+-- which bypasses RLS entirely (BYPASSRLS).
+--
+-- BYPASSRLS only skips policy checks, though — it's not a substitute for
+-- the base table GRANT, which Postgres still enforces first. With this
+-- project's `auto_expose_new_tables = false` (supabase/config.toml), no
+-- role gets an implicit grant on a new table, so service_role needs the
+-- same explicit grant every other role does (Sprint C1-H item 1: the
+-- loader and the capability-map integration test fixture both got
+-- "permission denied for table capability_maps" the first time either
+-- ever ran against a real Supabase — this table has had no working write
+-- path since it was created).
 -- ---------------------------------------------------------------------------
 
 alter table capability_maps enable row level security;
@@ -121,6 +132,7 @@ create policy capability_maps_select on capability_maps
   using (true);
 
 grant select on capability_maps to authenticated;
+grant select, insert, update, delete on capability_maps to service_role;
 
 alter table capability_map_items enable row level security;
 alter table capability_map_items force row level security;
@@ -130,6 +142,7 @@ create policy capability_map_items_select on capability_map_items
   using (true);
 
 grant select on capability_map_items to authenticated;
+grant select, insert, update, delete on capability_map_items to service_role;
 
 alter table capability_map_sources enable row level security;
 alter table capability_map_sources force row level security;
@@ -139,3 +152,4 @@ create policy capability_map_sources_select on capability_map_sources
   using (true);
 
 grant select on capability_map_sources to authenticated;
+grant select, insert, update, delete on capability_map_sources to service_role;

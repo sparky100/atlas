@@ -10,7 +10,19 @@ enabled = true
 port = 54321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
 # endpoints. `public` and `graphql_public` schemas are included by default.
-schemas = ["public", "graphql_public"]
+#
+# `atlas` holds every security-definer RPC the app's write path calls
+# (atlas.commit_deltas, atlas.seed_from_map, the review-queue functions —
+# SPEC-data-model.md §2, this file's own module comment on `[atlas]`
+# elsewhere in this repo) — src/db/*.ts calls them all as
+# `supabase.rpc('commit_deltas', ...)` etc. with no `.schema('atlas')`
+# override, so PostgREST must expose `atlas` directly or none of them are
+# reachable at all (Sprint C1-H item 1: the first real RPC call this
+# codebase ever made against a live PostgREST — `atlas.seed_from_map` from
+# repository.integration.test.ts's own beforeAll — failed with "Could not
+# find the function public.seed_from_map(...) in the schema cache",
+# because nothing had ever actually reached this far before).
+schemas = ["public", "graphql_public", "atlas"]
 # Extra schemas to add to the search_path of every request.
 extra_search_path = ["public", "extensions"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size

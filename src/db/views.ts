@@ -19,6 +19,16 @@ export interface GetOrCreateViewInput {
   kind: ViewKind;
   name: string;
   createdBy: UUID;
+  /**
+   * Which branch's folded state this view renders — `null`/omitted means
+   * `main` (SPEC §3.9). A branch's own As-is/To-be/Diff selector
+   * (UI-principles §6.2) shares *one* view/layout set across all three
+   * modes ("positions come from the same view_layouts rows in all three so
+   * nothing jumps when toggling") and keeps it separate from main's own —
+   * hence keying the get-or-create lookup on `branch_id` too, not folding
+   * a branch's layout into main's.
+   */
+  branchId?: UUID | null;
 }
 
 /**
@@ -32,16 +42,10 @@ export interface GetOrCreateViewInput {
  * "which view" choice to make yet).
  */
 export async function getOrCreateModelView(supabase: Client, input: GetOrCreateViewInput): Promise<ViewRow> {
-  const existing = await supabase
-    .from('views')
-    .select('*')
-    .eq('model_id', input.modelId)
-    .eq('kind', input.kind)
-    .is('scope_element_id', null)
-    .is('branch_id', null)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const branchId = input.branchId ?? null;
+  let query = supabase.from('views').select('*').eq('model_id', input.modelId).eq('kind', input.kind).is('scope_element_id', null);
+  query = branchId ? query.eq('branch_id', branchId) : query.is('branch_id', null);
+  const existing = await query.order('created_at', { ascending: true }).limit(1).maybeSingle();
   if (existing.error) throw new Error(`getOrCreateModelView: ${existing.error.message}`);
   if (existing.data) return existing.data as ViewRow;
 
@@ -52,7 +56,7 @@ export async function getOrCreateModelView(supabase: Client, input: GetOrCreateV
     name: input.name,
     kind: input.kind,
     scope_element_id: null,
-    branch_id: null,
+    branch_id: branchId,
     created_by: input.createdBy,
   };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
@@ -74,16 +78,10 @@ export interface GetOrCreateScopedViewInput extends GetOrCreateViewInput {
  * site can't accidentally pass a scope that the DB would reject anyway.
  */
 export async function getOrCreateScopedView(supabase: Client, input: GetOrCreateScopedViewInput): Promise<ViewRow> {
-  const existing = await supabase
-    .from('views')
-    .select('*')
-    .eq('model_id', input.modelId)
-    .eq('kind', input.kind)
-    .eq('scope_element_id', input.scopeElementId)
-    .is('branch_id', null)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const branchId = input.branchId ?? null;
+  let query = supabase.from('views').select('*').eq('model_id', input.modelId).eq('kind', input.kind).eq('scope_element_id', input.scopeElementId);
+  query = branchId ? query.eq('branch_id', branchId) : query.is('branch_id', null);
+  const existing = await query.order('created_at', { ascending: true }).limit(1).maybeSingle();
   if (existing.error) throw new Error(`getOrCreateScopedView: ${existing.error.message}`);
   if (existing.data) return existing.data as ViewRow;
 
@@ -94,7 +92,7 @@ export async function getOrCreateScopedView(supabase: Client, input: GetOrCreate
     name: input.name,
     kind: input.kind,
     scope_element_id: input.scopeElementId,
-    branch_id: null,
+    branch_id: branchId,
     created_by: input.createdBy,
   };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.

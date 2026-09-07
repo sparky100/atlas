@@ -9,8 +9,10 @@
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { Delta, DeltaKind, LifecycleStatus, UUID } from '../contracts/delta';
+import { ELEMENT_TYPES, RELATIONSHIP_TYPES, type Delta, type DeltaKind, type ElementType, type LifecycleStatus, type RelationshipType, type UUID } from '../contracts/delta';
+import { isRelationshipTripleAllowed, RELATIONSHIP_TYPE_RULES } from '../contracts/relationshipTypeRules';
 import type { Json } from '../contracts/rows';
+import { EngineError } from './errors';
 import { cloneHead, emptyHead, factMapKey, fold, invert, type CommitContext, type Head } from './deltas';
 import { canonicalizeHead, headHash } from './head';
 
@@ -304,6 +306,20 @@ function createSystemDelta(id: UUID, elementId: UUID): Delta {
   };
 }
 
+function createActorDelta(id: UUID, elementId: UUID): Delta {
+  return {
+    kind: 'element.create',
+    id,
+    elementId,
+    elementType: 'actor',
+    name: 'Fixture Actor',
+    parentId: null,
+    attributes: { subtype: 'person', isExternal: false },
+    sourceId: FIXTURE_SOURCE,
+    confidence: 1,
+  };
+}
+
 function createOwnsDelta(id: UUID, relationshipId: UUID): Delta {
   return {
     kind: 'relationship.create',
@@ -316,6 +332,15 @@ function createOwnsDelta(id: UUID, relationshipId: UUID): Delta {
     sourceId: FIXTURE_SOURCE,
     confidence: 1,
   };
+}
+
+/**
+ * `owns`'s endpoints (an actor and a system, C9's allowed triple for `owns`)
+ * folded first — every relationship fixture below needs both to exist
+ * before `createOwnsDelta` can pass apply()'s C9 check (Sprint H1).
+ */
+function ownsEndpointsHead(): Head {
+  return fold(emptyHead(), [createActorDelta('d-actor', 'fixture-actor'), createSystemDelta('d-target', 'fixture-target')], ctx);
 }
 
 const fixturesByKind: Record<DeltaKind, () => KindFixture> = {
@@ -354,12 +379,12 @@ const fixturesByKind: Record<DeltaKind, () => KindFixture> = {
     expectedInverseKind: 'element.retract',
   }),
   'relationship.create': () => ({
-    headBefore: emptyHead(),
+    headBefore: ownsEndpointsHead(),
     delta: createOwnsDelta('d-rcreate', 'rel-1'),
     expectedInverseKind: 'relationship.retract',
   }),
   'relationship.update': () => ({
-    headBefore: fold(emptyHead(), [createOwnsDelta('d-rcreate', 'rel-1')], ctx),
+    headBefore: fold(ownsEndpointsHead(), [createOwnsDelta('d-rcreate', 'rel-1')], ctx),
     delta: {
       kind: 'relationship.update',
       id: 'd-rupdate',
@@ -374,13 +399,13 @@ const fixturesByKind: Record<DeltaKind, () => KindFixture> = {
     expectedInverseKind: 'relationship.update',
   }),
   'relationship.retract': () => ({
-    headBefore: fold(emptyHead(), [createOwnsDelta('d-rcreate', 'rel-1')], ctx),
+    headBefore: fold(ownsEndpointsHead(), [createOwnsDelta('d-rcreate', 'rel-1')], ctx),
     delta: { kind: 'relationship.retract', id: 'd-rretract', relationshipId: 'rel-1', relationshipType: 'owns', previousDeltaId: 'd-rcreate', sourceId: FIXTURE_SOURCE, confidence: 1 },
     expectedInverseKind: 'relationship.restore',
   }),
   'relationship.restore': () => ({
     headBefore: fold(
-      emptyHead(),
+      ownsEndpointsHead(),
       [createOwnsDelta('d-rcreate', 'rel-1'), { kind: 'relationship.retract', id: 'd-rretract', relationshipId: 'rel-1', relationshipType: 'owns', previousDeltaId: 'd-rcreate', sourceId: FIXTURE_SOURCE, confidence: 1 }],
       ctx,
     ),
@@ -442,5 +467,108 @@ describe('canonicalizeHead / headHash', () => {
         expect(canonicalizeHead(h1)).toEqual(canonicalizeHead(h2));
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C9: relationship.create enforces RELATIONSHIP_TYPE_RULES (Sprint H1).
+//
+// Before this sprint, nothing checked this at all — apply() created a
+// relationship between any two elements regardless of type (see
+// docs/AUDIT-2026-09-U2.md §6.2). These tests cover the three angles the
+// sprint asked for: every documented triple is accepted, a sample of
+// non-triples is rejected, and a property test over the full
+// (relationshipType, fromType, toType) space agrees with
+// isRelationshipTripleAllowed exactly, not just on the examples above.
+// ---------------------------------------------------------------------------
+
+describe('C9: relationship.create enforces RELATIONSHIP_TYPE_RULES', () => {
+  function minimalAttributesFor(elementType: ElementType): Record<string, Json> {
+    switch (elementType) {
+      case 'capability':
+        return {};
+      case 'system':
+        return { lifecycleStatus: 'active', isExternal: false };
+      case 'container':
+        return { isExternal: false };
+      case 'component':
+        return {};
+      case 'actor':
+        return { subtype: 'person', isExternal: false };
+    }
+  }
+
+  function elementCreateDelta(id: UUID, elementId: UUID, elementType: ElementType): Delta {
+    return {
+      kind: 'element.create',
+      id,
+      elementId,
+      elementType,
+      name: `Fixture ${elementType}`,
+      parentId: null,
+      attributes: minimalAttributesFor(elementType) as never,
+      sourceId: 'src',
+      confidence: 1,
+    };
+  }
+
+  /** A head with one `fromType` element (`from-el`) and one `toType` element (`to-el`) already created — what C9 needs to look their types up. */
+  function headWithEndpoints(fromType: ElementType, toType: ElementType): Head {
+    return fold(emptyHead(), [elementCreateDelta('d-from', 'from-el', fromType), elementCreateDelta('d-to', 'to-el', toType)], ctx);
+  }
+
+  function relationshipCreateDelta(relationshipType: RelationshipType): Delta {
+    return {
+      kind: 'relationship.create',
+      id: 'd-rel',
+      relationshipId: 'rel-1',
+      relationshipType,
+      fromElementId: 'from-el',
+      toElementId: 'to-el',
+      attributes: (relationshipType === 'owns' ? { primary: true } : {}) as never,
+      sourceId: 'src',
+      confidence: 1,
+    };
+  }
+
+  it('every triple in RELATIONSHIP_TYPE_RULES is accepted', () => {
+    for (const rule of RELATIONSHIP_TYPE_RULES) {
+      const head = headWithEndpoints(rule.fromType, rule.toType);
+      expect(() => fold(head, [relationshipCreateDelta(rule.relationshipType)], ctx)).not.toThrow();
+    }
+  });
+
+  it('a sample of triples not in RELATIONSHIP_TYPE_RULES is rejected, with a message naming C9', () => {
+    const examples: [RelationshipType, ElementType, ElementType][] = [
+      ['uses', 'actor', 'capability'],
+      ['supports', 'capability', 'system'],
+      ['owns', 'system', 'system'],
+      ['flows_to', 'component', 'component'],
+    ];
+    for (const [relationshipType, fromType, toType] of examples) {
+      expect(isRelationshipTripleAllowed(relationshipType, fromType, toType)).toBe(false);
+      const head = headWithEndpoints(fromType, toType);
+      expect(() => fold(head, [relationshipCreateDelta(relationshipType)], ctx)).toThrow(EngineError);
+      expect(() => fold(head, [relationshipCreateDelta(relationshipType)], ctx)).toThrow(/RELATIONSHIP_TYPE_RULES \(C9\)/);
+    }
+  });
+
+  it('property: apply() accepts a triple if and only if it is in RELATIONSHIP_TYPE_RULES, over the whole (relationshipType, fromType, toType) space', () => {
+    fc.assert(
+      fc.property(fc.constantFrom(...RELATIONSHIP_TYPES), fc.constantFrom(...ELEMENT_TYPES), fc.constantFrom(...ELEMENT_TYPES), (relationshipType, fromType, toType) => {
+        const head = headWithEndpoints(fromType, toType);
+        const attempt = () => fold(head, [relationshipCreateDelta(relationshipType)], ctx);
+        if (isRelationshipTripleAllowed(relationshipType, fromType, toType)) {
+          expect(attempt).not.toThrow();
+        } else {
+          expect(attempt).toThrow(EngineError);
+        }
+      }),
+    );
+  });
+
+  it('also rejects when an endpoint does not exist at all, before it can even check the triple', () => {
+    const delta = relationshipCreateDelta('uses');
+    expect(() => fold(emptyHead(), [delta], ctx)).toThrow(/fromElementId .* does not exist/);
   });
 });

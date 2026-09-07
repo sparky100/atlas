@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
-import { getMainBranch } from '../../db/branches';
 import { commitToBranch } from '../../db/commits';
 import { getOrCreateManualSource } from '../../db/sources';
+import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 
 export type CapabilityCreateStatus = 'idle' | 'creating';
@@ -18,21 +18,23 @@ export interface UseCapabilityCreateInput {
   modelId: UUID;
   orgId: UUID;
   userId: UUID | null;
+  /** Which branch this create commits to — see src/ui/elements/useElementEditor.ts's `branch` doc comment (Sprint C1). */
+  branch: BranchRow;
   expectedHeadCommitId: UUID;
   onCreated: () => void;
 }
 
 /**
- * The tailoring flow's "add" action (Sprint U2 step 2): one
- * `element.create` capability delta, restricted — by this hook's own
- * signature, not just by the form calling it — to picking an *existing*
- * capability (or none, for a new top level) as parent. No `code`/
- * `templateRef` on a hand-added capability: those are starter-map
- * provenance (src/contracts/delta.ts's `CapabilityAttributes` doc comment),
- * and a capability added this way was never seeded from one.
+ * The tailoring flow's "add" action (Sprint U2 step 2, generalised beyond
+ * main-only in Sprint C1): one `element.create` capability delta,
+ * restricted — by this hook's own signature, not just by the form calling
+ * it — to picking an *existing* capability (or none, for a new top level)
+ * as parent. No `code`/`templateRef` on a hand-added capability: those are
+ * starter-map provenance (src/contracts/delta.ts's `CapabilityAttributes`
+ * doc comment), and a capability added this way was never seeded from one.
  */
 export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabilityCreateResult {
-  const { modelId, orgId, userId, expectedHeadCommitId, onCreated } = input;
+  const { modelId, orgId, userId, branch, expectedHeadCommitId, onCreated } = input;
   const [status, setStatus] = useState<CapabilityCreateStatus>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -51,9 +53,6 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
       setStatus('creating');
 
       try {
-        const main = await getMainBranch(supabase, modelId);
-        if (!main?.head_commit_id) throw new Error('main branch has no commits yet');
-
         const source = await getOrCreateManualSource(supabase, { id: crypto.randomUUID(), orgId, modelId, userId });
 
         const delta: Delta = {
@@ -70,16 +69,15 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
 
         const envelope: CommitEnvelope = {
           id: crypto.randomUUID(),
-          branchId: main.id,
+          branchId: branch.id,
           parentCommitId: expectedHeadCommitId,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
           message: `Add capability "${trimmed}"`,
-          authorId: userId,
           deltas: [delta],
         };
 
-        const result = await commitToBranch(supabase, { modelId, branchId: main.id, expectedHeadCommitId, envelope });
+        const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });
         if (!result.ok) {
           setStatus('idle');
           setError(
@@ -97,7 +95,7 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
         setError(e instanceof Error ? e.message : 'Could not add capability.');
       }
     },
-    [modelId, orgId, userId, expectedHeadCommitId, onCreated],
+    [modelId, orgId, userId, branch, expectedHeadCommitId, onCreated],
   );
 
   return { status, error, create };

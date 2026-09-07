@@ -20,8 +20,9 @@
  */
 
 import { EXISTS_ATTRIBUTE, type UUID } from '../contracts/delta';
-import type { FieldDiff } from './branch';
+import { threeWayDiff, type FieldDiff, type ThreeWayDiff } from './branch';
 import type { Head } from './deltas';
+import type { CommitLoader } from './head';
 
 export type ConflictClass =
   | 'field-conflict'
@@ -247,4 +248,22 @@ export function classifyMerge(input: MergeClassifyInput, options: MergeClassifyO
   const clean = [...subjectsTouched].filter((id) => !blockingSubjects.has(id) && !identitySubjects.has(id));
 
   return { findings, hasBlockingConflict: findings.some((f) => f.blocking), clean };
+}
+
+export interface MergeReview {
+  threeWay: ThreeWayDiff;
+  classification: MergeClassification;
+}
+
+/**
+ * The review queue's whole computation in one call (Sprint C1 step 7):
+ * `threeWayDiff` then `classifyMerge` on its own output — every caller
+ * that needs a branch's merge review (submitting a request, viewing the
+ * queue, re-checking after a refresh) wants both together, not one without
+ * the other.
+ */
+export function computeMergeReview(branchHeadCommitId: UUID, mainHeadCommitId: UUID, loader: CommitLoader, options: MergeClassifyOptions = {}): MergeReview {
+  const threeWay = threeWayDiff(branchHeadCommitId, mainHeadCommitId, loader);
+  const classification = classifyMerge({ base: threeWay.base, ours: threeWay.ours, theirs: threeWay.theirs, fields: threeWay.fields }, options);
+  return { threeWay, classification };
 }

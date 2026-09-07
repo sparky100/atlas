@@ -1,5 +1,6 @@
 import type { ElementsHeadRow, FactsRow } from '../../../contracts/rows';
 import type { UUID } from '../../../contracts/delta';
+import type { BranchRow } from '../../../db/types';
 import { useElementRename } from '../../elements/useElementRename';
 import { useElementRetract } from '../../elements/useElementRetract';
 import { Button } from '../Button/Button';
@@ -12,6 +13,8 @@ export interface CapabilityTailoringActionsProps {
   userId: UUID | null;
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
+  /** Which branch rename/retract commit to — see useElementEditor.ts's `branch` doc comment (Sprint C1). */
+  branch: BranchRow;
   expectedHeadCommitId: UUID;
   /** Whether the element is a leaf with no live relationships — the only shape `element.retract` can express without a cascade (C8, see useElementRetract's own comment). Retract is hidden, not shown disabled, otherwise. */
   canRetract: boolean;
@@ -26,9 +29,9 @@ export interface CapabilityTailoringActionsProps {
  * name as an alias before it commits (useElementRename's own comment
  * explains why that ordering matters).
  */
-export function CapabilityTailoringActions({ modelId, orgId, userId, element, facts, expectedHeadCommitId, canRetract, onChanged }: CapabilityTailoringActionsProps) {
-  const rename = useElementRename({ modelId, orgId, userId, element, facts, expectedHeadCommitId, onSaved: onChanged });
-  const retract = useElementRetract({ modelId, orgId, userId, element, facts, expectedHeadCommitId, onRetracted: onChanged });
+export function CapabilityTailoringActions({ modelId, orgId, userId, element, facts, branch, expectedHeadCommitId, canRetract, onChanged }: CapabilityTailoringActionsProps) {
+  const rename = useElementRename({ modelId, orgId, userId, element, facts, branch, expectedHeadCommitId, onSaved: onChanged });
+  const retract = useElementRetract({ modelId, orgId, userId, element, facts, branch, expectedHeadCommitId, onRetracted: onChanged });
 
   function confirmRetract(): void {
     if (window.confirm(`Retract "${element.name}"? This removes it from the model — it can be restored later, but it will disappear from every view until then.`)) {

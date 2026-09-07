@@ -7,6 +7,9 @@ import { useAuth } from '../auth/useAuth';
 import { useModels } from '../models/useModels';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
+import { parseViewMode } from '../../db/viewMode';
+import { BranchViewModeControl } from '../branches/BranchViewModeControl';
+import { useBranchLabel } from '../branches/useBranchLabel';
 import { StructureView } from '../structureView/StructureView';
 import { useStructureView } from '../structureView/useStructureView';
 import { parseCapabilityParam } from '../nav/zoomParams';
@@ -20,8 +23,9 @@ import styles from './ViewPage.module.css';
  */
 export function ComponentPage() {
   const { orgSlug, modelSlug, containerId } = useParams<{ orgSlug: string; modelSlug: string; containerId: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const ref = parseRefParam(searchParams.get('ref'));
+  const mode = parseViewMode(searchParams.get('mode'));
   const capabilityId = parseCapabilityParam(searchParams.get('capability'));
   const { userId } = useAuth();
 
@@ -29,8 +33,9 @@ export function ComponentPage() {
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
   const capability = useBreadcrumbElement(model?.id ?? '', ref, capabilityId);
+  const { label: branchLabel } = useBranchLabel(ref);
 
-  const state = useStructureView('component', model?.id ?? '', organisation?.id ?? '', userId, containerId ?? '', ref);
+  const state = useStructureView('component', model?.id ?? '', organisation?.id ?? '', userId, containerId ?? '', ref, mode);
   const systemId = state.status === 'ready' ? state.data.group.parent.parent_id : null;
   const system = useBreadcrumbElement(model?.id ?? '', ref, systemId);
 
@@ -62,7 +67,7 @@ export function ComponentPage() {
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
-          refLabel={refLabelOf(ref)}
+          refLabel={refLabelOf(ref, branchLabel)}
           segments={segments}
         />
         <div className={styles.header}>
@@ -70,6 +75,19 @@ export function ComponentPage() {
             Components
           </Text>
         </div>
+
+        {ref.kind === 'branch' && (
+          <BranchViewModeControl
+            mode={mode}
+            onChange={(next) => {
+              setSearchParams((prev) => {
+                const updated = new URLSearchParams(prev);
+                updated.set('mode', next);
+                return updated;
+              });
+            }}
+          />
+        )}
 
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
@@ -81,7 +99,7 @@ export function ComponentPage() {
             </Text>
           </Panel>
         )}
-        {state.status === 'ready' && <StructureView kind="component" group={state.data.group} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} refParam={refParam} />}
+        {state.status === 'ready' && <StructureView kind="component" group={state.data.group} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} refParam={refParam} diff={state.data.diff} />}
       </main>
     </div>
   );

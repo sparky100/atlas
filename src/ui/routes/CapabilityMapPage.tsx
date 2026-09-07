@@ -3,6 +3,7 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import { useMainBranch } from '../branches/useMainBranch';
 import { useModels } from '../models/useModels';
 import { canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -37,6 +38,7 @@ export function CapabilityMapPage() {
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const canEdit = ref.kind === 'main' && canEditOnMain(role);
+  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
 
   const { state, reload } = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref);
 
@@ -80,7 +82,9 @@ export function CapabilityMapPage() {
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}
             refParam={refParam}
-            addCapability={canEdit ? { modelId: model.id, orgId: organisation?.id ?? '', userId, expectedHeadCommitId: state.data.commitId, onCreated: reload } : undefined}
+            addCapability={
+              canEdit && mainBranch ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: mainBranch, expectedHeadCommitId: state.data.commitId, onCreated: reload } : undefined
+            }
           />
         )}
       </main>

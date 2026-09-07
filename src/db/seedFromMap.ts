@@ -119,8 +119,10 @@ export async function seedModelFromCapabilityMap(supabase: Client, input: SeedMo
   const head = fold(cloneHead(emptyHead()), deltas, { authorId, createdAt: new Date().toISOString() });
   const projection = serializeHeadProjection(head);
 
+  // .schema('atlas'): this RPC lives in the atlas schema (SPEC §2), not
+  // public — see src/db/commits.ts's own note on why this is required.
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.rpc('seed_from_map', {
+  const { data, error } = await supabase.schema('atlas').rpc('seed_from_map', {
     p_commit_id: commitId,
     p_model_id: modelId,
     p_branch_id: branchId,

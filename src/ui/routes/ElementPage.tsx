@@ -1,7 +1,7 @@
 import { useParams, useSearchParams } from 'react-router';
 import { ATTRIBUTE_SCHEMA_BY_TYPE } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
-import type { SourceRow } from '../../db/types';
+import type { BranchRow, SourceRow } from '../../db/types';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { AttributeEditRow } from '../components/AttributeEditRow/AttributeEditRow';
 import { AttributeRow } from '../components/AttributeRow/AttributeRow';
@@ -18,8 +18,9 @@ import { RelationshipsSection } from '../components/RelationshipGroup/Relationsh
 import { StructureSection } from '../components/StructureSection/StructureSection';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import { useEditingBranch } from '../branches/useEditingBranch';
 import { useModels } from '../models/useModels';
-import { canEditOnMain, useMembership } from '../orgs/useMembership';
+import { canEditBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
 import { elementBreadcrumbSegments } from '../nav/elementBreadcrumbSegments';
@@ -35,7 +36,20 @@ import styles from './ElementPage.module.css';
  * at no extra cost. Sprint U1 step 5 makes `Edit` (§4.2) real: owner/
  * architect, at `main`, editing attribute values — see
  * src/ui/elements/useElementEditor.ts for what that does and doesn't cover
- * yet. Decisions and comments have no backing table yet (`decisions`/
+ * yet.
+ *
+ * Sprint C1 step 9 closes a gap left open since step 4: `useElementEditor`
+ * (and `useElementRetract`/`useElementRename`/`CapabilityTailoringActions`)
+ * were already generalised to take any `branch: BranchRow`, but this page
+ * kept feeding them `useMainBranch()` regardless of `?ref=` — so "editing
+ * while a change is selected writes deltas to the branch" (the user's
+ * Sprint C1 brief) had no real path to a change branch at all until now.
+ * `useEditingBranch` (src/ui/branches/useEditingBranch.ts) resolves the
+ * right branch row for the current ref and `canEditBranch` (not
+ * `canEditOnMain`) gates `Edit` for either main or a draft change branch,
+ * per its own role rules.
+ *
+ * Decisions and comments have no backing table yet (`decisions`/
  * `comments` — deferred to Sprints D1/M1, per the user's own step 3a
  * decision) and say so plainly rather than rendering SPEC's designed
  * empty-state copy for a feature that doesn't exist yet.
@@ -52,7 +66,8 @@ export function ElementPage() {
   const { role } = useMembership(organisation?.id ?? null, userId);
 
   const { state, reload } = useElementPage(model?.id ?? '', elementId ?? '', ref);
-  const canEdit = ref.kind === 'main' && canEditOnMain(role);
+  const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
+  const canEdit = editingBranch !== null && canEditBranch(role, editingBranch);
 
   const data = state.status === 'ready' ? state.data : null;
   const editor = useElementEditor({
@@ -61,6 +76,7 @@ export function ElementPage() {
     userId,
     element: data?.element ?? PLACEHOLDER_ELEMENT,
     facts: data?.facts ?? EMPTY_FACTS,
+    branch: editingBranch ?? PLACEHOLDER_BRANCH,
     expectedHeadCommitId: data?.commitId ?? '',
     onSaved: reload,
   });
@@ -113,6 +129,7 @@ export function ElementPage() {
                 userId={userId}
                 element={state.data.element}
                 facts={state.data.facts}
+                branch={editingBranch}
                 expectedHeadCommitId={state.data.commitId}
                 canRetract={state.data.children.length === 0 && state.data.relationships.length === 0}
                 onChanged={reload}
@@ -171,6 +188,27 @@ const EMPTY_FACTS = new Map<string, FactsRow>();
 // render, not conditionally — always has an ElementsHeadRow to close over
 // while data is still loading.
 const PLACEHOLDER_ELEMENT: ElementsHeadRow = { element_id: '', element_type: 'system', name: '', parent_id: null, attributes: {}, exists_delta_id: '' };
+// Same reasoning as PLACEHOLDER_ELEMENT above: the editing hooks need a
+// branch to close over on every render, including before useEditingBranch has
+// resolved one — canEdit gates the affordance itself, so this is never
+// actually committed to.
+const PLACEHOLDER_BRANCH: BranchRow = {
+  id: '',
+  org_id: '',
+  model_id: '',
+  name: '',
+  kind: 'main',
+  status: 'draft',
+  base_commit_id: null,
+  head_commit_id: null,
+  shared_for_review: false,
+  title: null,
+  description: null,
+  target_date: null,
+  split_from: null,
+  created_by: '',
+  updated_at: '',
+};
 
 function AttributesTable({ element, facts, sources }: { element: ElementsHeadRow; facts: Map<string, FactsRow>; sources: Map<string, SourceRow> }) {
   const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type];

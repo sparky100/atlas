@@ -1,17 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
+import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff, VersionDiffState } from '../../engine/versionDiff';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/elementTypeGlyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { NODE_HEIGHT, NODE_WIDTH, type LandscapeLayout } from './layout';
 import { quantizeScale } from './zoom';
 import styles from './LandscapeCanvas.module.css';
 
+const DIFF_MARKER: Record<VersionDiffState, string> = { unchanged: '', added: '+', removed: '−', changed: '~', moved: '⤴' };
+
 export interface LandscapeCanvasProps {
   layout: LandscapeLayout;
   systemsById: Map<UUID, ElementsHeadRow>;
   edges: RelationshipsHeadRow[];
+  /** UI-principles §6.2/§6.3 — present only when a branch's Diff mode is active; `null` for `main`/`tag` and for As-is/To-be, where there's nothing to highlight against. */
+  diff?: VersionDiff | null;
   /** Where clicking a node navigates to — Sprint U2 step 3's zoom chain: a system's next level down is its Context view, not its element page directly (UI-principles §2.1's "semantic zoom", as a discrete link). Takes the clicked system's id. */
   nodeHref: (elementId: UUID) => string;
 }
@@ -40,6 +45,10 @@ interface CanvasTokens {
   text: string;
   textMuted: string;
   accent: string;
+  diffNone: string;
+  diffAdded: string;
+  diffRemoved: string;
+  diffChanged: string;
 }
 
 function readTokens(el: HTMLElement): CanvasTokens {
@@ -52,7 +61,36 @@ function readTokens(el: HTMLElement): CanvasTokens {
     text: v('--text'),
     textMuted: v('--text-muted'),
     accent: v('--accent'),
+    diffNone: v('--diff-none'),
+    diffAdded: v('--diff-added'),
+    diffRemoved: v('--diff-removed'),
+    diffChanged: v('--diff-changed'),
   };
+}
+
+/** The node's own diff border colour (§6.3's colour token column) — `null` for `unchanged`, which uses the same neutral border every non-diff render already draws. */
+function diffBorderColour(state: VersionDiffState, tokens: CanvasTokens): string | null {
+  if (state === 'added') return tokens.diffAdded;
+  if (state === 'removed') return tokens.diffRemoved;
+  if (state === 'changed' || state === 'moved') return tokens.diffChanged;
+  return null;
+}
+
+/** §6.3's "hatched, 50% opacity" removed-node fill — a small diagonal-stripe pattern, tiled. */
+function createHatchPattern(ctx: CanvasRenderingContext2D, colour: string): CanvasPattern | null {
+  const tile = document.createElement('canvas');
+  tile.width = 8;
+  tile.height = 8;
+  const tileCtx = tile.getContext('2d');
+  if (!tileCtx) return null;
+  tileCtx.strokeStyle = colour;
+  tileCtx.globalAlpha = 0.5;
+  tileCtx.lineWidth = 2;
+  tileCtx.beginPath();
+  tileCtx.moveTo(0, 8);
+  tileCtx.lineTo(8, 0);
+  tileCtx.stroke();
+  return ctx.createPattern(tile, 'repeat');
 }
 
 function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
@@ -118,14 +156,28 @@ function rectIntersects(rect: WorldRect, x: number, y: number, w: number, h: num
  * the landscape's next level down (UI-principles §2.1); the element page
  * itself is one link away from there. `+`/`-`/`0` (§8.8's canvas key
  * table) zoom/fit, which this does implement.
+ *
+ * Diff highlighting (Sprint C1, §6.3): `diff`, when given, is looked up per
+ * node/edge id for its added/removed/changed/moved/unchanged state — the
+ * colour token, marker glyph and border style all come from that one state,
+ * together, never colour alone (§6.3's own rule, checked here the same way
+ * `DiffBadge` already checks it for the list-based version diff). A `moved`
+ * system (parent changed) draws the same as `changed` — systems have no
+ * meaningful landscape "parent" to draw a ghost against (their only
+ * position is a swim lane, not a nested frame), so the `⤴` marker still
+ * fires but §6.3's "ghost at the old position" doesn't apply here the way
+ * it would on a nested view.
  */
-export function LandscapeCanvas({ layout, systemsById, edges, nodeHref }: LandscapeCanvasProps) {
+export function LandscapeCanvas({ layout, systemsById, edges, diff = null, nodeHref }: LandscapeCanvasProps) {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [transform, setTransform] = useState<Transform>({ scale: 1, tx: 0, ty: 0 });
   const [hover, setHover] = useState<HoverState | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; startTransform: Transform; moved: boolean } | null>(null);
+
+  const diffByElementId = useMemo(() => new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []), [diff]);
+  const diffByRelationshipId = useMemo(() => new Map<UUID, RelationshipVersionDiff>(diff?.relationships.map((r) => [r.relationshipId, r]) ?? []), [diff]);
 
   const nodeAt = useCallback(
     (screenX: number, screenY: number): UUID | null => {
@@ -183,11 +235,10 @@ export function LandscapeCanvas({ layout, systemsById, edges, nodeHref }: Landsc
         ctx.stroke();
       }
 
+      const edgeMarkers: { text: string; worldX: number; worldY: number; colour: string }[] = [];
       if (edgeScreenWidth >= 0.25) {
         const positionById = new Map(layout.nodes.map((n) => [n.elementId, n]));
         const simplified = edgeScreenWidth < 0.5;
-        ctx.strokeStyle = tokens.borderStrong;
-        ctx.lineWidth = simplified ? 1 / transform.scale : 1.5;
         for (const edge of edges) {
           const from = positionById.get(edge.from_element_id);
           const to = positionById.get(edge.to_element_id);
@@ -195,6 +246,15 @@ export function LandscapeCanvas({ layout, systemsById, edges, nodeHref }: Landsc
           const left = Math.min(from.x, to.x);
           const top = Math.min(from.y, to.y);
           if (!rectIntersects(visible, left, top, Math.abs(from.x - to.x) + NODE_WIDTH, Math.abs(from.y - to.y) + NODE_HEIGHT)) continue;
+
+          const edgeDiff = diffByRelationshipId.get(edge.relationship_id);
+          const edgeState = edgeDiff?.state ?? 'unchanged';
+          const diffColour = diff && edgeState !== 'unchanged' ? diffBorderColour(edgeState, tokens) : null;
+          ctx.save();
+          ctx.strokeStyle = diffColour ?? tokens.borderStrong;
+          ctx.lineWidth = simplified ? 1 / transform.scale : 1.5;
+          ctx.globalAlpha = diff && edgeState === 'unchanged' ? 0.6 : 1;
+          if (edgeState === 'removed') ctx.setLineDash([6, 4]);
 
           const fromCx = from.x + NODE_WIDTH / 2;
           const fromCy = from.y + NODE_HEIGHT / 2;
@@ -204,16 +264,24 @@ export function LandscapeCanvas({ layout, systemsById, edges, nodeHref }: Landsc
           ctx.moveTo(fromCx, fromCy);
           ctx.lineTo(toCx, toCy);
           ctx.stroke();
+          ctx.setLineDash([]);
+
+          if (diff && (edgeState === 'added' || edgeState === 'changed') && !simplified) {
+            edgeMarkers.push({ text: edgeState === 'added' ? '+' : '~', worldX: (fromCx + toCx) / 2, worldY: (fromCy + toCy) / 2, colour: diffColour ?? tokens.text });
+          }
+
           // "Aggregated": below the 0.5px tier, a plain hairline with no
           // arrowhead stands in for what would otherwise be a dense tangle
           // of individually-indistinguishable direction markers.
-          if (simplified) continue;
+          if (simplified) {
+            ctx.restore();
+            continue;
+          }
           // One arrowhead, direction-only semantics (UI-principles §9) —
           // never a per-relationship-type marker style.
           const angle = Math.atan2(toCy - fromCy, toCx - fromCx);
           const arrowX = toCx - Math.cos(angle) * (NODE_WIDTH / 2);
           const arrowY = toCy - Math.sin(angle) * (NODE_HEIGHT / 2);
-          ctx.save();
           ctx.translate(arrowX, arrowY);
           ctx.rotate(angle);
           ctx.beginPath();
@@ -221,29 +289,55 @@ export function LandscapeCanvas({ layout, systemsById, edges, nodeHref }: Landsc
           ctx.lineTo(-8, -4);
           ctx.lineTo(-8, 4);
           ctx.closePath();
-          ctx.fillStyle = tokens.borderStrong;
+          ctx.fillStyle = diffColour ?? tokens.borderStrong;
           ctx.fill();
           ctx.restore();
         }
       }
 
       const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number }[] = [];
+      const diffMarkers: { text: string; worldX: number; worldY: number; colour: string }[] = [];
       for (const node of layout.nodes) {
         if (!rectIntersects(visible, node.x, node.y, NODE_WIDTH, NODE_HEIGHT)) continue;
         const system = systemsById.get(node.elementId);
         if (!system) continue;
         const external = attributesRecord(system.attributes).isExternal === true;
         const isHovered = hover?.elementId === node.elementId;
+        const nodeDiff = diffByElementId.get(node.elementId);
+        const nodeState = nodeDiff?.state ?? 'unchanged';
+        const diffColour = diff ? diffBorderColour(nodeState, tokens) : null;
+
+        ctx.save();
+        ctx.globalAlpha = diff && nodeState === 'unchanged' ? 0.6 : 1;
         roundRectPath(ctx, node.x, node.y, NODE_WIDTH, NODE_HEIGHT, 8);
-        ctx.fillStyle = tokens.surfaceRaised;
-        ctx.fill();
-        ctx.strokeStyle = isHovered ? tokens.accent : tokens.borderStrong;
-        ctx.lineWidth = isHovered ? 2 : 1;
-        if (external) ctx.setLineDash([4, 3]);
+        if (diff && nodeState === 'removed') {
+          const pattern = createHatchPattern(ctx, tokens.diffRemoved);
+          ctx.fillStyle = tokens.surfaceRaised;
+          ctx.fill();
+          if (pattern) {
+            roundRectPath(ctx, node.x, node.y, NODE_WIDTH, NODE_HEIGHT, 8);
+            ctx.fillStyle = pattern;
+            ctx.fill();
+          }
+        } else if (diff && diffColour) {
+          ctx.fillStyle = `color-mix(in srgb, ${diffColour} 12%, ${tokens.surfaceRaised})`;
+          ctx.fill();
+        } else {
+          ctx.fillStyle = tokens.surfaceRaised;
+          ctx.fill();
+        }
+        ctx.strokeStyle = diffColour ?? (isHovered ? tokens.accent : tokens.borderStrong);
+        ctx.lineWidth = diffColour ? 2 : isHovered ? 2 : 1;
+        if (nodeState === 'removed' || (external && !diffColour)) ctx.setLineDash([4, 3]);
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.restore();
 
         if (showLabels) nodeLabels.push({ glyph: elementTypeGlyph('system'), name: system.name, worldX: node.x, worldY: node.y });
+        if (diff && DIFF_MARKER[nodeState] !== '') {
+          const label = nodeState === 'changed' ? `${DIFF_MARKER[nodeState]}${String(nodeDiff?.changedAttributes.length ?? 0)}` : DIFF_MARKER[nodeState];
+          diffMarkers.push({ text: label, worldX: node.x + 4, worldY: node.y + 4, colour: diffColour ?? tokens.text });
+        }
       }
 
       ctx.restore();
@@ -253,7 +347,7 @@ export function LandscapeCanvas({ layout, systemsById, edges, nodeHref }: Landsc
       // fixed on-screen size within a zoom step, not scale continuously
       // with the gesture the way node geometry does, so it can't share the
       // world-transformed pass above.
-      if (laneLabels.length > 0 || nodeLabels.length > 0) {
+      if (laneLabels.length > 0 || nodeLabels.length > 0 || diffMarkers.length > 0 || edgeMarkers.length > 0) {
         const textScale = quantizeScale(transform.scale, MIN_SCALE, MAX_SCALE);
         const toScreen = (worldX: number, worldY: number): [number, number] => [worldX * transform.scale + transform.tx, worldY * transform.scale + transform.ty];
         ctx.textBaseline = 'middle';
@@ -275,6 +369,22 @@ export function LandscapeCanvas({ layout, systemsById, edges, nodeHref }: Landsc
           const truncated = truncate(ctx, label.name, (NODE_WIDTH - 34) * textScale);
           ctx.fillText(truncated, x + 30 * textScale, y + screenNodeHeight / 2);
         }
+
+        // §6.3's "+"/"−"/"~N"/"⤴" badges — a small filled circle behind the
+        // glyph so it reads against any node/edge colour underneath, node
+        // markers top-left of the node, edge markers at the edge's midpoint.
+        ctx.font = `${(11 * textScale).toFixed(2)}px sans-serif`;
+        ctx.textAlign = 'center';
+        for (const marker of [...diffMarkers, ...edgeMarkers]) {
+          const [x, y] = toScreen(marker.worldX, marker.worldY);
+          ctx.beginPath();
+          ctx.arc(x, y, 8 * textScale, 0, Math.PI * 2);
+          ctx.fillStyle = marker.colour;
+          ctx.fill();
+          ctx.fillStyle = tokens.surfaceRaised;
+          ctx.fillText(marker.text, x, y + 1);
+        }
+        ctx.textAlign = 'left';
       }
     }
 
@@ -284,7 +394,7 @@ export function LandscapeCanvas({ layout, systemsById, edges, nodeHref }: Landsc
     return () => {
       observer.disconnect();
     };
-  }, [layout, edges, systemsById, transform, hover]);
+  }, [layout, edges, systemsById, diff, diffByElementId, diffByRelationshipId, transform, hover]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -348,6 +458,8 @@ export function LandscapeCanvas({ layout, systemsById, edges, nodeHref }: Landsc
   }
 
   const hoveredSystem = hover ? systemsById.get(hover.elementId) : undefined;
+  // §6.3: "Hover on any marker shows the changed attributes" — base -> new isn't shown here (the canvas has no per-field value, only the diff's element-grain summary); the element page's own history is where that detail lives.
+  const hoveredDiff = diff && hover ? diffByElementId.get(hover.elementId) : undefined;
 
   return (
     <div ref={wrapperRef} className={styles.wrapper} style={{ height: 520 }}>
@@ -370,6 +482,7 @@ export function LandscapeCanvas({ layout, systemsById, edges, nodeHref }: Landsc
         <div className={styles.tooltip} style={{ left: hover.screenX, top: hover.screenY }}>
           {hoveredSystem.name}
           {attributesRecord(hoveredSystem.attributes).isExternal === true ? ' (external)' : ''}
+          {hoveredDiff && hoveredDiff.state !== 'unchanged' && hoveredDiff.changedAttributes.length > 0 && ` — changed: ${hoveredDiff.changedAttributes.join(', ')}`}
         </div>
       )}
     </div>

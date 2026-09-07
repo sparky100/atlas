@@ -100,6 +100,15 @@ green in CI before calling the sprint done). This is a real open question,
 not a rounding error, and it's surfaced here for confirmation rather than
 resolved unilaterally.
 
+**Closed, Sprint H1 item 6 (docs/AUDIT-2026-09-U2.md §7.3's open-questions
+review flagged this as never having been answered in a doc): option (a).**
+`CLAUDE.md`'s Playwright-smoke bullet now says so explicitly — suspended
+for a sprint with no UI at all, not replaced with a substitute, and in
+full force for every sprint from the first one that ships UI onward. In
+practice this was already how the team behaved (Sprint U1 shipped real
+Playwright specs the moment there was UI to test), so this closes the
+question to match what already happened, not to change course.
+
 ## Docs updated
 
 - `docs/SPEC-data-model.md` §5.3 has been updated: it originally sketched

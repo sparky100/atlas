@@ -1,8 +1,10 @@
 import { Link } from 'react-router';
 import type { RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
+import type { ElementVersionDiff, VersionDiff } from '../../engine/versionDiff';
 import { Chip } from '../components/Chip/Chip';
 import { LinkButton } from '../components/Button/LinkButton';
+import { DiffBadge } from '../components/DiffBadge/DiffBadge';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
@@ -15,7 +17,10 @@ export interface ContextViewProps {
   orgSlug: string;
   modelSlug: string;
   refParam: string;
+  /** UI-principles §6.2/§6.3 — present only when a branch's Diff mode is active. This DOM view reuses `DiffBadge` (the same pill src/ui/versions/VersionDiffView.tsx already renders) rather than §6.3's canvas-specific border/fill/ghost treatment, which is written for shapes on a canvas, not list rows. */
+  diff?: VersionDiff | null;
 }
+
 
 /**
  * The Context view's renderer (UI-principles §6.1: "one system, every
@@ -35,10 +40,12 @@ export interface ContextViewProps {
  * form that is, per §8.7, already its own accessible view (a list), not a
  * diagram standing in need of one.
  */
-export function ContextView({ group, orgSlug, modelSlug, refParam }: ContextViewProps) {
+export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }: ContextViewProps) {
   const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?ref=${refParam}`;
   const containersHref = `/o/${orgSlug}/m/${modelSlug}/container/${group.hub.element_id}?ref=${refParam}`;
   const hubExternal = attributesRecord(group.hub.attributes).isExternal === true;
+  const diffById = new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []);
+  const hubDiff = diffById.get(group.hub.element_id);
 
   return (
     <div>
@@ -51,6 +58,7 @@ export function ContextView({ group, orgSlug, modelSlug, refParam }: ContextView
             </Text>
           </Link>
           {hubExternal && <Chip tone="neutral">external</Chip>}
+          {diff && hubDiff && <DiffBadge state={hubDiff.state} changedCount={hubDiff.state === 'changed' ? hubDiff.changedAttributes.length : undefined} />}
         </div>
         {/* The one "descend a level" affordance this view offers (UI-principles §2.1's semantic zoom, as a discrete link rather than a continuous gesture this sprint doesn't build — see CapabilityMapView's own "→ Landscape" link for the same pattern one level up). */}
         <LinkButton to={containersHref} variant="secondary">
@@ -76,7 +84,7 @@ export function ContextView({ group, orgSlug, modelSlug, refParam }: ContextView
             <Text as="h2" size="sm" tone="muted" className={styles.groupTitle}>
               Connections
             </Text>
-            <NeighbourList neighbours={group.internal} hubId={group.hub.element_id} elementHref={elementHref} />
+            <NeighbourList neighbours={group.internal} hubId={group.hub.element_id} elementHref={elementHref} diffById={diff ? diffById : null} />
           </div>
         )}
         {group.external.length > 0 && (
@@ -84,7 +92,7 @@ export function ContextView({ group, orgSlug, modelSlug, refParam }: ContextView
             <Text as="h2" size="sm" tone="muted" className={styles.groupTitle}>
               External
             </Text>
-            <NeighbourList neighbours={group.external} hubId={group.hub.element_id} elementHref={elementHref} />
+            <NeighbourList neighbours={group.external} hubId={group.hub.element_id} elementHref={elementHref} diffById={diff ? diffById : null} />
           </div>
         )}
       </div>
@@ -98,11 +106,12 @@ function edgeLabel(edge: RelationshipsHeadRow, hubId: UUID): string {
   return outbound ? 'uses →' : '← used by';
 }
 
-function NeighbourList({ neighbours, hubId, elementHref }: { neighbours: ContextNeighbour[]; hubId: UUID; elementHref: (id: UUID) => string }) {
+function NeighbourList({ neighbours, hubId, elementHref, diffById }: { neighbours: ContextNeighbour[]; hubId: UUID; elementHref: (id: UUID) => string; diffById: Map<UUID, ElementVersionDiff> | null }) {
   return (
     <ul className={styles.neighbours}>
       {neighbours.map((neighbour) => {
         const external = attributesRecord(neighbour.element.attributes).isExternal === true;
+        const neighbourDiff = diffById?.get(neighbour.element.element_id);
         return (
           <li key={neighbour.element.element_id} className={styles.neighbour}>
             <div className={styles.neighbourTitle}>
@@ -110,6 +119,7 @@ function NeighbourList({ neighbours, hubId, elementHref }: { neighbours: Context
               <Link to={elementHref(neighbour.element.element_id)}>
                 <Text as="span">{neighbour.element.name}</Text>
               </Link>
+              {diffById && neighbourDiff && <DiffBadge state={neighbourDiff.state} changedCount={neighbourDiff.state === 'changed' ? neighbourDiff.changedAttributes.length : undefined} />}
             </div>
             <Text as="span" size="sm" tone="muted">
               {neighbour.edges.map((edge) => edgeLabel(edge, hubId)).join(', ')}

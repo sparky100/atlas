@@ -33,3 +33,22 @@ export async function getOrCreateManualSource(supabase: Client, input: GetOrCrea
   if (error) throw new Error(`getOrCreateManualSource: ${error.message}`);
   return data as SourceRow;
 }
+
+export interface CreateMergeResolutionSourceInput {
+  /** Minted by the caller — a fresh row every refresh, not a per-user singleton like `manual`'s (no unique index backs a "one per user" claim for this kind, and a resolution's provenance is naturally scoped to the one refresh commit it belongs to, not a standing source a reviewer's other actions would also attach to). */
+  id: UUID;
+  orgId: UUID;
+  modelId: UUID;
+  createdBy: UUID;
+  /** Shown in a provenance badge's hover card (§4.3) — name the branch so "where did this come from" reads as a specific event, not just "a merge". */
+  branchTitle: string;
+}
+
+/** One `merge_resolution` source per refresh commit (SPEC §7.4) — every resolution delta the refresh writes shares it. `sources_insert`'s RLS (20260906162100_merge_resolution_source.sql) requires `user_id` null for this kind, unlike `manual`. */
+export async function createMergeResolutionSource(supabase: Client, input: CreateMergeResolutionSourceInput): Promise<SourceRow> {
+  const row = { id: input.id, org_id: input.orgId, model_id: input.modelId, kind: 'merge_resolution' as const, name: `Merge resolution — ${input.branchTitle}`, created_by: input.createdBy };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.from('sources').insert(row).select('*').single();
+  if (error) throw new Error(`createMergeResolutionSource: ${error.message}`);
+  return data as SourceRow;
+}
