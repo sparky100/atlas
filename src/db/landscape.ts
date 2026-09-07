@@ -22,21 +22,24 @@ export async function listSystemsForLandscape(supabase: Client, commitId: UUID):
 
 /**
  * `uses`/`flows_to` relationships between two Systems — the landscape's
- * edges. Chaining `.in()` twice ANDs the two clauses (postgrest-js's default
- * combinator across separate filter calls), so this asks for exactly "both
- * endpoints are in `systemIds`," not "either endpoint is."
+ * edges. Sprint C1-H item 1d (SPEC §6.7): this used to add
+ * `.in('from_element_id', systemIds).in('to_element_id', systemIds)` on top
+ * of the commit/type scoping, which put every system id in the model
+ * straight into the request URL — landscape-perf.spec.ts's 2,000-system
+ * fixture turned that into a ~70KB+ GET request a proxy/server rejects
+ * outright (400s, `net::ERR_FAILED`), not a slow query. Fetching every
+ * `uses`/`flows_to` edge at this commit and narrowing to `systemIds` in
+ * memory instead fetches the same order of magnitude of rows (a commit's
+ * whole edge set either way, `capabilityId`'s filter notwithstanding) with
+ * no id ever crossing the wire in the request itself.
  */
 export async function listLandscapeEdges(supabase: Client, commitId: UUID, systemIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
   if (systemIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from('relationships_head')
-    .select(RELATIONSHIPS_HEAD_COLUMNS)
-    .eq('commit_id', commitId)
-    .in('relationship_type', ['uses', 'flows_to'])
-    .in('from_element_id', systemIds)
-    .in('to_element_id', systemIds);
+  const ids = new Set(systemIds);
+  const { data, error } = await supabase.from('relationships_head').select(RELATIONSHIPS_HEAD_COLUMNS).eq('commit_id', commitId).in('relationship_type', ['uses', 'flows_to']);
   if (error) throw new Error(`listLandscapeEdges: ${error.message}`);
-  return data;
+  const rows = data as RelationshipsHeadRow[];
+  return rows.filter((r) => ids.has(r.from_element_id) && ids.has(r.to_element_id));
 }
 
 /**
@@ -47,10 +50,16 @@ export async function listLandscapeEdges(supabase: Client, commitId: UUID, syste
  * `supports`, unlike `owns`'s single-primary-owner rule) but a swim lane is
  * a single bucket — src/ui/landscape/layout.ts picks one deterministically
  * rather than this query silently returning "the" lane per system.
+ *
+ * Same Sprint C1-H item 1d rewrite as `listLandscapeEdges` above, and for
+ * the identical reason: fetch every `supports` edge at this commit, narrow
+ * to `systemIds` in memory, rather than putting the id list in the request.
  */
 export async function listSupportsEdgesForSystems(supabase: Client, commitId: UUID, systemIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
   if (systemIds.length === 0) return [];
-  const { data, error } = await supabase.from('relationships_head').select(RELATIONSHIPS_HEAD_COLUMNS).eq('commit_id', commitId).eq('relationship_type', 'supports').in('from_element_id', systemIds);
+  const ids = new Set(systemIds);
+  const { data, error } = await supabase.from('relationships_head').select(RELATIONSHIPS_HEAD_COLUMNS).eq('commit_id', commitId).eq('relationship_type', 'supports');
   if (error) throw new Error(`listSupportsEdgesForSystems: ${error.message}`);
-  return data;
+  const rows = data as RelationshipsHeadRow[];
+  return rows.filter((r) => ids.has(r.from_element_id));
 }

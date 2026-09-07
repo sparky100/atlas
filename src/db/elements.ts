@@ -13,6 +13,7 @@
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow, DeltaRow } from '../contracts/rows';
 import type { UUID } from '../contracts/delta';
 import type { Client } from './client';
+import { assertInFilterSize } from './inFilterLimit';
 import type { AliasRow, BranchRow, SourceRow } from './types';
 
 const ELEMENTS_HEAD_COLUMNS = 'element_id, element_type, name, parent_id, attributes, exists_delta_id';
@@ -61,6 +62,7 @@ export async function listRelationshipsForElement(supabase: Client, commitId: UU
 /** Batch lookup so a page with N badges makes one query, not N (§4.9's paint budget). */
 export async function getElementsByIds(supabase: Client, commitId: UUID, elementIds: readonly UUID[]): Promise<Map<UUID, ElementsHeadRow>> {
   if (elementIds.length === 0) return new Map();
+  assertInFilterSize('getElementsByIds', 'element_id', elementIds);
   const { data, error } = await supabase.from('elements_head').select(ELEMENTS_HEAD_COLUMNS).eq('commit_id', commitId).in('element_id', elementIds);
   if (error) throw new Error(`getElementsByIds: ${error.message}`);
   const rows = data as ElementsHeadRow[];
@@ -69,6 +71,7 @@ export async function getElementsByIds(supabase: Client, commitId: UUID, element
 
 export async function getSourcesByIds(supabase: Client, sourceIds: readonly UUID[]): Promise<Map<UUID, SourceRow>> {
   if (sourceIds.length === 0) return new Map();
+  assertInFilterSize('getSourcesByIds', 'id', sourceIds);
   const { data, error } = await supabase.from('sources').select('*').in('id', sourceIds);
   if (error) throw new Error(`getSourcesByIds: ${error.message}`);
   const rows = data as SourceRow[];
@@ -123,11 +126,13 @@ export async function listInFlightBranchesTouchingSubject(supabase: Client, mode
   const commitIds = [...new Set((deltaRows as { commit_id: UUID }[]).map((row) => row.commit_id))];
   if (commitIds.length === 0) return [];
 
+  assertInFilterSize('listInFlightBranchesTouchingSubject', 'id (commits)', commitIds);
   const { data: commitRows, error: commitError } = await supabase.from('commits').select('branch_id').in('id', commitIds);
   if (commitError) throw new Error(`listInFlightBranchesTouchingSubject: ${commitError.message}`);
   const branchIds = [...new Set((commitRows as { branch_id: UUID }[]).map((row) => row.branch_id))];
   if (branchIds.length === 0) return [];
 
+  assertInFilterSize('listInFlightBranchesTouchingSubject', 'id (branches)', branchIds);
   const { data: branchRows, error: branchError } = await supabase
     .from('branches')
     .select('*')
@@ -149,16 +154,19 @@ export async function listInFlightBranchesTouchingSubject(supabase: Client, mode
  */
 export async function listInFlightBranchesTouchingSubjects(supabase: Client, modelId: UUID, subjectIds: readonly UUID[], excludeBranchId: UUID): Promise<BranchRow[]> {
   if (subjectIds.length === 0) return [];
+  assertInFilterSize('listInFlightBranchesTouchingSubjects', 'subject_id', subjectIds);
   const { data: deltaRows, error: deltaError } = await supabase.from('deltas').select('commit_id').eq('model_id', modelId).in('subject_id', subjectIds);
   if (deltaError) throw new Error(`listInFlightBranchesTouchingSubjects: ${deltaError.message}`);
   const commitIds = [...new Set((deltaRows as { commit_id: UUID }[]).map((row) => row.commit_id))];
   if (commitIds.length === 0) return [];
 
+  assertInFilterSize('listInFlightBranchesTouchingSubjects', 'id (commits)', commitIds);
   const { data: commitRows, error: commitError } = await supabase.from('commits').select('branch_id').in('id', commitIds);
   if (commitError) throw new Error(`listInFlightBranchesTouchingSubjects: ${commitError.message}`);
   const branchIds = [...new Set((commitRows as { branch_id: UUID }[]).map((row) => row.branch_id))].filter((id) => id !== excludeBranchId);
   if (branchIds.length === 0) return [];
 
+  assertInFilterSize('listInFlightBranchesTouchingSubjects', 'id (branches)', branchIds);
   const { data: branchRows, error: branchError } = await supabase
     .from('branches')
     .select('*')
