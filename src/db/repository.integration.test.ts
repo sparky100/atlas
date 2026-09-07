@@ -53,35 +53,8 @@ async function createSignedInUser(label: string): Promise<TestUser> {
   if (createError) throw new Error(`createSignedInUser(${label}): ${createError.message}`);
 
   const signIn = createSupabaseClient(env);
-  const { data: signedIn, error: signInError } = await signIn.auth.signInWithPassword({ email, password });
+  const { error: signInError } = await signIn.auth.signInWithPassword({ email, password });
   if (signInError) throw new Error(`createSignedInUser(${label}) sign-in: ${signInError.message}`);
-
-  // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once the organisations
-  // RLS failure is root-caused): decode the access token's own claims
-  // without verification, purely to compare against created.user.id and see
-  // what role/exp this real GoTrue instance actually issued.
-  const jwtPayload = signedIn.session.access_token.split('.')[1] ?? '';
-  const claims = JSON.parse(Buffer.from(jwtPayload, 'base64').toString('utf8')) as Record<string, unknown>;
-  const { data: sessionCheck } = await signIn.auth.getSession();
-  const diag = {
-    createdUserId: created.user.id,
-    jwtSub: claims.sub,
-    jwtRole: claims.role,
-    jwtAud: claims.aud,
-    jwtExp: claims.exp,
-    nowSeconds: Math.floor(Date.now() / 1000),
-    getSessionHasSession: sessionCheck.session !== null,
-    getSessionTokenMatches: sessionCheck.session?.access_token === signedIn.session.access_token,
-  };
-  console.log(`[diag ${label}]`, JSON.stringify(diag));
-
-  // TEMPORARY (Sprint C1-H item 1 diagnostic, see supabase/migrations/
-  // 20260906163000_debug_whoami.sql — delete both once root-caused): what
-  // does Postgres itself see for this exact session, server-side? A
-  // verification failure at PostgREST would leave the client-side decode
-  // above none the wiser, so this is the other half of the picture.
-  const { data: whoami, error: whoamiError } = await signIn.rpc('debug_whoami');
-  console.log(`[diag ${label} server]`, whoamiError ? `error: ${whoamiError.message}` : JSON.stringify(whoami));
 
   return { id: created.user.id, email, client: signIn };
 }
@@ -110,22 +83,6 @@ describe('repository layer against a real local Supabase', () => {
 
     orgId = randomUUID();
     orgSlug = `test-council-${orgId.slice(0, 8)}`;
-
-    // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once root-caused):
-    // re-check whoami on alice.client at the exact point of the failing
-    // call, and log the exact row about to be inserted, to rule out any
-    // drift between createSignedInUser's own diagnostic and here.
-    const { data: whoamiNow, error: whoamiNowError } = await alice.client.rpc('debug_whoami');
-    console.log(`[diag alice pre-insert]`, whoamiNowError ? `error: ${whoamiNowError.message}` : JSON.stringify(whoamiNow));
-    console.log(`[diag alice insert row]`, JSON.stringify({ id: orgId, name: 'Test Council', slug: orgSlug, created_by: alice.id }));
-    const { data: tryInsert, error: tryInsertError } = await alice.client.rpc('debug_try_insert_org', {
-      p_id: randomUUID(),
-      p_name: 'Debug Council',
-      p_slug: `debug-council-${randomUUID().slice(0, 8)}`,
-      p_created_by: alice.id,
-    });
-    console.log(`[diag alice try-insert-via-rpc]`, tryInsertError ? `error: ${tryInsertError.message}` : JSON.stringify(tryInsert));
-
     // Through src/db/organisations.ts, not a raw insert — Sprint U1 step 2's
     // repository layer is exactly what real app code calls.
     await createOrganisation(alice.client, { id: orgId, name: 'Test Council', slug: orgSlug, createdBy: alice.id });

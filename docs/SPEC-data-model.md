@@ -1009,9 +1009,16 @@ $$;
 alter table organisations enable row level security;
 alter table organisations force row level security;
 
+-- `or created_by = auth.uid()`: a creator can always see the organisation
+-- they just created, true by construction (the trigger below makes them
+-- its owner in the same transaction) — needed because
+-- `.insert(row).select('*').single()` requires the inserted row to satisfy
+-- this SELECT policy at RETURNING time, before that trigger has run
+-- (Sprint C1-H item 1; the RETURNING-time check raises the same "new row
+-- violates row-level security policy" error a failed WITH CHECK would).
 create policy organisations_select on organisations
   for select to authenticated
-  using (atlas.is_member(id));
+  using (atlas.is_member(id) or created_by = auth.uid());
 
 -- Anyone signed in may create an org; a trigger makes them its owner.
 create policy organisations_insert on organisations
