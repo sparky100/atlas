@@ -786,6 +786,12 @@ The materialiser is trusted only because these three equalities are checked:
 
 Order-independence (P-3) is a second obligation: for commits whose delta fact-key sets are disjoint, applying them in either order yields the same `head_hash`. This is what makes `topo`'s tie-break irrelevant for correctness and only relevant for determinism.
 
+### 6.7 Reading a materialised head at scale
+
+`elements_head`/`relationships_head`/`facts` are keyed `(commit_id, ...)` (§3.5) — every read of them is already scoped to one commit. A read that also needs "only these particular subjects" (an element's own relationships, a landscape's edges among its systems) must not add that second scoping by handing an arbitrary, caller-sized id list to postgrest-js's `.in()`: `.in()` is sent as a GET query parameter, so its URL grows with the list — Sprint C1-H item 1 found this concretely (`docs/AUDIT-2026-09-C1.md` §1.4): a 2,000-system landscape's edge query, `.in('from_element_id', systemIds).in('to_element_id', systemIds)`, produced a ~70KB+ URL that a proxy/server rejects outright (400/`ERR_FAILED`), not a slow query — the read never completed at all.
+
+**Rule:** a `.in()` filter whose value list is caller-supplied and can grow with model size (element/subject/source/branch/commit ids — anything that isn't a small fixed enum like a status or type list) must stay at or under 50 values. `src/db/inFilterLimit.ts`'s `assertInFilterSize` enforces this at the point of call — a call site over the limit is a bug to fix, not a query to let run and hope stays small in practice. The fix is the same shape every time (`src/db/landscape.ts`'s `listLandscapeEdges`/`listSupportsEdgesForSystems`, rewritten this item): query the commit/model scope alone — no id-list filter at all — and narrow to the wanted subjects client-side, in memory, after the round trip. This trades a WHERE clause for a client-side `Set.has` filter; the row count fetched is the same order of magnitude either way (a commit's whole relationship set, not a per-subject slice), so this is a request-shape fix, not a data-volume one.
+
 ---
 
 ## 7. Merge algorithm
