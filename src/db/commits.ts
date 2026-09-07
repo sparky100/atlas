@@ -176,8 +176,13 @@ export async function commitToBranch(supabase: Client, input: CommitToBranchInpu
   const isMain = branch.kind === 'main';
   const projection = isMain ? serializeHeadProjection(newHead) : null;
 
+  // .schema('atlas'): every RPC this repo calls lives in the atlas schema
+  // (SPEC §2), not public — supabase.rpc() defaults to whatever schema the
+  // client itself is scoped to (public), and PostgREST only resolves an
+  // unqualified RPC name against the schema the request's Accept-Profile
+  // header names, so this override is required, not stylistic.
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.rpc('commit_deltas', {
+  const { data, error } = await supabase.schema('atlas').rpc('commit_deltas', {
     p_commit_id: envelope.id,
     p_model_id: modelId,
     p_branch_id: branchId,

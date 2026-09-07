@@ -382,7 +382,7 @@ describe('repository layer against a real local Supabase', () => {
       // the earlier "a contributor cannot create a model" test) — this is
       // the exact scenario that caught atlas.has_role returning NULL, not
       // false, for a non-member (see the migration's own comment).
-      const { error } = await bob.client.rpc('commit_deltas', {
+      const { error } = await bob.client.schema('atlas').rpc('commit_deltas', {
         p_commit_id: randomUUID(),
         p_model_id: modelId,
         p_branch_id: mainBranchId,
@@ -398,7 +398,7 @@ describe('repository layer against a real local Supabase', () => {
       const { error: inviteError } = await alice.client.from('members').insert({ org_id: orgId, user_id: bob.id, role: 'contributor', invited_by: alice.id });
       if (inviteError) throw new Error(`inviting bob as contributor: ${inviteError.message}`);
 
-      const { error } = await bob.client.rpc('commit_deltas', {
+      const { error } = await bob.client.schema('atlas').rpc('commit_deltas', {
         p_commit_id: randomUUID(),
         p_model_id: modelId,
         p_branch_id: mainBranchId,
@@ -414,7 +414,7 @@ describe('repository layer against a real local Supabase', () => {
     });
 
     it("commit_deltas rejects kind 'capture' on main (Sprint H1 item 3: only manual/merge/template_seed are allowed there)", async () => {
-      const { error } = await alice.client.rpc('commit_deltas', {
+      const { error } = await alice.client.schema('atlas').rpc('commit_deltas', {
         p_commit_id: randomUUID(),
         p_model_id: modelId,
         p_branch_id: mainBranchId,
@@ -436,7 +436,7 @@ describe('repository layer against a real local Supabase', () => {
         mainHeadCommitId: mainGenesisCommitId,
       });
       for (const kind of ['capture', 'template_seed']) {
-        const { error } = await alice.client.rpc('commit_deltas', {
+        const { error } = await alice.client.schema('atlas').rpc('commit_deltas', {
           p_commit_id: randomUUID(),
           p_model_id: modelId,
           p_branch_id: branch.id,
@@ -458,7 +458,7 @@ describe('repository layer against a real local Supabase', () => {
         createdBy: alice.id,
         mainHeadCommitId: mainGenesisCommitId,
       });
-      const { data, error } = await alice.client.rpc('commit_deltas', {
+      const { data, error } = await alice.client.schema('atlas').rpc('commit_deltas', {
         p_commit_id: randomUUID(),
         p_model_id: modelId,
         p_branch_id: branch.id,
@@ -575,7 +575,7 @@ describe('repository layer against a real local Supabase', () => {
       });
 
       const requestId = randomUUID();
-      const { data, error } = await alice.client.rpc('submit_merge_request', {
+      const { data, error } = await alice.client.schema('atlas').rpc('submit_merge_request', {
         p_id: requestId,
         p_branch_id: branch.id,
         p_classification: { hasBlockingConflict: false },
@@ -584,7 +584,7 @@ describe('repository layer against a real local Supabase', () => {
       expect(data).toMatchObject({ id: requestId, branch_id: branch.id, status: 'pending' });
       expect((await getBranch(alice.client, branch.id))?.status).toBe('proposed');
 
-      const { error: resubmitError } = await alice.client.rpc('submit_merge_request', { p_id: randomUUID(), p_branch_id: branch.id, p_classification: {} });
+      const { error: resubmitError } = await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: randomUUID(), p_branch_id: branch.id, p_classification: {} });
       expect(resubmitError).not.toBeNull();
     });
 
@@ -600,14 +600,14 @@ describe('repository layer against a real local Supabase', () => {
         mainHeadCommitId: main.head_commit_id,
       });
       const requestId = randomUUID();
-      await alice.client.rpc('submit_merge_request', { p_id: requestId, p_branch_id: branch.id, p_classification: { hasBlockingConflict: true } });
+      await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: requestId, p_branch_id: branch.id, p_classification: { hasBlockingConflict: true } });
 
-      const { error: blockedError } = await alice.client.rpc('approve_merge_request', { p_merge_request_id: requestId });
+      const { error: blockedError } = await alice.client.schema('atlas').rpc('approve_merge_request', { p_merge_request_id: requestId });
       expect(blockedError).not.toBeNull();
 
       const { error: inviteError } = await alice.client.from('members').insert({ org_id: orgId, user_id: bob.id, role: 'contributor', invited_by: alice.id });
       if (inviteError) throw new Error(`inviting bob: ${inviteError.message}`);
-      const { error: contributorError } = await bob.client.rpc('approve_merge_request', { p_merge_request_id: requestId });
+      const { error: contributorError } = await bob.client.schema('atlas').rpc('approve_merge_request', { p_merge_request_id: requestId });
       expect(contributorError).not.toBeNull();
       const { error: removeError } = await alice.client.from('members').delete().eq('org_id', orgId).eq('user_id', bob.id);
       if (removeError) throw new Error(`removing bob: ${removeError.message}`);
@@ -646,14 +646,14 @@ describe('repository layer against a real local Supabase', () => {
       if (!branchAfterCommit?.head_commit_id) throw new Error('branch has no head after commit');
 
       const requestId = randomUUID();
-      const { error: submitError } = await alice.client.rpc('submit_merge_request', {
+      const { error: submitError } = await alice.client.schema('atlas').rpc('submit_merge_request', {
         p_id: requestId,
         p_branch_id: branch.id,
         p_classification: { hasBlockingConflict: false },
       });
       expect(submitError).toBeNull();
 
-      const { error: approveError } = await alice.client.rpc('approve_merge_request', { p_merge_request_id: requestId });
+      const { error: approveError } = await alice.client.schema('atlas').rpc('approve_merge_request', { p_merge_request_id: requestId });
       expect(approveError).toBeNull();
 
       // The final merge carries zero deltas (SPEC §7.1: once mergeBase(B) ==
@@ -665,7 +665,7 @@ describe('repository layer against a real local Supabase', () => {
       const projection = serializeHeadProjection(mergedHead);
       const mergeCommitId = randomUUID();
 
-      const { data: mergeData, error: mergeError } = await alice.client.rpc('merge_branch', {
+      const { data: mergeData, error: mergeError } = await alice.client.schema('atlas').rpc('merge_branch', {
         p_merge_request_id: requestId,
         p_commit_id: mergeCommitId,
         p_message: 'merge full-merge-path',
@@ -725,7 +725,7 @@ describe('repository layer against a real local Supabase', () => {
       // §7.4's field-conflict actions describe.
       const winningDeltaId = randomUUID();
       const mergeCommitId = randomUUID();
-      const { data: refreshCommit, error: refreshError } = await alice.client.rpc('commit_deltas', {
+      const { data: refreshCommit, error: refreshError } = await alice.client.schema('atlas').rpc('commit_deltas', {
         p_commit_id: mergeCommitId,
         p_model_id: modelId,
         p_branch_id: branch.id,
@@ -774,8 +774,8 @@ describe('repository layer against a real local Supabase', () => {
         mainHeadCommitId: main.head_commit_id,
       });
       const requestId = randomUUID();
-      await alice.client.rpc('submit_merge_request', { p_id: requestId, p_branch_id: branch.id, p_classification: { hasBlockingConflict: false } });
-      const { error: approveError } = await alice.client.rpc('approve_merge_request', { p_merge_request_id: requestId });
+      await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: requestId, p_branch_id: branch.id, p_classification: { hasBlockingConflict: false } });
+      const { error: approveError } = await alice.client.schema('atlas').rpc('approve_merge_request', { p_merge_request_id: requestId });
       expect(approveError).toBeNull();
 
       // Move main directly (as owner), out from under the already-approved
@@ -796,7 +796,7 @@ describe('repository layer against a real local Supabase', () => {
       });
       expect(mainMoveResult).toMatchObject({ ok: true });
 
-      const { data: mergeData, error: mergeError } = await alice.client.rpc('merge_branch', {
+      const { data: mergeData, error: mergeError } = await alice.client.schema('atlas').rpc('merge_branch', {
         p_merge_request_id: requestId,
         p_commit_id: randomUUID(),
         p_message: 'stale merge attempt',
@@ -823,8 +823,8 @@ describe('repository layer against a real local Supabase', () => {
         mainHeadCommitId: main.head_commit_id,
       });
       const requestA = randomUUID();
-      await alice.client.rpc('submit_merge_request', { p_id: requestA, p_branch_id: branchA.id, p_classification: {} });
-      const { error: rcError } = await alice.client.rpc('request_changes', { p_merge_request_id: requestA, p_review_notes: 'please split the retract out' });
+      await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: requestA, p_branch_id: branchA.id, p_classification: {} });
+      const { error: rcError } = await alice.client.schema('atlas').rpc('request_changes', { p_merge_request_id: requestA, p_review_notes: 'please split the retract out' });
       expect(rcError).toBeNull();
       expect((await getBranch(alice.client, branchA.id))?.status).toBe('draft');
       const { data: reqARow, error: reqAError } = await service.from('merge_requests').select('status, review_notes').eq('id', requestA).single();
@@ -840,8 +840,8 @@ describe('repository layer against a real local Supabase', () => {
         mainHeadCommitId: main.head_commit_id,
       });
       const requestB = randomUUID();
-      await alice.client.rpc('submit_merge_request', { p_id: requestB, p_branch_id: branchB.id, p_classification: {} });
-      const { error: rejectError } = await alice.client.rpc('reject_merge_request', { p_merge_request_id: requestB, p_review_notes: 'superseded' });
+      await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: requestB, p_branch_id: branchB.id, p_classification: {} });
+      const { error: rejectError } = await alice.client.schema('atlas').rpc('reject_merge_request', { p_merge_request_id: requestB, p_review_notes: 'superseded' });
       expect(rejectError).toBeNull();
       expect((await getBranch(alice.client, branchB.id))?.status).toBe('rejected');
     });

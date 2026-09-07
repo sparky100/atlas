@@ -20,6 +20,11 @@
  * with no resolutions of its own and resubmit. The review UI names this
  * explicitly on structural-conflict cards rather than silently omitting
  * their actions.
+ *
+ * Every RPC below is called via `.schema('atlas')`: these functions live
+ * in the atlas schema (SPEC §2), not public, and `supabase.rpc()` on its
+ * own only ever resolves against whatever schema the client is scoped to
+ * (public by default) — see src/db/commits.ts's own note on this.
  */
 import type { CommitEnvelope, Delta, UUID } from '../contracts/delta';
 import { foldFromGenesis, headHash } from '../engine/head';
@@ -88,7 +93,7 @@ function classificationJson(review: MergeReview): Record<string, unknown> {
 
 export async function submitMergeRequest(supabase: Client, id: UUID, branchId: UUID, review: MergeReview): Promise<MergeRequestRow> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.rpc('submit_merge_request', { p_id: id, p_branch_id: branchId, p_classification: classificationJson(review) });
+  const { data, error } = await supabase.schema('atlas').rpc('submit_merge_request', { p_id: id, p_branch_id: branchId, p_classification: classificationJson(review) });
   if (error) throw new Error(`submitMergeRequest: ${error.message}`);
   return data as MergeRequestRow;
 }
@@ -96,7 +101,7 @@ export async function submitMergeRequest(supabase: Client, id: UUID, branchId: U
 /** Reopens an open request for edits (SPEC §7.4's implementation note) — a reviewer asking for changes, or the requester themselves reopening a stale/conflicted request to fix it. Moves the request to `changes_requested` and its branch back to `draft`. */
 export async function requestChanges(supabase: Client, mergeRequestId: UUID, reviewNotes?: string): Promise<MergeRequestRow> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.rpc('request_changes', { p_merge_request_id: mergeRequestId, p_review_notes: reviewNotes ?? null });
+  const { data, error } = await supabase.schema('atlas').rpc('request_changes', { p_merge_request_id: mergeRequestId, p_review_notes: reviewNotes ?? null });
   if (error) throw new Error(`requestChanges: ${error.message}`);
   return data as MergeRequestRow;
 }
@@ -104,21 +109,21 @@ export async function requestChanges(supabase: Client, mergeRequestId: UUID, rev
 /** `changes_requested` -> `pending` with a refreshed cached classification (this step's own `atlas.resubmit_merge_request`, `20260906162000_resubmit_merge_request.sql`) — the "at each refresh" half of SPEC §7.4's "cached at request and at each refresh" that plain `submit_merge_request` can't do on an already-open row. */
 export async function resubmitMergeRequest(supabase: Client, mergeRequestId: UUID, review: MergeReview): Promise<MergeRequestRow> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.rpc('resubmit_merge_request', { p_merge_request_id: mergeRequestId, p_classification: classificationJson(review) });
+  const { data, error } = await supabase.schema('atlas').rpc('resubmit_merge_request', { p_merge_request_id: mergeRequestId, p_classification: classificationJson(review) });
   if (error) throw new Error(`resubmitMergeRequest: ${error.message}`);
   return data as MergeRequestRow;
 }
 
 export async function approveMergeRequest(supabase: Client, mergeRequestId: UUID): Promise<MergeRequestRow> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.rpc('approve_merge_request', { p_merge_request_id: mergeRequestId });
+  const { data, error } = await supabase.schema('atlas').rpc('approve_merge_request', { p_merge_request_id: mergeRequestId });
   if (error) throw new Error(`approveMergeRequest: ${error.message}`);
   return data as MergeRequestRow;
 }
 
 export async function rejectMergeRequest(supabase: Client, mergeRequestId: UUID, reviewNotes?: string): Promise<MergeRequestRow> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.rpc('reject_merge_request', { p_merge_request_id: mergeRequestId, p_review_notes: reviewNotes ?? null });
+  const { data, error } = await supabase.schema('atlas').rpc('reject_merge_request', { p_merge_request_id: mergeRequestId, p_review_notes: reviewNotes ?? null });
   if (error) throw new Error(`rejectMergeRequest: ${error.message}`);
   return data as MergeRequestRow;
 }
@@ -144,7 +149,7 @@ export async function mergeApprovedRequest(supabase: Client, modelId: UUID, merg
   const projection = serializeHeadProjection(mergedHead);
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.rpc('merge_branch', {
+  const { data, error } = await supabase.schema('atlas').rpc('merge_branch', {
     p_merge_request_id: mergeRequestId,
     p_commit_id: crypto.randomUUID(),
     p_message: message,

@@ -45,7 +45,9 @@ export async function rebuildHead(serviceRoleClient: Client, modelId: UUID): Pro
   const head = foldFromGenesis(main.head_commit_id, loader);
   const projection = serializeHeadProjection(head);
 
-  const { error } = await serviceRoleClient.rpc('replace_main_head_projection', {
+  // .schema('atlas'): this RPC lives in the atlas schema (SPEC §2), not
+  // public — see src/db/commits.ts's own note on why this is required.
+  const { error } = await serviceRoleClient.schema('atlas').rpc('replace_main_head_projection', {
     p_org_id: main.org_id,
     p_model_id: modelId,
     // Same commit_id on both sides: this isn't advancing the head to a new
