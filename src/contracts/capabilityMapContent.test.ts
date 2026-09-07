@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCapabilityMapContent } from './capabilityMapContent';
+import { LEGACY_SECTOR_ALIASES, parseCapabilityMapContent, SECTORS } from './capabilityMapContent';
 
 interface MutableItem {
   code: string;
@@ -19,7 +19,7 @@ interface MutableContent {
 
 function validContent(): MutableContent {
   return {
-    sector: 'local_government',
+    sector: 'local_government_scotland',
     version: 1,
     status: 'draft',
     sourceDescription: 'A test map',
@@ -83,5 +83,35 @@ describe('parseCapabilityMapContent', () => {
     const content = validContent();
     content.items = [];
     expect(() => parseCapabilityMapContent(content, 'test.json')).toThrow();
+  });
+
+  // The sector list is the contract's, not a database CHECK's, as of
+  // 20260906180000_capability_maps_sector_taxonomy_in_code.sql — so this
+  // is the round-trip test rule 1 asks for: every canonical value parses,
+  // and the value the database used to accept but the contract retired
+  // ('generic', renamed public_body) no longer does.
+  describe('sectors (taxonomy in code)', () => {
+    it.each(SECTORS)('accepts canonical sector %s unchanged', (sector) => {
+      const content = validContent();
+      content.sector = sector;
+      expect(parseCapabilityMapContent(content, 'test.json').sector).toBe(sector);
+    });
+
+    it('parses the deprecated local_government alias as local_government_scotland', () => {
+      const content = validContent();
+      content.sector = 'local_government';
+      expect(parseCapabilityMapContent(content, 'test.json').sector).toBe('local_government_scotland');
+      expect(LEGACY_SECTOR_ALIASES.local_government).toBe('local_government_scotland');
+    });
+
+    it("rejects the retired 'generic' sector (renamed public_body, not aliased)", () => {
+      const content = validContent();
+      content.sector = 'generic';
+      expect(() => parseCapabilityMapContent(content, 'test.json')).toThrow();
+    });
+
+    it('lists exactly the eight sectors the starter content covers', () => {
+      expect([...SECTORS]).toEqual(['local_government_scotland', 'local_government_england', 'nhs', 'housing', 'hei', 'public_body', 'utility', 'electricity_network']);
+    });
   });
 });

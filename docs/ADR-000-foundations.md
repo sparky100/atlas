@@ -273,7 +273,7 @@ Free-form annotation (callouts, highlights, arrows drawn directly on a diagram f
 
 **Context.** Sector starter maps need their own versioning and provenance, independent of any one organisation's model, and tailoring them shouldn't sever the link back to the source.
 
-**Decision.** `capability_map_templates`: `id`, `sector` (`local_government`/`nhs`/`housing`/`hei`/`generic`), `version`, `published_at`, `source_description`, `status` (`draft`/`published`/`deprecated`). `capability_map_template_items`: `id`, `template_id`, `code`, `name`, `description`, `level`, `parent_code` (nullable).
+**Decision.** `capability_map_templates`: `id`, `sector` (one of `src/contracts/capabilityMapContent.ts`'s `SECTORS` — `local_government_scotland`, `local_government_england`, `nhs`, `housing`, `hei`, `public_body`, `utility`, `electricity_network`; the list lives in the contract, not a database CHECK, per ADR-001's taxonomy-in-code — amended from the original five, where `local_government` was Scottish-authority-shaped and is now a deprecated alias for `local_government_scotland`, and `generic` was renamed `public_body`), `version`, `published_at`, `source_description`, `status` (`draft`/`published`/`deprecated`). `capability_map_template_items`: `id`, `template_id`, `code`, `name`, `description`, `level`, `parent_code` (nullable).
 
 Applying a template to an organisation's model is a `template_seed`-kind commit whose deltas are ordinary `create` deltas with `source = template:{template_id}:{version}` and `confidence = high` — a curated reference, not an AI guess, but still an ordinary, auditable fact per ADR-007, not a special-cased import path.
 
