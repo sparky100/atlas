@@ -492,7 +492,11 @@ describe('repository layer against a real local Supabase', () => {
 
       const { data: headRows, error } = await service.from('elements_head').select('element_id, name').eq('commit_id', mainCommitId);
       if (error) throw new Error(`reading elements_head: ${error.message}`);
-      expect(headRows).toMatchObject([{ element_id: mainElementId, name: 'Tenant Portal' }]);
+      // elements_head is the *whole* materialised head at this commit, not
+      // just what this commit itself added — it also carries the genesis
+      // seed's two capability elements (Root/Child Capability) alongside
+      // the one this test just created.
+      expect(headRows).toContainEqual({ element_id: mainElementId, name: 'Tenant Portal' });
 
       // Sprint H1 item 4 (docs/AUDIT-2026-09-U2.md §2.E.3 item 1): facts.org_id/
       // model_id are backfilled/populated columns now, not absent — every fact
@@ -737,6 +741,7 @@ describe('repository layer against a real local Supabase', () => {
             id: winningDeltaId,
             kind: 'element_update',
             subject_id: elementId,
+            element_type: 'system',
             attribute: 'name',
             value: 'Resolved Name',
             previous_delta_id: losingDeltaId,

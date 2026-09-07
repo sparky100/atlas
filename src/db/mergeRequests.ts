@@ -159,7 +159,13 @@ export async function mergeApprovedRequest(supabase: Client, modelId: UUID, merg
     p_head_hash: headHash(mergedHead),
   });
   if (error) return { ok: false, reason: 'error', message: error.message };
-  if (data === null) {
+  // atlas.merge_branch's `returns commits` means its own `return null;` for
+  // the stale case doesn't reach here as a bare JSON null — PostgREST
+  // serialises a NULL composite as a row of null columns instead
+  // (confirmed against a real instance, Sprint C1-H item 1). Checking the
+  // row's own primary key for null is what actually detects "no commit was
+  // made," in both this shape and a true null, robust to either.
+  if (data === null || (data as { id: UUID | null }).id === null) {
     return { ok: false, reason: 'refresh_required', message: 'main advanced since this request was approved — it has been returned to pending for another look.' };
   }
   return { ok: true, commitId: (data as { id: UUID }).id };
