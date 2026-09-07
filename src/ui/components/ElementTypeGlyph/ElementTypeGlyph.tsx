@@ -1,5 +1,5 @@
 import type { ActorSubtype, ElementType } from '../../../contracts/delta';
-import { elementTypeGlyph } from './elementTypeGlyph';
+import { elementTypeGlyph } from './glyph';
 import styles from './ElementTypeGlyph.module.css';
 
 export interface ElementTypeGlyphProps {
