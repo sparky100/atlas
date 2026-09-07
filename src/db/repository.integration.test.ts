@@ -75,6 +75,14 @@ async function createSignedInUser(label: string): Promise<TestUser> {
   };
   console.log(`[diag ${label}]`, JSON.stringify(diag));
 
+  // TEMPORARY (Sprint C1-H item 1 diagnostic, see supabase/migrations/
+  // 20260906163000_debug_whoami.sql — delete both once root-caused): what
+  // does Postgres itself see for this exact session, server-side? A
+  // verification failure at PostgREST would leave the client-side decode
+  // above none the wiser, so this is the other half of the picture.
+  const { data: whoami, error: whoamiError } = await signIn.rpc('debug_whoami');
+  console.log(`[diag ${label} server]`, whoamiError ? `error: ${whoamiError.message}` : JSON.stringify(whoami));
+
   return { id: created.user.id, email, client: signIn };
 }
 
