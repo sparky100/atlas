@@ -25,6 +25,18 @@ import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
 
 test('create a change, edit it on its own branch, view it, submit, approve, and merge', async ({ page }) => {
   const env = loadEnv();
+  // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once root-caused):
+  // useElementEditor.ts's save() sets a visible submitError and leaves the
+  // form open (status stays 'editing', so ✎ Edit never reappears) on a
+  // failed commit — surface that text plus any console/page error if the
+  // edit below doesn't complete in time, instead of a bare "not found".
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') console.log(`[diag page console error] ${msg.text()}`);
+  });
+  page.on('pageerror', (err) => {
+    console.log(`[diag page error] ${err.message}`);
+  });
+
   const fixture = await bootstrapChangeBranchFixture(page, env, 'cbmerge', 'Billing Service');
   const { orgSlug, modelSlug, systemId } = fixture;
 
@@ -61,7 +73,13 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   // default 5s expect timeout is tight for a freshly-started local
   // Supabase's first real request; the overall 30s test timeout is the
   // real backstop.
-  await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible({ timeout: 15_000 });
+  try {
+    await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible({ timeout: 15_000 });
+  } catch (e) {
+    const bodyText = await page.locator('body').innerText().catch(() => '<could not read body>');
+    console.log(`[diag] ✎ Edit never reappeared after Save. Page body text: ${bodyText.slice(0, 2000)}`);
+    throw e;
+  }
   await expect(page.getByText('Acme Corp')).toBeVisible({ timeout: 15_000 });
 
   // Main is untouched by the branch's own edit (baseline stays baseline

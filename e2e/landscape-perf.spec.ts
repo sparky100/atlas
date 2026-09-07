@@ -110,8 +110,23 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
         message: `generated ${String(SYSTEM_COUNT)}-system/${String(EDGE_COUNT)}-edge landscape fixture`,
         deltas: generateLandscapeFixture(sourceId),
       };
+      // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once root-caused):
+      // split the 90s canvas-ready wait's own time out into seeding vs.
+      // page-load/layout, and surface any error the page itself renders
+      // (LandscapePage.tsx only mounts <canvas> once status === 'ready' —
+      // an error or a still-loading state both look like "canvas not
+      // found" to a bare locator, indistinguishably) or logs to console.
+      const seedStart = Date.now();
       const commitResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });
       if (!commitResult.ok) throw new Error(`seeding the landscape fixture: ${commitResult.message}`);
+      console.log(`[diag] fixture seeding took ${String(Date.now() - seedStart)}ms`);
+
+      page.on('console', (msg) => {
+        console.log(`[diag page console ${msg.type()}] ${msg.text()}`);
+      });
+      page.on('pageerror', (err) => {
+        console.log(`[diag page error] ${err.message}`);
+      });
 
       await page.goto('/sign-in');
       await page.getByLabel('Email').fill(email);
@@ -119,6 +134,7 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
       await page.getByRole('button', { name: 'Sign in' }).click();
       await expect(page.getByRole('heading', { name: 'Your organisations' })).toBeVisible();
 
+      const navStart = Date.now();
       await page.goto(`/o/${orgSlug}/m/${modelSlug}/landscape`);
       const canvas = page.locator('canvas');
       // Not just "the canvas exists" — the aria-label only reflects the
@@ -129,7 +145,14 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
       // payload (the sibling test's own measured baseline) inserting
       // ~2,010 elements/6,000 relationships in one transaction — real
       // headroom within this test's own 120s budget, not a flake cover-up.
-      await expect(canvas).toHaveAttribute('aria-label', new RegExp(`${String(SYSTEM_COUNT)} systems`), { timeout: 90_000 });
+      try {
+        await expect(canvas).toHaveAttribute('aria-label', new RegExp(`${String(SYSTEM_COUNT)} systems`), { timeout: 90_000 });
+      } catch (e) {
+        const bodyText = await page.locator('body').innerText().catch(() => '<could not read body>');
+        console.log(`[diag] canvas never became ready after ${String(Date.now() - navStart)}ms. Page body text: ${bodyText.slice(0, 2000)}`);
+        throw e;
+      }
+      console.log(`[diag] canvas ready after ${String(Date.now() - navStart)}ms`);
 
       const box = await canvas.boundingBox();
       if (!box) throw new Error('landscape canvas has no bounding box');

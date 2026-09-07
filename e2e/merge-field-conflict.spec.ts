@@ -31,6 +31,14 @@ import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
 
 test('a field conflict renders with its three-way context, resolves with one click, and the chosen value survives the merge', async ({ page }) => {
   const env = loadEnv();
+  // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once root-caused).
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') console.log(`[diag page console error] ${msg.text()}`);
+  });
+  page.on('pageerror', (err) => {
+    console.log(`[diag page error] ${err.message}`);
+  });
+
   const fixture = await bootstrapChangeBranchFixture(page, env, 'fieldconflict', 'Payments Service');
   const { signedIn, orgId, orgSlug, modelId, modelSlug, userId, main, seedCommitId, createDeltaId, seedSourceId, systemId } = fixture;
 
@@ -90,6 +98,14 @@ test('a field conflict renders with its three-way context, resolves with one cli
   // One-click resolution: "keep this change" (SPEC §7.4's first action).
   await card.getByRole('button', { name: 'Keep this change' }).click();
   await expect(card.getByText('Staged: keep this change')).toBeVisible();
+  // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once root-caused):
+  // ReviewRequestView.tsx renders this button's text from
+  // rr.stagedChoiceCount, which shares state with the card's own "Staged:"
+  // text above — log its actual current text before asserting the exact
+  // count, since a mismatch there (vs. this button just being slow) points
+  // at two different bugs.
+  const resubmitButton = page.getByRole('button', { name: /resubmit/ });
+  console.log(`[diag] resubmit button text: ${String(await resubmitButton.textContent())}`);
   await page.getByRole('button', { name: /Push refresh \(1 resolved\) & resubmit/ }).click();
 
   // Refreshed: the conflict is gone, Approve is enabled.
