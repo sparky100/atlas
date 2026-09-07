@@ -24,9 +24,10 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:status": "supabase status",
-    "content:load-capability-maps": "node --experimental-strip-types scripts/loadCapabilityMaps.ts",
-    "content:review-capability-maps": "node --experimental-strip-types scripts/reviewCapabilityMaps.ts",
-    "check:case-collisions": "node --experimental-strip-types scripts/checkCaseCollisions.ts"
+    "content:load-capability-maps": "tsx scripts/loadCapabilityMaps.ts",
+    "content:review-capability-maps": "tsx scripts/reviewCapabilityMaps.ts",
+    "content:publish-capability-map": "tsx scripts/publishCapabilityMap.ts",
+    "check:case-collisions": "tsx scripts/checkCaseCollisions.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -50,6 +51,7 @@
     "fast-check": "^4.5.0",
     "storybook": "10.6.0",
     "supabase": "^2.116.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.69.0",
     "vite": "8.2.2",

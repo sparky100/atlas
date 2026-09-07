@@ -20,11 +20,7 @@
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-// Explicit `.ts`: Node's ESM loader under --experimental-strip-types does
-// not guess extensions the way Vite/vitest do (tsconfig's
-// allowImportingTsExtensions is on for exactly this). The contract has no
-// relative imports of its own, so this is the only one that needs it here.
-import { parseCapabilityMapContent, type CapabilityMapContent, type CapabilityMapItemContent } from '../src/contracts/capabilityMapContent.ts';
+import { parseCapabilityMapContent, type CapabilityMapContent, type CapabilityMapItemContent } from '../src/contracts/capabilityMapContent';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONTENT_ROOT = path.join(REPO_ROOT, 'content', 'capability-maps');

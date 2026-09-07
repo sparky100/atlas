@@ -37,6 +37,7 @@ import { seedModelFromCapabilityMap } from './seedFromMap';
 import { getOrCreateManualSource } from './sources';
 import { createTag, listTagsForModel } from './tags';
 import { getUserPreferences, upsertUserPreferences } from './userPreferences';
+import { publishCapabilityMap } from '../../scripts/publishCapabilityMap';
 
 const env = loadEnv();
 const service = createServiceRoleClient(env);
@@ -107,15 +108,20 @@ describe('repository layer against a real local Supabase', () => {
     capabilityMapId = randomUUID();
     const rootItemId = randomUUID();
     const childItemId = randomUUID();
-    const { error: mapError } = await service
-      .from('capability_maps')
-      .insert({ id: capabilityMapId, sector: 'public_body', version: 1, status: 'published', source_description: 'Integration test fixture', published_at: new Date().toISOString() });
+    // Draft first, items second, published last — capability_map_items_guard_immutable
+    // (20260906190000_capability_map_items_immutable_once_published.sql)
+    // rejects any item write once the map is published, matching the real
+    // draft → load items → publish order scripts/loadCapabilityMaps.ts and
+    // scripts/publishCapabilityMap.ts actually use.
+    const { error: mapError } = await service.from('capability_maps').insert({ id: capabilityMapId, sector: 'public_body', version: 1, status: 'draft', source_description: 'Integration test fixture' });
     if (mapError) throw new Error(`capability_maps fixture: ${mapError.message}`);
     const { error: itemsError } = await service.from('capability_map_items').insert([
       { id: rootItemId, map_id: capabilityMapId, code: '1', parent_code: null, name: 'Root Capability', level: 1 },
       { id: childItemId, map_id: capabilityMapId, code: '1.1', parent_code: '1', name: 'Child Capability', level: 2 },
     ]);
     if (itemsError) throw new Error(`capability_map_items fixture: ${itemsError.message}`);
+    const { error: publishError } = await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', capabilityMapId);
+    if (publishError) throw new Error(`capability_maps fixture publish: ${publishError.message}`);
 
     // Main's genesis commit through the real tailoring-flow "import" path
     // (Sprint U2 step 2), replacing the former service-role stand-in insert
@@ -1003,6 +1009,58 @@ describe('repository layer against a real local Supabase', () => {
       });
       const { error } = await service.from('branches').update({ split_from: other.id }).eq('id', main.id);
       expect(error).not.toBeNull();
+    });
+  });
+
+  describe('capability map publishing (scripts/publishCapabilityMap.ts, immutability once published)', () => {
+    it('refuses to publish with no sources, then with only a placeholder source; publishes once a real reviewer replaces it; deprecates the previous published version; and locks items against further writes', async () => {
+      const draftMapId = randomUUID();
+      const { error: draftMapError } = await service.from('capability_maps').insert({ id: draftMapId, sector: 'nhs', version: 999, status: 'draft', source_description: 'Publish-flow integration test fixture' });
+      if (draftMapError) throw new Error(`draft map fixture: ${draftMapError.message}`);
+      const itemId = randomUUID();
+      const { error: itemError } = await service.from('capability_map_items').insert({ id: itemId, map_id: draftMapId, code: '1', parent_code: null, name: 'Test Capability', level: 1 });
+      if (itemError) throw new Error(`item fixture: ${itemError.message}`);
+
+      // No sources at all.
+      await expect(publishCapabilityMap(service, 'nhs', 999)).rejects.toThrow(/no capability_map_sources row/);
+
+      // A source, but still the drafting placeholder.
+      const sourceId = randomUUID();
+      const { error: sourceError } = await service
+        .from('capability_map_sources')
+        .insert({ id: sourceId, map_id: draftMapId, citation: 'Test source', reviewed_by: 'Pending human review — drafted by Claude Code', reviewed_at: '2026-01-01' });
+      if (sourceError) throw new Error(`source fixture: ${sourceError.message}`);
+      await expect(publishCapabilityMap(service, 'nhs', 999)).rejects.toThrow(/still the drafting placeholder/);
+
+      // A real reviewer's name replaces the placeholder — publishing now succeeds.
+      const { error: reviewError } = await service.from('capability_map_sources').update({ reviewed_by: 'A. Reviewer' }).eq('id', sourceId);
+      if (reviewError) throw new Error(`review-name fixture update: ${reviewError.message}`);
+      const firstPublish = await publishCapabilityMap(service, 'nhs', 999);
+      expect(firstPublish.deprecated).toEqual([]);
+      const { data: publishedRow } = await service.from('capability_maps').select('status, published_at').eq('id', draftMapId).maybeSingle();
+      expect(publishedRow).toMatchObject({ status: 'published' });
+      expect((publishedRow as { published_at: string | null } | null)?.published_at).not.toBeNull();
+
+      // Immutable once published: insert, update and delete on its items are all rejected.
+      const { error: insertAfterPublish } = await service.from('capability_map_items').insert({ id: randomUUID(), map_id: draftMapId, code: '2', parent_code: null, name: 'Too Late', level: 1 });
+      expect(insertAfterPublish?.message).toMatch(/published and immutable/);
+      const { error: updateAfterPublish } = await service.from('capability_map_items').update({ name: 'Renamed' }).eq('id', itemId);
+      expect(updateAfterPublish?.message).toMatch(/published and immutable/);
+      const { error: deleteAfterPublish } = await service.from('capability_map_items').delete().eq('id', itemId);
+      expect(deleteAfterPublish?.message).toMatch(/published and immutable/);
+
+      // A second, later version of the same sector supersedes the first: publishing it deprecates v999.
+      const secondMapId = randomUUID();
+      const { error: secondMapError } = await service.from('capability_maps').insert({ id: secondMapId, sector: 'nhs', version: 1000, status: 'draft', source_description: 'Publish-flow integration test fixture, v2' });
+      if (secondMapError) throw new Error(`second draft map fixture: ${secondMapError.message}`);
+      const { error: secondSourceError } = await service
+        .from('capability_map_sources')
+        .insert({ id: randomUUID(), map_id: secondMapId, citation: 'Test source v2', reviewed_by: 'A. Reviewer', reviewed_at: '2026-01-02' });
+      if (secondSourceError) throw new Error(`second source fixture: ${secondSourceError.message}`);
+      const secondPublish = await publishCapabilityMap(service, 'nhs', 1000);
+      expect(secondPublish.deprecated).toEqual([999]);
+      const { data: firstMapAfter } = await service.from('capability_maps').select('status').eq('id', draftMapId).maybeSingle();
+      expect(firstMapAfter).toMatchObject({ status: 'deprecated' });
     });
   });
 });
