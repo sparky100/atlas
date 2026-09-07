@@ -132,7 +132,18 @@ grant execute on function atlas.branch_reaches_commit to authenticated;
 -- Also accepts an optional p_resolved_conflicts array, written in the same
 -- transaction as the commit that resolves them (SPEC §7.4's field-conflict
 -- actions, ADR-007's `resolved_conflicts`).
+--
+-- Adding `p_resolved_conflicts` as a 13th parameter changes this function's
+-- type signature, so `create or replace` below does not replace the second
+-- generation's 12-arg function in place — it would silently create a second,
+-- coexisting overload instead, which then makes the unqualified
+-- revoke/grant below ambiguous (SQLSTATE 42725, "function name ... is not
+-- unique"). Drop the old signature explicitly first, and qualify
+-- revoke/grant with the full parameter list so a future arity change fails
+-- loudly here instead of at "not unique".
 -- ---------------------------------------------------------------------------
+
+drop function if exists atlas.commit_deltas(uuid, uuid, uuid, uuid, commit_kind, text, jsonb, uuid, jsonb, jsonb, jsonb, text);
 
 create or replace function atlas.commit_deltas(
   p_commit_id uuid,
@@ -234,8 +245,8 @@ begin
 end;
 $$;
 
-revoke all on function atlas.commit_deltas from public;
-grant execute on function atlas.commit_deltas to authenticated;
+revoke all on function atlas.commit_deltas(uuid, uuid, uuid, uuid, commit_kind, text, jsonb, uuid, jsonb, jsonb, jsonb, text, jsonb) from public;
+grant execute on function atlas.commit_deltas(uuid, uuid, uuid, uuid, commit_kind, text, jsonb, uuid, jsonb, jsonb, jsonb, text, jsonb) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- The review-queue workflow functions. Each is security definer for the

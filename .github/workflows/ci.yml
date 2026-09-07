@@ -77,14 +77,21 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Uses the `supabase` devDependency pinned in package.json, not a
-      # separately-versioned GitHub Action, so CI and local `pnpm db:start`
-      # are always running the same CLI. `supabase start` pulls a fresh set
-      # of images and brings up Postgres with the same `auth`/`storage`
-      # schemas a real project has, from nothing — every run is a clean
-      # database, which is what "fresh-database migration check" means
-      # (CLAUDE.md's definition of done).
+      # separately-versioned GitHub Action (`supabase/setup-cli`), so CI and
+      # local `pnpm db:start` are always running the same CLI — kept as-is
+      # for Sprint C1-H item 1: the CI failure this step used to hit
+      # (SQLSTATE 42725 inside `20260906161000_merge_review_queue.sql`,
+      # docs/AUDIT-2026-09-C1.md §1.4) was a genuine SQL bug in a migration,
+      # not a CLI-versioning problem, so switching the install mechanism
+      # would not have fixed it and would give up the single-CLI-version
+      # guarantee for no reason. `-x` drops services nothing here exercises
+      # (no Storybook/Studio UI is driven against this stack, no
+      # image-proxying, no edge functions exist yet in supabase/functions,
+      # and neither Vector nor Logflare's log shipping is asserted on by any
+      # test) — smaller pull surface, faster startup, same schema and same
+      # Postgres/GoTrue/PostgREST/Realtime stack every test actually needs.
       - name: Start local Supabase
-        run: pnpm exec supabase start
+        run: pnpm exec supabase start -x studio,imgproxy,logflare,vector,edge-runtime
 
       # `db reset` replays every file in supabase/migrations against that
       # fresh database in order. Any migration that only worked because an
@@ -129,8 +136,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      # Same rationale as the `database` job's identical step: kept on the
+      # pnpm-pinned CLI (Sprint C1-H item 1), `-x` drops services this job
+      # doesn't exercise either.
       - name: Start local Supabase
-        run: pnpm exec supabase start
+        run: pnpm exec supabase start -x studio,imgproxy,logflare,vector,edge-runtime
 
       - name: Apply all migrations to a fresh database
         run: pnpm exec supabase db reset
