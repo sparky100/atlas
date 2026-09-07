@@ -2,12 +2,16 @@ import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
 import { Button } from '../components/Button/Button';
+import { DiffLegend } from '../components/DiffBadge/DiffLegend';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useModels } from '../models/useModels';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
+import { parseViewMode } from '../../db/viewMode';
+import { BranchViewModeControl } from '../branches/BranchViewModeControl';
+import { useBranchLabel } from '../branches/useBranchLabel';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
 import { useLandscape } from '../landscape/useLandscape';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
@@ -28,8 +32,9 @@ import styles from './LandscapePage.module.css';
  */
 export function LandscapePage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const ref = parseRefParam(searchParams.get('ref'));
+  const mode = parseViewMode(searchParams.get('mode'));
   const capabilityId = parseCapabilityParam(searchParams.get('capability'));
   const { userId } = useAuth();
 
@@ -37,8 +42,9 @@ export function LandscapePage() {
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
   const capability = useBreadcrumbElement(model?.id ?? '', ref, capabilityId);
+  const { label: branchLabel } = useBranchLabel(ref);
 
-  const { state, resetLayout } = useLandscape(model?.id ?? '', organisation?.id ?? '', userId, ref, capabilityId);
+  const { state, resetLayout } = useLandscape(model?.id ?? '', organisation?.id ?? '', userId, ref, mode, capabilityId);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -62,7 +68,7 @@ export function LandscapePage() {
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
-          refLabel={refLabelOf(ref)}
+          refLabel={refLabelOf(ref, branchLabel)}
           segments={segments}
         />
         <div className={styles.header}>
@@ -78,6 +84,20 @@ export function LandscapePage() {
           )}
         </div>
 
+        {ref.kind === 'branch' && (
+          <BranchViewModeControl
+            mode={mode}
+            onChange={(next) => {
+              setSearchParams((prev) => {
+                const updated = new URLSearchParams(prev);
+                updated.set('mode', next);
+                return updated;
+              });
+            }}
+          />
+        )}
+        {ref.kind === 'branch' && mode === 'diff' && <DiffLegend />}
+
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
@@ -85,7 +105,7 @@ export function LandscapePage() {
           <EmptyState>{capability ? 'No systems support this capability yet.' : 'No systems yet. Add a System from the element page to see it here.'}</EmptyState>
         )}
         {state.status === 'ready' && state.data.layout.nodes.length > 0 && (
-          <LandscapeCanvas layout={state.data.layout} systemsById={state.data.systemsById} edges={state.data.edges} nodeHref={nodeHref} />
+          <LandscapeCanvas layout={state.data.layout} systemsById={state.data.systemsById} edges={state.data.edges} diff={state.data.diff} nodeHref={nodeHref} />
         )}
       </main>
     </div>
