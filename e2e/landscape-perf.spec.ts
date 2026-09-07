@@ -160,6 +160,15 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
       // payload (the sibling test's own measured baseline) inserting
       // ~2,010 elements/6,000 relationships in one transaction — real
       // headroom within this test's own 120s budget, not a flake cover-up.
+      //
+      // This exact assertion is also SPEC §6.7's `max_rows` regression
+      // test (Sprint C1-H item 1d): `supabase/config.toml`'s max_rows=1000
+      // silently truncated `listSystemsForLandscape` before src/db/
+      // selectAll.ts existed, and the canvas rendered "1000 systems" here
+      // with no error at all — asserting the literal `SYSTEM_COUNT` (2000,
+      // over the 1000-row cap) rather than "some systems" is what makes
+      // this catch that regression rather than pass on a silently-halved
+      // landscape.
       try {
         await expect(canvas).toHaveAttribute('aria-label', new RegExp(`${String(SYSTEM_COUNT)} systems`), { timeout: 90_000 });
       } catch (e) {
@@ -212,6 +221,9 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
       fps.sort((a, b) => a - b);
       const p5 = fps[Math.floor(fps.length * 0.05)];
       const p50 = fps[Math.floor(fps.length * 0.5)];
+      // Logged unconditionally, not just on failure — this is the number
+      // docs/AUDIT-2026-09-C1.md §1 found no CI run had ever produced.
+      console.log(`[diag] p50 fps: ${String(p50)}, p5 fps: ${String(p5)}`);
 
       expect(p50, `p50 fps was ${JSON.stringify(p50)}`).toBeGreaterThanOrEqual(55);
       expect(p5, `p5 fps was ${JSON.stringify(p5)}`).toBeGreaterThanOrEqual(45);

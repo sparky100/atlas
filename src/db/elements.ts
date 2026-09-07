@@ -14,6 +14,7 @@ import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow, DeltaRow } from '
 import type { UUID } from '../contracts/delta';
 import type { Client } from './client';
 import { assertInFilterSize } from './inFilterLimit';
+import { selectAll } from './selectAll';
 import type { AliasRow, BranchRow, SourceRow } from './types';
 
 const ELEMENTS_HEAD_COLUMNS = 'element_id, element_type, name, parent_id, attributes, exists_delta_id';
@@ -36,36 +37,47 @@ export async function getElementHead(supabase: Client, commitId: UUID, elementId
   return data;
 }
 
+/** Routed through `selectAll` (SPEC §6.7); ordered by `element_id` in addition to `name` for a stable, unique pagination order (see `listSystemsForLandscape`'s identical comment, src/db/landscape.ts). */
 export async function listChildrenOf(supabase: Client, commitId: UUID, parentId: UUID): Promise<ElementsHeadRow[]> {
-  const { data, error } = await supabase.from('elements_head').select(ELEMENTS_HEAD_COLUMNS).eq('commit_id', commitId).eq('parent_id', parentId).order('name');
-  if (error) throw new Error(`listChildrenOf: ${error.message}`);
-  return data;
+  const query = supabase.from('elements_head').select(ELEMENTS_HEAD_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).eq('parent_id', parentId).order('name').order('element_id');
+  return selectAll<ElementsHeadRow>(query);
 }
 
+/** Routed through `selectAll` (SPEC §6.7); ordered by `attribute` — `(commit_id, subject_id, attribute)` is `facts`'s primary key, and `commit_id`/`subject_id` are already pinned by the `.eq()`s above, so this is a unique pagination order. */
 export async function listFactsForSubject(supabase: Client, commitId: UUID, subjectId: UUID): Promise<FactsRow[]> {
-  const { data, error } = await supabase.from('facts').select(FACTS_COLUMNS).eq('commit_id', commitId).eq('subject_id', subjectId);
-  if (error) throw new Error(`listFactsForSubject: ${error.message}`);
-  return data;
+  const query = supabase.from('facts').select(FACTS_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).eq('subject_id', subjectId).order('attribute');
+  return selectAll<FactsRow>(query);
 }
 
-/** Every relationship touching `elementId` in either direction — §4.4's "both directions are shown," never just outbound. */
+/**
+ * Every relationship touching `elementId` in either direction — §4.4's "both
+ * directions are shown," never just outbound. Routed through `selectAll`
+ * (SPEC §6.7), ordered by `relationship_id` for a stable, unique pagination
+ * order.
+ */
 export async function listRelationshipsForElement(supabase: Client, commitId: UUID, elementId: UUID): Promise<RelationshipsHeadRow[]> {
-  const { data, error } = await supabase
+  const query = supabase
     .from('relationships_head')
-    .select(RELATIONSHIPS_HEAD_COLUMNS)
+    .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
     .eq('commit_id', commitId)
-    .or(`from_element_id.eq.${elementId},to_element_id.eq.${elementId}`);
-  if (error) throw new Error(`listRelationshipsForElement: ${error.message}`);
-  return data;
+    .or(`from_element_id.eq.${elementId},to_element_id.eq.${elementId}`)
+    .order('relationship_id');
+  return selectAll<RelationshipsHeadRow>(query);
 }
 
-/** Batch lookup so a page with N badges makes one query, not N (§4.9's paint budget). */
+/**
+ * Batch lookup so a page with N badges makes one query, not N (§4.9's paint
+ * budget). `assertInFilterSize` already keeps `elementIds` at or under 50,
+ * so this never actually pages — routed through `selectAll` anyway for the
+ * same reason every other `elements_head`/`relationships_head`/`facts`/
+ * `deltas`/`commits` read is (SPEC §6.7, and this module's own enforcement
+ * test, `headTableReads.test.ts`, requires it of every one of them).
+ */
 export async function getElementsByIds(supabase: Client, commitId: UUID, elementIds: readonly UUID[]): Promise<Map<UUID, ElementsHeadRow>> {
   if (elementIds.length === 0) return new Map();
   assertInFilterSize('getElementsByIds', 'element_id', elementIds);
-  const { data, error } = await supabase.from('elements_head').select(ELEMENTS_HEAD_COLUMNS).eq('commit_id', commitId).in('element_id', elementIds);
-  if (error) throw new Error(`getElementsByIds: ${error.message}`);
-  const rows = data as ElementsHeadRow[];
+  const query = supabase.from('elements_head').select(ELEMENTS_HEAD_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).in('element_id', elementIds).order('element_id');
+  const rows = await selectAll<ElementsHeadRow>(query);
   return new Map(rows.map((row) => [row.element_id, row]));
 }
 
@@ -85,11 +97,23 @@ export async function listAliasesForElement(supabase: Client, modelId: UUID, ele
   return data as AliasRow[];
 }
 
-/** The full history of every delta ever asserted about `subjectId`, newest first (§4.6.2's timeline) — this is the audit trail, read straight off `deltas`, not a projection. */
+/**
+ * The full history of every delta ever asserted about `subjectId`, newest
+ * first (§4.6.2's timeline) — this is the audit trail, read straight off
+ * `deltas`, not a projection. Routed through `selectAll` (SPEC §6.7);
+ * `created_at` alone isn't necessarily unique (two deltas in the same
+ * commit can share a timestamp), so `id` (this table's actual primary key)
+ * is added as a tiebreaker for a stable pagination order.
+ */
 export async function listDeltaHistoryForSubject(supabase: Client, modelId: UUID, subjectId: UUID): Promise<DeltaHistoryRow[]> {
-  const { data, error } = await supabase.from('deltas').select('*').eq('model_id', modelId).eq('subject_id', subjectId).order('created_at', { ascending: false });
-  if (error) throw new Error(`listDeltaHistoryForSubject: ${error.message}`);
-  return data as DeltaHistoryRow[];
+  const query = supabase
+    .from('deltas')
+    .select('*', { count: 'exact' })
+    .eq('model_id', modelId)
+    .eq('subject_id', subjectId)
+    .order('created_at', { ascending: false })
+    .order('id');
+  return selectAll<DeltaHistoryRow>(query);
 }
 
 /** A single fact's supersession chain (§4.3's provenance card): follow `previous_delta_id` back from `deltaId` to genesis. Bounded by the chain's real length, not by history depth — a fact is superseded at most a handful of times in practice. */
@@ -121,15 +145,19 @@ export async function getSupersessionChain(supabase: Client, deltaId: UUID): Pro
  * depend on that changing.
  */
 export async function listInFlightBranchesTouchingSubject(supabase: Client, modelId: UUID, subjectId: UUID): Promise<BranchRow[]> {
-  const { data: deltaRows, error: deltaError } = await supabase.from('deltas').select('commit_id').eq('model_id', modelId).eq('subject_id', subjectId);
-  if (deltaError) throw new Error(`listInFlightBranchesTouchingSubject: ${deltaError.message}`);
-  const commitIds = [...new Set((deltaRows as { commit_id: UUID }[]).map((row) => row.commit_id))];
+  // `deltas`/`commits` reads routed through `selectAll` (SPEC §6.7), ordered
+  // by each table's own primary key (`id`) — not part of the selected
+  // columns, but still a valid, unique ORDER BY target, and the only thing
+  // that matters for these two is complete row coverage, not row order.
+  const deltasQuery = supabase.from('deltas').select('commit_id', { count: 'exact' }).eq('model_id', modelId).eq('subject_id', subjectId).order('id');
+  const deltaRows = await selectAll<{ commit_id: UUID }>(deltasQuery);
+  const commitIds = [...new Set(deltaRows.map((row) => row.commit_id))];
   if (commitIds.length === 0) return [];
 
   assertInFilterSize('listInFlightBranchesTouchingSubject', 'id (commits)', commitIds);
-  const { data: commitRows, error: commitError } = await supabase.from('commits').select('branch_id').in('id', commitIds);
-  if (commitError) throw new Error(`listInFlightBranchesTouchingSubject: ${commitError.message}`);
-  const branchIds = [...new Set((commitRows as { branch_id: UUID }[]).map((row) => row.branch_id))];
+  const commitsQuery = supabase.from('commits').select('branch_id', { count: 'exact' }).in('id', commitIds).order('id');
+  const commitRows = await selectAll<{ branch_id: UUID }>(commitsQuery);
+  const branchIds = [...new Set(commitRows.map((row) => row.branch_id))];
   if (branchIds.length === 0) return [];
 
   assertInFilterSize('listInFlightBranchesTouchingSubject', 'id (branches)', branchIds);
@@ -155,15 +183,16 @@ export async function listInFlightBranchesTouchingSubject(supabase: Client, mode
 export async function listInFlightBranchesTouchingSubjects(supabase: Client, modelId: UUID, subjectIds: readonly UUID[], excludeBranchId: UUID): Promise<BranchRow[]> {
   if (subjectIds.length === 0) return [];
   assertInFilterSize('listInFlightBranchesTouchingSubjects', 'subject_id', subjectIds);
-  const { data: deltaRows, error: deltaError } = await supabase.from('deltas').select('commit_id').eq('model_id', modelId).in('subject_id', subjectIds);
-  if (deltaError) throw new Error(`listInFlightBranchesTouchingSubjects: ${deltaError.message}`);
-  const commitIds = [...new Set((deltaRows as { commit_id: UUID }[]).map((row) => row.commit_id))];
+  // Same selectAll/order-by-primary-key treatment as listInFlightBranchesTouchingSubject above.
+  const deltasQuery = supabase.from('deltas').select('commit_id', { count: 'exact' }).eq('model_id', modelId).in('subject_id', subjectIds).order('id');
+  const deltaRows = await selectAll<{ commit_id: UUID }>(deltasQuery);
+  const commitIds = [...new Set(deltaRows.map((row) => row.commit_id))];
   if (commitIds.length === 0) return [];
 
   assertInFilterSize('listInFlightBranchesTouchingSubjects', 'id (commits)', commitIds);
-  const { data: commitRows, error: commitError } = await supabase.from('commits').select('branch_id').in('id', commitIds);
-  if (commitError) throw new Error(`listInFlightBranchesTouchingSubjects: ${commitError.message}`);
-  const branchIds = [...new Set((commitRows as { branch_id: UUID }[]).map((row) => row.branch_id))].filter((id) => id !== excludeBranchId);
+  const commitsQuery = supabase.from('commits').select('branch_id', { count: 'exact' }).in('id', commitIds).order('id');
+  const commitRows = await selectAll<{ branch_id: UUID }>(commitsQuery);
+  const branchIds = [...new Set(commitRows.map((row) => row.branch_id))].filter((id) => id !== excludeBranchId);
   if (branchIds.length === 0) return [];
 
   assertInFilterSize('listInFlightBranchesTouchingSubjects', 'id (branches)', branchIds);

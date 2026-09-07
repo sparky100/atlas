@@ -11,6 +11,7 @@ import type { Client } from './client';
 import type { TagRow } from './types';
 import type { UUID } from '../contracts/delta';
 import { buildCommitLoader } from './commitLoader';
+import { selectAll } from './selectAll';
 import { verifyHeadMatchesFold } from '../engine/head';
 import { deserializeHeadProjection } from '../engine/projection';
 
@@ -26,16 +27,25 @@ export interface CreateTagInput {
   createdBy: UUID;
 }
 
+/**
+ * Reads the full materialised head at `commitId` — the exact set
+ * `verifyHeadMatchesFold` below compares against the delta history.
+ * Routed through `selectAll` (SPEC §6.7): this is the highest-stakes read
+ * in the whole codebase to leave silently truncatable, since `createTag` is
+ * "the one moment the cost is always paid" (this function's own doc
+ * comment) — a truncated `elements_head`/`relationships_head`/`facts` read
+ * here wouldn't tag a wrong commit (the hash mismatch would still catch
+ * that and fail loudly), but it would make every model past ~1,000
+ * elements/relationships/facts unable to ever create a tag at all, for a
+ * reason with no visible error pointing at it.
+ */
 async function loadMaterialisedHead(supabase: Client, commitId: UUID) {
-  const [elementsRes, relationshipsRes, factsRes] = await Promise.all([
-    supabase.from('elements_head').select('*').eq('commit_id', commitId),
-    supabase.from('relationships_head').select('*').eq('commit_id', commitId),
-    supabase.from('facts').select('*').eq('commit_id', commitId),
+  const [elementsData, relationshipsData, factsData] = await Promise.all([
+    selectAll<ElementsHeadRow>(supabase.from('elements_head').select('*', { count: 'exact' }).eq('commit_id', commitId).order('element_id')),
+    selectAll<RelationshipsHeadRow>(supabase.from('relationships_head').select('*', { count: 'exact' }).eq('commit_id', commitId).order('relationship_id')),
+    selectAll<FactsRow>(supabase.from('facts').select('*', { count: 'exact' }).eq('commit_id', commitId).order('subject_id').order('attribute')),
   ]);
-  if (elementsRes.error) throw new Error(`createTag: reading elements_head: ${elementsRes.error.message}`);
-  if (relationshipsRes.error) throw new Error(`createTag: reading relationships_head: ${relationshipsRes.error.message}`);
-  if (factsRes.error) throw new Error(`createTag: reading facts: ${factsRes.error.message}`);
-  return deserializeHeadProjection(elementsRes.data as ElementsHeadRow[], relationshipsRes.data as RelationshipsHeadRow[], factsRes.data as FactsRow[]);
+  return deserializeHeadProjection(elementsData, relationshipsData, factsData);
 }
 
 /**

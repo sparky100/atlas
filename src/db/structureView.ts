@@ -16,6 +16,7 @@
 import type { RelationshipsHeadRow } from '../contracts/rows';
 import type { RelationshipType, UUID } from '../contracts/delta';
 import type { Client } from './client';
+import { selectAll } from './selectAll';
 
 const RELATIONSHIPS_HEAD_COLUMNS = 'relationship_id, relationship_type, from_element_id, to_element_id, attributes, exists_delta_id';
 
@@ -27,16 +28,24 @@ const RELATIONSHIPS_HEAD_COLUMNS = 'relationship_id, relationship_type, from_ele
  * caller can tell which is which by checking each endpoint against
  * `subjectIds` itself (src/ui/structureView/structureGrouping.ts does
  * exactly that).
+ *
+ * Routed through `selectAll` (SPEC §6.7), ordered by `relationship_id` for
+ * a stable, unique pagination order. NOTE: the `.or(...in.(...))` filter
+ * below still puts `subjectIds` directly in the request URL, same as the
+ * `.in()` shape SPEC §6.7's other rule (`src/db/inFilterLimit.ts`) guards
+ * against — this call site was not in Sprint C1-H item 1d's scope (that
+ * item was the row-truncation half of §6.7, not the URL-size half) and is
+ * not guarded by `assertInFilterSize` today. Flagged, not fixed, here.
  */
 export async function listRelationshipsTouchingAny(supabase: Client, commitId: UUID, subjectIds: readonly UUID[], relationshipTypes: readonly RelationshipType[]): Promise<RelationshipsHeadRow[]> {
   if (subjectIds.length === 0) return [];
   const idList = subjectIds.join(',');
-  const { data, error } = await supabase
+  const query = supabase
     .from('relationships_head')
-    .select(RELATIONSHIPS_HEAD_COLUMNS)
+    .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
     .eq('commit_id', commitId)
     .in('relationship_type', relationshipTypes)
-    .or(`from_element_id.in.(${idList}),to_element_id.in.(${idList})`);
-  if (error) throw new Error(`listRelationshipsTouchingAny: ${error.message}`);
-  return data;
+    .or(`from_element_id.in.(${idList}),to_element_id.in.(${idList})`)
+    .order('relationship_id');
+  return selectAll<RelationshipsHeadRow>(query);
 }

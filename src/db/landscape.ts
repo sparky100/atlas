@@ -9,15 +9,30 @@
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { UUID } from '../contracts/delta';
 import type { Client } from './client';
+import { selectAll } from './selectAll';
 
 const ELEMENTS_HEAD_COLUMNS = 'element_id, element_type, name, parent_id, attributes, exists_delta_id';
 const RELATIONSHIPS_HEAD_COLUMNS = 'relationship_id, relationship_type, from_element_id, to_element_id, attributes, exists_delta_id';
 
-/** Every System at this commit — the landscape's nodes. */
+/**
+ * Every System at this commit — the landscape's nodes. Sprint C1-H item 1d
+ * (SPEC §6.7): this is the query that first exposed `max_rows`
+ * (`supabase/config.toml`, 1000) silently truncating a large result — a
+ * 2,000-system fixture rendered exactly 1,000 systems with no error at all.
+ * Routed through `selectAll` now, ordered by `element_id` in addition to
+ * `name` so pagination has a stable, unique order (two systems can share a
+ * name; `(commit_id, element_id)` is this table's actual primary key, and
+ * `commit_id` is already pinned by the `.eq()` above).
+ */
 export async function listSystemsForLandscape(supabase: Client, commitId: UUID): Promise<ElementsHeadRow[]> {
-  const { data, error } = await supabase.from('elements_head').select(ELEMENTS_HEAD_COLUMNS).eq('commit_id', commitId).eq('element_type', 'system').order('name');
-  if (error) throw new Error(`listSystemsForLandscape: ${error.message}`);
-  return data;
+  const query = supabase
+    .from('elements_head')
+    .select(ELEMENTS_HEAD_COLUMNS, { count: 'exact' })
+    .eq('commit_id', commitId)
+    .eq('element_type', 'system')
+    .order('name')
+    .order('element_id');
+  return selectAll<ElementsHeadRow>(query);
 }
 
 /**
@@ -32,13 +47,25 @@ export async function listSystemsForLandscape(supabase: Client, commitId: UUID):
  * memory instead fetches the same order of magnitude of rows (a commit's
  * whole edge set either way, `capabilityId`'s filter notwithstanding) with
  * no id ever crossing the wire in the request itself.
+ *
+ * Also routed through `selectAll` (SPEC §6.7's other read-at-scale rule,
+ * added alongside this one): "the same order of magnitude of rows either
+ * way" means this can just as easily exceed `max_rows` (1000) as the old
+ * `.in()`-filtered query could exceed the URL-size limit. Ordered by
+ * `relationship_id` — `commit_id` is already pinned by the `.eq()` above, so
+ * `(commit_id, relationship_id)` (this table's primary key) makes that a
+ * unique, stable pagination order.
  */
 export async function listLandscapeEdges(supabase: Client, commitId: UUID, systemIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
   if (systemIds.length === 0) return [];
   const ids = new Set(systemIds);
-  const { data, error } = await supabase.from('relationships_head').select(RELATIONSHIPS_HEAD_COLUMNS).eq('commit_id', commitId).in('relationship_type', ['uses', 'flows_to']);
-  if (error) throw new Error(`listLandscapeEdges: ${error.message}`);
-  const rows = data as RelationshipsHeadRow[];
+  const query = supabase
+    .from('relationships_head')
+    .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
+    .eq('commit_id', commitId)
+    .in('relationship_type', ['uses', 'flows_to'])
+    .order('relationship_id');
+  const rows = await selectAll<RelationshipsHeadRow>(query);
   return rows.filter((r) => ids.has(r.from_element_id) && ids.has(r.to_element_id));
 }
 
@@ -54,12 +81,17 @@ export async function listLandscapeEdges(supabase: Client, commitId: UUID, syste
  * Same Sprint C1-H item 1d rewrite as `listLandscapeEdges` above, and for
  * the identical reason: fetch every `supports` edge at this commit, narrow
  * to `systemIds` in memory, rather than putting the id list in the request.
+ * Same `selectAll`/order-by-`relationship_id` treatment too.
  */
 export async function listSupportsEdgesForSystems(supabase: Client, commitId: UUID, systemIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
   if (systemIds.length === 0) return [];
   const ids = new Set(systemIds);
-  const { data, error } = await supabase.from('relationships_head').select(RELATIONSHIPS_HEAD_COLUMNS).eq('commit_id', commitId).eq('relationship_type', 'supports');
-  if (error) throw new Error(`listSupportsEdgesForSystems: ${error.message}`);
-  const rows = data as RelationshipsHeadRow[];
+  const query = supabase
+    .from('relationships_head')
+    .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
+    .eq('commit_id', commitId)
+    .eq('relationship_type', 'supports')
+    .order('relationship_id');
+  const rows = await selectAll<RelationshipsHeadRow>(query);
   return rows.filter((r) => ids.has(r.from_element_id));
 }
