@@ -31,18 +31,17 @@ export interface ElementSearchAddProps {
 }
 
 /**
- * The search-first "Add" control (Blocking: element creation, ADR-012 per
- * the brief — see this feature's PR/commit for the note that ADR-012 in
- * `docs/ADR-000-foundations.md` is actually about capability maps as
- * starter content; no ADR number change was needed for a UI-only feature
- * that touches no data model, delta format, merge, provenance, or tenancy
- * decision, so none was written for this one). Type a name; existing
- * matches (by name, alias, or description — src/db/elementSearch.ts) show
- * with their owner and relationship count; a "Create …" row appears only
- * once nothing matches. Clicking an existing match just opens it — a
- * search-first control's whole point is finding out something already
- * exists rather than creating a duplicate. Clicking "Create" adds it via
- * `commit_deltas` (`useElementCreate`) and opens the new element's page.
+ * The search-first "Add" control — rule 1 of ADR-019's identity policy
+ * (search before creating, always; a caught duplicate is resolved by a
+ * reversible `atlas.merge_elements`, never a delete; what search alone
+ * misses is Q1's own duplicates report to catch, not this control's job).
+ * Type a name; existing matches (by name, alias, or description —
+ * src/db/elementSearch.ts) show with their owner and relationship count; a
+ * "Create …" row appears only once nothing matches. Clicking an existing
+ * match just opens it — a search-first control's whole point is finding
+ * out something already exists rather than creating a duplicate. Clicking
+ * "Create" adds it via `commit_deltas` (`useElementCreate`) and opens the
+ * new element's page.
  */
 export function ElementSearchAdd({
   elementType,

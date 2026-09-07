@@ -122,8 +122,17 @@ export function attributeFieldSchema(elementType: ElementType, key: string): Att
  * for a kind this function has no safe default for (text/date), is simply
  * left unset, which C3 will then reject at commit time rather than this
  * function inventing a wrong value.
+ *
+ * `onMain` overrides that generic rule for exactly one field
+ * (`SystemAttributes.lifecycleStatus`), by product decision rather than
+ * schema order: an architect quick-adding a system directly to `main` is
+ * recording an estate that already exists, so it defaults to `active`
+ * (the "in service" value), not `LIFECYCLE_STATUS_OPTIONS[0]`
+ * (`'planned'`) — which stays the default for a system created inside a
+ * change branch, since a new element proposed on a change is by
+ * definition not live yet.
  */
-export function defaultCreateAttributes(elementType: ElementType): Record<string, Json> {
+export function defaultCreateAttributes(elementType: ElementType, context: { onMain: boolean } = { onMain: true }): Record<string, Json> {
   const attributes: Record<string, Json> = {};
   for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[elementType]) {
     if (!field.required) continue;
@@ -132,6 +141,9 @@ export function defaultCreateAttributes(elementType: ElementType): Record<string
       const firstOption = field.options[0];
       if (firstOption !== undefined) attributes[field.key] = firstOption;
     }
+  }
+  if (elementType === 'system' && context.onMain) {
+    attributes.lifecycleStatus = 'active';
   }
   return attributes;
 }
