@@ -7,6 +7,7 @@ import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useOrganisations } from '../orgs/useOrganisations';
+import styles from './Home.module.css';
 
 function slugify(name: string): string {
   return name
@@ -44,7 +45,7 @@ export function Home() {
   return (
     <div>
       <AppHeader />
-      <main style={{ padding: 'var(--space-8)', maxWidth: 640, margin: '0 auto' }}>
+      <main className={styles.main}>
         <Text as="h1" size="2xl">
           Your organisations
         </Text>
@@ -66,9 +67,9 @@ export function Home() {
           </Panel>
         )}
         {organisations.length > 0 && (
-          <ul style={{ listStyle: 'none', margin: 'var(--space-4) 0', padding: 0 }}>
+          <ul className={styles.list}>
             {organisations.map((org) => (
-              <li key={org.id} style={{ marginBottom: 'var(--space-2)' }}>
+              <li key={org.id} className={styles.listItem}>
                 <Link to={`/o/${org.slug}`}>
                   <Text size="lg">{org.name}</Text>
                 </Link>
@@ -76,24 +77,16 @@ export function Home() {
             ))}
           </ul>
         )}
-        <div style={{ marginTop: 'var(--space-4)' }}>
+        <div className={styles.createSection}>
           {creating ? (
-            <form onSubmit={(e) => void handleCreate(e)} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+            <form onSubmit={(e) => void handleCreate(e)} className={styles.createForm}>
               <input
                 placeholder="Organisation name"
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
                 }}
-                style={{
-                  height: 'var(--row-height)',
-                  padding: '0 var(--space-3)',
-                  borderRadius: 'var(--radius-md)',
-                  border: 'var(--border-width) solid var(--border-strong)',
-                  background: 'var(--surface)',
-                  color: 'var(--text)',
-                  minWidth: 240,
-                }}
+                className={styles.input}
               />
               <Button type="submit" variant="primary" disabled={submitting || name.trim().length === 0}>
                 Create

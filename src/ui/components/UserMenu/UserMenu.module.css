@@ -1,5 +1,64 @@
+.wrapper {
+  position: relative;
+}
+
+.toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  height: var(--row-height);
+  width: var(--row-height);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.1em;
+  cursor: pointer;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .menu {
   display: flex;
   align-items: center;
   gap: var(--space-4);
+}
+
+/* Sprint U3b's mobile header collapse — the same 768px breakpoint
+   src/ui/home/DoorHome.module.css's own two-column layout collapses at. */
+@media (max-width: 768px) {
+  .toggle {
+    display: flex;
+  }
+
+  .menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    right: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: var(--border-width) solid var(--border-strong);
+    background: var(--surface);
+    box-shadow: var(--surface-raised-shadow);
+    min-width: 200px;
+    z-index: 10;
+  }
+
+  .menu.open {
+    display: flex;
+  }
 }

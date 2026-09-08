@@ -27,7 +27,16 @@ export function ReviewQueueView({ modelId, orgSlug, modelSlug }: ReviewQueueView
 
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
-  if (state.rows.length === 0) return <EmptyState>No open merge requests. A change reaches this queue once its author submits it for review.</EmptyState>;
+  if (state.rows.length === 0) {
+    return (
+      <div>
+        <EmptyState>No open merge requests. A change reaches this queue once its author submits it for review.</EmptyState>
+        <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes`} variant="secondary">
+          Changes →
+        </LinkButton>
+      </div>
+    );
+  }
 
   return (
     <ul className={styles.list}>

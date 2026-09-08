@@ -3,8 +3,13 @@
  * audit's own "zero Playwright coverage" finding for both —
  * docs/AUDIT-2026-09-U2.md §5.3): sign up, create an organisation through
  * the UI, land on OrgHome and see the owner role chip, create a model
- * through the UI, land on ModelHome and see its three real links
- * (capability map, landscape, versions).
+ * through the UI, land on ModelHome. Sprint U3b replaced ModelHome's own
+ * placeholder link list with the two front doors (UI-principles §3) —
+ * this test's own tail now checks that redesign's presence for a brand
+ * new, still-empty model (an owner's default door, the search box, the
+ * browse-elements link); e2e/front-doors-and-browse.spec.ts is the real
+ * coverage for the doors' seeded-model content, switching, search, and
+ * table behaviour.
  *
  * Entirely UI-driven, no Node-side seeding: org/model creation already has
  * a real form (Home.tsx, ModelList.tsx) — unlike element-edit.spec.ts and
@@ -14,7 +19,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 
-test('sign-up through org and model creation to ModelHome\'s three links', async ({ page }) => {
+test('sign-up through org and model creation to ModelHome\'s front doors', async ({ page }) => {
   const email = `orghome-${randomUUID()}@example.test`;
   const password = `${randomUUID()}Aa1!`;
   const orgName = `Org ${randomUUID().slice(0, 8)}`;
@@ -50,16 +55,16 @@ test('sign-up through org and model creation to ModelHome\'s three links', async
   await expect(modelLink).toBeVisible();
   await modelLink.click();
 
-  // ModelHome: the model's own name and its three real links — no fourth
-  // "browse an element" link, per this page's own "not built yet" note.
+  // ModelHome: the model's own name, the door switch (a fresh org's
+  // creator is its owner, so the architect door is the default —
+  // UI-principles §3), the search box, and the browse-elements link.
   await expect(page.getByRole('heading', { name: modelName })).toBeVisible();
-  const capabilityMapLink = page.getByRole('link', { name: 'Capability map →' });
-  const landscapeLink = page.getByRole('link', { name: 'Landscape →' });
-  const versionsLink = page.getByRole('link', { name: 'Versions →' });
-  await expect(capabilityMapLink).toBeVisible();
-  await expect(landscapeLink).toBeVisible();
-  await expect(versionsLink).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Architect view' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Director view' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByPlaceholder('Search or create a capability, system, or actor…')).toBeVisible();
 
-  await landscapeLink.click();
-  await expect(page).toHaveURL(/\/landscape$/);
+  const browseLink = page.getByRole('link', { name: 'Browse all elements →' });
+  await expect(browseLink).toBeVisible();
+  await browseLink.click();
+  await expect(page).toHaveURL(/\/elements$/);
 });

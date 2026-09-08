@@ -75,7 +75,12 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }
       )}
 
       {group.internal.length === 0 && group.external.length === 0 && group.owners.length === 0 && (
-        <EmptyState>No relationships yet. Add a `uses`, `flows_to` or `owns` relationship from the element page to see it here.</EmptyState>
+        <div>
+          <EmptyState>No relationships yet.</EmptyState>
+          <LinkButton to={elementHref(group.hub.element_id)} variant="secondary">
+            Add a relationship on the element page →
+          </LinkButton>
+        </div>
       )}
 
       <div className={styles.groups}>

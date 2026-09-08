@@ -9,6 +9,7 @@ import { canCreateModel, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { useOrganisations } from '../orgs/useOrganisations';
 import { useModels } from '../models/useModels';
+import styles from './OrgHome.module.css';
 
 /** Org home: the model list for one organisation, plus the org switcher and role-gated "New model" (Sprint U1 step 2). */
 export function OrgHome() {
@@ -23,7 +24,7 @@ export function OrgHome() {
     return (
       <div>
         <AppHeader />
-        <main style={{ padding: 'var(--space-8)' }}>
+        <main className={styles.main}>
           <Text tone="muted">Loading…</Text>
         </main>
       </div>
@@ -34,7 +35,7 @@ export function OrgHome() {
     return (
       <div>
         <AppHeader />
-        <main style={{ padding: 'var(--space-8)' }}>
+        <main className={styles.main}>
           <Text as="p">{orgError ?? `No organisation found for "${orgSlug ?? ''}", or you're not a member of it.`}</Text>
         </main>
       </div>
@@ -46,8 +47,8 @@ export function OrgHome() {
       <AppHeader>
         <OrgSwitcher organisations={organisations} currentOrgSlug={organisation.slug} />
       </AppHeader>
-      <main style={{ padding: 'var(--space-8)', maxWidth: 640, margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+      <main className={styles.main}>
+        <div className={styles.title}>
           <Text as="h1" size="2xl">
             {organisation.name}
           </Text>
