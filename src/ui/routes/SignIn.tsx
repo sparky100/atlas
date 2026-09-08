@@ -99,17 +99,18 @@ export function SignIn() {
             </Button>
           </form>
         )}
-        <button
-          type="button"
-          className={styles.modeSwitch}
-          onClick={() => {
-            setMode(mode === 'signIn' ? 'signUp' : 'signIn');
-            setError(null);
-            setSignedUpNeedsConfirmation(false);
-          }}
-        >
-          {mode === 'signIn' ? "Don't have an account? Create one" : 'Already have an account? Sign in'}
-        </button>
+        <div className={styles.modeSwitch}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setMode(mode === 'signIn' ? 'signUp' : 'signIn');
+              setError(null);
+              setSignedUpNeedsConfirmation(false);
+            }}
+          >
+            {mode === 'signIn' ? "Don't have an account? Create one" : 'Already have an account? Sign in'}
+          </Button>
+        </div>
       </Panel>
     </div>
   );

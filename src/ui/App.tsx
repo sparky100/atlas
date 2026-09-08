@@ -6,6 +6,7 @@ import { ComponentPage } from './routes/ComponentPage';
 import { ContainerPage } from './routes/ContainerPage';
 import { ContextPage } from './routes/ContextPage';
 import { ElementPage } from './routes/ElementPage';
+import { ElementsPage } from './routes/ElementsPage';
 import { Home } from './routes/Home';
 import { LandscapePage } from './routes/LandscapePage';
 import { ModelHome } from './routes/ModelHome';
@@ -32,6 +33,7 @@ export function App() {
           <Route path="/o/:orgSlug" element={<OrgHome />} />
           <Route path="/o/:orgSlug/m/:modelSlug" element={<ModelHome />} />
           <Route path="/o/:orgSlug/m/:modelSlug/e/:elementId" element={<ElementPage />} />
+          <Route path="/o/:orgSlug/m/:modelSlug/elements" element={<ElementsPage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/landscape" element={<LandscapePage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/capability-map" element={<CapabilityMapPage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/context/:systemId" element={<ContextPage />} />

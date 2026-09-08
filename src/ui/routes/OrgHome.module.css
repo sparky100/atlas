@@ -1,0 +1,12 @@
+.main {
+  padding: var(--space-8);
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}

@@ -20,6 +20,15 @@ import { describe, expect, it } from 'vitest';
  * patterns every real call site in this module uses. A read shaped some
  * third way would slip past this test undetected; if you're adding one,
  * make sure it's actually paginated, not just written to dodge the check.
+ *
+ * Two more shapes are exempt for the same reason `.maybeSingle()`/
+ * `.single()` are — `max_rows` truncation genuinely cannot happen to
+ * them, not because they dodge the letter of the rule: `head: true`
+ * (Sprint U3b, src/db/modelHome.ts's counts — a count-only query returns
+ * zero data rows regardless, only the exact count Postgres computed) and
+ * `.limit(N)` for a literal, caller-fixed `N` (Sprint U3b's
+ * `listRecentCommits` — the query already asks for fewer rows than
+ * `max_rows` could ever truncate down to).
  */
 
 const GUARDED_TABLES = ['elements_head', 'relationships_head', 'facts', 'deltas', 'commits'] as const;
@@ -63,6 +72,11 @@ function findViolationsIn(sources: { file: string; text: string }[]): Violation[
 
         // Exempt: a single-row lookup by a unique key can't be truncated by max_rows.
         if (/\.maybeSingle\(|\.single\(/.test(stmt)) continue;
+
+        // Exempt: a count-only query (no data rows returned at all) or a
+        // literal `.limit(N)` already below max_rows — see this file's own
+        // module comment.
+        if (/head:\s*true/.test(stmt) || /\.limit\(/.test(stmt)) continue;
 
         // Directly wrapped, in either order within the same statement:
         // `selectAll(supabase.from(...)...)` (selectAll precedes the match)
@@ -122,6 +136,16 @@ describe('head-scoped table reads (SPEC §6.7)', () => {
 
     it('does not flag a read against an unguarded table', () => {
       const violations = findViolationsIn([{ file: 'fixture.ts', text: `supabase.from('branches').select('*').eq('model_id', modelId);` }]);
+      expect(violations).toHaveLength(0);
+    });
+
+    it('does not flag a count-only query (head: true)', () => {
+      const violations = findViolationsIn([{ file: 'fixture.ts', text: `supabase.from('elements_head').select('element_id', { count: 'exact', head: true }).eq('commit_id', commitId);` }]);
+      expect(violations).toHaveLength(0);
+    });
+
+    it('does not flag a literal .limit(N)', () => {
+      const violations = findViolationsIn([{ file: 'fixture.ts', text: `supabase.from('commits').select('*').eq('branch_id', branchId).order('created_at', { ascending: false }).limit(10);` }]);
       expect(violations).toHaveLength(0);
     });
   });

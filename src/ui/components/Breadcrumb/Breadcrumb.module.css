@@ -10,8 +10,31 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  min-width: 0;
 }
 
 .sep {
   padding: 0 var(--space-1);
+}
+
+/* Sprint U3b's "truncates sensibly": below the mobile breakpoint, wrapping
+   to a second line pushes page content down awkwardly, so the breadcrumb
+   becomes one non-wrapping, horizontally scrollable line instead, with
+   each label capped and ellipsised individually rather than the whole bar
+   overflowing the viewport unreadably. */
+@media (max-width: 768px) {
+  .breadcrumb {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  .breadcrumb a {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: bottom;
+  }
 }
