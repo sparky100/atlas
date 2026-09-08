@@ -1,6 +1,8 @@
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { ModelNav } from '../components/ModelNav/ModelNav';
+import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useModels } from '../models/useModels';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -31,9 +33,12 @@ export function VersionDiffPage() {
     return (
       <div>
         <AppHeader />
-        <main className={styles.main}>
-          <Text tone="muted">Loading…</Text>
-        </main>
+        <div className={navStyles.body}>
+          <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+          <main className={styles.main}>
+            <Text tone="muted">Loading…</Text>
+          </main>
+        </div>
       </div>
     );
   }
@@ -41,23 +46,26 @@ export function VersionDiffPage() {
   return (
     <div>
       <AppHeader />
-      <main className={styles.main}>
-        <Breadcrumb
-          org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
-          model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
-          refLabel={`${refLabelOf(asIs)} → ${refLabelOf(toBe)}`}
-        />
-        <div className={styles.header}>
-          <Text as="h1" size="2xl">
-            Diff: {refLabelOf(asIs)} → {refLabelOf(toBe)}
-          </Text>
-        </div>
+      <div className={navStyles.body}>
+        <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+        <main className={styles.main}>
+          <Breadcrumb
+            org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
+            model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
+            refLabel={`${refLabelOf(asIs)} → ${refLabelOf(toBe)}`}
+          />
+          <div className={styles.header}>
+            <Text as="h1" size="2xl">
+              Diff: {refLabelOf(asIs)} → {refLabelOf(toBe)}
+            </Text>
+          </div>
 
-        {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
-        {state.status === 'error' && <Text as="p">{state.message}</Text>}
-        {state.status === 'refNotFound' && <Text as="p">One of these versions could not be found.</Text>}
-        {state.status === 'ready' && <VersionDiffView diff={state.data.diff} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} toBeRefParam={refParamOf(toBe)} asIsRefParam={refParamOf(asIs)} />}
-      </main>
+          {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+          {state.status === 'error' && <Text as="p">{state.message}</Text>}
+          {state.status === 'refNotFound' && <Text as="p">One of these versions could not be found.</Text>}
+          {state.status === 'ready' && <VersionDiffView diff={state.data.diff} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} toBeRefParam={refParamOf(toBe)} asIsRefParam={refParamOf(asIs)} />}
+        </main>
+      </div>
     </div>
   );
 }

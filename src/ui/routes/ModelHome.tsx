@@ -1,6 +1,8 @@
 import { Link, useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { EmptyState } from '../components/EmptyState/EmptyState';
+import { ModelNav } from '../components/ModelNav/ModelNav';
+import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
@@ -48,9 +50,12 @@ export function ModelHome() {
     return (
       <div>
         <AppHeader />
-        <main className={styles.main}>
-          <Text tone="muted">{loading ? 'Loading…' : `No model found for "${modelSlug ?? ''}" in this organisation.`}</Text>
-        </main>
+        <div className={navStyles.body}>
+          <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+          <main className={styles.main}>
+            <Text tone="muted">{loading ? 'Loading…' : `No model found for "${modelSlug ?? ''}" in this organisation.`}</Text>
+          </main>
+        </div>
       </div>
     );
   }
@@ -58,7 +63,9 @@ export function ModelHome() {
   return (
     <div>
       <AppHeader />
-      <main className={styles.main}>
+      <div className={navStyles.body}>
+        <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+        <main className={styles.main}>
         <div className={styles.header}>
           <Text as="h1" size="2xl">
             {model.name}
@@ -102,7 +109,8 @@ export function ModelHome() {
         {homeMode === 'architect' && architectState.status === 'ready' && (
           <ArchitectHome data={architectState.data} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
         )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

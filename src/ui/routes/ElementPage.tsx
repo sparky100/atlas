@@ -13,6 +13,8 @@ import { CollapsibleSection } from '../components/CollapsibleSection/Collapsible
 import { ElementHeader } from '../components/ElementHeader/ElementHeader';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { HistoryTimeline } from '../components/HistoryTimeline/HistoryTimeline';
+import { ModelNav } from '../components/ModelNav/ModelNav';
+import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Panel } from '../components/Panel/Panel';
 import { RelationshipsSection } from '../components/RelationshipGroup/RelationshipsSection';
 import { StructureSection } from '../components/StructureSection/StructureSection';
@@ -93,9 +95,12 @@ export function ElementPage() {
     return (
       <div>
         <AppHeader />
-        <main className={styles.main}>
-          <Text tone="muted">Loading…</Text>
-        </main>
+        <div className={navStyles.body}>
+          <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+          <main className={styles.main}>
+            <Text tone="muted">Loading…</Text>
+          </main>
+        </div>
       </div>
     );
   }
@@ -103,7 +108,9 @@ export function ElementPage() {
   return (
     <div>
       <AppHeader />
-      <main className={styles.main}>
+      <div className={navStyles.body}>
+        <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+        <main className={styles.main}>
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
@@ -198,7 +205,8 @@ export function ElementPage() {
             </div>
           </>
         )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

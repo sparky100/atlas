@@ -1,0 +1,109 @@
+/* Sprint U3b's persistent model nav — desktop rail, mobile bottom bar. The
+   768px breakpoint matches every other mobile treatment this sprint added
+   (UserMenu, Breadcrumb, DoorHome's own column collapse).
+
+   `.body` is the wrapping layout every model route uses: `<div
+   className={navStyles.body}><ModelNav .../><main>...</main></div>`, a rail
+   beside the page content on desktop, a page above a fixed bottom bar on
+   mobile (`.body`'s own bottom padding keeps the bar from covering the
+   page's last content). One shared class rather than fourteen near-
+   identical copies in each route's own module. */
+.body {
+  display: flex;
+  align-items: flex-start;
+}
+
+/* Targets the `<main>` tag directly, not a page-specific class, so every
+   route's own `.main` (each with its own max-width/margin:auto centering,
+   unchanged) still fills the space beside the rail instead of overflowing
+   or centering against the full viewport width. */
+.body > main {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .body {
+    flex-direction: column;
+    padding-bottom: 64px;
+  }
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 200px;
+  flex-shrink: 0;
+  padding: var(--space-4) var(--space-2);
+  border-right: var(--border-width) solid var(--border-strong);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.link {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+
+.link:hover {
+  background: var(--surface-raised);
+}
+
+.active {
+  background: var(--surface-raised);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.refChip {
+  padding: 0 var(--space-2);
+}
+
+@media (max-width: 768px) {
+  .nav {
+    width: 100%;
+    flex-direction: column-reverse;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    border-right: none;
+    border-top: var(--border-width) solid var(--border-strong);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--surface);
+    z-index: 10;
+  }
+
+  .list {
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 0;
+    overflow-x: auto;
+  }
+
+  .link {
+    padding: var(--space-1) var(--space-2);
+    white-space: nowrap;
+  }
+
+  .active {
+    box-shadow: inset 0 3px 0 var(--accent);
+  }
+
+  .refChip {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-1) 0 0;
+  }
+}

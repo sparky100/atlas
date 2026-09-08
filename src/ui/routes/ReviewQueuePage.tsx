@@ -1,6 +1,8 @@
 import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { ModelNav } from '../components/ModelNav/ModelNav';
+import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { ReviewQueueView } from '../reviews/ReviewQueueView';
 import { useModels } from '../models/useModels';
@@ -19,9 +21,12 @@ export function ReviewQueuePage() {
     return (
       <div>
         <AppHeader />
-        <main className={styles.main}>
-          <Text tone="muted">Loading…</Text>
-        </main>
+        <div className={navStyles.body}>
+          <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+          <main className={styles.main}>
+            <Text tone="muted">Loading…</Text>
+          </main>
+        </div>
       </div>
     );
   }
@@ -29,15 +34,18 @@ export function ReviewQueuePage() {
   return (
     <div>
       <AppHeader />
-      <main className={styles.main}>
-        <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel="Review queue" />
-        <div className={styles.header}>
-          <Text as="h1" size="2xl">
-            Review queue
-          </Text>
-        </div>
-        <ReviewQueueView modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
-      </main>
+      <div className={navStyles.body}>
+        <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+        <main className={styles.main}>
+          <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel="Review queue" />
+          <div className={styles.header}>
+            <Text as="h1" size="2xl">
+              Review queue
+            </Text>
+          </div>
+          <ReviewQueueView modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
+        </main>
+      </div>
     </div>
   );
 }
