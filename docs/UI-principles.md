@@ -115,7 +115,7 @@ Opens on **the capability map at `main`**, with three overlays and nothing else:
    Each is a filter chip, not a score. Toggling a chip highlights matching tiles; the tile's tooltip lists the specific systems and facts. There is no traffic light on the whole organisation, because the model cannot honestly produce one.
 3. **Changes in flight** — a right-hand list of change branches with status `proposed | in_review | approved`, each with title, the capabilities it touches, and a one-line to-be summary (counts of systems added/retired). Clicking opens the branch's to-be view scoped to the director's current zoom, not the review queue.
 
-The director's door has no sidebar, no branch selector, no editing affordance. Comments are readable (`team` visibility) via the side panel toggle.
+The director's door has no sidebar, no branch selector, no editing affordance. Comments are readable via the side panel toggle.
 
 ### 3.2 Architect's door
 
@@ -354,7 +354,7 @@ Starting a comment from a canvas node optionally stores `view_id`/`hint_x`/`hint
 One panel, right-docked, toggled with `c`, the same everywhere:
 
 - Header: scope (`This element` · `This view` · `This change` · `Model`) with the unresolved count, and a `Show resolved` toggle.
-- Threads: root comment, replies indented one level (flat thread, ADR-010), author, age, visibility chip for `internal`. Each thread shows its anchor as a breadcrumb line; clicking it navigates (and, on a canvas, pans to it).
+- Threads: root comment, replies indented one level (flat thread, ADR-010), author, age. Each thread shows its anchor as a breadcrumb line; clicking it navigates (and, on a canvas, pans to it). (ADR-010's Sprint M1a amendment dropped the `team`/`internal` visibility split this line originally named a chip for.)
 - Composer at the bottom, `⌘/Ctrl+Enter` to post, `@` mentions members.
 - `Resolve` on the thread for architect+; resolved threads collapse to one line and remain in history.
 
