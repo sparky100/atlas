@@ -59,6 +59,18 @@
   --canvas-node-min-height: 48px;
   --panel-padding: var(--space-4);
 
+  /* ---- Component sizes (named on introduction, per CLAUDE.md/Handoff 7d's
+     "never add a number without a token" rule — every one of these was a
+     bare pixel value in a component's own CSS module until this row named
+     it; density-mode remaps live in the `[data-density='compact']` block
+     below, same pattern as --row-height's own pair) ---- */
+  --tile-min-height: 78px;
+  --tile-min-height-emphasised: 104px;
+  --status-bar-height: 3px;
+  --status-dot-size: 6px;
+  --side-column-width: 300px;
+  --blueprint-corner-size: 10px;
+
   /* ---- Colour: surfaces and text, light (§8.4) ---- */
   --bg: #ffffff;
   --bg-subtle: #f6f7f9;
@@ -155,4 +167,6 @@
   --attribute-row-height: 26px;
   --canvas-node-min-height: 36px;
   --panel-padding: var(--space-2);
+  --tile-min-height: 62px;
+  --tile-min-height-emphasised: 84px;
 }

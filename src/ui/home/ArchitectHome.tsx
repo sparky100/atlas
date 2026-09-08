@@ -1,8 +1,10 @@
 import { Link } from 'react-router';
+import { BlueprintFrame } from '../components/BlueprintFrame/BlueprintFrame';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import type { ElementsHeadRow } from '../../contracts/rows';
 import { monthsSince } from '../../contracts/thresholds';
 import { branchStatusTone } from '../changes/branchStatus';
 import type { ArchitectHomeData } from './useArchitectHome';
@@ -22,18 +24,34 @@ function formatAge(dateStr: string, now: Date): string {
   return `${String(Math.floor(months / 12))}y ago`;
 }
 
+/** Handoff 7d's "names three plus +N" — every named-examples list in the Health findings panel uses this, so a finding is actionable from its own row without a click. */
+function namedExamples(items: readonly ElementsHeadRow[], max = 3): string {
+  const shown = items.slice(0, max).map((item) => item.name);
+  const remaining = items.length - shown.length;
+  return remaining > 0 ? `${shown.join(', ')}, +${String(remaining)}` : shown.join(', ');
+}
+
+function plural(count: number, singular: string, pluralForm: string): string {
+  return count === 1 ? singular : pluralForm;
+}
+
 /**
- * The architect's door (UI-principles §3.2, scoped down for Sprint U3b —
- * see src/db/modelHome.ts's own module comment for the full-vs-built
- * gap). Recent commits on main; the review queue's count and oldest item;
- * the signed-in user's own open branches; the duplicates count ADR-019
- * names for Q1, wired to 0 until then. Jumping to Changes or the review
+ * The architect's door (UI-principles §3.2, built to Handoff 7d's
+ * architect-door amendment for Health findings —
+ * `docs/HANDOFF-7d-architect-door.md`; still scoped down from §3.2's full
+ * three-column dashboard otherwise, see `useArchitectHome.ts`'s own
+ * comment for exactly what's deferred). Recent commits on main; the
+ * review queue's count and oldest item; the signed-in user's own open
+ * branches; four health findings (systems with no capability,
+ * capabilities with no owner, stale attributes, duplicates — the last
+ * still wired to 0 until Q1, ADR-019). Jumping to Changes or the review
  * queue generically is the persistent model nav's job now (ModelNav.tsx)
  * — this used to also carry its own "Start a change"/"Open the queue"
  * links before that existed.
  */
 export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) {
   const now = new Date();
+  const elementsHref = `/o/${orgSlug}/m/${modelSlug}/elements`;
 
   return (
     <div className={styles.columns}>
@@ -107,19 +125,56 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
 
         <Panel>
           <Text as="h2" size="lg">
-            Duplicates
+            Health findings
           </Text>
-          <div className={styles.count}>
-            <Text as="span" size="2xl">
-              {data.duplicatesCount}
-            </Text>
-            <Text as="span" tone="muted" size="sm">
-              flagged
-            </Text>
+          <div className={styles.findingPlates}>
+            <BlueprintFrame>
+              <Text as="p">
+                {data.systemsWithoutCapability.length} {plural(data.systemsWithoutCapability.length, 'system', 'systems')} not linked to a capability
+              </Text>
+              {data.systemsWithoutCapability.length > 0 && (
+                <>
+                  <Text as="p" tone="muted" size="sm">
+                    {namedExamples(data.systemsWithoutCapability)}
+                  </Text>
+                  <Link to={elementsHref}>
+                    <Text as="span" size="sm">
+                      Review and link →
+                    </Text>
+                  </Link>
+                </>
+              )}
+            </BlueprintFrame>
+
+            <div className={styles.findingPlate}>
+              <Text as="p">
+                {data.capabilitiesWithoutOwner.length} {plural(data.capabilitiesWithoutOwner.length, 'capability', 'capabilities')} with no owner
+              </Text>
+              {data.capabilitiesWithoutOwner.length > 0 && (
+                <Text as="p" tone="muted" size="sm">
+                  {namedExamples(data.capabilitiesWithoutOwner, data.capabilitiesWithoutOwner.length)}
+                </Text>
+              )}
+            </div>
+
+            <div className={styles.findingPlate}>
+              <Text as="p">
+                {data.staleAttributes.staleFactCount} {plural(data.staleAttributes.staleFactCount, 'attribute', 'attributes')} stale over 12 months
+              </Text>
+              {data.staleAttributes.staleFactCount > 0 && (
+                <Text as="p" tone="muted" size="sm">
+                  across {data.staleAttributes.systemCount} {plural(data.staleAttributes.systemCount, 'system', 'systems')} · oldest {data.staleAttributes.oldestAgeYears}y
+                </Text>
+              )}
+            </div>
+
+            <div className={styles.findingPlate}>
+              <Text as="p">{data.duplicatesCount} duplicates flagged</Text>
+              <Text as="p" tone="faint" size="sm">
+                Wired to 0 until Q1&rsquo;s matching pipeline can populate the standing duplicates report (ADR-019).
+              </Text>
+            </div>
           </div>
-          <Text as="p" tone="faint" size="sm">
-            Wired to 0 until Q1&rsquo;s matching pipeline can populate the standing duplicates report (ADR-019).
-          </Text>
         </Panel>
       </div>
     </div>

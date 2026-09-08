@@ -60,3 +60,17 @@
   justify-content: space-between;
   gap: var(--space-2);
 }
+
+/* Handoff 7d's architect-door Health findings: four plates, the first
+   blueprint-framed (rendered via <BlueprintFrame>, not this class). */
+.findingPlates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.findingPlate {
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+}
