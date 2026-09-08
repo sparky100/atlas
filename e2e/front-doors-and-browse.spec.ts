@@ -1,11 +1,12 @@
 /**
- * Sprint U3b's core user path (UI-principles §3): the two front doors,
- * the element browse table, and the mobile header collapse. Seeds a small
- * model (two systems — one `retiring`, to exercise the capability-map
- * thumbnail's exposure tone — one capability, one `supports` edge)
- * through the real `commitToBranch` path from Node (main already has a
- * real genesis commit, ADR-018 — no bootstrap needed), then drives the
- * actual UI through the browser.
+ * Sprint U3b's core user path (UI-principles §3), director door updated
+ * for Handoff 7d (`docs/HANDOFF-7d-director-door.md`): the two front
+ * doors, the element browse table, and the mobile header collapse. Seeds
+ * a small model (two systems — one `retiring`, to exercise the director
+ * door's weakness grid — one capability, one `supports` edge) through the
+ * real `commitToBranch` path from Node (main already has a real genesis
+ * commit, ADR-018 — no bootstrap needed), then drives the actual UI
+ * through the browser.
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
@@ -114,18 +115,20 @@ test('front doors and browse: both doors render for a seeded model, switching pe
   // (UI-principles §3: "Owners and Architects get the architect door").
   await expect(page.getByRole('heading', { name: 'My branches' })).toBeVisible();
 
-  // Switching to the director door renders the capability-map thumbnail
-  // with its exposure tone (the retiring system's own `supports` edge) and
-  // the three headline counts.
+  // Switching to the director door renders the weakness grid (Handoff 7d):
+  // the exposed capability's own tile, naming the retiring system that
+  // exposes it, plus the "N capabilities exposed" summary chip.
   await page.getByRole('button', { name: 'Director view' }).click();
-  await expect(page.getByText('Billing', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Billing/ })).toBeVisible();
+  await expect(page.getByText('1 capability exposed')).toBeVisible();
   await expect(page.getByText('lifecycle exposure')).toBeVisible();
-  await expect(page.getByText('Capabilities')).toBeVisible();
+  await expect(page.getByText('Legacy Mainframe')).toBeVisible();
 
   // Switching persists: reloading the page keeps the director door, not
   // just the in-memory toggle state.
   await page.reload();
-  await expect(page.getByText('Billing', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Billing/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Director view' })).toHaveAttribute('aria-pressed', 'true');
 
   // The search box is search-first and opens an existing element rather
