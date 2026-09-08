@@ -2,6 +2,8 @@ import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
+import { ModelNav } from '../components/ModelNav/ModelNav';
+import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
@@ -60,9 +62,12 @@ export function ComponentPage() {
     return (
       <div>
         <AppHeader />
-        <main className={styles.main}>
-          <Text tone="muted">Loading…</Text>
-        </main>
+        <div className={navStyles.body}>
+          <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+          <main className={styles.main}>
+            <Text tone="muted">Loading…</Text>
+          </main>
+        </div>
       </div>
     );
   }
@@ -80,7 +85,9 @@ export function ComponentPage() {
   return (
     <div>
       <AppHeader />
-      <main className={styles.main}>
+      <div className={navStyles.body}>
+        <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+        <main className={styles.main}>
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
@@ -144,7 +151,8 @@ export function ComponentPage() {
             }
           />
         )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

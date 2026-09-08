@@ -1,6 +1,8 @@
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
+import { ModelNav } from '../components/ModelNav/ModelNav';
+import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
@@ -41,9 +43,12 @@ export function ContextPage() {
     return (
       <div>
         <AppHeader />
-        <main className={styles.main}>
-          <Text tone="muted">Loading…</Text>
-        </main>
+        <div className={navStyles.body}>
+          <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+          <main className={styles.main}>
+            <Text tone="muted">Loading…</Text>
+          </main>
+        </div>
       </div>
     );
   }
@@ -56,7 +61,9 @@ export function ContextPage() {
   return (
     <div>
       <AppHeader />
-      <main className={styles.main}>
+      <div className={navStyles.body}>
+        <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+        <main className={styles.main}>
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
@@ -93,7 +100,8 @@ export function ContextPage() {
           </Panel>
         )}
         {state.status === 'ready' && <ContextView group={state.data.group} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} refParam={refParam} diff={state.data.diff} />}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

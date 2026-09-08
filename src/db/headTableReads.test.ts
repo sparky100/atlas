@@ -76,7 +76,7 @@ function findViolationsIn(sources: { file: string; text: string }[]): Violation[
         // Exempt: a count-only query (no data rows returned at all) or a
         // literal `.limit(N)` already below max_rows — see this file's own
         // module comment.
-        if (/head:\s*true/.test(stmt) || /\.limit\(/.test(stmt)) continue;
+        if (/head:\s*true/.test(stmt) || stmt.includes('.limit(')) continue;
 
         // Directly wrapped, in either order within the same statement:
         // `selectAll(supabase.from(...)...)` (selectAll precedes the match)

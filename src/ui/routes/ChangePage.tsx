@@ -1,6 +1,8 @@
 import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { ModelNav } from '../components/ModelNav/ModelNav';
+import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { ChangeView } from '../changes/ChangeView';
 import { useChange } from '../changes/useChange';
@@ -31,9 +33,12 @@ export function ChangePage() {
     return (
       <div>
         <AppHeader />
-        <main className={styles.main}>
-          <Text tone="muted">Loading…</Text>
-        </main>
+        <div className={navStyles.body}>
+          <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+          <main className={styles.main}>
+            <Text tone="muted">Loading…</Text>
+          </main>
+        </div>
       </div>
     );
   }
@@ -43,15 +48,18 @@ export function ChangePage() {
   return (
     <div>
       <AppHeader />
-      <main className={styles.main}>
-        <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabel} />
-        <div className={styles.header}>
-          <Text as="h1" size="2xl">
-            {branch?.title ?? branch?.name ?? 'Change'}
-          </Text>
-        </div>
-        <ChangeView modelId={model.id} branchId={branchId ?? ''} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canEdit={canEdit} />
-      </main>
+      <div className={navStyles.body}>
+        <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+        <main className={styles.main}>
+          <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabel} />
+          <div className={styles.header}>
+            <Text as="h1" size="2xl">
+              {branch?.title ?? branch?.name ?? 'Change'}
+            </Text>
+          </div>
+          <ChangeView modelId={model.id} branchId={branchId ?? ''} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canEdit={canEdit} />
+        </main>
+      </div>
     </div>
   );
 }

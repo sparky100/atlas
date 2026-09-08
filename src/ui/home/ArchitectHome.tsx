@@ -27,7 +27,10 @@ function formatAge(dateStr: string, now: Date): string {
  * see src/db/modelHome.ts's own module comment for the full-vs-built
  * gap). Recent commits on main; the review queue's count and oldest item;
  * the signed-in user's own open branches; the duplicates count ADR-019
- * names for Q1, wired to 0 until then.
+ * names for Q1, wired to 0 until then. Jumping to Changes or the review
+ * queue generically is the persistent model nav's job now (ModelNav.tsx)
+ * — this used to also carry its own "Start a change"/"Open the queue"
+ * links before that existed.
  */
 export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) {
   const now = new Date();
@@ -62,14 +65,7 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
             My branches
           </Text>
           {data.myOpenBranches.length === 0 ? (
-            <div>
-              <EmptyState>No open branches of your own right now.</EmptyState>
-              <Link to={`/o/${orgSlug}/m/${modelSlug}/changes`}>
-                <Text as="span" size="sm">
-                  Start a change →
-                </Text>
-              </Link>
-            </div>
+            <EmptyState>No open branches of your own right now.</EmptyState>
           ) : (
             <ul className={styles.branchList}>
               {data.myOpenBranches.map((branch) => (
@@ -107,11 +103,6 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
               </Text>
             </Link>
           )}
-          <Link to={`/o/${orgSlug}/m/${modelSlug}/review`}>
-            <Text as="span" tone="muted" size="sm">
-              Open the queue →
-            </Text>
-          </Link>
         </Panel>
 
         <Panel>

@@ -30,6 +30,18 @@ The incumbents fail most of these: Sparx has no provenance and hand-drawn diagra
 
 ## 2. Navigation model
 
+### 2.0 Persistent model navigation
+
+Every model-scoped route (home, capability map, landscape and the zoom chain beneath it, changes, versions, review) renders the same six-item navigation alongside the page: **Home, Capability map, Landscape, Changes, Versions, Review queue**. It is chrome, not a per-page affordance — a page never grows its own "back to X" link to stand in for it (§8 forbids raw HTML lists/links for the same reason: one component, everywhere, not a hand-rolled equivalent per route).
+
+- **Desktop**: a left rail, 200px wide, between the app header and the page content.
+- **Mobile** (< 768px): a bottom bar, fixed to the viewport, below the page content (which gains bottom padding so nothing sits underneath it).
+- The item for the current route is highlighted (`aria-current="page"`).
+- The `[ref]` chip (§2.2) sits alongside the nav items — same `main` / tag / branch-title rendering as the breadcrumb's chip — so which state you're looking at travels with you across a jump, not just within one page's breadcrumb. Home, Changes, and Review queue aren't ref-scoped, so their links carry no `?ref=`; Capability map, Landscape, and Versions preserve the current ref.
+- Because every section is one tap away from every other on the bottom bar, any model route is reachable from any other within two taps on a mobile viewport (one to leave the current section, at most one more to land on an element within it).
+
+Implementation: `src/ui/components/ModelNav/ModelNav.tsx`, section membership resolved by path in `src/ui/nav/modelNavSection.ts`.
+
 ### 2.1 One zoom gesture, five levels
 
 The model is a hierarchy with one business layer on top (ADR-001). Navigation is a single continuous zoom that crosses semantic levels:
