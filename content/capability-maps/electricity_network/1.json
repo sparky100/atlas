@@ -1,13 +1,13 @@
 {
   "sector": "electricity_network",
   "version": 1,
-  "status": "draft",
-  "sourceDescription": "Starter capability map for an electricity network operator (a distribution network operator taking on distribution system operator functions, or a transmission owner), drafted 2026-09-07 as the worked example of the utility map: the four utility-specific level-1 capabilities (codes 9-12) use exactly the utility map's level-1 wording, and every level-2 under them is electricity-specific rather than a restatement of the generic utility level-2s — except Connections and Emergency Response, which are the same capability and keep the same wording. Drafted from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.",
+  "status": "published",
+  "sourceDescription": "Starter capability map for an electricity network operator (a distribution network operator taking on distribution system operator functions, or a transmission owner), drafted 2026-09-07 as the worked example of the utility map: the four utility-specific level-1 capabilities (codes 9-12) use exactly the utility map's level-1 wording, and every level-2 under them is electricity-specific rather than a restatement of the generic utility level-2s — except Connections and Emergency Response, which are the same capability and keep the same wording. Drafted from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
-    { "citation": "Ofgem RIIO-ED2 price-control framework and the Distribution Code / Grid Code (consulted for regulatory and operational vocabulary; not copied)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "Energy Networks Association Open Networks project (consulted for DSO and flexibility-market vocabulary; not copied)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "IEC 61970/61968 Common Information Model (consulted for network-asset and operations vocabulary; not copied)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" }
+    { "citation": "Ofgem RIIO-ED2 price-control framework and the Distribution Code / Grid Code (consulted for regulatory and operational vocabulary; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "Energy Networks Association Open Networks project (consulted for DSO and flexibility-market vocabulary; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "IEC 61970/61968 Common Information Model (consulted for network-asset and operations vocabulary; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" }
   ],
   "items": [
     { "code": "1", "name": "Finance", "level": 1, "parentCode": null, "description": "Planning, controlling and accounting for the organisation's money and financial risk." },

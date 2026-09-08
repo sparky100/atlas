@@ -1,12 +1,12 @@
 {
   "sector": "public_body",
   "version": 1,
-  "status": "draft",
-  "sourceDescription": "Starter capability map for a generic public body (an executive agency, non-departmental public body or similar that makes policy, engages the public and often administers funding, but does not itself run schools, hospitals, homes or networks), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus three generic-public-body ones (policy development, public engagement, grants and funding). Renamed from the original 'generic' sector. Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.",
+  "status": "published",
+  "sourceDescription": "Starter capability map for a generic public body (an executive agency, non-departmental public body or similar that makes policy, engages the public and often administers funding, but does not itself run schools, hospitals, homes or networks), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus three generic-public-body ones (policy development, public engagement, grants and funding). Renamed from the original 'generic' sector. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
-    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for both the shared corporate capabilities and the generic policy/engagement/grants shape)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "HM Treasury Green Book (consulted for policy appraisal vocabulary; not copied)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "APQC Process Classification Framework (consulted only to check scope coverage of the shared capabilities; it is a process model and no process names were adopted)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" }
+    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for both the shared corporate capabilities and the generic policy/engagement/grants shape)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "HM Treasury Green Book (consulted for policy appraisal vocabulary; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "APQC Process Classification Framework (consulted only to check scope coverage of the shared capabilities; it is a process model and no process names were adopted)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" }
   ],
   "items": [
     { "code": "1", "name": "Finance", "level": 1, "parentCode": null, "description": "Planning, controlling and accounting for the organisation's money and financial risk." },

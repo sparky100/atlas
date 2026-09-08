@@ -1,12 +1,12 @@
 {
   "sector": "utility",
   "version": 1,
-  "status": "draft",
-  "sourceDescription": "Starter capability map for a generic regulated, asset-owning UK utility (a water, gas or electricity network company under Ofwat or Ofgem price control), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four utility-specific ones (asset management, network operations, customer and metering, regulatory compliance and price-control reporting) whose level-1 wording the electricity_network map shares exactly, adding its own sector-specific level-2 entries rather than restating these. Connections and Emergency Response are level-2 here because they belong to Network Operations, and the 12 level-1 ceiling is already reached. Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.",
+  "status": "published",
+  "sourceDescription": "Starter capability map for a generic regulated, asset-owning UK utility (a water, gas or electricity network company under Ofwat or Ofgem price control), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four utility-specific ones (asset management, network operations, customer and metering, regulatory compliance and price-control reporting) whose level-1 wording the electricity_network map shares exactly, adding its own sector-specific level-2 entries rather than restating these. Connections and Emergency Response are level-2 here because they belong to Network Operations, and the 12 level-1 ceiling is already reached. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
-    { "citation": "Ofgem RIIO price-control framework and Ofwat PR24 methodology (consulted for the regulatory reporting and price-control shape; not copied)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "ISO 55000 asset management standard (consulted for asset-management vocabulary; not copied)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" }
+    { "citation": "Ofgem RIIO price-control framework and Ofwat PR24 methodology (consulted for the regulatory reporting and price-control shape; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "ISO 55000 asset management standard (consulted for asset-management vocabulary; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" }
   ],
   "items": [
     { "code": "1", "name": "Finance", "level": 1, "parentCode": null, "description": "Planning, controlling and accounting for the organisation's money and financial risk." },

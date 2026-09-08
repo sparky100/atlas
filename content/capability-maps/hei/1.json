@@ -1,12 +1,12 @@
 {
   "sector": "hei",
   "version": 1,
-  "status": "draft",
-  "sourceDescription": "Starter capability map for a university or college (a higher-education institution; a further-education college would carry Teaching & Learning and Student Support but a much smaller Research & Innovation), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (teaching and learning, research and innovation, student support, recruitment and admissions). Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.",
+  "status": "published",
+  "sourceDescription": "Starter capability map for a university or college (a higher-education institution; a further-education college would carry Teaching & Learning and Student Support but a much smaller Research & Innovation), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (teaching and learning, research and innovation, student support, recruitment and admissions). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
-    { "citation": "UCISA Higher Education Capability Model (consulted for scope and level-1 shape; not copied)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "Office for Students conditions of registration and the Scottish Funding Council outcome agreements (regulatory duties consulted for sector-specific capabilities)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" }
+    { "citation": "UCISA Higher Education Capability Model (consulted for scope and level-1 shape; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "Office for Students conditions of registration and the Scottish Funding Council outcome agreements (regulatory duties consulted for sector-specific capabilities)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" }
   ],
   "items": [
     { "code": "1", "name": "Finance", "level": 1, "parentCode": null, "description": "Planning, controlling and accounting for the organisation's money and financial risk." },
