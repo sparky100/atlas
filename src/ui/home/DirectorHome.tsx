@@ -19,9 +19,11 @@ export interface DirectorHomeProps {
  * see src/db/modelHome.ts's own module comment for the full-vs-built
  * gap). Capability map thumbnail with exposure tone; counts; changes in
  * flight by status; the last three versions. No sidebar, no branch
- * selector, no editing affordance (§3.1) — every link here either opens
- * the real capability map/changes/versions pages or a change's own page,
- * never an inline edit.
+ * selector, no editing affordance (§3.1) — every link here either opens a
+ * change or a version's own page, never an inline edit. Jumping to the
+ * capability map or versions pages generically is the persistent model
+ * nav's job now (ModelNav.tsx) — this used to also carry its own "Open
+ * the capability map"/"All versions" links before that existed.
  */
 export function DirectorHome({ data, orgSlug, modelSlug }: DirectorHomeProps) {
   const capabilityMapHref = `/o/${orgSlug}/m/${modelSlug}/capability-map`;
@@ -98,11 +100,6 @@ export function DirectorHome({ data, orgSlug, modelSlug }: DirectorHomeProps) {
               ))}
             </ul>
           )}
-          <Link to={`/o/${orgSlug}/m/${modelSlug}/versions`}>
-            <Text as="span" tone="muted" size="sm">
-              All versions →
-            </Text>
-          </Link>
         </Panel>
       </div>
     </div>

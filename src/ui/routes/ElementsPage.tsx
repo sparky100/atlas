@@ -2,6 +2,8 @@ import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ElementBrowseTable } from '../components/ElementBrowseTable/ElementBrowseTable';
+import { ModelNav } from '../components/ModelNav/ModelNav';
+import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useModels } from '../models/useModels';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -26,9 +28,12 @@ export function ElementsPage() {
     return (
       <div>
         <AppHeader />
-        <main className={styles.main}>
-          <Text tone="muted">Loading…</Text>
-        </main>
+        <div className={navStyles.body}>
+          <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+          <main className={styles.main}>
+            <Text tone="muted">Loading…</Text>
+          </main>
+        </div>
       </div>
     );
   }
@@ -36,17 +41,20 @@ export function ElementsPage() {
   return (
     <div>
       <AppHeader />
-      <main className={styles.main}>
-        <Breadcrumb
-          org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
-          model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
-          refLabel="main"
-        />
-        <Text as="h1" size="2xl">
-          Elements
-        </Text>
-        <ElementBrowseTable state={state} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
-      </main>
+      <div className={navStyles.body}>
+        <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+        <main className={styles.main}>
+          <Breadcrumb
+            org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
+            model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
+            refLabel="main"
+          />
+          <Text as="h1" size="2xl">
+            Elements
+          </Text>
+          <ElementBrowseTable state={state} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+        </main>
+      </div>
     </div>
   );
 }

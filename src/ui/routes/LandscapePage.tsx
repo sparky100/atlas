@@ -5,6 +5,8 @@ import { Button } from '../components/Button/Button';
 import { DiffLegend } from '../components/DiffBadge/DiffLegend';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
 import { EmptyState } from '../components/EmptyState/EmptyState';
+import { ModelNav } from '../components/ModelNav/ModelNav';
+import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useModels } from '../models/useModels';
@@ -75,9 +77,12 @@ export function LandscapePage() {
     return (
       <div>
         <AppHeader />
-        <main className={styles.main}>
-          <Text tone="muted">Loading…</Text>
-        </main>
+        <div className={navStyles.body}>
+          <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+          <main className={styles.main}>
+            <Text tone="muted">Loading…</Text>
+          </main>
+        </div>
       </div>
     );
   }
@@ -89,7 +94,9 @@ export function LandscapePage() {
   return (
     <div>
       <AppHeader />
-      <main className={styles.main}>
+      <div className={navStyles.body}>
+        <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+        <main className={styles.main}>
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
@@ -184,7 +191,8 @@ export function LandscapePage() {
         {state.status === 'ready' && state.data.layout.nodes.length > 0 && (
           <LandscapeCanvas layout={state.data.layout} systemsById={state.data.systemsById} edges={state.data.edges} diff={state.data.diff} nodeHref={nodeHref} />
         )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

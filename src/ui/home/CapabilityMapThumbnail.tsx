@@ -47,11 +47,6 @@ export function CapabilityMapThumbnail({ tree, exposureTone, capabilityMapHref }
           </span>
         ))}
       </Link>
-      <Link to={capabilityMapHref}>
-        <Text as="span" tone="muted" size="sm">
-          Open the capability map →
-        </Text>
-      </Link>
     </div>
   );
 }
