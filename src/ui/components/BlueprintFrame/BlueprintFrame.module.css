@@ -1,0 +1,46 @@
+.frame {
+  position: relative;
+  height: 100%;
+  box-sizing: border-box;
+  border: var(--border-width-emphasis) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+}
+
+.corner {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-style: solid;
+  border-color: var(--accent);
+  border-width: 0;
+  pointer-events: none;
+}
+
+.topLeft {
+  top: -2px;
+  left: -2px;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+
+.topRight {
+  top: -2px;
+  right: -2px;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+
+.bottomLeft {
+  bottom: -2px;
+  left: -2px;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
+
+.bottomRight {
+  bottom: -2px;
+  right: -2px;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+}

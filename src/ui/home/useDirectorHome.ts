@@ -1,46 +1,81 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { listChangeBranches } from '../../db/branches';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
 import { listSystemsForLandscape } from '../../db/landscape';
-import { computeExposureTone, listAllSupportsEdges, loadModelCounts, type ExposureTone, type ModelCounts } from '../../db/modelHome';
+import {
+  buildCapabilityTiles,
+  commitsSincePreviousTag,
+  loadChangeTouchCounts,
+  loadCommitDepths,
+  loadModelCounts,
+  loadPlannedReplacements,
+  listAllSupportsEdges,
+  type CapabilityTileData,
+  type ModelCounts,
+} from '../../db/modelHome';
+import { listProfilesByIds } from '../../db/profiles';
 import { listTagsForModel } from '../../db/tags';
-import type { BranchRow, TagRow } from '../../db/types';
+import type { BranchRow, ProfileRow, TagRow } from '../../db/types';
 import { resolveRef } from '../../db/ref';
-import { computeCapabilityMapTree, type CapabilityMapTree } from '../capabilityMap/layout';
+import { computeCapabilityMapTree } from '../capabilityMap/layout';
 import { supabase } from '../supabaseClient';
 
-export interface ChangesByStatus {
-  status: BranchRow['status'];
-  branches: BranchRow[];
+export interface OpenChangeRow {
+  branch: BranchRow;
+  touches: number;
+}
+
+export interface VersionStamp {
+  tag: TagRow;
+  /** The tagging user's `atlas.profiles` display name/handle, falling back to their bare id if they have no profile visible (shouldn't happen past first membership — SPEC §3.2 — but never blocks the stamp on it). */
+  authorDisplay: string;
+  /** `null` for the oldest tag on the model — nothing to compare against. */
+  commitsSincePrevious: number | null;
 }
 
 export interface DirectorHomeData {
-  tree: CapabilityMapTree;
-  exposureTone: ExposureTone;
+  tiles: CapabilityTileData[];
+  exposedCount: number;
+  unrecordedCount: number;
   counts: ModelCounts;
-  changesInFlight: ChangesByStatus[];
-  recentVersions: TagRow[];
+  openChanges: OpenChangeRow[];
+  /** The earliest `target_date` among `openChanges` — `null` if none has one. */
+  nextTargetDate: string | null;
+  versions: VersionStamp[];
 }
 
-export type DirectorHomeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: DirectorHomeData };
+type DirectorHomeLoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: DirectorHomeData };
 
-// UI-principles §3.1's "changes in flight" list is `proposed | in_review |
-// approved`; `draft` work isn't proposed yet, so it's excluded here even
-// though loadModelCounts's own openChanges count includes it (that count
-// answers a different question — "how much is in motion at all", not "what
-// would a director recognise as a change already underway").
-const IN_FLIGHT_STATUSES: BranchRow['status'][] = ['proposed', 'in_review', 'approved'];
+/** A callable `reload` alongside the same load-state union every other door/route hook already returns — kept as an intersection (not folded into each branch by hand) so the union stays discriminable on `status`. */
+export type DirectorHomeState = DirectorHomeLoadState & { reload: () => void };
+
+/** Handoff 7d's "What's changing" scope: the same set `loadModelCounts`'s `openChanges` count already uses — everything still in motion, `draft` included (a change not yet proposed is still an open piece of work a director should see coming). */
+const OPEN_CHANGE_STATUSES: BranchRow['status'][] = ['draft', 'proposed', 'in_review', 'approved'];
+
+function compareByTargetDateAscending(a: BranchRow, b: BranchRow): number {
+  if (a.target_date === null && b.target_date === null) return 0;
+  if (a.target_date === null) return 1; // nulls last
+  if (b.target_date === null) return -1;
+  return a.target_date.localeCompare(b.target_date);
+}
 
 /**
- * The director door's data (Sprint U3b, scoped down from UI-principles
- * §3.1 — see src/db/modelHome.ts's own module comment for exactly what's
- * deferred). Always reads `main` — the director's door has no branch
- * selector (§3.1: "no sidebar, no branch selector, no editing affordance").
+ * The director door's data (UI-principles §3.1, built to Handoff 7d —
+ * `docs/HANDOFF-7d-director-door.md`). Always reads `main` — the
+ * director's door has no branch selector (§3.1: "no sidebar, no branch
+ * selector, no editing affordance"). Still not built: §3.1's Coverage/
+ * Staleness/Confidence toggles beyond Lifecycle Exposure, and the
+ * director's branch-scoped to-be zoom (`src/db/modelHome.ts`'s own module
+ * comment).
  */
 export function useDirectorHome(modelId: UUID, orgId: UUID): DirectorHomeState {
-  const [state, setState] = useState<DirectorHomeState>({ status: 'loading' });
+  const [state, setState] = useState<DirectorHomeLoadState>({ status: 'loading' });
+  const [reloadToken, setReloadToken] = useState(0);
+  const reload = useCallback(() => {
+    setReloadToken((t) => t + 1);
+  }, []);
 
   useEffect(() => {
     if (!modelId) return undefined;
@@ -56,24 +91,63 @@ export function useDirectorHome(modelId: UUID, orgId: UUID): DirectorHomeState {
         return;
       }
 
-      const [capabilities, supportsEdges, systems, counts, changeBranches, tags] = await Promise.all([
+      const [capabilities, supportsEdges, systems, counts, changeBranches, tags, plannedReplacements] = await Promise.all([
         listCapabilitiesForMap(supabase, commitId),
         listAllSupportsEdges(supabase, commitId),
         listSystemsForLandscape(supabase, commitId),
         loadModelCounts(supabase, commitId, modelId),
         listChangeBranches(supabase, modelId),
         listTagsForModel(supabase, modelId),
+        loadPlannedReplacements(supabase, modelId),
       ]);
 
       const systemsById = new Map<UUID, ElementsHeadRow>(systems.map((s) => [s.element_id, s]));
-      const tree = computeCapabilityMapTree(capabilities);
-      const exposureTone = computeExposureTone(supportsEdges, systemsById);
-      const changesInFlight = IN_FLIGHT_STATUSES.map((status) => ({ status, branches: changeBranches.filter((b) => b.status === status) })).filter(
-        (group) => group.branches.length > 0,
-      );
-      const recentVersions = [...tags].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3);
+      // Handoff 7d's grid is level-1 tiles only — `listCapabilitiesForMap`
+      // returns every level (1-3); computeCapabilityMapTree's own `l1`
+      // array is the real, parent_id-derived level-1 set (never a fixed
+      // "12 tiles" count — it reflows to however many a map actually has).
+      const level1Capabilities = computeCapabilityMapTree(capabilities).l1.map((column) => column.capability);
+      const tiles = buildCapabilityTiles(level1Capabilities, supportsEdges, systemsById, plannedReplacements);
+      const exposedCount = tiles.filter((t) => t.tone === 'warn' || t.tone === 'info').length;
+      const unrecordedCount = tiles.filter((t) => t.tone === 'neutral').length;
 
-      if (!cancelled) setState({ status: 'ready', data: { tree, exposureTone, counts, changesInFlight, recentVersions } });
+      const openChanges = changeBranches
+        .filter((b) => OPEN_CHANGE_STATUSES.includes(b.status))
+        .sort(compareByTargetDateAscending);
+      const nextTargetDate = openChanges.find((b) => b.target_date !== null)?.target_date ?? null;
+      const touchCounts = await loadChangeTouchCounts(
+        supabase,
+        openChanges.map((b) => b.id),
+      );
+      const openChangeRows: OpenChangeRow[] = openChanges.map((branch) => ({ branch, touches: touchCounts.get(branch.id) ?? 0 }));
+
+      const recentTags = [...tags].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3);
+      // One older tag beyond the three shown is enough to compute the
+      // oldest-shown one's own "commits since previous" — sorted the same
+      // way, so index 3 (if it exists) is the tag right before recentTags[2].
+      const allSortedTags = [...tags].sort((a, b) => b.created_at.localeCompare(a.created_at));
+      const depthLookupCommitIds = allSortedTags.slice(0, 4).map((t) => t.commit_id);
+      const depths = await loadCommitDepths(supabase, depthLookupCommitIds);
+      const authorIds = [...new Set(recentTags.map((t) => t.created_by))];
+      const profiles = await listProfilesByIds(supabase, authorIds);
+      const profileById = new Map<UUID, ProfileRow>(profiles.map((p) => [p.user_id, p]));
+
+      const versions: VersionStamp[] = recentTags.map((tag, index) => {
+        const olderTag = allSortedTags[index + 1];
+        const newerDepth = depths.get(tag.commit_id) ?? null;
+        const olderDepth = olderTag ? (depths.get(olderTag.commit_id) ?? null) : null;
+        const commitsSincePrevious = newerDepth !== null ? commitsSincePreviousTag(newerDepth, olderDepth) : null;
+        const profile = profileById.get(tag.created_by);
+        const authorDisplay = profile?.display_name ?? profile?.handle ?? tag.created_by;
+        return { tag, authorDisplay, commitsSincePrevious };
+      });
+
+      if (!cancelled) {
+        setState({
+          status: 'ready',
+          data: { tiles, exposedCount, unrecordedCount, counts, openChanges: openChangeRows, nextTargetDate, versions },
+        });
+      }
     }
 
     load().catch((e: unknown) => {
@@ -83,7 +157,7 @@ export function useDirectorHome(modelId: UUID, orgId: UUID): DirectorHomeState {
     return () => {
       cancelled = true;
     };
-  }, [modelId, orgId]);
+  }, [modelId, orgId, reloadToken]);
 
-  return state;
+  return { ...state, reload };
 }

@@ -1,20 +1,41 @@
 /**
- * Data queries for the two front doors (UI-principles §3, Sprint U3b).
- * This sprint's scope is the reduced set the brief names explicitly —
- * counts, changes-in-flight, recent activity, a review-queue count with
- * its oldest item, a capability-map thumbnail with one overall exposure
- * tone — not §3's full interactive health-chip system (per-tile Coverage/
- * Staleness/Confidence/Lifecycle-exposure toggles, the director's branch-
- * scoped to-be zoom) or the architect door's full three-column dashboard
- * (validation status per queue item, "behind main by N commits", mentions
- * floating to the top). Those stay real gaps, not faked — see each
- * component's own comment for exactly what's deferred and why.
+ * Data queries for the two front doors (UI-principles §3). The director
+ * door's Lifecycle Exposure rule (§3.1, `computeExposureTone`/
+ * `loadPlannedReplacements`) and its "commits since previous tag" stamp
+ * (`loadCommitDepths`) are built in full — see Handoff 7d
+ * (`docs/HANDOFF-7d-director-door.md`). Still not built: §3.1's Coverage/
+ * Staleness/Confidence toggles and the director's branch-scoped to-be
+ * zoom, or the architect door's full three-column dashboard (validation
+ * status per queue item, "behind main by N commits", mentions floating to
+ * the top). Those stay real gaps, not faked — see each component's own
+ * comment for exactly what's deferred and why.
  */
 import type { UUID } from '../contracts/delta';
-import type { CommitRow, ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
+import type { CommitRow, DeltaRow, ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
 import { attributesRecord } from '../ui/elements/attributesRecord';
 import type { Client } from './client';
+import { assertInFilterSize } from './inFilterLimit';
 import { selectAll } from './selectAll';
+
+/** A bare `commits` row projection, `id`/`depth` only — named (not an inline `selectAll<{...}>` literal) because a multi-field inline object-type generic's own `;` field separators confuse `headTableReads.test.ts`'s text-level statement scanner (SPEC §6.7's checker), which is a real limitation of that checker, not a reason to skip pagination. */
+interface CommitIdRow {
+  id: UUID;
+}
+
+interface CommitDepthRow {
+  id: UUID;
+  depth: number;
+}
+
+interface CommitBranchRow {
+  id: UUID;
+  branch_id: UUID;
+}
+
+interface DeltaSubjectRow {
+  commit_id: UUID;
+  subject_id: UUID;
+}
 
 export interface ModelCounts {
   capabilities: number;
@@ -60,29 +81,183 @@ export async function listRecentCommits(supabase: Client, mainBranchId: UUID, li
   return data as CommitRow[];
 }
 
-export type ExposureTone = 'ok' | 'warn';
+export type ExposureTone = 'ok' | 'warn' | 'info';
 
 /**
- * The director door's capability-map thumbnail gets one overall tone, not
- * UI-principles §3.1's full per-tile Lifecycle Exposure chip (which also
- * requires checking every `approved` change branch for a delta-level
- * "planned replacement" — a system added there, supporting the same
- * capability, with the exposed system explicitly retracted in the same
- * branch). This is the honest subset that's actually built this sprint:
- * `warn` the instant any capability has a supporting system whose
- * `lifecycleStatus` is `retiring` or `retired`, full stop — a coarser
- * signal than "and nothing already replaces it", but never a false `ok`
- * (an exposed system with an unrecorded or in-progress replacement still
- * shows `warn`, which is the safe direction to be coarse in).
+ * UI-principles §3.1's full Lifecycle Exposure rule, evaluated per
+ * capability (Handoff 7d): `warn` when a supporting system is `retiring`/
+ * `retired` and nothing planned replaces it; `info` ("replacement
+ * planned") when every exposed supporting system does have one; `ok` when
+ * nothing is exposed at all. `warn` wins over `info` when a capability has
+ * more than one exposed system and only some of them have a planned
+ * replacement — the same "never falsely calm" direction the original,
+ * coarser U3b version of this function already committed to.
+ *
+ * `plannedReplacementSystemIds` is the set of this capability's own
+ * exposed system ids that `loadPlannedReplacements` found a match for —
+ * callers scope both `supportsEdges` and this set to one capability before
+ * calling (see `useDirectorHome.ts`), so this function stays a pure,
+ * capability-agnostic predicate over whatever it's handed, same shape as
+ * before this rule existed.
  */
-export function computeExposureTone(supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): ExposureTone {
+export function computeExposureTone(
+  supportsEdges: readonly RelationshipsHeadRow[],
+  systemsById: ReadonlyMap<UUID, ElementsHeadRow>,
+  plannedReplacementSystemIds: ReadonlySet<UUID> = new Set(),
+): ExposureTone {
+  let anyExposed = false;
+  let anyExposedWithoutReplacement = false;
   for (const edge of supportsEdges) {
     const system = systemsById.get(edge.from_element_id);
     if (!system) continue;
     const lifecycleStatus = attributesRecord(system.attributes).lifecycleStatus;
-    if (lifecycleStatus === 'retiring' || lifecycleStatus === 'retired') return 'warn';
+    if (lifecycleStatus === 'retiring' || lifecycleStatus === 'retired') {
+      anyExposed = true;
+      if (!plannedReplacementSystemIds.has(system.element_id)) anyExposedWithoutReplacement = true;
+    }
   }
+  if (anyExposedWithoutReplacement) return 'warn';
+  if (anyExposed) return 'info';
   return 'ok';
+}
+
+/** One `(capabilityId, exposedSystemId)` pair `loadPlannedReplacements` found evidence for — an `approved` change branch that both adds a new system supporting `capabilityId` and retracts `exposedSystemId`, within that branch's own delta history. */
+export interface PlannedReplacement {
+  capabilityId: UUID;
+  exposedSystemId: UUID;
+  replacementSystemId: UUID;
+  branchId: UUID;
+}
+
+/**
+ * UI-principles §3.1's "planned replacement" evidence: for every `approved`
+ * change branch on this model (in delivery — merging is what marks a
+ * change delivered, ADR-006), read that branch's *own* deltas (never
+ * main's — a branch's own commits only, via `commits.branch_id`) and look
+ * for a system it both creates and wires up to support a capability, where
+ * the same branch also retracts some other system. That's the strongest
+ * pairing signal the data model has: an `element.retract` delta carries no
+ * explicit "this is what replaces it" reference of its own (SPEC §4), so
+ * "same branch, same capability" is the evidence, not a stronger per-delta
+ * link — documented coarseness, same spirit as `computeExposureTone`'s own
+ * history of being coarse in the direction that never falsely calms a
+ * capability that's still genuinely exposed (a branch's retraction and its
+ * new supporting system don't have to be causally connected for this to
+ * record a candidate; `computeExposureTone` only ever consults an entry
+ * for a system that is *itself* a real, current supporter of that exact
+ * capability, which is what keeps false positives narrow in practice).
+ *
+ * Bounded by the number of `approved` branches on one model at a time
+ * (rare and short-lived by construction — SPEC §7.4's review flow), not by
+ * model size, so the `.in('commit_id', ...)` list itself never risks
+ * rule 8's URL-length hazard — but the `deltas`/`commits` reads still go
+ * through `selectAll` regardless, since `max_rows` truncation (SPEC §6.7)
+ * is a per-query-result-size risk independent of how the filter list was
+ * built: even one branch can, in principle, carry more than `max_rows`
+ * deltas.
+ */
+export async function loadPlannedReplacements(supabase: Client, modelId: UUID): Promise<PlannedReplacement[]> {
+  const { data: branchRows, error: branchesError } = await supabase.from('branches').select('id').eq('model_id', modelId).eq('kind', 'change').eq('status', 'approved');
+  if (branchesError) throw new Error(`loadPlannedReplacements: ${branchesError.message}`);
+  const branches = branchRows as { id: UUID }[];
+  if (branches.length === 0) return [];
+
+  const replacements: PlannedReplacement[] = [];
+  for (const branch of branches) {
+    const commitRows = await selectAll<CommitIdRow>(supabase.from('commits').select('id', { count: 'exact' }).eq('branch_id', branch.id).order('id'));
+    const commitIds = commitRows.map((c) => c.id);
+    if (commitIds.length === 0) continue;
+    assertInFilterSize('loadPlannedReplacements', 'commit_id', commitIds);
+
+    const deltas = await selectAll<DeltaRow>(supabase.from('deltas').select('*', { count: 'exact' }).in('commit_id', commitIds).order('id'));
+
+    const createdSystemIds = new Set(deltas.filter((d) => d.kind === 'element_create' && d.element_type === 'system').map((d) => d.subject_id));
+    const retractedSystemIds = new Set(deltas.filter((d) => d.kind === 'element_retract' && d.element_type === 'system').map((d) => d.subject_id));
+    if (retractedSystemIds.size === 0) continue;
+
+    for (const delta of deltas) {
+      if (delta.kind !== 'relationship_create' || delta.relationship_type !== 'supports') continue;
+      const replacementSystemId = delta.from_element_id;
+      const capabilityId = delta.to_element_id;
+      if (!replacementSystemId || !capabilityId || !createdSystemIds.has(replacementSystemId)) continue;
+      for (const exposedSystemId of retractedSystemIds) {
+        replacements.push({ capabilityId, exposedSystemId, replacementSystemId, branchId: branch.id });
+      }
+    }
+  }
+  return replacements;
+}
+
+/** One capability tile's worth of Handoff 7d's "Where are we weak" grid — everything a tile needs to render, already resolved. `tone` is `'neutral'` for a capability with zero supporting systems ("nothing recorded", §3.1's Coverage gap, distinct from Lifecycle Exposure — `computeExposureTone` is never called for that case, since it has nothing to evaluate). */
+export interface CapabilityTileData {
+  capability: ElementsHeadRow;
+  supportingSystems: ElementsHeadRow[];
+  /** The subset of `supportingSystems` that's `retiring`/`retired` — empty unless `tone` is `warn` or `info`. */
+  exposedSystems: ElementsHeadRow[];
+  tone: ExposureTone | 'neutral';
+}
+
+/**
+ * Groups every level-1 capability with its own supporting systems and
+ * resolves each one's tile tone — the pure core of the director door's
+ * weakness grid, unit-testable without a database. `plannedReplacements`
+ * is the whole model's list from `loadPlannedReplacements`; this function
+ * does the per-capability filtering `computeExposureTone` itself expects
+ * its caller to have already done.
+ */
+export function buildCapabilityTiles(
+  capabilities: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  systemsById: ReadonlyMap<UUID, ElementsHeadRow>,
+  plannedReplacements: readonly PlannedReplacement[],
+): CapabilityTileData[] {
+  const edgesByCapability = new Map<UUID, RelationshipsHeadRow[]>();
+  for (const edge of supportsEdges) {
+    const list = edgesByCapability.get(edge.to_element_id) ?? [];
+    list.push(edge);
+    edgesByCapability.set(edge.to_element_id, list);
+  }
+  const replacementsByCapability = new Map<UUID, Set<UUID>>();
+  for (const replacement of plannedReplacements) {
+    const set = replacementsByCapability.get(replacement.capabilityId) ?? new Set<UUID>();
+    set.add(replacement.exposedSystemId);
+    replacementsByCapability.set(replacement.capabilityId, set);
+  }
+
+  return capabilities.map((capability): CapabilityTileData => {
+    const edges = edgesByCapability.get(capability.element_id) ?? [];
+    const supportingSystems: ElementsHeadRow[] = [];
+    for (const edge of edges) {
+      const system = systemsById.get(edge.from_element_id);
+      if (system) supportingSystems.push(system);
+    }
+    const exposedSystems = supportingSystems.filter((system) => {
+      const lifecycleStatus = attributesRecord(system.attributes).lifecycleStatus;
+      return lifecycleStatus === 'retiring' || lifecycleStatus === 'retired';
+    });
+    const tone: ExposureTone | 'neutral' =
+      supportingSystems.length === 0 ? 'neutral' : computeExposureTone(edges, systemsById, replacementsByCapability.get(capability.element_id) ?? new Set());
+    return { capability, supportingSystems, exposedSystems, tone };
+  });
+}
+
+/**
+ * Commits-since-previous-tag (Handoff 7d): the difference between two
+ * commits' own `depth` (SPEC §3.4 — a monotonic count of a commit's
+ * ancestry length on `main`, already stored, no diff walk needed). Callers
+ * pass the newer tag's commit first. `null` when there is no previous tag
+ * to compare against (the oldest tag on the model) — the pure half of the
+ * stamp, so it's unit-testable without a database.
+ */
+export function commitsSincePreviousTag(newerDepth: number, olderDepth: number | null): number | null {
+  return olderDepth === null ? null : newerDepth - olderDepth;
+}
+
+export async function loadCommitDepths(supabase: Client, commitIds: readonly UUID[]): Promise<Map<UUID, number>> {
+  if (commitIds.length === 0) return new Map();
+  assertInFilterSize('loadCommitDepths', 'id', commitIds);
+  const rows = await selectAll<CommitDepthRow>(supabase.from('commits').select('id, depth', { count: 'exact' }).in('id', commitIds as UUID[]).order('id'));
+  return new Map(rows.map((row) => [row.id, row.depth]));
 }
 
 /** All `supports` edges at `commitId`, regardless of which capability — used once by the thumbnail to compute both the exposure tone and (paired with `capabilities`) the tile list, rather than the per-capability-id `.in()` shape `listSupportsEdgesForCapabilities` needs for the full map view. */
@@ -94,4 +269,36 @@ export async function listAllSupportsEdges(supabase: Client, commitId: UUID): Pr
     .eq('relationship_type', 'supports')
     .order('relationship_id');
   return selectAll<RelationshipsHeadRow>(query);
+}
+
+/**
+ * Handoff 7d's "Touches" column: the count of distinct subjects (elements
+ * or relationships) each branch's own deltas touch — a cheap count, not
+ * the change page's own full `affectedCapabilities` resolution
+ * (`src/db/changeSummary.ts`, which folds the branch's as-is/to-be heads
+ * and is too expensive to run once per row in a list of many open
+ * changes). Bounded the same way `loadPlannedReplacements` is: by how many
+ * branches the caller passes and each one's own commit/delta count, not by
+ * model size.
+ */
+export async function loadChangeTouchCounts(supabase: Client, branchIds: readonly UUID[]): Promise<Map<UUID, number>> {
+  if (branchIds.length === 0) return new Map();
+  assertInFilterSize('loadChangeTouchCounts', 'branch_id', branchIds);
+  const commits = await selectAll<CommitBranchRow>(supabase.from('commits').select('id, branch_id', { count: 'exact' }).in('branch_id', branchIds as UUID[]).order('id'));
+  if (commits.length === 0) return new Map();
+  const branchIdByCommitId = new Map(commits.map((c) => [c.id, c.branch_id]));
+  const commitIds = commits.map((c) => c.id);
+  assertInFilterSize('loadChangeTouchCounts', 'commit_id', commitIds);
+
+  const deltas = await selectAll<DeltaSubjectRow>(supabase.from('deltas').select('commit_id, subject_id', { count: 'exact' }).in('commit_id', commitIds).order('id'));
+
+  const subjectsByBranch = new Map<UUID, Set<UUID>>();
+  for (const delta of deltas) {
+    const branchId = branchIdByCommitId.get(delta.commit_id);
+    if (!branchId) continue;
+    const subjects = subjectsByBranch.get(branchId) ?? new Set<UUID>();
+    subjects.add(delta.subject_id);
+    subjectsByBranch.set(branchId, subjects);
+  }
+  return new Map([...subjectsByBranch.entries()].map(([branchId, subjects]) => [branchId, subjects.size]));
 }

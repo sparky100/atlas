@@ -1,0 +1,205 @@
+.door {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  border-bottom: var(--border-width) solid var(--border);
+  padding-bottom: var(--space-2);
+}
+
+.sectionLink {
+  white-space: nowrap;
+}
+
+.weaknessChips {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+/* Handoff 7d: "12 level-1 tiles at full width" is typical, not fixed —
+   this reflows to however many level-1 capabilities the map has, per
+   computeCapabilityMapTree's own real parent_id structure. */
+.tileGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+}
+
+.tile,
+.tileEmphasised {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tile {
+  min-height: 78px;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  box-sizing: border-box;
+}
+
+.tileEmphasised {
+  min-height: 104px;
+}
+
+.statusBar {
+  display: block;
+  height: 3px;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-1);
+}
+
+.statusBar[data-tone='ok'] {
+  background: var(--status-ok);
+}
+
+.statusBar[data-tone='warn'] {
+  background: var(--status-warn);
+}
+
+.statusBar[data-tone='info'] {
+  background: var(--status-info);
+}
+
+.statusBar[data-tone='neutral'] {
+  background: var(--status-neutral);
+}
+
+.tileName {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+}
+
+.exposingSystems {
+  list-style: none;
+  margin: 0 0 var(--space-1);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tileFooter {
+  margin: 0;
+}
+
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.lowerRow {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.changesColumn {
+  min-width: 0;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: var(--space-2);
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+.changeColumn {
+  width: 44%;
+}
+
+.targetColumn {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.versionsColumn {
+  min-width: 0;
+}
+
+.versionPlates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.versionLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.versionPlate {
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+}
+
+/* Empty state (new model): dashed placeholder tiles at 55% opacity, then
+   the explanation and the one action — CapabilityMapImportPanel, which
+   already lists the real published sectors dynamically rather than a
+   hand-maintained dropdown. */
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 640px;
+}
+
+.emptyTiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+}
+
+.emptyTile {
+  height: 78px;
+  border: var(--border-width) dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  opacity: 0.55;
+}
+
+@media (max-width: 768px) {
+  .tileGrid,
+  .emptyTiles {
+    grid-template-columns: 1fr;
+  }
+
+  .lowerRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+:root[data-density='compact'] .tile {
+  min-height: 62px;
+}
+
+:root[data-density='compact'] .tileEmphasised {
+  min-height: 84px;
+}

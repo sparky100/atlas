@@ -101,7 +101,7 @@ export function ModelHome() {
         {homeMode === 'director' && directorState.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {homeMode === 'director' && directorState.status === 'error' && <Text as="p">{directorState.message}</Text>}
         {homeMode === 'director' && directorState.status === 'ready' && (
-          <DirectorHome data={directorState.data} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+          <DirectorHome data={directorState.data} reload={directorState.reload} modelId={model.id} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
         )}
 
         {homeMode === 'architect' && architectState.status === 'loading' && <Text tone="muted">Loading…</Text>}
