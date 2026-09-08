@@ -73,9 +73,9 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | `argument_stance` | `for`, `against`, `neutral` |
 | `assumption_status` | `open`, `validated`, `invalidated` |
 | `evidence_kind` | `document`, `link`, `capture_job_ref`, `comment_ref` |
-| `comment_visibility` | `team`, `internal` |
 | `comment_status` | `open`, `resolved` |
-| `anchor_type` | `element`, `relationship`, `delta`, `branch`, `decision` |
+| `anchor_type` | `element`, `relationship`, `change`, `decision`, `version` (Sprint M1a amendment — see §3.8; `comment_visibility`, `delta`, and `branch` from the original draft are gone: visibility is dropped for now, `branch` is renamed `change`, and `delta` has no replacement yet, so an attribute-level "comment on this value" anchor isn't reachable until it does) |
+| `notification_kind` | `mention` (Sprint M1a; the only kind today — extensible by name, not by schema, once a second one is needed) |
 | `view_kind` | `landscape`, `context`, `container`, `component`, `capability_map` |
 | `annotation_kind` | `text`, `highlight`, `arrow` |
 | `map_status` | `draft`, `published`, `deprecated` |
@@ -109,6 +109,19 @@ Who belongs to an organisation and with what role.
 
 Primary key `(org_id, user_id)`. Index on `(user_id)`.
 Trigger `atlas.on_organisation_created` inserts the creator as `owner`. `atlas.guard_last_owner`, an ordinary `before` row trigger — not a SQL `create constraint trigger` (Sprint H1 correction, docs/AUDIT-2026-09-U2.md §2.E.3 item 18: this deferrable-checking distinction isn't needed here — "no owners left" should reject the statement immediately, not at end of transaction) — stops an org losing its last `owner`.
+
+#### `atlas.profiles` (Sprint M1a, ADR-009 amendment)
+A user's public identity, decoupled from `auth.users.email`. Lives in the `atlas` schema, not `public` — infrastructure identity, not model content, same distinction that already separates every `atlas.*` RPC from the tables it writes; client reads/writes go through `.schema('atlas')`. No `org_id` (like `organisations`/`user_preferences`, this is not org-scoped — a person's profile follows them across every org they belong to).
+
+| Column | Type | Constraints |
+|---|---|---|
+| `user_id` | uuid | pk, → `auth.users(id)` on delete cascade |
+| `display_name` | text | nullable |
+| `handle` | text | not null, unique, lowercase (`check (handle ~ '^[a-z0-9_-]+$')`) |
+| `avatar_url` | text | nullable |
+| `updated_at` | timestamptz | not null default now() |
+
+Created by trigger `atlas.ensure_profile` (`after insert on members`) the first time a user joins any organisation — a no-op on every org after their first, since a profile is one per person, not one per membership. The default `handle` is the email's local part, lowercased and sanitised to the column's own charset, with a `-2`/`-3`/... suffix appended on collision so two people who both happen to be `alex@` never silently overwrite one handle. **Email is never exposed to other members** — there is no email column here, and nothing else in this schema exposes one either. Editable by the user only; readable by any fellow org member (any shared org, any role). Commit and comment author display always reads through this table (`src/db/profiles.ts`), never a raw join against `auth.users`, which RLS never exposes to a client at all.
 
 #### `models`
 A landscape. One org owns it; sharing is by grant (`model_shares`), never by moving it.
@@ -455,25 +468,46 @@ Primary key `(commit_id, level)`.
 ### 3.8 Collaboration
 
 #### `comments`
-Threaded comments anchored to a model object (ADR-010, S-16).
+Threaded comments anchored to a model object (ADR-010 amendment, S-16, Sprint M1a — `supabase/migrations/20260906240000_comments.sql`'s own module comment has the full column-by-column diff from the original draft below).
 
 | Column | Type | Constraints |
 |---|---|---|
 | `model_id` | uuid | → `models(id)` |
-| `parent_comment_id` | uuid | → `comments(id)`, nullable; replies must share the root's anchor (trigger) |
-| `anchor_type` | anchor_type | not null |
-| `anchor_id` | uuid | not null |
-| `view_id` | uuid | → `views(id)`, nullable — optional visual pin |
-| `hint_x`, `hint_y` | double precision | nullable |
+| `anchor_type` | anchor_type | not null — `element`, `relationship`, `change`, `decision`, `version` |
+| `anchor_id` | uuid | not null — a stable subject id (element/relationship/branch/tag id), **never a commit id**, so merge and refresh cost this table nothing (RT-8) |
+| `branch_id` | uuid | → `branches(id)`, nullable — which branch this comment was raised *from*, for an anchor (typically an element/relationship) not yet on main; stays pinned to that branch forever, even after merge, so it is display metadata (e.g. the change page's own comment feed), not part of viewer-visibility (that's the anchor's own job, via `atlas.anchor_visible_to_viewer`) |
+| `view_kind` | view_kind | nullable — which kind of view a comment was raised from, if any (no per-view pin coordinate this iteration) |
+| `parent_comment_id` | uuid | → `comments(id)`, nullable; replies are flat (no reply-to-a-reply) and must share the root's exact anchor — both checked by trigger `atlas.check_anchor` |
+| `body` | text | not null, non-empty |
 | `author_id` | uuid | not null |
-| `body` | text | not null |
-| `visibility` | comment_visibility | not null default `team` |
-| `status` | comment_status | not null default `open` |
+| `status` | comment_status | not null default `open`; only a thread's root ever carries resolution state |
 | `resolved_by` | uuid | nullable |
 | `resolved_at` | timestamptz | nullable |
 | `edited_at` | timestamptz | nullable |
 
-Indexes `(model_id, anchor_type, anchor_id)`, `(parent_comment_id)`. Anchor existence is checked by trigger `atlas.check_anchor` (polymorphic; Postgres cannot FK it).
+Indexes `(model_id, anchor_type, anchor_id)`, `(parent_comment_id)`, `(org_id)`, `(branch_id)` where not null. Anchor existence is checked by trigger `atlas.check_anchor` (polymorphic; Postgres cannot FK it) against permanent history (`deltas`' own `element_create`/`relationship_create` rows), not the current head — an element retracted after its comment was posted stays a valid anchor forever (rule 5), and the comment stays readable, flagged by `src/db/comments.ts`'s `listCommentsForAnchor` as anchored to a retracted subject when the anchor is absent from main's current `elements_head`/`relationships_head`. `visibility` (`team`/`internal`) and the `view_id`/`hint_x`/`hint_y` visual-pin columns from the original draft are dropped for this iteration — no product need for an internal-only comment has shown up yet, and a pin coordinate never shipped a renderer. `replica identity full`, so a realtime `UPDATE` payload always carries the complete previous row.
+
+#### `comment_mentions` (Sprint M1a)
+Who an `@handle` in a comment's body resolved to.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `comment_id` | uuid | → `comments(id)` on delete cascade |
+| `user_id` | uuid | not null |
+
+Primary key `(comment_id, user_id)`. Written only by trigger `atlas.process_comment_mentions` (`after insert on comments`), which parses `@handle` tokens out of the new comment's body against `atlas.profiles.handle`, restricted to the comment's own org, dropping any mention of the comment's own author (no self-notification). `src/contracts/comments.ts`'s `parseMentionHandles` is the same pattern client-side, kept in sync by a round-trip test — a read-only preview of what the server will do, not a second enforcement point.
+
+#### `notifications` (Sprint M1a)
+One in-app notification per mentioned member per comment. No email delivery — SPEC §11 defers a notification tray UI to U4; this sprint ships the record and an unread count only (`src/db/notifications.ts`).
+
+| Column | Type | Constraints |
+|---|---|---|
+| `user_id` | uuid | not null — the recipient |
+| `kind` | notification_kind | not null — `mention`, today the only value |
+| `comment_id` | uuid | → `comments(id)` on delete cascade, nullable |
+| `read_at` | timestamptz | nullable |
+
+Index `(user_id, read_at)`. Written only by `atlas.process_comment_mentions`, alongside its `comment_mentions` row, in the same transaction as the comment itself — a mention and its notification always exist together or not at all. A person's own notifications are private: nobody else, not even an owner, reads another member's `notifications` rows.
 
 #### `decisions`, `decision_arguments`, `decision_links`, `assumptions`, `evidence`
 Decision record (ADR-013). Column lists as in ADR-013, with these additions: `decisions.superseded_decision_id → decisions(id)`; `decision_links` primary key `(decision_id, linked_type, linked_id)` with `linked_type` a text check over `('element','relationship','branch','assumption','evidence')`; `assumptions.linked_review_pending boolean default false` — set true on linked decisions when an assumption's status changes (the "re-review nudge"); `evidence.source_id → sources(id)` nullable, so a piece of evidence that is also a capture source is the same row in both roles.
@@ -1165,81 +1199,23 @@ create policy commits_insert on commits
 
 `deltas` follow `commits` exactly (select through the commit's visibility; insert only alongside a commit the same user may insert; no update/delete). The policy is the same predicate applied via `exists (select 1 from commits c where c.id = deltas.commit_id)` — the RLS on `commits` does the work.
 
-### 9.4 `comments`
+### 9.4 `comments`, `comment_mentions`, `notifications`, `atlas.profiles` (Sprint M1a amendment)
 
-```sql
-alter table comments enable row level security;
-alter table comments force row level security;
+The literal RLS SQL below is superseded — reproducing it here would drift the moment the migration does, so this section now points at the migration instead of re-embedding it: `supabase/migrations/20260906240000_comments.sql` (`comments`/`comment_mentions`/`notifications`) and `20260906230000_profiles.sql` (`atlas.profiles`) are the source of truth, with every decision's rationale in their own module comments.
 
-create policy comments_select on comments
-  for select to authenticated
-  using (
-    atlas.is_member(org_id)
-    and (
-      atlas.has_role(org_id, 'owner', 'architect', 'contributor')
-      or (
-        visibility = 'team'
-        and atlas.anchor_visible_to_viewer(anchor_type, anchor_id)
-      )
-    )
-  );
+The shape, summarised:
 
-create policy comments_insert on comments
-  for insert to authenticated
-  with check (
-    atlas.has_role(org_id, 'owner', 'architect', 'contributor')
-    and author_id = auth.uid()
-    and status = 'open'
-    and resolved_by is null
-  );
+- **`atlas.comment_visible_to_viewer(org_id, anchor_type, anchor_id)`**: the one predicate both `comments_select` and `comment_mentions_select` use. Contributor+ see every comment in their org unconditionally (same as commits/deltas/views); a viewer additionally needs `atlas.anchor_visible_to_viewer` true for the comment's own anchor. `comments.branch_id` is deliberately **not** part of this predicate — see §3.8's own note on why gating on it too would leave a merged element's comments permanently invisible to viewers.
+- **`atlas.anchor_visible_to_viewer(anchor_type, anchor_id)`**: `decision` → always true (no migrated table yet); `change` → `atlas.branch_visible_to_viewer(anchor_id)`; `version` → the tag exists; `element`/`relationship` → present in `elements_head`/`relationships_head` at a commit whose branch is main or `shared_for_review`.
+- **`comments_insert`**: contributor+ only, `author_id = auth.uid()`, must start `open` with no resolution metadata.
+- **`comments_update`**: RLS narrows to author, owner/architect, or (for a root comment only) any contributor; the real split — body only by its author, resolution state by owner/architect or by a contributor resolving their *own* thread, never someone else's — is enforced by trigger `atlas.guard_comment_update`, the same "narrow the grant, enforce the rest in a trigger" pattern `atlas.guard_tag_on_main` already uses.
+- **`atlas.check_anchor`** (`before insert on comments`): the named anchor must exist in permanent history (`deltas`' `element_create`/`relationship_create` rows, `branches`, or `tags` — never `elements_head`/`relationships_head`, so a comment can be posted on something already retracted); a reply must point at a root (not another reply) and share that root's exact anchor.
+- **`atlas.process_comment_mentions`** (`after insert on comments`): parses `@handle` out of the body against `atlas.profiles.handle`, one `comment_mentions` row and one `notifications` row per resolved fellow-org member, skipping the author's own handle.
+- **`notifications`**: `user_id = auth.uid()` only, for both select and (the `read_at` column only) update — private per recipient, never org-shared like comments.
+- **`atlas.profiles`**: readable by any fellow org member (any shared org, any role); updatable (`display_name`/`handle`/`avatar_url`) by its own user only; no insert/delete grant to `authenticated` — rows exist only via `atlas.ensure_profile`.
+- **`atlas.unresolved_comment_counts(model_id, anchor_ids[])`**: a POST RPC (§6.7 — sidesteps the GET `.in()` URL-length hazard entirely, the reason it exists as an RPC rather than a client-side `.in()` read), `security invoker` so a caller's own `comments_select` RLS applies exactly as it would to any other read.
 
--- Authors edit their own body; architects and owners may also resolve/unresolve.
--- Column-level grants restrict what each may touch; the trigger below enforces the split.
-create policy comments_update on comments
-  for update to authenticated
-  using (
-    atlas.is_member(org_id)
-    and (author_id = auth.uid() or atlas.has_role(org_id, 'owner', 'architect'))
-  )
-  with check (
-    atlas.is_member(org_id)
-    and (author_id = auth.uid() or atlas.has_role(org_id, 'owner', 'architect'))
-  );
-
-revoke update on comments from authenticated;
-grant update (body, edited_at, status, resolved_by, resolved_at) on comments to authenticated;
-
-create or replace function atlas.guard_comment_update()
-returns trigger
-language plpgsql
-as $$
-begin
-  -- Only architects/owners change resolution state.
-  if (new.status, new.resolved_by, new.resolved_at) is distinct from (old.status, old.resolved_by, old.resolved_at)
-     and not atlas.has_role(new.org_id, 'owner', 'architect') then
-    raise exception 'only architects or owners may resolve comments' using errcode = '42501';
-  end if;
-  -- Only the author edits the body.
-  if new.body is distinct from old.body and new.author_id <> auth.uid() then
-    raise exception 'only the author may edit a comment' using errcode = '42501';
-  end if;
-  -- Resolution metadata must be consistent.
-  if new.status = 'resolved' and (new.resolved_by is null or new.resolved_at is null) then
-    raise exception 'resolved comments need resolved_by and resolved_at';
-  end if;
-  if new.status = 'open' and (new.resolved_by is not null or new.resolved_at is not null) then
-    raise exception 'open comments must not carry resolution metadata';
-  end if;
-  return new;
-end;
-$$;
-
-create trigger comments_guard_update
-  before update on comments
-  for each row execute function atlas.guard_comment_update();
-
--- No delete policy: comments are never deleted, only resolved.
-```
+Comments never block a merge (ADR-006, UI-principles §7.3): `atlas.merge_branch`/`atlas.approve_merge_request` never reference `comments` at all, so an open, unresolved thread on a branch being merged has no effect on it whatsoever — confirmed by `src/db/comments.integration.test.ts`'s own merge-survival test, which posts an unresolved comment and merges anyway in the same test.
 
 ### 9.5 Pattern for every other table
 
@@ -1276,8 +1252,11 @@ All property tests use generated inputs (fast-check or equivalent) with shrinkin
 | RT-5 | `type_schemas.json_schema` generated from `src/contracts/delta.ts` equals the checked-in seed, and every arbitrary `ElementAttributesByType[T]` validates against the schema for `T` (and an arbitrary object with one required key removed does not). |
 | RT-6 | `atlas.merge_elements(a, b)` then resolve `a` and `b` through `aliases` → same survivor; `deltas` and `relationships_head` rows that referenced `b` before the merge are byte-identical after it (history untouched); the survivor carries every relationship `b` had, deduplicated per S-6. |
 | RT-7 | For an arbitrary `views` row: node and edge set returned by the view query is identical before and after deleting all `view_layouts` and `view_annotations` rows for it. |
-| RT-8 | Comment anchored to a delta on a change branch → merge the branch → the anchor resolves to the same `deltas` row, now reachable from main's ancestry; comment count on the element unchanged. |
+| RT-8 | Comment anchored to an element on a change branch → merge the branch → the same comment is still listed on the element, unchanged, and becomes visible to a viewer who couldn't see it pre-merge (Sprint M1a amendment: anchored to the element's own id, never a delta or commit id — `src/db/comments.integration.test.ts`'s "survives merge" test). |
 | RT-9 | Arbitrary `UserPreferences` → `user_preferences` row → `UserPreferences` is deep-equal; a user reads only their own row and cannot read, write or delete another user's (P-22 style matrix, user-scoped). |
+| RT-10 | Comment anchored to an element on a change branch → refresh (pull main forward into the branch) → the same comment, unchanged, is still listed on the element (Sprint M1a, `src/db/comments.integration.test.ts`). |
+| RT-11 | Comment anchored to an element → retract the element → the comment is still readable (rule 5) and flagged as anchored to a retracted subject; posting a *new* comment on an already-retracted element still succeeds (Sprint M1a). |
+| RT-12 | A comment body containing `@handle` → one `comment_mentions` row and one `notifications` row per resolved fellow-org member, none for a handle mentioning the comment's own author, none for a handle with no matching profile in the org (Sprint M1a). |
 
 ### 10.2 Properties — fold and materialisation
 
@@ -1325,9 +1304,9 @@ All property tests use generated inputs (fast-check or equivalent) with shrinkin
 | Id | Property |
 |---|---|
 | P-22 | For random (org, user, role) and random artefacts: a user sees zero rows from any table for an org they are not a member of and that has not shared with them. |
-| P-23 | Viewer matrix: a viewer sees commits/heads/deltas on main, tagged commits, and `shared_for_review` branches, and nothing on draft or capture branches; sees `team` comments whose anchors are visible and never `internal` ones. |
+| P-23 | Viewer matrix: a viewer sees commits/heads/deltas on main, tagged commits, and `shared_for_review` branches, and nothing on draft or capture branches; sees a comment iff its anchor is visible to them (Sprint M1a amendment: `visibility`'s `team`/`internal` split is dropped for now — see §3.8/§9.4 — so this row is now purely about anchor visibility, not a visibility column). |
 | P-24 | Share matrix: a member of a shared-with org sees exactly the pinned tag's commit and heads (tag-pinned) or main's commits and heads (unpinned), never branches, comments, decisions or sources; nothing after `expires_at`. |
-| P-25 | Write matrix: contributor can insert commits on draft change branches only; viewer cannot insert anything model-bearing; nobody with an application role can insert a commit on main, update or delete a commit, delta or tag; only architect+ can create tags, approve merge requests, or resolve comments. |
+| P-25 | Write matrix: contributor can insert commits on draft change branches only; viewer cannot insert anything model-bearing, including a comment (Sprint M1a: `comments_insert` requires contributor+); nobody with an application role can insert a commit on main, update or delete a commit, delta or tag; only architect+ can create tags or approve merge requests; a comment thread resolves by architect+ (any thread) or by a contributor (their own thread only, Sprint M1a's narrower matrix than the original architect+-only draft). |
 | P-26 | Last owner: deleting or demoting the sole owner of an org fails. |
 
 ### 10.7 Properties — content
@@ -1347,6 +1326,8 @@ Sprint H1 item 12 (docs/AUDIT-2026-09-U2.md's own deferred-items review, §7.2):
 
 | Item | What's deferred | Target | Why |
 |---|---|---|---|
+| Member directory and invite UI | Sprint M1a's `atlas.profiles` (§3.2) gives every member a handle/display name, and the RLS to read a fellow member's, but there is still no page listing an org's members, no invite flow, and no @mention autocomplete — mention resolution today is purely server-side text parsing (`atlas.process_comment_mentions`) against a handle the author already knows | **U4** | Real UI surface (a member list, an invite-by-email flow, a mention picker) that Sprint M1a's own scope ("plumbing track... no UI beyond what tests need") deliberately excluded — the backend it depends on (`atlas.profiles`) is done; the UI isn't started. |
+| Notification tray UI | `notifications` (§3.8) and `src/db/notifications.ts` ship a full read/mark-read repository and an unread count; there is no inbox list, no in-app toast, no click-through to the mentioning comment | **U4** | Same sprint-scope decision as the member directory row above (asked and answered: "unread count only" for M1a) — grouped with it since both are the UI half of the same backend-complete, UI-deferred pattern U3b's "duplicates count wired to zero until Q1" already established. |
 | `type_schemas` (§3.3, ADR-001/ADR-015) | The full TypeScript-type-to-JSON-Schema generator plus checked-in seed and validator (RT-5) | Sprint K1 | Real schema-validation infrastructure the element page never needed; Sprint K1's capture edge function is the first consumer outside the TypeScript runtime that will actually need it. Already deferred inline at §3.3; listed here too for one-place discoverability. |
 | Delta-apply in SQL (§5.3's implementation note, ADR-015) | Teaching `atlas.commit_deltas` to apply just the *new* commit's deltas directly against the existing `elements_head`/`relationships_head`/`facts` rows, rather than receiving and replacing the whole materialised set on every commit | **Before Sprint K1** | The current design's real, measured cost (~8.45 MB per single-element edit against a 2,010-element/6,000-relationship/~16,000-fact model, budgeted at 12 MB — `e2e/landscape-perf.spec.ts`) is accepted today because this product's stated scale is one or two architects editing by hand, not a high-frequency writer. Sprint K1's capture pipeline is exactly that: an automated writer producing commits at a rate and volume manual editing never will. The payload-size tradeoff needs to be resolved *before* that new write pressure arrives, not discovered after a capture run is already timing out or exceeding the budget in production. |
 | `atlas.merge_elements` and §8's name+type+context trigram identity matching | The SQL procedure that actually executes an identity merge (RT-6), and the fuzzy-matching algorithm (trigram similarity ≥ 0.6, structural context, P-19) that would ever produce a candidate pair for it to merge | **Q1** | Neither has a reason to exist independently of the other: `merge_elements` has nothing to merge until something proposes "these two elements might be the same," and the matching algorithm only matters once the capture pipeline (Sprint K1) produces draft elements to match against a model's existing ones. Both wait on that same upstream dependency, and both land together once Q1 actually does the identity-matching work — Sprint C1 closes without either, per this row's own retargeting. The GIN trigram index this depends on (`elements_head_name_trgm_idx`, §3.5) is already migrated — the index exists; nothing queries it for matching purposes yet. |

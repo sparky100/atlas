@@ -7,6 +7,8 @@
  */
 import type { UUID } from '../contracts/delta';
 import type { SourceKind } from '../contracts/sources';
+export type { AnchorType, CommentStatus, NotificationKind } from '../contracts/comments';
+import type { AnchorType, CommentStatus, NotificationKind } from '../contracts/comments';
 
 export type MemberRole = 'owner' | 'architect' | 'contributor' | 'viewer';
 
@@ -165,6 +167,58 @@ export interface AliasRow {
  * built renderer.
  */
 export type ViewKind = 'landscape' | 'context' | 'container' | 'component' | 'capability_map';
+
+// ---------------------------------------------------------------------------
+// Collaboration (Sprint M1a): profiles, comments, mentions, notifications.
+// See supabase/migrations/20260906230000_profiles.sql and
+// 20260906240000_comments.sql for the full column-by-column rationale.
+// ---------------------------------------------------------------------------
+
+/** The literal shape of a row in `atlas.profiles` (SPEC §3.2 amendment, ADR-009 amendment). No email column — never exposed to fellow members. */
+export interface ProfileRow {
+  user_id: UUID;
+  display_name: string | null;
+  handle: string;
+  avatar_url: string | null;
+  updated_at: string;
+}
+
+/** The literal shape of a row in `comments` (SPEC §3.8 amendment, ADR-010 amendment). Anchors are stable subject ids, never commit ids. */
+export interface CommentRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  anchor_type: AnchorType;
+  anchor_id: UUID;
+  branch_id: UUID | null;
+  view_kind: ViewKind | null;
+  parent_comment_id: UUID | null;
+  body: string;
+  author_id: UUID;
+  status: CommentStatus;
+  resolved_by: UUID | null;
+  resolved_at: string | null;
+  created_at: string;
+  edited_at: string | null;
+}
+
+/** The literal shape of a row in `comment_mentions` — written only by `atlas.process_comment_mentions`. */
+export interface CommentMentionRow {
+  comment_id: UUID;
+  org_id: UUID;
+  user_id: UUID;
+}
+
+/** The literal shape of a row in `notifications` — written only by `atlas.process_comment_mentions`. In-app only, no email delivery. */
+export interface NotificationRow {
+  id: UUID;
+  org_id: UUID;
+  user_id: UUID;
+  kind: NotificationKind;
+  comment_id: UUID | null;
+  read_at: string | null;
+  created_at: string;
+}
 
 /** The literal shape of a row in `views` (SPEC §3.9, ADR-011) — a saved query, not a saved drawing. */
 export interface ViewRow {
