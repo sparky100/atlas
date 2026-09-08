@@ -6,16 +6,16 @@ Maps: 8 (`electricity_network/1.json`, `hei/1.json`, `housing/1.json`, `local_go
 
 ## 1. Per sector: full tree with definitions
 
-## electricity_network — v1 (draft, 12 level-1, 71 items)
+## electricity_network — v1 (published, 12 level-1, 71 items)
 
-Starter capability map for an electricity network operator (a distribution network operator taking on distribution system operator functions, or a transmission owner), drafted 2026-09-07 as the worked example of the utility map: the four utility-specific level-1 capabilities (codes 9-12) use exactly the utility map's level-1 wording, and every level-2 under them is electricity-specific rather than a restatement of the generic utility level-2s — except Connections and Emergency Response, which are the same capability and keep the same wording. Drafted from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.
+Starter capability map for an electricity network operator (a distribution network operator taking on distribution system operator functions, or a transmission owner), drafted 2026-09-07 as the worked example of the utility map: the four utility-specific level-1 capabilities (codes 9-12) use exactly the utility map's level-1 wording, and every level-2 under them is electricity-specific rather than a restatement of the generic utility level-2s — except Connections and Emergency Response, which are the same capability and keep the same wording. Drafted from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
 Sources:
 
-- Ofgem RIIO-ED2 price-control framework and the Distribution Code / Grid Code (consulted for regulatory and operational vocabulary; not copied) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- Energy Networks Association Open Networks project (consulted for DSO and flexibility-market vocabulary; not copied) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- IEC 61970/61968 Common Information Model (consulted for network-asset and operations vocabulary; not copied) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
+- Ofgem RIIO-ED2 price-control framework and the Distribution Code / Grid Code (consulted for regulatory and operational vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- Energy Networks Association Open Networks project (consulted for DSO and flexibility-market vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- IEC 61970/61968 Common Information Model (consulted for network-asset and operations vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 1. Finance
 
@@ -136,15 +136,15 @@ Meeting licence obligations and reporting to the regulator on performance and co
 - **12.4 Network Access & Charging** — Setting use-of-system charges and access arrangements under the codes.
 - **12.5 Industry Codes Compliance** — Meeting obligations under the distribution and grid codes.
 
-## hei — v1 (draft, 12 level-1, 74 items)
+## hei — v1 (published, 12 level-1, 74 items)
 
-Starter capability map for a university or college (a higher-education institution; a further-education college would carry Teaching & Learning and Student Support but a much smaller Research & Innovation), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (teaching and learning, research and innovation, student support, recruitment and admissions). Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.
+Starter capability map for a university or college (a higher-education institution; a further-education college would carry Teaching & Learning and Student Support but a much smaller Research & Innovation), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (teaching and learning, research and innovation, student support, recruitment and admissions). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
 Sources:
 
-- UCISA Higher Education Capability Model (consulted for scope and level-1 shape; not copied) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- Office for Students conditions of registration and the Scottish Funding Council outcome agreements (regulatory duties consulted for sector-specific capabilities) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
+- UCISA Higher Education Capability Model (consulted for scope and level-1 shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- Office for Students conditions of registration and the Scottish Funding Council outcome agreements (regulatory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 1. Finance
 
@@ -268,15 +268,15 @@ Attracting applicants and admitting them as students onto programmes of study.
 - **12.3 International Recruitment & Compliance** — Recruiting international students and meeting visa sponsorship duties.
 - **12.4 Enrolment & Induction** — Registering new students and inducting them into the institution.
 
-## housing — v1 (draft, 12 level-1, 73 items)
+## housing — v1 (published, 12 level-1, 73 items)
 
-Starter capability map for a housing association (a registered social landlord / registered provider), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (tenancy and lettings, housing stock as the core asset — distinct from the shared Estates capability, which covers the corporate estate — development and regeneration, tenant support). Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.
+Starter capability map for a housing association (a registered social landlord / registered provider), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (tenancy and lettings, housing stock as the core asset — distinct from the shared Estates capability, which covers the corporate estate — development and regeneration, tenant support). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
 Sources:
 
-- HACT UK Housing Data Standards (consulted for sector vocabulary; not copied) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- Regulator of Social Housing consumer and economic standards, and the Scottish Social Housing Charter (regulatory duties consulted for sector-specific capabilities) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
+- HACT UK Housing Data Standards (consulted for sector vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- Regulator of Social Housing consumer and economic standards, and the Scottish Social Housing Charter (regulatory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 1. Finance
 
@@ -399,15 +399,15 @@ Supporting tenants' wellbeing and investing in their communities.
 - **12.4 Community Investment** — Funding and running projects that improve residents' opportunities.
 - **12.5 Domestic Abuse & Safeguarding** — Protecting tenants at risk of abuse or harm.
 
-## local_government_england — v1 (draft, 12 level-1, 75 items)
+## local_government_england — v1 (published, 12 level-1, 75 items)
 
-Starter capability map for an English local authority (unitary, county or district functions combined — a district-only council would not carry Adult Social Care or Children's Services), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four England-specific ones (Care Act 2014 adult social care, SEND and children's social care, public health, Council Tax Support and business rates). Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.
+Starter capability map for an English local authority (unitary, county or district functions combined — a district-only council would not carry Adult Social Care or Children's Services), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four England-specific ones (Care Act 2014 adult social care, SEND and children's social care, public health, Council Tax Support and business rates). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
 Sources:
 
-- Socitm Local Public Services Business Capability Model (consulted for scope and level-1 shape; not copied) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- Care Act 2014, Children Act 1989/2004 and the Local Government Finance Act 1992 (statutory duties consulted for sector-specific capabilities) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
+- Socitm Local Public Services Business Capability Model (consulted for scope and level-1 shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- Care Act 2014, Children Act 1989/2004 and the Local Government Finance Act 1992 (statutory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 1. Finance
 
@@ -532,15 +532,15 @@ Raising local income and administering the support residents are entitled to.
 - **12.4 Discretionary & Household Support** — Awarding discretionary housing payments and local welfare assistance.
 - **12.5 Money & Welfare Advice** — Helping residents maximise their income, claim entitlements and manage debt.
 
-## local_government_scotland — v1 (draft, 12 level-1, 75 items)
+## local_government_scotland — v1 (published, 12 level-1, 75 items)
 
-Starter capability map for a Scottish local authority (a council under the Local Government etc. (Scotland) Act 1994), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four Scotland-specific ones (Curriculum for Excellence, Integration Joint Boards, Council Tax Reduction, the Scottish Welfare Fund). Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.
+Starter capability map for a Scottish local authority (a council under the Local Government etc. (Scotland) Act 1994), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four Scotland-specific ones (Curriculum for Excellence, Integration Joint Boards, Council Tax Reduction, the Scottish Welfare Fund). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
 Sources:
 
-- Socitm Local Public Services Business Capability Model (consulted for scope and level-1 shape; not copied) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- Local Government etc. (Scotland) Act 1994 and the Public Bodies (Joint Working) (Scotland) Act 2014 (statutory duties consulted for sector-specific capabilities) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
+- Socitm Local Public Services Business Capability Model (consulted for scope and level-1 shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- Local Government etc. (Scotland) Act 1994 and the Public Bodies (Joint Working) (Scotland) Act 2014 (statutory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 1. Finance
 
@@ -665,15 +665,15 @@ Raising local income and administering the support residents are entitled to.
 - **12.4 Scottish Welfare Fund** — Awarding crisis and community care grants to people in need.
 - **12.5 Money & Welfare Advice** — Helping residents maximise their income, claim entitlements and manage debt.
 
-## nhs — v1 (draft, 12 level-1, 73 items)
+## nhs — v1 (published, 12 level-1, 73 items)
 
-Starter capability map for an NHS board or trust (a Scottish territorial board or an English provider trust — the level-2 wording is deliberately neutral between them), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four health-specific ones (patient care, clinical quality and safety, population health, diagnostics and clinical support). Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.
+Starter capability map for an NHS board or trust (a Scottish territorial board or an English provider trust — the level-2 wording is deliberately neutral between them), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four health-specific ones (patient care, clinical quality and safety, population health, diagnostics and clinical support). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
 Sources:
 
-- NHS England enterprise-architecture business capability model (consulted for scope and level-1 shape; not copied) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- Health and Care Act 2022 and the National Health Service (Scotland) Act 1978 (statutory duties consulted for sector-specific capabilities) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
+- NHS England enterprise-architecture business capability model (consulted for scope and level-1 shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- Health and Care Act 2022 and the National Health Service (Scotland) Act 1978 (statutory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 1. Finance
 
@@ -796,15 +796,15 @@ Providing the tests, medicines and technical services clinical care depends on.
 - **12.4 Medical Devices & Clinical Engineering** — Managing the safety, maintenance and availability of medical equipment.
 - **12.5 Blood & Transfusion Services** — Ensuring safe supply and use of blood and blood products.
 
-## public_body — v1 (draft, 11 level-1, 64 items)
+## public_body — v1 (published, 11 level-1, 64 items)
 
-Starter capability map for a generic public body (an executive agency, non-departmental public body or similar that makes policy, engages the public and often administers funding, but does not itself run schools, hospitals, homes or networks), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus three generic-public-body ones (policy development, public engagement, grants and funding). Renamed from the original 'generic' sector. Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.
+Starter capability map for a generic public body (an executive agency, non-departmental public body or similar that makes policy, engages the public and often administers funding, but does not itself run schools, hospitals, homes or networks), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus three generic-public-body ones (policy development, public engagement, grants and funding). Renamed from the original 'generic' sector. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
 Sources:
 
-- UK Government Functional Standards GovS 001-016 (consulted for both the shared corporate capabilities and the generic policy/engagement/grants shape) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- HM Treasury Green Book (consulted for policy appraisal vocabulary; not copied) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- APQC Process Classification Framework (consulted only to check scope coverage of the shared capabilities; it is a process model and no process names were adopted) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
+- UK Government Functional Standards GovS 001-016 (consulted for both the shared corporate capabilities and the generic policy/engagement/grants shape) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
+- HM Treasury Green Book (consulted for policy appraisal vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- APQC Process Classification Framework (consulted only to check scope coverage of the shared capabilities; it is a process model and no process names were adopted) (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 1. Finance
 
@@ -914,15 +914,15 @@ Awarding and assuring public funding to deliver policy outcomes.
 - **11.3 Grant Monitoring & Assurance** — Monitoring recipients and assuring funds are used as intended.
 - **11.4 Payment & Clawback** — Paying instalments and recovering funds where conditions are breached.
 
-## utility — v1 (draft, 12 level-1, 72 items)
+## utility — v1 (published, 12 level-1, 72 items)
 
-Starter capability map for a generic regulated, asset-owning UK utility (a water, gas or electricity network company under Ofwat or Ofgem price control), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four utility-specific ones (asset management, network operations, customer and metering, regulatory compliance and price-control reporting) whose level-1 wording the electricity_network map shares exactly, adding its own sector-specific level-2 entries rather than restating these. Connections and Emergency Response are level-2 here because they belong to Network Operations, and the 12 level-1 ceiling is already reached. Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.
+Starter capability map for a generic regulated, asset-owning UK utility (a water, gas or electricity network company under Ofwat or Ofgem price control), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four utility-specific ones (asset management, network operations, customer and metering, regulatory compliance and price-control reporting) whose level-1 wording the electricity_network map shares exactly, adding its own sector-specific level-2 entries rather than restating these. Connections and Emergency Response are level-2 here because they belong to Network Operations, and the 12 level-1 ceiling is already reached. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
 Sources:
 
-- Ofgem RIIO price-control framework and Ofwat PR24 methodology (consulted for the regulatory reporting and price-control shape; not copied) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- ISO 55000 asset management standard (consulted for asset-management vocabulary; not copied) (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Pending human review — drafted by Claude Code, 2026-09-07)
+- Ofgem RIIO price-control framework and Ofwat PR24 methodology (consulted for the regulatory reporting and price-control shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- ISO 55000 asset management standard (consulted for asset-management vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 1. Finance
 

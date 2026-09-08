@@ -1,12 +1,12 @@
 {
   "sector": "local_government_scotland",
   "version": 1,
-  "status": "draft",
-  "sourceDescription": "Starter capability map for a Scottish local authority (a council under the Local Government etc. (Scotland) Act 1994), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four Scotland-specific ones (Curriculum for Excellence, Integration Joint Boards, Council Tax Reduction, the Scottish Welfare Fund). Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.",
+  "status": "published",
+  "sourceDescription": "Starter capability map for a Scottish local authority (a council under the Local Government etc. (Scotland) Act 1994), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four Scotland-specific ones (Curriculum for Excellence, Integration Joint Boards, Council Tax Reduction, the Scottish Welfare Fund). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
-    { "citation": "Socitm Local Public Services Business Capability Model (consulted for scope and level-1 shape; not copied)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "Local Government etc. (Scotland) Act 1994 and the Public Bodies (Joint Working) (Scotland) Act 2014 (statutory duties consulted for sector-specific capabilities)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" }
+    { "citation": "Socitm Local Public Services Business Capability Model (consulted for scope and level-1 shape; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "Local Government etc. (Scotland) Act 1994 and the Public Bodies (Joint Working) (Scotland) Act 2014 (statutory duties consulted for sector-specific capabilities)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" }
   ],
   "items": [
     { "code": "1", "name": "Finance", "level": 1, "parentCode": null, "description": "Planning, controlling and accounting for the organisation's money and financial risk." },

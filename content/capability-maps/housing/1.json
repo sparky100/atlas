@@ -1,12 +1,12 @@
 {
   "sector": "housing",
   "version": 1,
-  "status": "draft",
-  "sourceDescription": "Starter capability map for a housing association (a registered social landlord / registered provider), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (tenancy and lettings, housing stock as the core asset — distinct from the shared Estates capability, which covers the corporate estate — development and regeneration, tenant support). Pending human review — status stays draft until a named reviewer signs it off. Licence: CC BY 4.0.",
+  "status": "published",
+  "sourceDescription": "Starter capability map for a housing association (a registered social landlord / registered provider), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (tenancy and lettings, housing stock as the core asset — distinct from the shared Estates capability, which covers the corporate estate — development and regeneration, tenant support). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
-    { "citation": "HACT UK Housing Data Standards (consulted for sector vocabulary; not copied)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "Regulator of Social Housing consumer and economic standards, and the Scottish Social Housing Charter (regulatory duties consulted for sector-specific capabilities)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" },
-    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-07" }
+    { "citation": "HACT UK Housing Data Standards (consulted for sector vocabulary; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "Regulator of Social Housing consumer and economic standards, and the Scottish Social Housing Charter (regulatory duties consulted for sector-specific capabilities)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
+    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" }
   ],
   "items": [
     { "code": "1", "name": "Finance", "level": 1, "parentCode": null, "description": "Planning, controlling and accounting for the organisation's money and financial risk." },
