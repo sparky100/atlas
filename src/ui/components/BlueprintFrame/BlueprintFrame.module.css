@@ -9,8 +9,8 @@
 
 .corner {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: var(--blueprint-corner-size);
+  height: var(--blueprint-corner-size);
   border-style: solid;
   border-color: var(--accent);
   border-width: 0;
@@ -18,29 +18,29 @@
 }
 
 .topLeft {
-  top: -2px;
-  left: -2px;
-  border-top-width: 2px;
-  border-left-width: 2px;
+  top: calc(-1 * var(--border-width-emphasis));
+  left: calc(-1 * var(--border-width-emphasis));
+  border-top-width: var(--border-width-emphasis);
+  border-left-width: var(--border-width-emphasis);
 }
 
 .topRight {
-  top: -2px;
-  right: -2px;
-  border-top-width: 2px;
-  border-right-width: 2px;
+  top: calc(-1 * var(--border-width-emphasis));
+  right: calc(-1 * var(--border-width-emphasis));
+  border-top-width: var(--border-width-emphasis);
+  border-right-width: var(--border-width-emphasis);
 }
 
 .bottomLeft {
-  bottom: -2px;
-  left: -2px;
-  border-bottom-width: 2px;
-  border-left-width: 2px;
+  bottom: calc(-1 * var(--border-width-emphasis));
+  left: calc(-1 * var(--border-width-emphasis));
+  border-bottom-width: var(--border-width-emphasis);
+  border-left-width: var(--border-width-emphasis);
 }
 
 .bottomRight {
-  bottom: -2px;
-  right: -2px;
-  border-bottom-width: 2px;
-  border-right-width: 2px;
+  bottom: calc(-1 * var(--border-width-emphasis));
+  right: calc(-1 * var(--border-width-emphasis));
+  border-bottom-width: var(--border-width-emphasis);
+  border-right-width: var(--border-width-emphasis);
 }
