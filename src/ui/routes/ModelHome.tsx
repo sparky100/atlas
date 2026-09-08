@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { ModelNav } from '../components/ModelNav/ModelNav';
@@ -6,7 +6,9 @@ import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
+import { parseRefParam } from '../../db/ref';
 import { ArchitectHome } from '../home/ArchitectHome';
 import { DirectorHome } from '../home/DirectorHome';
 import { HomeModeSwitch } from '../home/HomeModeSwitch';
@@ -15,7 +17,7 @@ import { useArchitectHome } from '../home/useArchitectHome';
 import { useDirectorHome } from '../home/useDirectorHome';
 import { useHomeMode } from '../home/useHomeMode';
 import { useModels } from '../models/useModels';
-import { canEditOnMain, useMembership } from '../orgs/useMembership';
+import { canCreateChangeBranch, canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import styles from './ModelHome.module.css';
 
@@ -34,11 +36,17 @@ export function ModelHome() {
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { homeMode, setHomeMode } = useHomeMode(userId, canEditOnMain(role));
 
-  // Both doors have no branch selector (UI-principles §3.1/§3.2) — the
-  // search box's create action always writes to main, gated the same way
-  // every other main-only affordance in this product is (ADR-015).
+  // Handoff — Flow: Add a system, decision 5: the search box's create
+  // action now follows the current `?ref=` (main, unless the door is
+  // opened at `?ref=branch:…`) rather than always writing to main — a
+  // contributor viewing main gets `HomeSearch`'s own propose-a-change
+  // picker instead of a direct write, same role split every other write
+  // path in this product already makes (ADR-015/ADR-009).
+  const [searchParams] = useSearchParams();
+  const ref = parseRefParam(searchParams.get('ref'));
   const { branch: mainBranch } = useMainBranch(model?.id ?? null);
-  const canEdit = canEditOnMain(role);
+  const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
+  const canShowSearch = canCreateChangeBranch(role);
   const searchCommitId = mainBranch?.head_commit_id ?? null;
 
   const directorState = useDirectorHome(model?.id ?? '', organisation?.id ?? '');
@@ -74,19 +82,25 @@ export function ModelHome() {
         </div>
 
         <Panel>
-          {canEdit && mainBranch && searchCommitId ? (
+          {canShowSearch && searchCommitId ? (
             <HomeSearch
               modelId={model.id}
               orgId={organisation?.id ?? ''}
               userId={userId}
+              role={role}
               searchCommitId={searchCommitId}
-              branch={mainBranch}
-              expectedHeadCommitId={searchCommitId}
+              activeRef={ref}
+              editingBranch={editingBranch}
               orgSlug={organisation?.slug ?? ''}
               modelSlug={model.slug}
+              // Handoff — Flow: Add a system, decision 2: autofocus only on
+              // the architect door — the director door's own content (the
+              // weakness grid) is what a director opens this page to see.
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- HomeSearch's own input carries the real disable comment; this is a plain boolean prop being forwarded to it, opt-in per door.
+              autoFocus={homeMode === 'architect'}
             />
           ) : (
-            <EmptyState>Only an owner or architect can add elements from here.</EmptyState>
+            <EmptyState>Only an owner, architect, or contributor can add elements from here.</EmptyState>
           )}
         </Panel>
 

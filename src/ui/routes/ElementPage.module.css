@@ -27,3 +27,36 @@
   gap: var(--space-2);
   margin-top: var(--space-3);
 }
+
+/* Handoff — Flow: Add a system, step 7: the post-create toast. An `info`
+   accent (never a celebration colour, per the handoff's own colour section)
+   comes from Panel's own border/background tokens — no extra tone needed
+   here. Pinned full-width above the mobile safe area at narrow widths. */
+.toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.toastActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+@media (max-width: 480px) {
+  .toast {
+    position: fixed;
+    left: var(--space-2);
+    right: var(--space-2);
+    bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+    z-index: 20;
+  }
+
+  .toastActions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

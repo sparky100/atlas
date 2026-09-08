@@ -31,7 +31,8 @@ export interface RelationshipsSectionAddConfig {
   searchCommitId: UUID;
   branch: BranchRow;
   expectedHeadCommitId: UUID;
-  onCreated: () => void;
+  /** The newly related element's id — the caller (ElementPage.tsx) uses this to mark the row "just added" (Handoff — Flow: Add a system, step 7). */
+  onCreated: (otherElementId: UUID) => void;
 }
 
 export interface RelationshipsSectionProps {
@@ -44,6 +45,8 @@ export interface RelationshipsSectionProps {
   relationshipFacts: Map<UUID, Map<string, FactsRow>>;
   sources: Map<UUID, SourceRow>;
   addRelationship?: RelationshipsSectionAddConfig | undefined;
+  /** The other element id of a relationship just added in this session (Handoff — Flow: Add a system, step 7's `just added` chip) — cleared by the caller once acknowledged, not by this component. */
+  justAddedElementId?: UUID | null;
 }
 
 /**
@@ -57,7 +60,7 @@ export interface RelationshipsSectionProps {
  * with neither existing rows nor (when `addRelationship` is given) the
  * right to add is skipped entirely, same as before this generalisation.
  */
-export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementType, relationships, endpoints, relationshipFacts, sources, addRelationship }: RelationshipsSectionProps) {
+export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementType, relationships, endpoints, relationshipFacts, sources, addRelationship, justAddedElementId = null }: RelationshipsSectionProps) {
   const outboundSlots = new Map(outboundRelationshipGroups(elementType).map((slot) => [slot.relationshipType, slot]));
   const inboundSlots = new Map(inboundRelationshipGroups(elementType).map((slot) => [slot.relationshipType, slot]));
 
@@ -92,6 +95,7 @@ export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementTyp
               relationshipFacts={relationshipFacts}
               sources={sources}
               addRelationship={addRelationship}
+              justAddedElementId={justAddedElementId}
             />
           )}
           {showInbound && (
@@ -107,6 +111,7 @@ export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementTyp
               relationshipFacts={relationshipFacts}
               sources={sources}
               addRelationship={addRelationship}
+              justAddedElementId={justAddedElementId}
             />
           )}
         </div>
@@ -127,6 +132,7 @@ function RelationshipDirectionGroup({
   relationshipFacts,
   sources,
   addRelationship,
+  justAddedElementId,
 }: {
   label: string;
   rows: RelationshipsHeadRow[];
@@ -139,6 +145,7 @@ function RelationshipDirectionGroup({
   relationshipFacts: Map<UUID, Map<string, FactsRow>>;
   sources: Map<UUID, SourceRow>;
   addRelationship?: RelationshipsSectionAddConfig | undefined;
+  justAddedElementId?: UUID | null;
 }) {
   return (
     <div className={styles.directionGroup}>
@@ -153,6 +160,12 @@ function RelationshipDirectionGroup({
         const attrs = attributesRecord(rel.attributes);
         const dataClassification = attrs.dataClassification;
         const isPrimaryOwner = rel.relationship_type === 'owns' && attrs.primary === true;
+        // The verb phrase a `uses`/`flows_to` "+ Add" (RelationshipAdd.tsx)
+        // writes into the relationship's own `description` — the field is
+        // legal on every type (SupportsAttributes/UsesAttributes/
+        // FlowsToAttributes), so this renders wherever it's actually set.
+        const phrase = typeof attrs.description === 'string' && attrs.description.length > 0 ? attrs.description : null;
+        const justAdded = other !== undefined && other.element_id === justAddedElementId;
 
         return (
           <div key={rel.relationship_id} className={styles.row}>
@@ -172,12 +185,18 @@ function RelationshipDirectionGroup({
             <Text tone="muted" size="sm" as="span">
               {other?.element_type ?? ''}
             </Text>
+            {phrase && (
+              <Text tone="faint" size="sm" as="span">
+                &ldquo;{phrase}&rdquo;
+              </Text>
+            )}
             {isPrimaryOwner && (
               <span aria-label="primary owner" title="Primary owner">
                 ★
               </span>
             )}
             {typeof dataClassification === 'string' && dataClassification.length > 0 && <Chip tone="info">{dataClassification}</Chip>}
+            {justAdded && <Chip tone="info">just added</Chip>}
             {existsFact && <FactBadge fact={existsFact} source={sources.get(existsFact.source_id)} />}
           </div>
         );
