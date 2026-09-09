@@ -684,6 +684,14 @@ describe('C17: at most one primary supports edge per system, one primary owns ed
     return { kind: 'relationship.create', id, relationshipId, relationshipType: 'owns', fromElementId: actorId, toElementId: targetId, attributes: { primary }, sourceId: 'src', confidence: 1 };
   }
 
+  function relationshipRetract(id: UUID, relationshipId: UUID, relationshipType: RelationshipType, previousDeltaId: UUID): Delta {
+    return { kind: 'relationship.retract', id, relationshipId, relationshipType, previousDeltaId, sourceId: 'src', confidence: 1 };
+  }
+
+  function relationshipRestore(id: UUID, relationshipId: UUID, relationshipType: RelationshipType, previousDeltaId: UUID): Delta {
+    return { kind: 'relationship.restore', id, relationshipId, relationshipType, previousDeltaId, sourceId: 'src', confidence: 1 };
+  }
+
   /** One system and two capabilities — a fixture wide enough for "the system's second supports edge" scenarios. */
   function systemAndTwoCapabilities(): Head {
     return fold(emptyHead(), [elementCreate('d-sys', 'sys-1', 'system', 'PowerON'), elementCreate('d-cap-a', 'cap-a', 'capability', 'Asset Management'), elementCreate('d-cap-b', 'cap-b', 'capability', 'Network Operations')], ctx);
@@ -756,6 +764,38 @@ describe('C17: at most one primary supports edge per system, one primary owns ed
     const demote: Delta = { kind: 'relationship.update', id: 'd-demote', relationshipId: 'rel-1', relationshipType: 'owns', attribute: 'primary', value: false, previousDeltaId: 'd-r1', sourceId: 'src', confidence: 1 };
     const promote = ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', true);
     expect(() => fold(head, [demote, promote], ctx)).not.toThrow();
+  });
+
+  it('supports.restore: reviving a retracted primary is rejected once a new edge has taken over as primary; restoring after that new one is retracted too succeeds', () => {
+    const head = systemAndTwoCapabilities();
+    fold(head, [supportsCreate('d-r1', 'rel-1', 'sys-1', 'cap-a', 'primary')], ctx);
+    fold(head, [relationshipRetract('d-retract-r1', 'rel-1', 'supports', 'd-r1')], ctx);
+    fold(head, [supportsCreate('d-r2', 'rel-2', 'sys-1', 'cap-b', 'primary')], ctx);
+
+    const attempt = () => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'supports', 'd-retract-r1')], ctx);
+    expect(attempt).toThrow(EngineError);
+    expect(attempt).toThrow(/C17/);
+    expect(attempt).toThrow(/PowerON/);
+    expect(attempt).toThrow(/Network Operations/);
+
+    fold(head, [relationshipRetract('d-retract-r2', 'rel-2', 'supports', 'd-r2')], ctx);
+    expect(() => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'supports', 'd-retract-r1')], ctx)).not.toThrow();
+  });
+
+  it('owns.restore: reviving a retracted primary owner is rejected once a new owner has taken over as primary; restoring after that new one is retracted too succeeds', () => {
+    const head = twoActorsAndOneSystem();
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
+    fold(head, [relationshipRetract('d-retract-r1', 'rel-1', 'owns', 'd-r1')], ctx);
+    fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', true)], ctx);
+
+    const attempt = () => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'owns', 'd-retract-r1')], ctx);
+    expect(attempt).toThrow(EngineError);
+    expect(attempt).toThrow(/C17/);
+    expect(attempt).toThrow(/PowerON/);
+    expect(attempt).toThrow(/Asset Management Team/);
+
+    fold(head, [relationshipRetract('d-retract-r2', 'rel-2', 'owns', 'd-r2')], ctx);
+    expect(() => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'owns', 'd-retract-r1')], ctx)).not.toThrow();
   });
 
   it('two different systems/targets never conflict with each other', () => {

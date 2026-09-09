@@ -405,7 +405,7 @@ export const COMMIT_INVARIANTS = [
   { id: 'C16', text: 'The resulting head passes the validation level required for the branch kind: capture_draft → structural only; change → structural, schema advisory; main → structural and schema (SPEC §6.3).' },
   {
     id: 'C17',
-    text: "relationship.create/relationship.update setting supports.role = 'primary' or owns.primary = true: no other live relationship in the resulting head already has that same primary flag on the same anchor element — supports' anchor is fromElementId (one primary capability per system), owns' is toElementId (one primary owner per owned element). A same-commit delta demoting the existing one first (earlier in seq order) makes the promotion legal.",
+    text: "relationship.create/relationship.update/relationship.restore setting (or reviving, for restore) supports.role = 'primary' or owns.primary = true: no other live relationship in the resulting head already has that same primary flag on the same anchor element — supports' anchor is fromElementId (one primary capability per system), owns' is toElementId (one primary owner per owned element). A same-commit delta demoting the existing one first (earlier in seq order) makes the promotion legal; a restore is checked against the head as it stands now, not as it stood when the relationship was retracted.",
   },
 ] as const;
 
