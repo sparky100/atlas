@@ -12,6 +12,7 @@ import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
+import { SyncDescriptionsAction } from '../capabilityMap/SyncDescriptionsAction';
 import { useCapabilityMap } from '../capabilityMap/useCapabilityMap';
 import styles from './CapabilityMapPage.module.css';
 
@@ -89,6 +90,9 @@ export function CapabilityMapPage() {
         {state.status === 'refNotFound' && !canEdit && <Text as="p">This model has no commits yet at this ref.</Text>}
         {state.status === 'ready' && state.data.tree.l1.length === 0 && state.data.tree.orphans.length === 0 && canEdit && (
           <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reload} />
+        )}
+        {state.status === 'ready' && (state.data.tree.l1.length > 0 || state.data.tree.orphans.length > 0) && canEdit && (
+          <SyncDescriptionsAction modelId={model.id} userId={userId} onSynced={reload} />
         )}
         {state.status === 'ready' && (
           <CapabilityMapView

@@ -116,8 +116,8 @@ describe('repository layer against a real local Supabase', () => {
     const { error: mapError } = await service.from('capability_maps').insert({ id: capabilityMapId, sector: 'public_body', version: 1, status: 'draft', source_description: 'Integration test fixture' });
     if (mapError) throw new Error(`capability_maps fixture: ${mapError.message}`);
     const { error: itemsError } = await service.from('capability_map_items').insert([
-      { id: rootItemId, map_id: capabilityMapId, code: '1', parent_code: null, name: 'Root Capability', level: 1 },
-      { id: childItemId, map_id: capabilityMapId, code: '1.1', parent_code: '1', name: 'Child Capability', level: 2 },
+      { id: rootItemId, map_id: capabilityMapId, code: '1', parent_code: null, name: 'Root Capability', description: 'Top-level fixture capability.', level: 1 },
+      { id: childItemId, map_id: capabilityMapId, code: '1.1', parent_code: '1', name: 'Child Capability', description: 'Second-level fixture capability.', level: 2 },
     ]);
     if (itemsError) throw new Error(`capability_map_items fixture: ${itemsError.message}`);
     const { error: publishError } = await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', capabilityMapId);
@@ -200,6 +200,25 @@ describe('repository layer against a real local Supabase', () => {
         expect(attrs.code).toEqual(expect.any(String));
         expect(attrs.templateRef).toEqual(expect.any(String));
         expect(aliasRows).toContainEqual({ element_id: row.element_id, alias_value: attrs.code, alias_type: 'template_code' });
+      }
+    });
+
+    it("every seeded element's attributes.description matches the map item's own description (Bug A2)", async () => {
+      const { data: elementsHead, error } = await service
+        .from('elements_head')
+        .select('name, attributes')
+        .eq('commit_id', mainGenesisCommitId)
+        .eq('element_type', 'capability');
+      if (error) throw new Error(`reading elements_head: ${error.message}`);
+
+      const expectedDescriptionByName: Record<string, string> = {
+        'Root Capability': 'Top-level fixture capability.',
+        'Child Capability': 'Second-level fixture capability.',
+      };
+      expect(elementsHead).toHaveLength(Object.keys(expectedDescriptionByName).length);
+      for (const row of elementsHead) {
+        const attrs = row.attributes as { description?: string };
+        expect(attrs.description).toBe(expectedDescriptionByName[row.name as string]);
       }
     });
 

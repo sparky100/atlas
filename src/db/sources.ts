@@ -16,6 +16,27 @@ export interface GetOrCreateManualSourceInput {
 }
 
 /**
+ * The `template`-kind `sources` row `atlas.seed_from_map` created when this
+ * model was seeded (SPEC §3.6: `kind = 'template'` iff `capability_map_id`
+ * is not null) — read-only lookup, never created here. `sources_insert`'s
+ * RLS only allows an authenticated user to record `document`/`spreadsheet`/
+ * `interview`/`manual` (`supabase/migrations/20260906071500_sources_and_aliases.sql`);
+ * `template` (like `capture_job`) is a service-role-only kind, written
+ * once, atomically, by the seed itself. Anything that needs to attribute a
+ * fact to "the starter map" after that (Bug A2's sync-descriptions action:
+ * src/db/syncDescriptionsFromMap.ts) reuses this same row rather than
+ * minting a new one — it's the same source restating a fact it already
+ * carried, not a fresh one. A model seeded at most once (SPEC §5.1) means
+ * at most one such row per model.
+ */
+export async function getTemplateSource(supabase: Client, modelId: UUID): Promise<SourceRow | null> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.from('sources').select('*').eq('model_id', modelId).eq('kind', 'template').maybeSingle();
+  if (error) throw new Error(`getTemplateSource: ${error.message}`);
+  return data as SourceRow | null;
+}
+
+/**
  * A person's own manual edits all share one `sources` row per model
  * (`sources_model_id_user_id_manual_idx`, SPEC §3.6 — at most one
  * `kind = 'manual'` source per (model, user)). Editing (Sprint U1 step 5)

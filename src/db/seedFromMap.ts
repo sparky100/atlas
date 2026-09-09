@@ -5,10 +5,15 @@
  * parented on main's existing genesis commit (ADR-018: main always has a
  * real head, even before this runs — only the trigger-inserted `genesis`
  * commit itself is ever allowed a null parent), whose `element.create`
- * deltas carry `attributes.code`/`attributes.templateRef`, plus one
- * `sources` row (kind `template`) and one `aliases` row per element
- * (`template_code`, RT-4) recording which starter map and version seeded
- * this model.
+ * deltas carry `attributes.code`/`attributes.templateRef`/(when the map
+ * item has one) `attributes.description`, plus one `sources` row (kind
+ * `template`) and one `aliases` row per element (`template_code`, RT-4)
+ * recording which starter map and version seeded this model.
+ *
+ * `attributes.description` (Bug A2 fix — it was previously dropped
+ * silently) carries the same provenance as `name`: it's the map item's own
+ * fact, `sourceId`/confidence 1 from this same seed commit, not something
+ * that needs its own delta or source.
  *
  * Same division of labour as src/db/commits.ts: this builds the deltas and
  * folds them through the real engine (src/engine/deltas.ts's `fold`, from
@@ -20,7 +25,7 @@
  * are actually enforced — this is a client, not the authority.
  */
 import type { CapabilityMapItemRow } from './capabilityMapTemplates';
-import type { UUID } from '../contracts/delta';
+import type { CapabilityAttributes, UUID } from '../contracts/delta';
 import type { Delta } from '../contracts/delta';
 import { cloneHead, emptyHead, fold } from '../engine/deltas';
 import { headHash } from '../engine/head';
@@ -71,6 +76,9 @@ export function buildSeedDeltas(
     }
 
     const deltaId = mintId();
+    const attributes: CapabilityAttributes = { code: item.code, templateRef: item.id };
+    const description = item.description?.trim();
+    if (description) attributes.description = description;
     deltas.push({
       kind: 'element.create',
       id: deltaId,
@@ -78,7 +86,7 @@ export function buildSeedDeltas(
       elementType: 'capability',
       name: item.name,
       parentId,
-      attributes: { code: item.code, templateRef: item.id },
+      attributes,
       sourceId,
       confidence: 1, // "template seeds are 1.00" (src/contracts/delta.ts's Provenance doc comment).
     });

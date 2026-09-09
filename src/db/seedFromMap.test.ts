@@ -42,6 +42,27 @@ describe('buildSeedDeltas', () => {
     expect(deltas[0]).toMatchObject({ sourceId: 'source-xyz', confidence: 1 });
   });
 
+  it('Bug A2: copies a non-empty map item description onto attributes.description, with the same sourceId/confidence as the rest of the delta', () => {
+    const items = [item({ code: '1', name: 'Root', level: 1, parent_code: null, description: 'What this capability covers.' })];
+    const { deltas } = buildSeedDeltas(items, 'source-1');
+    const creates = asCreates(deltas);
+    expect(creates[0]?.attributes).toEqual({ code: '1', templateRef: 'item-1', description: 'What this capability covers.' });
+    expect(creates[0]?.sourceId).toBe('source-1');
+    expect(creates[0]?.confidence).toBe(1);
+  });
+
+  it("Bug A2: a null or all-whitespace description is omitted entirely, not written as an empty string", () => {
+    const items = [
+      item({ code: '1', name: 'Root', level: 1, parent_code: null, description: null }),
+      item({ code: '1.1', name: 'Child', level: 2, parent_code: '1', description: '   ' }),
+    ];
+    const { deltas } = buildSeedDeltas(items, 'source-1');
+    const creates = asCreates(deltas);
+    for (const create of creates) {
+      expect(create.attributes).not.toHaveProperty('description');
+    }
+  });
+
   it('links a three-level tree correctly regardless of input order', () => {
     const items = [
       item({ code: '1.1.1', name: 'Grandchild', level: 3, parent_code: '1.1' }),
