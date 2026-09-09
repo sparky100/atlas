@@ -10,6 +10,7 @@ import { clearViewLayouts, getOrCreateModelView, listViewLayouts, upsertViewLayo
 import type { ViewMode } from '../../db/viewMode';
 import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
+import { l1AncestorOf, loadCapabilityAncestry } from '../elements/capabilityDepth';
 import type { LandscapeLayout } from './layout';
 import { computeLandscapeLayoutInWorker } from './layoutWorkerClient';
 import { supabase } from '../supabaseClient';
@@ -43,14 +44,28 @@ async function loadSupportingSystemIds(commitId: UUID, capabilityId: UUID): Prom
 export type LandscapeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: LandscapeData };
 
 /**
- * Only the capabilities actually named by a `supports` edge are looked up
- * (for lane labels) — a system can support a sub-capability, not only a
- * root one, so this is driven by the edges found, not by walking the whole
- * capability tree.
+ * Every capability actually named by a `supports` edge, mapped to its own
+ * level-1 ancestor (Sprint U4-1 B4: "lanes are level-1 capabilities only;
+ * every supports rolls up to its level-1 ancestor via parent_id") — driven
+ * by the edges found, not by walking the whole capability tree, since a
+ * system can support a sub-capability at any depth. `byIds` abstracts over
+ * this hook's two sources (a real round trip for `main`/a tag, the branch
+ * projection's own in-memory lookup for a branch ref) the same way the
+ * rest of this file already does.
  */
-async function loadCapabilitiesById(commitId: UUID, supportsEdges: RelationshipsHeadRow[]): Promise<Map<UUID, ElementsHeadRow>> {
+async function loadL1AncestorByCapabilityId(
+  byIds: (ids: readonly UUID[]) => Promise<Map<UUID, ElementsHeadRow>>,
+  supportsEdges: readonly RelationshipsHeadRow[],
+): Promise<Map<UUID, ElementsHeadRow>> {
   const capabilityIds = [...new Set(supportsEdges.map((edge) => edge.to_element_id))];
-  return getElementsByIds(supabase, commitId, capabilityIds);
+  const leaves = await byIds(capabilityIds);
+  const ancestry = await loadCapabilityAncestry(byIds, leaves);
+  const l1ByCapabilityId = new Map<UUID, ElementsHeadRow>();
+  for (const id of capabilityIds) {
+    const l1 = l1AncestorOf(id, ancestry);
+    if (l1) l1ByCapabilityId.set(id, l1);
+  }
+  return l1ByCapabilityId;
 }
 
 export interface UseLandscapeResult {
@@ -141,9 +156,8 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
       const [edges, supportsEdges] = systemsSource
         ? [systemsSource.edges(systemIds), systemsSource.supports(systemIds)]
         : await Promise.all([listLandscapeEdges(supabase, commitId, systemIds), listSupportsEdgesForSystems(supabase, commitId, systemIds)]);
-      const capabilitiesById = systemsSource
-        ? systemsSource.byIds([...new Set(supportsEdges.map((edge) => edge.to_element_id))])
-        : await loadCapabilitiesById(commitId, supportsEdges);
+      const byIds: (ids: readonly UUID[]) => Promise<Map<UUID, ElementsHeadRow>> = systemsSource ? (ids) => Promise.resolve(systemsSource.byIds([...ids])) : (ids) => getElementsByIds(supabase, commitId, ids);
+      const l1AncestorByCapabilityId = await loadL1AncestorByCapabilityId(byIds, supportsEdges);
 
       const view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'landscape', name: 'Landscape', createdBy: currentUserId, branchId });
       const savedLayout = await listViewLayouts(supabase, view.id);
@@ -154,7 +168,7 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
       );
 
       // UI-principles §8.6: layout runs off the main thread.
-      const computed = await computeLandscapeLayoutInWorker(systems, supportsEdges, capabilitiesById);
+      const computed = await computeLandscapeLayoutInWorker(systems, supportsEdges, l1AncestorByCapabilityId);
       const nodes = computed.nodes.map((node) => {
         const saved = savedById.get(node.elementId);
         return saved ? { elementId: node.elementId, x: saved.x, y: saved.y } : node;

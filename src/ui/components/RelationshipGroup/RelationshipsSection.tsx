@@ -190,6 +190,8 @@ function RelationshipDirectionGroup({
           direction={direction}
           elementId={elementId}
           elementName={addRelationship.elementName}
+          existingRows={rows}
+          relationshipFacts={relationshipFacts}
           modelId={addRelationship.modelId}
           orgId={addRelationship.orgId}
           userId={addRelationship.userId}

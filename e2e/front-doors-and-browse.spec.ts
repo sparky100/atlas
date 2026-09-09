@@ -101,7 +101,7 @@ test('front doors and browse: both doors render for a seeded model, switching pe
         relationshipType: 'supports',
         fromElementId: retiringSystemId,
         toElementId: capabilityId,
-        attributes: {},
+        attributes: { role: 'secondary' },
         sourceId: seedSourceId,
         confidence: 1,
       },

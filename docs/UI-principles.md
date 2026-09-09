@@ -302,7 +302,7 @@ The centre pane for a merge request follows SPEC §7.4: summary row, then confli
 | Kind | Scope | Nodes | Edges | Layout |
 |---|---|---|---|---|
 | **Capability map** | model | capabilities L1–L3 | none (structure is nesting) | nested tiles, L1 as columns, L2 as stacked cards, L3 on zoom |
-| **Landscape** | model, optional capability filter | systems, grouped into swim-lanes by the capability they `support`; externals in a bottom lane | `uses`, `flows_to` between systems | layered, lanes fixed, positions within lane are hints |
+| **Landscape** | model, optional capability filter | systems, grouped into swim-lanes by the *level-1* capability their **primary** `supports` edge rolls up to (`supports.role`, Sprint U4-1 B4) — a system with no primary edge lands by whichever was added most recently, flagged "+N" for the other lanes it also touches; every other level-1 lane a system also supports gets a linked reference chip, never a second tile; externals in a bottom lane | `uses`, `flows_to` between systems | layered, lanes fixed, positions within lane are hints |
 | **Context** | one system | the system, every system/actor it has a relationship with | all relationship types touching it | radial, scope at centre, externals outside a ring |
 | **Container** | one system | its containers, plus external systems/containers they `uses`/`flows_to` | `uses`, `flows_to` at container grain | layered inside the system frame; externals outside |
 | **Component** | one container | its components, plus containers they `uses` | `uses` | same as container |

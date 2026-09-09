@@ -86,9 +86,9 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
       createSystem(randomUUID(), sysWarnId, 'Northgate Revenues', 'retiring', seedSourceId),
       createSystem(sysInfoOldCreateDeltaId, sysInfoOldId, 'Legacy Case System', 'retiring', seedSourceId),
       createSystem(randomUUID(), sysHealthyId, 'Bartec Collective', 'active', seedSourceId),
-      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: sysWarnId, toElementId: capWarnId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
-      { kind: 'relationship.create', id: sysInfoOldSupportsCreateDeltaId, relationshipId: sysInfoOldSupportsRelationshipId, relationshipType: 'supports', fromElementId: sysInfoOldId, toElementId: capInfoId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
-      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: sysHealthyId, toElementId: capHealthyId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: sysWarnId, toElementId: capWarnId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'relationship.create', id: sysInfoOldSupportsCreateDeltaId, relationshipId: sysInfoOldSupportsRelationshipId, relationshipType: 'supports', fromElementId: sysInfoOldId, toElementId: capInfoId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: sysHealthyId, toElementId: capHealthyId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
     ],
   };
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope: seedEnvelope });
@@ -119,7 +119,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
       body: null,
       deltas: [
         createSystem(randomUUID(), sysInfoNewId, 'Modern Case Platform', 'active', seedSourceId),
-        { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: sysInfoNewId, toElementId: capInfoId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
+        { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: sysInfoNewId, toElementId: capInfoId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
         // C8: an element can't be retracted while a live relationship still
         // references it — retract the old system's own supports edge first.
         { kind: 'relationship.retract', id: randomUUID(), relationshipId: sysInfoOldSupportsRelationshipId, relationshipType: 'supports', previousDeltaId: sysInfoOldSupportsCreateDeltaId, sourceId: seedSourceId, confidence: 1 },

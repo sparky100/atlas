@@ -60,6 +60,8 @@ export const DELIBERATELY_NOT_MODELLED = [
 export type LifecycleStatus = 'planned' | 'active' | 'retiring' | 'retired';
 export type ActorSubtype = 'person' | 'team';
 export type DataClassification = 'public' | 'official' | 'official_sensitive' | 'special_category';
+/** Sprint U4-1 B4: which of a system's `supports` edges anchors its one landscape lane (relationship_type_rules' new `maxPrimaryPerFrom: 1`, `supports`-only). Always set at creation, defaulting to `secondary` unless the picker's "primary?" prompt is answered yes — never left unset the way `SupportsAttributes.description` is, since lane placement has to read *something* off every edge. */
+export type SupportsRole = 'primary' | 'secondary';
 
 /**
  * Attributes stored in `elements_head.attributes` (jsonb). `name` and
@@ -128,6 +130,8 @@ export interface ElementAttributesByType {
 /** Attributes stored in `relationships_head.attributes` (jsonb). Endpoints are immutable and are not attributes. */
 export interface SupportsAttributes {
   description?: string;
+  /** Sprint U4-1 B4 — see `SupportsRole`'s own doc comment. */
+  role: SupportsRole;
 }
 export interface UsesAttributes {
   description?: string;

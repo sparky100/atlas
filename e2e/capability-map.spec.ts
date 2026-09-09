@@ -87,7 +87,7 @@ test('capability map: two-level tree with an orphan, L2→L3 expand, orphan flag
       sourceId: seedSourceId,
       confidence: 1,
     },
-    { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemId, toElementId: l2Id, attributes: {}, sourceId: seedSourceId, confidence: 1 },
+    { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemId, toElementId: l2Id, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
   ];
 
   const envelope: CommitEnvelope = {

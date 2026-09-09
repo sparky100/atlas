@@ -25,19 +25,21 @@ export interface RelationshipTypeRule {
   maxPerFrom: number | null;
   /** Max live relationships with `primary: true` into one element (`owns` only). `null` = unbounded. */
   maxPrimaryPerTo: number | null;
+  /** Max live relationships with `role: 'primary'` from one element (`supports` only, Sprint U4-1 B4 — the landscape lane a system's tile is placed in). `null` = unbounded. Enforced by a partial unique index (`supabase/migrations`), not by engine validation — see that migration's own comment on why. */
+  maxPrimaryPerFrom: number | null;
 }
 
 export const RELATIONSHIP_TYPE_RULES: readonly RelationshipTypeRule[] = [
-  { relationshipType: 'supports', fromType: 'system', toType: 'capability', maxPerFrom: null, maxPrimaryPerTo: null },
-  { relationshipType: 'uses', fromType: 'system', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null },
-  { relationshipType: 'uses', fromType: 'container', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null },
-  { relationshipType: 'uses', fromType: 'component', toType: 'component', maxPerFrom: null, maxPrimaryPerTo: null },
-  { relationshipType: 'uses', fromType: 'container', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null },
-  { relationshipType: 'uses', fromType: 'component', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null },
-  { relationshipType: 'owns', fromType: 'actor', toType: 'capability', maxPerFrom: null, maxPrimaryPerTo: 1 },
-  { relationshipType: 'owns', fromType: 'actor', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: 1 },
-  { relationshipType: 'flows_to', fromType: 'system', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null },
-  { relationshipType: 'flows_to', fromType: 'container', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null },
+  { relationshipType: 'supports', fromType: 'system', toType: 'capability', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: 1 },
+  { relationshipType: 'uses', fromType: 'system', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  { relationshipType: 'uses', fromType: 'container', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  { relationshipType: 'uses', fromType: 'component', toType: 'component', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  { relationshipType: 'uses', fromType: 'container', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  { relationshipType: 'uses', fromType: 'component', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  { relationshipType: 'owns', fromType: 'actor', toType: 'capability', maxPerFrom: null, maxPrimaryPerTo: 1, maxPrimaryPerFrom: null },
+  { relationshipType: 'owns', fromType: 'actor', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: 1, maxPrimaryPerFrom: null },
+  { relationshipType: 'flows_to', fromType: 'system', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  { relationshipType: 'flows_to', fromType: 'container', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
 ] as const;
 
 /** The rule for a triple, or `undefined` if the triple isn't legal (C9/V3). */

@@ -72,7 +72,10 @@ const actorAttributes: fc.Arbitrary<ActorAttributes> = fc.record(
   { requiredKeys: ['subtype', 'isExternal'] },
 );
 
-const supportsAttributes: fc.Arbitrary<SupportsAttributes> = fc.record({ description: fc.string() }, { requiredKeys: [] });
+const supportsAttributes: fc.Arbitrary<SupportsAttributes> = fc.record(
+  { description: fc.string(), role: fc.constantFrom('primary' as const, 'secondary' as const) },
+  { requiredKeys: ['role'] },
+);
 const usesAttributes: fc.Arbitrary<UsesAttributes> = fc.record({ description: fc.string() }, { requiredKeys: [] });
 const ownsAttributes: fc.Arbitrary<OwnsAttributes> = fc.record({ primary: fc.boolean() }, { requiredKeys: ['primary'] });
 const flowsToAttributes: fc.Arbitrary<FlowsToAttributes> = fc.record(

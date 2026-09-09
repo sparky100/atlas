@@ -63,7 +63,7 @@ describe('describeEnvelope', () => {
   });
 
   it('relationship.create (supports): "Link {from} supports {to}"', () => {
-    const delta = base({ kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'supports', fromElementId: 'powerOn', toElementId: 'outageAndFault', attributes: {} });
+    const delta = base({ kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'supports', fromElementId: 'powerOn', toElementId: 'outageAndFault', attributes: { role: 'secondary' } });
     expect(describeEnvelope([delta], nameLookup)).toBe('Link PowerON supports Outage & Fault Management');
   });
 
@@ -110,7 +110,7 @@ describe('describeEnvelope', () => {
 
   it('a create-and-link pair works in either endpoint direction', () => {
     const create = base({ kind: 'element.create', elementId: 'powerOn', elementType: 'system', name: 'PowerON', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false } });
-    const link = base({ kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'supports', fromElementId: 'powerOn', toElementId: 'networkOperations', attributes: {} });
+    const link = base({ kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'supports', fromElementId: 'powerOn', toElementId: 'networkOperations', attributes: { role: 'secondary' } });
     expect(describeEnvelope([create, link], nameLookup)).toBe('Add system PowerON and link to Network Operations (2 changes)');
   });
 
@@ -146,7 +146,7 @@ describe('envelopeSubjects', () => {
   });
 
   it('relationship.create: both endpoints, from then to', () => {
-    const delta = base({ kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'supports', fromElementId: 'powerOn', toElementId: 'outageAndFault', attributes: {} });
+    const delta = base({ kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'supports', fromElementId: 'powerOn', toElementId: 'outageAndFault', attributes: { role: 'secondary' } });
     expect(envelopeSubjects([delta])).toEqual(['powerOn', 'outageAndFault']);
   });
 

@@ -184,6 +184,8 @@ Primary key `(subject_type, type_name, schema_version)`. No `org_id`: this is pr
 
 **Superseded by a constant, not a migrated table (Sprint H1).** Unlike `type_schemas` above, this table's content was fully known from ADR-001 from the start and simply had no runtime enforcement anywhere in the codebase — not a table, not an engine check, not an application-level validation (flagged in docs/AUDIT-2026-09-U2.md §6.2/§6.3). Sprint H1 closes that gap with `RELATIONSHIP_TYPE_RULES`, a constant in `src/contracts/relationshipTypeRules.ts`: the seed rows below are that constant's content, kept here as the documented reference, not read from a live table at runtime. C9 and V3 are both checked against the constant — in `src/engine/deltas.ts`'s `apply()` (so every caller of `fold`, including `commitToBranch`, inherits the check), and therefore at the commit boundary in `src/db/commits.ts`. **Superseded, not deferred (§11 lists this alongside this document's genuinely-deferred items, marked "never"):** migrating this to a real table isn't scheduled anywhere and isn't expected to be — it would only be worth doing if the ruleset needed to become live-editable product content without a code change (e.g. an admin screen), and nothing today requires that.
 
+**Correction (Sprint U4-1, found while adding `max_primary_per_from` below).** The paragraph above overstates what `apply()` actually checks: only C9 (the `(type, from.type, to.type)` triple itself) is enforced there — `isRelationshipTripleAllowed`, `src/engine/deltas.ts`. Neither `max_per_from` nor `max_primary_per_to` (V3's cardinality half) has ever been checked anywhere, engine or database; `owns.primary`'s own "at most one primary owner" has no runtime enforcement today. `max_primary_per_from` is the one exception, and only for `supports`: enforced by a real database constraint (a partial unique index, `relationships_head_one_primary_supports_per_system` — Postgres has no cross-row `CHECK`, this is its standard equivalent), not by `apply()`. Fixing `max_primary_per_to`/`max_per_from` in general is a real, pre-existing gap, left as one — it wasn't this sprint's item to close.
+
 Which `(relationship_type, from_type, to_type)` triples are legal, and cardinality (ADR-001).
 
 | Column | Type | Constraints |
@@ -193,21 +195,22 @@ Which `(relationship_type, from_type, to_type)` triples are legal, and cardinali
 | `to_type` | element_type | not null |
 | `max_per_from` | int | nullable — max live relationships of this type from one element |
 | `max_primary_per_to` | int | nullable — used by `owns` (1) |
+| `max_primary_per_from` | int | nullable — used by `supports` (1, Sprint U4-1 B4: `supports.role`, the landscape lane a system's tile is placed in) |
 
 Primary key `(relationship_type, from_type, to_type)`. No `org_id`; product content. Seed rows:
 
-| relationship_type | from | to | max_per_from | max_primary_per_to |
-|---|---|---|---|---|
-| supports | system | capability | | |
-| uses | system | system | | |
-| uses | container | container | | |
-| uses | component | component | | |
-| uses | container | system | | |
-| uses | component | container | | |
-| owns | actor | capability | | 1 |
-| owns | actor | system | | 1 |
-| flows_to | system | system | | |
-| flows_to | container | container | | |
+| relationship_type | from | to | max_per_from | max_primary_per_to | max_primary_per_from |
+|---|---|---|---|---|---|
+| supports | system | capability | | | 1 |
+| uses | system | system | | | |
+| uses | container | container | | | |
+| uses | component | component | | | |
+| uses | container | system | | | |
+| uses | component | container | | | |
+| owns | actor | capability | | 1 | |
+| owns | actor | system | | 1 | |
+| flows_to | system | system | | | |
+| flows_to | container | container | | | |
 
 ### 3.4 History
 
@@ -772,7 +775,7 @@ A tombstone `$exists` fact with `live = false` is kept in memory for C7 checks a
 |---|---|---|
 | V1 | schema | every `elements_head.attributes` and `relationships_head.attributes` validates against `type_schemas` for `(type, models.schema_version)`; required attributes present |
 | V2 | structural | every `parent_id` references an element in the same head with the required type: capability→capability, container→system, component→container; capability/system/actor parents are null or (capability only) a capability. Every relationship endpoint references an element in the same head. |
-| V3 | schema | every relationship's `(type, from.type, to.type)` is in `relationship_type_rules`; `max_per_from` and `max_primary_per_to` respected |
+| V3 | schema | every relationship's `(type, from.type, to.type)` is in `relationship_type_rules`; `max_per_from`, `max_primary_per_to`, and `max_primary_per_from` respected — as of Sprint U4-1, only the triple-legality half and `supports`' own `max_primary_per_from` (a database constraint, not this check) have real enforcement; see `relationship_type_rules`'s own correction note in §3.3 |
 | V4 | structural | no cycle in `parent_id` |
 | V5 | structural | no element id in the head appears as `merged_element_id` in `element_merges` |
 | V6 | structural | no two relationships in the head share `(type, from, to)` |
