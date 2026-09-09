@@ -1364,7 +1364,7 @@ All property tests use generated inputs (fast-check or equivalent) with shrinkin
 | P-27 | Capability map upgrade: seed v1, rename and re-parent arbitrary items, publish v2 with arbitrary additions/renames; the computed upgrade diff matches every renamed item through its `template_code` alias and creates no duplicates. |
 | P-28 | `owns` cardinality: at most one `primary = true` owner per target survives V3; a second is a cardinality conflict at merge and a V3 failure on commit. |
 
-A UI ticket may not be opened until RT-1…RT-9 and P-1…P-28 exist and pass in CI.
+A UI ticket may not be opened until RT-1…RT-9 and P-1…P-28 exist and pass locally (`pnpm test` — CLAUDE.md's "Verification (all local)": there is no test CI to pass in).
 
 ---
 
