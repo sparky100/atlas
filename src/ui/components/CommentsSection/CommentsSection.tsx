@@ -21,6 +21,8 @@ export interface CommentsSectionProps {
   anchorId: UUID;
   branchId?: UUID | null;
   viewKind?: ViewKind | null;
+  /** `n`'s own "New comment on the focused row" (UI-principles §8.8) — the canvas panel opens with the composer ready to type into; the element page section never sets this (opening the page isn't itself a request to comment). */
+  autoFocusComposer?: boolean;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface CommentsSectionProps {
  * anything else anchoring a full thread list to one subject; the canvas
  * panel (5a) wraps this same component rather than reimplementing it.
  */
-export function CommentsSection({ orgId, modelId, userId, role, anchorType, anchorId, branchId, viewKind }: CommentsSectionProps) {
+export function CommentsSection({ orgId, modelId, userId, role, anchorType, anchorId, branchId, viewKind, autoFocusComposer = false }: CommentsSectionProps) {
   const [showResolved, setShowResolved] = useState(false);
   const { state, reload } = useAnchorComments(modelId, anchorType, anchorId);
   const members = useOrgMemberProfiles(orgId);
@@ -60,6 +62,7 @@ export function CommentsSection({ orgId, modelId, userId, role, anchorType, anch
               key={thread.root.id}
               thread={thread}
               profiles={state.profiles}
+              branches={state.branches}
               members={members}
               role={role}
               userId={userId}
@@ -86,6 +89,7 @@ export function CommentsSection({ orgId, modelId, userId, role, anchorType, anch
                   key={thread.root.id}
                   thread={thread}
                   profiles={state.profiles}
+                  branches={state.branches}
                   members={members}
                   role={role}
                   userId={userId}
@@ -102,7 +106,14 @@ export function CommentsSection({ orgId, modelId, userId, role, anchorType, anch
 
       {canPost && (
         <div className={styles.newThread}>
-          <CommentComposer members={members} placeholder="Write a comment…" submitLabel="Post" onSubmit={actions.createThread} />
+          <CommentComposer
+            members={members}
+            placeholder="Write a comment…"
+            submitLabel="Post"
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- opt-in per caller; the canvas panel's own `n` shortcut is itself the request to type one (RelationshipAdd.tsx/ElementSearchAdd.tsx's own convention).
+            autoFocus={autoFocusComposer}
+            onSubmit={actions.createThread}
+          />
         </div>
       )}
     </div>

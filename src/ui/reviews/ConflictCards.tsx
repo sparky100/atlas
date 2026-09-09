@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -25,7 +26,7 @@ import styles from './ConflictCards.module.css';
  * themselves, or their one-click field-conflict resolution, to differ.
  */
 
-export function StructuralConflictCard({ finding, heads }: { finding: ConflictFinding; heads: readonly Head[] }) {
+export function StructuralConflictCard({ finding, heads, commentsSlot }: { finding: ConflictFinding; heads: readonly Head[]; commentsSlot?: ReactNode }) {
   return (
     <li className={styles.card}>
       <div className={styles.cardTitle}>
@@ -42,6 +43,7 @@ export function StructuralConflictCard({ finding, heads }: { finding: ConflictFi
           Related: {subjectName(heads, finding.relatedSubjectId)}
         </Text>
       )}
+      {commentsSlot}
     </li>
   );
 }
@@ -74,9 +76,10 @@ export interface FieldConflictCardProps {
   choice: FieldConflictChoice | undefined;
   onChoose: (choice: FieldConflictChoice) => void;
   onClear: (subjectId: UUID, attribute: string) => void;
+  commentsSlot?: ReactNode;
 }
 
-export function FieldConflictCard({ finding, threeWay, canResolve, choice, onChoose, onClear }: FieldConflictCardProps) {
+export function FieldConflictCard({ finding, threeWay, canResolve, choice, onChoose, onClear, commentsSlot }: FieldConflictCardProps) {
   const [customValue, setCustomValue] = useState('');
   const attribute = finding.attribute ?? '';
   const field = threeWay.fields.find((f) => f.subjectId === finding.subjectId && f.attribute === attribute);
@@ -164,11 +167,24 @@ export function FieldConflictCard({ finding, threeWay, canResolve, choice, onCho
           Only a contributor on this change can resolve this.
         </Text>
       )}
+      {commentsSlot}
     </li>
   );
 }
 
-export function IdentityWarningCard({ finding, heads, dismissed, onDismiss }: { finding: ConflictFinding; heads: readonly Head[]; dismissed: boolean; onDismiss: () => void }) {
+export function IdentityWarningCard({
+  finding,
+  heads,
+  dismissed,
+  onDismiss,
+  commentsSlot,
+}: {
+  finding: ConflictFinding;
+  heads: readonly Head[];
+  dismissed: boolean;
+  onDismiss: () => void;
+  commentsSlot?: ReactNode;
+}) {
   if (dismissed) return null;
   return (
     <li className={styles.card}>
@@ -194,11 +210,12 @@ export function IdentityWarningCard({ finding, heads, dismissed, onDismiss }: { 
       <Button variant="ghost" onClick={onDismiss}>
         Keep both
       </Button>
+      {commentsSlot}
     </li>
   );
 }
 
-export function CleanChanges({ base, ours, cleanIds }: { base: Head; ours: Head; cleanIds: readonly UUID[] }) {
+export function CleanChanges({ base, ours, cleanIds, commentsSlotFor }: { base: Head; ours: Head; cleanIds: readonly UUID[]; commentsSlotFor?: (subjectId: UUID) => ReactNode }) {
   const diff = computeVersionDiff(base, ours);
   const cleanIdSet = new Set(cleanIds);
   const elements = diff.elements.filter((e) => cleanIdSet.has(e.elementId) && e.state !== 'unchanged');
@@ -220,12 +237,14 @@ export function CleanChanges({ base, ours, cleanIds }: { base: Head; ours: Head;
               ({e.changedAttributes.join(', ')})
             </Text>
           )}
+          {commentsSlotFor?.(e.elementId)}
         </li>
       ))}
       {relationships.map((r) => (
         <li key={r.relationshipId}>
           <DiffBadge state={r.state} changedCount={r.changedAttributes.length} />{' '}
           <Text as="span">{(r.toBe ?? r.asIs)?.relationshipType ?? r.relationshipId}</Text>
+          {commentsSlotFor?.(r.relationshipId)}
         </li>
       ))}
     </ul>

@@ -1,8 +1,10 @@
 import { useId, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
+import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
 import { Button } from '../components/Button/Button';
+import { CommentsPanel } from '../components/CommentsPanel/CommentsPanel';
 import { DiffLegend } from '../components/DiffBadge/DiffLegend';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
 import { EmptyState } from '../components/EmptyState/EmptyState';
@@ -10,6 +12,7 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import { useUnresolvedCommentCounts } from '../comments/useUnresolvedCommentCounts';
 import { useModels } from '../models/useModels';
 import { canEditBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -96,6 +99,17 @@ export function LandscapePage() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const addMenuId = useId();
   const moreMenuId = useId();
+
+  // Sprint M1b (`docs/HANDOFF-M1b-comments.md`'s Canvas section, direction
+  // 5a): the panel is scoped to one system at a time, opened by clicking a
+  // node's own comment marker or by `c`/`n` on the hovered node
+  // (`LandscapeCanvas`'s own prop comments) — the canvas has no other
+  // "selected node" concept yet, so hover stands in for it.
+  const [commentsPanelElementId, setCommentsPanelElementId] = useState<UUID | null>(null);
+  const [autoFocusComposer, setAutoFocusComposer] = useState(false);
+  const anchorIds = state.status === 'ready' ? [...state.data.systemsById.keys()] : [];
+  const unresolvedState = useUnresolvedCommentCounts(model?.id ?? null, anchorIds);
+  const unresolvedCounts = unresolvedState.status === 'ready' ? unresolvedState.counts : undefined;
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -267,7 +281,50 @@ export function LandscapePage() {
           </div>
         )}
         {state.status === 'ready' && state.data.layout.nodes.length > 0 && (
-          <LandscapeCanvas layout={state.data.layout} systemsById={state.data.systemsById} edges={state.data.edges} diff={state.data.diff} nodeHref={nodeHref} />
+          <div className={styles.canvasRow}>
+            <LandscapeCanvas
+              layout={state.data.layout}
+              systemsById={state.data.systemsById}
+              edges={state.data.edges}
+              diff={state.data.diff}
+              nodeHref={nodeHref}
+              unresolvedCommentCounts={unresolvedCounts}
+              onCommentMarkerClick={(elementId) => {
+                setCommentsPanelElementId(elementId);
+                setAutoFocusComposer(false);
+              }}
+              onToggleCommentsPanel={(elementId) => {
+                if (commentsPanelElementId !== null) {
+                  setCommentsPanelElementId(null);
+                } else if (elementId) {
+                  setCommentsPanelElementId(elementId);
+                  setAutoFocusComposer(false);
+                }
+              }}
+              onNewCommentShortcut={(elementId) => {
+                setCommentsPanelElementId(elementId);
+                setAutoFocusComposer(true);
+              }}
+            />
+            {commentsPanelElementId && (
+              <CommentsPanel
+                orgId={organisation?.id ?? ''}
+                modelId={model.id}
+                userId={userId}
+                role={role}
+                anchorType="element"
+                anchorId={commentsPanelElementId}
+                subjectName={state.data.systemsById.get(commentsPanelElementId)?.name ?? ''}
+                unresolvedCount={unresolvedCounts?.get(commentsPanelElementId) ?? 0}
+                branchId={ref.kind === 'branch' ? (editingBranch?.id ?? null) : null}
+                viewKind="landscape"
+                autoFocusComposer={autoFocusComposer}
+                onClose={() => {
+                  setCommentsPanelElementId(null);
+                }}
+              />
+            )}
+          </div>
         )}
         </main>
       </div>

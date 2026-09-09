@@ -13,6 +13,7 @@
  * `eslint-disable` comments mark exactly that boundary, nowhere else.
  */
 import type { Client } from './client';
+import { assertInFilterSize } from './inFilterLimit';
 import type { BranchRow } from './types';
 import type { UUID } from '../contracts/delta';
 
@@ -70,6 +71,23 @@ export async function getMainBranch(supabase: Client, modelId: UUID): Promise<Br
 export async function listBranchesForModel(supabase: Client, modelId: UUID): Promise<BranchRow[]> {
   const { data, error } = await supabase.from('branches').select('*').eq('model_id', modelId);
   if (error) throw new Error(`listBranchesForModel: ${error.message}`);
+  return data as BranchRow[];
+}
+
+/**
+ * Every branch named by `ids` — the "on change: <name>" tag's own lookup
+ * (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s 6b: `comments.branch_id`
+ * is display metadata, resolved to a name wherever a thread renders).
+ * Bounded by construction, not by page size — the distinct `branch_id`s
+ * across the threads on one anchor, which is always small — but goes
+ * through the same rule 8 ceiling every other batch id lookup does
+ * (`listProfilesByIds`'s own precedent) rather than assuming that.
+ */
+export async function listBranchesByIds(supabase: Client, ids: readonly UUID[]): Promise<BranchRow[]> {
+  if (ids.length === 0) return [];
+  assertInFilterSize('listBranchesByIds', 'id', ids);
+  const { data, error } = await supabase.from('branches').select('*').in('id', ids as UUID[]);
+  if (error) throw new Error(`listBranchesByIds: ${error.message}`);
   return data as BranchRow[];
 }
 

@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
+import { listBranchesByIds } from '../../db/branches';
 import { listCommentsForAnchor, type AnchorComments } from '../../db/comments';
 import { listProfilesByIds } from '../../db/profiles';
-import type { AnchorType, ProfileRow } from '../../db/types';
+import type { AnchorType, BranchRow, ProfileRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 
 export type UseAnchorCommentsState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; data: AnchorComments; profiles: ReadonlyMap<UUID, ProfileRow> };
+  | { status: 'ready'; data: AnchorComments; profiles: ReadonlyMap<UUID, ProfileRow>; branches: ReadonlyMap<UUID, BranchRow> };
 
 export interface UseAnchorCommentsResult {
   state: UseAnchorCommentsState;
@@ -39,14 +40,20 @@ export function useAnchorComments(modelId: UUID | null, anchorType: AnchorType, 
     listCommentsForAnchor(supabase, modelId, anchorType, anchorId)
       .then(async (data) => {
         const authorIds = new Set<UUID>();
+        // Only the root's own `branch_id` — "a thread shows its anchor"
+        // (`docs/HANDOFF-M1b-comments.md`'s Intent), one tag per thread,
+        // not per reply.
+        const branchIds = new Set<UUID>();
         for (const thread of data.threads) {
           authorIds.add(thread.root.author_id);
+          if (thread.root.branch_id) branchIds.add(thread.root.branch_id);
           for (const reply of thread.replies) authorIds.add(reply.author_id);
         }
-        const profileRows = await listProfilesByIds(supabase, [...authorIds]);
+        const [profileRows, branchRows] = await Promise.all([listProfilesByIds(supabase, [...authorIds]), listBranchesByIds(supabase, [...branchIds])]);
         if (cancelled) return;
         const profiles = new Map(profileRows.map((p) => [p.user_id, p]));
-        setState({ status: 'ready', data, profiles });
+        const branches = new Map(branchRows.map((b) => [b.id, b]));
+        setState({ status: 'ready', data, profiles, branches });
       })
       .catch((e: unknown) => {
         if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Could not load comments.' });

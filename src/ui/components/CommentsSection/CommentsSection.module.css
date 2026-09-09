@@ -26,4 +26,11 @@
 .newThread {
   padding-top: var(--space-2);
   border-top: var(--border-width) solid var(--border);
+  /* "Pinned to the bottom" (`docs/HANDOFF-M1b-comments.md`'s Canvas panel
+     spec) — only visible inside a scrolling ancestor (the canvas panel's
+     own `.body`, `CommentsPanel.module.css`); inert on the element page,
+     which has no scroll container of its own around this section. */
+  position: sticky;
+  bottom: 0;
+  background: var(--surface-raised);
 }
