@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import type { BranchRow } from '../../db/types';
-import { Chip } from '../components/Chip/Chip';
+import { CapabilityTile } from '../components/CapabilityTile/CapabilityTile';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { CapabilityMapAddForm } from './CapabilityMapAddForm';
@@ -78,6 +78,16 @@ export interface CapabilityMapViewProps {
  * CSS-module class selector. Column count itself is asserted there via
  * `getComputedStyle(...).gridTemplateColumns` at each breakpoint, plus a
  * no-horizontal-scroll check at the narrowest (390px).
+ *
+ * Sprint U4-1 C3: L2 cards and L3 tiles are both the shared
+ * `CapabilityTile` component (`src/ui/components/CapabilityTile/
+ * CapabilityTile.tsx` — that file's own comment has the full design:
+ * blueprint-framed, plain-text name, whole tile as the click target,
+ * colour-by tone filling the tile rather than sitting in a separate
+ * chip alone). Not L1: an L1 column holds several independently-
+ * clickable L2 cards, not one clickable unit, and doesn't participate in
+ * colour-by — see `L1ColumnView`'s own header markup below, unchanged by
+ * C3.
  */
 export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, modelSlug, refParam, addCapability, reorderCapability }: CapabilityMapViewProps) {
   const [colourBy, setColourBy] = useState<ColourByMode>('none');
@@ -335,27 +345,21 @@ function L2CardView({
   const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
 
   return (
-    <div className={styles.card}>
-      <div className={styles.cardHeader}>
-        <div className={styles.cardTitle}>
-          <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`}>
-            <Text as="span">{card.capability.name}</Text>
-          </Link>
-          {reorderCapability && (
-            <ReorderButtons
-              capability={card.capability}
-              previous={previousSibling}
-              next={nextSibling}
-              context={reorderCapability}
-              previousGlyph="↑"
-              previousLabel={`Move ${card.capability.name} up`}
-              nextGlyph="↓"
-              nextLabel={`Move ${card.capability.name} down`}
-            />
-          )}
-          <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-          {colour.tone !== undefined && colour.label !== undefined && <Chip tone={colour.tone}>{colour.label}</Chip>}
-        </div>
+    <CapabilityTile href={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`} name={card.capability.name} tone={colour.tone} toneLabel={colour.label}>
+      <div className={styles.cardSecondaryRow}>
+        {reorderCapability && (
+          <ReorderButtons
+            capability={card.capability}
+            previous={previousSibling}
+            next={nextSibling}
+            context={reorderCapability}
+            previousGlyph="↑"
+            previousLabel={`Move ${card.capability.name} up`}
+            nextGlyph="↓"
+            nextLabel={`Move ${card.capability.name} down`}
+          />
+        )}
+        <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
         {card.l3.length > 0 && (
           <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { onToggleExpand(card.capability.element_id); }}>
             {expanded ? '▾' : '▸'} {card.l3.length}
@@ -368,19 +372,20 @@ function L2CardView({
             const leafColour = tileColourFor(colourBy, leaf.element_id, supportsEdges, systemsById);
             const leafCount = supportingSystemIds(leaf.element_id, supportsEdges).length;
             return (
-              <div key={leaf.element_id} className={styles.l3Tile}>
-                <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${leaf.element_id}`}>
-                  <Text as="span" size="sm">
-                    {leaf.name}
-                  </Text>
-                </Link>
+              <CapabilityTile
+                key={leaf.element_id}
+                href={`/o/${orgSlug}/m/${modelSlug}/e/${leaf.element_id}`}
+                name={leaf.name}
+                tone={leafColour.tone}
+                toneLabel={leafColour.label}
+                size="compact"
+              >
                 <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-                {leafColour.tone !== undefined && leafColour.label !== undefined && <Chip tone={leafColour.tone}>{leafColour.label}</Chip>}
-              </div>
+              </CapabilityTile>
             );
           })}
         </div>
       )}
-    </div>
+    </CapabilityTile>
   );
 }

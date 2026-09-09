@@ -74,32 +74,20 @@
   border-bottom: var(--border-width-emphasis) solid var(--border-strong);
 }
 
-.card {
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  padding: var(--space-2) var(--space-3);
-}
-
-.cardHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
-.cardTitle {
+/**
+ * Sprint U4-1 C3: the L2 card's own box (border, background, click
+ * target) is now `CapabilityTile` (src/ui/components/CapabilityTile/) —
+ * this row is just its secondary controls (reorder buttons, the zoom
+ * link, the expand toggle), rendered as `CapabilityTile`'s `children`
+ * (that component's own comment explains why they stay independently
+ * clickable despite the tile's own whole-tile link).
+ */
+.cardSecondaryRow {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-width: 0;
-}
-
-.cardTitle > a {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
 }
 
 .expandButton {
@@ -114,19 +102,10 @@
 .l3Tiles {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1);
+  gap: var(--space-2);
   margin-top: var(--space-2);
   padding-top: var(--space-2);
   border-top: var(--border-width) solid var(--border);
-}
-
-.l3Tile {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 2px var(--space-2);
 }
 
 .zoomLink {
