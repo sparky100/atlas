@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, RelationshipType, UUID } from '../../contracts/delta';
+import type { Json } from '../../contracts/rows';
 import { commitToBranch } from '../../db/commits';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
@@ -10,7 +11,8 @@ export type RelationshipCreateStatus = 'idle' | 'creating';
 export interface UseRelationshipCreateResult {
   status: RelationshipCreateStatus;
   error: string | null;
-  create: (otherElementId: UUID) => Promise<void>;
+  /** `attributes`, when given, merges over this relationship type's own default (Handoff — Flow: Add a system, step 6: a `uses`/`flows_to` verb phrase rides in the relationship's own `description`, per `UsesAttributes`/`FlowsToAttributes` — there is no separate verb field in the contract). */
+  create: (otherElementId: UUID, attributes?: Record<string, Json>) => Promise<void>;
 }
 
 export interface UseRelationshipCreateInput {
@@ -46,7 +48,7 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
   const [error, setError] = useState<string | null>(null);
 
   const create = useCallback(
-    async (otherElementId: UUID) => {
+    async (otherElementId: UUID, extraAttributes?: Record<string, Json>) => {
       if (!userId) {
         setError('You must be signed in to add a relationship.');
         return;
@@ -63,7 +65,7 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
         // real default here rather than `{}` — every other relationship
         // type's attributes are entirely optional (SupportsAttributes/
         // UsesAttributes/FlowsToAttributes).
-        const attributes = relationshipType === 'owns' ? { primary: true } : {};
+        const attributes = { ...(relationshipType === 'owns' ? { primary: true } : {}), ...extraAttributes };
 
         const delta = {
           kind: 'relationship.create',

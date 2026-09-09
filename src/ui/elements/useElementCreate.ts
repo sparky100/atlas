@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { defaultCreateAttributes } from '../../contracts/attributeSchema';
 import type { CommitEnvelope, Delta, ElementType, UUID } from '../../contracts/delta';
+import type { Json } from '../../contracts/rows';
 import { commitToBranch } from '../../db/commits';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
@@ -8,10 +9,17 @@ import { supabase } from '../supabaseClient';
 
 export type ElementCreateStatus = 'idle' | 'creating';
 
+export interface CreateOptions {
+  /** Merged over `defaultCreateAttributes(elementType, {onMain})` — a provided key wins over the default for that same key (Handoff — Flow: Add a system, step 4's required description; C4 forbids a follow-up `element.update` in the same commit, so it has to ride in the create's own attributes). */
+  attributes?: Record<string, Json>;
+  /** Handoff — Flow: Add a system, step 4's "Supports which capability?": when given, a `relationship.create` (`supports`, this element → the capability) rides in the *same* commit as the `element.create` — C9 only requires both endpoints exist in the resulting head, which a same-commit pair satisfies. */
+  supportsCapabilityId?: UUID;
+}
+
 export interface UseElementCreateResult {
   status: ElementCreateStatus;
   error: string | null;
-  create: (name: string) => Promise<void>;
+  create: (name: string, options?: CreateOptions) => Promise<void>;
 }
 
 export interface UseElementCreateInput {
@@ -29,16 +37,20 @@ export interface UseElementCreateInput {
 
 /**
  * The search-first "Add" control's create step (Blocking: element
- * creation): one `element.create` delta through `commit_deltas`, with the
- * current user's manual source as provenance — the same shape
- * `useCapabilityCreate.ts` already established for capabilities,
- * generalised across every element type this control creates (system,
- * actor, container, component). `defaultCreateAttributes` fills in
- * whatever this type requires beyond a name (Blocking: element creation
- * never collects more than that at create time) — including, for a
- * system, `lifecycleStatus` defaulting to `active` on `main` and
- * `planned` on a change branch (`defaultCreateAttributes`'s own doc
- * comment explains why), driven by `branch.kind` here.
+ * creation): one commit through `commit_deltas`, with the current user's
+ * manual source as provenance — the same shape `useCapabilityCreate.ts`
+ * already established for capabilities, generalised across every element
+ * type this control creates (system, actor, container, component).
+ * `defaultCreateAttributes` fills in whatever this type requires beyond a
+ * name — including, for a system, `lifecycleStatus` defaulting to `active`
+ * on `main` and `planned` on a change branch (`defaultCreateAttributes`'s
+ * own doc comment explains why), driven by `branch.kind` here.
+ *
+ * Handoff — Flow: Add a system: `options.attributes` (e.g. a required
+ * description) merges over the schema default rather than following the
+ * create with a second delta (C4), and `options.supportsCapabilityId`, when
+ * given, appends a `supports` `relationship.create` to the same commit
+ * envelope — one commit for "create this system and link it," not two.
  */
 export function useElementCreate(input: UseElementCreateInput): UseElementCreateResult {
   const { modelId, orgId, userId, elementType, parentId, branch, expectedHeadCommitId, onCreated } = input;
@@ -46,7 +58,7 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
   const [error, setError] = useState<string | null>(null);
 
   const create = useCallback(
-    async (name: string) => {
+    async (name: string, options?: CreateOptions) => {
       if (!userId) {
         setError(`You must be signed in to add a ${elementType}.`);
         return;
@@ -68,17 +80,32 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
         // literal per-type branch, so the cast is the one place that
         // generality meets the delta union's own type, same as
         // scripts/loadCapabilityMaps.ts-style bulk construction elsewhere.
-        const delta = {
+        const createDelta = {
           kind: 'element.create',
           id: crypto.randomUUID(),
           elementId,
           elementType,
           name: trimmed,
           parentId,
-          attributes: defaultCreateAttributes(elementType, { onMain: branch.kind === 'main' }),
+          attributes: { ...defaultCreateAttributes(elementType, { onMain: branch.kind === 'main' }), ...options?.attributes },
           sourceId: source.id,
           confidence: 1,
         } as Delta;
+
+        const deltas: Delta[] = [createDelta];
+        if (options?.supportsCapabilityId) {
+          deltas.push({
+            kind: 'relationship.create',
+            id: crypto.randomUUID(),
+            relationshipId: crypto.randomUUID(),
+            relationshipType: 'supports',
+            fromElementId: elementId,
+            toElementId: options.supportsCapabilityId,
+            attributes: {},
+            sourceId: source.id,
+            confidence: 1,
+          });
+        }
 
         const envelope: CommitEnvelope = {
           id: crypto.randomUUID(),
@@ -87,7 +114,7 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
           mergedBranchHeadCommitId: null,
           kind: 'manual',
           message: `Add ${elementType} "${trimmed}"`,
-          deltas: [delta],
+          deltas,
         };
 
         const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });

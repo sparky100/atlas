@@ -1,4 +1,5 @@
-import { useParams, useSearchParams } from 'react-router';
+import { useState } from 'react';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router';
 import { ATTRIBUTE_SCHEMA_BY_TYPE } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
 import type { BranchRow, SourceRow } from '../../db/types';
@@ -62,6 +63,17 @@ export function ElementPage() {
   const [searchParams] = useSearchParams();
   const ref = parseRefParam(searchParams.get('ref'));
   const { userId } = useAuth();
+  const location = useLocation();
+  // Handoff — Flow: Add a system, step 7: `HomeSearch`'s onCreated navigates
+  // here with `{ justCreated: elementType }` in router state — the toast
+  // offering "Add another <type>" reads it once, on landing, and it is
+  // never restored on a later reload of the same URL (router state doesn't
+  // survive one). `justAddedElementId` is separate: it tracks a
+  // relationship just added *from this page* (the "+ Add" under Uses), not
+  // the element-create toast.
+  const [justCreatedType] = useState<string | null>(() => (location.state as { justCreated?: string } | null)?.justCreated ?? null);
+  const [toastDismissed, setToastDismissed] = useState(false);
+  const [justAddedElementId, setJustAddedElementId] = useState<string | null>(null);
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
@@ -137,6 +149,23 @@ export function ElementPage() {
               aliasSources={state.data.aliasSources}
               onEdit={canEdit && editor.status === 'idle' ? editor.startEditing : undefined}
             />
+            {justCreatedType && !toastDismissed && (
+              <Panel className={styles.toast ?? ''} data-testid="add-system-toast">
+                <Text as="p" size="sm">
+                  {state.data.element.name} added.
+                </Text>
+                <div className={styles.toastActions}>
+                  <Link to={`/o/${orgSlug ?? ''}/m/${model.slug}`}>
+                    <Text as="span" size="sm">
+                      Add another {justCreatedType} →
+                    </Text>
+                  </Link>
+                  <Button variant="ghost" onClick={() => { setToastDismissed(true); }}>
+                    Dismiss
+                  </Button>
+                </div>
+              </Panel>
+            )}
             {canEdit && state.data.element.element_type === 'capability' && (
               <CapabilityTailoringActions
                 modelId={model.id}
@@ -169,6 +198,7 @@ export function ElementPage() {
                     endpoints={state.data.relationshipEndpoints}
                     relationshipFacts={state.data.relationshipFacts}
                     sources={state.data.sources}
+                    justAddedElementId={justAddedElementId}
                     addRelationship={
                       canAddRelationship
                         ? {
@@ -178,7 +208,10 @@ export function ElementPage() {
                             searchCommitId,
                             branch: editingBranch,
                             expectedHeadCommitId: state.data.commitId,
-                            onCreated: reload,
+                            onCreated: (otherElementId) => {
+                              setJustAddedElementId(otherElementId);
+                              reload();
+                            },
                           }
                         : undefined
                     }

@@ -53,3 +53,57 @@
   gap: var(--space-2);
   align-items: center;
 }
+
+/* Handoff — Flow: Add a system, step 4's "one sheet" and the propose-a-
+   change picker (decision 5) — inline, not a real modal (matching this
+   control's existing style: everything here is an inline panel, never an
+   overlay), full-width and stacked at narrow widths per the handoff's own
+   mobile section. */
+.sheet,
+.proposePanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface-raised);
+}
+
+.proposeRow {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.capabilityPicker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+@media (max-width: 480px) {
+  .sheet,
+  .proposePanel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .actions,
+  .proposeRow,
+  .createRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
