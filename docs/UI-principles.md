@@ -310,6 +310,8 @@ The centre pane for a merge request follows SPEC §7.4: summary row, then confli
 | **Container** | one system | its containers, plus external systems/containers they `uses`/`flows_to` | `uses`, `flows_to` at container grain | layered inside the system frame; externals outside |
 | **Component** | one container | its components, plus containers they `uses` | `uses` | same as container |
 
+**Landscape node corner assignment (Sprint M1b, `docs/HANDOFF-M1b-comments.md`):** a landscape node can carry more than one small badge at once (the diff badge, the "+N" other-lanes marker, the unresolved-comment marker) and no corner is ever shared — each badge kind owns exactly one corner, permanently, so a future one doesn't have to relitigate this. Top-left: the diff badge (§6.3, Diff mode only). Top-right: "+N" other-lanes (Sprint U4-1 B4 — assigned first, so it keeps first claim). Bottom-right: the unresolved-comment marker (Sprint M1b). Bottom-left is unclaimed — the next badge kind takes it, not one of the other three.
+
 All five (component included) were designed as the *same* renderer with a different query and layout preset — see decision 7 (§10) for where the implementation departed from that, and why. Nothing is drawn; a view with zero results says so.
 
 Sprint U1 step 4 builds the renderer and the **Landscape** kind end to end. Context, Container and Component reuse the same renderer with their own query and layout preset in a later step. Capability map is Sprint U2 — it renders the model's own capability elements (SPEC §3.9), not the versioned starter-content maps (SPEC §3.10, ADR-012) used to seed them.

@@ -329,4 +329,6 @@ Recorded here so they land in the right sprint rather than only in conversation.
 - Never let a sprint start from a screenshot of a competitor; start from `docs/UI-principles.md`.
 - If a sprint's summary contains "for now" or "placeholder", the sprint isn't done.
 - Keep this file in the repo at `docs/prompts/` so every sprint is citable by number in a fresh session.
+- **Handoff-review checklist** (grows as real mistakes turn up — this is the first entry, added 2026-09-09 after `--color-accent-700` turned up invented in *two* handoffs, HANDOFF-U4-element-page.md then HANDOFF-M1b-comments.md, before either was caught in review):
+  - **Every design token named must exist in `src/ui/styles/tokens.css`, spelled exactly.** Grep it before writing it into a handoff, not after — a token that reads as plausible (`--color-accent-700` looks exactly like a real one) is invented, not verified, until it's actually found in the file.
 - Current order (also in `docs/NEXT.md`, if that file exists — it doesn't yet in this repository as of this pack's own commit): U4-1 merged → housekeeping (labels still open) → M1b → U4-2 (repeat until usable) → C2 → K1 → D1 → Q1 → R1, with the plumbing track alongside. See the State section at the top.
