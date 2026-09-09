@@ -19,12 +19,35 @@
   flex-wrap: wrap;
 }
 
-/* Sprint U4-1 D1: the header's own overflow menu — "Copy element ID" is
-   its one item today, kept as a menu (not a bare button) since the raw
-   id itself is deliberately not shown unconditionally any more (see
-   ElementHeader.tsx's own comment). Always collapsed, at every viewport
-   width — unlike UserMenu.module.css's own `.toggle`/`.menu`, which only
-   collapse on a narrow viewport; there's no "always-open bar" mode here. */
+/* Sprint U4-1 D3: replaces the static `h1` in place, right where the name
+   already sits, while renaming is active — moved here (and off
+   `CapabilityTailoringActions.tsx`'s own former standalone row) from
+   there. */
+.renameForm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.renameInput {
+  height: var(--row-height);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-2xl-size);
+}
+
+/* Sprint U4-1 D1's header overflow menu ("Copy element ID"; Sprint U4-1
+   D3 adds "Rename", capability-only) — kept as a menu (not bare buttons)
+   since the raw id itself is deliberately not shown unconditionally any
+   more (see ElementHeader.tsx's own comment). Always collapsed, at every
+   viewport width — unlike UserMenu.module.css's own `.toggle`/`.menu`,
+   which only collapse on a narrow viewport; there's no "always-open bar"
+   mode here. */
 .menuWrapper {
   position: relative;
 }

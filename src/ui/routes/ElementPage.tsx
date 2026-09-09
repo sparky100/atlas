@@ -8,7 +8,7 @@ import { AttributeEditRow } from '../components/AttributeEditRow/AttributeEditRo
 import { AttributeRow } from '../components/AttributeRow/AttributeRow';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { Button } from '../components/Button/Button';
-import { CapabilityTailoringActions } from '../components/CapabilityTailoringActions/CapabilityTailoringActions';
+import { CapabilityRetractAction } from '../components/CapabilityRetractAction/CapabilityRetractAction';
 import { ChangesTouchingSection } from '../components/ChangesTouchingSection/ChangesTouchingSection';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { ElementHeader } from '../components/ElementHeader/ElementHeader';
@@ -31,6 +31,7 @@ import { elementBreadcrumbSegments } from '../nav/elementBreadcrumbSegments';
 import { ALIAS_TYPE_LABELS, aliasAsFact } from '../elements/aliasLabels';
 import { useElementPage } from '../elements/useElementPage';
 import { useElementEditor, type DraftValue } from '../elements/useElementEditor';
+import { useElementRename } from '../elements/useElementRename';
 import styles from './ElementPage.module.css';
 
 /**
@@ -44,7 +45,8 @@ import styles from './ElementPage.module.css';
  * yet.
  *
  * Sprint C1 step 9 closes a gap left open since step 4: `useElementEditor`
- * (and `useElementRetract`/`useElementRename`/`CapabilityTailoringActions`)
+ * (and `useElementRetract`/`useElementRename`/`CapabilityRetractAction`,
+ * the latter renamed from `CapabilityTailoringActions` in Sprint U4-1 D3)
  * were already generalised to take any `branch: BranchRow`, but this page
  * kept feeding them `useMainBranch()` regardless of `?ref=` — so "editing
  * while a change is selected writes deltas to the branch" (the user's
@@ -104,6 +106,21 @@ export function ElementPage() {
     expectedHeadCommitId: data?.commitId ?? '',
     onSaved: reloadAfterCommit,
   });
+  // Sprint U4-1 D3: called unconditionally, same reasoning as `editor`
+  // above (the Rules of Hooks) — only actually offered to
+  // ElementHeader.tsx (its `rename` prop) once `canEdit` and the element
+  // is a capability, the same gate `CapabilityRetractAction.tsx`'s own
+  // former bundling with rename already used.
+  const rename = useElementRename({
+    modelId: model?.id ?? '',
+    orgId: organisation?.id ?? '',
+    userId,
+    element: data?.element ?? PLACEHOLDER_ELEMENT,
+    facts: data?.facts ?? EMPTY_FACTS,
+    branch: editingBranch ?? PLACEHOLDER_BRANCH,
+    expectedHeadCommitId: data?.commitId ?? '',
+    onSaved: reloadAfterCommit,
+  });
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -148,9 +165,10 @@ export function ElementPage() {
               existsFact={state.data.facts.get('$exists')}
               existsSource={state.data.sources.get(state.data.facts.get('$exists')?.source_id ?? '')}
               onEdit={canEdit && editor.status === 'idle' ? editor.startEditing : undefined}
+              rename={canEdit && state.data.element.element_type === 'capability' ? rename : undefined}
             />
             {canEdit && state.data.element.element_type === 'capability' && (
-              <CapabilityTailoringActions
+              <CapabilityRetractAction
                 modelId={model.id}
                 orgId={organisation?.id ?? ''}
                 userId={userId}

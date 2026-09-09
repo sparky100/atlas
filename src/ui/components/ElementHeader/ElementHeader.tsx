@@ -3,6 +3,7 @@ import type { ElementsHeadRow } from '../../../contracts/rows';
 import type { SourceRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
 import { lifecycleToneFor } from '../../elements/lifecycleTone';
+import type { UseElementRenameResult } from '../../elements/useElementRename';
 import { Button } from '../Button/Button';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
@@ -30,6 +31,19 @@ export interface ElementHeaderProps {
    * disabled, for the same reason.
    */
   onEdit?: (() => void) | undefined;
+  /**
+   * Sprint U4-1 D3's "Rename" — omitted entirely, same convention as
+   * `onEdit`, when the caller hasn't established edit rights (in
+   * practice always together with `onEdit`, but kept as its own prop:
+   * rename is capability-only today — `ElementPage.tsx`'s own gate,
+   * inherited from the former `CapabilityTailoringActions.tsx` — while
+   * `onEdit` applies to every element type). "Move into Edit mode or the
+   * header menu": both at once — its trigger is a "Rename" item in this
+   * header's own overflow menu; once active, it replaces the static name
+   * with an inline input right here, rather than a standalone control
+   * sitting between Edit and Attributes.
+   */
+  rename?: UseElementRenameResult | undefined;
 }
 
 /**
@@ -52,8 +66,17 @@ export interface ElementHeaderProps {
  * header chrome. What's left here is exactly "one provenance badge for
  * the element's existence fact" (`existsFact`), the sprint item's own
  * wording — nothing else competes with it for attention.
+ *
+ * Sprint U4-1 D3: "Rename. Move into Edit mode or the header menu; no
+ * stray control between Edit and Attributes." — `rename` (when given)
+ * puts a "Rename" item in the overflow menu; picking it swaps the
+ * static `h1` for an inline input right here, with its own Save/Cancel,
+ * independent of the Attributes section's own edit form. The old
+ * standalone rename row that used to sit between this header and
+ * Attributes (`CapabilityTailoringActions.tsx`, now
+ * `CapabilityRetractAction.tsx` — retract only) is gone.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, rename }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
@@ -76,13 +99,47 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit }: Ele
     }
   }
 
+  const renaming = rename !== undefined && rename.status !== 'idle';
+
   return (
     <header className={styles.header}>
       <div className={styles.titleRow}>
         <ElementTypeGlyph type={element.element_type} external={isExternal} />
-        <Text as="h1" size="2xl">
-          {element.name}
-        </Text>
+        {renaming ? (
+          <form
+            className={styles.renameForm}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void rename.save();
+            }}
+          >
+            <input
+              className={styles.renameInput}
+              type="text"
+              value={rename.value}
+              onChange={(e) => {
+                rename.setValue(e.target.value);
+              }}
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- choosing "Rename" is itself the request to type a new name; same convention as RelationshipAdd.tsx/ElementSearchAdd.tsx's own inputs.
+              autoFocus
+            />
+            <Button variant="primary" type="submit" disabled={rename.status === 'submitting'}>
+              {rename.status === 'submitting' ? 'Saving…' : 'Save'}
+            </Button>
+            <Button variant="ghost" type="button" onClick={rename.cancelRenaming} disabled={rename.status === 'submitting'}>
+              Cancel
+            </Button>
+            {rename.submitError !== null && (
+              <Text as="p" tone="default">
+                {rename.submitError}
+              </Text>
+            )}
+          </form>
+        ) : (
+          <Text as="h1" size="2xl">
+            {element.name}
+          </Text>
+        )}
         {lifecycleStatus !== null && lifecycleTone !== undefined && <Chip tone={lifecycleTone}>{lifecycleStatus}</Chip>}
         {isExternal && <Chip tone="neutral">{externalOrganisation ? `external (${externalOrganisation})` : 'external'}</Chip>}
       </div>
@@ -98,6 +155,18 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit }: Ele
             <span aria-hidden="true">⋯</span>
           </button>
           <div id={menuId} className={[styles.menu, menuOpen ? styles.open : ''].filter(Boolean).join(' ')}>
+            {rename && !renaming && (
+              <button
+                type="button"
+                className={styles.menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                  rename.startRenaming();
+                }}
+              >
+                <Text as="span">Rename</Text>
+              </button>
+            )}
             <button type="button" className={styles.menuItem} onClick={() => void copyId()}>
               <Text as="span">{copied ? 'Copied' : 'Copy element ID'}</Text>
               <Text mono size="sm" tone="muted" as="span">
