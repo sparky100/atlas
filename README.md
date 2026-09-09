@@ -34,6 +34,10 @@ The browser only ever reads the `VITE_`-prefixed environment variables (`src/ui/
 
 **In GitHub Actions, on every push to `main` — and only that:** `.github/workflows/deploy-migrations.yml` runs `supabase db push` against the live "Architecture" project. No lint, no typecheck, no tests of any kind, no Docker, no Playwright, and nothing at all on a branch push or a pull request — CI's only job is getting an already-verified migration onto the live database, not verifying anything itself. See CLAUDE.md's "Verification (all local)" section for why, and the note below for exactly what that one workflow does.
 
+**On every push, outside GitHub Actions entirely:** Cloudflare Workers Builds deploys the app itself — no command in this repository triggers it and none needs to; it's configured on Cloudflare's side against this repository's `main` branch.
+
+`pnpm release` (`supabase db push`, from the desktop) is the manual equivalent of the migrations half of the above — run it after `supabase link` (below) when pushing a migration ahead of, or instead of, waiting for the GitHub Actions workflow. It does not touch the app deploy: Cloudflare's own push-triggered build already covers that, which is all the script's own closing line says.
+
 ## Environments
 
 There is one live Supabase project this repository deploys to: **"Architecture"** (ref `xakqcssapdiatwrmnjop`, `eu-central-1`, org `eyuhmtxtmcddtsptqvyv`) — the closest thing this product has to a "dev" environment today. There is no separate staging/production split yet; every migration in `supabase/migrations` is applied there. (A sibling project, "Des-studio", exists in the same organisation and belongs to the unrelated "existing suite" ADR-014/ADR-017 discuss — never target it. The "Architecture" project's own `public` schema was also found, during Sprint H1's environment work, to hold a handful of tables with no connection to Atlas or to that existing suite at all — `events`, `lap_data`, `strava_activities`, `training_metrics`, and a few `v_*` views — left over from unrelated use of the same project. They are not Atlas's; nothing here reads or writes them, and nothing in this repo should.)

@@ -24,6 +24,7 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:status": "supabase status",
+    "release": "supabase db push && echo 'Migrations pushed to the live project. Cloudflare Workers Builds deploys the app itself automatically on every git push to main — nothing else to run here.'",
     "content:load-capability-maps": "tsx scripts/loadCapabilityMaps.ts",
     "content:review-capability-maps": "tsx scripts/reviewCapabilityMaps.ts",
     "content:publish-capability-map": "tsx scripts/publishCapabilityMap.ts",
