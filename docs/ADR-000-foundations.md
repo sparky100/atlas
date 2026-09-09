@@ -3,7 +3,7 @@
 **Status:** Proposed
 **Scope:** Atlas — an enterprise-architecture product for mid-market and public-sector organisations (councils, NHS boards, housing associations, universities), sized for one-or-two-architect teams currently on Sparx, Visio, or spreadsheets.
 
-This document is a set of numbered architecture decisions (ADR-001 through ADR-014). Each follows Context / Decision / Alternatives Rejected / Consequences. It is a foundations record, not a full design — several decisions explicitly defer detail to a future ADR, and say so.
+This document is a set of numbered architecture decisions (ADR-001 through ADR-019). Each follows Context / Decision / Alternatives Rejected / Consequences. It is a foundations record, not a full design — several decisions explicitly defer detail to a future ADR, and say so.
 
 **Working assumptions**, stated up front because several decisions depend on them:
 

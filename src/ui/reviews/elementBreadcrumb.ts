@@ -25,6 +25,23 @@ export function elementBreadcrumb(head: Head, elementId: UUID): string {
   return names.join(' › ');
 }
 
+/**
+ * Which comment anchor kind a conflict/clean-change finding's own
+ * `subjectId` is (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s 6b section)
+ * — `ConflictFinding.subjectId` is generically a `UUID` (`src/engine/merge.ts`),
+ * naming either an element or a relationship depending on which one the
+ * finding is actually about; `comments.anchor_type` needs to know which.
+ * Same lookup order as `subjectName` below, so the two never disagree
+ * about what a given id is.
+ */
+export function subjectAnchorType(heads: readonly Head[], subjectId: UUID): 'element' | 'relationship' {
+  for (const head of heads) {
+    if (head.elements.has(subjectId)) return 'element';
+    if (head.relationships.has(subjectId)) return 'relationship';
+  }
+  return 'element';
+}
+
 /** The subject's own display name — an element's name, or "`type` A → B" for a relationship — from whichever side of the diff still has it. */
 export function subjectName(heads: readonly Head[], subjectId: UUID): string {
   for (const head of heads) {

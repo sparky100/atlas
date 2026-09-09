@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
+import { NotificationTray } from '../NotificationTray/NotificationTray';
 import { Text } from '../Text/Text';
 import { UserMenu } from '../UserMenu/UserMenu';
 import styles from './AppHeader.module.css';
@@ -26,7 +27,10 @@ export function AppHeader({ children }: AppHeaderProps) {
         </Link>
         {children}
       </div>
-      <UserMenu />
+      <div className={styles.right}>
+        <NotificationTray />
+        <UserMenu />
+      </div>
     </header>
   );
 }

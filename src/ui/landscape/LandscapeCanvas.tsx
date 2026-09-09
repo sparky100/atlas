@@ -24,6 +24,13 @@ export interface LandscapeCanvasProps {
   nodeHref: (elementId: UUID) => string;
   /** Where clicking an actor node navigates to — an actor has no Context view of its own (the zoom chain is system-specific), so this goes straight to the actor's own element page. */
   actorHref: (elementId: UUID) => string;
+  /** Unresolved comment-thread count per system id (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s Canvas section) — `useUnresolvedCommentCounts`'s own batched RPC result. A system absent from the map has zero unresolved threads and paints no marker. Actors carry no comment markers this sprint. */
+  unresolvedCommentCounts?: ReadonlyMap<UUID, number> | undefined;
+  /** Clicking a node's own comment marker (not the rest of the node, which still navigates via `nodeHref`) — opens the comments panel scoped to that system. */
+  onCommentMarkerClick?: (elementId: UUID) => void;
+  /** `c`/`n` (UI-principles §8.8) act on whichever node is currently hovered — the canvas has no persistent "selected node" of its own yet (only hover and click-to-navigate), so the hovered node is the nearest existing stand-in for "the focused row". `c` with nothing hovered is a no-op the caller may still handle (e.g. closing an already-open panel). */
+  onToggleCommentsPanel?: (elementId: UUID | null) => void;
+  onNewCommentShortcut?: (elementId: UUID) => void;
 }
 
 interface Transform {
@@ -158,6 +165,10 @@ function computeFitTransform(worldWidth: number, worldHeight: number, displayWid
   return { scale, tx, ty };
 }
 
+const COMMENT_MARKER_WIDTH = 18;
+const COMMENT_MARKER_HEIGHT = 16;
+const COMMENT_MARKER_INSET = 4;
+
 /**
  * The landscape's renderer (UI-principles §6.1/§8.6): Canvas 2D for
  * lanes/nodes/edges/labels, DOM only for the hover tooltip and the zoom
@@ -199,8 +210,28 @@ function computeFitTransform(worldWidth: number, worldHeight: number, displayWid
  * position is a swim lane, not a nested frame), so the `⤴` marker still
  * fires but §6.3's "ghost at the old position" doesn't apply here the way
  * it would on a nested view.
+ *
+ * Comments (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s Canvas section):
+ * a node with at least one unresolved comment thread draws a small
+ * bottom-right "ink plate" (`commentMarkers` below) — the one corner
+ * nothing else claims (`+N` keeps top-right) — clicking it opens the
+ * comments panel instead of navigating; `c`/`n` act on whichever node is
+ * currently hovered. Actors carry no comment markers this sprint (`layout.
+ * actorNodes` never contributes to `commentMarkers`).
  */
-export function LandscapeCanvas({ layout, systemsById, actorsById, edges, diff = null, nodeHref, actorHref }: LandscapeCanvasProps) {
+export function LandscapeCanvas({
+  layout,
+  systemsById,
+  actorsById,
+  edges,
+  diff = null,
+  nodeHref,
+  actorHref,
+  unresolvedCommentCounts,
+  onCommentMarkerClick,
+  onToggleCommentsPanel,
+  onNewCommentShortcut,
+}: LandscapeCanvasProps) {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -247,6 +278,26 @@ export function LandscapeCanvas({ layout, systemsById, actorsById, edges, diff =
       return null;
     },
     [layout, transform],
+  );
+
+  /** The comment marker's own hit region — bottom-right, only for a system node with at least one unresolved thread (the only state this sprint draws — see the marker's own drawing comment below). Checked before `nodeAt` in the click handler so a marker click opens the panel instead of navigating. Actors never carry a marker (`unresolvedCommentCounts` is system-keyed). */
+  const commentMarkerAt = useCallback(
+    (screenX: number, screenY: number): UUID | null => {
+      if (!unresolvedCommentCounts || unresolvedCommentCounts.size === 0) return null;
+      const worldX = (screenX - transform.tx) / transform.scale;
+      const worldY = (screenY - transform.ty) / transform.scale;
+      for (const node of layout.nodes) {
+        const count = unresolvedCommentCounts.get(node.elementId);
+        if (!count) continue;
+        const markerLeft = node.x + NODE_WIDTH - COMMENT_MARKER_INSET - COMMENT_MARKER_WIDTH;
+        const markerTop = node.y + NODE_HEIGHT - COMMENT_MARKER_INSET - COMMENT_MARKER_HEIGHT;
+        if (worldX >= markerLeft && worldX <= markerLeft + COMMENT_MARKER_WIDTH && worldY >= markerTop && worldY <= markerTop + COMMENT_MARKER_HEIGHT) {
+          return node.elementId;
+        }
+      }
+      return null;
+    },
+    [layout, transform, unresolvedCommentCounts],
   );
 
   useEffect(() => {
@@ -374,13 +425,25 @@ export function LandscapeCanvas({ layout, systemsById, actorsById, edges, diff =
         }
       }
 
-      const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number }[] = [];
+      const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; truncateToNarrow: boolean }[] = [];
       const diffMarkers: { text: string; worldX: number; worldY: number; colour: string }[] = [];
       // B4's "no primary -> most recently added decides, with a '+N' chip
       // listing the rest" — top-right corner (diff markers already own
       // top-left), a neutral tone rather than any `--diff-*` token since
       // this isn't a diff state.
       const extraLaneMarkers: { text: string; worldX: number; worldY: number; colour: string }[] = [];
+      // Sprint M1b, bottom-right (UI-principles §6.1's corner-assignment
+      // rule — "+N" keeps top-right, this is the one corner nothing else
+      // claims). Always drawn, at every zoom, unlike `showLabels`-gated
+      // node labels: "a count nobody can see is a count that does not
+      // exist" (`docs/HANDOFF-M1b-comments.md`'s Canvas section). Only the
+      // unresolved (ink) state is drawn this sprint — the "all resolved,
+      // hollow" state needs a way to tell "zero unresolved" apart from "no
+      // comments at all", which `atlas.unresolved_comment_counts` doesn't
+      // return (an anchor with zero unresolved threads is simply absent
+      // either way); a follow-up backend addition, tracked in
+      // `docs/SPEC-data-model.md` §11, not faked here.
+      const commentMarkers: { elementId: UUID; count: number; worldX: number; worldY: number }[] = [];
 
       // An arrow function assigned to a `const`, not a hoisted `function`
       // declaration — TS narrows `ctx` to non-null only up to this point in
@@ -423,9 +486,12 @@ export function LandscapeCanvas({ layout, systemsById, actorsById, edges, diff =
         ctx.setLineDash([]);
         ctx.restore();
 
+        // Comment markers (Sprint M1b) only ever apply to systems —
+        // `unresolvedCommentCounts` is keyed by system id.
+        const unresolvedCount = elementType === 'system' ? (unresolvedCommentCounts?.get(elementId) ?? 0) : 0;
         if (showLabels) {
           const glyph = elementType === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph('system');
-          nodeLabels.push({ glyph, name: element.name, worldX: x, worldY: y });
+          nodeLabels.push({ glyph, name: element.name, worldX: x, worldY: y, truncateToNarrow: unresolvedCount > 0 });
         }
         if (diff && elementType === 'system' && DIFF_MARKER[nodeState] !== '') {
           const label = nodeState === 'changed' ? `${DIFF_MARKER[nodeState]}${String(nodeDiff?.changedAttributes.length ?? 0)}` : DIFF_MARKER[nodeState];
@@ -433,6 +499,9 @@ export function LandscapeCanvas({ layout, systemsById, actorsById, edges, diff =
         }
         if (extraLaneCount !== undefined) {
           extraLaneMarkers.push({ text: `+${String(extraLaneCount)}`, worldX: x + NODE_WIDTH - 4, worldY: y + 4, colour: tokens.textMuted });
+        }
+        if (unresolvedCount > 0) {
+          commentMarkers.push({ elementId, count: unresolvedCount, worldX: x + NODE_WIDTH - COMMENT_MARKER_INSET, worldY: y + NODE_HEIGHT - COMMENT_MARKER_INSET });
         }
       };
 
@@ -446,7 +515,7 @@ export function LandscapeCanvas({ layout, systemsById, actorsById, edges, diff =
       // fixed on-screen size within a zoom step, not scale continuously
       // with the gesture the way node geometry does, so it can't share the
       // world-transformed pass above.
-      if (laneLabels.length > 0 || nodeLabels.length > 0 || diffMarkers.length > 0 || edgeMarkers.length > 0 || extraLaneMarkers.length > 0 || referenceChips.length > 0) {
+      if (laneLabels.length > 0 || nodeLabels.length > 0 || diffMarkers.length > 0 || edgeMarkers.length > 0 || extraLaneMarkers.length > 0 || referenceChips.length > 0 || commentMarkers.length > 0) {
         const textScale = quantizeScale(transform.scale, MIN_SCALE, MAX_SCALE);
         const toScreen = (worldX: number, worldY: number): [number, number] => [worldX * transform.scale + transform.tx, worldY * transform.scale + transform.ty];
         ctx.textBaseline = 'middle';
@@ -483,7 +552,12 @@ export function LandscapeCanvas({ layout, systemsById, actorsById, edges, diff =
           ctx.font = `${(14 * textScale).toFixed(2)}px sans-serif`;
           ctx.fillText(label.glyph, x + 10 * textScale, y + screenNodeHeight / 2);
           ctx.font = `${(12 * textScale).toFixed(2)}px sans-serif`;
-          const truncated = truncate(ctx, label.name, (NODE_WIDTH - 34) * textScale);
+          // A node carrying a comment marker reserves the marker's own
+          // width (4px inset + 18px box + 4px gap = 26px) so the name
+          // never overlaps it (`docs/HANDOFF-M1b-comments.md`'s Canvas
+          // section: "truncate to 100px instead").
+          const maxWidth = (label.truncateToNarrow ? NODE_WIDTH - 34 - 26 : NODE_WIDTH - 34) * textScale;
+          const truncated = truncate(ctx, label.name, maxWidth);
           ctx.fillText(truncated, x + 30 * textScale, y + screenNodeHeight / 2);
         }
 
@@ -501,6 +575,23 @@ export function LandscapeCanvas({ layout, systemsById, actorsById, edges, diff =
           ctx.fillStyle = tokens.surfaceRaised;
           ctx.fillText(marker.text, x, y + 1);
         }
+
+        // Sprint M1b's own comment marker (see `commentMarkers`'s own
+        // comment above) — a rounded-rect "ink plate", not the circular
+        // shape the badges above use, so its 2-digit count has somewhere
+        // to sit: 18×16, 2px radius, bottom-right inset.
+        for (const marker of commentMarkers) {
+          const [right, bottom] = toScreen(marker.worldX, marker.worldY);
+          const w = COMMENT_MARKER_WIDTH * textScale;
+          const h = COMMENT_MARKER_HEIGHT * textScale;
+          const left = right - w;
+          const top = bottom - h;
+          roundRectPath(ctx, left, top, w, h, 2 * textScale);
+          ctx.fillStyle = tokens.text;
+          ctx.fill();
+          ctx.fillStyle = tokens.surfaceRaised;
+          ctx.fillText(String(marker.count), left + w / 2, top + h / 2 + 1);
+        }
         ctx.textAlign = 'left';
       }
     }
@@ -511,7 +602,7 @@ export function LandscapeCanvas({ layout, systemsById, actorsById, edges, diff =
     return () => {
       observer.disconnect();
     };
-  }, [layout, edges, systemsById, actorsById, diff, diffByElementId, diffByRelationshipId, transform, hover]);
+  }, [layout, edges, systemsById, actorsById, diff, diffByElementId, diffByRelationshipId, transform, hover, unresolvedCommentCounts]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -546,6 +637,11 @@ export function LandscapeCanvas({ layout, systemsById, actorsById, edges, diff =
     const drag = dragRef.current;
     dragRef.current = null;
     if (drag?.moved) return;
+    const markerElementId = commentMarkerAt(screenX, screenY);
+    if (markerElementId) {
+      onCommentMarkerClick?.(markerElementId);
+      return;
+    }
     const hit = nodeAt(screenX, screenY);
     if (hit) void navigate(hit.elementType === 'system' ? nodeHref(hit.elementId) : actorHref(hit.elementId));
   }
@@ -572,6 +668,9 @@ export function LandscapeCanvas({ layout, systemsById, actorsById, edges, diff =
     if (e.key === '+' || e.key === '=') zoomBy(1.2);
     else if (e.key === '-') zoomBy(1 / 1.2);
     else if (e.key === '0') fitToView();
+    // §8.8's global `c`/`n` — see this component's own `onToggleCommentsPanel`/`onNewCommentShortcut` prop comments for why the hovered node stands in for "the focused row" here.
+    else if (e.key === 'c') onToggleCommentsPanel?.(hover?.elementId ?? null);
+    else if (e.key === 'n' && hover) onNewCommentShortcut?.(hover.elementId);
   }
 
   const hoveredElement = hover ? (hover.elementType === 'system' ? systemsById.get(hover.elementId) : actorsById.get(hover.elementId)) : undefined;

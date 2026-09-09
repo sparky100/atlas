@@ -40,3 +40,15 @@ export async function markNotificationRead(supabase: Client, notificationId: UUI
   if (error) throw new Error(`markNotificationRead: ${error.message}`);
   return data as NotificationRow;
 }
+
+/**
+ * The tray's own "Mark all read" (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s
+ * 6c). A single `where read_at is null` update, not a fetch-then-`.in()`
+ * over every unread id — there is no id list to bound here at all, so rule
+ * 8 doesn't apply the way it does to `listCommentsByIds`/`listProfilesByIds`.
+ */
+export async function markAllNotificationsRead(supabase: Client, userId: UUID): Promise<void> {
+  const patch = { read_at: new Date().toISOString() };
+  const { error } = await supabase.from('notifications').update(patch).eq('user_id', userId).is('read_at', null);
+  if (error) throw new Error(`markAllNotificationsRead: ${error.message}`);
+}

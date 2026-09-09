@@ -40,6 +40,26 @@ export async function listProfilesByIds(supabase: Client, userIds: readonly UUID
   return (data as ProfileRow[] | null) ?? [];
 }
 
+/**
+ * Every fellow org member's profile, for the @mention composer's own
+ * autocomplete (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s "The
+ * composer's autocomplete lists org members by handle") — not the member
+ * directory page itself, which SPEC §11 defers to U4 (no invite flow, no
+ * member list route; this is bounded, read-only lookup data for one
+ * control, not that surface). Two queries, not a cross-schema embedded
+ * join — `members` is `public`, `atlas.profiles` is `atlas`, and
+ * PostgREST's embedded-resource syntax doesn't cross schemas. `listProfilesByIds`
+ * already enforces rule 8's `.in()` ceiling on the second query; an org
+ * over that size hits the same guard every other batch profile lookup
+ * does, rather than a second, looser one invented just for this.
+ */
+export async function listOrgMemberProfiles(supabase: Client, orgId: UUID): Promise<ProfileRow[]> {
+  const { data, error } = await supabase.from('members').select('user_id').eq('org_id', orgId);
+  if (error) throw new Error(`listOrgMemberProfiles: ${error.message}`);
+  const userIds = ((data as { user_id: UUID }[] | null) ?? []).map((row) => row.user_id);
+  return listProfilesByIds(supabase, userIds);
+}
+
 export interface UpdateMyProfileInput {
   userId: UUID;
   displayName?: string | null;

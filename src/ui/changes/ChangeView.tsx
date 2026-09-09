@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
+import { CommentsSection } from '../components/CommentsSection/CommentsSection';
 import { ConfidenceDots } from '../components/ConfidenceDots/ConfidenceDots';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../components/EmptyState/EmptyState';
@@ -10,6 +11,7 @@ import { LinkButton } from '../components/Button/LinkButton';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import type { MemberRole } from '../../db/types';
 import { BranchRebasePanel } from '../reviews/BranchRebasePanel';
 import { branchStatusTone } from './branchStatus';
 import { describeDelta } from './changeSummaryFormat';
@@ -20,10 +22,12 @@ import { useSubmitForReview } from './useSubmitForReview';
 import styles from './ChangeView.module.css';
 
 export interface ChangeViewProps {
+  orgId: UUID;
   modelId: UUID;
   branchId: UUID;
   orgSlug: string;
   modelSlug: string;
+  role: MemberRole | null;
   /** Contributor+ (ADR-009) — the same gate `ChangesView`'s create form uses; a viewer sees the change read-only. */
   canEdit: boolean;
 }
@@ -57,7 +61,7 @@ export interface ChangeViewProps {
  * request's own page instead (it also has to resubmit the request's
  * cached classification, which this panel has no request to update).
  */
-export function ChangeView({ modelId, branchId, orgSlug, modelSlug, canEdit }: ChangeViewProps) {
+export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role, canEdit }: ChangeViewProps) {
   const { userId } = useAuth();
   const { status, branch, error, updateMetadata, reload } = useChange(branchId);
   const summaryState = useChangeSummary(modelId, branch);
@@ -257,6 +261,13 @@ export function ChangeView({ modelId, branchId, orgSlug, modelSlug, canEdit }: C
             ))}
           </ul>
         )}
+      </Panel>
+
+      <Panel>
+        <Text as="h2" size="lg">
+          Comments on this change
+        </Text>
+        <CommentsSection orgId={orgId} modelId={modelId} userId={userId} role={role} anchorType="change" anchorId={branchId} branchId={branchId} />
       </Panel>
 
       <Panel>

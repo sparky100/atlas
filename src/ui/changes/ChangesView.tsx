@@ -6,6 +6,7 @@ import { EmptyState } from '../components/EmptyState/EmptyState';
 import { LinkButton } from '../components/Button/LinkButton';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { useUnresolvedCommentCounts } from '../comments/useUnresolvedCommentCounts';
 import type { BranchRow } from '../../db/types';
 import { branchStatusTone } from './branchStatus';
 import { useChanges } from './useChanges';
@@ -36,6 +37,16 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [targetDate, setTargetDate] = useState('');
+  // Changes list unresolved count (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s
+  // 6b: "the meta row: branch status chip, Target: YYYY-MM-DD, and the
+  // unresolved count") — `anchor_type = 'change'` counts key on the same
+  // `anchor_id` (a branch's own id) regardless of anchor type, so the
+  // batched RPC works unchanged here.
+  const unresolvedState = useUnresolvedCommentCounts(
+    modelId,
+    branches.map((b) => b.id),
+  );
+  const unresolvedCounts = unresolvedState.status === 'ready' ? unresolvedState.counts : undefined;
 
   return (
     <div>
@@ -122,7 +133,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
       {branches.length > 0 && (
         <ul className={styles.list}>
           {branches.map((branch) => (
-            <ChangeRow key={branch.id} branch={branch} orgSlug={orgSlug} modelSlug={modelSlug} />
+            <ChangeRow key={branch.id} branch={branch} orgSlug={orgSlug} modelSlug={modelSlug} unresolvedCount={unresolvedCounts?.get(branch.id)} />
           ))}
         </ul>
       )}
@@ -130,7 +141,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   );
 }
 
-function ChangeRow({ branch, orgSlug, modelSlug }: { branch: BranchRow; orgSlug: string; modelSlug: string }) {
+function ChangeRow({ branch, orgSlug, modelSlug, unresolvedCount }: { branch: BranchRow; orgSlug: string; modelSlug: string; unresolvedCount: number | undefined }) {
   return (
     <li className={styles.row}>
       <div>
@@ -147,6 +158,19 @@ function ChangeRow({ branch, orgSlug, modelSlug }: { branch: BranchRow; orgSlug:
           {branch.target_date !== null && (
             <Text as="span" tone="faint" size="xs">
               Target: {branch.target_date}
+            </Text>
+          )}
+          {/* Only the "has unresolved" state is real data — see
+              `docs/SPEC-data-model.md` §11's "hollow marker" row for why a
+              muted "all resolved" state isn't distinguishable from "no
+              comments at all" with today's RPC, and isn't faked here. */}
+          {unresolvedCount !== undefined && unresolvedCount > 0 ? (
+            <Text as="span" tone="faint" size="xs">
+              💬 {unresolvedCount} unresolved
+            </Text>
+          ) : (
+            <Text as="span" tone="muted" size="xs">
+              no comments
             </Text>
           )}
         </div>
