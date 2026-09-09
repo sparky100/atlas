@@ -6,7 +6,6 @@ import type { BranchRow } from '../../db/types';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
-import { attributesRecord } from '../elements/attributesRecord';
 import { CapabilityMapAddForm } from './CapabilityMapAddForm';
 import { COLOUR_BY_OPTIONS, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
 import type { CapabilityMapTree, L1Column, L2Card } from './layout';
@@ -173,13 +172,17 @@ function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, refParam }
  * own module comment explains why buttons, not a mouse drag). `previous`/
  * `next` are this capability's immediate siblings in display order
  * (`compareCapabilities`) — `undefined` at either end of the list, which
- * disables the matching button rather than wrapping around. Mounted only
- * when the caller has edit rights (`L1ColumnView`/`L2CardView` render this
- * conditionally on `reorderCapability`, never with `context` missing) —
- * `useCapabilityReorder` is a real hook, so it can't be called
- * conditionally *inside* one always-mounted component the way a plain
- * `if` can guard a prop; conditional mounting is the correct place for
- * that decision, same as `addCapability`'s sibling `CapabilityMapAddForm`.
+ * disables the matching button rather than wrapping around; that's the
+ * only reason a button is ever disabled here — every capability gets an
+ * `order` at creation now (`useCapabilityCreate.ts`) or via the one-off
+ * `scripts/backfillCapabilityOrder.ts` for anything older, so there's no
+ * "not orderable yet" state left to show. Mounted only when the caller has
+ * edit rights (`L1ColumnView`/`L2CardView` render this conditionally on
+ * `reorderCapability`, never with `context` missing) — `useCapabilityReorder`
+ * is a real hook, so it can't be called conditionally *inside* one
+ * always-mounted component the way a plain `if` can guard a prop;
+ * conditional mounting is the correct place for that decision, same as
+ * `addCapability`'s sibling `CapabilityMapAddForm`.
  */
 function ReorderButtons({
   capability,
@@ -202,22 +205,12 @@ function ReorderButtons({
 }) {
   const { status, error, swap } = useCapabilityReorder(context);
 
-  const order = attributesRecord(capability.attributes).order;
-  const hasOrder = typeof order === 'number';
-  const canMovePrevious = previous !== undefined && hasOrder && typeof attributesRecord(previous.attributes).order === 'number';
-  const canMoveNext = next !== undefined && hasOrder && typeof attributesRecord(next.attributes).order === 'number';
-  // A hand-added capability (never seeded, no order of its own yet) can't
-  // swap with anything — a swap needs a real order on both sides — so its
-  // buttons stay visible but disabled, not hidden (CLAUDE.md rule 7: a gap
-  // made visible), with a reason a title attribute can surface on hover.
-  const noOrderTitle = hasOrder ? undefined : 'This capability has no explicit order yet — only capabilities seeded from a starter map can be reordered this way today.';
-
   return (
     <span className={styles.reorderButtons}>
-      <button type="button" aria-label={previousLabel} title={noOrderTitle} disabled={!canMovePrevious || status === 'reordering'} onClick={() => { if (previous) void swap(capability, previous); }}>
+      <button type="button" aria-label={previousLabel} disabled={previous === undefined || status === 'reordering'} onClick={() => { if (previous) void swap(capability, previous); }}>
         {previousGlyph}
       </button>
-      <button type="button" aria-label={nextLabel} title={noOrderTitle} disabled={!canMoveNext || status === 'reordering'} onClick={() => { if (next) void swap(capability, next); }}>
+      <button type="button" aria-label={nextLabel} disabled={next === undefined || status === 'reordering'} onClick={() => { if (next) void swap(capability, next); }}>
         {nextGlyph}
       </button>
       {error !== null && (

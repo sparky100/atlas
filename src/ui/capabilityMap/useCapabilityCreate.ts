@@ -5,6 +5,7 @@ import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
+import { nextSiblingOrder, type CapabilityMapTree } from './layout';
 
 export type CapabilityCreateStatus = 'idle' | 'creating';
 
@@ -22,6 +23,8 @@ export interface UseCapabilityCreateInput {
   /** Which branch this create commits to — see src/ui/elements/useElementEditor.ts's `branch` doc comment (Sprint C1). */
   branch: BranchRow;
   expectedHeadCommitId: UUID;
+  /** Read-only: `layout.ts`'s `nextSiblingOrder` uses this to give the new capability an `order` among its new siblings — the same tree `CapabilityMapAddForm.tsx`'s own parent picker is already built from, so no extra query. */
+  tree: CapabilityMapTree;
   onCreated: () => void;
 }
 
@@ -33,12 +36,14 @@ export interface UseCapabilityCreateInput {
  * as parent. No `code`/`templateRef` on a hand-added capability: those are
  * starter-map provenance (src/contracts/delta.ts's `CapabilityAttributes`
  * doc comment), and a capability added this way was never seeded from one.
- * Same reasoning applies to `order` (Sprint U4-1 C1): it has no place among
- * seeded siblings' order values, so it's left unset — `useCapabilityReorder.ts`
- * only offers a swap once a capability actually has one.
+ * `order` is different (Sprint U4-1 C1, tightened after review): every
+ * capability gets one at creation, seeded or hand-added alike, so it can
+ * be reordered immediately rather than staying permanently un-orderable —
+ * one more than the highest existing sibling's order (`layout.ts`'s
+ * `nextSiblingOrder`), landing the new capability last among its siblings.
  */
 export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabilityCreateResult {
-  const { modelId, orgId, userId, branch, expectedHeadCommitId, onCreated } = input;
+  const { modelId, orgId, userId, branch, expectedHeadCommitId, tree, onCreated } = input;
   const [status, setStatus] = useState<CapabilityCreateStatus>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -66,7 +71,7 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
           elementType: 'capability',
           name: trimmed,
           parentId,
-          attributes: {},
+          attributes: { order: nextSiblingOrder(tree, parentId) },
           sourceId: source.id,
           confidence: 1,
         };
@@ -103,7 +108,7 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
         setError(e instanceof Error ? e.message : 'Could not add capability.');
       }
     },
-    [modelId, orgId, userId, branch, expectedHeadCommitId, onCreated],
+    [modelId, orgId, userId, branch, expectedHeadCommitId, tree, onCreated],
   );
 
   return { status, error, create };

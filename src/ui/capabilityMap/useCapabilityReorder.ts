@@ -18,9 +18,13 @@ export interface UseCapabilityReorderResult {
    * Swaps `capability` and `neighbor`'s `attributes.order` — moving
    * `capability` one place among its siblings, Sprint U4-1 C1's "drag-to-
    * reorder" (a swap, not a drag gesture — see this hook's own module
-   * comment). Both must already carry a real `order`: a hand-added
-   * capability that's never been given one has no position to swap into
-   * yet, so the caller (`CapabilityMapView.tsx`) never offers this for it.
+   * comment). Both are expected to already carry a real `order`: every
+   * capability gets one at creation now (`useCapabilityCreate.ts`), and
+   * `scripts/backfillCapabilityOrder.ts` is the one-off fix for anything
+   * created before that change existed — the `typeof !== 'number'` check
+   * below is a defensive guard against that invariant somehow not
+   * holding (an unbackfilled model, a write path this hook doesn't know
+   * about), not a normal path the UI routes around.
    */
   swap: (capability: ElementsHeadRow, neighbor: ElementsHeadRow) => Promise<void>;
 }

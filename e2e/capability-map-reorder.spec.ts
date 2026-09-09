@@ -6,7 +6,13 @@
  * drag-and-drop anywhere else in this codebase, no DnD library, and
  * buttons stay keyboard-/screen-reader-operable) — the *effect* (a
  * capability swaps places with an adjacent sibling, `attributes.order`
- * updated) is the same either way.
+ * updated) is the same either way; SPEC-data-model.md §11 records a real
+ * drag gesture as a reviewed, deliberate follow-up, not a gap in this item.
+ *
+ * Also covers the review follow-up that tightened C1: every capability
+ * gets an `order` at creation now (useCapabilityCreate.ts), including a
+ * hand-added one — so a brand-new capability can be moved immediately,
+ * with no "not orderable yet" disabled state left anywhere.
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
@@ -18,7 +24,7 @@ import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
 
-test('reordering: move-right swaps two L1 capabilities, move-down swaps two L2 capabilities, and an order-less capability gets no working move buttons', async ({ page }) => {
+test('reordering: move-right swaps two L1 capabilities, move-down swaps two L2 capabilities, and a hand-added capability can be moved immediately', async ({ page }) => {
   const env = loadEnv();
 
   const email = `capmap-reorder-${randomUUID()}@example.test`;
@@ -59,7 +65,6 @@ test('reordering: move-right swaps two L1 capabilities, move-down swaps two L2 c
   const rootBId = randomUUID();
   const childXId = randomUUID();
   const childYId = randomUUID();
-  const handAddedId = randomUUID();
 
   const seedEnvelope: CommitEnvelope = {
     id: randomUUID(),
@@ -67,15 +72,13 @@ test('reordering: move-right swaps two L1 capabilities, move-down swaps two L2 c
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    title: 'seed two ordered L1 capabilities, each with an ordered L2 child, plus one hand-added capability with no order',
+    title: 'seed two ordered L1 capabilities, each with an ordered L2 child',
     body: null,
     deltas: [
       { kind: 'element.create', id: randomUUID(), elementId: rootAId, elementType: 'capability', name: 'Root Alpha', parentId: null, attributes: { order: 10 }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: rootBId, elementType: 'capability', name: 'Root Beta', parentId: null, attributes: { order: 20 }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: childXId, elementType: 'capability', name: 'Child X', parentId: rootAId, attributes: { order: 10 }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: childYId, elementType: 'capability', name: 'Child Y', parentId: rootAId, attributes: { order: 20 }, sourceId: seedSourceId, confidence: 1 },
-      // Never seeded from a map — no order attribute at all.
-      { kind: 'element.create', id: randomUUID(), elementId: handAddedId, elementType: 'capability', name: 'Hand Added Root', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 },
     ],
   };
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope: seedEnvelope });
@@ -107,7 +110,25 @@ test('reordering: move-right swaps two L1 capabilities, move-down swaps two L2 c
     expect(l2Order).toEqual(['Child Y', 'Child X']);
   }).toPass();
 
-  // --- An order-less capability's move buttons are disabled, not silently broken ---
-  await expect(page.getByRole('button', { name: 'Move Hand Added Root left' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Move Hand Added Root right' })).toBeDisabled();
+  // --- A hand-added capability gets an order at creation, and can be moved immediately ---
+  // (the review follow-up that tightened C1: no "not orderable yet" state
+  // survives to a freshly-created capability, seeded or hand-added alike).
+  await page.getByRole('button', { name: '+ Add capability' }).click();
+  await page.getByPlaceholder('Capability name').fill('Hand Added Root');
+  // Leave the parent picker at its default ("Top level") — a new L1.
+  await page.getByRole('button', { name: 'Add' }).click();
+
+  // Lands after Root Beta and Root Alpha (order 10/21 after the swap above,
+  // so the new capability gets 21) — last among the three L1s.
+  await expect(async () => {
+    const l1Order = await page.getByRole('link', { name: /^(Root Alpha|Root Beta|Hand Added Root)$/ }).allTextContents();
+    expect(l1Order).toEqual(['Root Beta', 'Root Alpha', 'Hand Added Root']);
+  }).toPass();
+
+  await page.getByRole('button', { name: 'Move Hand Added Root left' }).click();
+
+  await expect(async () => {
+    const l1Order = await page.getByRole('link', { name: /^(Root Alpha|Root Beta|Hand Added Root)$/ }).allTextContents();
+    expect(l1Order).toEqual(['Root Beta', 'Hand Added Root', 'Root Alpha']);
+  }).toPass();
 });

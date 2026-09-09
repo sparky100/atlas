@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareCapabilities, computeCapabilityMapTree } from './layout';
+import { compareCapabilities, computeCapabilityMapTree, nextSiblingOrder } from './layout';
 import type { ElementsHeadRow } from '../../contracts/rows';
 
 function capability(id: string, name: string, parentId: string | null, code?: string): ElementsHeadRow {
@@ -93,5 +93,51 @@ describe('compareCapabilities', () => {
     const a = capability('a', 'Alpha', null);
     const b = capability('b', 'Beta', null);
     expect([b, a].sort(compareCapabilities).map((c) => c.element_id)).toEqual(['a', 'b']);
+  });
+});
+
+function withOrder(id: string, name: string, parentId: string | null, order: number): ElementsHeadRow {
+  return { element_id: id, element_type: 'capability', name, parent_id: parentId, attributes: { order }, exists_delta_id: `d-${id}` };
+}
+
+describe('nextSiblingOrder (Sprint U4-1 C1)', () => {
+  it('one more than the highest existing L1 order, for a new top-level capability (parentId: null)', () => {
+    const tree = computeCapabilityMapTree([withOrder('a', 'Alpha', null, 10), withOrder('b', 'Beta', null, 20)]);
+    expect(nextSiblingOrder(tree, null)).toBe(21);
+  });
+
+  it('1 when there are no siblings yet', () => {
+    const tree = computeCapabilityMapTree([]);
+    expect(nextSiblingOrder(tree, null)).toBe(1);
+  });
+
+  it('1 when siblings exist but none of them have an order', () => {
+    const tree = computeCapabilityMapTree([capability('a', 'Alpha', null), capability('b', 'Beta', null)]);
+    expect(nextSiblingOrder(tree, null)).toBe(1);
+  });
+
+  it('scopes to the given parent — an L1 id looks at that L1\'s own L2 children, not any other group', () => {
+    const tree = computeCapabilityMapTree([
+      withOrder('root-a', 'Root A', null, 10),
+      withOrder('root-b', 'Root B', null, 20),
+      withOrder('child-a1', 'Child A1', 'root-a', 10),
+      withOrder('child-b1', 'Child B1', 'root-b', 100),
+    ]);
+    expect(nextSiblingOrder(tree, 'root-a')).toBe(11);
+    expect(nextSiblingOrder(tree, 'root-b')).toBe(101);
+  });
+
+  it('scopes to an L2 id\'s own L3 children', () => {
+    const tree = computeCapabilityMapTree([
+      withOrder('root', 'Root', null, 10),
+      withOrder('mid', 'Mid', 'root', 10),
+      withOrder('leaf', 'Leaf', 'mid', 5),
+    ]);
+    expect(nextSiblingOrder(tree, 'mid')).toBe(6);
+  });
+
+  it('an unresolvable parentId (not a real L1/L2 in this tree) has no siblings to consider — always 1', () => {
+    const tree = computeCapabilityMapTree([withOrder('a', 'Alpha', null, 10)]);
+    expect(nextSiblingOrder(tree, 'does-not-exist')).toBe(1);
   });
 });

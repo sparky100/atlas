@@ -36,6 +36,7 @@ export function CapabilityMapAddForm({ tree, modelId, orgId, userId, branch, exp
     userId,
     branch,
     expectedHeadCommitId,
+    tree,
     onCreated: () => {
       setOpen(false);
       setName('');

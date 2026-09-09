@@ -48,3 +48,11 @@ export async function getModelBySlug(supabase: Client, orgId: UUID, slug: string
   if (error) throw new Error(`getModelBySlug: ${error.message}`);
   return data as ModelRow | null;
 }
+
+/** By id, not slug — `scripts/backfillCapabilityOrder.ts` is the first caller: it only has a model id (a CLI argument), no org slug to resolve through first. */
+export async function getModelById(supabase: Client, id: UUID): Promise<ModelRow | null> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.from('models').select('*').eq('id', id).maybeSingle();
+  if (error) throw new Error(`getModelById: ${error.message}`);
+  return data as ModelRow | null;
+}
