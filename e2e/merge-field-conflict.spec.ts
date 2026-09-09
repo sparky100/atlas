@@ -44,7 +44,8 @@ test('a field conflict renders with its three-way context, resolves with one cli
     parentCommitId: seedCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'branch: set vendor to Branch Value',
+    title: 'branch: set vendor to Branch Value',
+    body: null,
     deltas: [{ kind: 'element.update', id: randomUUID(), elementId: systemId, elementType: 'system', attribute: 'vendor', value: 'Branch Value', previousDeltaId: createDeltaId, sourceId: seedSourceId, confidence: 1 }],
   };
   const branchResult = await commitToBranch(signedIn, { modelId, branchId, expectedHeadCommitId: seedCommitId, envelope: branchEnvelope });
@@ -59,7 +60,8 @@ test('a field conflict renders with its three-way context, resolves with one cli
     parentCommitId: seedCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'main: set vendor to Main Value',
+    title: 'main: set vendor to Main Value',
+    body: null,
     deltas: [{ kind: 'element.update', id: randomUUID(), elementId: systemId, elementType: 'system', attribute: 'vendor', value: 'Main Value', previousDeltaId: createDeltaId, sourceId: seedSourceId, confidence: 1 }],
   };
   const mainResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: seedCommitId, envelope: mainEnvelope });

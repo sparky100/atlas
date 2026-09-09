@@ -24,7 +24,8 @@ function envelope(overrides: Partial<CommitEnvelope>): CommitEnvelope {
     parentCommitId: 'head-0',
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'a change',
+    title: 'a change',
+    body: null,
     deltas: [createDelta('d1', 'el-1')],
     ...overrides,
   };

@@ -28,6 +28,8 @@ export interface RelationshipsSectionAddConfig {
   modelId: UUID;
   orgId: UUID;
   userId: UUID | null;
+  /** This element's own name — only for the generated commit title (`useRelationshipCreate`'s own doc comment). */
+  elementName: string;
   searchCommitId: UUID;
   branch: BranchRow;
   expectedHeadCommitId: UUID;
@@ -187,6 +189,7 @@ function RelationshipDirectionGroup({
           slot={slot}
           direction={direction}
           elementId={elementId}
+          elementName={addRelationship.elementName}
           modelId={addRelationship.modelId}
           orgId={addRelationship.orgId}
           userId={addRelationship.userId}

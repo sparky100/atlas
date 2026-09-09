@@ -68,7 +68,8 @@ test('front doors and browse: both doors render for a seeded model, switching pe
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'seed capability, two systems, one supports edge',
+    title: 'seed capability, two systems, one supports edge',
+    body: null,
     deltas: [
       { kind: 'element.create', id: randomUUID(), elementId: capabilityId, elementType: 'capability', name: 'Billing', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 },
       {

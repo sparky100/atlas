@@ -3,6 +3,7 @@ import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow, Json } from '../../contracts/rows';
 import { ATTRIBUTE_SCHEMA_BY_TYPE, validateAttributeValue } from '../../contracts/attributeSchema';
 import { commitToBranch } from '../../db/commits';
+import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
@@ -163,7 +164,8 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
         parentCommitId: expectedHeadCommitId,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: `Edit ${element.name}`,
+        title: describeEnvelope(deltas, (id) => (id === element.element_id ? element.name : undefined)),
+        body: `Edit ${element.name}`,
         deltas,
       };
 

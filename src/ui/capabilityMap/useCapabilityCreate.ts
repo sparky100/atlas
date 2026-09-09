@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import { commitToBranch } from '../../db/commits';
+import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
@@ -67,14 +68,18 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
           confidence: 1,
         };
 
+        const deltas = [delta];
         const envelope: CommitEnvelope = {
           id: crypto.randomUUID(),
           branchId: branch.id,
           parentCommitId: expectedHeadCommitId,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
-          message: `Add capability "${trimmed}"`,
-          deltas: [delta],
+          // See useElementCreate.ts's identical comment: an element.create
+          // delta never needs the name lookup, its name is on the delta.
+          title: describeEnvelope(deltas, () => undefined),
+          body: `Add capability "${trimmed}"`,
+          deltas,
         };
 
         const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });

@@ -96,7 +96,8 @@ test('capability map: two-level tree with an orphan, L2→L3 expand, orphan flag
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'seed a two-level capability tree with an orphan',
+    title: 'seed a two-level capability tree with an orphan',
+    body: null,
     deltas,
   };
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });

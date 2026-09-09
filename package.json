@@ -27,7 +27,8 @@
     "content:load-capability-maps": "tsx scripts/loadCapabilityMaps.ts",
     "content:review-capability-maps": "tsx scripts/reviewCapabilityMaps.ts",
     "content:publish-capability-map": "tsx scripts/publishCapabilityMap.ts",
-    "check:case-collisions": "tsx scripts/checkCaseCollisions.ts"
+    "check:case-collisions": "tsx scripts/checkCaseCollisions.ts",
+    "backfill:commit-titles": "tsx scripts/backfillCommitTitles.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

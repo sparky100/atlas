@@ -76,7 +76,8 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'seed four capabilities and their systems',
+    title: 'seed four capabilities and their systems',
+    body: null,
     deltas: [
       { kind: 'element.create', id: randomUUID(), elementId: capWarnId, elementType: 'capability', name: 'Revenues and Benefits', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: capInfoId, elementType: 'capability', name: 'Adult Social Care', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 },
@@ -114,7 +115,8 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
       parentCommitId: replacementBranch.head_commit_id,
       mergedBranchHeadCommitId: null,
       kind: 'manual',
-      message: 'add the replacement system, retract the old one',
+      title: 'add the replacement system, retract the old one',
+      body: null,
       deltas: [
         createSystem(randomUUID(), sysInfoNewId, 'Modern Case Platform', 'active', seedSourceId),
         { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: sysInfoNewId, toElementId: capInfoId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
@@ -145,7 +147,8 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
       parentCommitId: mainAfterSeed.head_commit_id,
       mergedBranchHeadCommitId: null,
       kind: 'manual',
-      message: 'a further commit before the second tag',
+      title: 'a further commit before the second tag',
+      body: null,
       deltas: [createSystem(randomUUID(), randomUUID(), 'An Unrelated System', 'active', seedSourceId)],
     },
   });

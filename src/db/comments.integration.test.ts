@@ -137,7 +137,8 @@ describe('comments, mentions, notifications, and realtime against a real local S
         parentCommitId: main.head_commit_id,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'add a system for the realtime test',
+        title: 'add a system for the realtime test',
+        body: null,
         deltas: [makeCreateDelta(randomUUID(), elementId, 'Realtime Test System', aliceManualSourceId)],
       },
     });
@@ -231,7 +232,8 @@ describe('comments, mentions, notifications, and realtime against a real local S
         parentCommitId: branch.head_commit_id,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'add Draft-Only System',
+        title: 'add Draft-Only System',
+        body: null,
         deltas: [makeCreateDelta(randomUUID(), elementId, 'Draft-Only System', aliceManualSourceId)],
       },
     });
@@ -262,7 +264,8 @@ describe('comments, mentions, notifications, and realtime against a real local S
         parentCommitId: main.head_commit_id,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'add two systems for the flat-reply-chain test',
+        title: 'add two systems for the flat-reply-chain test',
+        body: null,
         deltas: [makeCreateDelta(randomUUID(), elementId, 'Reply Chain System', aliceManualSourceId), makeCreateDelta(randomUUID(), otherElementId, 'A Different System', aliceManualSourceId)],
       },
     });
@@ -306,7 +309,8 @@ describe('comments, mentions, notifications, and realtime against a real local S
         parentCommitId: branch.head_commit_id,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'add Merge Survivor System',
+        title: 'add Merge Survivor System',
+        body: null,
         deltas: [makeCreateDelta(randomUUID(), elementId, 'Merge Survivor System', aliceManualSourceId)],
       },
     });
@@ -334,7 +338,7 @@ describe('comments, mentions, notifications, and realtime against a real local S
     const { error: mergeError } = await alice.client.schema('atlas').rpc('merge_branch', {
       p_merge_request_id: requestId,
       p_commit_id: randomUUID(),
-      p_message: 'merge comment-survives-merge',
+      p_title: 'merge comment-survives-merge',
       p_elements_head: projection.elementsHead,
       p_relationships_head: projection.relationshipsHead,
       p_facts: projection.facts,
@@ -371,7 +375,8 @@ describe('comments, mentions, notifications, and realtime against a real local S
         parentCommitId: branch.head_commit_id,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'add Refresh Survivor System',
+        title: 'add Refresh Survivor System',
+        body: null,
         deltas: [makeCreateDelta(randomUUID(), elementId, 'Refresh Survivor System', aliceManualSourceId)],
       },
     });
@@ -392,7 +397,8 @@ describe('comments, mentions, notifications, and realtime against a real local S
         parentCommitId: mainBeforeFork.head_commit_id,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'advance main past the branch fork point',
+        title: 'advance main past the branch fork point',
+        body: null,
         deltas: [makeCreateDelta(randomUUID(), randomUUID(), 'Refreshed-In System', aliceManualSourceId)],
       },
     });
@@ -408,7 +414,7 @@ describe('comments, mentions, notifications, and realtime against a real local S
       p_branch_id: branch.id,
       p_base_commit_id: branchAfterCommit.head_commit_id,
       p_kind: 'merge',
-      p_message: 'refresh: pull main into the branch',
+      p_title: 'refresh: pull main into the branch',
       p_deltas: [],
       p_merged_branch_head_commit_id: mainAfterAdvance.head_commit_id,
     });
@@ -436,7 +442,8 @@ describe('comments, mentions, notifications, and realtime against a real local S
         parentCommitId: main.head_commit_id,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'add To-Be-Retracted System',
+        title: 'add To-Be-Retracted System',
+        body: null,
         deltas: [makeCreateDelta(createDeltaId, elementId, 'To-Be-Retracted System', aliceManualSourceId)],
       },
     });
@@ -454,7 +461,8 @@ describe('comments, mentions, notifications, and realtime against a real local S
         parentCommitId: mainAfterCreate.head_commit_id,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'retract To-Be-Retracted System',
+        title: 'retract To-Be-Retracted System',
+        body: null,
         deltas: [makeRetractDelta(randomUUID(), elementId, createDeltaId, aliceManualSourceId)],
       },
     });
@@ -488,7 +496,8 @@ describe('comments, mentions, notifications, and realtime against a real local S
         parentCommitId: main.head_commit_id,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'add Resolve Matrix System',
+        title: 'add Resolve Matrix System',
+        body: null,
         deltas: [makeCreateDelta(randomUUID(), elementId, 'Resolve Matrix System', aliceManualSourceId)],
       },
     });
@@ -544,7 +553,8 @@ describe('comments, mentions, notifications, and realtime against a real local S
         parentCommitId: main.head_commit_id,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'add a system for the viewer-cannot-post test',
+        title: 'add a system for the viewer-cannot-post test',
+        body: null,
         deltas: [makeCreateDelta(randomUUID(), elementId, 'Viewer Cannot Post System', aliceManualSourceId)],
       },
     });
@@ -570,7 +580,8 @@ describe('comments, mentions, notifications, and realtime against a real local S
         parentCommitId: main.head_commit_id,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'add a system for the mentions test',
+        title: 'add a system for the mentions test',
+        body: null,
         deltas: [makeCreateDelta(randomUUID(), elementId, 'Mentions Test System', aliceManualSourceId)],
       },
     });
@@ -629,7 +640,8 @@ describe('comments, mentions, notifications, and realtime against a real local S
         parentCommitId: main.head_commit_id,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'three systems for the unresolved-counts test',
+        title: 'three systems for the unresolved-counts test',
+        body: null,
         deltas: [
           makeCreateDelta(randomUUID(), elementWithOpen, 'Has Open Thread', aliceManualSourceId),
           makeCreateDelta(randomUUID(), elementWithResolvedOnly, 'Has Only Resolved Thread', aliceManualSourceId),

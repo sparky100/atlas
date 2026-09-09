@@ -67,7 +67,7 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
               {data.recentCommits.map((commit) => (
                 <li key={commit.id} className={styles.commitRow}>
                   <Text as="span" size="sm">
-                    {commit.message}
+                    {commit.title}
                   </Text>
                   <Text as="span" tone="faint" size="sm">
                     {formatAge(commit.created_at, now)}

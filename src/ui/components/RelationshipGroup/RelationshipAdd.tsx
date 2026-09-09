@@ -13,6 +13,8 @@ export interface RelationshipAddProps {
   slot: RelationshipGroupSlot;
   direction: 'outbound' | 'inbound';
   elementId: UUID;
+  /** Same element's name — only for the generated commit title (`useRelationshipCreate`'s own doc comment). */
+  elementName: string;
   modelId: UUID;
   orgId: UUID;
   userId: UUID | null;
@@ -36,7 +38,7 @@ const DIRECTION_VERB: Record<RelationshipType, { outbound: string; inbound: stri
  * — pick an existing element of a legal target type, and this element
  * gains a `relationshipType` relationship to it in the given `direction`.
  */
-export function RelationshipAdd({ slot, direction, elementId, modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, onCreated }: RelationshipAddProps) {
+export function RelationshipAdd({ slot, direction, elementId, elementName, modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, onCreated }: RelationshipAddProps) {
   const [open, setOpen] = useState(false);
   const search = useRelationshipTargetSearch(searchCommitId, modelId, slot.targetTypes, elementId);
   const { status, error, create } = useRelationshipCreate({
@@ -46,6 +48,7 @@ export function RelationshipAdd({ slot, direction, elementId, modelId, orgId, us
     relationshipType: slot.relationshipType,
     direction,
     elementId,
+    elementName,
     branch,
     expectedHeadCommitId,
     onCreated: () => {
@@ -92,7 +95,7 @@ export function RelationshipAdd({ slot, direction, elementId, modelId, orgId, us
         <ul className={styles.results}>
           {search.results.map((result) => (
             <li key={result.element_id}>
-              <button type="button" className={styles.resultRow} disabled={status === 'creating'} onClick={() => void create(result.element_id)}>
+              <button type="button" className={styles.resultRow} disabled={status === 'creating'} onClick={() => void create(result.element_id, result.name)}>
                 <ElementTypeGlyph type={result.element_type} />
                 <Text as="span">{result.name}</Text>
                 <Text as="span" tone="muted" size="sm">

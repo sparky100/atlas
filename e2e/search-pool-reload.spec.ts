@@ -78,7 +78,7 @@ test('an element page finds an existing element to relate after adding a relatio
     { kind: 'element.create', id: randomUUID(), elementId: billingServiceId, elementType: 'system', name: 'Billing Service', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
     { kind: 'element.create', id: randomUUID(), elementId: paymentGatewayId, elementType: 'system', name: 'Payment Gateway', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
   ];
-  const seedEnvelope: CommitEnvelope = { id: randomUUID(), branchId: main.id, parentCommitId: genesisCommitId, mergedBranchHeadCommitId: null, kind: 'manual', message: 'seed capability and two systems', deltas: seedDeltas };
+  const seedEnvelope: CommitEnvelope = { id: randomUUID(), branchId: main.id, parentCommitId: genesisCommitId, mergedBranchHeadCommitId: null, kind: 'manual', title: 'seed capability and two systems', body: null, deltas: seedDeltas };
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope: seedEnvelope });
   if (!seedResult.ok) throw new Error(`seeding capability/systems: ${seedResult.message}`);
 

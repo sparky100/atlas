@@ -301,7 +301,8 @@ export interface CommitRow {
   parent_commit_id: UUID | null;
   merged_branch_head_commit_id: UUID | null;
   kind: CommitKind;
-  message: string;
+  title: string;
+  body: string | null;
   author_id: UUID;
   /** Hex-encoded; null until the head is materialised (SPEC §6.4, S-15). */
   head_hash: string | null;
@@ -340,7 +341,8 @@ export function toCommitRow(envelope: CommitEnvelope, ctx: CommitRowContext): Co
     parent_commit_id: envelope.parentCommitId,
     merged_branch_head_commit_id: envelope.mergedBranchHeadCommitId,
     kind: envelope.kind,
-    message: envelope.message,
+    title: envelope.title,
+    body: envelope.body,
     author_id: ctx.authorId,
     depth: ctx.depth,
   };
@@ -364,7 +366,8 @@ export function fromCommitRow(row: CommitInsertRow | CommitRow, deltaRows: reado
     parentCommitId: row.parent_commit_id,
     mergedBranchHeadCommitId: row.merged_branch_head_commit_id,
     kind: row.kind,
-    message: row.message,
+    title: row.title,
+    body: row.body,
     deltas: orderedDeltas.map(fromDeltaRow),
   };
 }

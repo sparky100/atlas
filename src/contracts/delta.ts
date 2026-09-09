@@ -362,7 +362,17 @@ export interface CommitEnvelope {
    */
   mergedBranchHeadCommitId: UUID | null;
   kind: CommitKind;
-  message: string;
+  /**
+   * Generated, not typed by hand (Sprint U4-1 B1): `src/engine/
+   * describeEnvelope.ts`'s `describeEnvelope(deltas, nameLookup)`, for
+   * every `manual` commit. `merge`/`template_seed`/`genesis` commits keep
+   * their own domain-specific phrasing instead (mergeRequests.ts, seedFromMap.ts,
+   * `atlas.on_model_created`) — `describeEnvelope`'s own module comment
+   * explains why those three don't route through it.
+   */
+  title: string;
+  /** Whatever a hook used to hand-write as `message` before this sprint (e.g. `Edit ${element.name}`) — kept, not discarded, as an optional elaboration alongside the generated `title`. No UI reads or writes this yet beyond carrying it through; `null` when a caller has nothing to add. */
+  body: string | null;
   /** Ordered. Index in this array is `deltas.seq`. */
   deltas: Delta[];
 }

@@ -93,7 +93,7 @@ export interface SeedModelFromCapabilityMapInput {
   branchId: UUID;
   authorId: UUID;
   capabilityMapId: UUID;
-  /** e.g. "local_government" — used only to build `p_message`/`p_source_name`; the RPC re-derives everything it actually checks from `capabilityMapId` itself. */
+  /** e.g. "local_government" — used only to build `p_title`/`p_source_name`; the RPC re-derives everything it actually checks from `capabilityMapId` itself. */
   sector: string;
   version: number;
   items: readonly CapabilityMapItemRow[];
@@ -128,7 +128,7 @@ export async function seedModelFromCapabilityMap(supabase: Client, input: SeedMo
     p_commit_id: commitId,
     p_model_id: modelId,
     p_branch_id: branchId,
-    p_message: `Seed from ${sector} v${String(version)}`,
+    p_title: `Seed from ${sector} v${String(version)}`,
     p_capability_map_id: capabilityMapId,
     p_source_id: sourceId,
     p_source_name: `Capability map seed: ${sector} v${String(version)}`,

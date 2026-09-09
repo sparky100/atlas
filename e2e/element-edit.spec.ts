@@ -87,7 +87,8 @@ test('an owner edits a System attribute on main and sees the new value with its 
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'seed Billing Service',
+    title: 'seed Billing Service',
+    body: null,
     deltas: [
       {
         kind: 'element.create',

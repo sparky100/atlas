@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { defaultCreateAttributes } from '../../contracts/attributeSchema';
 import type { CommitEnvelope, Delta, ElementType, UUID } from '../../contracts/delta';
 import { commitToBranch } from '../../db/commits';
+import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
@@ -80,14 +81,20 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
           confidence: 1,
         } as Delta;
 
+        const deltas = [delta];
         const envelope: CommitEnvelope = {
           id: crypto.randomUUID(),
           branchId: branch.id,
           parentCommitId: expectedHeadCommitId,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
-          message: `Add ${elementType} "${trimmed}"`,
-          deltas: [delta],
+          // `describeEnvelope` never actually calls the name lookup for an
+          // `element.create` delta — the new element's name is right there
+          // on the delta itself — so there's nothing for this hook to
+          // build one out of.
+          title: describeEnvelope(deltas, () => undefined),
+          body: `Add ${elementType} "${trimmed}"`,
+          deltas,
         };
 
         const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });

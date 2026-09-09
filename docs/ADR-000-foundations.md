@@ -79,6 +79,8 @@ A `relationship_type_rules` table constrains what's legal: columns `relationship
 
 A **commit** groups a batch of deltas: `commits`: `id`, `branch_id`, `parent_commit_id`, `merged_branch_head_commit_id` (nullable — set only on merge-kind commits; this makes commit ancestry a DAG with two parents on a merge, exactly like a git merge commit), `kind` (`manual`/`capture`/`merge`/`template_seed`), `author`, `message`, `created_at`.
 
+*(Sprint U4-1 amendment.)* `message` is `title` (renamed) plus `body` (added). `title` is no longer caller-typed: for a `manual` commit it's generated from the commit's own deltas (`src/engine/describeEnvelope.ts`) — real element and relationship names, not a hand-written summary. `body` is an optional caller elaboration nothing writes a real one into yet. See SPEC-data-model.md §5.1 for the full detail.
+
 A **branch** is a named, mutable pointer: `branches`: `id`, `org_id`, `model_id`, `name`, `kind` (`main`/`change`/`capture_draft`), `base_commit_id`, `head_commit_id`, `status` (`draft`/`proposed`/`in_review`/`approved`/`merged`/`rejected`/`archived`), `created_by`.
 
 A **tag** is an immutable, never-moved pointer, and is how "version" is implemented: `tags`: `id`, `org_id`, `model_id`, `name`, `commit_id` (must resolve to a commit on `main`), `created_by`, `created_at`. A tag row is insert-only — there is no update or delete path — and it does **not** duplicate the landscape's state; it points at a commit, and the materialised state at that commit is computed as described in ADR-003.

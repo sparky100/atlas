@@ -110,7 +110,8 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
         parentCommitId: genesisCommitId,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: `generated ${String(SYSTEM_COUNT)}-system/${String(EDGE_COUNT)}-edge landscape fixture`,
+        title: `generated ${String(SYSTEM_COUNT)}-system/${String(EDGE_COUNT)}-edge landscape fixture`,
+        body: null,
         deltas: generateLandscapeFixture(sourceId, runSeed),
       };
       // TEMPORARY (Sprint C1-H item 1 diagnostic — remove once root-caused):

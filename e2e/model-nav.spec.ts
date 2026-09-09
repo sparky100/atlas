@@ -65,7 +65,8 @@ test('model nav: every model route reachable from every other within two taps on
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'seed one capability, one system',
+    title: 'seed one capability, one system',
+    body: null,
     deltas: [
       { kind: 'element.create', id: randomUUID(), elementId: capabilityId, elementType: 'capability', name: 'Billing', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 },
       {

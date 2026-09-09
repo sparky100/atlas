@@ -141,7 +141,7 @@ export type MergeApprovedResult = { ok: true; commitId: UUID } | { ok: false; re
  * the fully-merged result — `base == theirs` at that point, so `ours`
  * already contains everything `theirs` has, plus the branch's own deltas.
  */
-export async function mergeApprovedRequest(supabase: Client, modelId: UUID, mergeRequestId: UUID, branch: BranchRow, message: string): Promise<MergeApprovedResult> {
+export async function mergeApprovedRequest(supabase: Client, modelId: UUID, mergeRequestId: UUID, branch: BranchRow, title: string): Promise<MergeApprovedResult> {
   const loader = await buildCommitLoader(supabase, modelId);
   const mergedHead = foldFromGenesis(branch.head_commit_id, loader);
   const projection = serializeHeadProjection(mergedHead);
@@ -150,7 +150,7 @@ export async function mergeApprovedRequest(supabase: Client, modelId: UUID, merg
   const { data, error } = await supabase.schema('atlas').rpc('merge_branch', {
     p_merge_request_id: mergeRequestId,
     p_commit_id: crypto.randomUUID(),
-    p_message: message,
+    p_title: title,
     p_elements_head: projection.elementsHead,
     p_relationships_head: projection.relationshipsHead,
     p_facts: projection.facts,
@@ -221,7 +221,8 @@ export async function pushRefresh(supabase: Client, input: PushRefreshInput): Pr
     parentCommitId: branch.head_commit_id,
     mergedBranchHeadCommitId: mainHeadCommitId,
     kind: 'merge',
-    message: deltas.length > 0 ? `Refresh from main, resolving ${String(deltas.length)} conflict(s)` : 'Refresh from main',
+    title: deltas.length > 0 ? `Refresh from main, resolving ${String(deltas.length)} conflict(s)` : 'Refresh from main',
+    body: null,
     deltas,
   };
 

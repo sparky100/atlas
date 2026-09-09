@@ -314,14 +314,23 @@ describe('CommitEnvelope <-> commits+deltas rows round trip (RT-2, contract leve
   );
 
   const envelopeArb: fc.Arbitrary<CommitEnvelope> = fc
-    .tuple(uuid, uuid, fc.option(uuid, { nil: null }), kindAndMerge, fc.string({ minLength: 1, maxLength: 80 }), fc.array(deltaArb, { minLength: 0, maxLength: 6 }))
-    .map(([id, branchId, parentCommitId, { kind, mergedBranchHeadCommitId }, message, deltas]) => ({
+    .tuple(
+      uuid,
+      uuid,
+      fc.option(uuid, { nil: null }),
+      kindAndMerge,
+      fc.string({ minLength: 1, maxLength: 80 }),
+      fc.option(fc.string({ maxLength: 80 }), { nil: null }),
+      fc.array(deltaArb, { minLength: 0, maxLength: 6 }),
+    )
+    .map(([id, branchId, parentCommitId, { kind, mergedBranchHeadCommitId }, title, body, deltas]) => ({
       id,
       branchId,
       parentCommitId,
       mergedBranchHeadCommitId,
       kind,
-      message,
+      title,
+      body,
       deltas,
     }));
 

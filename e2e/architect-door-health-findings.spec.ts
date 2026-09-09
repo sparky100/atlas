@@ -69,7 +69,8 @@ test('architect door: health findings name systems with no capability, capabilit
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'seed capabilities, systems, an actor, and a stale vendor fact',
+    title: 'seed capabilities, systems, an actor, and a stale vendor fact',
+    body: null,
     deltas: [
       { kind: 'element.create', id: randomUUID(), elementId: ownedCapabilityId, elementType: 'capability', name: 'Owned Capability', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: unownedCapabilityId, elementType: 'capability', name: 'Unowned Capability', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 },

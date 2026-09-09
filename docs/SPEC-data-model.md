@@ -242,7 +242,8 @@ An ordered batch of deltas on a branch. Ancestry is a DAG: two parents on a merg
 | `parent_commit_id` | uuid | → `commits(id)`, null only for `kind = 'genesis'` — the one commit per model ever allowed a null parent, inserted only by `atlas.on_model_created` (ADR-018), never by a client RPC |
 | `merged_branch_head_commit_id` | uuid | → `commits(id)`, nullable; `check ((kind = 'merge') = (merged_branch_head_commit_id is not null))` |
 | `kind` | commit_kind | not null |
-| `message` | text | not null |
+| `title` | text | not null — generated, not caller-typed, for `manual` commits (§5.1: `describeEnvelope`); renamed from `message` in Sprint U4-1 B1 |
+| `body` | text | nullable — optional caller elaboration alongside `title`, added Sprint U4-1 B1 |
 | `author_id` | uuid | not null — `auth.users.id` or service identity |
 | `head_hash` | bytea | nullable; set only for a commit on `main` (§3.5, S-15) — `atlas.commit_deltas` writes it iff the branch kind is `main`, never "once materialisation eventually happens" for any other branch kind; 32 bytes (§6.4) |
 | `depth` | int | not null — 1 + parent depth; genesis = 0. Used to bound replay and order topological sorts. |
@@ -663,7 +664,9 @@ Attribute keys inside `value` stay camelCase in jsonb (they are validated by `ty
 
 ### 5.1 Structure
 
-`CommitEnvelope` in `delta.ts`: `id`, `branchId`, `parentCommitId`, `mergedBranchHeadCommitId`, `kind`, `message`, `deltas[]`.
+`CommitEnvelope` in `delta.ts`: `id`, `branchId`, `parentCommitId`, `mergedBranchHeadCommitId`, `kind`, `title`, `body`, `deltas[]`.
+
+**`message` was renamed to `title` in Sprint U4-1 (item B1), and `body` was added.** `title` is no longer a caller-typed string: for a `manual` commit it is generated from the commit's own deltas by `src/engine/describeEnvelope.ts`'s `describeEnvelope(deltas, nameLookup)` (e.g. "Add system PowerON", "Link PowerON supports Outage & Fault Management", "Set PowerON owner to Network Control") — `merge`/`template_seed`/`genesis` commits keep their own established, domain-specific phrasing instead ("Refresh from main, resolving N conflict(s)", "Seed from {sector} v{version}", "Genesis"). `body` is optional (nullable) free text a caller can supply alongside the generated title; nothing writes a real one yet — every current caller just carries forward what used to be its whole hand-typed `message` as `body`, verbatim — but the column exists so a future free-text note has somewhere to go without another migration. A one-off script (`scripts/backfillCommitTitles.ts`) regenerated `title` for every commit that existed before this sprint.
 
 **`authorId` was removed from the wire contract in Sprint H1** (docs/AUDIT-2026-09-U2.md §2.E.3 item 15). It was never actually the source of `commits.author_id`/`deltas.created_by` — `atlas.commit_deltas` has always derived both from `auth.uid()`, ignoring whatever the envelope claimed — but it *was* still the untrusted source of `facts.asserted_by`/`facts.asserted_at` (§3.5), a real gap: a client could assert a fact under any identity it liked. `atlas.replace_main_head_projection` now derives both of those the same way everything else already did, joining each fact's `delta_id` back to `deltas.created_by`/`deltas.created_at` rather than trusting the payload. Nothing about who authored a commit is client-supplied anywhere in this product any more; `auth.uid()` is the only source, full stop.
 

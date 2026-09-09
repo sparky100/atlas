@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, RelationshipType, UUID } from '../../contracts/delta';
 import { commitToBranch } from '../../db/commits';
+import { describeEnvelope, type NameLookup } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
@@ -10,7 +11,8 @@ export type RelationshipCreateStatus = 'idle' | 'creating';
 export interface UseRelationshipCreateResult {
   status: RelationshipCreateStatus;
   error: string | null;
-  create: (otherElementId: UUID) => Promise<void>;
+  /** `otherElementName` is only for the generated commit title (`describeEnvelope`'s `nameLookup`, e.g. "Link PowerON supports Outage & Fault Management") — the caller already has it in hand, it's the very search result being clicked. */
+  create: (otherElementId: UUID, otherElementName: string) => Promise<void>;
 }
 
 export interface UseRelationshipCreateInput {
@@ -21,6 +23,8 @@ export interface UseRelationshipCreateInput {
   direction: 'outbound' | 'inbound';
   /** The element whose Relationships section this "+ Add" lives on. */
   elementId: UUID;
+  /** Same element's name — only for the generated commit title, see `create`'s own doc comment. */
+  elementName: string;
   branch: BranchRow;
   expectedHeadCommitId: UUID;
   onCreated: () => void;
@@ -41,12 +45,12 @@ export interface UseRelationshipCreateInput {
  * enforced server-side regardless of what this default guesses.
  */
 export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRelationshipCreateResult {
-  const { modelId, orgId, userId, relationshipType, direction, elementId, branch, expectedHeadCommitId, onCreated } = input;
+  const { modelId, orgId, userId, relationshipType, direction, elementId, elementName, branch, expectedHeadCommitId, onCreated } = input;
   const [status, setStatus] = useState<RelationshipCreateStatus>('idle');
   const [error, setError] = useState<string | null>(null);
 
   const create = useCallback(
-    async (otherElementId: UUID) => {
+    async (otherElementId: UUID, otherElementName: string) => {
       if (!userId) {
         setError('You must be signed in to add a relationship.');
         return;
@@ -77,14 +81,17 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
           confidence: 1,
         } as Delta;
 
+        const deltas = [delta];
+        const nameLookup: NameLookup = (id) => (id === elementId ? elementName : id === otherElementId ? otherElementName : undefined);
         const envelope: CommitEnvelope = {
           id: crypto.randomUUID(),
           branchId: branch.id,
           parentCommitId: expectedHeadCommitId,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
-          message: `Add ${relationshipType} relationship`,
-          deltas: [delta],
+          title: describeEnvelope(deltas, nameLookup),
+          body: `Add ${relationshipType} relationship`,
+          deltas,
         };
 
         const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });
@@ -105,7 +112,7 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
         setError(e instanceof Error ? e.message : 'Could not add relationship.');
       }
     },
-    [modelId, orgId, userId, relationshipType, direction, elementId, branch, expectedHeadCommitId, onCreated],
+    [modelId, orgId, userId, relationshipType, direction, elementId, elementName, branch, expectedHeadCommitId, onCreated],
   );
 
   return { status, error, create };

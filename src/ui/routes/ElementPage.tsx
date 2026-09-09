@@ -187,6 +187,7 @@ export function ElementPage() {
                             modelId: model.id,
                             orgId: organisation?.id ?? '',
                             userId,
+                            elementName: state.data.element.name,
                             searchCommitId,
                             branch: editingBranch,
                             expectedHeadCommitId: state.data.commitId,
