@@ -112,6 +112,12 @@ test('front doors and browse: both doors render for a seeded model, switching pe
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
 
+  // Sprint U4-2a item 6: the desktop header now collapses behind the same
+  // single avatar menu mobile already used — "Sign out"/theme/density sit
+  // behind it, not open in the bar, even at this default (desktop) width.
+  await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign out' })).not.toBeVisible();
+
   // The org's creator is its owner, so the default door is architect
   // (UI-principles §3: "Owners and Architects get the architect door").
   await expect(page.getByRole('heading', { name: 'My branches' })).toBeVisible();
@@ -150,7 +156,7 @@ test('front doors and browse: both doors render for a seeded model, switching pe
   // menu button instead of sitting in the bar unconditionally.
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
-  const menuToggle = page.getByRole('button', { name: 'Menu' });
+  const menuToggle = page.getByRole('button', { name: 'Account menu' });
   await expect(menuToggle).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign out' })).not.toBeVisible();
   await menuToggle.click();

@@ -4,6 +4,14 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--bg-subtle);
+  /* Sprint U4-2a item 5: "full height below header" — fills whatever
+     height the page's own flex layout leaves it (`LandscapePage.module.css`'s
+     `.mainWithCanvas`/`.canvasRow`), not a fixed pixel constant; `min-height`
+     is the fallback for a page that never opts into that flex layout at
+     all (Storybook, or any future caller that just wants a sane default). */
+  flex: 1;
+  min-height: 400px;
+  width: 100%;
 }
 
 .canvas {

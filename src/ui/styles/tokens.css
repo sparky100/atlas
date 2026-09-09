@@ -73,6 +73,8 @@
   --comments-panel-width: 372px;
   --avatar-size-sm: 24px;
   --avatar-size-md: 32px;
+  /** Sprint U4-2a item 5: a canvas route's own full-viewport-height calc (`LandscapePage.module.css`) needs this exact value — named once here rather than repeating the literal `AppHeader.module.css`'s `.header` already used. */
+  --app-header-height: 56px;
 
   /* ---- Colour: surfaces and text, light (§8.4) ---- */
   --bg: #ffffff;

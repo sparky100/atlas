@@ -681,7 +681,6 @@ export function LandscapeCanvas({
     <div
       ref={wrapperRef}
       className={styles.wrapper}
-      style={{ height: 520 }}
       data-scale={transform.scale}
       data-tx={transform.tx}
       data-ty={transform.ty}

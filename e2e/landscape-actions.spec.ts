@@ -123,7 +123,7 @@ test('landscape actions: "+ Add" and "Reset layout" collapse into disclosures be
   // Sprint U4-1 E2: the app header's own mobile menu, a separate
   // component from Landscape's own two disclosures above, still
   // collapses correctly here too — opening it disturbs neither of them.
-  const appMenuToggle = page.getByRole('button', { name: 'Menu' });
+  const appMenuToggle = page.getByRole('button', { name: 'Account menu' });
   await expect(appMenuToggle).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign out' })).not.toBeVisible();
   await appMenuToggle.click();
