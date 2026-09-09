@@ -168,7 +168,8 @@ test('a failed save surfaces its error in the UI instead of leaving the editor o
     parentCommitId: seedCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'race: someone else edits the branch first',
+    title: 'race: someone else edits the branch first',
+    body: null,
     deltas: [{ kind: 'element.update', id: randomUUID(), elementId: systemId, elementType: 'system', attribute: 'vendor', value: 'Someone Else Value', previousDeltaId: createDeltaId, sourceId: seedSourceId, confidence: 1 }],
   };
   const raceResult = await commitToBranch(signedIn, { modelId, branchId, expectedHeadCommitId: seedCommitId, envelope: raceEnvelope });

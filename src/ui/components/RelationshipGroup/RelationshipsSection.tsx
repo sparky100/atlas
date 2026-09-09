@@ -23,11 +23,13 @@ const DIRECTION_LABEL: Record<RelationshipType, { outbound: string; inbound: str
   flows_to: { outbound: 'flows to', inbound: 'receives from' },
 };
 
-/** Everything `RelationshipAdd` needs beyond the group slot itself and direction — one object so `RelationshipsSection`'s own prop list doesn't grow one entry per field every time the create path needs another. Omitted entirely (not passed disabled) when the caller hasn't established edit rights, same convention as `CapabilityMapView`'s `addCapability`. */
+/** Everything `RelationshipAdd` needs beyond the group slot itself and direction — one object so `RelationshipsSection`'s own prop list doesn't grow one entry per field every time the create path needs another. Omitted entirely (not passed disabled) when the caller hasn't established edit rights, same convention as `CapabilityMapView`'s `reorderCapability`. */
 export interface RelationshipsSectionAddConfig {
   modelId: UUID;
   orgId: UUID;
   userId: UUID | null;
+  /** This element's own name — only for the generated commit title (`useRelationshipCreate`'s own doc comment). */
+  elementName: string;
   searchCommitId: UUID;
   branch: BranchRow;
   expectedHeadCommitId: UUID;
@@ -160,11 +162,12 @@ function RelationshipDirectionGroup({
         const attrs = attributesRecord(rel.attributes);
         const dataClassification = attrs.dataClassification;
         const isPrimaryOwner = rel.relationship_type === 'owns' && attrs.primary === true;
-        // The verb phrase a `uses`/`flows_to` "+ Add" (RelationshipAdd.tsx)
-        // writes into the relationship's own `description` — the field is
-        // legal on every type (SupportsAttributes/UsesAttributes/
-        // FlowsToAttributes), so this renders wherever it's actually set.
-        const phrase = typeof attrs.description === 'string' && attrs.description.length > 0 ? attrs.description : null;
+        // The verb-phrase label (Sprint U4-1 B5: required at creation for
+        // uses/flows_to, optional elsewhere) — shown whenever one exists,
+        // not gated to those two types, since `description` is the same
+        // free-text attribute on every relationship type and nothing else
+        // in this row surfaces it otherwise.
+        const description = attrs.description;
         const justAdded = other !== undefined && other.element_id === justAddedElementId;
 
         return (
@@ -185,9 +188,9 @@ function RelationshipDirectionGroup({
             <Text tone="muted" size="sm" as="span">
               {other?.element_type ?? ''}
             </Text>
-            {phrase && (
-              <Text tone="faint" size="sm" as="span">
-                &ldquo;{phrase}&rdquo;
+            {typeof description === 'string' && description.trim().length > 0 && (
+              <Text tone="muted" size="sm" as="span">
+                “{description}”
               </Text>
             )}
             {isPrimaryOwner && (
@@ -206,6 +209,9 @@ function RelationshipDirectionGroup({
           slot={slot}
           direction={direction}
           elementId={elementId}
+          elementName={addRelationship.elementName}
+          existingRows={rows}
+          relationshipFacts={relationshipFacts}
           modelId={addRelationship.modelId}
           orgId={addRelationship.orgId}
           userId={addRelationship.userId}

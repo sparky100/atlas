@@ -1,3 +1,4 @@
+import { useId, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
@@ -19,6 +20,7 @@ import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
+import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { useLandscape } from '../landscape/useLandscape';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import { parseCapabilityParam, zoomQueryString } from '../nav/zoomParams';
@@ -41,6 +43,21 @@ import styles from './LandscapePage.module.css';
  * — the empty-state affordance the landscape never had before ("Add a
  * System from the element page" pointed at a page you could only reach by
  * already knowing a system's id, i.e. nowhere).
+ *
+ * Sprint U4-1 E1: at >= 768px (the app's own mobile breakpoint —
+ * ModelNav.tsx/UserMenu.tsx/UI-principles.md §2 — 390px, the sprint's own
+ * narrow-mobile floor from C2, is a Playwright viewport width to prove no
+ * horizontal overflow at, not a second breakpoint) the header actions row
+ * is unchanged: "+ Add system", "+ Add actor", "Reset layout" inline.
+ * Below it, three same-row controls plus the ref/breadcrumb chrome above
+ * them left no room, so the two "Add" controls collapse into one "+ Add"
+ * disclosure and "Reset layout" moves into its own "⋯" overflow menu —
+ * kept as two separate disclosures, not merged into one, so a primary
+ * creation action doesn't hide behind the same trigger as a secondary
+ * view action (the same split ElementHeader.tsx's `Edit` vs. its own "⋯"
+ * keeps). `useIsNarrowViewport` decides which arrangement actually
+ * *mounts* (not a CSS-only show/hide of both) so `ElementSearchAdd`'s own
+ * search-pool fetch never runs twice for one page load.
  */
 export function LandscapePage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
@@ -60,7 +77,7 @@ export function LandscapePage() {
   // Search always scans main's real head, regardless of which ref/branch is
   // being viewed (src/db/elementSearch.ts's own module comment) — only the
   // write target (`editingBranch`) varies with the ref.
-  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   const canEdit = editingBranch !== null && canEditBranch(role, editingBranch);
   // ADR-018 guarantees both are never null in practice (every branch always
   // has a real head, from genesis onward) — `BranchRow`'s own type hasn't
@@ -72,6 +89,13 @@ export function LandscapePage() {
   const canAdd = canEdit && searchCommitId !== null && writeHeadCommitId !== null;
 
   const { state, resetLayout } = useLandscape(model?.id ?? '', organisation?.id ?? '', userId, ref, mode, capabilityId);
+
+  // Sprint U4-1 E1: see this component's own module comment.
+  const narrow = useIsNarrowViewport(768);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const addMenuId = useId();
+  const moreMenuId = useId();
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -91,6 +115,43 @@ export function LandscapePage() {
   const segments: BreadcrumbSegment[] = capability ? [{ label: capability.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/capability-map?ref=${refParam}` }] : [];
   const nodeHref = (systemId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/context/${systemId}?${zoomQueryString({ ref, capabilityId })}`;
 
+  // Shared between the >=768px inline row and the <768px "+ Add" menu
+  // (E1) — same two controls, a different wrapper around them.
+  const addControls = canAdd && (
+    <>
+      <ElementSearchAdd
+        elementType="system"
+        buttonLabel="+ Add system"
+        parentId={null}
+        modelId={model.id}
+        orgId={organisation?.id ?? ''}
+        userId={userId}
+        searchCommitId={searchCommitId}
+        branch={editingBranch}
+        expectedHeadCommitId={writeHeadCommitId}
+        orgSlug={organisation?.slug ?? ''}
+        modelSlug={model.slug}
+        refParam={refParam}
+        onCreated={reloadMainBranch}
+      />
+      <ElementSearchAdd
+        elementType="actor"
+        buttonLabel="+ Add actor"
+        parentId={null}
+        modelId={model.id}
+        orgId={organisation?.id ?? ''}
+        userId={userId}
+        searchCommitId={searchCommitId}
+        branch={editingBranch}
+        expectedHeadCommitId={writeHeadCommitId}
+        orgSlug={organisation?.slug ?? ''}
+        modelSlug={model.slug}
+        refParam={refParam}
+        onCreated={reloadMainBranch}
+      />
+    </>
+  );
+
   return (
     <div>
       <AppHeader />
@@ -107,43 +168,59 @@ export function LandscapePage() {
           <Text as="h1" size="2xl">
             Landscape{capability ? `: systems supporting ${capability.name}` : ''}
           </Text>
-          {state.status === 'ready' && (
+          {state.status === 'ready' && !narrow && (
             <div className={styles.actions}>
-              {canAdd && (
-                <>
-                  <ElementSearchAdd
-                    elementType="system"
-                    buttonLabel="+ Add system"
-                    parentId={null}
-                    modelId={model.id}
-                    orgId={organisation?.id ?? ''}
-                    userId={userId}
-                    searchCommitId={searchCommitId}
-                    branch={editingBranch}
-                    expectedHeadCommitId={writeHeadCommitId}
-                    orgSlug={organisation?.slug ?? ''}
-                    modelSlug={model.slug}
-                    refParam={refParam}
-                  />
-                  <ElementSearchAdd
-                    elementType="actor"
-                    buttonLabel="+ Add actor"
-                    parentId={null}
-                    modelId={model.id}
-                    orgId={organisation?.id ?? ''}
-                    userId={userId}
-                    searchCommitId={searchCommitId}
-                    branch={editingBranch}
-                    expectedHeadCommitId={writeHeadCommitId}
-                    orgSlug={organisation?.slug ?? ''}
-                    modelSlug={model.slug}
-                    refParam={refParam}
-                  />
-                </>
-              )}
+              {addControls}
               <Button variant="ghost" onClick={resetLayout}>
                 Reset layout
               </Button>
+            </div>
+          )}
+          {state.status === 'ready' && narrow && (
+            <div className={styles.actions}>
+              {canAdd && (
+                <div className={styles.menuWrapper}>
+                  <button
+                    type="button"
+                    className={styles.menuToggle}
+                    aria-expanded={addMenuOpen}
+                    aria-controls={addMenuId}
+                    onClick={() => {
+                      setAddMenuOpen((o) => !o);
+                    }}
+                  >
+                    <Text as="span">+ Add</Text>
+                  </button>
+                  <div id={addMenuId} className={[styles.menu, addMenuOpen ? styles.open : ''].filter(Boolean).join(' ')}>
+                    {addControls}
+                  </div>
+                </div>
+              )}
+              <div className={styles.menuWrapper}>
+                <button
+                  type="button"
+                  className={styles.menuToggle}
+                  aria-expanded={moreMenuOpen}
+                  aria-controls={moreMenuId}
+                  aria-label="Landscape actions"
+                  onClick={() => {
+                    setMoreMenuOpen((o) => !o);
+                  }}
+                >
+                  <span aria-hidden="true">⋯</span>
+                </button>
+                <div id={moreMenuId} className={[styles.menu, moreMenuOpen ? styles.open : ''].filter(Boolean).join(' ')}>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setMoreMenuOpen(false);
+                      resetLayout();
+                    }}
+                  >
+                    Reset layout
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -183,6 +260,7 @@ export function LandscapePage() {
                   orgSlug={organisation?.slug ?? ''}
                   modelSlug={model.slug}
                   refParam={refParam}
+                  onCreated={reloadMainBranch}
                 />
               </div>
             )}

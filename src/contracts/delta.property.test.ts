@@ -72,7 +72,10 @@ const actorAttributes: fc.Arbitrary<ActorAttributes> = fc.record(
   { requiredKeys: ['subtype', 'isExternal'] },
 );
 
-const supportsAttributes: fc.Arbitrary<SupportsAttributes> = fc.record({ description: fc.string() }, { requiredKeys: [] });
+const supportsAttributes: fc.Arbitrary<SupportsAttributes> = fc.record(
+  { description: fc.string(), role: fc.constantFrom('primary' as const, 'secondary' as const) },
+  { requiredKeys: ['role'] },
+);
 const usesAttributes: fc.Arbitrary<UsesAttributes> = fc.record({ description: fc.string() }, { requiredKeys: [] });
 const ownsAttributes: fc.Arbitrary<OwnsAttributes> = fc.record({ primary: fc.boolean() }, { requiredKeys: ['primary'] });
 const flowsToAttributes: fc.Arbitrary<FlowsToAttributes> = fc.record(
@@ -314,14 +317,23 @@ describe('CommitEnvelope <-> commits+deltas rows round trip (RT-2, contract leve
   );
 
   const envelopeArb: fc.Arbitrary<CommitEnvelope> = fc
-    .tuple(uuid, uuid, fc.option(uuid, { nil: null }), kindAndMerge, fc.string({ minLength: 1, maxLength: 80 }), fc.array(deltaArb, { minLength: 0, maxLength: 6 }))
-    .map(([id, branchId, parentCommitId, { kind, mergedBranchHeadCommitId }, message, deltas]) => ({
+    .tuple(
+      uuid,
+      uuid,
+      fc.option(uuid, { nil: null }),
+      kindAndMerge,
+      fc.string({ minLength: 1, maxLength: 80 }),
+      fc.option(fc.string({ maxLength: 80 }), { nil: null }),
+      fc.array(deltaArb, { minLength: 0, maxLength: 6 }),
+    )
+    .map(([id, branchId, parentCommitId, { kind, mergedBranchHeadCommitId }, title, body, deltas]) => ({
       id,
       branchId,
       parentCommitId,
       mergedBranchHeadCommitId,
       kind,
-      message,
+      title,
+      body,
       deltas,
     }));
 

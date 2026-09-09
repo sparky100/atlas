@@ -99,7 +99,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
 
   const submitCreate = () => {
     const attributes: Record<string, Json> = showDescriptionSheet && description.trim().length > 0 ? { description: description.trim() } : {};
-    void create(search.query, { attributes, ...(capability ? { supportsCapabilityId: capability.id } : {}) });
+    void create(search.query, { attributes, ...(capability ? { supportsCapabilityId: capability.id, supportsCapabilityName: capability.name } : {}) });
   };
 
   return (

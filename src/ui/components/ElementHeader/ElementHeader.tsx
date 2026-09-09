@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { ElementsHeadRow } from '../../../contracts/rows';
-import type { AliasRow, SourceRow } from '../../../db/types';
+import type { SourceRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
 import { lifecycleToneFor } from '../../elements/lifecycleTone';
+import type { UseElementRenameResult } from '../../elements/useElementRename';
 import { Button } from '../Button/Button';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
@@ -15,8 +16,6 @@ export interface ElementHeaderProps {
   element: ElementsHeadRow;
   existsFact: FactsRow | undefined;
   existsSource: SourceRow | undefined;
-  aliases: AliasRow[];
-  aliasSources: Map<string, SourceRow>;
   /**
    * `Edit` (§4.2), shown only when the caller has already established its
    * gate: `canEditBranch(role, editingBranch)` (src/ui/orgs/roleGates.ts) —
@@ -32,6 +31,19 @@ export interface ElementHeaderProps {
    * disabled, for the same reason.
    */
   onEdit?: (() => void) | undefined;
+  /**
+   * Sprint U4-1 D3's "Rename" — omitted entirely, same convention as
+   * `onEdit`, when the caller hasn't established edit rights (in
+   * practice always together with `onEdit`, but kept as its own prop:
+   * rename is capability-only today — `ElementPage.tsx`'s own gate,
+   * inherited from the former `CapabilityTailoringActions.tsx` — while
+   * `onEdit` applies to every element type). "Move into Edit mode or the
+   * header menu": both at once — its trigger is a "Rename" item in this
+   * header's own overflow menu; once active, it replaces the static name
+   * with an inline input right here, rather than a standalone control
+   * sitting between Edit and Attributes.
+   */
+  rename?: UseElementRenameResult | undefined;
 }
 
 /**
@@ -41,9 +53,33 @@ export interface ElementHeaderProps {
  * the role/ref combinations `canEditBranch` actually allows: owner/architect
  * at `main` (ADR-015), or owner/architect/contributor on a draft change
  * branch (Sprint C1).
+ *
+ * Sprint U4-1 D1: the raw element id is no longer shown directly in the
+ * meta row — it's an internal identifier a reader almost never needs at a
+ * glance, and showing it unconditionally crowded the one badge that
+ * actually matters here (below). It's still one click away, behind this
+ * header's own overflow menu ("⋯"), not removed outright. Aliases moved
+ * out of this component entirely, into the element page's own Attributes
+ * section (`ElementPage.tsx`'s `AttributesTable`/`AttributesEditor`,
+ * `src/ui/elements/aliasLabels.ts`'s `aliasAsFact`) — they're identifying
+ * facts about the element, the same shape as any other attribute, not
+ * header chrome. What's left here is exactly "one provenance badge for
+ * the element's existence fact" (`existsFact`), the sprint item's own
+ * wording — nothing else competes with it for attention.
+ *
+ * Sprint U4-1 D3: "Rename. Move into Edit mode or the header menu; no
+ * stray control between Edit and Attributes." — `rename` (when given)
+ * puts a "Rename" item in the overflow menu; picking it swaps the
+ * static `h1` for an inline input right here, with its own Save/Cancel,
+ * independent of the Attributes section's own edit form. The old
+ * standalone rename row that used to sit between this header and
+ * Attributes (`CapabilityTailoringActions.tsx`, now
+ * `CapabilityRetractAction.tsx` — retract only) is gone.
  */
-export function ElementHeader({ element, existsFact, existsSource, aliases, aliasSources, onEdit }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, rename }: ElementHeaderProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const menuId = useId();
   const attrs = attributesRecord(element.attributes);
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
@@ -63,64 +99,82 @@ export function ElementHeader({ element, existsFact, existsSource, aliases, alia
     }
   }
 
+  const renaming = rename !== undefined && rename.status !== 'idle';
+
   return (
     <header className={styles.header}>
       <div className={styles.titleRow}>
         <ElementTypeGlyph type={element.element_type} external={isExternal} />
-        <Text as="h1" size="2xl">
-          {element.name}
-        </Text>
+        {renaming ? (
+          <form
+            className={styles.renameForm}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void rename.save();
+            }}
+          >
+            <input
+              className={styles.renameInput}
+              type="text"
+              value={rename.value}
+              onChange={(e) => {
+                rename.setValue(e.target.value);
+              }}
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- choosing "Rename" is itself the request to type a new name; same convention as RelationshipAdd.tsx/ElementSearchAdd.tsx's own inputs.
+              autoFocus
+            />
+            <Button variant="primary" type="submit" disabled={rename.status === 'submitting'}>
+              {rename.status === 'submitting' ? 'Saving…' : 'Save'}
+            </Button>
+            <Button variant="ghost" type="button" onClick={rename.cancelRenaming} disabled={rename.status === 'submitting'}>
+              Cancel
+            </Button>
+            {rename.submitError !== null && (
+              <Text as="p" tone="default">
+                {rename.submitError}
+              </Text>
+            )}
+          </form>
+        ) : (
+          <Text as="h1" size="2xl">
+            {element.name}
+          </Text>
+        )}
         {lifecycleStatus !== null && lifecycleTone !== undefined && <Chip tone={lifecycleTone}>{lifecycleStatus}</Chip>}
         {isExternal && <Chip tone="neutral">{externalOrganisation ? `external (${externalOrganisation})` : 'external'}</Chip>}
       </div>
       <div className={styles.metaRow}>
-        <button type="button" className={styles.idButton} onClick={() => void copyId()}>
-          <Text mono size="sm" tone="muted" as="span">
-            {element.element_id.slice(0, 8)}…
-          </Text>
-          <Text size="sm" tone="muted" as="span">
-            {copied ? 'copied' : '⧉'}
-          </Text>
-        </button>
         {existsFact && <FactBadge fact={existsFact} source={existsSource} />}
-        {/*
-          Aliases aren't `facts` rows (no delta_id — SPEC §3.6's aliases
-          table stands apart from the delta/fact stream), so FactBadge's
-          own "supersession chain" concept doesn't really apply to one.
-          Reusing FactBadge here for its compact source+confidence display
-          is a deliberate simplification: the badge's hover chain will
-          just come back empty (delta_id doesn't resolve to a real delta),
-          which is honest — an alias has no supersession chain — not a bug
-          to route around with a second, near-identical badge component.
-        */}
-        {aliases.map((alias) => (
-          <span key={alias.id} className={styles.alias}>
-            <Text tone="muted" size="sm" as="span">
-              aka "{alias.alias_value}"
-            </Text>
-            <FactBadge
-              fact={{
-                subject_type: 'element',
-                subject_id: element.element_id,
-                attribute: `alias:${alias.alias_type}`,
-                value: alias.alias_value,
-                delta_id: alias.id,
-                source_id: alias.source_id,
-                source_ref: null,
-                effective_date: null,
-                confidence: alias.confidence,
-                asserted_by: alias.created_by,
-                asserted_at: alias.created_at,
-              }}
-              source={aliasSources.get(alias.source_id)}
-            />
-          </span>
-        ))}
         {onEdit && (
           <Button variant="ghost" onClick={onEdit}>
             ✎ Edit
           </Button>
         )}
+        <div className={styles.menuWrapper}>
+          <button type="button" className={styles.menuToggle} aria-expanded={menuOpen} aria-controls={menuId} aria-label="Element actions" onClick={() => { setMenuOpen((o) => !o); }}>
+            <span aria-hidden="true">⋯</span>
+          </button>
+          <div id={menuId} className={[styles.menu, menuOpen ? styles.open : ''].filter(Boolean).join(' ')}>
+            {rename && !renaming && (
+              <button
+                type="button"
+                className={styles.menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                  rename.startRenaming();
+                }}
+              >
+                <Text as="span">Rename</Text>
+              </button>
+            )}
+            <button type="button" className={styles.menuItem} onClick={() => void copyId()}>
+              <Text as="span">{copied ? 'Copied' : 'Copy element ID'}</Text>
+              <Text mono size="sm" tone="muted" as="span">
+                {element.element_id.slice(0, 8)}…
+              </Text>
+            </button>
+          </div>
+        </div>
       </div>
     </header>
   );

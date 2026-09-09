@@ -87,7 +87,7 @@ test('capability map: two-level tree with an orphan, L2→L3 expand, orphan flag
       sourceId: seedSourceId,
       confidence: 1,
     },
-    { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemId, toElementId: l2Id, attributes: {}, sourceId: seedSourceId, confidence: 1 },
+    { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemId, toElementId: l2Id, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
   ];
 
   const envelope: CommitEnvelope = {
@@ -96,7 +96,8 @@ test('capability map: two-level tree with an orphan, L2→L3 expand, orphan flag
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'seed a two-level capability tree with an orphan',
+    title: 'seed a two-level capability tree with an orphan',
+    body: null,
     deltas,
   };
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });
@@ -117,9 +118,16 @@ test('capability map: two-level tree with an orphan, L2→L3 expand, orphan flag
   await page.getByRole('button', { name: /▸\s*1/ }).click();
   await expect(page.getByText('Repairs')).toBeVisible();
 
-  // Colour-by actually changes a tile's tone: no coverage chip before,
-  // a real one (naming the same count the "→ Landscape" link already
-  // shows) after switching.
+  // Colour-by actually changes a tile's tone: no coverage chip once
+  // explicitly set to None, a real one (naming the same count the
+  // "→ Landscape" link already shows) after switching to Coverage.
+  // Starts from an explicit "None" selection, not an assumed default —
+  // Sprint U4-1 C4 gives this model a real default colour-by the instant
+  // it loads (this fixture's own user owns their org, so home_mode
+  // defaults to architect, and coverage is the architect default on a
+  // model that already has a system) — this test is about the *switch*
+  // working, not about which mode happens to load first.
+  await page.getByLabel('Colour by').selectOption({ label: 'None' });
   await expect(page.getByText('1 supporting system')).toHaveCount(0);
   await page.getByLabel('Colour by').selectOption({ label: 'Coverage (supporting-system count)' });
   await expect(page.getByText('1 supporting system')).toBeVisible();

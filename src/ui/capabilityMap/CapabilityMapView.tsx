@@ -3,29 +3,51 @@ import { Link } from 'react-router';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import type { BranchRow } from '../../db/types';
+import { CapabilityTile } from '../components/CapabilityTile/CapabilityTile';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
-import { CapabilityMapAddForm } from './CapabilityMapAddForm';
-import { COLOUR_BY_OPTIONS, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
+import { COLOUR_BY_OPTIONS, aggregateTileColourFor, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
 import type { CapabilityMapTree, L1Column, L2Card } from './layout';
+import { useCapabilityReorder } from './useCapabilityReorder';
 import styles from './CapabilityMapView.module.css';
+
+/**
+ * `reorderCapability`'s own "does the caller have edit rights, and what do
+ * we need to commit through them" shape (Sprint U4-1 C1). Also used to be
+ * `addCapability`'s shape too, before Sprint U4-1 C5 moved "+ Add
+ * capability" out of this component entirely, into `CapabilityMapPage.tsx`'s
+ * own page-action area — reordering stays a per-tile control rendered
+ * inside the map itself, not a page action, so it's the one caller left.
+ */
+export interface CapabilityMapEditContext {
+  modelId: UUID;
+  orgId: UUID;
+  userId: UUID | null;
+  branch: BranchRow;
+  expectedHeadCommitId: UUID;
+}
 
 export interface CapabilityMapViewProps {
   tree: CapabilityMapTree;
   supportsEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
+  /** Sprint U4-1 C4: the model-wide "does this model have any systems at all" answer — see `useCapabilityMap.ts`'s own `hasSystems` comment for why this isn't derived from `systemsById` above. Drives the "link systems to capabilities to see coverage" hint. */
+  hasSystems: boolean;
+  /** Sprint U4-1 C4: resolved and persisted by the caller (`useColourByPreference`) — this component no longer owns colour-by as local state, so its default (director→exposure, architect→coverage, none-until-systems-exist) and "remember last choice per user" both live in one place. */
+  colourBy: ColourByMode;
+  onColourByChange: (mode: ColourByMode) => void;
   orgSlug: string;
   modelSlug: string;
   /** `?ref=...` — carried into every "→ Landscape" zoom link so it lands on the same ref the map itself is showing (§2.4's deep-link rule). */
   refParam: string;
   /**
-   * The tailoring flow's "add" action (§4.2-style gate: owner/architect, at
-   * `main` — ADR-015). Omitted entirely, not shown disabled, when the
-   * caller hasn't established both halves — same convention as
-   * ElementHeader's `onEdit`.
+   * Sprint U4-1 C1's "drag-to-reorder among siblings" (§4.2-style gate:
+   * owner/architect, at `main` — ADR-015). Omitted entirely, not shown
+   * disabled, when the caller hasn't established both halves — same
+   * convention as `ElementHeader`'s `onEdit`.
    */
-  addCapability?: { modelId: UUID; orgId: UUID; userId: UUID | null; branch: BranchRow; expectedHeadCommitId: UUID; onCreated: () => void } | undefined;
+  reorderCapability?: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
 }
 
 /**
@@ -33,9 +55,13 @@ export interface CapabilityMapViewProps {
  * L1 as columns, L2 as stacked cards, L3 revealed inline on expand. Plain
  * DOM/CSS, not Canvas — see src/ui/capabilityMap/layout.ts's module
  * comment for why. Colour-by (src/ui/capabilityMap/metrics.ts) is a
- * toolbar toggle, defaulting to `none`; every mode still shows the
- * supporting-system count as text regardless (§4.3-style "never
- * colour-only").
+ * toolbar toggle — `colourBy`/`onColourByChange` are controlled from the
+ * caller (`CapabilityMapPage.tsx`'s `useColourByPreference`, Sprint U4-1
+ * C4), not local state here, since its default depends on context
+ * (home mode, whether the model has systems yet) and its choice needs to
+ * persist across visits, both concerns this component itself shouldn't
+ * own. Every mode still shows the supporting-system count as text
+ * regardless (§4.3-style "never colour-only").
  *
  * Sprint U2 step 3: every tile's supporting-system count is now also the
  * zoom chain's entry point — a link to the landscape filtered to exactly
@@ -49,9 +75,46 @@ export interface CapabilityMapViewProps {
  * than originally scheduled), covering a two-level tree with an orphan,
  * expanding an L2 to reveal L3, and a colour-by switch actually changing
  * a tile's tone.
+ *
+ * Sprint U4-1 C2: the L1 row (`.columns`) is a responsive CSS grid, not a
+ * horizontally-scrolling one — see CapabilityMapView.module.css's own
+ * comment for the breakpoint tiers. `role="list"`/`role="listitem"` on the
+ * grid and each L1 column give it real list semantics (there was no
+ * accessible structure here before — a bare `<div>` grid of tiles reads
+ * as nothing in particular to a screen reader) and, as a side effect,
+ * something e2e/capability-map-layout.spec.ts can query without a
+ * CSS-module class selector. Column count itself is asserted there via
+ * `getComputedStyle(...).gridTemplateColumns` at each breakpoint, plus a
+ * no-horizontal-scroll check at the narrowest (390px).
+ *
+ * Sprint U4-1 C3: L2 cards and L3 tiles are both the shared
+ * `CapabilityTile` component (`src/ui/components/CapabilityTile/
+ * CapabilityTile.tsx` — that file's own comment has the full design:
+ * blueprint-framed, plain-text name, whole tile as the click target,
+ * colour-by tone filling the tile rather than sitting in a separate
+ * chip alone). Not L1: an L1 column holds several independently-
+ * clickable L2 cards, not one clickable unit, so a tile-style whole-
+ * column click target and fill don't apply the same way — but the
+ * human's own review of C3 did ask for a *group-level* signal at L1: a
+ * Chip (a strip, not a fill — `aggregateTileColourFor`, metrics.ts)
+ * aggregated across every L2 *and* L3 descendant, worst-of-children for
+ * exposure/lifecycle stage, fraction-supported for coverage — so a
+ * capability exposed only at L3 still shows at its L1 ancestor, and the
+ * L1 name link itself just loses its underline (`.columnLink`), the same
+ * "plain-text name" reasoning as the tile component's own primary link,
+ * without becoming a stretched-link tile itself.
+ *
+ * Sprint U4-1 C5: "'+ Add capability' moves to the page action area;
+ * colour-by stays left as a view control." This component no longer
+ * renders `CapabilityMapAddForm` at all — `CapabilityMapPage.tsx`'s own
+ * header now owns that action, alongside its title, the same page-level
+ * spot `LandscapePage.tsx` already uses for "+ Add system"/"+ Add actor".
+ * Colour-by (the `select` in `.toolbar` below) stays exactly where it
+ * was: a view control that changes how this view reads, not a page
+ * action that changes the model — the same distinction `LandscapePage.tsx`
+ * draws between its own header actions and `BranchViewModeControl`.
  */
-export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, modelSlug, refParam, addCapability }: CapabilityMapViewProps) {
-  const [colourBy, setColourBy] = useState<ColourByMode>('none');
+export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, colourBy, onColourByChange, orgSlug, modelSlug, refParam, reorderCapability }: CapabilityMapViewProps) {
   const [expanded, setExpanded] = useState<Set<UUID>>(new Set());
   const colourById = useId();
 
@@ -64,17 +127,12 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, m
     });
   }
 
+  // Sprint U4-1 C5: no "+ Add capability" fallback here any more —
+  // CapabilityMapPage.tsx's own header action area is always visible
+  // (whenever `canEdit`), whether the map is empty or not, so there's
+  // nothing left for this branch to add beyond the message itself.
   if (tree.l1.length === 0 && tree.orphans.length === 0) {
-    return (
-      <div>
-        <EmptyState>No capabilities yet. A capability map has nothing to show until at least one Capability element exists.</EmptyState>
-        {addCapability && (
-          <div className={styles.toolbar}>
-            <CapabilityMapAddForm tree={tree} {...addCapability} />
-          </div>
-        )}
-      </div>
-    );
+    return <EmptyState>No capabilities yet. A capability map has nothing to show until at least one Capability element exists.</EmptyState>;
   }
 
   return (
@@ -85,7 +143,7 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, m
             Colour by
           </Text>
         </label>
-        <select id={colourById} className={styles.select} value={colourBy} onChange={(e) => { setColourBy(e.target.value as ColourByMode); }}>
+        <select id={colourById} className={styles.select} value={colourBy} onChange={(e) => { onColourByChange(e.target.value as ColourByMode); }}>
           <option value="none">None</option>
           {COLOUR_BY_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -93,13 +151,32 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, m
             </option>
           ))}
         </select>
-        {addCapability && <CapabilityMapAddForm tree={tree} {...addCapability} />}
+        {/* Sprint U4-1 C4: "'None' only while the model has no systems, with hint..." — shown for that specific state, not every time someone happens to have colour-by off (a user who manually picks None on a populated model doesn't need a nudge to link systems that are already linked). */}
+        {colourBy === 'none' && !hasSystems && (
+          <Text as="span" size="sm" tone="muted">
+            Link systems to capabilities to see coverage.
+          </Text>
+        )}
       </div>
 
       {tree.l1.length > 0 && (
-        <div className={styles.columns}>
-          {tree.l1.map((column) => (
-            <L1ColumnView key={column.capability.element_id} column={column} colourBy={colourBy} supportsEdges={supportsEdges} systemsById={systemsById} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} expanded={expanded} onToggleExpand={toggleExpanded} />
+        <div className={styles.columns} role="list" aria-label="Level 1 capabilities">
+          {tree.l1.map((column, index) => (
+            <L1ColumnView
+              key={column.capability.element_id}
+              column={column}
+              colourBy={colourBy}
+              supportsEdges={supportsEdges}
+              systemsById={systemsById}
+              orgSlug={orgSlug}
+              modelSlug={modelSlug}
+              refParam={refParam}
+              expanded={expanded}
+              onToggleExpand={toggleExpanded}
+              previousSibling={tree.l1[index - 1]?.capability}
+              nextSibling={tree.l1[index + 1]?.capability}
+              reorderCapability={reorderCapability}
+            />
           ))}
         </div>
       )}
@@ -135,6 +212,61 @@ function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, refParam }
   );
 }
 
+/**
+ * Sprint U4-1 C1's "drag-to-reorder among siblings" (`useCapabilityReorder`'s
+ * own module comment explains why buttons, not a mouse drag). `previous`/
+ * `next` are this capability's immediate siblings in display order
+ * (`compareCapabilities`) — `undefined` at either end of the list, which
+ * disables the matching button rather than wrapping around; that's the
+ * only reason a button is ever disabled here — every capability gets an
+ * `order` at creation now (`useCapabilityCreate.ts`) or via the one-off
+ * `scripts/backfillCapabilityOrder.ts` for anything older, so there's no
+ * "not orderable yet" state left to show. Mounted only when the caller has
+ * edit rights (`L1ColumnView`/`L2CardView` render this conditionally on
+ * `reorderCapability`, never with `context` missing) — `useCapabilityReorder`
+ * is a real hook, so it can't be called conditionally *inside* one
+ * always-mounted component the way a plain `if` can guard a prop;
+ * conditional mounting is the correct place for that decision, same as
+ * `addCapability`'s sibling `CapabilityMapAddForm`.
+ */
+function ReorderButtons({
+  capability,
+  previous,
+  next,
+  context,
+  previousGlyph,
+  previousLabel,
+  nextGlyph,
+  nextLabel,
+}: {
+  capability: ElementsHeadRow;
+  previous: ElementsHeadRow | undefined;
+  next: ElementsHeadRow | undefined;
+  context: CapabilityMapEditContext & { onReordered: () => void };
+  previousGlyph: string;
+  previousLabel: string;
+  nextGlyph: string;
+  nextLabel: string;
+}) {
+  const { status, error, swap } = useCapabilityReorder(context);
+
+  return (
+    <span className={styles.reorderButtons}>
+      <button type="button" aria-label={previousLabel} disabled={previous === undefined || status === 'reordering'} onClick={() => { if (previous) void swap(capability, previous); }}>
+        {previousGlyph}
+      </button>
+      <button type="button" aria-label={nextLabel} disabled={next === undefined || status === 'reordering'} onClick={() => { if (next) void swap(capability, next); }}>
+        {nextGlyph}
+      </button>
+      {error !== null && (
+        <Text as="span" size="xs">
+          {error}
+        </Text>
+      )}
+    </span>
+  );
+}
+
 function L1ColumnView({
   column,
   colourBy,
@@ -145,6 +277,9 @@ function L1ColumnView({
   refParam,
   expanded,
   onToggleExpand,
+  previousSibling,
+  nextSibling,
+  reorderCapability,
 }: {
   column: L1Column;
   colourBy: ColourByMode;
@@ -155,20 +290,55 @@ function L1ColumnView({
   refParam: string;
   expanded: Set<UUID>;
   onToggleExpand: (id: UUID) => void;
+  previousSibling: ElementsHeadRow | undefined;
+  nextSibling: ElementsHeadRow | undefined;
+  reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
 }) {
   const count = supportingSystemIds(column.capability.element_id, supportsEdges).length;
+  // Every L2 *and* L3 descendant — not just this column's direct L2
+  // children — so an L1 whose only exposed capability sits at L3 still
+  // reads as exposed at the group level (Sprint U4-1 C3 review note).
+  const descendantIds = column.l2.flatMap((card) => [card.capability.element_id, ...card.l3.map((leaf) => leaf.element_id)]);
+  const aggregateColour = aggregateTileColourFor(colourBy, descendantIds, supportsEdges, systemsById);
   return (
-    <div className={styles.column}>
+    <div className={styles.column} role="listitem">
       <div className={styles.columnHeader}>
-        <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${column.capability.element_id}`}>
+        <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${column.capability.element_id}`} className={styles.columnLink}>
           <Text as="span" size="lg">
             {column.capability.name}
           </Text>
         </Link>
+        {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <Chip tone={aggregateColour.tone}>{aggregateColour.label}</Chip>}
         <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+        {reorderCapability && (
+          <ReorderButtons
+            capability={column.capability}
+            previous={previousSibling}
+            next={nextSibling}
+            context={reorderCapability}
+            previousGlyph="←"
+            previousLabel={`Move ${column.capability.name} left`}
+            nextGlyph="→"
+            nextLabel={`Move ${column.capability.name} right`}
+          />
+        )}
       </div>
-      {column.l2.map((card) => (
-        <L2CardView key={card.capability.element_id} card={card} colourBy={colourBy} supportsEdges={supportsEdges} systemsById={systemsById} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} expanded={expanded.has(card.capability.element_id)} onToggleExpand={onToggleExpand} />
+      {column.l2.map((card, index) => (
+        <L2CardView
+          key={card.capability.element_id}
+          card={card}
+          colourBy={colourBy}
+          supportsEdges={supportsEdges}
+          systemsById={systemsById}
+          orgSlug={orgSlug}
+          modelSlug={modelSlug}
+          refParam={refParam}
+          expanded={expanded.has(card.capability.element_id)}
+          onToggleExpand={onToggleExpand}
+          previousSibling={column.l2[index - 1]?.capability}
+          nextSibling={column.l2[index + 1]?.capability}
+          reorderCapability={reorderCapability}
+        />
       ))}
     </div>
   );
@@ -184,6 +354,9 @@ function L2CardView({
   refParam,
   expanded,
   onToggleExpand,
+  previousSibling,
+  nextSibling,
+  reorderCapability,
 }: {
   card: L2Card;
   colourBy: ColourByMode;
@@ -194,20 +367,29 @@ function L2CardView({
   refParam: string;
   expanded: boolean;
   onToggleExpand: (id: UUID) => void;
+  previousSibling: ElementsHeadRow | undefined;
+  nextSibling: ElementsHeadRow | undefined;
+  reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
 }) {
   const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById);
   const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
 
   return (
-    <div className={styles.card}>
-      <div className={styles.cardHeader}>
-        <div className={styles.cardTitle}>
-          <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`}>
-            <Text as="span">{card.capability.name}</Text>
-          </Link>
-          <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-          {colour.tone !== undefined && colour.label !== undefined && <Chip tone={colour.tone}>{colour.label}</Chip>}
-        </div>
+    <CapabilityTile href={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`} name={card.capability.name} tone={colour.tone} toneLabel={colour.label}>
+      <div className={styles.cardSecondaryRow}>
+        {reorderCapability && (
+          <ReorderButtons
+            capability={card.capability}
+            previous={previousSibling}
+            next={nextSibling}
+            context={reorderCapability}
+            previousGlyph="↑"
+            previousLabel={`Move ${card.capability.name} up`}
+            nextGlyph="↓"
+            nextLabel={`Move ${card.capability.name} down`}
+          />
+        )}
+        <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
         {card.l3.length > 0 && (
           <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { onToggleExpand(card.capability.element_id); }}>
             {expanded ? '▾' : '▸'} {card.l3.length}
@@ -220,19 +402,20 @@ function L2CardView({
             const leafColour = tileColourFor(colourBy, leaf.element_id, supportsEdges, systemsById);
             const leafCount = supportingSystemIds(leaf.element_id, supportsEdges).length;
             return (
-              <div key={leaf.element_id} className={styles.l3Tile}>
-                <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${leaf.element_id}`}>
-                  <Text as="span" size="sm">
-                    {leaf.name}
-                  </Text>
-                </Link>
+              <CapabilityTile
+                key={leaf.element_id}
+                href={`/o/${orgSlug}/m/${modelSlug}/e/${leaf.element_id}`}
+                name={leaf.name}
+                tone={leafColour.tone}
+                toneLabel={leafColour.label}
+                size="compact"
+              >
                 <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-                {leafColour.tone !== undefined && leafColour.label !== undefined && <Chip tone={leafColour.tone}>{leafColour.label}</Chip>}
-              </div>
+              </CapabilityTile>
             );
           })}
         </div>
       )}
-    </div>
+    </CapabilityTile>
   );
 }

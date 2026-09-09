@@ -21,11 +21,13 @@ export interface UseEditingBranchResult {
  * didn't finish: "every editing hook now takes an explicit `branch:
  * BranchRow` rather than looking main up for itself" generalised the
  * *hooks* (`useElementEditor`, `useElementRetract`, `useElementRename`,
- * `CapabilityTailoringActions`) in Sprint C1 step 4, but every actual call
- * site kept feeding them `useMainBranch()` regardless of `ref` — meaning
- * "editing while a change is selected writes deltas to the branch" (the
- * user's own Sprint C1 brief, item 2) had no real UI path to a change
- * branch at all until this hook existed to pick the right one.
+ * `CapabilityTailoringActions` — renamed `CapabilityRetractAction` in
+ * Sprint U4-1 D3, once rename moved out of it) in Sprint C1 step 4, but
+ * every actual call site kept feeding them `useMainBranch()` regardless
+ * of `ref` — meaning "editing while a change is selected writes deltas
+ * to the branch" (the user's own Sprint C1 brief, item 2) had no real UI
+ * path to a change branch at all until this hook existed to pick the
+ * right one.
  */
 export function useEditingBranch(modelId: UUID | null, ref: Ref): UseEditingBranchResult {
   const [branch, setBranch] = useState<BranchRow | null>(null);

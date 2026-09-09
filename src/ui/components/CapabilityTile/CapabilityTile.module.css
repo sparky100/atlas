@@ -1,0 +1,86 @@
+/* `card` size: the capability map's L2 cards — name, tone chip and
+   secondary controls stack in a column. `compact` size: L3's smaller
+   inline pill, revealed only on expand — everything sits in one row. */
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+}
+
+.tileCompact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-1);
+}
+
+/* Colour-by's tone fill (Sprint U4-1 C3) — same formula as
+   Chip.module.css's own tone classes: a tinted background derived from
+   the status colour at low opacity, readable in both themes. `none`
+   (no colour-by, or a mode with nothing to show) is plain transparent —
+   the frame border alone still marks this as a tile. */
+.tile[data-tone='ok'],
+.tileCompact[data-tone='ok'] {
+  background: color-mix(in srgb, var(--status-ok) 16%, transparent);
+}
+.tile[data-tone='warn'],
+.tileCompact[data-tone='warn'] {
+  background: color-mix(in srgb, var(--status-warn) 16%, transparent);
+}
+.tile[data-tone='danger'],
+.tileCompact[data-tone='danger'] {
+  background: color-mix(in srgb, var(--status-danger) 16%, transparent);
+}
+.tile[data-tone='info'],
+.tileCompact[data-tone='info'] {
+  background: color-mix(in srgb, var(--status-info) 16%, transparent);
+}
+.tile[data-tone='neutral'],
+.tileCompact[data-tone='neutral'] {
+  background: var(--bg-subtle);
+}
+.tile[data-tone='none'],
+.tileCompact[data-tone='none'] {
+  background: transparent;
+}
+
+/* The "stretched link" primary click target — see CapabilityTile.tsx's
+   own module comment. Positioned relative to BlueprintFrame's own
+   `.frame` (the nearest `position: relative` ancestor), so `inset: 0`
+   covers the whole tile, not just this link's own text. */
+.primaryLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.primaryLink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Lifted above the primary link's overlay (CSS paints/hit-tests a
+   positioned element above plain in-flow content, regardless of DOM
+   order) so real controls passed as `children` — a zoom link, reorder
+   buttons, an expand toggle, even a further nested list of tiles — stay
+   independently clickable. Deliberately not a flex/layout container
+   itself (`children` can be a small inline control row or a full
+   block-level list) — the caller's own markup decides that; this wrapper
+   only does the one thing every use needs, lifting content above the
+   overlay.
+*/
+.secondary {
+  position: relative;
+  z-index: 1;
+}

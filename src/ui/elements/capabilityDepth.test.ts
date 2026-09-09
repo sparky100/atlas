@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { capabilityLevel } from './capabilityDepth';
+import { capabilityLevel, l1AncestorOf, loadCapabilityAncestry } from './capabilityDepth';
+import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 
 function capability(id: string, parentId: string | null): ElementsHeadRow {
@@ -25,5 +26,96 @@ describe('capabilityLevel', () => {
 
   it('is null when nesting goes deeper than 3 levels', () => {
     expect(capabilityLevel(capability('p', 'gp'), capability('gp', 'ggp'))).toBeNull();
+  });
+});
+
+describe('l1AncestorOf', () => {
+  it('is itself for a root capability', () => {
+    const all = new Map([['root', capability('root', null)]]);
+    expect(l1AncestorOf('root', all)).toEqual(capability('root', null));
+  });
+
+  it('is the parent for a level-2 capability', () => {
+    const all = new Map([
+      ['root', capability('root', null)],
+      ['l2', capability('l2', 'root')],
+    ]);
+    expect(l1AncestorOf('l2', all)).toEqual(capability('root', null));
+  });
+
+  it('is the grandparent for a level-3 capability', () => {
+    const all = new Map([
+      ['root', capability('root', null)],
+      ['l2', capability('l2', 'root')],
+      ['l3', capability('l3', 'l2')],
+    ]);
+    expect(l1AncestorOf('l3', all)).toEqual(capability('root', null));
+  });
+
+  it('is null when the chain nests deeper than 3 levels', () => {
+    const all = new Map([
+      ['root', capability('root', null)],
+      ['l2', capability('l2', 'root')],
+      ['l3', capability('l3', 'l2')],
+      ['l4', capability('l4', 'l3')],
+    ]);
+    expect(l1AncestorOf('l4', all)).toBeNull();
+  });
+
+  it('is null when the capability itself is not in the map', () => {
+    expect(l1AncestorOf('ghost', new Map())).toBeNull();
+  });
+
+  it('is null when a link in the chain is missing from the map', () => {
+    const all = new Map([['l2', capability('l2', 'root')]]);
+    expect(l1AncestorOf('l2', all)).toBeNull();
+  });
+});
+
+describe('loadCapabilityAncestry', () => {
+  it('fetches nothing more when every leaf is already a root', async () => {
+    const leaves = new Map([['root', capability('root', null)]]);
+    const byIds = (): Promise<Map<UUID, ElementsHeadRow>> => {
+      throw new Error('should not be called — nothing has a parent to fetch');
+    };
+    const all = await loadCapabilityAncestry(byIds, leaves);
+    expect(all).toEqual(leaves);
+  });
+
+  it('fetches one round for a level-2 leaf (its parent)', async () => {
+    const leaves = new Map([['l2', capability('l2', 'root')]]);
+    const byIds = (ids: readonly UUID[]): Promise<Map<UUID, ElementsHeadRow>> => {
+      expect(ids).toEqual(['root']);
+      return Promise.resolve(new Map([['root', capability('root', null)]]));
+    };
+    const all = await loadCapabilityAncestry(byIds, leaves);
+    expect(l1AncestorOf('l2', all)).toEqual(capability('root', null));
+  });
+
+  it('fetches two rounds for a level-3 leaf (parent, then grandparent), and stops there', async () => {
+    const leaves = new Map([['l3', capability('l3', 'l2')]]);
+    const calls: (readonly UUID[])[] = [];
+    const byIds = (ids: readonly UUID[]): Promise<Map<UUID, ElementsHeadRow>> => {
+      calls.push(ids);
+      if (ids[0] === 'l2') return Promise.resolve(new Map([['l2', capability('l2', 'root')]]));
+      return Promise.resolve(new Map([['root', capability('root', null)]]));
+    };
+    const all = await loadCapabilityAncestry(byIds, leaves);
+    expect(calls).toEqual([['l2'], ['root']]);
+    expect(l1AncestorOf('l3', all)).toEqual(capability('root', null));
+  });
+
+  it('de-duplicates parent ids shared by more than one leaf, fetching each id once', async () => {
+    const leaves = new Map([
+      ['a', capability('a', 'shared-parent')],
+      ['b', capability('b', 'shared-parent')],
+    ]);
+    const byIds = (ids: readonly UUID[]): Promise<Map<UUID, ElementsHeadRow>> => {
+      expect(ids).toEqual(['shared-parent']);
+      return Promise.resolve(new Map([['shared-parent', capability('shared-parent', null)]]));
+    };
+    const all = await loadCapabilityAncestry(byIds, leaves);
+    expect(l1AncestorOf('a', all)).toEqual(capability('shared-parent', null));
+    expect(l1AncestorOf('b', all)).toEqual(capability('shared-parent', null));
   });
 });

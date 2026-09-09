@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lifecycleExposure, oldestLifecycleStage, supportingSystemIds, tileColourFor } from './metrics';
+import { aggregateTileColourFor, lifecycleExposure, oldestLifecycleStage, resolveDefaultColourBy, supportingSystemIds, tileColourFor } from './metrics';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 
 function system(id: string, lifecycleStatus?: string, plannedEnd?: string): ElementsHeadRow {
@@ -98,5 +98,79 @@ describe('tileColourFor', () => {
 
     const notExposedById = new Map([['sys-1', system('sys-1', 'active')]]);
     expect(tileColourFor('metric:lifecycleExposure', 'cap-1', [supports('sys-1', 'cap-1')], notExposedById)).toEqual({ tone: undefined, label: undefined });
+  });
+});
+
+describe('aggregateTileColourFor (Sprint U4-1 C3 review note: L1 group header)', () => {
+  it('mode "none" never returns a tone or label', () => {
+    expect(aggregateTileColourFor('none', ['cap-1'], [], new Map())).toEqual({ tone: undefined, label: undefined });
+  });
+
+  it('an empty descendant list (an L1 with no L2/L3 children at all) never returns a tone or label', () => {
+    expect(aggregateTileColourFor('metric:lifecycleExposure', [], [], new Map())).toEqual({ tone: undefined, label: undefined });
+  });
+
+  it('exposure: worst-of-children — any exposed descendant makes the whole group exposed, even when it is the only one', () => {
+    const soon = new Date();
+    soon.setMonth(soon.getMonth() + 1);
+    const systemsById = new Map([
+      ['sys-safe', system('sys-safe', 'active')],
+      ['sys-exposed', system('sys-exposed', 'retiring', soon.toISOString().slice(0, 10))],
+    ]);
+    const edges = [supports('sys-safe', 'cap-safe'), supports('sys-exposed', 'cap-exposed')];
+    expect(aggregateTileColourFor('metric:lifecycleExposure', ['cap-safe', 'cap-exposed'], edges, systemsById)).toEqual({ tone: 'danger', label: 'exposed' });
+  });
+
+  it('exposure: an L1 whose only exposed capability sits at L3 still reads as exposed — the descendant list is the caller\'s own flattened L2+L3 ids, not just L2', () => {
+    const soon = new Date();
+    soon.setMonth(soon.getMonth() + 1);
+    const systemsById = new Map([['sys-l3', system('sys-l3', 'retiring', soon.toISOString().slice(0, 10))]]);
+    const edges = [supports('sys-l3', 'cap-l3-leaf')];
+    // 'cap-l2' (the L2 parent) has no supporting system of its own at all —
+    // only its L3 child ('cap-l3-leaf') does.
+    expect(aggregateTileColourFor('metric:lifecycleExposure', ['cap-l2', 'cap-l3-leaf'], edges, systemsById)).toEqual({ tone: 'danger', label: 'exposed' });
+  });
+
+  it('exposure: no tone when nothing in the group is exposed', () => {
+    const systemsById = new Map([['sys-1', system('sys-1', 'active')]]);
+    const edges = [supports('sys-1', 'cap-1')];
+    expect(aggregateTileColourFor('metric:lifecycleExposure', ['cap-1', 'cap-2'], edges, systemsById)).toEqual({ tone: undefined, label: undefined });
+  });
+
+  it('oldest lifecycle stage: worst-of-children — the most-advanced stage among any descendant', () => {
+    const systemsById = new Map([
+      ['sys-1', system('sys-1', 'active')],
+      ['sys-2', system('sys-2', 'retired')],
+    ]);
+    const edges = [supports('sys-1', 'cap-1'), supports('sys-2', 'cap-2')];
+    expect(aggregateTileColourFor('metric:oldestLifecycleStage', ['cap-1', 'cap-2'], edges, systemsById)).toEqual({ tone: 'neutral', label: 'retired' });
+  });
+
+  it('coverage: fraction-supported, not worst-of-children — the label names the real fraction', () => {
+    const systemsById = new Map([['sys-1', system('sys-1')]]);
+    const edges = [supports('sys-1', 'cap-1')];
+    expect(aggregateTileColourFor('metric:supportingSystemCount', ['cap-1', 'cap-2', 'cap-3'], edges, systemsById)).toEqual({ tone: 'neutral', label: '1/3 capabilities supported' });
+  });
+
+  it('coverage: warn only when literally none of the group\'s descendants have a supporting system', () => {
+    expect(aggregateTileColourFor('metric:supportingSystemCount', ['cap-1', 'cap-2'], [], new Map())).toEqual({ tone: 'warn', label: '0/2 capabilities supported' });
+  });
+});
+
+describe('resolveDefaultColourBy (Sprint U4-1 C4)', () => {
+  it('a saved choice always wins, regardless of home mode or whether the model has systems', () => {
+    expect(resolveDefaultColourBy('metric:oldestLifecycleStage', 'director', true)).toBe('metric:oldestLifecycleStage');
+    expect(resolveDefaultColourBy('none', 'architect', true)).toBe('none');
+    expect(resolveDefaultColourBy('metric:supportingSystemCount', 'director', false)).toBe('metric:supportingSystemCount');
+  });
+
+  it('"none" while the model has no systems at all, no saved choice, regardless of home mode', () => {
+    expect(resolveDefaultColourBy(null, 'director', false)).toBe('none');
+    expect(resolveDefaultColourBy(null, 'architect', false)).toBe('none');
+  });
+
+  it('exposure for a director, coverage for an architect, once the model has real systems', () => {
+    expect(resolveDefaultColourBy(null, 'director', true)).toBe('metric:lifecycleExposure');
+    expect(resolveDefaultColourBy(null, 'architect', true)).toBe('metric:supportingSystemCount');
   });
 });

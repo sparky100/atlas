@@ -19,6 +19,8 @@ export interface UpsertUserPreferencesInput {
   homeMode?: UserPreferencesRow['home_mode'];
   density?: UserPreferencesRow['density'];
   theme?: UserPreferencesRow['theme'];
+  /** Sprint U4-1 C4's "remember last choice per user" — omitted (not `null`) leaves any previously-saved choice untouched; a caller that wants to explicitly reset it back to "no override" would need a different signature, which nothing today needs. */
+  capabilityMapColourBy?: UserPreferencesRow['capability_map_colour_by'];
 }
 
 /**
@@ -32,6 +34,7 @@ export async function upsertUserPreferences(supabase: Client, input: UpsertUserP
   if (input.homeMode !== undefined) patch.home_mode = input.homeMode;
   if (input.density !== undefined) patch.density = input.density;
   if (input.theme !== undefined) patch.theme = input.theme;
+  if (input.capabilityMapColourBy !== undefined) patch.capability_map_colour_by = input.capabilityMapColourBy;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('user_preferences').upsert(patch, { onConflict: 'user_id' }).select('*').single();

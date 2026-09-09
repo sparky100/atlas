@@ -3,6 +3,7 @@ import { defaultCreateAttributes } from '../../contracts/attributeSchema';
 import type { CommitEnvelope, Delta, ElementType, UUID } from '../../contracts/delta';
 import type { Json } from '../../contracts/rows';
 import { commitToBranch } from '../../db/commits';
+import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
@@ -14,6 +15,8 @@ export interface CreateOptions {
   attributes?: Record<string, Json>;
   /** Handoff — Flow: Add a system, step 4's "Supports which capability?": when given, a `relationship.create` (`supports`, this element → the capability) rides in the *same* commit as the `element.create` — C9 only requires both endpoints exist in the resulting head, which a same-commit pair satisfies. */
   supportsCapabilityId?: UUID;
+  /** The same capability's name (the caller already has it — it's the picker result being clicked) — only for the generated commit title's "and link to X" (`describeEnvelope`'s `nameLookup`; B1). Ignored unless `supportsCapabilityId` is also given. */
+  supportsCapabilityName?: string;
 }
 
 export interface UseElementCreateResult {
@@ -101,19 +104,35 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
             relationshipType: 'supports',
             fromElementId: elementId,
             toElementId: options.supportsCapabilityId,
-            attributes: {},
+            // The new element's very first supports link — the same
+            // "never asked, created secondary outright" case
+            // `defaultAttributesForPlainPick`'s own doc comment describes
+            // (Sprint U4-1 B4): nothing to compare a brand-new element's
+            // one-and-only link against yet, and `computeLandscapeLayout`'s
+            // "no primary -> most recently added decides" fallback places
+            // it correctly regardless.
+            attributes: { role: 'secondary' },
             sourceId: source.id,
             confidence: 1,
           });
         }
 
+        // `describeEnvelope` never actually calls the name lookup for an
+        // `element.create` delta on its own — the new element's name is
+        // right there on the delta itself — but the 2-delta "create and
+        // link" combination (a `supportsCapabilityId` create) does need it,
+        // to resolve the capability's own name; the caller already has it
+        // in hand (`options.supportsCapabilityName`), same convention as
+        // `useRelationshipCreate.ts`'s own `otherElementName`.
+        const nameLookup = (id: UUID): string | undefined => (options?.supportsCapabilityId && id === options.supportsCapabilityId ? options.supportsCapabilityName : undefined);
         const envelope: CommitEnvelope = {
           id: crypto.randomUUID(),
           branchId: branch.id,
           parentCommitId: expectedHeadCommitId,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
-          message: `Add ${elementType} "${trimmed}"`,
+          title: describeEnvelope(deltas, nameLookup),
+          body: `Add ${elementType} "${trimmed}"`,
           deltas,
         };
 

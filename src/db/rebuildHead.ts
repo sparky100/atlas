@@ -13,6 +13,15 @@
  * safe and changes nothing observable — which is exactly what lets this
  * double as both "repair a known-bad projection" and "verify a
  * known-good one," per SPEC §6.6 item 2's nightly integrity job.
+ *
+ * `foldFromGenesis` below re-runs every commit's deltas through the real
+ * `apply()` (src/engine/deltas.ts), so any invariant `apply()` enforces
+ * inline — C8, C9, C17 (Sprint U4-1: at most one primary `supports`/`owns`
+ * edge per anchor) — is re-checked here too. A model whose history already
+ * contains a violation (written before the check existed, or landed some
+ * other way) makes this throw an `EngineError` instead of returning a
+ * result: that's this function surfacing a pre-existing violation, not a
+ * bug in the rebuild — no separate detection code needed for that case.
  */
 import type { UUID } from '../contracts/delta';
 import { foldFromGenesis, headHash } from '../engine/head';

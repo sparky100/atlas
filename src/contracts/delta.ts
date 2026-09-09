@@ -60,6 +60,8 @@ export const DELIBERATELY_NOT_MODELLED = [
 export type LifecycleStatus = 'planned' | 'active' | 'retiring' | 'retired';
 export type ActorSubtype = 'person' | 'team';
 export type DataClassification = 'public' | 'official' | 'official_sensitive' | 'special_category';
+/** Sprint U4-1 B4: which of a system's `supports` edges anchors its one landscape lane (relationship_type_rules' new `maxPrimaryPerFrom: 1`, `supports`-only). Always set at creation, defaulting to `secondary` unless the picker's "primary?" prompt is answered yes — never left unset the way `SupportsAttributes.description` is, since lane placement has to read *something* off every edge. */
+export type SupportsRole = 'primary' | 'secondary';
 
 /**
  * Attributes stored in `elements_head.attributes` (jsonb). `name` and
@@ -79,6 +81,17 @@ export interface CapabilityAttributes {
   code?: string;
   /** `capability_map_items.id` this capability was seeded from. */
   templateRef?: UUID;
+  /**
+   * Explicit display order among this capability's siblings (same
+   * `parentId`), independent of `code` (Sprint U4-1 C1,
+   * `capability_map_items.item_order`) — `src/ui/capabilityMap/layout.ts`'s
+   * `compareCapabilities` sorts by this first. Set at seed time for every
+   * capability a starter map produces (`capabilityMapContent.ts` requires
+   * one on every template item); left unset for a hand-added capability
+   * until the tailoring flow's reorder control gives it one — an unset
+   * capability sorts after every ordered sibling, never before.
+   */
+  order?: number;
 }
 
 export interface SystemAttributes {
@@ -128,6 +141,8 @@ export interface ElementAttributesByType {
 /** Attributes stored in `relationships_head.attributes` (jsonb). Endpoints are immutable and are not attributes. */
 export interface SupportsAttributes {
   description?: string;
+  /** Sprint U4-1 B4 — see `SupportsRole`'s own doc comment. */
+  role: SupportsRole;
 }
 export interface UsesAttributes {
   description?: string;
@@ -362,7 +377,17 @@ export interface CommitEnvelope {
    */
   mergedBranchHeadCommitId: UUID | null;
   kind: CommitKind;
-  message: string;
+  /**
+   * Generated, not typed by hand (Sprint U4-1 B1): `src/engine/
+   * describeEnvelope.ts`'s `describeEnvelope(deltas, nameLookup)`, for
+   * every `manual` commit. `merge`/`template_seed`/`genesis` commits keep
+   * their own domain-specific phrasing instead (mergeRequests.ts, seedFromMap.ts,
+   * `atlas.on_model_created`) — `describeEnvelope`'s own module comment
+   * explains why those three don't route through it.
+   */
+  title: string;
+  /** Whatever a hook used to hand-write as `message` before this sprint (e.g. `Edit ${element.name}`) — kept, not discarded, as an optional elaboration alongside the generated `title`. No UI reads or writes this yet beyond carrying it through; `null` when a caller has nothing to add. */
+  body: string | null;
   /** Ordered. Index in this array is `deltas.seq`. */
   deltas: Delta[];
 }
@@ -389,6 +414,10 @@ export const COMMIT_INVARIANTS = [
   { id: 'C14', text: 'kind === "merge" iff mergedBranchHeadCommitId is non-null. A merge commit on main is created only by the merge procedure, never by a direct insert.' },
   { id: 'C15', text: 'Merge commit: every fact key changed to different values on both sides since the merge base has exactly one delta in this commit (a resolution); no delta addresses a fact key that is not a field conflict.' },
   { id: 'C16', text: 'The resulting head passes the validation level required for the branch kind: capture_draft → structural only; change → structural, schema advisory; main → structural and schema (SPEC §6.3).' },
+  {
+    id: 'C17',
+    text: "relationship.create/relationship.update/relationship.restore setting (or reviving, for restore) supports.role = 'primary' or owns.primary = true: no other live relationship in the resulting head already has that same primary flag on the same anchor element — supports' anchor is fromElementId (one primary capability per system), owns' is toElementId (one primary owner per owned element). A same-commit delta demoting the existing one first (earlier in seq order) makes the promotion legal; a restore is checked against the head as it stands now, not as it stood when the relationship was retracted.",
+  },
 ] as const;
 
 export type CommitInvariantId = (typeof COMMIT_INVARIANTS)[number]['id'];

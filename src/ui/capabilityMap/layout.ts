@@ -68,8 +68,38 @@ function codeOf(capability: ElementsHeadRow): string | null {
   return typeof code === 'string' && code !== '' ? code : null;
 }
 
-/** Deterministic order: by `code` (numeric-aware) when both tiles have one, else by name, then id as the final tiebreak. */
+function orderOf(capability: ElementsHeadRow): number | null {
+  const order = attributesRecord(capability.attributes).order;
+  return typeof order === 'number' ? order : null;
+}
+
+/**
+ * Deterministic order: by `attributes.order` (Sprint U4-1 C1) when both
+ * tiles have one — this is what actually puts a sector map's own
+ * capabilities first and the eight shared back-office ones last
+ * (content/capability-maps/README.md's ordering convention,
+ * `useCapabilityReorder.ts`'s own tailoring-flow updates to it); falls
+ * back to `code` (numeric-aware) when either tile lacks an order, then
+ * name, then id as the final tiebreak. Every capability normally has an
+ * order — `useCapabilityCreate.ts` sets one at creation time (this
+ * file's own `nextSiblingOrder`), and `scripts/backfillCapabilityOrder.ts`
+ * is the one-off fix for anything created before that — so the no-order
+ * branch is a defensive fallback for data that predates or has somehow
+ * escaped both, not an expected steady-state case; it sorts after every
+ * ordered sibling, never before, so a gap like that can't jump a
+ * capability ahead of ones someone deliberately placed.
+ */
 export function compareCapabilities(a: ElementsHeadRow, b: ElementsHeadRow): number {
+  const orderA = orderOf(a);
+  const orderB = orderOf(b);
+  if (orderA !== null && orderB !== null) {
+    if (orderA !== orderB) return orderA - orderB;
+  } else if (orderA !== null) {
+    return -1;
+  } else if (orderB !== null) {
+    return 1;
+  }
+
   const codeA = codeOf(a);
   const codeB = codeOf(b);
   if (codeA !== null && codeB !== null) {
@@ -77,6 +107,37 @@ export function compareCapabilities(a: ElementsHeadRow, b: ElementsHeadRow): num
     if (byCode !== 0) return byCode;
   }
   return a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id);
+}
+
+/**
+ * The order a newly-added capability under `parentId` should get (Sprint
+ * U4-1 C1, tightened after review: every capability gets one at creation,
+ * not just capabilities seeded from a map — `useCapabilityCreate.ts` is
+ * this function's one caller). One more than the highest existing
+ * sibling's order, or 1 if there are no siblings yet or none of them have
+ * one — a new capability always lands last among its siblings, never
+ * ahead of one someone already placed. `parentId: null` means a new L1
+ * (siblings are `tree.l1`); an L1 id means a new L2 (that L1's own `l2`);
+ * an L2 id means a new L3 (that L2's own `l3`) — the only three shapes
+ * `CapabilityMapAddForm.tsx`'s own parent picker ever offers.
+ */
+function siblingsOf(tree: CapabilityMapTree, parentId: UUID | null): ElementsHeadRow[] {
+  if (parentId === null) return tree.l1.map((column) => column.capability);
+  for (const l1 of tree.l1) {
+    if (l1.capability.element_id === parentId) return l1.l2.map((card) => card.capability);
+    const l2 = l1.l2.find((card) => card.capability.element_id === parentId);
+    if (l2) return l2.l3;
+  }
+  return [];
+}
+
+export function nextSiblingOrder(tree: CapabilityMapTree, parentId: UUID | null): number {
+  let max = 0;
+  for (const sibling of siblingsOf(tree, parentId)) {
+    const order = attributesRecord(sibling.attributes).order;
+    if (typeof order === 'number' && order > max) max = order;
+  }
+  return max + 1;
 }
 
 /** `capability.parent_id`'s depth from a root (0), or `null` if it can't be resolved cleanly (missing parent, or a cycle) within `maxDepth` hops. */

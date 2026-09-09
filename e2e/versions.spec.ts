@@ -64,7 +64,8 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'add System A',
+    title: 'add System A',
+    body: null,
     deltas: [
       { kind: 'element.create', id: randomUUID(), elementId: systemAId, elementType: 'system', name: 'System A', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
     ],
@@ -95,7 +96,8 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
     parentCommitId: v1CommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'add System B',
+    title: 'add System B',
+    body: null,
     deltas: v2Deltas,
   };
   const v2Result = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: v1CommitId, envelope: v2Envelope });

@@ -178,6 +178,18 @@ export function LandscapeCanvas({ layout, systemsById, edges, diff = null, nodeH
 
   const diffByElementId = useMemo(() => new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []), [diff]);
   const diffByRelationshipId = useMemo(() => new Map<UUID, RelationshipVersionDiff>(diff?.relationships.map((r) => [r.relationshipId, r]) ?? []), [diff]);
+  // B4's reference chips, grouped by which lane shows them — a lane can
+  // reference more than one system (or the same system more than once,
+  // never expected but harmless either way).
+  const referenceMarkersByLane = useMemo(() => {
+    const map = new Map<string, UUID[]>();
+    for (const marker of layout.referenceMarkers) {
+      const list = map.get(marker.laneKey) ?? [];
+      list.push(marker.elementId);
+      map.set(marker.laneKey, list);
+    }
+    return map;
+  }, [layout.referenceMarkers]);
 
   const nodeAt = useCallback(
     (screenX: number, screenY: number): UUID | null => {
@@ -226,7 +238,18 @@ export function LandscapeCanvas({ layout, systemsById, edges, diff = null, nodeH
       const laneLabels: { text: string; worldX: number; worldY: number }[] = [];
       for (const lane of layout.lanes) {
         if (lane.y > visible.bottom || lane.y + lane.height < visible.top) continue;
-        laneLabels.push({ text: lane.label.toUpperCase(), worldX: 4, worldY: lane.y + 8 });
+        // B4's "other lanes show a linked reference chip, never a
+        // duplicate tile": appended to the lane's own label rather than a
+        // second drawn shape — the real, clickable tile is one click away
+        // (§8.7: the element page/relationships list are this diagram's
+        // accessible view regardless), this is only a visual pointer to
+        // where a referenced system actually lives.
+        const referencedNames = referenceMarkersByLane
+          .get(lane.key)
+          ?.map((elementId) => systemsById.get(elementId)?.name)
+          .filter((name): name is string => name !== undefined);
+        const referenceSuffix = referencedNames && referencedNames.length > 0 ? `  ⇢ ${referencedNames.join(', ')}` : '';
+        laneLabels.push({ text: lane.label.toUpperCase() + referenceSuffix, worldX: 4, worldY: lane.y + 8 });
         ctx.strokeStyle = tokens.border;
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -297,6 +320,11 @@ export function LandscapeCanvas({ layout, systemsById, edges, diff = null, nodeH
 
       const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number }[] = [];
       const diffMarkers: { text: string; worldX: number; worldY: number; colour: string }[] = [];
+      // B4's "no primary -> most recently added decides, with a '+N' chip
+      // listing the rest" — top-right corner (diff markers already own
+      // top-left), a neutral tone rather than any `--diff-*` token since
+      // this isn't a diff state.
+      const extraLaneMarkers: { text: string; worldX: number; worldY: number; colour: string }[] = [];
       for (const node of layout.nodes) {
         if (!rectIntersects(visible, node.x, node.y, NODE_WIDTH, NODE_HEIGHT)) continue;
         const system = systemsById.get(node.elementId);
@@ -338,6 +366,9 @@ export function LandscapeCanvas({ layout, systemsById, edges, diff = null, nodeH
           const label = nodeState === 'changed' ? `${DIFF_MARKER[nodeState]}${String(nodeDiff?.changedAttributes.length ?? 0)}` : DIFF_MARKER[nodeState];
           diffMarkers.push({ text: label, worldX: node.x + 4, worldY: node.y + 4, colour: diffColour ?? tokens.text });
         }
+        if (node.extraLaneCount !== undefined) {
+          extraLaneMarkers.push({ text: `+${String(node.extraLaneCount)}`, worldX: node.x + NODE_WIDTH - 4, worldY: node.y + 4, colour: tokens.textMuted });
+        }
       }
 
       ctx.restore();
@@ -347,7 +378,7 @@ export function LandscapeCanvas({ layout, systemsById, edges, diff = null, nodeH
       // fixed on-screen size within a zoom step, not scale continuously
       // with the gesture the way node geometry does, so it can't share the
       // world-transformed pass above.
-      if (laneLabels.length > 0 || nodeLabels.length > 0 || diffMarkers.length > 0 || edgeMarkers.length > 0) {
+      if (laneLabels.length > 0 || nodeLabels.length > 0 || diffMarkers.length > 0 || edgeMarkers.length > 0 || extraLaneMarkers.length > 0) {
         const textScale = quantizeScale(transform.scale, MIN_SCALE, MAX_SCALE);
         const toScreen = (worldX: number, worldY: number): [number, number] => [worldX * transform.scale + transform.tx, worldY * transform.scale + transform.ty];
         ctx.textBaseline = 'middle';
@@ -375,7 +406,7 @@ export function LandscapeCanvas({ layout, systemsById, edges, diff = null, nodeH
         // markers top-left of the node, edge markers at the edge's midpoint.
         ctx.font = `${(11 * textScale).toFixed(2)}px sans-serif`;
         ctx.textAlign = 'center';
-        for (const marker of [...diffMarkers, ...edgeMarkers]) {
+        for (const marker of [...diffMarkers, ...edgeMarkers, ...extraLaneMarkers]) {
           const [x, y] = toScreen(marker.worldX, marker.worldY);
           ctx.beginPath();
           ctx.arc(x, y, 8 * textScale, 0, Math.PI * 2);
@@ -394,7 +425,7 @@ export function LandscapeCanvas({ layout, systemsById, edges, diff = null, nodeH
     return () => {
       observer.disconnect();
     };
-  }, [layout, edges, systemsById, diff, diffByElementId, diffByRelationshipId, transform, hover]);
+  }, [layout, edges, systemsById, diff, diffByElementId, diffByRelationshipId, referenceMarkersByLane, transform, hover]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);

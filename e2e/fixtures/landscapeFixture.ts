@@ -92,7 +92,7 @@ export function generateLandscapeFixture(sourceId: string, runSeed: string): Del
       relationshipType: 'supports',
       fromElementId: systemId(runSeed, s),
       toElementId: capabilityId(runSeed, s % CAPABILITY_COUNT),
-      attributes: {},
+      attributes: { role: 'secondary' },
       sourceId,
       confidence: 1,
     });

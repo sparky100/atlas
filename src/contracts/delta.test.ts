@@ -107,6 +107,36 @@ describe('one worked example per DeltaKind', () => {
     expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
   });
 
+  it('relationship.create (supports, with role — Sprint U4-1 B4)', () => {
+    const d: Delta = {
+      kind: 'relationship.create',
+      id: 'delta-6b',
+      relationshipId: 'rel-2',
+      relationshipType: 'supports',
+      fromElementId: 'el-1',
+      toElementId: 'el-2',
+      attributes: { role: 'primary' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('relationship.update (supports.role, primary -> secondary — the demotion half of Sprint U4-1 B4\'s "at most one primary" swap)', () => {
+    const d: Delta = {
+      kind: 'relationship.update',
+      id: 'delta-6c',
+      relationshipId: 'rel-2',
+      relationshipType: 'supports',
+      attribute: 'role',
+      value: 'secondary',
+      previousDeltaId: 'delta-6b',
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
   it('relationship.update', () => {
     const d: Delta = {
       kind: 'relationship.update',

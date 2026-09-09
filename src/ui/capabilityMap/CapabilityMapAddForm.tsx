@@ -25,6 +25,11 @@ export interface CapabilityMapAddFormProps {
  * capabilityMap/layout.ts: "L1 columns, L2 cards, L3 on zoom") has no slot
  * to render; such a capability would just fall into `tree.orphans` next
  * load, which is a worse experience than the picker simply not offering it.
+ *
+ * Rendered from `CapabilityMapPage.tsx`'s own header action area, not
+ * from `CapabilityMapView.tsx` (Sprint U4-1 C5: "'+ Add capability' moves
+ * to the page action area") — this component itself is unchanged either
+ * way, just its caller.
  */
 export function CapabilityMapAddForm({ tree, modelId, orgId, userId, branch, expectedHeadCommitId, onCreated }: CapabilityMapAddFormProps) {
   const [open, setOpen] = useState(false);
@@ -36,6 +41,7 @@ export function CapabilityMapAddForm({ tree, modelId, orgId, userId, branch, exp
     userId,
     branch,
     expectedHeadCommitId,
+    tree,
     onCreated: () => {
       setOpen(false);
       setName('');

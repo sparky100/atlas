@@ -116,8 +116,8 @@ describe('repository layer against a real local Supabase', () => {
     const { error: mapError } = await service.from('capability_maps').insert({ id: capabilityMapId, sector: 'public_body', version: 1, status: 'draft', source_description: 'Integration test fixture' });
     if (mapError) throw new Error(`capability_maps fixture: ${mapError.message}`);
     const { error: itemsError } = await service.from('capability_map_items').insert([
-      { id: rootItemId, map_id: capabilityMapId, code: '1', parent_code: null, name: 'Root Capability', level: 1 },
-      { id: childItemId, map_id: capabilityMapId, code: '1.1', parent_code: '1', name: 'Child Capability', level: 2 },
+      { id: rootItemId, map_id: capabilityMapId, code: '1', parent_code: null, name: 'Root Capability', description: 'Top-level fixture capability.', level: 1 },
+      { id: childItemId, map_id: capabilityMapId, code: '1.1', parent_code: '1', name: 'Child Capability', description: 'Second-level fixture capability.', level: 2 },
     ]);
     if (itemsError) throw new Error(`capability_map_items fixture: ${itemsError.message}`);
     const { error: publishError } = await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', capabilityMapId);
@@ -203,6 +203,25 @@ describe('repository layer against a real local Supabase', () => {
       }
     });
 
+    it("every seeded element's attributes.description matches the map item's own description (Bug A2)", async () => {
+      const { data: elementsHead, error } = await service
+        .from('elements_head')
+        .select('name, attributes')
+        .eq('commit_id', mainGenesisCommitId)
+        .eq('element_type', 'capability');
+      if (error) throw new Error(`reading elements_head: ${error.message}`);
+
+      const expectedDescriptionByName: Record<string, string> = {
+        'Root Capability': 'Top-level fixture capability.',
+        'Child Capability': 'Second-level fixture capability.',
+      };
+      expect(elementsHead).toHaveLength(Object.keys(expectedDescriptionByName).length);
+      for (const row of elementsHead) {
+        const attrs = row.attributes as { description?: string };
+        expect(attrs.description).toBe(expectedDescriptionByName[row.name as string]);
+      }
+    });
+
     it('records provenance as a `sources` row of kind template, pointing at the capability map used', async () => {
       const { data: sourceRows, error } = await service.from('sources').select('kind, capability_map_id').eq('model_id', modelId).eq('kind', 'template');
       if (error) throw new Error(`reading sources: ${error.message}`);
@@ -249,7 +268,8 @@ describe('repository layer against a real local Supabase', () => {
         parentCommitId: mainGenesisCommitId,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: 'add Housing Options',
+        title: 'add Housing Options',
+        body: null,
         deltas: [makeCreateDelta(randomUUID(), elementId, 'Housing Options', aliceManualSourceId)],
       },
     });
@@ -275,7 +295,8 @@ describe('repository layer against a real local Supabase', () => {
       parentCommitId: mainGenesisCommitId,
       mergedBranchHeadCommitId: null,
       kind: 'manual' as const,
-      message: name,
+      title: name,
+      body: null,
       deltas: [makeCreateDelta(randomUUID(), randomUUID(), name, aliceManualSourceId)],
     });
 
@@ -395,7 +416,7 @@ describe('repository layer against a real local Supabase', () => {
         p_branch_id: mainBranchId,
         p_base_commit_id: mainGenesisCommitId,
         p_kind: 'manual',
-        p_message: 'non-member tries main',
+        p_title: 'non-member tries main',
         p_deltas: [],
       });
       expect(error).not.toBeNull();
@@ -411,7 +432,7 @@ describe('repository layer against a real local Supabase', () => {
         p_branch_id: mainBranchId,
         p_base_commit_id: mainGenesisCommitId,
         p_kind: 'manual',
-        p_message: 'contributor tries main',
+        p_title: 'contributor tries main',
         p_deltas: [],
       });
       expect(error).not.toBeNull();
@@ -427,7 +448,7 @@ describe('repository layer against a real local Supabase', () => {
         p_branch_id: mainBranchId,
         p_base_commit_id: mainGenesisCommitId,
         p_kind: 'capture',
-        p_message: 'capture kind on main',
+        p_title: 'capture kind on main',
         p_deltas: [],
       });
       expect(error).not.toBeNull();
@@ -449,7 +470,7 @@ describe('repository layer against a real local Supabase', () => {
           p_branch_id: branch.id,
           p_base_commit_id: mainGenesisCommitId,
           p_kind: kind,
-          p_message: `${kind} kind on a change branch`,
+          p_title: `${kind} kind on a change branch`,
           p_deltas: [],
         });
         expect(error).not.toBeNull();
@@ -471,7 +492,7 @@ describe('repository layer against a real local Supabase', () => {
         p_branch_id: branch.id,
         p_base_commit_id: mainGenesisCommitId,
         p_kind: 'merge',
-        p_message: 'refresh: pull main into the branch',
+        p_title: 'refresh: pull main into the branch',
         p_deltas: [],
         p_merged_branch_head_commit_id: mainGenesisCommitId,
       });
@@ -491,7 +512,8 @@ describe('repository layer against a real local Supabase', () => {
           parentCommitId: mainGenesisCommitId,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
-          message: 'add Tenant Portal directly to main',
+          title: 'add Tenant Portal directly to main',
+          body: null,
           deltas: [makeCreateDelta(randomUUID(), mainElementId, 'Tenant Portal', aliceManualSourceId)],
         },
       });
@@ -648,7 +670,8 @@ describe('repository layer against a real local Supabase', () => {
           parentCommitId: branch.head_commit_id,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
-          message: 'add Resident Portal',
+          title: 'add Resident Portal',
+          body: null,
           deltas: [makeCreateDelta(randomUUID(), elementId, 'Resident Portal', aliceManualSourceId)],
         },
       });
@@ -679,7 +702,7 @@ describe('repository layer against a real local Supabase', () => {
       const { data: mergeData, error: mergeError } = await alice.client.schema('atlas').rpc('merge_branch', {
         p_merge_request_id: requestId,
         p_commit_id: mergeCommitId,
-        p_message: 'merge full-merge-path',
+        p_title: 'merge full-merge-path',
         p_elements_head: projection.elementsHead,
         p_relationships_head: projection.relationshipsHead,
         p_facts: projection.facts,
@@ -737,7 +760,8 @@ describe('repository layer against a real local Supabase', () => {
           parentCommitId: branch.head_commit_id,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
-          message: 'seed an element to conflict over',
+          title: 'seed an element to conflict over',
+          body: null,
           deltas: [makeCreateDelta(losingDeltaId, elementId, 'Contested System', aliceManualSourceId)],
         },
       });
@@ -756,7 +780,7 @@ describe('repository layer against a real local Supabase', () => {
         p_branch_id: branch.id,
         p_base_commit_id: branchAfterSeed.head_commit_id,
         p_kind: 'merge',
-        p_message: 'refresh: resolve a field conflict on name',
+        p_title: 'refresh: resolve a field conflict on name',
         p_deltas: [
           {
             id: winningDeltaId,
@@ -815,7 +839,8 @@ describe('repository layer against a real local Supabase', () => {
           parentCommitId: mainBeforeFork.head_commit_id,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
-          message: 'advance main past the branch fork point',
+          title: 'advance main past the branch fork point',
+          body: null,
           deltas: [makeCreateDelta(randomUUID(), randomUUID(), 'Refreshed-In System', aliceManualSourceId)],
         },
       });
@@ -835,7 +860,7 @@ describe('repository layer against a real local Supabase', () => {
         p_branch_id: branch.id,
         p_base_commit_id: branch.head_commit_id,
         p_kind: 'merge',
-        p_message: 'refresh: pull main into the branch',
+        p_title: 'refresh: pull main into the branch',
         p_deltas: [],
         p_merged_branch_head_commit_id: mainAfterAdvance.head_commit_id,
       });
@@ -887,7 +912,8 @@ describe('repository layer against a real local Supabase', () => {
           parentCommitId: main.head_commit_id,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
-          message: 'move main out from under the approval',
+          title: 'move main out from under the approval',
+          body: null,
           deltas: [makeCreateDelta(randomUUID(), randomUUID(), 'Unrelated System', aliceManualSourceId)],
         },
       });
@@ -896,7 +922,7 @@ describe('repository layer against a real local Supabase', () => {
       const { data: mergeData, error: mergeError } = await alice.client.schema('atlas').rpc('merge_branch', {
         p_merge_request_id: requestId,
         p_commit_id: randomUUID(),
-        p_message: 'stale merge attempt',
+        p_title: 'stale merge attempt',
       });
       expect(mergeError).toBeNull();
       // atlas.merge_branch's `returns commits` means PostgREST serialises

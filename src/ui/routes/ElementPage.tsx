@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router';
 import { ATTRIBUTE_SCHEMA_BY_TYPE } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
-import type { BranchRow, SourceRow } from '../../db/types';
+import type { UUID } from '../../contracts/delta';
+import type { AliasRow, BranchRow, SourceRow } from '../../db/types';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { AttributeEditRow } from '../components/AttributeEditRow/AttributeEditRow';
 import { AttributeRow } from '../components/AttributeRow/AttributeRow';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { Button } from '../components/Button/Button';
-import { CapabilityTailoringActions } from '../components/CapabilityTailoringActions/CapabilityTailoringActions';
+import { CapabilityRetractAction } from '../components/CapabilityRetractAction/CapabilityRetractAction';
 import { ChangesTouchingSection } from '../components/ChangesTouchingSection/ChangesTouchingSection';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { ElementHeader } from '../components/ElementHeader/ElementHeader';
@@ -28,8 +29,10 @@ import { canEditBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
 import { elementBreadcrumbSegments } from '../nav/elementBreadcrumbSegments';
+import { ALIAS_TYPE_LABELS, aliasAsFact } from '../elements/aliasLabels';
 import { useElementPage } from '../elements/useElementPage';
 import { useElementEditor, type DraftValue } from '../elements/useElementEditor';
+import { useElementRename } from '../elements/useElementRename';
 import styles from './ElementPage.module.css';
 
 /**
@@ -43,7 +46,8 @@ import styles from './ElementPage.module.css';
  * yet.
  *
  * Sprint C1 step 9 closes a gap left open since step 4: `useElementEditor`
- * (and `useElementRetract`/`useElementRename`/`CapabilityTailoringActions`)
+ * (and `useElementRetract`/`useElementRename`/`CapabilityRetractAction`,
+ * the latter renamed from `CapabilityTailoringActions` in Sprint U4-1 D3)
  * were already generalised to take any `branch: BranchRow`, but this page
  * kept feeding them `useMainBranch()` regardless of `?ref=` — so "editing
  * while a change is selected writes deltas to the branch" (the user's
@@ -82,7 +86,7 @@ export function ElementPage() {
 
   const { state, reload } = useElementPage(model?.id ?? '', elementId ?? '', ref);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
-  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   const canEdit = editingBranch !== null && canEditBranch(role, editingBranch);
   // See LandscapePage.tsx's identical comment: ADR-018 guarantees main's
   // head is never null in practice; `BranchRow`'s own type hasn't been
@@ -90,6 +94,18 @@ export function ElementPage() {
   // itself reuses `state.data.commitId`, already established below.
   const searchCommitId = mainBranch?.head_commit_id ?? null;
   const canAddRelationship = canEdit && searchCommitId !== null;
+
+  // Sprint U4-1 A1: any commit made from this page — a relationship, an
+  // attribute edit, a capability tailoring action — can move `main`'s head,
+  // which is exactly the commit id the relationship-add search pool reads
+  // against (`searchCommitId`, above). Reloading the page's own data
+  // without also reloading `mainBranch` left `searchCommitId` pointing at a
+  // commit `elements_head` no longer has any rows for, so a second search
+  // in the same visit found nothing at all.
+  const reloadAfterCommit = () => {
+    reload();
+    reloadMainBranch();
+  };
 
   const data = state.status === 'ready' ? state.data : null;
   const editor = useElementEditor({
@@ -100,7 +116,22 @@ export function ElementPage() {
     facts: data?.facts ?? EMPTY_FACTS,
     branch: editingBranch ?? PLACEHOLDER_BRANCH,
     expectedHeadCommitId: data?.commitId ?? '',
-    onSaved: reload,
+    onSaved: reloadAfterCommit,
+  });
+  // Sprint U4-1 D3: called unconditionally, same reasoning as `editor`
+  // above (the Rules of Hooks) — only actually offered to
+  // ElementHeader.tsx (its `rename` prop) once `canEdit` and the element
+  // is a capability, the same gate `CapabilityRetractAction.tsx`'s own
+  // former bundling with rename already used.
+  const rename = useElementRename({
+    modelId: model?.id ?? '',
+    orgId: organisation?.id ?? '',
+    userId,
+    element: data?.element ?? PLACEHOLDER_ELEMENT,
+    facts: data?.facts ?? EMPTY_FACTS,
+    branch: editingBranch ?? PLACEHOLDER_BRANCH,
+    expectedHeadCommitId: data?.commitId ?? '',
+    onSaved: reloadAfterCommit,
   });
 
   if (orgLoading || modelsLoading || !model) {
@@ -145,9 +176,8 @@ export function ElementPage() {
               element={state.data.element}
               existsFact={state.data.facts.get('$exists')}
               existsSource={state.data.sources.get(state.data.facts.get('$exists')?.source_id ?? '')}
-              aliases={state.data.aliases}
-              aliasSources={state.data.aliasSources}
               onEdit={canEdit && editor.status === 'idle' ? editor.startEditing : undefined}
+              rename={canEdit && state.data.element.element_type === 'capability' ? rename : undefined}
             />
             {justCreatedType && !toastDismissed && (
               <Panel className={styles.toast ?? ''} data-testid="add-system-toast">
@@ -167,7 +197,7 @@ export function ElementPage() {
               </Panel>
             )}
             {canEdit && state.data.element.element_type === 'capability' && (
-              <CapabilityTailoringActions
+              <CapabilityRetractAction
                 modelId={model.id}
                 orgId={organisation?.id ?? ''}
                 userId={userId}
@@ -176,16 +206,22 @@ export function ElementPage() {
                 branch={editingBranch}
                 expectedHeadCommitId={state.data.commitId}
                 canRetract={state.data.children.length === 0 && state.data.relationships.length === 0}
-                onChanged={reload}
+                onChanged={reloadAfterCommit}
               />
             )}
             <div className={styles.columns}>
               <div className={styles.leftColumn}>
                 <CollapsibleSection title="Attributes">
                   {editor.status === 'idle' ? (
-                    <AttributesTable element={state.data.element} facts={state.data.facts} sources={state.data.sources} />
+                    <AttributesTable
+                      element={state.data.element}
+                      facts={state.data.facts}
+                      sources={state.data.sources}
+                      aliases={state.data.aliases}
+                      aliasSources={state.data.aliasSources}
+                    />
                   ) : (
-                    <AttributesEditor element={state.data.element} editor={editor} />
+                    <AttributesEditor element={state.data.element} editor={editor} aliases={state.data.aliases} aliasSources={state.data.aliasSources} />
                   )}
                 </CollapsibleSection>
                 <CollapsibleSection title="Relationships" meta={`(${String(state.data.relationships.length)})`}>
@@ -205,12 +241,13 @@ export function ElementPage() {
                             modelId: model.id,
                             orgId: organisation?.id ?? '',
                             userId,
+                            elementName: state.data.element.name,
                             searchCommitId,
                             branch: editingBranch,
                             expectedHeadCommitId: state.data.commitId,
                             onCreated: (otherElementId) => {
                               setJustAddedElementId(otherElementId);
-                              reload();
+                              reloadAfterCommit();
                             },
                           }
                         : undefined
@@ -273,19 +310,58 @@ const PLACEHOLDER_BRANCH: BranchRow = {
   updated_at: '',
 };
 
-function AttributesTable({ element, facts, sources }: { element: ElementsHeadRow; facts: Map<string, FactsRow>; sources: Map<string, SourceRow> }) {
-  const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type];
+/** Sprint U4-1 D1: "alias moves into attributes" — each alias renders as its own read-only row, same shape as any other attribute (`aliasAsFact` gives `AttributeRow` a `FactsRow` to work with), labelled by its real `alias_type` (`ALIAS_TYPE_LABELS`) rather than the header's old single undifferentiated "aka" bucket. Appended after the schema-driven fields — an alias is always additional identifying information, never a substitute for one of them. */
+function AliasRows({ elementId, aliases, aliasSources }: { elementId: UUID; aliases: AliasRow[]; aliasSources: Map<UUID, SourceRow> }) {
+  return (
+    <>
+      {aliases.map((alias) => {
+        const fact = aliasAsFact(alias, elementId);
+        return <AttributeRow key={alias.id} label={ALIAS_TYPE_LABELS[alias.alias_type]} required={false} fact={fact} source={aliasSources.get(alias.source_id)} />;
+      })}
+    </>
+  );
+}
+
+function AttributesTable({
+  element,
+  facts,
+  sources,
+  aliases,
+  aliasSources,
+}: {
+  element: ElementsHeadRow;
+  facts: Map<string, FactsRow>;
+  sources: Map<string, SourceRow>;
+  aliases: AliasRow[];
+  aliasSources: Map<UUID, SourceRow>;
+}) {
+  // Sprint U4-1 D2: `hidden` fields (Capability.templateRef) never show
+  // in the read-only list either — its own information still surfaces,
+  // reworded, on a seeded fact's provenance card instead
+  // (ProvenanceCard.tsx's `seededFrom`).
+  const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type].filter((field) => field.hidden !== true);
   return (
     <div>
       {schema.map((field) => {
         const fact = facts.get(field.key);
         return <AttributeRow key={field.key} label={field.label} required={field.required} fact={fact} source={fact ? sources.get(fact.source_id) : undefined} />;
       })}
+      <AliasRows elementId={element.element_id} aliases={aliases} aliasSources={aliasSources} />
     </div>
   );
 }
 
-function AttributesEditor({ element, editor }: { element: ElementsHeadRow; editor: ReturnType<typeof useElementEditor> }) {
+function AttributesEditor({
+  element,
+  editor,
+  aliases,
+  aliasSources,
+}: {
+  element: ElementsHeadRow;
+  editor: ReturnType<typeof useElementEditor>;
+  aliases: AliasRow[];
+  aliasSources: Map<UUID, SourceRow>;
+}) {
   const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type].filter((field) => field.editable !== false);
   return (
     <div>
@@ -300,6 +376,10 @@ function AttributesEditor({ element, editor }: { element: ElementsHeadRow; edito
           error={editor.fieldErrors[field.key]}
         />
       ))}
+      {/* Not editable here (this hook only ever writes attributes.*, never
+          the separate aliases table) — still shown, read-only, so an
+          alias doesn't visibly disappear the moment someone clicks Edit. */}
+      <AliasRows elementId={element.element_id} aliases={aliases} aliasSources={aliasSources} />
       {editor.submitError !== null && (
         <Text as="p" tone="default">
           {editor.submitError}

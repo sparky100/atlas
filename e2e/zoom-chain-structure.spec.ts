@@ -75,7 +75,8 @@ test('descending the zoom chain: a system\'s context, its containers, and a cont
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'seed Billing Service, its API Gateway container, and an Auth Module component',
+    title: 'seed Billing Service, its API Gateway container, and an Auth Module component',
+    body: null,
     deltas,
   };
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });

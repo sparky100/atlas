@@ -27,7 +27,11 @@
     "content:load-capability-maps": "tsx scripts/loadCapabilityMaps.ts",
     "content:review-capability-maps": "tsx scripts/reviewCapabilityMaps.ts",
     "content:publish-capability-map": "tsx scripts/publishCapabilityMap.ts",
-    "check:case-collisions": "tsx scripts/checkCaseCollisions.ts"
+    "content:export-capability-map": "tsx scripts/exportCapabilityMap.ts",
+    "check:case-collisions": "tsx scripts/checkCaseCollisions.ts",
+    "backfill:commit-titles": "tsx scripts/backfillCommitTitles.ts",
+    "backfill:capability-order": "tsx scripts/backfillCapabilityOrder.ts",
+    "sync:descriptions": "tsx scripts/syncDescriptionsFromMap.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

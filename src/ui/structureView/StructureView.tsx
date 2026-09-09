@@ -20,7 +20,7 @@ export interface StructureViewProps {
   refParam: string;
   /** UI-principles §6.2/§6.3 — present only when a branch's Diff mode is active. Reuses `DiffBadge`, same call as ContextView.tsx's own comment explains for this family of DOM views. */
   diff?: VersionDiff | null;
-  /** Blocking: element creation's search-first "Add" control (an `ElementSearchAdd`, pre-built by the page with this frame's own `parentId`/branch already resolved) — omitted entirely, not shown disabled, when the caller hasn't established edit rights, same convention as `CapabilityMapView`'s `addCapability`. */
+  /** Blocking: element creation's search-first "Add" control (an `ElementSearchAdd`, pre-built by the page with this frame's own `parentId`/branch already resolved) — omitted entirely, not shown disabled, when the caller hasn't established edit rights, same convention as `CapabilityMapView`'s `reorderCapability`. */
   addChild?: ReactNode;
 }
 

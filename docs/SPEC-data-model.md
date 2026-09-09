@@ -159,9 +159,10 @@ Per-person UI preferences. Keyed on the user, not the membership: preferences fo
 | `home_mode` | text | not null default `'director'`, `check (home_mode in ('director','architect'))` |
 | `density` | text | not null default `'comfortable'`, `check (density in ('comfortable','compact'))` |
 | `theme` | text | not null default `'system'`, `check (theme in ('system','light','dark'))` |
+| `capability_map_colour_by` | text | nullable, no default, `check (capability_map_colour_by in ('none','metric:supportingSystemCount','metric:oldestLifecycleStage','metric:lifecycleExposure'))` — Sprint U4-1 C4 |
 | `updated_at` | timestamptz | not null default now() |
 
-No `org_id` (exception to S-20: the row is not org-bearing). RLS: `user_id = auth.uid()` for select, insert, update; no delete policy (a row is reset, not removed). Defaults in the UI when no row exists: architect door for `owner`/`architect` members, director door otherwise; the row is created on first change, not on sign-up.
+No `org_id` (exception to S-20: the row is not org-bearing). RLS: `user_id = auth.uid()` for select, insert, update; no delete policy (a row is reset, not removed). Defaults in the UI when no row exists: architect door for `owner`/`architect` members, director door otherwise; the row is created on first change, not on sign-up. `capability_map_colour_by` is the one column here without a fixed default — unlike its three siblings, null (no override ever saved) resolves in the UI, not the schema: exposure for director home mode, coverage for architect, "none" while the model has no systems at all (`src/ui/capabilityMap/metrics.ts`'s `resolveDefaultColourBy`) — a saved value always wins over that computed default ("remember last choice per user").
 
 ### 3.3 Schema registry
 
@@ -184,6 +185,10 @@ Primary key `(subject_type, type_name, schema_version)`. No `org_id`: this is pr
 
 **Superseded by a constant, not a migrated table (Sprint H1).** Unlike `type_schemas` above, this table's content was fully known from ADR-001 from the start and simply had no runtime enforcement anywhere in the codebase — not a table, not an engine check, not an application-level validation (flagged in docs/AUDIT-2026-09-U2.md §6.2/§6.3). Sprint H1 closes that gap with `RELATIONSHIP_TYPE_RULES`, a constant in `src/contracts/relationshipTypeRules.ts`: the seed rows below are that constant's content, kept here as the documented reference, not read from a live table at runtime. C9 and V3 are both checked against the constant — in `src/engine/deltas.ts`'s `apply()` (so every caller of `fold`, including `commitToBranch`, inherits the check), and therefore at the commit boundary in `src/db/commits.ts`. **Superseded, not deferred (§11 lists this alongside this document's genuinely-deferred items, marked "never"):** migrating this to a real table isn't scheduled anywhere and isn't expected to be — it would only be worth doing if the ruleset needed to become live-editable product content without a code change (e.g. an admin screen), and nothing today requires that.
 
+**Correction (Sprint U4-1 B4, found while adding `max_primary_per_from` below; superseded by the C17 note directly below it).** The paragraph above overstates what `apply()` checked at the time: only C9 (the `(type, from.type, to.type)` triple itself) was enforced there — `isRelationshipTripleAllowed`, `src/engine/deltas.ts`. Neither `max_per_from` nor `max_primary_per_to` (V3's cardinality half) was checked anywhere, engine or database; `owns.primary`'s own "at most one primary owner" had no runtime enforcement. `max_primary_per_from` was the one exception, and only for `supports`: enforced by a database constraint (a partial unique index, `relationships_head_one_primary_supports_per_system`), not by `apply()`.
+
+**C17 (Sprint U4-1, addressed the gap above the same sprint it was found).** `apply()` now enforces both primary-cardinality rules inline, alongside C8/C9, on every fold — `checkPrimaryCardinality`, `src/engine/deltas.ts`: a `relationship.create`/`relationship.update`/`relationship.restore` that would set (or, for restore, revive) `supports.role = 'primary'` (anchored on `fromElementId`, one system) or `owns.primary = true` (anchored on `toElementId`, one owned target) is rejected if the resulting head would already hold another live edge with that same primary flag on the same anchor — unless the same commit demotes the existing one first (an earlier delta in `seq` order); a restore is checked against the head as it stands now, not as it stood when the relationship was retracted, so reviving a stale primary can't silently create a second one alongside whatever was promoted while it was gone. Because `fold`/`apply` are the same functions `commitToBranch` calls for every branch kind, this is checked at commit time on a `change` branch's own commits, not only once they reach `main` — closing the branch-time gap the partial-unique-index approach alone left open (§6.3, C10/C11 discussion). `rebuildHead` (`src/db/rebuildHead.ts`) re-folding a model's full history from genesis means a pre-existing violation (written before this check existed) surfaces there too, as a thrown error, with no separate detection code. `max_per_from` (a non-primary per-type count cap) is not used by any seed row today and remains unenforced — a real gap, but a different one, and not this item's to close. Both `supports.role` and `owns.primary` also have a database partial-unique-index as backstop (`relationships_head_one_primary_supports_per_system`, `relationships_head_one_primary_owns_per_target`) — `relationships_head` is materialised for `main`/tags only, so each index only ever backstops main; `apply()`'s C17 is what actually covers a change branch.
+
 Which `(relationship_type, from_type, to_type)` triples are legal, and cardinality (ADR-001).
 
 | Column | Type | Constraints |
@@ -193,21 +198,22 @@ Which `(relationship_type, from_type, to_type)` triples are legal, and cardinali
 | `to_type` | element_type | not null |
 | `max_per_from` | int | nullable — max live relationships of this type from one element |
 | `max_primary_per_to` | int | nullable — used by `owns` (1) |
+| `max_primary_per_from` | int | nullable — used by `supports` (1, Sprint U4-1 B4: `supports.role`, the landscape lane a system's tile is placed in) |
 
 Primary key `(relationship_type, from_type, to_type)`. No `org_id`; product content. Seed rows:
 
-| relationship_type | from | to | max_per_from | max_primary_per_to |
-|---|---|---|---|---|
-| supports | system | capability | | |
-| uses | system | system | | |
-| uses | container | container | | |
-| uses | component | component | | |
-| uses | container | system | | |
-| uses | component | container | | |
-| owns | actor | capability | | 1 |
-| owns | actor | system | | 1 |
-| flows_to | system | system | | |
-| flows_to | container | container | | |
+| relationship_type | from | to | max_per_from | max_primary_per_to | max_primary_per_from |
+|---|---|---|---|---|---|
+| supports | system | capability | | | 1 |
+| uses | system | system | | | |
+| uses | container | container | | | |
+| uses | component | component | | | |
+| uses | container | system | | | |
+| uses | component | container | | | |
+| owns | actor | capability | | 1 | |
+| owns | actor | system | | 1 | |
+| flows_to | system | system | | | |
+| flows_to | container | container | | | |
 
 ### 3.4 History
 
@@ -242,7 +248,8 @@ An ordered batch of deltas on a branch. Ancestry is a DAG: two parents on a merg
 | `parent_commit_id` | uuid | → `commits(id)`, null only for `kind = 'genesis'` — the one commit per model ever allowed a null parent, inserted only by `atlas.on_model_created` (ADR-018), never by a client RPC |
 | `merged_branch_head_commit_id` | uuid | → `commits(id)`, nullable; `check ((kind = 'merge') = (merged_branch_head_commit_id is not null))` |
 | `kind` | commit_kind | not null |
-| `message` | text | not null |
+| `title` | text | not null — generated, not caller-typed, for `manual` commits (§5.1: `describeEnvelope`); renamed from `message` in Sprint U4-1 B1 |
+| `body` | text | nullable — optional caller elaboration alongside `title`, added Sprint U4-1 B1 |
 | `author_id` | uuid | not null — `auth.users.id` or service identity |
 | `head_hash` | bytea | nullable; set only for a commit on `main` (§3.5, S-15) — `atlas.commit_deltas` writes it iff the branch kind is `main`, never "once materialisation eventually happens" for any other branch kind; 32 bytes (§6.4) |
 | `depth` | int | not null — 1 + parent depth; genesis = 0. Used to bound replay and order topological sorts. |
@@ -584,7 +591,7 @@ A versioned sector starter map (ADR-012).
 | `source_description` | text | not null |
 | `published_at` | timestamptz | nullable; not null iff `status <> 'draft'` — set once, on first publish, and kept through a later `deprecated` transition (`20260906200000_capability_maps_deprecated_keeps_published_at.sql`): when a map was actually published is real provenance a supersession shouldn't erase. |
 
-No `org_id`; product content. Readable by all authenticated users; writable by service role.
+No `org_id`; product content. Readable by all authenticated users; directly writable only by service role (`scripts/loadCapabilityMaps.ts`) — Sprint U4-1 C6 adds one gated, indirect write path for an authenticated session: `atlas.export_capability_map_as_draft` (below), always producing `status = 'draft'`.
 
 #### `capability_map_items`
 
@@ -596,6 +603,7 @@ No `org_id`; product content. Readable by all authenticated users; writable by s
 | `name` | text | not null |
 | `description` | text | |
 | `level` | int | not null, `check (level between 1 and 3)` |
+| `item_order` | int | not null (Sprint U4-1 C1, `20260906300000_capability_map_item_order.sql`) — display order among siblings (same `parent_code`); independent of `code`, which stays a stable reference id. Named `item_order`, not `order` (a reserved SQL keyword). |
 
 Trigger: `level = 1` ⇔ `parent_code is null`; parent's level = level − 1.
 
@@ -609,7 +617,45 @@ Trigger: `level = 1` ⇔ `parent_code is null`; parent's level = level − 1.
 | `reviewed_by` | text | not null — a name, not a user id; reviewers are often external |
 | `reviewed_at` | date | not null |
 
-Seeding a model from a map (ADR-012) creates one `sources` row of kind `template` and one `template_seed` commit whose `element_create` deltas have `attributes.code` and `attributes.templateRef` set and an `aliases` row of type `template_code` per element.
+Seeding a model from a map (ADR-012) creates one `sources` row of kind `template` and one `template_seed` commit whose `element_create` deltas have `attributes.code`/`attributes.templateRef` set (plus `attributes.description`, copied from the map item's own description when it has one — Bug A2: this was silently dropped until Sprint U4-1, and `scripts/syncDescriptionsFromMap.ts`/its owner-action equivalent is the one-off fix for a model already seeded before then) and an `aliases` row of type `template_code` per element.
+
+**Sprint U4-1 C6: export the other direction, and seeding a draft.** A
+model's own tailored capability tree can become new starter content two
+ways, both built on the same read/transform (`src/db/exportCapabilityMap.ts`'s
+`buildCapabilityMapExport`: fresh, sequential codes from the tree's
+resolved structure and display order, never a capability's own
+`attributes.code`/`order` — that's this model's own seed provenance, not
+something a new starter map should inherit) —
+
+- `pnpm content:export-capability-map <org> <model> <sector> <version>`
+  (`scripts/exportCapabilityMap.ts`) writes a real
+  `content/capability-maps/<sector>/<version>.json` file (service role;
+  read-only against model data) and regenerates
+  `docs/review/capability-maps.md`, joining the ordinary hand-authored
+  workflow from there (`content/capability-maps/README.md`).
+- `atlas.export_capability_map_as_draft(p_model_id, p_sector, p_version,
+  p_source_description, p_items, p_sources)` — security definer, granted
+  to `authenticated`, gated owner/architect (ADR-015, same check
+  `atlas.seed_from_map` uses) — is the same export for a browser session,
+  which has no filesystem to write a content file to: it upserts
+  `capability_maps`/`capability_map_items`/`capability_map_sources`
+  directly, always as `status = 'draft'` regardless of what's passed, and
+  refuses outright if `(sector, version)` already exists as anything but
+  `draft` (a published or deprecated map is fixed history;
+  `capability_map_items_guard_immutable` would reject the item writes
+  regardless, but this function gives a clearer reason first).
+
+`atlas.seed_from_map` itself now accepts a `draft` map, not just
+`published` (`20260906320000_seed_from_draft_map.sql`, superseding
+`20260906120000_seed_from_map.sql`'s original `<> 'published'` check) —
+"draft maps are seedable into a model for review": an owner/architect can
+seed their own (or a colleague's) fresh export into a real model to see
+how it reads before deciding whether to publish it. `deprecated` is still
+refused either way. The picker itself
+(`src/db/capabilityMapTemplates.ts`'s `listSeedableCapabilityMaps`,
+superseding `listPublishedCapabilityMaps`) lists both statuses, flagged
+"Draft" in the UI — never indistinguishable from a reviewed, published
+map.
 
 ---
 
@@ -663,7 +709,9 @@ Attribute keys inside `value` stay camelCase in jsonb (they are validated by `ty
 
 ### 5.1 Structure
 
-`CommitEnvelope` in `delta.ts`: `id`, `branchId`, `parentCommitId`, `mergedBranchHeadCommitId`, `kind`, `message`, `deltas[]`.
+`CommitEnvelope` in `delta.ts`: `id`, `branchId`, `parentCommitId`, `mergedBranchHeadCommitId`, `kind`, `title`, `body`, `deltas[]`.
+
+**`message` was renamed to `title` in Sprint U4-1 (item B1), and `body` was added.** `title` is no longer a caller-typed string: for a `manual` commit it is generated from the commit's own deltas by `src/engine/describeEnvelope.ts`'s `describeEnvelope(deltas, nameLookup)` (e.g. "Add system PowerON", "Link PowerON supports Outage & Fault Management", "Set PowerON owner to Network Control") — `merge`/`template_seed`/`genesis` commits keep their own established, domain-specific phrasing instead ("Refresh from main, resolving N conflict(s)", "Seed from {sector} v{version}", "Genesis"). `body` is optional (nullable) free text a caller can supply alongside the generated title; nothing writes a real one yet — every current caller just carries forward what used to be its whole hand-typed `message` as `body`, verbatim — but the column exists so a future free-text note has somewhere to go without another migration. A one-off script (`scripts/backfillCommitTitles.ts`) regenerated `title` for every commit that existed before this sprint.
 
 **`authorId` was removed from the wire contract in Sprint H1** (docs/AUDIT-2026-09-U2.md §2.E.3 item 15). It was never actually the source of `commits.author_id`/`deltas.created_by` — `atlas.commit_deltas` has always derived both from `auth.uid()`, ignoring whatever the envelope claimed — but it *was* still the untrusted source of `facts.asserted_by`/`facts.asserted_at` (§3.5), a real gap: a client could assert a fact under any identity it liked. `atlas.replace_main_head_projection` now derives both of those the same way everything else already did, joining each fact's `delta_id` back to `deltas.created_by`/`deltas.created_at` rather than trusting the payload. Nothing about who authored a commit is client-supplied anywhere in this product any more; `auth.uid()` is the only source, full stop.
 
@@ -677,13 +725,13 @@ Kinds:
 
 ### 5.2 Invariants
 
-`COMMIT_INVARIANTS` in `delta.ts` is the list (C1–C16). They are checked in this order, and the first failure rejects the whole commit:
+`COMMIT_INVARIANTS` in `delta.ts` is the list (C1–C17). They are checked in this order, and the first failure rejects the whole commit:
 
 1. Shape: C1, C2, C3, C14.
 2. Intra-commit: C4.
 3. Against history: C5 (id never used), C13 (parent is current head), C12 (source in model).
 4. Against parent head: C6 (previousDeltaId matches `facts`), C7 (exists/not-exists preconditions).
-5. Against resulting head: C8, C9, C10, C11, C15.
+5. Against resulting head: C8, C9, C10, C11, C15, C17 (Sprint U4-1: at most one primary `supports`/`owns` edge per anchor element).
 6. Validation level for the branch kind: C16 → §6.3.
 
 C6 is the one that turns concurrent editing into a rejected commit rather than a lost update. Two people editing the same attribute of the same element on the same branch: the second submit fails C6 and must re-read.
@@ -769,7 +817,7 @@ A tombstone `$exists` fact with `live = false` is kept in memory for C7 checks a
 |---|---|---|
 | V1 | schema | every `elements_head.attributes` and `relationships_head.attributes` validates against `type_schemas` for `(type, models.schema_version)`; required attributes present |
 | V2 | structural | every `parent_id` references an element in the same head with the required type: capability→capability, container→system, component→container; capability/system/actor parents are null or (capability only) a capability. Every relationship endpoint references an element in the same head. |
-| V3 | schema | every relationship's `(type, from.type, to.type)` is in `relationship_type_rules`; `max_per_from` and `max_primary_per_to` respected |
+| V3 | schema | every relationship's `(type, from.type, to.type)` is in `relationship_type_rules`; `max_per_from`, `max_primary_per_to`, and `max_primary_per_from` respected — as of Sprint U4-1, the triple-legality half (C9) and both primary-cardinality rules (`max_primary_per_to` for `owns`, `max_primary_per_from` for `supports`) are enforced in `apply()` as C17, on every fold, with a database partial-unique-index as backstop for each; `max_per_from` (a non-primary per-type count cap, unused by any seed row today) has no enforcement anywhere — see `relationship_type_rules`'s own correction note in §3.3 |
 | V4 | structural | no cycle in `parent_id` |
 | V5 | structural | no element id in the head appears as `merged_element_id` in `element_merges` |
 | V6 | structural | no two relationships in the head share `(type, from, to)` |
@@ -1274,7 +1322,7 @@ All property tests use generated inputs (fast-check or equivalent) with shrinkin
 
 | Id | Property |
 |---|---|
-| P-8 | For each invariant C1–C16 there is a generator that produces an otherwise-valid envelope violating exactly that invariant, and `atlas.commit_deltas` (Sprint H1 rename, see RT-2) rejects it naming that id. Valid envelopes are accepted. |
+| P-8 | For each invariant C1–C17 there is a generator that produces an otherwise-valid envelope violating exactly that invariant, and `atlas.commit_deltas` (Sprint H1 rename, see RT-2) rejects it naming that id. Valid envelopes are accepted. |
 | P-9 | For each rule V1–V6 there is a generator that mutates a valid head to violate exactly that rule, and the gate reports exactly that rule; the resulting head is refused on main and (structural rules) on change branches, and accepted on `capture_draft` with the finding recorded. |
 | P-10 | Concurrency: two envelopes with the same `parentCommitId` submitted to the same branch → exactly one succeeds (C13); two envelopes on sequential parents updating the same fact key with the same `previousDeltaId` → the second fails C6. |
 | P-11 | Id reuse: an `element.create` with an id that appears in any delta of the model on any branch (including a retracted or merged-away one) is rejected (C5). |
@@ -1338,5 +1386,6 @@ Sprint H1 item 12 (docs/AUDIT-2026-09-U2.md's own deferred-items review, §7.2):
 | A generated (typed) Supabase client, replacing the untyped `Client` (src/db/branches.ts's own module comment: "no generated `Database` schema") | Every `src/db` function casts `data`/`error` by hand at its own return point instead of getting the row shape from a generated schema | **H2** | A real correctness/maintenance improvement (a schema drift would surface as a type error, not a runtime surprise) with no urgency today — regenerating on every migration is upkeep work worth taking on deliberately, not mid-sprint, and Sprint H2 is the first point named for revisiting this project's own H1/H2 numbering scheme. |
 | `relationship_type_rules` as a migrated table (§3.3) | A real `relationship_type_rules` table, as originally specified below | **Superseded — never.** | Sprint H1's `RELATIONSHIP_TYPE_RULES` constant (`src/contracts/relationshipTypeRules.ts`) already fully enforces C9/V3 — see §3.3's own note on this table. A migrated table would only ever be worth building if the ruleset needed to become live-editable product content without a code change (e.g. an admin screen for adjusting rules) — nothing today requires that, and none is planned. This is not "not yet"; it is a permanent design choice, recorded so a future request to migrate it has to argue against this decision rather than treat the gap as an oversight. |
 | Landscape p5 fps, 30 → 45 (UI-principles §8.6, ADR-015) | Closing the gap between the measured p5 frame rate (~30fps, three clean runs — `e2e/landscape-perf.spec.ts`) and §8.6's actual ≥45fps target; the CI gate itself is 28, a no-regression baseline, not this target | **R-perf** | Sprint C1-H item 1d got this test running end to end for the first time (previously blocked by an `.in()`-filter-size bug, then a `max_rows` truncation bug — both fixed); the ~30fps p5 number it then produced is real and reproducible, not an artifact of either fix. Closing it is a rendering-performance investigation, not a read-path one — profile the worst frames first (which ones miss budget, and why) rather than guessing at a fix. |
+| True drag-and-drop for capability map sibling reordering (Sprint U4-1 C1) | "Tailoring allows drag-to-reorder among siblings" ships as move buttons — left/right at L1, up/down at L2 — swapping `attributes.order` with an adjacent sibling, not a mouse drag gesture (`src/ui/capabilityMap/useCapabilityReorder.ts`'s own module comment: no drag-and-drop anywhere else in this codebase, no DnD library, and buttons stay keyboard-/screen-reader-operable, which a bare `draggable` element wouldn't be) | **U4-2** | Reviewed and accepted as the shipped behaviour for U4-1, not a gap to close before the item counts as done — the *effect* (a capability swaps places with an adjacent sibling) is identical either way. A real drag gesture is a genuine interaction upgrade once tailoring sees more day-to-day use, worth its own sprint rather than folded into C1 unreviewed. |
 
 Everything else this document defers is named at its point of use, not repeated here: SPEC §2's `created_at` exceptions, §9's `model_shares`-dependent RLS clauses (§9.2/§9.3/§9.5, all three annotated "pending `model_shares`, no target sprint named"), and §3.6's `capture_job_id` FK (pending `capture_jobs`, Sprint K1) are documentation of an absent dependency, not a scheduled follow-up in the sense this section means.

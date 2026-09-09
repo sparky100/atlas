@@ -10,9 +10,14 @@ import { useModels } from '../models/useModels';
 import { canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
+import { CapabilityMapAddForm } from '../capabilityMap/CapabilityMapAddForm';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
+import { ExportCapabilityMapAction } from '../capabilityMap/ExportCapabilityMapAction';
+import { SyncDescriptionsAction } from '../capabilityMap/SyncDescriptionsAction';
 import { useCapabilityMap } from '../capabilityMap/useCapabilityMap';
+import { useColourByPreference } from '../capabilityMap/useColourByPreference';
+import { useHomeMode } from '../home/useHomeMode';
 import styles from './CapabilityMapPage.module.css';
 
 /**
@@ -31,9 +36,11 @@ import styles from './CapabilityMapPage.module.css';
  * moment that matters in practice — main resolves fine but has no
  * capabilities yet — is `ready` with an empty tree: the import panel
  * (seed from a starter map, the primary action once any map is published)
- * and "Add a capability" (CapabilityMapView's own empty-state branch, the
- * always-available fallback) both show there, owner/architect only, same
- * gate as `Edit` (ADR-015).
+ * shows there, and "+ Add capability" (this page's own header action
+ * area, Sprint U4-1 C5 — always available whenever `canEdit`, whether
+ * the map is empty or not, not just CapabilityMapView's own former
+ * empty-state fallback) is already visible above it — both owner/
+ * architect only, same gate as `Edit` (ADR-015).
  */
 export function CapabilityMapPage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
@@ -49,6 +56,14 @@ export function CapabilityMapPage() {
   const { branch: mainBranch } = useMainBranch(model?.id ?? null);
 
   const { state, reload } = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref);
+
+  // Sprint U4-1 C4: "exposure for director home mode, coverage for
+  // architect" — the same home_mode this org's ModelHome.tsx switches
+  // doors on, not a capability-map-local concept. `hasSystems` only
+  // exists once the load resolves; `false` while it hasn't is a harmless
+  // transient default (colourBy isn't rendered anywhere until `ready`).
+  const { homeMode } = useHomeMode(userId, canEditOnMain(role));
+  const { colourBy, setColourBy } = useColourByPreference(userId, homeMode, state.status === 'ready' ? state.data.hasSystems : false);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -81,6 +96,19 @@ export function CapabilityMapPage() {
           <Text as="h1" size="2xl">
             Capability map
           </Text>
+          {canEdit && mainBranch && state.status === 'ready' && (
+            <div className={styles.actions}>
+              <CapabilityMapAddForm
+                tree={state.data.tree}
+                modelId={model.id}
+                orgId={organisation?.id ?? ''}
+                userId={userId}
+                branch={mainBranch}
+                expectedHeadCommitId={state.data.commitId}
+                onCreated={reload}
+              />
+            </div>
+          )}
         </div>
 
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
@@ -90,16 +118,32 @@ export function CapabilityMapPage() {
         {state.status === 'ready' && state.data.tree.l1.length === 0 && state.data.tree.orphans.length === 0 && canEdit && (
           <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reload} />
         )}
+        {state.status === 'ready' && (state.data.tree.l1.length > 0 || state.data.tree.orphans.length > 0) && canEdit && (
+          <div className={styles.maintenanceActions}>
+            <SyncDescriptionsAction modelId={model.id} userId={userId} onSynced={reload} />
+            <ExportCapabilityMapAction
+              modelId={model.id}
+              modelName={model.name}
+              orgName={organisation?.name ?? ''}
+              orgSlug={organisation?.slug ?? ''}
+              modelSlug={model.slug}
+              userId={userId}
+            />
+          </div>
+        )}
         {state.status === 'ready' && (
           <CapabilityMapView
             tree={state.data.tree}
             supportsEdges={state.data.supportsEdges}
             systemsById={state.data.systemsById}
+            hasSystems={state.data.hasSystems}
+            colourBy={colourBy}
+            onColourByChange={setColourBy}
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}
             refParam={refParam}
-            addCapability={
-              canEdit && mainBranch ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: mainBranch, expectedHeadCommitId: state.data.commitId, onCreated: reload } : undefined
+            reorderCapability={
+              canEdit && mainBranch ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: mainBranch, expectedHeadCommitId: state.data.commitId, onReordered: reload } : undefined
             }
           />
         )}

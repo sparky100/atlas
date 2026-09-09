@@ -47,8 +47,8 @@ Adding a sector is one edit there plus its tests, not a migration.
     }
   ],
   "items": [
-    { "code": "1", "name": "Finance", "level": 1, "parentCode": null, "description": "Planning, controlling and accounting for the organisation's money." },
-    { "code": "1.1", "name": "Financial Accounting", "level": 2, "parentCode": "1", "description": "Recording transactions and producing the statutory accounts." }
+    { "code": "1", "name": "Finance", "level": 1, "parentCode": null, "description": "Planning, controlling and accounting for the organisation's money.", "order": 10 },
+    { "code": "1.1", "name": "Financial Accounting", "level": 2, "parentCode": "1", "description": "Recording transactions and producing the statutory accounts.", "order": 10 }
   ]
 }
 ```
@@ -72,6 +72,11 @@ passes the parser can't fail the database):
 - `status: "published"` is what makes a map importable into a model (the
   tailoring flow's import picker only lists `published` maps) — leave new
   content at `"draft"` until it's actually reviewed by a named person.
+- Every item carries an `order` (integer). It only has to be unique among
+  siblings (same `parentCode`) — the parser rejects two siblings sharing
+  one. It does not have to be contiguous or start at 1 (see "multiples of
+  ten" below), and it's unrelated to `code`, which stays the stable
+  identifier deltas and seeded elements reference.
 
 ## Editorial conventions (not enforced by the parser — flagged by the review doc)
 
@@ -86,6 +91,16 @@ passes the parser can't fail the database):
   Estates, Digital & Technology, Governance & Assurance.
 - `sources.md` names the reference models consulted for every map and
   confirms nothing is copied verbatim. Licence for this content: CC BY 4.0.
+- Sector maps put their own core capabilities first and the shared
+  back-office ones last (Sprint U4-1 C1). Order values within one map are
+  multiples of ten (`10, 20, 30, …`) in each item's own sibling group, so a
+  later manual insertion between two existing items doesn't force
+  renumbering every sibling that follows it — give the new item the
+  midpoint value (e.g. `15` between `10` and `20`) instead. The eight
+  shared capabilities use the fixed values `1000`–`1070` (in the order
+  listed above) in every sector map, deliberately outside any sector's own
+  `10`-`90`-ish range, so they always sort after a sector's core
+  capabilities regardless of how many that sector has.
 
 Run `pnpm content:load-capability-maps` after adding or editing a file.
 Re-running is safe **for a draft map**: the loader upserts by
@@ -95,11 +110,50 @@ Once a map is published (below), re-running the loader against its
 `(sector, version)` fails loudly instead — publish content by adding a
 new version, not by editing a version that's already out.
 
+## Starting a map from a real model (`content:export-capability-map`)
+
+A file under this directory doesn't have to start from a blank page: Sprint
+U4-1 C6's `pnpm content:export-capability-map <org> <model> <sector>
+<version>` walks a model's own tailored capability tree at main head and
+writes `content/capability-maps/<sector>/<version>.json` for you — names,
+definitions, order and parent structure carried over; every model-specific
+attribute (an element id, `attributes.code`/`templateRef` from whatever
+originally seeded it) dropped, and fresh, sequential codes generated purely
+from the tree's own structure and display order. It regenerates
+`docs/review/capability-maps.md` afterwards, same as running
+`content:review-capability-maps` by hand.
+
+The written file is a `draft` with the same drafting placeholder every
+hand-authored map starts with ("Pending human review — exported from model
+\"...\""), and this script only writes the file — it does not load it: run
+`pnpm content:load-capability-maps` next, exactly as if you'd hand-authored
+it, then follow the same review/publish workflow below. Refuses to
+overwrite a file that already exists, so re-exporting an in-progress review
+never silently discards a human's edits to it.
+
+The owner-only "Export as starter map" action on the capability map page
+does the same underlying export, but for a browser session — which has no
+filesystem to write a content file to — it writes the result straight into
+`capability_maps`/`capability_map_items`/`capability_map_sources` as a new
+draft, via a privileged database function rather than this script's file.
+Both paths produce the same content from the same model at the same
+commit; only where the result lands differs.
+
+## Seeding a draft for review
+
+A `draft` map is real, loaded, queryable, **and seedable** — Sprint U4-1
+C6 relaxed the tailoring flow's import picker (and `atlas.seed_from_map`
+itself, which enforces this regardless of what the picker shows) to offer
+draft maps alongside published ones, flagged "Draft" in the list, so an
+owner or architect can seed one into a real model to see how it actually
+reads before deciding whether to publish it. A `deprecated` map is never
+offered either way.
+
 ## Publishing: draft → review doc → a human runs `content:publish-capability-map`
 
-A map stays `draft` — real, loaded, queryable, but not offered by the
-tailoring flow's import picker — until someone actually reviews it. The
-workflow:
+A map stays `draft` — real, loaded, queryable and seedable for review, but
+flagged as such everywhere it appears, not indistinguishable from a
+reviewed, published map — until someone actually reviews it. The workflow:
 
 1. Load the map (`pnpm content:load-capability-maps`) and regenerate the
    review document (`pnpm content:review-capability-maps`); read

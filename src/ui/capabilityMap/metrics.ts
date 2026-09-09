@@ -40,12 +40,18 @@
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { LifecycleStatus, UUID } from '../../contracts/delta';
+import type { HomeMode } from '../../contracts/userPreferences';
 import type { ChipTone } from '../components/Chip/Chip';
 import { STALE_AFTER_MONTHS } from '../../contracts/thresholds';
 import { attributesRecord } from '../elements/attributesRecord';
 import { LIFECYCLE_ORDER, LIFECYCLE_TONE } from '../elements/lifecycleTone';
 
-export type ColourByMode = 'none' | 'metric:supportingSystemCount' | 'metric:oldestLifecycleStage' | 'metric:lifecycleExposure';
+// The mode identifiers themselves are canonical in src/contracts/userPreferences.ts
+// (Sprint U4-1 C4: they're now persisted, `user_preferences.capability_map_colour_by`)
+// — re-exported under this file's own established name so its two existing
+// callers (CapabilityMapView.tsx, this file) don't need to change.
+export type { CapabilityMapColourByMode as ColourByMode } from '../../contracts/userPreferences';
+import type { CapabilityMapColourByMode as ColourByMode } from '../../contracts/userPreferences';
 
 export const COLOUR_BY_OPTIONS: { value: ColourByMode; label: string }[] = [
   { value: 'metric:supportingSystemCount', label: 'Coverage (supporting-system count)' },
@@ -127,4 +133,76 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
       return exposed ? { tone: 'danger', label: 'exposed' } : { tone: undefined, label: undefined };
     }
   }
+}
+
+/**
+ * The tone+label an L1 group's own header shows (a Chip alongside the
+ * name, per the human's own review note on Sprint U4-1 C3 — "a strip/
+ * chip... not a fill", unlike `tileColourFor`'s per-tile background
+ * fill), aggregated across every L2 *and* L3 descendant capability, not
+ * just the L1's own direct children — a capability whose only exposed
+ * descendant sits at L3 still needs its L1 ancestor to read as exposed,
+ * or the group-level summary hides exactly the thing colour-by exists to
+ * surface.
+ *
+ * - **Exposure** / **oldest lifecycle stage**: worst-of-children — any
+ *   exposed descendant makes the whole group `exposed`; the group's own
+ *   "oldest stage" is the most-advanced stage among any descendant's own
+ *   (already worst-of-its-own-supporting-systems) stage. Same reasoning
+ *   `tileColourFor`'s per-tile version already uses, just maximised over
+ *   more than one capability.
+ * - **Coverage**: fraction-supported, not worst-of-children — "0 of 3
+ *   capabilities have a supporting system" is a real, different fact
+ *   from "1 of 3", and averaging away *how many* would lose it. `warn`
+ *   only when literally none of the group's descendants have a
+ *   supporting system (mirrors the per-tile rule: a count of zero is the
+ *   one coverage value that's ever `warn`).
+ *
+ * `descendantCapabilityIds` is the caller's own flattened L2+L3 id list
+ * (`L1ColumnView` already has `column.l2`/each card's `l3`) — kept a
+ * plain id list rather than this file taking a dependency on `layout.ts`'s
+ * tree shape.
+ */
+export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityIds: readonly UUID[], supportsEdges: readonly RelationshipsHeadRow[], systemsById: Map<UUID, ElementsHeadRow>): TileColour {
+  if (descendantCapabilityIds.length === 0) return { tone: undefined, label: undefined };
+  switch (mode) {
+    case 'none':
+      return { tone: undefined, label: undefined };
+    case 'metric:supportingSystemCount': {
+      const supportedCount = descendantCapabilityIds.filter((id) => supportingSystemIds(id, supportsEdges).length > 0).length;
+      const total = descendantCapabilityIds.length;
+      return { tone: supportedCount === 0 ? 'warn' : 'neutral', label: `${String(supportedCount)}/${String(total)} capabilities supported` };
+    }
+    case 'metric:oldestLifecycleStage': {
+      let worst: LifecycleStatus | null = null;
+      for (const id of descendantCapabilityIds) {
+        const stage = oldestLifecycleStage(id, supportsEdges, systemsById);
+        if (stage !== null && (worst === null || LIFECYCLE_ORDER[stage] > LIFECYCLE_ORDER[worst])) worst = stage;
+      }
+      return worst === null ? { tone: undefined, label: undefined } : { tone: LIFECYCLE_TONE[worst], label: worst };
+    }
+    case 'metric:lifecycleExposure': {
+      const exposed = descendantCapabilityIds.some((id) => lifecycleExposure(id, supportsEdges, systemsById));
+      return exposed ? { tone: 'danger', label: 'exposed' } : { tone: undefined, label: undefined };
+    }
+  }
+}
+
+/**
+ * Sprint U4-1 C4's "default colour-by": exposure for a director, coverage
+ * for an architect; "none" only while the model has no systems at all
+ * (`hasSystems` — `src/db/capabilityMap.ts`'s `hasAnySystem`, the real
+ * model-wide answer, not `useCapabilityMap.ts`'s own `systemsById`, which
+ * only ever holds systems that already support *some* capability — a
+ * model can have real systems and still show 0 there); a saved choice
+ * (`user_preferences.capability_map_colour_by`, `saved` here) always
+ * wins over both, since "remember last choice per user" is the whole
+ * point of persisting it at all — this only ever runs the default logic
+ * for the *first* time a person opens a map, or after using it on a
+ * model with no systems yet.
+ */
+export function resolveDefaultColourBy(saved: ColourByMode | null, homeMode: HomeMode, hasSystems: boolean): ColourByMode {
+  if (saved !== null) return saved;
+  if (!hasSystems) return 'none';
+  return homeMode === 'director' ? 'metric:lifecycleExposure' : 'metric:supportingSystemCount';
 }

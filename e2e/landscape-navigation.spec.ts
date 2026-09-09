@@ -81,7 +81,8 @@ test('selecting a system on the landscape zooms to its Context view and updates 
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'seed Billing Service',
+    title: 'seed Billing Service',
+    body: null,
     deltas: [
       { kind: 'element.create', id: randomUUID(), elementId: systemId, elementType: 'system', name: systemName, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
     ],

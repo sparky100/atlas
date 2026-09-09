@@ -658,3 +658,179 @@ describe('C9: relationship.create enforces RELATIONSHIP_TYPE_RULES', () => {
     expect(() => fold(emptyHead(), [delta], ctx)).toThrow(/fromElementId .* does not exist/);
   });
 });
+
+describe('C17: at most one primary supports edge per system, one primary owns edge per owned element', () => {
+  // `fold`/`apply` take no branch-kind argument — `commitToBranch`
+  // (src/db/commits.ts) calls the exact same `fold` for a `main` commit
+  // and a `change` branch's own commit, so a check inside `apply()` is, by
+  // construction, checked identically for both. The tests below exercise
+  // `fold` directly (as C8/C9 above already do, with no separate
+  // "on main"/"on a change branch" split), which is what makes this an
+  // engine-level guarantee rather than something a branch kind could opt
+  // out of; the last test in this block makes that explicit by folding the
+  // same violating pair of deltas onto two independently-built heads that
+  // stand in for a main head and a change branch's head.
+  function elementCreate(id: UUID, elementId: UUID, elementType: ElementType, name: string): Delta {
+    const attributes =
+      elementType === 'system' ? { lifecycleStatus: 'active', isExternal: false } : elementType === 'actor' ? { subtype: 'person', isExternal: false } : {};
+    return { kind: 'element.create', id, elementId, elementType, name, parentId: null, attributes: attributes as never, sourceId: 'src', confidence: 1 };
+  }
+
+  function supportsCreate(id: UUID, relationshipId: UUID, systemId: UUID, capabilityId: UUID, role: 'primary' | 'secondary'): Delta {
+    return { kind: 'relationship.create', id, relationshipId, relationshipType: 'supports', fromElementId: systemId, toElementId: capabilityId, attributes: { role }, sourceId: 'src', confidence: 1 };
+  }
+
+  function ownsCreate(id: UUID, relationshipId: UUID, actorId: UUID, targetId: UUID, primary: boolean): Delta {
+    return { kind: 'relationship.create', id, relationshipId, relationshipType: 'owns', fromElementId: actorId, toElementId: targetId, attributes: { primary }, sourceId: 'src', confidence: 1 };
+  }
+
+  function relationshipRetract(id: UUID, relationshipId: UUID, relationshipType: RelationshipType, previousDeltaId: UUID): Delta {
+    return { kind: 'relationship.retract', id, relationshipId, relationshipType, previousDeltaId, sourceId: 'src', confidence: 1 };
+  }
+
+  function relationshipRestore(id: UUID, relationshipId: UUID, relationshipType: RelationshipType, previousDeltaId: UUID): Delta {
+    return { kind: 'relationship.restore', id, relationshipId, relationshipType, previousDeltaId, sourceId: 'src', confidence: 1 };
+  }
+
+  /** One system and two capabilities — a fixture wide enough for "the system's second supports edge" scenarios. */
+  function systemAndTwoCapabilities(): Head {
+    return fold(emptyHead(), [elementCreate('d-sys', 'sys-1', 'system', 'PowerON'), elementCreate('d-cap-a', 'cap-a', 'capability', 'Asset Management'), elementCreate('d-cap-b', 'cap-b', 'capability', 'Network Operations')], ctx);
+  }
+
+  /** Two actors and one target system — "the system's second owner" scenarios. */
+  function twoActorsAndOneSystem(): Head {
+    return fold(
+      emptyHead(),
+      [elementCreate('d-actor-a', 'actor-a', 'actor', 'Network Control'), elementCreate('d-actor-b', 'actor-b', 'actor', 'Asset Management Team'), elementCreate('d-sys', 'sys-1', 'system', 'PowerON')],
+      ctx,
+    );
+  }
+
+  it('supports.create: a second primary edge from the same system, with no demotion, is rejected naming C17 and both capabilities', () => {
+    const head = systemAndTwoCapabilities();
+    fold(head, [supportsCreate('d-r1', 'rel-1', 'sys-1', 'cap-a', 'primary')], ctx);
+    const attempt = () => fold(head, [supportsCreate('d-r2', 'rel-2', 'sys-1', 'cap-b', 'primary')], ctx);
+    expect(attempt).toThrow(EngineError);
+    expect(attempt).toThrow(/C17/);
+    expect(attempt).toThrow(/PowerON/);
+    expect(attempt).toThrow(/Asset Management/);
+  });
+
+  it('supports.create: a second edge with no role conflict (secondary) is always accepted, primary or not', () => {
+    const head = systemAndTwoCapabilities();
+    fold(head, [supportsCreate('d-r1', 'rel-1', 'sys-1', 'cap-a', 'primary')], ctx);
+    expect(() => fold(head, [supportsCreate('d-r2', 'rel-2', 'sys-1', 'cap-b', 'secondary')], ctx)).not.toThrow();
+  });
+
+  it('supports.create: promoting a second edge is accepted when the same commit demotes the first one earlier in seq order', () => {
+    const head = systemAndTwoCapabilities();
+    fold(head, [supportsCreate('d-r1', 'rel-1', 'sys-1', 'cap-a', 'primary')], ctx);
+    const demote: Delta = { kind: 'relationship.update', id: 'd-demote', relationshipId: 'rel-1', relationshipType: 'supports', attribute: 'role', value: 'secondary', previousDeltaId: 'd-r1', sourceId: 'src', confidence: 1 };
+    const promote = supportsCreate('d-r2', 'rel-2', 'sys-1', 'cap-b', 'primary');
+    expect(() => fold(head, [demote, promote], ctx)).not.toThrow();
+  });
+
+  it('supports.update: promoting an existing secondary edge while another edge already holds primary is rejected; the same fold with a same-commit demotion first succeeds', () => {
+    const buildHead = () => fold(systemAndTwoCapabilities(), [supportsCreate('d-r1', 'rel-1', 'sys-1', 'cap-a', 'primary'), supportsCreate('d-r2', 'rel-2', 'sys-1', 'cap-b', 'secondary')], ctx);
+    const promote: Delta = { kind: 'relationship.update', id: 'd-promote', relationshipId: 'rel-2', relationshipType: 'supports', attribute: 'role', value: 'primary', previousDeltaId: 'd-r2', sourceId: 'src', confidence: 1 };
+
+    expect(() => fold(buildHead(), [promote], ctx)).toThrow(/C17/);
+
+    const demote: Delta = { kind: 'relationship.update', id: 'd-demote', relationshipId: 'rel-1', relationshipType: 'supports', attribute: 'role', value: 'secondary', previousDeltaId: 'd-r1', sourceId: 'src', confidence: 1 };
+    expect(() => fold(buildHead(), [demote, promote], ctx)).not.toThrow();
+  });
+
+  it('owns.create: a second primary owner of the same target, with no demotion, is rejected naming C17, the target, and the existing owner', () => {
+    const head = twoActorsAndOneSystem();
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
+    const attempt = () => fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', true)], ctx);
+    expect(attempt).toThrow(EngineError);
+    expect(attempt).toThrow(/C17/);
+    // Names the target (the anchor) and the *existing* primary owner —
+    // not the new one being attempted, which the caller already knows.
+    expect(attempt).toThrow(/PowerON/);
+    expect(attempt).toThrow(/Network Control/);
+  });
+
+  it('owns.create: a non-primary second owner of the same target is always accepted', () => {
+    const head = twoActorsAndOneSystem();
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
+    expect(() => fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', false)], ctx)).not.toThrow();
+  });
+
+  it('owns.create: promoting a second owner is accepted when the same commit demotes the first one earlier in seq order', () => {
+    const head = twoActorsAndOneSystem();
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
+    const demote: Delta = { kind: 'relationship.update', id: 'd-demote', relationshipId: 'rel-1', relationshipType: 'owns', attribute: 'primary', value: false, previousDeltaId: 'd-r1', sourceId: 'src', confidence: 1 };
+    const promote = ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', true);
+    expect(() => fold(head, [demote, promote], ctx)).not.toThrow();
+  });
+
+  it('supports.restore: reviving a retracted primary is rejected once a new edge has taken over as primary; restoring after that new one is retracted too succeeds', () => {
+    const head = systemAndTwoCapabilities();
+    fold(head, [supportsCreate('d-r1', 'rel-1', 'sys-1', 'cap-a', 'primary')], ctx);
+    fold(head, [relationshipRetract('d-retract-r1', 'rel-1', 'supports', 'd-r1')], ctx);
+    fold(head, [supportsCreate('d-r2', 'rel-2', 'sys-1', 'cap-b', 'primary')], ctx);
+
+    const attempt = () => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'supports', 'd-retract-r1')], ctx);
+    expect(attempt).toThrow(EngineError);
+    expect(attempt).toThrow(/C17/);
+    expect(attempt).toThrow(/PowerON/);
+    expect(attempt).toThrow(/Network Operations/);
+
+    fold(head, [relationshipRetract('d-retract-r2', 'rel-2', 'supports', 'd-r2')], ctx);
+    expect(() => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'supports', 'd-retract-r1')], ctx)).not.toThrow();
+  });
+
+  it('owns.restore: reviving a retracted primary owner is rejected once a new owner has taken over as primary; restoring after that new one is retracted too succeeds', () => {
+    const head = twoActorsAndOneSystem();
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
+    fold(head, [relationshipRetract('d-retract-r1', 'rel-1', 'owns', 'd-r1')], ctx);
+    fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', true)], ctx);
+
+    const attempt = () => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'owns', 'd-retract-r1')], ctx);
+    expect(attempt).toThrow(EngineError);
+    expect(attempt).toThrow(/C17/);
+    expect(attempt).toThrow(/PowerON/);
+    expect(attempt).toThrow(/Asset Management Team/);
+
+    fold(head, [relationshipRetract('d-retract-r2', 'rel-2', 'owns', 'd-r2')], ctx);
+    expect(() => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'owns', 'd-retract-r1')], ctx)).not.toThrow();
+  });
+
+  it('two different systems/targets never conflict with each other', () => {
+    const head = fold(
+      emptyHead(),
+      [
+        elementCreate('d-sys-a', 'sys-a', 'system', 'PowerON'),
+        elementCreate('d-sys-b', 'sys-b', 'system', 'Grid Sensor Array'),
+        elementCreate('d-cap', 'cap-1', 'capability', 'Asset Management'),
+      ],
+      ctx,
+    );
+    fold(head, [supportsCreate('d-r1', 'rel-1', 'sys-a', 'cap-1', 'primary')], ctx);
+    expect(() => fold(head, [supportsCreate('d-r2', 'rel-2', 'sys-b', 'cap-1', 'primary')], ctx)).not.toThrow();
+  });
+
+  it('rejects the same violation whether the deltas are folded onto a main-shaped head or a change-branch-shaped head', () => {
+    // Nothing here is actually "main" or "a change branch" — Head has no
+    // such field, which is exactly the point: commitToBranch folds a
+    // change branch's own commits through this identical `fold`/`apply`,
+    // so there is no code path where a branch kind sees a different
+    // result. Two independently-forked heads (standing in for main's head
+    // and a change branch's own head, both descended from the same
+    // genesis-shaped fixture) both reject the same second-primary delta.
+    // `fold` mutates its `head` argument in place (each commit advances the
+    // branch's head), so main and the change branch need their own
+    // independently-built fixture — sharing one `Head` object between them
+    // would make the branch's fold see main's edge already applied.
+    const mainHead = fold(systemAndTwoCapabilities(), [supportsCreate('d-main-r1', 'rel-main-1', 'sys-1', 'cap-a', 'primary')], ctx);
+    const changeBranchHead = fold(systemAndTwoCapabilities(), [supportsCreate('d-branch-r1', 'rel-branch-1', 'sys-1', 'cap-a', 'primary')], ctx);
+
+    const promoteOnMain = supportsCreate('d-main-r2', 'rel-main-2', 'sys-1', 'cap-b', 'primary');
+    const promoteOnBranch = supportsCreate('d-branch-r2', 'rel-branch-2', 'sys-1', 'cap-b', 'primary');
+
+    expect(() => fold(mainHead, [promoteOnMain], ctx)).toThrow(/C17/);
+    expect(() => fold(changeBranchHead, [promoteOnBranch], ctx)).toThrow(/C17/);
+  });
+});

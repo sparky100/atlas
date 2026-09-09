@@ -50,6 +50,22 @@ export async function listFactsForSubject(supabase: Client, commitId: UUID, subj
 }
 
 /**
+ * Every live `attribute` fact at `commitId`, across every subject — the
+ * commit/model-scoped shape CLAUDE.md rule 8 asks for instead of an
+ * `.in(subject_id, [...])` sized by however many subjects a caller cares
+ * about (a list that can grow with the model, e.g. "every capability"):
+ * one query bounded by `commit_id`/`attribute` alone, filtered against the
+ * caller's own subject list client-side (src/db/syncDescriptionsFromMap.ts's
+ * one caller today). Ordered by `subject_id` for a stable pagination order —
+ * `(commit_id, subject_id, attribute)` is `facts`'s primary key, and
+ * `commit_id`/`attribute` are already pinned by the `.eq()`s above.
+ */
+export async function listFactsForAttribute(supabase: Client, commitId: UUID, attribute: string): Promise<FactsRow[]> {
+  const query = supabase.from('facts').select(FACTS_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).eq('attribute', attribute).order('subject_id');
+  return selectAll<FactsRow>(query);
+}
+
+/**
  * Every relationship touching `elementId` in either direction — §4.4's "both
  * directions are shown," never just outbound. Routed through `selectAll`
  * (SPEC §6.7), ordered by `relationship_id` for a stable, unique pagination

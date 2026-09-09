@@ -1,12 +1,12 @@
-.actions,
-.renameForm {
+.form {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
 }
 
-.input {
+.input,
+.select {
   height: var(--row-height);
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
@@ -14,4 +14,8 @@
   background: var(--surface);
   color: var(--text);
   font: inherit;
+}
+
+.input {
+  width: 5em;
 }

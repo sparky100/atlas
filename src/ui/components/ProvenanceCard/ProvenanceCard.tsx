@@ -1,5 +1,6 @@
 import type { DeltaRow, FactsRow } from '../../../contracts/rows';
 import { monthsSince } from '../../../contracts/thresholds';
+import type { CapabilityMapRow } from '../../../db/capabilityMapTemplates';
 import type { SourceRow } from '../../../db/types';
 import { ConfidenceDots } from '../ConfidenceDots/ConfidenceDots';
 import { Text } from '../Text/Text';
@@ -18,6 +19,15 @@ export interface ProvenanceCardProps {
   /** [currentFact's own delta, ...supersededDeltas], oldest last. `null` while still loading (fetched lazily on first hover/focus) — the top-level fields render immediately either way; only the "Previously" section waits. */
   supersessionChain: DeltaRow[] | null;
   supersessionSources: Map<string, SourceRow>;
+  /**
+   * Sprint U4-1 D2: "Show on the provenance card as 'Seeded from
+   * electricity_network v1'". `null` either while `FactBadge`'s own lazy
+   * fetch hasn't resolved yet, or when `source` isn't a `template`-kind
+   * source at all (the overwhelmingly common case) — either way, nothing
+   * renders; this is additional context for a seeded fact, not a
+   * required field every card must show.
+   */
+  seededFrom: CapabilityMapRow | null;
   now?: Date;
 }
 
@@ -28,7 +38,7 @@ export interface ProvenanceCardProps {
  * every screen, per §4.3 — this component is the shared implementation;
  * canvas tooltips (step 4) reuse it too.
  */
-export function ProvenanceCard({ fact, source, supersessionChain, supersessionSources, now = new Date() }: ProvenanceCardProps) {
+export function ProvenanceCard({ fact, source, supersessionChain, supersessionSources, seededFrom, now = new Date() }: ProvenanceCardProps) {
   const effectiveDate = fact.effective_date ? new Date(fact.effective_date) : new Date(fact.asserted_at);
   const recordedDate = new Date(fact.asserted_at);
   const superseded = supersessionChain?.filter((d) => d.id !== fact.delta_id) ?? null;
@@ -51,6 +61,11 @@ export function ProvenanceCard({ fact, source, supersessionChain, supersessionSo
           {source?.kind ?? '—'}
         </Text>
       </div>
+      {seededFrom && (
+        <Text size="sm" tone="muted" as="p" className={styles.seededFrom}>
+          Seeded from {seededFrom.sector} v{seededFrom.version}
+        </Text>
+      )}
       {fact.source_ref !== null && (
         <div className={styles.row}>
           <Text size="sm" tone="muted" as="span">

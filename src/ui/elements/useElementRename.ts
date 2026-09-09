@@ -3,6 +3,7 @@ import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
 import { createAlias } from '../../db/aliases';
 import { commitToBranch } from '../../db/commits';
+import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
@@ -108,14 +109,19 @@ export function useElementRename(input: UseElementRenameInput): UseElementRename
         confidence: 1,
       } as Delta;
 
+      const deltas = [delta];
       const envelope: CommitEnvelope = {
         id: crypto.randomUUID(),
         branchId: branch.id,
         parentCommitId: expectedHeadCommitId,
         mergedBranchHeadCommitId: null,
         kind: 'manual',
-        message: `Rename "${element.name}" to "${trimmed}"`,
-        deltas: [delta],
+        // `element.name` is still the *old* name here — the rename hasn't
+        // committed yet — which is exactly what "Rename {old} to {new}"
+        // needs.
+        title: describeEnvelope(deltas, (id) => (id === element.element_id ? element.name : undefined)),
+        body: `Rename "${element.name}" to "${trimmed}"`,
+        deltas,
       };
 
       const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });

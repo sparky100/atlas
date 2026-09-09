@@ -12,7 +12,7 @@ function elementUpdate(id: string, elementId: string, value: string, previousDel
 }
 
 function relationshipCreate(id: string, relationshipId: string, fromElementId: string, toElementId: string): Delta {
-  return { kind: 'relationship.create', id, relationshipId, relationshipType: 'supports', fromElementId, toElementId, attributes: {}, sourceId: 'src', confidence: 1 };
+  return { kind: 'relationship.create', id, relationshipId, relationshipType: 'supports', fromElementId, toElementId, attributes: { role: 'secondary' }, sourceId: 'src', confidence: 1 };
 }
 
 function system(name: string): ElementRow {

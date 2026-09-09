@@ -92,7 +92,8 @@ export async function bootstrapChangeBranchFixture(page: Page, env: Env, prefix:
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: `seed ${systemName}`,
+    title: `seed ${systemName}`,
+    body: null,
     deltas: [
       {
         kind: 'element.create',

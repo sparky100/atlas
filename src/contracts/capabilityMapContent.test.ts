@@ -6,6 +6,7 @@ interface MutableItem {
   name: string;
   level: number;
   parentCode: string | null;
+  order: number;
 }
 
 interface MutableContent {
@@ -25,8 +26,8 @@ function validContent(): MutableContent {
     sourceDescription: 'A test map',
     sources: [{ citation: 'Some framework', reviewedBy: 'Jane Reviewer', reviewedAt: '2026-01-01' }],
     items: [
-      { code: '1', name: 'Root', level: 1, parentCode: null },
-      { code: '1.1', name: 'Child', level: 2, parentCode: '1' },
+      { code: '1', name: 'Root', level: 1, parentCode: null, order: 10 },
+      { code: '1.1', name: 'Child', level: 2, parentCode: '1', order: 10 },
     ],
   };
 }
@@ -83,6 +84,34 @@ describe('parseCapabilityMapContent', () => {
     const content = validContent();
     content.items = [];
     expect(() => parseCapabilityMapContent(content, 'test.json')).toThrow();
+  });
+
+  describe('order (Sprint U4-1 C1)', () => {
+    it('rejects an item with no order at all', () => {
+      const content = validContent();
+      const withoutOrder = content.items as (Partial<MutableItem> & Omit<MutableItem, 'order'>)[];
+      delete withoutOrder[0]?.order;
+      expect(() => parseCapabilityMapContent(content, 'test.json')).toThrow();
+    });
+
+    it('rejects two siblings under the same parent sharing an order value', () => {
+      const content = validContent();
+      content.items.push({ code: '1.2', name: 'Second Child', level: 2, parentCode: '1', order: 10 }); // same order as "1.1"
+      expect(() => parseCapabilityMapContent(content, 'test.json')).toThrow(/order 10 is already used/);
+    });
+
+    it('the same order value is fine across two different sibling groups (top level vs under "1")', () => {
+      // Root ("1", top level) and Child ("1.1", under "1") both already use
+      // order 10 in validContent() — different sibling groups, no collision.
+      const parsed = parseCapabilityMapContent(validContent(), 'test.json');
+      expect(parsed.items.map((i) => i.order)).toEqual([10, 10]);
+    });
+
+    it('two top-level items sharing an order value are rejected', () => {
+      const content = validContent();
+      content.items.push({ code: '2', name: 'Second Root', level: 1, parentCode: null, order: 10 }); // same order as "1", both top-level
+      expect(() => parseCapabilityMapContent(content, 'test.json')).toThrow(/order 10 is already used/);
+    });
   });
 
   // The sector list is the contract's, not a database CHECK's, as of

@@ -2,17 +2,42 @@ import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, RelationshipType, UUID } from '../../contracts/delta';
 import type { Json } from '../../contracts/rows';
 import { commitToBranch } from '../../db/commits';
+import { describeEnvelope, type NameLookup } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 
 export type RelationshipCreateStatus = 'idle' | 'creating';
 
+/** A second, same-commit `relationship.update` alongside the create — Sprint U4-1 B4's "at most one primary per system" swap: promoting a new `supports` edge to `role: 'primary'` demotes whichever edge held it before, in the same commit, or the DB's own partial unique index (`relationships_head_one_primary_supports_per_system`) would reject the commit outright. */
+export interface RelationshipCreateDemotion {
+  relationshipId: UUID;
+  /** The delta currently asserting the attribute being changed (`relationshipFacts.get(relationshipId)?.get(attribute)?.delta_id`), falling back to the relationship's own `exists_delta_id` when nothing has updated that attribute since creation — same fallback shape `useElementRename.ts`/`useElementEditor.ts` already use for an element's own facts. */
+  previousDeltaId: UUID;
+  attribute: string;
+  value: Json;
+}
+
 export interface UseRelationshipCreateResult {
   status: RelationshipCreateStatus;
   error: string | null;
-  /** `attributes`, when given, merges over this relationship type's own default (Handoff — Flow: Add a system, step 6: a `uses`/`flows_to` verb phrase rides in the relationship's own `description`, per `UsesAttributes`/`FlowsToAttributes` — there is no separate verb field in the contract). */
-  create: (otherElementId: UUID, attributes?: Record<string, Json>) => Promise<void>;
+  /**
+   * `otherElementName` is only for the generated commit title
+   * (`describeEnvelope`'s `nameLookup`, e.g. "Link PowerON supports Outage
+   * & Fault Management") — the caller already has it in hand, it's the
+   * very search result being clicked. `attributesOverride`, when given,
+   * replaces this hook's own default attributes entirely — B4's `supports`
+   * picker builds `{ role: 'primary' | 'secondary' }` itself (only the
+   * caller knows the answer to "primary?"), and Handoff — Flow: Add a
+   * system, step 6's `uses`/`flows_to` verb phrase builds `{ description }`
+   * the same way (there is no separate verb field in the contract —
+   * `UsesAttributes`/`FlowsToAttributes.description` is it). Every real
+   * caller's own default (`relationshipType === 'owns' ? {primary:true} :
+   * {}`) is `{}` whenever it passes an override at all, so replace-vs-merge
+   * never actually differs for any of them — override is simpler. `demotion`,
+   * when given, folds one extra `relationship.update` into the same commit.
+   */
+  create: (otherElementId: UUID, otherElementName: string, attributesOverride?: Record<string, Json>, demotion?: RelationshipCreateDemotion | null) => Promise<void>;
 }
 
 export interface UseRelationshipCreateInput {
@@ -23,6 +48,8 @@ export interface UseRelationshipCreateInput {
   direction: 'outbound' | 'inbound';
   /** The element whose Relationships section this "+ Add" lives on. */
   elementId: UUID;
+  /** Same element's name — only for the generated commit title, see `create`'s own doc comment. */
+  elementName: string;
   branch: BranchRow;
   expectedHeadCommitId: UUID;
   onCreated: () => void;
@@ -43,12 +70,12 @@ export interface UseRelationshipCreateInput {
  * enforced server-side regardless of what this default guesses.
  */
 export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRelationshipCreateResult {
-  const { modelId, orgId, userId, relationshipType, direction, elementId, branch, expectedHeadCommitId, onCreated } = input;
+  const { modelId, orgId, userId, relationshipType, direction, elementId, elementName, branch, expectedHeadCommitId, onCreated } = input;
   const [status, setStatus] = useState<RelationshipCreateStatus>('idle');
   const [error, setError] = useState<string | null>(null);
 
   const create = useCallback(
-    async (otherElementId: UUID, extraAttributes?: Record<string, Json>) => {
+    async (otherElementId: UUID, otherElementName: string, attributesOverride?: Record<string, Json>, demotion?: RelationshipCreateDemotion | null) => {
       if (!userId) {
         setError('You must be signed in to add a relationship.');
         return;
@@ -64,10 +91,11 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
         // See this hook's own module comment for why `owns` alone gets a
         // real default here rather than `{}` — every other relationship
         // type's attributes are entirely optional (SupportsAttributes/
-        // UsesAttributes/FlowsToAttributes).
-        const attributes = { ...(relationshipType === 'owns' ? { primary: true } : {}), ...extraAttributes };
+        // UsesAttributes/FlowsToAttributes). `attributesOverride` always
+        // replaces this when given.
+        const attributes = attributesOverride ?? (relationshipType === 'owns' ? { primary: true } : {});
 
-        const delta = {
+        const createDelta = {
           kind: 'relationship.create',
           id: crypto.randomUUID(),
           relationshipId: crypto.randomUUID(),
@@ -79,14 +107,36 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
           confidence: 1,
         } as Delta;
 
+        const demoteDelta: Delta | null = demotion
+          ? ({
+              kind: 'relationship.update',
+              id: crypto.randomUUID(),
+              relationshipId: demotion.relationshipId,
+              relationshipType,
+              attribute: demotion.attribute,
+              value: demotion.value,
+              previousDeltaId: demotion.previousDeltaId,
+              sourceId: source.id,
+              confidence: 1,
+            } as Delta)
+          : null;
+        // The demotion lands first — describeEnvelope's own 2-delta
+        // "create and link" combination only recognises `[element.create,
+        // relationship.create]`, so ordering the create delta last here
+        // just falls through to its generic "(2 changes)" fallback rather
+        // than accidentally matching the wrong combined phrasing.
+        const deltas = demoteDelta ? [demoteDelta, createDelta] : [createDelta];
+
+        const nameLookup: NameLookup = (id) => (id === elementId ? elementName : id === otherElementId ? otherElementName : undefined);
         const envelope: CommitEnvelope = {
           id: crypto.randomUUID(),
           branchId: branch.id,
           parentCommitId: expectedHeadCommitId,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
-          message: `Add ${relationshipType} relationship`,
-          deltas: [delta],
+          title: describeEnvelope(deltas, nameLookup),
+          body: `Add ${relationshipType} relationship`,
+          deltas,
         };
 
         const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });
@@ -107,7 +157,7 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
         setError(e instanceof Error ? e.message : 'Could not add relationship.');
       }
     },
-    [modelId, orgId, userId, relationshipType, direction, elementId, branch, expectedHeadCommitId, onCreated],
+    [modelId, orgId, userId, relationshipType, direction, elementId, elementName, branch, expectedHeadCommitId, onCreated],
   );
 
   return { status, error, create };

@@ -7,21 +7,35 @@ import { supabase } from '../supabaseClient';
 export interface UseMainBranchResult {
   branch: BranchRow | null;
   loading: boolean;
+  /**
+   * Re-fetches this row (Sprint U4-1 A1) — call after any commit that may
+   * have moved `main`'s head, alongside whatever else the page reloads.
+   * Needed because `head_commit_id` isn't just a display value: every
+   * search-pool hook (`useElementSearchAdd`/`useHomeSearch`/
+   * `useRelationshipTargetSearch`) reads `elements_head`/`aliases` filtered
+   * to a specific `commit_id`, and `elements_head` only ever holds rows for
+   * `main`'s *current* head (SPEC §1 S-2/P-6) — once another commit lands,
+   * the old `commit_id` this hook handed out has zero rows left, not just
+   * stale ones. Without calling this, a page that creates something once
+   * and then searches again (or creates a second thing) silently searches
+   * against a `commit_id` that no longer exists, finding nothing at all.
+   */
+  reload: () => void;
 }
 
 /**
  * A model's `main` branch row (Sprint C1 step 4) — every editing hook now
  * takes an explicit `branch: BranchRow` rather than looking `main` up for
  * itself (src/ui/elements/useElementEditor.ts's own doc comment), so every
- * page that edits at `main` needs this once. Reload isn't wired here: none
- * of `main`'s own row fields (`id`, `kind`) that editing actually reads
- * ever change once a model exists, only `head_commit_id` — and every
- * editing hook already takes that separately as `expectedHeadCommitId`,
- * refreshed by the page's own reload.
+ * page that edits at `main` needs this once. `id`/`kind` never change once
+ * a model exists, but `head_commit_id` does, on every commit — `reload`
+ * (added Sprint U4-1 A1) is how a caller keeps it current; see `reload`'s
+ * own doc comment for why that matters beyond "the value looks stale."
  */
 export function useMainBranch(modelId: UUID | null): UseMainBranchResult {
   const [branch, setBranch] = useState<BranchRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     if (!modelId) {
@@ -44,7 +58,13 @@ export function useMainBranch(modelId: UUID | null): UseMainBranchResult {
     return () => {
       cancelled = true;
     };
-  }, [modelId]);
+  }, [modelId, reloadToken]);
 
-  return { branch, loading };
+  return {
+    branch,
+    loading,
+    reload: () => {
+      setReloadToken((t) => t + 1);
+    },
+  };
 }

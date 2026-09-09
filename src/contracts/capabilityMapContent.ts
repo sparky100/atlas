@@ -40,6 +40,15 @@ const itemSchema = z.object({
   description: z.string().optional(),
   level: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   parentCode: z.string().min(1).nullable(),
+  /**
+   * Explicit display order among this item's siblings (Sprint U4-1 C1) —
+   * independent of `code`, which stays a stable reference id
+   * (`attributes.templateRef`/`aliases`) that must not change when an
+   * item's position does. Not required to be contiguous or start at 1:
+   * this repo's convention (README) is multiples of 10, so a later
+   * manual insertion doesn't need every sibling renumbered.
+   */
+  order: z.number().int(),
 });
 
 const sourceSchema = z.object({
@@ -73,6 +82,20 @@ export const capabilityMapContentSchema = z
         continue;
       }
       if (item.level !== parent.level + 1) ctx.addIssue({ code: 'custom', message: `item "${item.code}": level must be exactly one more than its parent's level` });
+    }
+
+    // Sprint U4-1 C1: order only has to be unique among siblings (the same
+    // parentCode, or — for level-1 items — the shared null) — two items
+    // under different parents are never compared against each other, so
+    // reusing an order value across sibling groups is fine.
+    const orderCollisions = new Map<string | null, Set<number>>();
+    for (const item of content.items) {
+      const seenOrders = orderCollisions.get(item.parentCode) ?? new Set<number>();
+      if (seenOrders.has(item.order)) {
+        ctx.addIssue({ code: 'custom', message: `item "${item.code}": order ${String(item.order)} is already used by another sibling under ${item.parentCode ?? '(top level)'}` });
+      }
+      seenOrders.add(item.order);
+      orderCollisions.set(item.parentCode, seenOrders);
     }
   });
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
-import { getCapabilityMap, listCapabilityMapItems, listPublishedCapabilityMaps, type CapabilityMapRow } from '../../db/capabilityMapTemplates';
+import { getCapabilityMap, listCapabilityMapItems, listSeedableCapabilityMaps, type CapabilityMapRow } from '../../db/capabilityMapTemplates';
 import { seedModelFromCapabilityMap } from '../../db/seedFromMap';
 import { supabase } from '../supabaseClient';
 
@@ -23,13 +23,14 @@ export interface UseCapabilityImportInput {
 
 /**
  * The tailoring flow's "import" action (Sprint U2 step 2): lists the
- * published starter maps for the picker, then seeds the chosen one via
- * atlas.seed_from_map (src/db/seedFromMap.ts). Reachable whenever the map
- * has no capabilities yet — an unresolvable ref, or (the common case since
- * ADR-018) main resolved fine but is still just its genesis commit —
- * gated in src/ui/routes/CapabilityMapPage.tsx; `seed_from_map` itself
- * re-checks the same "still at genesis" precondition server-side
- * regardless.
+ * seedable starter maps for the picker — published and draft alike since
+ * Sprint U4-1 C6 ("draft maps are seedable into a model for review") —
+ * then seeds the chosen one via atlas.seed_from_map (src/db/seedFromMap.ts).
+ * Reachable whenever the map has no capabilities yet — an unresolvable
+ * ref, or (the common case since ADR-018) main resolved fine but is still
+ * just its genesis commit — gated in src/ui/routes/CapabilityMapPage.tsx;
+ * `seed_from_map` itself re-checks the same "still at genesis" precondition
+ * server-side regardless, along with the published-or-draft allowance.
  */
 export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabilityImportResult {
   const { modelId, userId, onImported } = input;
@@ -39,7 +40,7 @@ export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabil
 
   useEffect(() => {
     let cancelled = false;
-    listPublishedCapabilityMaps(supabase)
+    listSeedableCapabilityMaps(supabase)
       .then((rows) => {
         if (!cancelled) {
           setMaps(rows);

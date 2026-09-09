@@ -66,7 +66,8 @@ test('add a system: search finds nothing, the create sheet asks description and 
     parentCommitId: main.head_commit_id,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    message: 'seed a capability and a second system',
+    title: 'seed a capability and a second system',
+    body: null,
     deltas: [
       { kind: 'element.create', id: randomUUID(), elementId: capabilityId, elementType: 'capability', name: 'Revenues & Benefits', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: otherSystemId, elementType: 'system', name: 'Council Tax System', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
