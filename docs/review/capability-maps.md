@@ -17,87 +17,6 @@ Sources:
 - IEC 61970/61968 Common Information Model (consulted for network-asset and operations vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
 - UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
-### 1. Finance
-
-Planning, controlling and accounting for the organisation's money and financial risk.
-
-- **1.1 Financial Planning & Budgeting** — Setting medium-term financial plans and annual budgets aligned to priorities.
-- **1.2 Financial Accounting & Reporting** — Recording transactions and producing statutory accounts and management reports.
-- **1.3 Treasury & Cash Management** — Managing cash, borrowing, investments and liquidity to meet obligations.
-- **1.4 Payments & Receivables** — Paying suppliers and collecting income owed to the organisation.
-- **1.5 Financial Control & Audit Support** — Maintaining internal controls and evidence for internal and external audit.
-
-### 2. Human Resources
-
-Attracting, developing, rewarding and retaining the people the organisation needs.
-
-- **2.1 Workforce Planning** — Forecasting the roles, numbers and skills the organisation will need.
-- **2.2 Recruitment & Onboarding** — Sourcing, selecting and settling new people into their roles.
-- **2.3 Learning & Development** — Building the skills, knowledge and behaviours the workforce needs.
-- **2.4 Pay, Reward & Pensions** — Administering pay, benefits and pension arrangements accurately and on time.
-- **2.5 Employee Relations & Wellbeing** — Supporting fair treatment, health, safety and engagement of employees.
-
-### 3. Procurement
-
-Obtaining goods, works and services that offer value for money and manage supply risk.
-
-- **3.1 Category & Sourcing Strategy** — Deciding how each category of spend is best sourced and competed.
-- **3.2 Tendering & Contract Award** — Running compliant competitions and awarding contracts to suppliers.
-- **3.3 Contract & Supplier Management** — Managing supplier performance, relationships and risk through the contract life.
-- **3.4 Spend Control & Compliance** — Ensuring purchases follow policy, thresholds and approved suppliers.
-
-### 4. Information Management
-
-Governing, protecting and exploiting the organisation's information as an asset.
-
-- **4.1 Records Management** — Creating, keeping and disposing of records according to retention rules.
-- **4.2 Data Governance & Quality** — Defining ownership, standards and quality controls for the organisation's data.
-- **4.3 Information Rights & Access** — Meeting freedom of information, subject access and transparency obligations.
-- **4.4 Data Protection & Privacy** — Ensuring personal data is processed lawfully, securely and proportionately.
-- **4.5 Analytics & Business Intelligence** — Turning data into insight that informs decisions and performance management.
-
-### 5. Customer Contact
-
-Handling enquiries, requests and feedback from the people the organisation serves.
-
-- **5.1 Contact Channels** — Providing phone, digital, post and face-to-face channels for contact.
-- **5.2 Identity & Account Verification** — Confirming who a customer is before acting on their behalf.
-- **5.3 Case & Request Tracking** — Recording each request and its progress until it is resolved.
-- **5.4 Complaints & Feedback** — Receiving, investigating and learning from complaints and compliments.
-- **5.5 Accessibility & Inclusion** — Making contact usable for people with different needs and languages.
-
-### 6. Estates
-
-Providing, operating and maintaining the buildings and land the organisation occupies.
-
-- **6.1 Property Portfolio & Strategy** — Deciding which properties to hold, acquire, adapt or release.
-- **6.2 Facilities & Building Operations** — Running buildings day to day: cleaning, security, utilities and reception.
-- **6.3 Maintenance & Compliance** — Keeping buildings safe, compliant and in good repair over their life.
-- **6.4 Space & Workplace** — Allocating and configuring space to how people actually work.
-- **6.5 Energy & Sustainability** — Reducing the energy, carbon and environmental impact of the estate.
-
-### 7. Digital & Technology
-
-Delivering and running the technology and digital services the organisation depends on.
-
-- **7.1 Enterprise Architecture & Standards** — Setting the target technology landscape and the standards it follows.
-- **7.2 Application Delivery & Support** — Building, buying, integrating and supporting the applications the business runs on.
-- **7.3 Infrastructure, Cloud & Networks** — Providing the compute, storage, hosting and connectivity services rely on.
-- **7.4 Cyber Security & Resilience** — Protecting systems and data from threats and recovering from disruption.
-- **7.5 Digital Service Design** — Designing user-centred digital services around real user needs.
-- **7.6 Technology Service Management** — Handling incidents, requests, changes and problems across live services.
-
-### 8. Governance & Assurance
-
-Directing the organisation and assuring that it is well run, lawful and accountable.
-
-- **8.1 Strategy & Performance** — Setting direction and measuring progress against agreed outcomes.
-- **8.2 Risk Management** — Identifying, assessing and treating the risks that threaten objectives.
-- **8.3 Internal Audit & Assurance** — Independently checking that controls work and reporting on them.
-- **8.4 Legal & Regulatory Compliance** — Meeting the laws, regulations and statutory duties that apply.
-- **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
-- **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
-
 ### 9. Asset Management
 
 Knowing, maintaining and investing in network assets across their whole life.
@@ -136,16 +55,6 @@ Meeting licence obligations and reporting to the regulator on performance and co
 - **12.4 Network Access & Charging** — Setting use-of-system charges and access arrangements under the codes.
 - **12.5 Industry Codes Compliance** — Meeting obligations under the distribution and grid codes.
 
-## hei — v1 (published, 12 level-1, 74 items)
-
-Starter capability map for a university or college (a higher-education institution; a further-education college would carry Teaching & Learning and Student Support but a much smaller Research & Innovation), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (teaching and learning, research and innovation, student support, recruitment and admissions). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
-
-Sources:
-
-- UCISA Higher Education Capability Model (consulted for scope and level-1 shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
-- Office for Students conditions of registration and the Scottish Funding Council outcome agreements (regulatory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
-
 ### 1. Finance
 
 Planning, controlling and accounting for the organisation's money and financial risk.
@@ -226,6 +135,16 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.4 Legal & Regulatory Compliance** — Meeting the laws, regulations and statutory duties that apply.
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
+
+## hei — v1 (published, 12 level-1, 74 items)
+
+Starter capability map for a university or college (a higher-education institution; a further-education college would carry Teaching & Learning and Student Support but a much smaller Research & Innovation), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (teaching and learning, research and innovation, student support, recruitment and admissions). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
+
+Sources:
+
+- UCISA Higher Education Capability Model (consulted for scope and level-1 shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- Office for Students conditions of registration and the Scottish Funding Council outcome agreements (regulatory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 9. Teaching & Learning
 
@@ -268,16 +187,6 @@ Attracting applicants and admitting them as students onto programmes of study.
 - **12.3 International Recruitment & Compliance** — Recruiting international students and meeting visa sponsorship duties.
 - **12.4 Enrolment & Induction** — Registering new students and inducting them into the institution.
 
-## housing — v1 (published, 12 level-1, 73 items)
-
-Starter capability map for a housing association (a registered social landlord / registered provider), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (tenancy and lettings, housing stock as the core asset — distinct from the shared Estates capability, which covers the corporate estate — development and regeneration, tenant support). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
-
-Sources:
-
-- HACT UK Housing Data Standards (consulted for sector vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
-- Regulator of Social Housing consumer and economic standards, and the Scottish Social Housing Charter (regulatory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
-
 ### 1. Finance
 
 Planning, controlling and accounting for the organisation's money and financial risk.
@@ -358,6 +267,16 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.4 Legal & Regulatory Compliance** — Meeting the laws, regulations and statutory duties that apply.
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
+
+## housing — v1 (published, 12 level-1, 73 items)
+
+Starter capability map for a housing association (a registered social landlord / registered provider), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (tenancy and lettings, housing stock as the core asset — distinct from the shared Estates capability, which covers the corporate estate — development and regeneration, tenant support). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
+
+Sources:
+
+- HACT UK Housing Data Standards (consulted for sector vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- Regulator of Social Housing consumer and economic standards, and the Scottish Social Housing Charter (regulatory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 9. Tenancy & Lettings
 
@@ -399,16 +318,6 @@ Supporting tenants' wellbeing and investing in their communities.
 - **12.4 Community Investment** — Funding and running projects that improve residents' opportunities.
 - **12.5 Domestic Abuse & Safeguarding** — Protecting tenants at risk of abuse or harm.
 
-## local_government_england — v1 (published, 12 level-1, 75 items)
-
-Starter capability map for an English local authority (unitary, county or district functions combined — a district-only council would not carry Adult Social Care or Children's Services), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four England-specific ones (Care Act 2014 adult social care, SEND and children's social care, public health, Council Tax Support and business rates). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
-
-Sources:
-
-- Socitm Local Public Services Business Capability Model (consulted for scope and level-1 shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
-- Care Act 2014, Children Act 1989/2004 and the Local Government Finance Act 1992 (statutory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
-
 ### 1. Finance
 
 Planning, controlling and accounting for the organisation's money and financial risk.
@@ -489,6 +398,16 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.4 Legal & Regulatory Compliance** — Meeting the laws, regulations and statutory duties that apply.
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
+
+## local_government_england — v1 (published, 12 level-1, 75 items)
+
+Starter capability map for an English local authority (unitary, county or district functions combined — a district-only council would not carry Adult Social Care or Children's Services), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four England-specific ones (Care Act 2014 adult social care, SEND and children's social care, public health, Council Tax Support and business rates). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
+
+Sources:
+
+- Socitm Local Public Services Business Capability Model (consulted for scope and level-1 shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- Care Act 2014, Children Act 1989/2004 and the Local Government Finance Act 1992 (statutory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 9. Adult Social Care
 
@@ -532,16 +451,6 @@ Raising local income and administering the support residents are entitled to.
 - **12.4 Discretionary & Household Support** — Awarding discretionary housing payments and local welfare assistance.
 - **12.5 Money & Welfare Advice** — Helping residents maximise their income, claim entitlements and manage debt.
 
-## local_government_scotland — v1 (published, 12 level-1, 75 items)
-
-Starter capability map for a Scottish local authority (a council under the Local Government etc. (Scotland) Act 1994), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four Scotland-specific ones (Curriculum for Excellence, Integration Joint Boards, Council Tax Reduction, the Scottish Welfare Fund). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
-
-Sources:
-
-- Socitm Local Public Services Business Capability Model (consulted for scope and level-1 shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
-- Local Government etc. (Scotland) Act 1994 and the Public Bodies (Joint Working) (Scotland) Act 2014 (statutory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
-
 ### 1. Finance
 
 Planning, controlling and accounting for the organisation's money and financial risk.
@@ -622,6 +531,16 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.4 Legal & Regulatory Compliance** — Meeting the laws, regulations and statutory duties that apply.
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
+
+## local_government_scotland — v1 (published, 12 level-1, 75 items)
+
+Starter capability map for a Scottish local authority (a council under the Local Government etc. (Scotland) Act 1994), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four Scotland-specific ones (Curriculum for Excellence, Integration Joint Boards, Council Tax Reduction, the Scottish Welfare Fund). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
+
+Sources:
+
+- Socitm Local Public Services Business Capability Model (consulted for scope and level-1 shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- Local Government etc. (Scotland) Act 1994 and the Public Bodies (Joint Working) (Scotland) Act 2014 (statutory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 9. Education & Learning
 
@@ -665,16 +584,6 @@ Raising local income and administering the support residents are entitled to.
 - **12.4 Scottish Welfare Fund** — Awarding crisis and community care grants to people in need.
 - **12.5 Money & Welfare Advice** — Helping residents maximise their income, claim entitlements and manage debt.
 
-## nhs — v1 (published, 12 level-1, 73 items)
-
-Starter capability map for an NHS board or trust (a Scottish territorial board or an English provider trust — the level-2 wording is deliberately neutral between them), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four health-specific ones (patient care, clinical quality and safety, population health, diagnostics and clinical support). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
-
-Sources:
-
-- NHS England enterprise-architecture business capability model (consulted for scope and level-1 shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
-- Health and Care Act 2022 and the National Health Service (Scotland) Act 1978 (statutory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
-
 ### 1. Finance
 
 Planning, controlling and accounting for the organisation's money and financial risk.
@@ -755,6 +664,16 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.4 Legal & Regulatory Compliance** — Meeting the laws, regulations and statutory duties that apply.
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
+
+## nhs — v1 (published, 12 level-1, 73 items)
+
+Starter capability map for an NHS board or trust (a Scottish territorial board or an English provider trust — the level-2 wording is deliberately neutral between them), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four health-specific ones (patient care, clinical quality and safety, population health, diagnostics and clinical support). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
+
+Sources:
+
+- NHS England enterprise-architecture business capability model (consulted for scope and level-1 shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- Health and Care Act 2022 and the National Health Service (Scotland) Act 1978 (statutory duties consulted for sector-specific capabilities) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 9. Patient Care
 
@@ -796,16 +715,6 @@ Providing the tests, medicines and technical services clinical care depends on.
 - **12.4 Medical Devices & Clinical Engineering** — Managing the safety, maintenance and availability of medical equipment.
 - **12.5 Blood & Transfusion Services** — Ensuring safe supply and use of blood and blood products.
 
-## public_body — v1 (published, 11 level-1, 64 items)
-
-Starter capability map for a generic public body (an executive agency, non-departmental public body or similar that makes policy, engages the public and often administers funding, but does not itself run schools, hospitals, homes or networks), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus three generic-public-body ones (policy development, public engagement, grants and funding). Renamed from the original 'generic' sector. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
-
-Sources:
-
-- UK Government Functional Standards GovS 001-016 (consulted for both the shared corporate capabilities and the generic policy/engagement/grants shape) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
-- HM Treasury Green Book (consulted for policy appraisal vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
-- APQC Process Classification Framework (consulted only to check scope coverage of the shared capabilities; it is a process model and no process names were adopted) (reviewed by Simon Parkinson, 2026-09-08)
-
 ### 1. Finance
 
 Planning, controlling and accounting for the organisation's money and financial risk.
@@ -886,6 +795,16 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.4 Legal & Regulatory Compliance** — Meeting the laws, regulations and statutory duties that apply.
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
+
+## public_body — v1 (published, 11 level-1, 64 items)
+
+Starter capability map for a generic public body (an executive agency, non-departmental public body or similar that makes policy, engages the public and often administers funding, but does not itself run schools, hospitals, homes or networks), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus three generic-public-body ones (policy development, public engagement, grants and funding). Renamed from the original 'generic' sector. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
+
+Sources:
+
+- UK Government Functional Standards GovS 001-016 (consulted for both the shared corporate capabilities and the generic policy/engagement/grants shape) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
+- HM Treasury Green Book (consulted for policy appraisal vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- APQC Process Classification Framework (consulted only to check scope coverage of the shared capabilities; it is a process model and no process names were adopted) (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 9. Policy Development
 
@@ -914,16 +833,6 @@ Awarding and assuring public funding to deliver policy outcomes.
 - **11.3 Grant Monitoring & Assurance** — Monitoring recipients and assuring funds are used as intended.
 - **11.4 Payment & Clawback** — Paying instalments and recovering funds where conditions are breached.
 
-## utility — v1 (published, 12 level-1, 72 items)
-
-Starter capability map for a generic regulated, asset-owning UK utility (a water, gas or electricity network company under Ofwat or Ofgem price control), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four utility-specific ones (asset management, network operations, customer and metering, regulatory compliance and price-control reporting) whose level-1 wording the electricity_network map shares exactly, adding its own sector-specific level-2 entries rather than restating these. Connections and Emergency Response are level-2 here because they belong to Network Operations, and the 12 level-1 ceiling is already reached. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
-
-Sources:
-
-- Ofgem RIIO price-control framework and Ofwat PR24 methodology (consulted for the regulatory reporting and price-control shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
-- ISO 55000 asset management standard (consulted for asset-management vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
-- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
-
 ### 1. Finance
 
 Planning, controlling and accounting for the organisation's money and financial risk.
@@ -1004,6 +913,16 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.4 Legal & Regulatory Compliance** — Meeting the laws, regulations and statutory duties that apply.
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
+
+## utility — v1 (published, 12 level-1, 72 items)
+
+Starter capability map for a generic regulated, asset-owning UK utility (a water, gas or electricity network company under Ofwat or Ofgem price control), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four utility-specific ones (asset management, network operations, customer and metering, regulatory compliance and price-control reporting) whose level-1 wording the electricity_network map shares exactly, adding its own sector-specific level-2 entries rather than restating these. Connections and Emergency Response are level-2 here because they belong to Network Operations, and the 12 level-1 ceiling is already reached. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
+
+Sources:
+
+- Ofgem RIIO price-control framework and Ofwat PR24 methodology (consulted for the regulatory reporting and price-control shape; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- ISO 55000 asset management standard (consulted for asset-management vocabulary; not copied) (reviewed by Simon Parkinson, 2026-09-08)
+- UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities) — <https://www.gov.uk/government/collections/functional-standards> (reviewed by Simon Parkinson, 2026-09-08)
 
 ### 9. Asset Management
 
@@ -1043,6 +962,87 @@ Meeting licence obligations and reporting to the regulator on performance and co
 - **12.3 Regulatory Performance Reporting** — Reporting outputs, incentives and performance to the regulator.
 - **12.4 Environmental Permitting & Compliance** — Holding and complying with environmental permits and consents.
 - **12.5 Health, Safety & Environment** — Keeping people and the environment safe in a hazardous industry.
+
+### 1. Finance
+
+Planning, controlling and accounting for the organisation's money and financial risk.
+
+- **1.1 Financial Planning & Budgeting** — Setting medium-term financial plans and annual budgets aligned to priorities.
+- **1.2 Financial Accounting & Reporting** — Recording transactions and producing statutory accounts and management reports.
+- **1.3 Treasury & Cash Management** — Managing cash, borrowing, investments and liquidity to meet obligations.
+- **1.4 Payments & Receivables** — Paying suppliers and collecting income owed to the organisation.
+- **1.5 Financial Control & Audit Support** — Maintaining internal controls and evidence for internal and external audit.
+
+### 2. Human Resources
+
+Attracting, developing, rewarding and retaining the people the organisation needs.
+
+- **2.1 Workforce Planning** — Forecasting the roles, numbers and skills the organisation will need.
+- **2.2 Recruitment & Onboarding** — Sourcing, selecting and settling new people into their roles.
+- **2.3 Learning & Development** — Building the skills, knowledge and behaviours the workforce needs.
+- **2.4 Pay, Reward & Pensions** — Administering pay, benefits and pension arrangements accurately and on time.
+- **2.5 Employee Relations & Wellbeing** — Supporting fair treatment, health, safety and engagement of employees.
+
+### 3. Procurement
+
+Obtaining goods, works and services that offer value for money and manage supply risk.
+
+- **3.1 Category & Sourcing Strategy** — Deciding how each category of spend is best sourced and competed.
+- **3.2 Tendering & Contract Award** — Running compliant competitions and awarding contracts to suppliers.
+- **3.3 Contract & Supplier Management** — Managing supplier performance, relationships and risk through the contract life.
+- **3.4 Spend Control & Compliance** — Ensuring purchases follow policy, thresholds and approved suppliers.
+
+### 4. Information Management
+
+Governing, protecting and exploiting the organisation's information as an asset.
+
+- **4.1 Records Management** — Creating, keeping and disposing of records according to retention rules.
+- **4.2 Data Governance & Quality** — Defining ownership, standards and quality controls for the organisation's data.
+- **4.3 Information Rights & Access** — Meeting freedom of information, subject access and transparency obligations.
+- **4.4 Data Protection & Privacy** — Ensuring personal data is processed lawfully, securely and proportionately.
+- **4.5 Analytics & Business Intelligence** — Turning data into insight that informs decisions and performance management.
+
+### 5. Customer Contact
+
+Handling enquiries, requests and feedback from the people the organisation serves.
+
+- **5.1 Contact Channels** — Providing phone, digital, post and face-to-face channels for contact.
+- **5.2 Identity & Account Verification** — Confirming who a customer is before acting on their behalf.
+- **5.3 Case & Request Tracking** — Recording each request and its progress until it is resolved.
+- **5.4 Complaints & Feedback** — Receiving, investigating and learning from complaints and compliments.
+- **5.5 Accessibility & Inclusion** — Making contact usable for people with different needs and languages.
+
+### 6. Estates
+
+Providing, operating and maintaining the buildings and land the organisation occupies.
+
+- **6.1 Property Portfolio & Strategy** — Deciding which properties to hold, acquire, adapt or release.
+- **6.2 Facilities & Building Operations** — Running buildings day to day: cleaning, security, utilities and reception.
+- **6.3 Maintenance & Compliance** — Keeping buildings safe, compliant and in good repair over their life.
+- **6.4 Space & Workplace** — Allocating and configuring space to how people actually work.
+- **6.5 Energy & Sustainability** — Reducing the energy, carbon and environmental impact of the estate.
+
+### 7. Digital & Technology
+
+Delivering and running the technology and digital services the organisation depends on.
+
+- **7.1 Enterprise Architecture & Standards** — Setting the target technology landscape and the standards it follows.
+- **7.2 Application Delivery & Support** — Building, buying, integrating and supporting the applications the business runs on.
+- **7.3 Infrastructure, Cloud & Networks** — Providing the compute, storage, hosting and connectivity services rely on.
+- **7.4 Cyber Security & Resilience** — Protecting systems and data from threats and recovering from disruption.
+- **7.5 Digital Service Design** — Designing user-centred digital services around real user needs.
+- **7.6 Technology Service Management** — Handling incidents, requests, changes and problems across live services.
+
+### 8. Governance & Assurance
+
+Directing the organisation and assuring that it is well run, lawful and accountable.
+
+- **8.1 Strategy & Performance** — Setting direction and measuring progress against agreed outcomes.
+- **8.2 Risk Management** — Identifying, assessing and treating the risks that threaten objectives.
+- **8.3 Internal Audit & Assurance** — Independently checking that controls work and reporting on them.
+- **8.4 Legal & Regulatory Compliance** — Meeting the laws, regulations and statutory duties that apply.
+- **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
+- **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
 
 ## 2. Level-1 cross-sector matrix
 

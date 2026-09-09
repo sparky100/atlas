@@ -98,6 +98,27 @@
   white-space: nowrap;
 }
 
+/* Sprint U4-1 C1's reorder buttons — same visual treatment as .expandButton (plain, muted, no button chrome), just a pair side by side. */
+.reorderButtons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.reorderButtons > button {
+  background: none;
+  border: none;
+  padding: var(--space-1);
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.reorderButtons > button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
 .orphans {
   margin-top: var(--space-6);
 }

@@ -6,6 +6,10 @@ function capability(id: string, name: string, parentId: string | null, code?: st
   return { element_id: id, element_type: 'capability', name, parent_id: parentId, attributes: code !== undefined ? { code, level: 1 } : { level: 1 }, exists_delta_id: `d-${id}` };
 }
 
+function orderedCapability(id: string, name: string, order: number): ElementsHeadRow {
+  return { element_id: id, element_type: 'capability', name, parent_id: null, attributes: { order }, exists_delta_id: `d-${id}` };
+}
+
 describe('computeCapabilityMapTree', () => {
   it('places root capabilities as L1 columns, ordered deterministically', () => {
     const tree = computeCapabilityMapTree([capability('b', 'Beta', null), capability('a', 'Alpha', null)]);
@@ -70,5 +74,24 @@ describe('compareCapabilities', () => {
     const withCode = capability('a', 'Zeta', null, '1.1');
     const withoutCode = capability('b', 'Alpha', null);
     expect([withCode, withoutCode].sort(compareCapabilities).map((c) => c.element_id)).toEqual(['b', 'a']);
+  });
+
+  it('Sprint U4-1 C1: sorts by attributes.order first, overriding what code order alone would give', () => {
+    // Code "1" would normally sort before "2" — order says otherwise.
+    const codeFirst = { ...capability('a', 'Alpha', null, '1'), attributes: { code: '1', order: 20 } };
+    const codeSecond = { ...capability('b', 'Beta', null, '2'), attributes: { code: '2', order: 10 } };
+    expect([codeFirst, codeSecond].sort(compareCapabilities).map((c) => c.element_id)).toEqual(['b', 'a']);
+  });
+
+  it('an ordered capability always sorts before an unordered one, regardless of name/code', () => {
+    const ordered = orderedCapability('a', 'Zeta', 10);
+    const unordered = capability('b', 'Alpha', null);
+    expect([unordered, ordered].sort(compareCapabilities).map((c) => c.element_id)).toEqual(['a', 'b']);
+  });
+
+  it('two unordered capabilities still fall back to code/name, unaffected by the order comparison', () => {
+    const a = capability('a', 'Alpha', null);
+    const b = capability('b', 'Beta', null);
+    expect([b, a].sort(compareCapabilities).map((c) => c.element_id)).toEqual(['a', 'b']);
   });
 });

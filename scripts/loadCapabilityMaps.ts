@@ -98,6 +98,7 @@ async function loadOne(supabase: ReturnType<typeof createServiceRoleClient>, fil
     name: item.name,
     description: item.description ?? null,
     level: item.level,
+    item_order: item.order,
   }));
   // Insert parents before children so the level/parent-chain trigger
   // always finds the parent row it needs — items are already

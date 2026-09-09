@@ -154,10 +154,20 @@ function escapeCell(text: string): string {
   return text.replace(/\|/g, '\\|');
 }
 
+const byOrder = (a: CapabilityMapItemContent, b: CapabilityMapItemContent): number => a.order - b.order;
+
+/**
+ * Sprint U4-1 C1: the tree renders in display order (`item.order`), not
+ * file order — a map's `items` array position is authoring convenience
+ * only (`order` is what actually decides "core capabilities first, shared
+ * back-office last"), so a reviewer reading this document top to bottom
+ * sees the same sequence the product's own capability map view does
+ * (`src/ui/capabilityMap/layout.ts`'s `compareCapabilities`).
+ */
 function renderTree(content: CapabilityMapContent): string[] {
   const lines: string[] = [];
-  const children = (parent: CapabilityMapItemContent) => content.items.filter((item) => item.parentCode === parent.code);
-  for (const l1 of content.items.filter((item) => item.level === 1)) {
+  const children = (parent: CapabilityMapItemContent) => content.items.filter((item) => item.parentCode === parent.code).sort(byOrder);
+  for (const l1 of content.items.filter((item) => item.level === 1).sort(byOrder)) {
     lines.push(`### ${l1.code}. ${l1.name}`, '', l1.description ?? '_No definition._', '');
     for (const l2 of children(l1)) {
       lines.push(`- **${l2.code} ${l2.name}** — ${l2.description ?? '_No definition._'}`);

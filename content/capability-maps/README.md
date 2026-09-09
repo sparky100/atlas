@@ -47,8 +47,8 @@ Adding a sector is one edit there plus its tests, not a migration.
     }
   ],
   "items": [
-    { "code": "1", "name": "Finance", "level": 1, "parentCode": null, "description": "Planning, controlling and accounting for the organisation's money." },
-    { "code": "1.1", "name": "Financial Accounting", "level": 2, "parentCode": "1", "description": "Recording transactions and producing the statutory accounts." }
+    { "code": "1", "name": "Finance", "level": 1, "parentCode": null, "description": "Planning, controlling and accounting for the organisation's money.", "order": 10 },
+    { "code": "1.1", "name": "Financial Accounting", "level": 2, "parentCode": "1", "description": "Recording transactions and producing the statutory accounts.", "order": 10 }
   ]
 }
 ```
@@ -72,6 +72,11 @@ passes the parser can't fail the database):
 - `status: "published"` is what makes a map importable into a model (the
   tailoring flow's import picker only lists `published` maps) — leave new
   content at `"draft"` until it's actually reviewed by a named person.
+- Every item carries an `order` (integer). It only has to be unique among
+  siblings (same `parentCode`) — the parser rejects two siblings sharing
+  one. It does not have to be contiguous or start at 1 (see "multiples of
+  ten" below), and it's unrelated to `code`, which stays the stable
+  identifier deltas and seeded elements reference.
 
 ## Editorial conventions (not enforced by the parser — flagged by the review doc)
 
@@ -86,6 +91,16 @@ passes the parser can't fail the database):
   Estates, Digital & Technology, Governance & Assurance.
 - `sources.md` names the reference models consulted for every map and
   confirms nothing is copied verbatim. Licence for this content: CC BY 4.0.
+- Sector maps put their own core capabilities first and the shared
+  back-office ones last (Sprint U4-1 C1). Order values within one map are
+  multiples of ten (`10, 20, 30, …`) in each item's own sibling group, so a
+  later manual insertion between two existing items doesn't force
+  renumbering every sibling that follows it — give the new item the
+  midpoint value (e.g. `15` between `10` and `20`) instead. The eight
+  shared capabilities use the fixed values `1000`–`1070` (in the order
+  listed above) in every sector map, deliberately outside any sector's own
+  `10`-`90`-ish range, so they always sort after a sector's core
+  capabilities regardless of how many that sector has.
 
 Run `pnpm content:load-capability-maps` after adding or editing a file.
 Re-running is safe **for a draft map**: the loader upserts by

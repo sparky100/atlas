@@ -33,6 +33,9 @@ export interface UseCapabilityCreateInput {
  * as parent. No `code`/`templateRef` on a hand-added capability: those are
  * starter-map provenance (src/contracts/delta.ts's `CapabilityAttributes`
  * doc comment), and a capability added this way was never seeded from one.
+ * Same reasoning applies to `order` (Sprint U4-1 C1): it has no place among
+ * seeded siblings' order values, so it's left unset — `useCapabilityReorder.ts`
+ * only offers a swap once a capability actually has one.
  */
 export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabilityCreateResult {
   const { modelId, orgId, userId, branch, expectedHeadCommitId, onCreated } = input;

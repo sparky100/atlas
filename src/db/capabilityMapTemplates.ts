@@ -28,6 +28,8 @@ export interface CapabilityMapItemRow {
   name: string;
   description: string | null;
   level: number;
+  /** Sprint U4-1 C1 — see the migration's own comment for why `item_order`, not `order` (a reserved SQL keyword). */
+  item_order: number;
 }
 
 /** Every published starter map — the tailoring flow's import picker only ever offers these (a draft map is real schema, reviewable, but not yet meant for anyone to seed a model from). */

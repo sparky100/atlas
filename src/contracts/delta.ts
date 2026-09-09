@@ -81,6 +81,17 @@ export interface CapabilityAttributes {
   code?: string;
   /** `capability_map_items.id` this capability was seeded from. */
   templateRef?: UUID;
+  /**
+   * Explicit display order among this capability's siblings (same
+   * `parentId`), independent of `code` (Sprint U4-1 C1,
+   * `capability_map_items.item_order`) — `src/ui/capabilityMap/layout.ts`'s
+   * `compareCapabilities` sorts by this first. Set at seed time for every
+   * capability a starter map produces (`capabilityMapContent.ts` requires
+   * one on every template item); left unset for a hand-added capability
+   * until the tailoring flow's reorder control gives it one — an unset
+   * capability sorts after every ordered sibling, never before.
+   */
+  order?: number;
 }
 
 export interface SystemAttributes {

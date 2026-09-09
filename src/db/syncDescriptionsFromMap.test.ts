@@ -21,6 +21,7 @@ function item(overrides: Partial<CapabilityMapItemRow> & Pick<CapabilityMapItemR
     name: 'Item',
     description: null,
     level: 1,
+    item_order: 10,
     ...overrides,
   };
 }

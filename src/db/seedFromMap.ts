@@ -5,10 +5,12 @@
  * parented on main's existing genesis commit (ADR-018: main always has a
  * real head, even before this runs — only the trigger-inserted `genesis`
  * commit itself is ever allowed a null parent), whose `element.create`
- * deltas carry `attributes.code`/`attributes.templateRef`/(when the map
- * item has one) `attributes.description`, plus one `sources` row (kind
- * `template`) and one `aliases` row per element (`template_code`, RT-4)
- * recording which starter map and version seeded this model.
+ * deltas carry `attributes.code`/`attributes.templateRef`/`attributes.order`
+ * (Sprint U4-1 C1: `capability_map_items.item_order`, always present —
+ * the content schema requires one on every item)/(when the map item has
+ * one) `attributes.description`, plus one `sources` row (kind `template`)
+ * and one `aliases` row per element (`template_code`, RT-4) recording
+ * which starter map and version seeded this model.
  *
  * `attributes.description` (Bug A2 fix — it was previously dropped
  * silently) carries the same provenance as `name`: it's the map item's own
@@ -76,7 +78,7 @@ export function buildSeedDeltas(
     }
 
     const deltaId = mintId();
-    const attributes: CapabilityAttributes = { code: item.code, templateRef: item.id };
+    const attributes: CapabilityAttributes = { code: item.code, templateRef: item.id, order: item.item_order };
     const description = item.description?.trim();
     if (description) attributes.description = description;
     deltas.push({

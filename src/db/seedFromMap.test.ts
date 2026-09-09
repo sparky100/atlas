@@ -8,6 +8,7 @@ function item(overrides: Partial<CapabilityMapItemRow> & Pick<CapabilityMapItemR
     id: `item-${overrides.code}`,
     map_id: 'map-1',
     description: null,
+    item_order: 10,
     ...overrides,
   };
 }
@@ -21,8 +22,8 @@ function asCreates(deltas: ReturnType<typeof buildSeedDeltas>['deltas']): Elemen
 }
 
 describe('buildSeedDeltas', () => {
-  it('builds one element.create per item, root before child, with code/templateRef set', () => {
-    const items = [item({ code: '1', name: 'Root', level: 1, parent_code: null }), item({ code: '1.1', name: 'Child', level: 2, parent_code: '1' })];
+  it('builds one element.create per item, root before child, with code/templateRef/order set', () => {
+    const items = [item({ code: '1', name: 'Root', level: 1, parent_code: null, item_order: 10 }), item({ code: '1.1', name: 'Child', level: 2, parent_code: '1', item_order: 20 })];
     let n = 0;
     const { deltas } = buildSeedDeltas(items, 'source-1', () => `id-${String(n++)}`);
     const creates = asCreates(deltas);
@@ -30,10 +31,10 @@ describe('buildSeedDeltas', () => {
     expect(creates).toHaveLength(2);
     expect(creates[0]?.name).toBe('Root');
     expect(creates[0]?.parentId).toBeNull();
-    expect(creates[0]?.attributes).toEqual({ code: '1', templateRef: 'item-1' });
+    expect(creates[0]?.attributes).toEqual({ code: '1', templateRef: 'item-1', order: 10 });
     expect(creates[1]?.name).toBe('Child');
     expect(creates[1]?.parentId).toBe(creates[0]?.elementId);
-    expect(creates[1]?.attributes).toEqual({ code: '1.1', templateRef: 'item-1.1' });
+    expect(creates[1]?.attributes).toEqual({ code: '1.1', templateRef: 'item-1.1', order: 20 });
   });
 
   it('every delta shares the given sourceId and confidence 1 (template seeds are always fully confident)', () => {
@@ -43,12 +44,19 @@ describe('buildSeedDeltas', () => {
   });
 
   it('Bug A2: copies a non-empty map item description onto attributes.description, with the same sourceId/confidence as the rest of the delta', () => {
-    const items = [item({ code: '1', name: 'Root', level: 1, parent_code: null, description: 'What this capability covers.' })];
+    const items = [item({ code: '1', name: 'Root', level: 1, parent_code: null, description: 'What this capability covers.', item_order: 10 })];
     const { deltas } = buildSeedDeltas(items, 'source-1');
     const creates = asCreates(deltas);
-    expect(creates[0]?.attributes).toEqual({ code: '1', templateRef: 'item-1', description: 'What this capability covers.' });
+    expect(creates[0]?.attributes).toEqual({ code: '1', templateRef: 'item-1', description: 'What this capability covers.', order: 10 });
     expect(creates[0]?.sourceId).toBe('source-1');
     expect(creates[0]?.confidence).toBe(1);
+  });
+
+  it('Sprint U4-1 C1: carries the map item\'s own item_order onto attributes.order verbatim', () => {
+    const items = [item({ code: '9', name: 'Core Capability', level: 1, parent_code: null, item_order: 1000 })];
+    const { deltas } = buildSeedDeltas(items, 'source-1');
+    const creates = asCreates(deltas);
+    expect(creates[0]?.attributes.order).toBe(1000);
   });
 
   it("Bug A2: a null or all-whitespace description is omitted entirely, not written as an empty string", () => {

@@ -55,8 +55,15 @@ const CAPABILITY_META: Record<keyof CapabilityAttributes, AttributeFieldMeta> = 
   code: { label: 'Code', required: false, kind: 'text' },
   description: { label: 'Description', required: false, kind: 'text' },
   templateRef: { label: 'Template reference', required: false, kind: 'text', editable: false },
+  // Not a user-facing edit field, same reasoning as templateRef — Sprint
+  // U4-1 C1's reorder control (src/ui/capabilityMap/useCapabilityReorder.ts)
+  // is the only writer. `kind: 'text'`, not a real "this is text" claim: no
+  // AttributeKind exists for a number today, and this attribute is excluded
+  // from the edit form regardless (editable: false) — the display-only
+  // AttributeRow.formatValue already renders a number correctly.
+  order: { label: 'Order', required: false, kind: 'text', editable: false },
 };
-const CAPABILITY_ORDER: (keyof CapabilityAttributes)[] = ['code', 'description', 'templateRef'];
+const CAPABILITY_ORDER: (keyof CapabilityAttributes)[] = ['code', 'description', 'templateRef', 'order'];
 
 const LIFECYCLE_STATUS_OPTIONS = ['planned', 'active', 'retiring', 'retired'] as const;
 

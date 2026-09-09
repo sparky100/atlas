@@ -68,8 +68,35 @@ function codeOf(capability: ElementsHeadRow): string | null {
   return typeof code === 'string' && code !== '' ? code : null;
 }
 
-/** Deterministic order: by `code` (numeric-aware) when both tiles have one, else by name, then id as the final tiebreak. */
+function orderOf(capability: ElementsHeadRow): number | null {
+  const order = attributesRecord(capability.attributes).order;
+  return typeof order === 'number' ? order : null;
+}
+
+/**
+ * Deterministic order: by `attributes.order` (Sprint U4-1 C1) when both
+ * tiles have one — this is what actually puts a sector map's own
+ * capabilities first and the eight shared back-office ones last
+ * (content/capability-maps/README.md's ordering convention,
+ * `useCapabilityReorder.ts`'s own tailoring-flow updates to it); falls
+ * back to `code` (numeric-aware) when either tile lacks an order, then
+ * name, then id as the final tiebreak. A capability with no order (never
+ * seeded from a map, or hand-added and not yet given one) always sorts
+ * after every ordered sibling, never before — landing at the end of its
+ * group rather than jumping ahead of capabilities someone deliberately
+ * placed.
+ */
 export function compareCapabilities(a: ElementsHeadRow, b: ElementsHeadRow): number {
+  const orderA = orderOf(a);
+  const orderB = orderOf(b);
+  if (orderA !== null && orderB !== null) {
+    if (orderA !== orderB) return orderA - orderB;
+  } else if (orderA !== null) {
+    return -1;
+  } else if (orderB !== null) {
+    return 1;
+  }
+
   const codeA = codeOf(a);
   const codeB = codeOf(b);
   if (codeA !== null && codeB !== null) {

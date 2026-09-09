@@ -105,6 +105,9 @@ export function CapabilityMapPage() {
             addCapability={
               canEdit && mainBranch ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: mainBranch, expectedHeadCommitId: state.data.commitId, onCreated: reload } : undefined
             }
+            reorderCapability={
+              canEdit && mainBranch ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: mainBranch, expectedHeadCommitId: state.data.commitId, onReordered: reload } : undefined
+            }
           />
         )}
         </main>
