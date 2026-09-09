@@ -95,7 +95,6 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
       ]);
 
       const myOpenBranches = changeBranches.filter((b) => b.created_by === userId && MY_OPEN_STATUSES.includes(b.status));
-      const systemIds = new Set(systems.map((s) => s.element_id));
       const usesAndFlowsToEndpointsById = new Map(usesAndFlowsToEndpoints.map((el) => [el.element_id, el]));
 
       // Sprint U4-1 B2: author display name and named-subject links for
@@ -143,7 +142,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             duplicatesCount: 0,
             systemsWithoutCapability: findSystemsWithoutCapability(systems, supportsEdges),
             capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges),
-            staleAttributes: computeStaleAttributesFinding(facts, systemIds),
+            staleAttributes: computeStaleAttributesFinding(facts, systems),
             unlabeledVerbRelationships: findUnlabeledVerbRelationships(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
           },
         });

@@ -1,16 +1,40 @@
 import { Link } from 'react-router';
-import type { ElementType } from '../../../contracts/delta';
+import type { ElementType, UUID } from '../../../contracts/delta';
 import { ELEMENT_TYPE_FILTER_OPTIONS } from '../../../db/elementBrowse';
+import type { BranchRow } from '../../../db/types';
+import { RelationshipAdd } from '../RelationshipGroup/RelationshipAdd';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
 import type { ElementBrowseSortKey, ElementBrowseState } from '../../elements/useElementBrowse';
 import styles from './ElementBrowseTable.module.css';
 
+/**
+ * Sprint U4-1 B3: "the browse table filtered to unlinked systems with the
+ * supports picker inline per row." Only ever passed when `?filter=
+ * unlinked-systems` is active and the viewer can edit main (ElementsPage.tsx's
+ * own gate, `canEditOnMain` — the same role floor every other main write
+ * uses, ADR-015) — omitted entirely otherwise, same convention as
+ * `CapabilityMapView`'s `addCapability`.
+ */
+export interface ElementBrowseLinkSupportsConfig {
+  modelId: UUID;
+  orgId: UUID;
+  userId: UUID | null;
+  branch: BranchRow;
+  expectedHeadCommitId: UUID;
+  /** Called after a row's own picker successfully creates its `supports` edge — the caller's job to reload both the branch (a new head_commit_id) and this table's own rows (so the just-linked system drops out of the filter). */
+  onLinked: () => void;
+}
+
 export interface ElementBrowseTableProps {
   state: ElementBrowseState;
   orgSlug: string;
   modelSlug: string;
+  // `| undefined` explicitly, not just `?:` — exactOptionalPropertyTypes
+  // treats "optional" and "may be undefined" as different things (same
+  // convention `Text.tsx`'s own `className` prop documents).
+  linkSupportsInline?: ElementBrowseLinkSupportsConfig | undefined;
 }
 
 const COLUMNS: { key: ElementBrowseSortKey; label: string }[] = [
@@ -20,8 +44,38 @@ const COLUMNS: { key: ElementBrowseSortKey; label: string }[] = [
   { key: 'lifecycle', label: 'Lifecycle' },
 ];
 
+/**
+ * A system's own "+ Add supports" (RelationshipsSection.tsx's own control,
+ * reused verbatim), pre-wired for exactly this table's row shape: every row
+ * it's rendered on is by definition a system with zero existing `supports`
+ * edges (that's the `unlinked-systems` filter itself), so `existingRows: []`
+ * and `relationshipFacts: new Map()` are always correct here — B4's
+ * "primary?" prompt only fires once a system already has one, which by
+ * construction none of these do yet (the very-first-link path, always
+ * `role: 'secondary'`, exactly matches what a from-scratch link should be).
+ */
+function InlineSupportsPicker({ system, config, searchCommitId }: { system: { elementId: UUID; name: string }; config: ElementBrowseLinkSupportsConfig; searchCommitId: UUID }) {
+  return (
+    <RelationshipAdd
+      slot={{ relationshipType: 'supports', targetTypes: ['capability'] }}
+      direction="outbound"
+      elementId={system.elementId}
+      elementName={system.name}
+      existingRows={[]}
+      relationshipFacts={new Map()}
+      modelId={config.modelId}
+      orgId={config.orgId}
+      userId={config.userId}
+      searchCommitId={searchCommitId}
+      branch={config.branch}
+      expectedHeadCommitId={config.expectedHeadCommitId}
+      onCreated={config.onLinked}
+    />
+  );
+}
+
 /** Sprint U3b: "filterable, sortable table of elements by type with owner and lifecycle." A real `<table>` — semantic tabular data, not a design-system gap (native `<table>`/`<th>`/`<td>` is the correct element here, the same way `<ul>`/`<li>` already is for plain lists elsewhere in this app). */
-export function ElementBrowseTable({ state, orgSlug, modelSlug }: ElementBrowseTableProps) {
+export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInline }: ElementBrowseTableProps) {
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 
@@ -65,6 +119,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug }: ElementBrowseT
                     </button>
                   </th>
                 ))}
+                {linkSupportsInline && <th>Link to a capability</th>}
               </tr>
             </thead>
             <tbody>
@@ -105,6 +160,13 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug }: ElementBrowseT
                       </Text>
                     )}
                   </td>
+                  {linkSupportsInline && (
+                    <td>
+                      {row.element.element_type === 'system' && (
+                        <InlineSupportsPicker system={{ elementId: row.element.element_id, name: row.element.name }} config={linkSupportsInline} searchCommitId={state.commitId} />
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { BlueprintFrame } from '../components/BlueprintFrame/BlueprintFrame';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
+import { HealthFinding, type HealthFindingItem } from '../components/HealthFinding/HealthFinding';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { ElementsHeadRow } from '../../contracts/rows';
@@ -27,22 +28,18 @@ function formatAge(dateStr: string, now: Date): string {
   return `${String(Math.floor(months / 12))}y ago`;
 }
 
-/** Handoff 7d's "names three plus +N" — every named-examples list in the Health findings panel uses this, so a finding is actionable from its own row without a click. */
-function namedExamples(items: readonly ElementsHeadRow[], max = 3): string {
-  const shown = items.slice(0, max).map((item) => item.name);
-  const remaining = items.length - shown.length;
-  return remaining > 0 ? `${shown.join(', ')}, +${String(remaining)}` : shown.join(', ');
-}
-
 function plural(count: number, singular: string, pluralForm: string): string {
   return count === 1 ? singular : pluralForm;
 }
 
-/** Sprint U4-1 B5's own named-examples formatter — `namedExamples` above is `ElementsHeadRow[]`-shaped and this finding's items are relationship pairs, not elements. */
-function namedRelationshipExamples(items: readonly UnlabeledVerbRelationship[], max = 3): string {
-  const shown = items.slice(0, max).map((item) => `${item.fromName} → ${item.toName}`);
-  const remaining = items.length - shown.length;
-  return remaining > 0 ? `${shown.join(', ')}, +${String(remaining)}` : shown.join(', ');
+/** `ElementsHeadRow[]` → `HealthFindingItem[]` — every element-shaped finding's items are just names linking nowhere special (the row itself isn't a link; `HealthFinding`'s own browse link is the actionable part now, Sprint U4-1 B3). */
+function elementItems(elements: readonly ElementsHeadRow[]): HealthFindingItem[] {
+  return elements.map((el) => ({ id: el.element_id, label: el.name }));
+}
+
+/** Sprint U4-1 B5's own finding is relationship pairs, not elements — its own `HealthFindingItem[]` builder. */
+function unlabeledRelationshipItems(edges: readonly UnlabeledVerbRelationship[]): HealthFindingItem[] {
+  return edges.map((edge) => ({ id: edge.relationshipId, label: `${edge.fromName} → ${edge.toName}` }));
 }
 
 /**
@@ -55,20 +52,39 @@ function namedRelationshipExamples(items: readonly UnlabeledVerbRelationship[], 
  * branches; five health findings (systems with no capability,
  * capabilities with no owner, stale attributes, `uses`/`flows_to`
  * relationships with no verb-phrase label (Sprint U4-1 B5), duplicates —
- * the last still wired to 0 until Q1, ADR-019). Jumping to Changes or the review
+ * the last still wired to 0 until Q1, ADR-019), each rendered through
+ * `HealthFinding` (Sprint U4-1 B3: collapsed row → expand, paginated at
+ * 20, a link into the browse table pre-filtered to the finding where one
+ * applies) — collapsing to a single "No findings" line when every one of
+ * them is zero at once. Jumping to Changes or the review
  * queue generically is the persistent model nav's job now (ModelNav.tsx)
  * — this used to also carry its own "Start a change"/"Open the queue"
  * links before that existed.
  */
 export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) {
   const now = new Date();
-  const elementsHref = `/o/${orgSlug}/m/${modelSlug}/elements`;
   const elementHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}`;
   // A commit's diff against its own parent (Sprint U4-1 B2) — main's genesis
   // commit has no parent to diff against, so it stays plain text below
   // rather than linking anywhere.
   const commitDiffHref = (commit: RecentCommitRow['commit']) =>
     commit.parent_commit_id ? `/o/${orgSlug}/m/${modelSlug}/diff?ref=commit:${commit.id}&diff=commit:${commit.parent_commit_id}` : null;
+  // Sprint U4-1 B3: each element-shaped finding's own pre-filter into the
+  // browse table (src/ui/elements/useElementBrowse.ts's `filter` param) —
+  // the relationship-shaped finding (unlabeledVerbRelationships) has no
+  // browse-table home at all, so it gets no href.
+  const browseHref = (filter: string) => `/o/${orgSlug}/m/${modelSlug}/elements?filter=${filter}`;
+
+  // Sprint U4-1 B3: "zero-count findings collapse to one 'No findings'
+  // line" — checked across every real finding. `duplicatesCount` is typed
+  // as the literal `0` (still wired to 0 until Q1, ADR-019), so it's
+  // trivially always satisfied and left out of this check rather than
+  // written as a tautological `=== 0`.
+  const allFindingsZero =
+    data.systemsWithoutCapability.length === 0 &&
+    data.capabilitiesWithoutOwner.length === 0 &&
+    data.staleAttributes.staleFactCount === 0 &&
+    data.unlabeledVerbRelationships.length === 0;
 
   return (
     <div className={styles.columns}>
@@ -172,65 +188,56 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
           <Text as="h2" size="lg">
             Health findings
           </Text>
-          <div className={styles.findingPlates}>
-            <BlueprintFrame>
-              <Text as="p">
-                {data.systemsWithoutCapability.length} {plural(data.systemsWithoutCapability.length, 'system', 'systems')} not linked to a capability
-              </Text>
-              {data.systemsWithoutCapability.length > 0 && (
-                <>
-                  <Text as="p" tone="muted" size="sm">
-                    {namedExamples(data.systemsWithoutCapability)}
-                  </Text>
-                  <Link to={elementsHref}>
-                    <Text as="span" size="sm">
-                      Review and link →
-                    </Text>
-                  </Link>
-                </>
-              )}
-            </BlueprintFrame>
+          {allFindingsZero ? (
+            <Text as="p" tone="muted">
+              No findings.
+            </Text>
+          ) : (
+            <div className={styles.findingPlates}>
+              <BlueprintFrame>
+                <HealthFinding
+                  summary={`${String(data.systemsWithoutCapability.length)} ${plural(data.systemsWithoutCapability.length, 'system', 'systems')} not linked to a capability`}
+                  items={elementItems(data.systemsWithoutCapability)}
+                  browseHref={browseHref('unlinked-systems')}
+                  browseLabel="Review and link →"
+                />
+              </BlueprintFrame>
 
-            <div className={styles.findingPlate}>
-              <Text as="p">
-                {data.capabilitiesWithoutOwner.length} {plural(data.capabilitiesWithoutOwner.length, 'capability', 'capabilities')} with no owner
-              </Text>
-              {data.capabilitiesWithoutOwner.length > 0 && (
-                <Text as="p" tone="muted" size="sm">
-                  {namedExamples(data.capabilitiesWithoutOwner, data.capabilitiesWithoutOwner.length)}
+              <div className={styles.findingPlate}>
+                <HealthFinding
+                  summary={`${String(data.capabilitiesWithoutOwner.length)} ${plural(data.capabilitiesWithoutOwner.length, 'capability', 'capabilities')} with no owner`}
+                  items={elementItems(data.capabilitiesWithoutOwner)}
+                  browseHref={browseHref('unowned-capabilities')}
+                />
+              </div>
+
+              <div className={styles.findingPlate}>
+                <HealthFinding
+                  summary={
+                    data.staleAttributes.staleFactCount > 0
+                      ? `${String(data.staleAttributes.staleFactCount)} ${plural(data.staleAttributes.staleFactCount, 'attribute', 'attributes')} stale over 12 months — across ${String(data.staleAttributes.staleSystems.length)} ${plural(data.staleAttributes.staleSystems.length, 'system', 'systems')} · oldest ${String(data.staleAttributes.oldestAgeYears)}y`
+                      : '0 attributes stale over 12 months'
+                  }
+                  items={elementItems(data.staleAttributes.staleSystems)}
+                  browseHref={browseHref('stale-attributes')}
+                />
+              </div>
+
+              <div className={styles.findingPlate}>
+                <HealthFinding
+                  summary={`${String(data.unlabeledVerbRelationships.length)} ${plural(data.unlabeledVerbRelationships.length, 'relationship', 'relationships')} missing a label`}
+                  items={unlabeledRelationshipItems(data.unlabeledVerbRelationships)}
+                />
+              </div>
+
+              <div className={styles.findingPlate}>
+                <Text as="p">{data.duplicatesCount} duplicates flagged</Text>
+                <Text as="p" tone="faint" size="sm">
+                  Wired to 0 until Q1&rsquo;s matching pipeline can populate the standing duplicates report (ADR-019).
                 </Text>
-              )}
+              </div>
             </div>
-
-            <div className={styles.findingPlate}>
-              <Text as="p">
-                {data.staleAttributes.staleFactCount} {plural(data.staleAttributes.staleFactCount, 'attribute', 'attributes')} stale over 12 months
-              </Text>
-              {data.staleAttributes.staleFactCount > 0 && (
-                <Text as="p" tone="muted" size="sm">
-                  across {data.staleAttributes.systemCount} {plural(data.staleAttributes.systemCount, 'system', 'systems')} · oldest {data.staleAttributes.oldestAgeYears}y
-                </Text>
-              )}
-            </div>
-
-            <div className={styles.findingPlate}>
-              <Text as="p">
-                {data.unlabeledVerbRelationships.length} {plural(data.unlabeledVerbRelationships.length, 'relationship', 'relationships')} missing a label
-              </Text>
-              {data.unlabeledVerbRelationships.length > 0 && (
-                <Text as="p" tone="muted" size="sm">
-                  {namedRelationshipExamples(data.unlabeledVerbRelationships)}
-                </Text>
-              )}
-            </div>
-
-            <div className={styles.findingPlate}>
-              <Text as="p">{data.duplicatesCount} duplicates flagged</Text>
-              <Text as="p" tone="faint" size="sm">
-                Wired to 0 until Q1&rsquo;s matching pipeline can populate the standing duplicates report (ADR-019).
-              </Text>
-            </div>
-          </div>
+          )}
         </Panel>
       </div>
     </div>
