@@ -15,20 +15,55 @@
   font: inherit;
 }
 
+/**
+ * Sprint U4-1 C2: a responsive grid of L1 groups, replacing the old
+ * horizontally-scrolling row — the item's own text is "whole map visible
+ * without horizontal scroll". Column count narrows with viewport width;
+ * breakpoints are mobile-first (base rule = narrowest tier, each
+ * `min-width` query widens it) and combine this codebase's own existing
+ * tiers (docs/UI-principles.md §2: mobile < 768px, desktop >= 1024px)
+ * with the sprint text's two explicit numbers (>=1280px, a 390px mobile
+ * floor) bracketing them:
+ *   < 768px (mobile, down to 390px): 1 column
+ *   768-1023px (tablet): 2 columns
+ *   1024-1279px (desktop): 4 columns
+ *   >= 1280px: 5 columns
+ * Extra L1 groups beyond one row's column count wrap onto further rows on
+ * their own (grid's normal auto-placement) — vertical scroll only, never
+ * horizontal.
+ */
 .columns {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
   gap: var(--space-6);
-  overflow-x: auto;
-  padding-bottom: var(--space-2);
+}
+
+@media (min-width: 768px) {
+  .columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .columns {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
 .column {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  min-width: 220px;
-  flex: 0 0 auto;
+  /* Grid item, not a flex item any more — min-width: 0 (not the old fixed
+     220px) is what actually stops a long tile name from forcing the grid
+     wider than its column and reintroducing horizontal scroll. */
+  min-width: 0;
 }
 
 .columnHeader {

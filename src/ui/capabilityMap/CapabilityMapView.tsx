@@ -67,6 +67,17 @@ export interface CapabilityMapViewProps {
  * than originally scheduled), covering a two-level tree with an orphan,
  * expanding an L2 to reveal L3, and a colour-by switch actually changing
  * a tile's tone.
+ *
+ * Sprint U4-1 C2: the L1 row (`.columns`) is a responsive CSS grid, not a
+ * horizontally-scrolling one — see CapabilityMapView.module.css's own
+ * comment for the breakpoint tiers. `role="list"`/`role="listitem"` on the
+ * grid and each L1 column give it real list semantics (there was no
+ * accessible structure here before — a bare `<div>` grid of tiles reads
+ * as nothing in particular to a screen reader) and, as a side effect,
+ * something e2e/capability-map-layout.spec.ts can query without a
+ * CSS-module class selector. Column count itself is asserted there via
+ * `getComputedStyle(...).gridTemplateColumns` at each breakpoint, plus a
+ * no-horizontal-scroll check at the narrowest (390px).
  */
 export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, modelSlug, refParam, addCapability, reorderCapability }: CapabilityMapViewProps) {
   const [colourBy, setColourBy] = useState<ColourByMode>('none');
@@ -115,7 +126,7 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, m
       </div>
 
       {tree.l1.length > 0 && (
-        <div className={styles.columns}>
+        <div className={styles.columns} role="list" aria-label="Level 1 capabilities">
           {tree.l1.map((column, index) => (
             <L1ColumnView
               key={column.capability.element_id}
@@ -251,7 +262,7 @@ function L1ColumnView({
 }) {
   const count = supportingSystemIds(column.capability.element_id, supportsEdges).length;
   return (
-    <div className={styles.column}>
+    <div className={styles.column} role="listitem">
       <div className={styles.columnHeader}>
         <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${column.capability.element_id}`}>
           <Text as="span" size="lg">
