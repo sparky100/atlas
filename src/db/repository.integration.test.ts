@@ -132,6 +132,7 @@ describe('repository layer against a real local Supabase', () => {
     const seedResult = await seedModelFromCapabilityMap(alice.client, {
       modelId,
       branchId: main.id,
+      expectedHeadCommitId: main.head_commit_id,
       authorId: alice.id,
       capabilityMapId,
       sector: 'public_body',
@@ -235,6 +236,7 @@ describe('repository layer against a real local Supabase', () => {
       const result = await seedModelFromCapabilityMap(alice.client, {
         modelId,
         branchId: main.id,
+        expectedHeadCommitId: main.head_commit_id,
         authorId: alice.id,
         capabilityMapId,
         sector: 'public_body',
@@ -242,6 +244,97 @@ describe('repository layer against a real local Supabase', () => {
         items,
       });
       expect(result.ok).toBe(false);
+    });
+
+    // 20260906370000_seed_from_map_parent_commit_fix.sql: seed_from_map used
+    // to hardcode `parent_commit_id = null` for its own commit — main's head
+    // is never null (ADR-018), so branches_guard_head_advance rejected the
+    // resulting `update branches set head_commit_id = ...` on every real
+    // attempt (masked until 20260906360000's genesis-check fix let a real
+    // seed reach this far for the first time). This exercises the real fix
+    // end to end: a fresh model's own genesis-only main (not the shared
+    // `modelId` fixture above, already past genesis by this point in the
+    // suite), then an ordinary follow-on commit on top of the freshly
+    // seeded result — "later tailoring is ordinary manual commits on top of
+    // this one" (seed_from_map's own comment), now that the model already
+    // has commits of its own. Both must succeed, and both must leave
+    // main's materialised head exactly matching fold(deltas) from genesis
+    // (SPEC §6.6).
+    it('seeds a genesis-only model, then takes an ordinary commit on top — both succeed, main advances correctly, and head == fold both times', async () => {
+      const freshOrgId = randomUUID();
+      await createOrganisation(alice.client, { id: freshOrgId, name: 'Fresh Seed Test Org', slug: `fresh-seed-${freshOrgId.slice(0, 8)}`, createdBy: alice.id });
+      const freshModelId = randomUUID();
+      await createModel(alice.client, { id: freshModelId, orgId: freshOrgId, name: 'Fresh Seed Test Model', slug: `fresh-seed-model-${freshModelId.slice(0, 8)}`, createdBy: alice.id });
+
+      const mainBeforeSeed = await getMainBranch(alice.client, freshModelId);
+      if (!mainBeforeSeed) throw new Error('main branch was not auto-created');
+      const genesisCommitId = mainBeforeSeed.head_commit_id;
+      const { data: genesisRow, error: genesisError } = await service.from('commits').select('kind').eq('id', genesisCommitId).single();
+      if (genesisError) throw new Error(`reading genesis commit: ${genesisError.message}`);
+      expect(genesisRow.kind).toBe('genesis');
+
+      // --- seed into a fresh model (genesis only) ---
+      const freshItems = await listCapabilityMapItems(alice.client, capabilityMapId);
+      const seedResult = await seedModelFromCapabilityMap(alice.client, {
+        modelId: freshModelId,
+        branchId: mainBeforeSeed.id,
+        expectedHeadCommitId: genesisCommitId,
+        authorId: alice.id,
+        capabilityMapId,
+        sector: 'public_body',
+        version: 1,
+        items: freshItems,
+      });
+      if (!seedResult.ok) throw new Error(`seedModelFromCapabilityMap on a fresh model: ${seedResult.message}`);
+
+      const { data: seedCommitRow, error: seedCommitError } = await service.from('commits').select('parent_commit_id, depth').eq('id', seedResult.commitId).single();
+      if (seedCommitError) throw new Error(`reading seed commit: ${seedCommitError.message}`);
+      // The regression this test guards against, directly: the seed
+      // commit's own parent must be the real genesis commit, never null.
+      expect((seedCommitRow as { parent_commit_id: string | null }).parent_commit_id).toBe(genesisCommitId);
+      expect((seedCommitRow as { depth: number }).depth).toBe(1);
+
+      const mainAfterSeed = await getMainBranch(alice.client, freshModelId);
+      if (!mainAfterSeed) throw new Error('main branch not found after seeding');
+      expect(mainAfterSeed.head_commit_id).toBe(seedResult.commitId);
+
+      const loaderAfterSeed = await buildCommitLoader(service, freshModelId);
+      const expectedHeadAfterSeed = foldFromGenesis(seedResult.commitId, loaderAfterSeed);
+      const rebuildAfterSeed = await rebuildHead(service, freshModelId);
+      expect(rebuildAfterSeed.headHash).toBe(headHash(expectedHeadAfterSeed));
+
+      // --- an ordinary commit into a model that already has commits ---
+      // (the seed above, on top of genesis) — the same commitToBranch path
+      // every real edit uses, verifying the parent-chain fix here didn't
+      // disturb the branch's own ordinary advance.
+      const freshManualSource = await getOrCreateManualSource(alice.client, { id: randomUUID(), orgId: freshOrgId, modelId: freshModelId, userId: alice.id });
+      const newElementId = randomUUID();
+      const tailoringResult = await commitToBranch(alice.client, {
+        modelId: freshModelId,
+        branchId: mainAfterSeed.id,
+        expectedHeadCommitId: seedResult.commitId,
+        envelope: {
+          id: randomUUID(),
+          branchId: mainAfterSeed.id,
+          parentCommitId: seedResult.commitId,
+          mergedBranchHeadCommitId: null,
+          kind: 'manual',
+          title: 'add a system by hand',
+          body: null,
+          deltas: [makeCreateDelta(randomUUID(), newElementId, 'Hand-Added System', freshManualSource.id)],
+        },
+      });
+      if (!tailoringResult.ok) throw new Error(`commitToBranch after seeding: ${tailoringResult.message}`);
+
+      const mainAfterTailoring = await getMainBranch(alice.client, freshModelId);
+      expect(mainAfterTailoring?.head_commit_id).toBe(tailoringResult.commitId);
+
+      const loaderAfterTailoring = await buildCommitLoader(service, freshModelId);
+      const expectedHeadAfterTailoring = foldFromGenesis(tailoringResult.commitId, loaderAfterTailoring);
+      const rebuildAfterTailoring = await rebuildHead(service, freshModelId);
+      expect(rebuildAfterTailoring.headHash).toBe(headHash(expectedHeadAfterTailoring));
+
+      await service.from('organisations').delete().eq('id', freshOrgId);
     });
   });
 
