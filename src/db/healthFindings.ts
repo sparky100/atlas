@@ -5,7 +5,9 @@
  * toward that fuller dashboard, not the whole of it). Three genuinely new
  * findings — systems with no capability, capabilities with no owner,
  * attributes stale past `STALE_AFTER_MONTHS` — plus the duplicates count
- * `useArchitectHome.ts` already wires to 0 until Q1 (ADR-019).
+ * `useArchitectHome.ts` already wires to 0 until Q1 (ADR-019). Sprint U4-1
+ * B5 adds a fifth: `uses`/`flows_to` relationships with no verb-phrase
+ * label (`findUnlabeledVerbRelationships`).
  *
  * "Owner" here is a derived concept, not a direct column: capabilities
  * have no `owner` attribute of their own (`CAPABILITY_ORDER` is `code`/
@@ -33,6 +35,71 @@ export async function listAllOwnsEdges(supabase: Client, commitId: string): Prom
     .eq('relationship_type', 'owns')
     .order('relationship_id');
   return selectAll<RelationshipsHeadRow>(query);
+}
+
+/** All `uses`/`flows_to` edges at `commitId` — Sprint U4-1 B5's "missing a label" finding. `.in(relationship_type, ['uses', 'flows_to'])` is a small fixed enum, not a caller-supplied list that grows with the model (CLAUDE.md rule 8) — same shape `src/db/landscape.ts`'s own `.in('relationship_type', ['uses', 'flows_to'])` already uses. */
+export async function listAllUsesAndFlowsToEdges(supabase: Client, commitId: string): Promise<RelationshipsHeadRow[]> {
+  const query = supabase
+    .from('relationships_head')
+    .select('relationship_id, relationship_type, from_element_id, to_element_id, attributes, exists_delta_id', { count: 'exact' })
+    .eq('commit_id', commitId)
+    .in('relationship_type', ['uses', 'flows_to'])
+    .order('relationship_id');
+  return selectAll<RelationshipsHeadRow>(query);
+}
+
+/**
+ * Every element `uses`/`flows_to` can legally touch (`relationshipTypeRules.ts`:
+ * system↔system, container↔container, component↔component, container→system,
+ * component→container) — one commit-scoped query filtered by a fixed
+ * 3-value `element_type` list, not an `.in(element_id, ...)` sized by
+ * however many unlabeled edges this finding turns up (CLAUDE.md rule 8;
+ * same reasoning `listAllUsesAndFlowsToEdges` above gives for its own
+ * `.in()`). `findUnlabeledVerbRelationships`'s only use for these rows is
+ * `name`, for the finding's own named examples.
+ */
+export async function listUsesAndFlowsToEndpointElements(supabase: Client, commitId: string): Promise<ElementsHeadRow[]> {
+  const query = supabase
+    .from('elements_head')
+    .select('element_id, element_type, name, parent_id, attributes, exists_delta_id', { count: 'exact' })
+    .eq('commit_id', commitId)
+    .in('element_type', ['system', 'container', 'component'])
+    .order('element_id');
+  return selectAll<ElementsHeadRow>(query);
+}
+
+export interface UnlabeledVerbRelationship {
+  relationshipId: UUID;
+  relationshipType: 'uses' | 'flows_to';
+  fromName: string;
+  toName: string;
+}
+
+/**
+ * `uses`/`flows_to` edges with no verb-phrase label — Sprint U4-1 B5's
+ * "review checklist flags any without one": RelationshipAdd.tsx requires
+ * one for every *new* edge of either type going forward, but this is what
+ * catches one that predates that requirement (or reached `relationships_head`
+ * some other way — capture, a script). "Unlabeled" is `attributes.description`
+ * missing, `null`, or blank — the same three-state check
+ * `src/db/syncDescriptionsFromMap.ts`'s own "empty description" candidate
+ * filter already uses.
+ */
+export function findUnlabeledVerbRelationships(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): UnlabeledVerbRelationship[] {
+  const result: UnlabeledVerbRelationship[] = [];
+  for (const edge of edges) {
+    if (edge.relationship_type !== 'uses' && edge.relationship_type !== 'flows_to') continue;
+    const description = attributesRecord(edge.attributes).description;
+    if (typeof description === 'string' && description.trim() !== '') continue;
+
+    result.push({
+      relationshipId: edge.relationship_id,
+      relationshipType: edge.relationship_type,
+      fromName: elementsById.get(edge.from_element_id)?.name ?? edge.from_element_id,
+      toName: elementsById.get(edge.to_element_id)?.name ?? edge.to_element_id,
+    });
+  }
+  return result;
 }
 
 /** Every fact at `commitId`, unfiltered by subject — callers scope to the systems they care about (health findings only reads systems' own attributes, not every subject in the model). Routed through `selectAll` (SPEC §6.7): `facts` is one of the tables `max_rows` can silently truncate. */

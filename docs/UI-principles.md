@@ -202,7 +202,7 @@ used by  (1)
 - Each row: the other endpoint (link), its type and structural context, the relationship's own provenance badge, and an unresolved-comment count if any.
 - `flows_to` rows also show `data_classification` as a chip when set, because that is the attribute a director asks about.
 - The `owns` group marks the primary owner with `★`.
-- Row hover shows the relationship's attributes (description, protocol) inline; click opens a compact relationship sheet with the same attribute/provenance layout as §4.3 — relationships do not get their own page.
+- Row hover shows the relationship's attributes (description, protocol) inline; click opens a compact relationship sheet with the same attribute/provenance layout as §4.3 — relationships do not get their own page. **Amendment (Sprint U4-1 B5):** ahead of that sheet existing (still future scope, Sprint U1 step 5's own note above), a `uses`/`flows_to` row shows its `description` (the verb-phrase label, now required at creation for these two types — RelationshipAdd.tsx) directly in the row, always, in quotes — not gated behind hover, since it's the whole point of the label being there. `supports`/`flows_to`'s `data_classification` chip and the `owns` group's `★` stay as already documented.
 
 ### 4.5 Structure
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../contracts/rows';
-import { computeStaleAttributesFinding, findCapabilitiesWithoutOwner, findSystemsWithoutCapability } from './healthFindings';
+import { computeStaleAttributesFinding, findCapabilitiesWithoutOwner, findSystemsWithoutCapability, findUnlabeledVerbRelationships } from './healthFindings';
 
 function system(id: string): ElementsHeadRow {
   return { element_id: id, element_type: 'system', name: `System ${id}`, parent_id: null, attributes: {}, exists_delta_id: `delta-${id}` };
@@ -104,5 +104,37 @@ describe('computeStaleAttributesFinding', () => {
     const facts: FactsRow[] = [{ ...fact('sys-1', 'vendor', ''), effective_date: null, asserted_at: '2024-01-01' }];
     const result = computeStaleAttributesFinding(facts, new Set(['sys-1']), now);
     expect(result.staleFactCount).toBe(1);
+  });
+});
+
+describe('findUnlabeledVerbRelationships (Sprint U4-1 B5)', () => {
+  const elementsById = new Map([
+    ['sys-1', system('sys-1')],
+    ['sys-2', system('sys-2')],
+  ]);
+
+  it('a uses/flows_to edge with no description attribute at all is unlabeled', () => {
+    const edges = [relationship('r1', 'uses', 'sys-1', 'sys-2')];
+    expect(findUnlabeledVerbRelationships(edges, elementsById)).toEqual([{ relationshipId: 'r1', relationshipType: 'uses', fromName: 'System sys-1', toName: 'System sys-2' }]);
+  });
+
+  it('a blank or whitespace-only description still counts as unlabeled, not written', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-1', 'sys-2', { description: '   ' })];
+    expect(findUnlabeledVerbRelationships(edges, elementsById)).toHaveLength(1);
+  });
+
+  it('a real description means the edge is not flagged', () => {
+    const edges = [relationship('r1', 'uses', 'sys-1', 'sys-2', { description: 'reads customer records from' })];
+    expect(findUnlabeledVerbRelationships(edges, elementsById)).toEqual([]);
+  });
+
+  it('supports/owns edges are never flagged, labeled or not — this finding is uses/flows_to only', () => {
+    const edges = [relationship('r1', 'supports', 'sys-1', 'sys-2', { role: 'secondary' }), relationship('r2', 'owns', 'sys-1', 'sys-2', { primary: true })];
+    expect(findUnlabeledVerbRelationships(edges, elementsById)).toEqual([]);
+  });
+
+  it('falls back to the raw element id when an endpoint is missing from elementsById', () => {
+    const edges = [relationship('r1', 'uses', 'sys-1', 'sys-missing')];
+    expect(findUnlabeledVerbRelationships(edges, elementsById)).toEqual([{ relationshipId: 'r1', relationshipType: 'uses', fromName: 'System sys-1', toName: 'sys-missing' }]);
   });
 });

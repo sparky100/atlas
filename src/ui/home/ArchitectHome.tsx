@@ -7,6 +7,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { monthsSince } from '../../contracts/thresholds';
+import type { UnlabeledVerbRelationship } from '../../db/healthFindings';
 import { branchStatusTone } from '../changes/branchStatus';
 import { formatCommitActivityTime } from './commitActivityTime';
 import type { ArchitectHomeData, RecentCommitRow } from './useArchitectHome';
@@ -37,6 +38,13 @@ function plural(count: number, singular: string, pluralForm: string): string {
   return count === 1 ? singular : pluralForm;
 }
 
+/** Sprint U4-1 B5's own named-examples formatter — `namedExamples` above is `ElementsHeadRow[]`-shaped and this finding's items are relationship pairs, not elements. */
+function namedRelationshipExamples(items: readonly UnlabeledVerbRelationship[], max = 3): string {
+  const shown = items.slice(0, max).map((item) => `${item.fromName} → ${item.toName}`);
+  const remaining = items.length - shown.length;
+  return remaining > 0 ? `${shown.join(', ')}, +${String(remaining)}` : shown.join(', ');
+}
+
 /**
  * The architect's door (UI-principles §3.2, built to Handoff 7d's
  * architect-door amendment for Health findings —
@@ -44,9 +52,10 @@ function plural(count: number, singular: string, pluralForm: string): string {
  * three-column dashboard otherwise, see `useArchitectHome.ts`'s own
  * comment for exactly what's deferred). Recent commits on main; the
  * review queue's count and oldest item; the signed-in user's own open
- * branches; four health findings (systems with no capability,
- * capabilities with no owner, stale attributes, duplicates — the last
- * still wired to 0 until Q1, ADR-019). Jumping to Changes or the review
+ * branches; five health findings (systems with no capability,
+ * capabilities with no owner, stale attributes, `uses`/`flows_to`
+ * relationships with no verb-phrase label (Sprint U4-1 B5), duplicates —
+ * the last still wired to 0 until Q1, ADR-019). Jumping to Changes or the review
  * queue generically is the persistent model nav's job now (ModelNav.tsx)
  * — this used to also carry its own "Start a change"/"Open the queue"
  * links before that existed.
@@ -200,6 +209,17 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
               {data.staleAttributes.staleFactCount > 0 && (
                 <Text as="p" tone="muted" size="sm">
                   across {data.staleAttributes.systemCount} {plural(data.staleAttributes.systemCount, 'system', 'systems')} · oldest {data.staleAttributes.oldestAgeYears}y
+                </Text>
+              )}
+            </div>
+
+            <div className={styles.findingPlate}>
+              <Text as="p">
+                {data.unlabeledVerbRelationships.length} {plural(data.unlabeledVerbRelationships.length, 'relationship', 'relationships')} missing a label
+              </Text>
+              {data.unlabeledVerbRelationships.length > 0 && (
+                <Text as="p" tone="muted" size="sm">
+                  {namedRelationshipExamples(data.unlabeledVerbRelationships)}
                 </Text>
               )}
             </div>

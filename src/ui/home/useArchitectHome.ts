@@ -9,9 +9,13 @@ import {
   computeStaleAttributesFinding,
   findCapabilitiesWithoutOwner,
   findSystemsWithoutCapability,
+  findUnlabeledVerbRelationships,
   listAllOwnsEdges,
+  listAllUsesAndFlowsToEdges,
   listFactsForCommit,
+  listUsesAndFlowsToEndpointElements,
   type StaleAttributesFinding,
+  type UnlabeledVerbRelationship,
 } from '../../db/healthFindings';
 import { listSystemsForLandscape } from '../../db/landscape';
 import { listOpenMergeRequestsForModel } from '../../db/mergeRequests';
@@ -41,6 +45,8 @@ export interface ArchitectHomeData {
   systemsWithoutCapability: ElementsHeadRow[];
   capabilitiesWithoutOwner: ElementsHeadRow[];
   staleAttributes: StaleAttributesFinding;
+  /** Sprint U4-1 B5's fifth finding: `uses`/`flows_to` relationships with no verb-phrase label. */
+  unlabeledVerbRelationships: UnlabeledVerbRelationship[];
 }
 
 export type ArchitectHomeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeData };
@@ -75,7 +81,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
         return;
       }
 
-      const [commits, reviewQueue, changeBranches, capabilities, systems, supportsEdges, ownsEdges, facts] = await Promise.all([
+      const [commits, reviewQueue, changeBranches, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints] = await Promise.all([
         listRecentCommits(supabase, main.id, 10),
         listOpenMergeRequestsForModel(supabase, modelId),
         listChangeBranches(supabase, modelId),
@@ -84,10 +90,13 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
         listAllSupportsEdges(supabase, main.head_commit_id),
         listAllOwnsEdges(supabase, main.head_commit_id),
         listFactsForCommit(supabase, main.head_commit_id),
+        listAllUsesAndFlowsToEdges(supabase, main.head_commit_id),
+        listUsesAndFlowsToEndpointElements(supabase, main.head_commit_id),
       ]);
 
       const myOpenBranches = changeBranches.filter((b) => b.created_by === userId && MY_OPEN_STATUSES.includes(b.status));
       const systemIds = new Set(systems.map((s) => s.element_id));
+      const usesAndFlowsToEndpointsById = new Map(usesAndFlowsToEndpoints.map((el) => [el.element_id, el]));
 
       // Sprint U4-1 B2: author display name and named-subject links for
       // each shown commit, both batched once across every row rather than
@@ -135,6 +144,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             systemsWithoutCapability: findSystemsWithoutCapability(systems, supportsEdges),
             capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges),
             staleAttributes: computeStaleAttributesFinding(facts, systemIds),
+            unlabeledVerbRelationships: findUnlabeledVerbRelationships(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
           },
         });
       }

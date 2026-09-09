@@ -9,6 +9,7 @@ import { useRelationshipTargetSearch } from '../../elements/useRelationshipTarge
 import { Button } from '../Button/Button';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
+import { defaultAttributesForPlainPick } from './relationshipAddDefaults';
 import styles from './RelationshipAdd.module.css';
 
 export interface RelationshipAddProps {
@@ -62,10 +63,24 @@ interface PendingTarget {
  * `role: 'secondary'` outright; `computeLandscapeLayout`'s own "no primary
  * -> most recently added decides" fallback is exactly what then places it,
  * correctly, without ever needing to ask.
+ *
+ * Sprint U4-1 B5 adds a second, unconditional step for `uses`/`flows_to`:
+ * both require a verb-phrase label (what this edge actually does — "reads
+ * customer records from", not just "uses") before the relationship is
+ * created at all, stored in the attribute both types already had
+ * (`UsesAttributes`/`FlowsToAttributes.description`, previously optional
+ * free text nobody was ever asked for). This is a create-time UI
+ * requirement, not a contract or engine change — an existing relationship
+ * with no label stays perfectly valid to read; the health findings panel's
+ * new "missing a label" finding (`findUnlabeledVerbRelationships`,
+ * src/db/healthFindings.ts) is what catches one that predates this or
+ * slips through some other path, exactly the "review checklist flags any
+ * without one" the sprint item asked for.
  */
 export function RelationshipAdd({ slot, direction, elementId, elementName, existingRows, relationshipFacts, modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, onCreated }: RelationshipAddProps) {
   const [open, setOpen] = useState(false);
   const [pendingTarget, setPendingTarget] = useState<PendingTarget | null>(null);
+  const [labelDraft, setLabelDraft] = useState('');
   const search = useRelationshipTargetSearch(searchCommitId, modelId, slot.targetTypes, elementId);
   const { status, error, create } = useRelationshipCreate({
     modelId,
@@ -80,11 +95,13 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
     onCreated: () => {
       setOpen(false);
       setPendingTarget(null);
+      setLabelDraft('');
       onCreated();
     },
   });
 
   const asksPrimary = slot.relationshipType === 'supports' && direction === 'outbound' && existingRows.length > 0;
+  const needsLabel = slot.relationshipType === 'uses' || slot.relationshipType === 'flows_to';
 
   function currentPrimaryDemotion(): RelationshipCreateDemotion | null {
     const currentPrimary = existingRows.find((row) => attributesRecord(row.attributes).role === 'primary');
@@ -94,16 +111,27 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
   }
 
   function pickResult(target: PendingTarget): void {
-    if (asksPrimary) {
+    if (asksPrimary || needsLabel) {
       setPendingTarget(target);
       return;
     }
-    void create(target.elementId, target.name, { role: 'secondary' });
+    void create(target.elementId, target.name, defaultAttributesForPlainPick(slot.relationshipType));
   }
 
   function answerPrimary(primary: boolean): void {
     if (!pendingTarget) return;
     void create(pendingTarget.elementId, pendingTarget.name, { role: primary ? 'primary' : 'secondary' }, primary ? currentPrimaryDemotion() : null);
+  }
+
+  function submitLabel(): void {
+    const label = labelDraft.trim();
+    if (!pendingTarget || label.length === 0) return;
+    void create(pendingTarget.elementId, pendingTarget.name, { description: label });
+  }
+
+  function cancelPending(): void {
+    setPendingTarget(null);
+    setLabelDraft('');
   }
 
   if (!open) {
@@ -114,7 +142,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
     );
   }
 
-  if (pendingTarget) {
+  if (pendingTarget && asksPrimary) {
     return (
       <div className={styles.panel}>
         <Text as="p" size="sm">
@@ -130,7 +158,39 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
           <Button variant="ghost" onClick={() => { answerPrimary(false); }} disabled={status === 'creating'}>
             No
           </Button>
-          <Button variant="ghost" onClick={() => { setPendingTarget(null); }} disabled={status === 'creating'}>
+          <Button variant="ghost" onClick={cancelPending} disabled={status === 'creating'}>
+            Cancel
+          </Button>
+        </div>
+        {error !== null && (
+          <Text as="p" size="sm">
+            {error}
+          </Text>
+        )}
+      </div>
+    );
+  }
+
+  if (pendingTarget && needsLabel) {
+    return (
+      <div className={styles.panel}>
+        <Text as="p" size="sm">
+          What does this {slot.relationshipType === 'uses' ? 'use' : 'flow'} do? ({DIRECTION_VERB[slot.relationshipType][direction]} {pendingTarget.name})
+        </Text>
+        <input
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- picking a target is the request to type its label next.
+          autoFocus
+          type="text"
+          className={styles.input}
+          placeholder="e.g. reads customer records from"
+          value={labelDraft}
+          onChange={(e) => { setLabelDraft(e.target.value); }}
+        />
+        <div className={styles.actions}>
+          <Button variant="secondary" onClick={submitLabel} disabled={status === 'creating' || labelDraft.trim().length === 0}>
+            {status === 'creating' ? 'Adding…' : 'Add'}
+          </Button>
+          <Button variant="ghost" onClick={cancelPending} disabled={status === 'creating'}>
             Cancel
           </Button>
         </div>

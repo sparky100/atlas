@@ -155,6 +155,12 @@ function RelationshipDirectionGroup({
         const attrs = attributesRecord(rel.attributes);
         const dataClassification = attrs.dataClassification;
         const isPrimaryOwner = rel.relationship_type === 'owns' && attrs.primary === true;
+        // The verb-phrase label (Sprint U4-1 B5: required at creation for
+        // uses/flows_to, optional elsewhere) — shown whenever one exists,
+        // not gated to those two types, since `description` is the same
+        // free-text attribute on every relationship type and nothing else
+        // in this row surfaces it otherwise.
+        const description = attrs.description;
 
         return (
           <div key={rel.relationship_id} className={styles.row}>
@@ -174,6 +180,11 @@ function RelationshipDirectionGroup({
             <Text tone="muted" size="sm" as="span">
               {other?.element_type ?? ''}
             </Text>
+            {typeof description === 'string' && description.trim().length > 0 && (
+              <Text tone="muted" size="sm" as="span">
+                “{description}”
+              </Text>
+            )}
             {isPrimaryOwner && (
               <span aria-label="primary owner" title="Primary owner">
                 ★

@@ -74,6 +74,15 @@ test('from an empty model, add two systems and a uses relationship between them,
   await page.getByPlaceholder('Search…').fill('Billing');
   await page.getByRole('button', { name: /Billing Service/ }).click();
 
+  // Sprint U4-1 B5: uses requires a verb-phrase label before the
+  // relationship is actually created — "Add" stays disabled until one is
+  // typed.
+  const addLabelButton = page.getByRole('button', { name: 'Add', exact: true });
+  await expect(addLabelButton).toBeDisabled();
+  await page.getByPlaceholder('e.g. reads customer records from').fill('calls for payment authorisation');
+  await expect(addLabelButton).toBeEnabled();
+  await addLabelButton.click();
+
   // The relationship now shows on Payment Gateway's own element page — a
   // link to Billing Service, in the Relationships section. Following it
   // (rather than going back through Landscape, whose canvas is Canvas 2D,
@@ -81,6 +90,8 @@ test('from an empty model, add two systems and a uses relationship between them,
   // Billing Service's page, where the reverse direction should show too.
   const billingServiceLink = page.getByRole('link', { name: /Billing Service/ });
   await expect(billingServiceLink).toBeVisible();
+  // The label itself is shown on the row too, not just collected and hidden.
+  await expect(page.getByText('“calls for payment authorisation”')).toBeVisible();
   await billingServiceLink.click();
   await expect(page.getByRole('heading', { name: 'Billing Service' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Payment Gateway/ })).toBeVisible();

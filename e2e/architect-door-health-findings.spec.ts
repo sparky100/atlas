@@ -2,11 +2,12 @@
  * The architect door's Health findings (Handoff 7d's architect-door
  * amendment, `docs/HANDOFF-7d-architect-door.md`, UI-principles §3.2):
  * systems not linked to a capability, capabilities with no owner,
- * attributes stale over `STALE_AFTER_MONTHS`, and the duplicates count
- * (already wired to 0, ADR-019). Seeds a realistic mix through the real
- * `commitToBranch` path from Node (ADR-018 — main already has a genesis
- * commit, no bootstrap needed), then drives the actual UI through the
- * browser.
+ * attributes stale over `STALE_AFTER_MONTHS`, `uses`/`flows_to`
+ * relationships with no verb-phrase label (Sprint U4-1 B5), and the
+ * duplicates count (already wired to 0, ADR-019). Seeds a realistic mix
+ * through the real `commitToBranch` path from Node (ADR-018 — main already
+ * has a genesis commit, no bootstrap needed), then drives the actual UI
+ * through the browser.
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
@@ -62,6 +63,8 @@ test('architect door: health findings name systems with no capability, capabilit
   const unownedSystemId = randomUUID(); // supports unownedCapability, but no primary owner
   const orphanSystemId = randomUUID(); // supports nothing at all
   const actorId = randomUUID();
+  const consumerSystemId = randomUUID(); // uses ownedSystemId, no label — B5's own finding
+  const labeledTargetSystemId = randomUUID(); // uses ownedSystemId too, but labeled — must not be flagged
 
   const seedEnvelope: CommitEnvelope = {
     id: randomUUID(),
@@ -78,9 +81,17 @@ test('architect door: health findings name systems with no capability, capabilit
       { kind: 'element.create', id: randomUUID(), elementId: unownedSystemId, elementType: 'system', name: 'Unowned System', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: orphanSystemId, elementType: 'system', name: 'Orphan System', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: actorId, elementType: 'actor', name: 'Housing Digital Team', parentId: null, attributes: { subtype: 'team', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: consumerSystemId, elementType: 'system', name: 'Consumer System', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: labeledTargetSystemId, elementType: 'system', name: 'Labeled Consumer System', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: ownedSystemId, toElementId: ownedCapabilityId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: unownedSystemId, toElementId: unownedCapabilityId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'owns', fromElementId: actorId, toElementId: ownedSystemId, attributes: { primary: true }, sourceId: seedSourceId, confidence: 1 },
+      // B5: a uses edge with no label (attributes: {}, predating the
+      // creation-time requirement — nothing enforces it retroactively) is
+      // the finding's own target; a second, labeled one proves the finding
+      // doesn't flag every uses edge indiscriminately.
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'uses', fromElementId: consumerSystemId, toElementId: ownedSystemId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'uses', fromElementId: labeledTargetSystemId, toElementId: ownedSystemId, attributes: { description: 'reads billing records from' }, sourceId: seedSourceId, confidence: 1 },
       // A vendor fact over a year old — Unowned System's own "stale attribute".
       {
         kind: 'element.update',
@@ -114,6 +125,12 @@ test('architect door: health findings name systems with no capability, capabilit
 
   await expect(page.getByText('1 attribute stale over 12 months')).toBeVisible();
   await expect(page.getByText(/across 1 system · oldest \dy/)).toBeVisible();
+
+  // Sprint U4-1 B5's finding: exactly the one unlabeled edge, named by its
+  // endpoints — the labeled one must not appear here.
+  await expect(page.getByText('1 relationship missing a label')).toBeVisible();
+  await expect(page.getByText('Consumer System → Well Owned System')).toBeVisible();
+  await expect(page.getByText('Labeled Consumer System → Well Owned System')).toHaveCount(0);
 
   await expect(page.getByText('0 duplicates flagged')).toBeVisible();
 });
