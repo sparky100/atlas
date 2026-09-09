@@ -620,6 +620,65 @@ describe('comments, mentions, notifications, and realtime against a real local S
     }
   }, 30_000);
 
+  it('a reply notifies the thread\'s other participants (root author + prior repliers, never the replier themselves); a reply that also @mentions a participant sends them a "mention" only, never both', async () => {
+    const main = await getMainBranch(alice.client, modelId);
+    if (!main?.head_commit_id) throw new Error('main branch not found');
+    const elementId = randomUUID();
+    await commitToBranch(alice.client, {
+      modelId,
+      branchId: main.id,
+      expectedHeadCommitId: main.head_commit_id,
+      envelope: {
+        id: randomUUID(),
+        branchId: main.id,
+        parentCommitId: main.head_commit_id,
+        mergedBranchHeadCommitId: null,
+        kind: 'manual',
+        title: 'add a system for the reply-notification test',
+        body: null,
+        deltas: [makeCreateDelta(randomUUID(), elementId, 'Reply Notification Test System', aliceManualSourceId)],
+      },
+    });
+
+    // Alice starts the thread. No one has replied yet, so nothing to notify
+    // — a root comment is what @mentions are for, not this feature.
+    const root = await createComment(alice.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementId, body: 'root comment, no mentions', authorId: alice.id });
+
+    const aliceBefore = await getUnreadNotificationCount(alice.client, alice.id);
+    const bobReply = await createComment(bob.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementId, parentCommentId: root.id, body: 'a plain reply, no mentions', authorId: bob.id });
+
+    // Alice (the root's author) is notified; Bob never notifies himself for
+    // his own reply, the same self-skip the mention loop already uses.
+    const aliceAfterBobReply = await getUnreadNotificationCount(alice.client, alice.id);
+    expect(aliceAfterBobReply).toBe(aliceBefore + 1);
+    const bobUnaffected = await getUnreadNotificationCount(bob.client, bob.id);
+    expect(bobUnaffected).toBe(0);
+    const aliceNotifications = await listMyNotifications(alice.client, alice.id, { unreadOnly: true });
+    expect(aliceNotifications.find((n) => n.comment_id === bobReply.id)).toMatchObject({ kind: 'reply', user_id: alice.id, comment_id: bobReply.id });
+
+    // Dave replies next, and @mentions Bob in the same reply. Bob is now
+    // both a thread participant (he replied above) and an @mention target
+    // — mention wins, so he gets exactly one notification, kind "mention",
+    // not two and not "reply". Alice, a participant but not mentioned,
+    // still gets her "reply" notification as before.
+    const aliceBeforeDaveReply = await getUnreadNotificationCount(alice.client, alice.id);
+    const daveReply = await createComment(dave.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementId, parentCommentId: root.id, body: `agreed, @${bobHandle}`, authorId: dave.id });
+
+    const aliceAfterDaveReply = await getUnreadNotificationCount(alice.client, alice.id);
+    expect(aliceAfterDaveReply).toBe(aliceBeforeDaveReply + 1);
+    const aliceSecondNotification = await listMyNotifications(alice.client, alice.id, { unreadOnly: true });
+    expect(aliceSecondNotification.find((n) => n.comment_id === daveReply.id)).toMatchObject({ kind: 'reply', user_id: alice.id, comment_id: daveReply.id });
+
+    const bobNotifications = await listMyNotifications(bob.client, bob.id, { unreadOnly: true });
+    const bobOnDaveReply = bobNotifications.filter((n) => n.comment_id === daveReply.id);
+    expect(bobOnDaveReply).toHaveLength(1);
+    expect(bobOnDaveReply[0]).toMatchObject({ kind: 'mention', user_id: bob.id, comment_id: daveReply.id });
+
+    // Dave never notifies himself for his own reply either.
+    const daveUnaffected = await getUnreadNotificationCount(dave.client, dave.id);
+    expect(daveUnaffected).toBe(0);
+  }, 30_000);
+
   // ---------------------------------------------------------------------
   // unresolved_comment_counts
   // ---------------------------------------------------------------------
