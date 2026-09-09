@@ -12,6 +12,11 @@
  * lesson in e2e/element-header.spec.ts/e2e/element-rename.spec.ts (both
  * arrangements' menu items are CSS-hidden, not unmounted, until opened).
  *
+ * Also covers Sprint U4-1 E2: "header collapsed user menu — verify" —
+ * the app header's own mobile user menu (`AppHeader.tsx`/`UserMenu.tsx`,
+ * Sprint U3b, unrelated to and untouched by E1) still collapses
+ * correctly on the landscape page alongside its own two new disclosures.
+ *
  * Same "needs a real Supabase" limitation as e2e/element-edit.spec.ts.
  */
 import { randomUUID } from 'node:crypto';
@@ -114,5 +119,17 @@ test('landscape actions: "+ Add" and "Reset layout" collapse into disclosures be
   await moreToggle.click();
   const resetLayout = page.getByRole('button', { name: 'Reset layout' });
   await expect(resetLayout).toBeVisible();
+
+  // Sprint U4-1 E2: the app header's own mobile menu, a separate
+  // component from Landscape's own two disclosures above, still
+  // collapses correctly here too — opening it disturbs neither of them.
+  const appMenuToggle = page.getByRole('button', { name: 'Menu' });
+  await expect(appMenuToggle).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign out' })).not.toBeVisible();
+  await appMenuToggle.click();
+  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '+ Add system' })).toBeVisible();
+  await expect(resetLayout).toBeVisible();
+
   await resetLayout.click();
 });

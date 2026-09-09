@@ -42,6 +42,8 @@ Every model-scoped route (home, capability map, landscape and the zoom chain ben
 
 Implementation: `src/ui/components/ModelNav/ModelNav.tsx`, section membership resolved by path in `src/ui/nav/modelNavSection.ts`.
 
+The app header's own user menu (`src/ui/components/AppHeader/AppHeader.tsx`/`UserMenu.tsx`, Sprint U3b — email/theme/density/sign-out, the same < 768px collapse-behind-a-toggle shape as above but its own separate component, unconditional on every route) is untouched by this sprint. Sprint U4-1 E2 re-verified it specifically on the two pages that gained their own header-level disclosure this sprint (the element page's D1/D3 "⋯" menu, Landscape's E1 "+ Add"/"⋯" menus) — distinct accessible names keep the three from colliding, and opening one never disturbs another (`e2e/element-header.spec.ts`, `e2e/landscape-actions.spec.ts`).
+
 ### 2.1 One zoom gesture, five levels
 
 The model is a hierarchy with one business layer on top (ADR-001). Navigation is a single continuous zoom that crosses semantic levels:

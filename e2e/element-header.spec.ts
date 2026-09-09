@@ -3,6 +3,12 @@
  * copy action in a header menu); alias moves into attributes; keep one
  * provenance badge for the element's existence fact."
  *
+ * Also covers Sprint U4-1 E2: "header collapsed user menu — verify" —
+ * the app header's own mobile user menu (`AppHeader.tsx`/`UserMenu.tsx`,
+ * Sprint U3b, unrelated to and untouched by D1) still collapses
+ * correctly on the element page now that D1 gave the page its own
+ * header disclosure sitting right next to it.
+ *
  * Same "needs a real Supabase" limitation as e2e/element-edit.spec.ts.
  */
 import { randomUUID } from 'node:crypto';
@@ -100,4 +106,18 @@ test('element header: raw id is hidden behind the header menu, an alias renders 
   await menuToggle.click();
   await expect(copyButton).toBeVisible();
   await expect(rawIdText).toBeVisible();
+
+  // Sprint U4-1 E2: the app header's own mobile menu, a separate
+  // component from the element header's own one above, still collapses
+  // correctly here — and opening it doesn't disturb the element header's
+  // own menu, already open from the click above. Distinct accessible
+  // names ("Menu" vs. "Element actions") are why the two don't collide.
+  await page.setViewportSize({ width: 375, height: 812 });
+  const appMenuToggle = page.getByRole('button', { name: 'Menu' });
+  await expect(appMenuToggle).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign out' })).not.toBeVisible();
+  await expect(copyButton).toBeVisible();
+  await appMenuToggle.click();
+  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  await expect(copyButton).toBeVisible();
 });
