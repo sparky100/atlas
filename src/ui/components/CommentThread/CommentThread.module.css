@@ -1,0 +1,60 @@
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+.thread:last-child {
+  border-bottom: none;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.rowContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.rowHeader {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.authorName {
+  font-weight: 600;
+}
+
+/* Flat, one level only (ADR-010) — a left rule, indented to align under the root's own avatar column. */
+.replies {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-left: var(--space-6);
+  padding-left: var(--space-3);
+  border-left: var(--border-width) solid var(--border);
+}
+
+/* Aligned to the reply indent, same as the handoff's own "Actions row (Reply / Resolve) aligns to the reply indent." */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: var(--space-6);
+  padding-left: var(--space-3);
+}
+
+.replyComposer {
+  margin-left: var(--space-6);
+  padding-left: var(--space-3);
+}

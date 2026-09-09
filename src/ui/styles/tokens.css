@@ -70,6 +70,9 @@
   --status-dot-size: 6px;
   --side-column-width: 300px;
   --blueprint-corner-size: 10px;
+  --comments-panel-width: 372px;
+  --avatar-size-sm: 24px;
+  --avatar-size-md: 32px;
 
   /* ---- Colour: surfaces and text, light (§8.4) ---- */
   --bg: #ffffff;
