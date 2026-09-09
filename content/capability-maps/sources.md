@@ -65,3 +65,34 @@ placeholder.
   are electricity-specific rather than restatements, except Connections
   and Emergency Response, which are the same capability in both and keep
   the same wording.
+
+## electricity_network v2 (2026-09-09)
+
+Sprint U4-1's own "Electricity map additions" item, done once
+`content:export-capability-map` (C6) existed to support the review loop
+this addition goes through. Six level-2 items added under the four
+sector-specific level-1s (9–12); codes 1–8 and every level-2 item v1
+already had are untouched, so nothing seeded from v1 is affected. Found
+two ways, both against material already in this directory rather than a
+fresh source pass:
+
+- Three (`10.6 Control Room & Real-Time Operations`, `11.5 Billing &
+  Settlement`, `11.6 Vulnerable Customer Support`) have a direct
+  counterpart in `utility/1.json`'s own level-2 set for the same
+  level-1 (`10.1`, `11.2`, `11.3`) that v1's electricity map never
+  gave an electricity-specific equivalent to — the same comparison
+  method v1's own `sourceDescription` used to justify why its level-2
+  entries diverge from `utility`'s at all, run the other way, against
+  the one map it has a level-1-wording sibling to.
+- One (`9.6 Vegetation Management`) is in neither map: a distinct,
+  safety-critical capability for a network with overhead lines that
+  general-utility wording (deliberately generic across water, gas and
+  electricity) wouldn't be expected to name.
+
+Drafted from the same sources named above for `electricity_network`,
+consulted the same way (scope and vocabulary only, nothing copied
+verbatim) — no new reference model added. `status: draft`,
+`reviewedBy: "Pending human review — drafted by Claude Code"`, same as
+every map's own first draft: it stays draft, seedable for review
+alongside the published v1, until a named reviewer edits that field and
+runs `pnpm content:publish-capability-map electricity_network 2`.
