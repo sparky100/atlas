@@ -10,13 +10,20 @@
 -- Full redefinition (`create or replace`), not a targeted patch — the same
 -- shape every other in-place function amendment in this schema uses
 -- (commit_deltas's own several revisions, seed_from_map's own sibling
--- functions). Identical to 20260906120000_seed_from_map.sql's version
--- except the one status check below.
+-- functions). Identical to 20260906270000_commit_titles.sql's version
+-- (p_title/title, not the original p_message/message
+-- 20260906120000_seed_from_map.sql shipped — first found applying this
+-- migration for the first time, ever: written against the pre-rename
+-- signature, which `create or replace` can't reconcile with the
+-- already-renamed live function (Postgres 42P13, "cannot change name of
+-- input parameter") even before considering that the `message` column
+-- itself no longer exists to insert into) except the one status check
+-- below.
 create or replace function atlas.seed_from_map(
   p_commit_id uuid,
   p_model_id uuid,
   p_branch_id uuid,
-  p_message text,
+  p_title text,
   p_capability_map_id uuid,
   p_source_id uuid,
   p_source_name text,
@@ -87,8 +94,8 @@ begin
   insert into sources (id, org_id, model_id, kind, name, capability_map_id, created_by)
   values (p_source_id, v_org_id, p_model_id, 'template', p_source_name, p_capability_map_id, auth.uid());
 
-  insert into commits (id, org_id, model_id, branch_id, parent_commit_id, merged_branch_head_commit_id, kind, message, author_id, depth, head_hash)
-  values (p_commit_id, v_org_id, p_model_id, p_branch_id, null, null, 'template_seed', p_message, auth.uid(), 0, decode(p_head_hash, 'hex'))
+  insert into commits (id, org_id, model_id, branch_id, parent_commit_id, merged_branch_head_commit_id, kind, title, author_id, depth, head_hash)
+  values (p_commit_id, v_org_id, p_model_id, p_branch_id, null, null, 'template_seed', p_title, auth.uid(), 0, decode(p_head_hash, 'hex'))
   returning * into v_commit;
 
   insert into deltas (

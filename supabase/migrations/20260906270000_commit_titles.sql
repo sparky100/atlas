@@ -145,6 +145,17 @@ $$;
 revoke all on function atlas.commit_deltas(uuid, uuid, uuid, uuid, commit_kind, text, jsonb, uuid, jsonb, jsonb, jsonb, text, jsonb, text) from public;
 grant execute on function atlas.commit_deltas(uuid, uuid, uuid, uuid, commit_kind, text, jsonb, uuid, jsonb, jsonb, jsonb, text, jsonb, text) to authenticated;
 
+-- Same reason as commit_deltas above: `create or replace function` cannot
+-- rename an existing parameter (Postgres 42P13, "cannot change name of
+-- input parameter") — only the argument *types* and *count* are allowed to
+-- stay fixed for a bare replace. `p_message` -> `p_title` is a rename at
+-- the same position/type, which still hits this, and was missed here on
+-- first write (only commit_deltas's own signature-widening case was
+-- handled) — found applying this migration for the first time, ever, to
+-- any database, so fixed in place rather than left broken in history for
+-- a follow-up migration nothing has depended on yet.
+drop function if exists atlas.merge_branch(uuid, uuid, text, jsonb, jsonb, jsonb, text);
+
 create or replace function atlas.merge_branch(
   p_merge_request_id uuid,
   p_commit_id uuid,
@@ -212,6 +223,12 @@ begin
 end;
 $$;
 
+-- The drop above wipes merge_branch's own grants (same reasoning as
+-- commit_deltas's restatement above it) — restated identically to
+-- 20260906161000_merge_review_queue.sql's original grant.
+revoke all on function atlas.merge_branch(uuid, uuid, text, jsonb, jsonb, jsonb, text) from public;
+grant execute on function atlas.merge_branch(uuid, uuid, text, jsonb, jsonb, jsonb, text) to authenticated;
+
 create or replace function atlas.on_model_created()
 returns trigger
 language plpgsql
@@ -231,6 +248,10 @@ begin
   return new;
 end;
 $$;
+
+-- Same rename-hits-42P13 fix as merge_branch above: p_message -> p_title
+-- at the same position/type.
+drop function if exists atlas.seed_from_map(uuid, uuid, uuid, text, uuid, uuid, text, jsonb, jsonb, jsonb, jsonb, text);
 
 create or replace function atlas.seed_from_map(
   p_commit_id uuid,
@@ -326,3 +347,9 @@ begin
   return v_commit;
 end;
 $$;
+
+-- Same reasoning as merge_branch's restatement above: the drop wipes
+-- seed_from_map's own grants, restated identically to
+-- 20260906120000_seed_from_map.sql's original grant.
+revoke all on function atlas.seed_from_map(uuid, uuid, uuid, text, uuid, uuid, text, jsonb, jsonb, jsonb, jsonb, text) from public;
+grant execute on function atlas.seed_from_map(uuid, uuid, uuid, text, uuid, uuid, text, jsonb, jsonb, jsonb, jsonb, text) to authenticated;
