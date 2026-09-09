@@ -8,15 +8,16 @@
  *
  * The canvas is Canvas 2D, not DOM (src/ui/landscape/LandscapeCanvas.tsx's
  * own module comment) — there is no per-node element to click by role or
- * text. This computes the seeded system's real screen position the same
- * way the canvas itself does: `computeLandscapeLayout` (the pure,
+ * text. This computes the seeded system's real *world* position the same
+ * way the canvas itself does — `computeLandscapeLayout` (the pure,
  * deterministic layout function the app calls, imported directly here,
  * same technique e2e/landscape-perf.spec.ts already uses for its own
- * fixture) against the identical single-system input, then clicks the
- * canvas at that node's centre. The canvas's transform starts at identity
- * (`{ scale: 1, tx: 0, ty: 0 }`, LandscapeCanvas.tsx's own initial state),
- * so world coordinates are screen coordinates directly, with no fit-to-
- * view step to account for.
+ * fixture) against the identical single-system input — then converts that
+ * to a screen position using the canvas's own live transform, read off the
+ * wrapper's `data-scale`/`data-tx`/`data-ty` attributes (Landscape canvas,
+ * structural, item 1: the canvas now fits the whole diagram to view on
+ * load, so the transform is never a plain identity `{scale:1,tx:0,ty:0}`
+ * by the time this fixture's one-system diagram has rendered).
  *
  * Same "needs a real Supabase" limitation as e2e/element-edit.spec.ts. No
  * genesis-commit bootstrap (ADR-018): main already has a real head the
@@ -110,7 +111,13 @@ test('selecting a system on the landscape zooms to its Context view and updates 
   const node = layout.nodes.find((n) => n.elementId === systemId);
   if (!node) throw new Error('computeLandscapeLayout did not place the seeded system');
 
-  await canvas.click({ position: { x: node.x + NODE_WIDTH / 2, y: node.y + NODE_HEIGHT / 2 } });
+  const wrapper = page.locator('[data-scale]');
+  const scale = Number(await wrapper.getAttribute('data-scale'));
+  const tx = Number(await wrapper.getAttribute('data-tx'));
+  const ty = Number(await wrapper.getAttribute('data-ty'));
+  const screenX = (node.x + NODE_WIDTH / 2) * scale + tx;
+  const screenY = (node.y + NODE_HEIGHT / 2) * scale + ty;
+  await canvas.click({ position: { x: screenX, y: screenY } });
 
   await expect(page).toHaveURL(new RegExp(`/context/${systemId}\\?ref=main`));
   await expect(page.getByRole('heading', { name: 'Context' })).toBeVisible();

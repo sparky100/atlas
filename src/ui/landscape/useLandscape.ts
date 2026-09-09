@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
-import { resolveBranchModeProjection, projectionElementsByIds, projectionLandscapeEdges, projectionSupportsEdgesForSystems, projectionSystemsForLandscape } from '../../db/branchProjection';
+import { resolveBranchModeProjection, projectionActorsForLandscape, projectionElementsByIds, projectionLandscapeEdges, projectionSupportsEdgesForSystems, projectionSystemsForLandscape } from '../../db/branchProjection';
 import { listSupportsEdgesForCapabilities } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
-import { listLandscapeEdges, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
+import { listActorsForLandscape, listLandscapeEdges, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import { clearViewLayouts, getOrCreateModelView, listViewLayouts, upsertViewLayouts } from '../../db/views';
 import type { ViewMode } from '../../db/viewMode';
@@ -19,6 +19,8 @@ export interface LandscapeData {
   commitId: UUID;
   view: ViewRow;
   systemsById: Map<UUID, ElementsHeadRow>;
+  /** Landscape canvas, structural (item 3) — every Actor at this commit, keyed for `LandscapeCanvas.tsx`'s own actor-row render, the same shape `systemsById` already has. */
+  actorsById: Map<UUID, ElementsHeadRow>;
   edges: RelationshipsHeadRow[];
   layout: LandscapeLayout;
   /** Populated only when `ref` is a branch and `mode === 'diff'` (UI-principles §6.2/§6.3) — `null` for `main`/`tag`, and for `asIs`/`toBe`, where there's nothing to highlight against. */
@@ -110,6 +112,7 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
     async function load(): Promise<void> {
       let commitId: UUID;
       let allSystems: ElementsHeadRow[];
+      let allActors: ElementsHeadRow[];
       let branchId: UUID | null = null;
       let diff: VersionDiff | null = null;
       // Populated only for a branch ref, closed over below so every
@@ -134,6 +137,7 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
         branchId = branch.id;
         diff = resolved.diff;
         allSystems = projectionSystemsForLandscape(resolved.projection);
+        allActors = projectionActorsForLandscape(resolved.projection);
         systemsSource = {
           edges: (systemIds) => projectionLandscapeEdges(resolved.projection, systemIds),
           supports: (systemIds) => projectionSupportsEdgesForSystems(resolved.projection, systemIds),
@@ -147,7 +151,7 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
           return;
         }
         commitId = resolvedCommitId;
-        allSystems = await listSystemsForLandscape(supabase, commitId);
+        [allSystems, allActors] = await Promise.all([listSystemsForLandscape(supabase, commitId), listActorsForLandscape(supabase, commitId)]);
       }
 
       const supportingIds = capabilityId ? (systemsSource ? systemsSource.supportingSystemIds(capabilityId) : await loadSupportingSystemIds(commitId, capabilityId)) : null;
@@ -167,8 +171,13 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
           .map((row) => [row.subject_id, row]),
       );
 
-      // UI-principles §8.6: layout runs off the main thread.
-      const computed = await computeLandscapeLayoutInWorker(systems, supportsEdges, l1AncestorByCapabilityId);
+      // UI-principles §8.6: layout runs off the main thread. Actors have no
+      // saved `view_layouts` positions of their own (there's no drag-to-
+      // reposition feature for them, or for systems either — the saved
+      // positions below exist only so a reload renders the same picture,
+      // not to persist a manual move) — `computed.actorNodes` passes
+      // straight through.
+      const computed = await computeLandscapeLayoutInWorker(systems, supportsEdges, l1AncestorByCapabilityId, allActors);
       const nodes = computed.nodes.map((node) => {
         const saved = savedById.get(node.elementId);
         return saved ? { elementId: node.elementId, x: saved.x, y: saved.y } : node;
@@ -184,7 +193,8 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
       }
 
       const systemsById = new Map(systems.map((s) => [s.element_id, s]));
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, edges, layout, diff } });
+      const actorsById = new Map(allActors.map((a) => [a.element_id, a]));
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, actorsById, edges, layout, diff } });
     }
 
     load().catch((e: unknown) => {
