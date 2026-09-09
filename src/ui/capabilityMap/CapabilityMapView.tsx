@@ -7,13 +7,19 @@ import { CapabilityTile } from '../components/CapabilityTile/CapabilityTile';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
-import { CapabilityMapAddForm } from './CapabilityMapAddForm';
 import { COLOUR_BY_OPTIONS, aggregateTileColourFor, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
 import type { CapabilityMapTree, L1Column, L2Card } from './layout';
 import { useCapabilityReorder } from './useCapabilityReorder';
 import styles from './CapabilityMapView.module.css';
 
-/** Shape shared by `addCapability` and `reorderCapability` — both are "does the caller have edit rights, and what do we need to commit through them" (Sprint U4-1 C1 adds the second one). */
+/**
+ * `reorderCapability`'s own "does the caller have edit rights, and what do
+ * we need to commit through them" shape (Sprint U4-1 C1). Also used to be
+ * `addCapability`'s shape too, before Sprint U4-1 C5 moved "+ Add
+ * capability" out of this component entirely, into `CapabilityMapPage.tsx`'s
+ * own page-action area — reordering stays a per-tile control rendered
+ * inside the map itself, not a page action, so it's the one caller left.
+ */
 export interface CapabilityMapEditContext {
   modelId: UUID;
   orgId: UUID;
@@ -36,18 +42,10 @@ export interface CapabilityMapViewProps {
   /** `?ref=...` — carried into every "→ Landscape" zoom link so it lands on the same ref the map itself is showing (§2.4's deep-link rule). */
   refParam: string;
   /**
-   * The tailoring flow's "add" action (§4.2-style gate: owner/architect, at
-   * `main` — ADR-015). Omitted entirely, not shown disabled, when the
-   * caller hasn't established both halves — same convention as
-   * ElementHeader's `onEdit`.
-   */
-  addCapability?: (CapabilityMapEditContext & { onCreated: () => void }) | undefined;
-  /**
-   * Sprint U4-1 C1's "drag-to-reorder among siblings" — same edit-rights
-   * gate as `addCapability` (in practice, always given together — both
-   * come from `CapabilityMapPage.tsx`'s one `canEdit` check — but kept as
-   * a separate prop rather than folded into `addCapability` since the two
-   * really are different actions with different callbacks).
+   * Sprint U4-1 C1's "drag-to-reorder among siblings" (§4.2-style gate:
+   * owner/architect, at `main` — ADR-015). Omitted entirely, not shown
+   * disabled, when the caller hasn't established both halves — same
+   * convention as `ElementHeader`'s `onEdit`.
    */
   reorderCapability?: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
 }
@@ -105,8 +103,18 @@ export interface CapabilityMapViewProps {
  * L1 name link itself just loses its underline (`.columnLink`), the same
  * "plain-text name" reasoning as the tile component's own primary link,
  * without becoming a stretched-link tile itself.
+ *
+ * Sprint U4-1 C5: "'+ Add capability' moves to the page action area;
+ * colour-by stays left as a view control." This component no longer
+ * renders `CapabilityMapAddForm` at all — `CapabilityMapPage.tsx`'s own
+ * header now owns that action, alongside its title, the same page-level
+ * spot `LandscapePage.tsx` already uses for "+ Add system"/"+ Add actor".
+ * Colour-by (the `select` in `.toolbar` below) stays exactly where it
+ * was: a view control that changes how this view reads, not a page
+ * action that changes the model — the same distinction `LandscapePage.tsx`
+ * draws between its own header actions and `BranchViewModeControl`.
  */
-export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, colourBy, onColourByChange, orgSlug, modelSlug, refParam, addCapability, reorderCapability }: CapabilityMapViewProps) {
+export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, colourBy, onColourByChange, orgSlug, modelSlug, refParam, reorderCapability }: CapabilityMapViewProps) {
   const [expanded, setExpanded] = useState<Set<UUID>>(new Set());
   const colourById = useId();
 
@@ -119,17 +127,12 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
     });
   }
 
+  // Sprint U4-1 C5: no "+ Add capability" fallback here any more —
+  // CapabilityMapPage.tsx's own header action area is always visible
+  // (whenever `canEdit`), whether the map is empty or not, so there's
+  // nothing left for this branch to add beyond the message itself.
   if (tree.l1.length === 0 && tree.orphans.length === 0) {
-    return (
-      <div>
-        <EmptyState>No capabilities yet. A capability map has nothing to show until at least one Capability element exists.</EmptyState>
-        {addCapability && (
-          <div className={styles.toolbar}>
-            <CapabilityMapAddForm tree={tree} {...addCapability} />
-          </div>
-        )}
-      </div>
-    );
+    return <EmptyState>No capabilities yet. A capability map has nothing to show until at least one Capability element exists.</EmptyState>;
   }
 
   return (
@@ -154,7 +157,6 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
             Link systems to capabilities to see coverage.
           </Text>
         )}
-        {addCapability && <CapabilityMapAddForm tree={tree} {...addCapability} />}
       </div>
 
       {tree.l1.length > 0 && (

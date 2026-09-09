@@ -15,7 +15,7 @@ import styles from './ElementBrowseTable.module.css';
  * unlinked-systems` is active and the viewer can edit main (ElementsPage.tsx's
  * own gate, `canEditOnMain` — the same role floor every other main write
  * uses, ADR-015) — omitted entirely otherwise, same convention as
- * `CapabilityMapView`'s `addCapability`.
+ * `CapabilityMapView`'s `reorderCapability`.
  */
 export interface ElementBrowseLinkSupportsConfig {
   modelId: UUID;

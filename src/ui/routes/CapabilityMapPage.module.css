@@ -4,6 +4,17 @@
   margin: 0 auto;
 }
 
+/* Sprint U4-1 C5: "'+ Add capability' moves to the page action area" —
+   same header/actions split LandscapePage.module.css already uses for
+   its own "+ Add system"/"+ Add actor". */
 .header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   margin-bottom: var(--space-4);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
 }

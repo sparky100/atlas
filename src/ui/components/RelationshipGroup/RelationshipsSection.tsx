@@ -23,7 +23,7 @@ const DIRECTION_LABEL: Record<RelationshipType, { outbound: string; inbound: str
   flows_to: { outbound: 'flows to', inbound: 'receives from' },
 };
 
-/** Everything `RelationshipAdd` needs beyond the group slot itself and direction — one object so `RelationshipsSection`'s own prop list doesn't grow one entry per field every time the create path needs another. Omitted entirely (not passed disabled) when the caller hasn't established edit rights, same convention as `CapabilityMapView`'s `addCapability`. */
+/** Everything `RelationshipAdd` needs beyond the group slot itself and direction — one object so `RelationshipsSection`'s own prop list doesn't grow one entry per field every time the create path needs another. Omitted entirely (not passed disabled) when the caller hasn't established edit rights, same convention as `CapabilityMapView`'s `reorderCapability`. */
 export interface RelationshipsSectionAddConfig {
   modelId: UUID;
   orgId: UUID;
