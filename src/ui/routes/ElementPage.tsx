@@ -1,7 +1,8 @@
 import { useParams, useSearchParams } from 'react-router';
 import { ATTRIBUTE_SCHEMA_BY_TYPE } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
-import type { BranchRow, SourceRow } from '../../db/types';
+import type { UUID } from '../../contracts/delta';
+import type { AliasRow, BranchRow, SourceRow } from '../../db/types';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { AttributeEditRow } from '../components/AttributeEditRow/AttributeEditRow';
 import { AttributeRow } from '../components/AttributeRow/AttributeRow';
@@ -27,6 +28,7 @@ import { canEditBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
 import { elementBreadcrumbSegments } from '../nav/elementBreadcrumbSegments';
+import { ALIAS_TYPE_LABELS, aliasAsFact } from '../elements/aliasLabels';
 import { useElementPage } from '../elements/useElementPage';
 import { useElementEditor, type DraftValue } from '../elements/useElementEditor';
 import styles from './ElementPage.module.css';
@@ -145,8 +147,6 @@ export function ElementPage() {
               element={state.data.element}
               existsFact={state.data.facts.get('$exists')}
               existsSource={state.data.sources.get(state.data.facts.get('$exists')?.source_id ?? '')}
-              aliases={state.data.aliases}
-              aliasSources={state.data.aliasSources}
               onEdit={canEdit && editor.status === 'idle' ? editor.startEditing : undefined}
             />
             {canEdit && state.data.element.element_type === 'capability' && (
@@ -166,9 +166,15 @@ export function ElementPage() {
               <div className={styles.leftColumn}>
                 <CollapsibleSection title="Attributes">
                   {editor.status === 'idle' ? (
-                    <AttributesTable element={state.data.element} facts={state.data.facts} sources={state.data.sources} />
+                    <AttributesTable
+                      element={state.data.element}
+                      facts={state.data.facts}
+                      sources={state.data.sources}
+                      aliases={state.data.aliases}
+                      aliasSources={state.data.aliasSources}
+                    />
                   ) : (
-                    <AttributesEditor element={state.data.element} editor={editor} />
+                    <AttributesEditor element={state.data.element} editor={editor} aliases={state.data.aliases} aliasSources={state.data.aliasSources} />
                   )}
                 </CollapsibleSection>
                 <CollapsibleSection title="Relationships" meta={`(${String(state.data.relationships.length)})`}>
@@ -253,7 +259,31 @@ const PLACEHOLDER_BRANCH: BranchRow = {
   updated_at: '',
 };
 
-function AttributesTable({ element, facts, sources }: { element: ElementsHeadRow; facts: Map<string, FactsRow>; sources: Map<string, SourceRow> }) {
+/** Sprint U4-1 D1: "alias moves into attributes" — each alias renders as its own read-only row, same shape as any other attribute (`aliasAsFact` gives `AttributeRow` a `FactsRow` to work with), labelled by its real `alias_type` (`ALIAS_TYPE_LABELS`) rather than the header's old single undifferentiated "aka" bucket. Appended after the schema-driven fields — an alias is always additional identifying information, never a substitute for one of them. */
+function AliasRows({ elementId, aliases, aliasSources }: { elementId: UUID; aliases: AliasRow[]; aliasSources: Map<UUID, SourceRow> }) {
+  return (
+    <>
+      {aliases.map((alias) => {
+        const fact = aliasAsFact(alias, elementId);
+        return <AttributeRow key={alias.id} label={ALIAS_TYPE_LABELS[alias.alias_type]} required={false} fact={fact} source={aliasSources.get(alias.source_id)} />;
+      })}
+    </>
+  );
+}
+
+function AttributesTable({
+  element,
+  facts,
+  sources,
+  aliases,
+  aliasSources,
+}: {
+  element: ElementsHeadRow;
+  facts: Map<string, FactsRow>;
+  sources: Map<string, SourceRow>;
+  aliases: AliasRow[];
+  aliasSources: Map<UUID, SourceRow>;
+}) {
   const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type];
   return (
     <div>
@@ -261,11 +291,22 @@ function AttributesTable({ element, facts, sources }: { element: ElementsHeadRow
         const fact = facts.get(field.key);
         return <AttributeRow key={field.key} label={field.label} required={field.required} fact={fact} source={fact ? sources.get(fact.source_id) : undefined} />;
       })}
+      <AliasRows elementId={element.element_id} aliases={aliases} aliasSources={aliasSources} />
     </div>
   );
 }
 
-function AttributesEditor({ element, editor }: { element: ElementsHeadRow; editor: ReturnType<typeof useElementEditor> }) {
+function AttributesEditor({
+  element,
+  editor,
+  aliases,
+  aliasSources,
+}: {
+  element: ElementsHeadRow;
+  editor: ReturnType<typeof useElementEditor>;
+  aliases: AliasRow[];
+  aliasSources: Map<UUID, SourceRow>;
+}) {
   const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type].filter((field) => field.editable !== false);
   return (
     <div>
@@ -280,6 +321,10 @@ function AttributesEditor({ element, editor }: { element: ElementsHeadRow; edito
           error={editor.fieldErrors[field.key]}
         />
       ))}
+      {/* Not editable here (this hook only ever writes attributes.*, never
+          the separate aliases table) — still shown, read-only, so an
+          alias doesn't visibly disappear the moment someone clicks Edit. */}
+      <AliasRows elementId={element.element_id} aliases={aliases} aliasSources={aliasSources} />
       {editor.submitError !== null && (
         <Text as="p" tone="default">
           {editor.submitError}

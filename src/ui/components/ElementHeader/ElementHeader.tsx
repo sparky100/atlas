@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { ElementsHeadRow } from '../../../contracts/rows';
-import type { AliasRow, SourceRow } from '../../../db/types';
+import type { SourceRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
 import { lifecycleToneFor } from '../../elements/lifecycleTone';
 import { Button } from '../Button/Button';
@@ -15,8 +15,6 @@ export interface ElementHeaderProps {
   element: ElementsHeadRow;
   existsFact: FactsRow | undefined;
   existsSource: SourceRow | undefined;
-  aliases: AliasRow[];
-  aliasSources: Map<string, SourceRow>;
   /**
    * `Edit` (§4.2), shown only when the caller has already established its
    * gate: `canEditBranch(role, editingBranch)` (src/ui/orgs/roleGates.ts) —
@@ -41,9 +39,24 @@ export interface ElementHeaderProps {
  * the role/ref combinations `canEditBranch` actually allows: owner/architect
  * at `main` (ADR-015), or owner/architect/contributor on a draft change
  * branch (Sprint C1).
+ *
+ * Sprint U4-1 D1: the raw element id is no longer shown directly in the
+ * meta row — it's an internal identifier a reader almost never needs at a
+ * glance, and showing it unconditionally crowded the one badge that
+ * actually matters here (below). It's still one click away, behind this
+ * header's own overflow menu ("⋯"), not removed outright. Aliases moved
+ * out of this component entirely, into the element page's own Attributes
+ * section (`ElementPage.tsx`'s `AttributesTable`/`AttributesEditor`,
+ * `src/ui/elements/aliasLabels.ts`'s `aliasAsFact`) — they're identifying
+ * facts about the element, the same shape as any other attribute, not
+ * header chrome. What's left here is exactly "one provenance badge for
+ * the element's existence fact" (`existsFact`), the sprint item's own
+ * wording — nothing else competes with it for attention.
  */
-export function ElementHeader({ element, existsFact, existsSource, aliases, aliasSources, onEdit }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit }: ElementHeaderProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const menuId = useId();
   const attrs = attributesRecord(element.attributes);
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
@@ -74,53 +87,25 @@ export function ElementHeader({ element, existsFact, existsSource, aliases, alia
         {isExternal && <Chip tone="neutral">{externalOrganisation ? `external (${externalOrganisation})` : 'external'}</Chip>}
       </div>
       <div className={styles.metaRow}>
-        <button type="button" className={styles.idButton} onClick={() => void copyId()}>
-          <Text mono size="sm" tone="muted" as="span">
-            {element.element_id.slice(0, 8)}…
-          </Text>
-          <Text size="sm" tone="muted" as="span">
-            {copied ? 'copied' : '⧉'}
-          </Text>
-        </button>
         {existsFact && <FactBadge fact={existsFact} source={existsSource} />}
-        {/*
-          Aliases aren't `facts` rows (no delta_id — SPEC §3.6's aliases
-          table stands apart from the delta/fact stream), so FactBadge's
-          own "supersession chain" concept doesn't really apply to one.
-          Reusing FactBadge here for its compact source+confidence display
-          is a deliberate simplification: the badge's hover chain will
-          just come back empty (delta_id doesn't resolve to a real delta),
-          which is honest — an alias has no supersession chain — not a bug
-          to route around with a second, near-identical badge component.
-        */}
-        {aliases.map((alias) => (
-          <span key={alias.id} className={styles.alias}>
-            <Text tone="muted" size="sm" as="span">
-              aka "{alias.alias_value}"
-            </Text>
-            <FactBadge
-              fact={{
-                subject_type: 'element',
-                subject_id: element.element_id,
-                attribute: `alias:${alias.alias_type}`,
-                value: alias.alias_value,
-                delta_id: alias.id,
-                source_id: alias.source_id,
-                source_ref: null,
-                effective_date: null,
-                confidence: alias.confidence,
-                asserted_by: alias.created_by,
-                asserted_at: alias.created_at,
-              }}
-              source={aliasSources.get(alias.source_id)}
-            />
-          </span>
-        ))}
         {onEdit && (
           <Button variant="ghost" onClick={onEdit}>
             ✎ Edit
           </Button>
         )}
+        <div className={styles.menuWrapper}>
+          <button type="button" className={styles.menuToggle} aria-expanded={menuOpen} aria-controls={menuId} aria-label="Element actions" onClick={() => { setMenuOpen((o) => !o); }}>
+            <span aria-hidden="true">⋯</span>
+          </button>
+          <div id={menuId} className={[styles.menu, menuOpen ? styles.open : ''].filter(Boolean).join(' ')}>
+            <button type="button" className={styles.menuItem} onClick={() => void copyId()}>
+              <Text as="span">{copied ? 'Copied' : 'Copy element ID'}</Text>
+              <Text mono size="sm" tone="muted" as="span">
+                {element.element_id.slice(0, 8)}…
+              </Text>
+            </button>
+          </div>
+        </div>
       </div>
     </header>
   );

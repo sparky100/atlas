@@ -19,18 +19,63 @@
   flex-wrap: wrap;
 }
 
-.idButton {
-  display: inline-flex;
+/* Sprint U4-1 D1: the header's own overflow menu — "Copy element ID" is
+   its one item today, kept as a menu (not a bare button) since the raw
+   id itself is deliberately not shown unconditionally any more (see
+   ElementHeader.tsx's own comment). Always collapsed, at every viewport
+   width — unlike UserMenu.module.css's own `.toggle`/`.menu`, which only
+   collapse on a narrow viewport; there's no "always-open bar" mode here. */
+.menuWrapper {
+  position: relative;
+}
+
+.menuToggle {
+  display: flex;
   align-items: center;
-  gap: var(--space-1);
-  background: none;
-  border: none;
-  padding: 0;
+  justify-content: center;
+  height: var(--row-height);
+  width: var(--row-height);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.1em;
   cursor: pointer;
 }
 
-.alias {
-  display: inline-flex;
+.menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--surface-raised-shadow);
+  min-width: 220px;
+  z-index: 10;
+}
+
+.menu.open {
+  display: flex;
+}
+
+.menuItem {
+  display: flex;
   align-items: center;
-  gap: var(--space-1);
+  justify-content: space-between;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  cursor: pointer;
+  text-align: left;
+}
+
+.menuItem:hover {
+  background: var(--bg-subtle);
 }

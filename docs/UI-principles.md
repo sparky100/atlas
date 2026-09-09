@@ -158,8 +158,8 @@ Two columns on desktop (≥ 1024 px), stacked on narrower screens. Left column ~
 
 - Type glyph (§8.5) and type word, then name as the page title (`h1`).
 - Status chips, only those that apply: lifecycle (`planned | active | retiring | retired`, systems only), `external` with the external organisation on hover, `not present at this ref` (§2.4), `merged into …` banner if reached via a merged id.
-- The id, truncated, with copy-to-clipboard.
-- Aliases (`aliases` rows other than `merged_id`), inline, each with its provenance badge on hover.
+- The id, truncated, with copy-to-clipboard. **Amended (Sprint U4-1 D1):** not shown directly in the header any more — it sits behind the header's own overflow menu ("⋯" → "Copy element ID"), one click away rather than unconditionally visible, so it stops competing with the one badge that actually matters here (the existence fact's, below). `ElementHeader.tsx`'s own comment has the full reasoning.
+- Aliases (`aliases` rows other than `merged_id`), inline, each with its provenance badge on hover. **Amended (Sprint U4-1 D1):** moved out of the header entirely, into the element page's own Attributes section (§4.3) — one row per alias, labelled by its real `alias_type` (`src/ui/elements/aliasLabels.ts`'s `ALIAS_TYPE_LABELS`) rather than a single "aka" bucket, using the exact same attribute-row shape (and provenance badge) every other attribute gets, since an alias is exactly that: an identifying fact about the element, not header chrome.
 - "in N views" links to the list of saved views whose query includes this element at the current ref.
 - `Edit`: for a **contributor**, present only when the ref is a draft change branch; at `main` or a tag it reads `Propose a change…` and opens the branch picker — a contributor never edits main directly. For an **architect or owner**, `Edit` is also available directly at `main` (ADR-015, SPEC §5.3) — the same action, going straight to a commit on main rather than a change branch, since those two roles are the ones a commit to main is actually gated on. At a tag, for any role, it is always `Propose a change…`: a tag is never itself editable.
 
