@@ -33,7 +33,8 @@ export interface RelationshipsSectionAddConfig {
   searchCommitId: UUID;
   branch: BranchRow;
   expectedHeadCommitId: UUID;
-  onCreated: () => void;
+  /** The newly related element's id — the caller (ElementPage.tsx) uses this to mark the row "just added" (Handoff — Flow: Add a system, step 7). */
+  onCreated: (otherElementId: UUID) => void;
 }
 
 export interface RelationshipsSectionProps {
@@ -46,6 +47,8 @@ export interface RelationshipsSectionProps {
   relationshipFacts: Map<UUID, Map<string, FactsRow>>;
   sources: Map<UUID, SourceRow>;
   addRelationship?: RelationshipsSectionAddConfig | undefined;
+  /** The other element id of a relationship just added in this session (Handoff — Flow: Add a system, step 7's `just added` chip) — cleared by the caller once acknowledged, not by this component. */
+  justAddedElementId?: UUID | null;
 }
 
 /**
@@ -59,7 +62,7 @@ export interface RelationshipsSectionProps {
  * with neither existing rows nor (when `addRelationship` is given) the
  * right to add is skipped entirely, same as before this generalisation.
  */
-export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementType, relationships, endpoints, relationshipFacts, sources, addRelationship }: RelationshipsSectionProps) {
+export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementType, relationships, endpoints, relationshipFacts, sources, addRelationship, justAddedElementId = null }: RelationshipsSectionProps) {
   const outboundSlots = new Map(outboundRelationshipGroups(elementType).map((slot) => [slot.relationshipType, slot]));
   const inboundSlots = new Map(inboundRelationshipGroups(elementType).map((slot) => [slot.relationshipType, slot]));
 
@@ -94,6 +97,7 @@ export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementTyp
               relationshipFacts={relationshipFacts}
               sources={sources}
               addRelationship={addRelationship}
+              justAddedElementId={justAddedElementId}
             />
           )}
           {showInbound && (
@@ -109,6 +113,7 @@ export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementTyp
               relationshipFacts={relationshipFacts}
               sources={sources}
               addRelationship={addRelationship}
+              justAddedElementId={justAddedElementId}
             />
           )}
         </div>
@@ -129,6 +134,7 @@ function RelationshipDirectionGroup({
   relationshipFacts,
   sources,
   addRelationship,
+  justAddedElementId,
 }: {
   label: string;
   rows: RelationshipsHeadRow[];
@@ -141,6 +147,7 @@ function RelationshipDirectionGroup({
   relationshipFacts: Map<UUID, Map<string, FactsRow>>;
   sources: Map<UUID, SourceRow>;
   addRelationship?: RelationshipsSectionAddConfig | undefined;
+  justAddedElementId?: UUID | null;
 }) {
   return (
     <div className={styles.directionGroup}>
@@ -161,6 +168,7 @@ function RelationshipDirectionGroup({
         // free-text attribute on every relationship type and nothing else
         // in this row surfaces it otherwise.
         const description = attrs.description;
+        const justAdded = other !== undefined && other.element_id === justAddedElementId;
 
         return (
           <div key={rel.relationship_id} className={styles.row}>
@@ -191,6 +199,7 @@ function RelationshipDirectionGroup({
               </span>
             )}
             {typeof dataClassification === 'string' && dataClassification.length > 0 && <Chip tone="info">{dataClassification}</Chip>}
+            {justAdded && <Chip tone="info">just added</Chip>}
             {existsFact && <FactBadge fact={existsFact} source={sources.get(existsFact.source_id)} />}
           </div>
         );

@@ -1,0 +1,106 @@
+import { useState } from 'react';
+import type { UUID } from '../../contracts/delta';
+import type { BranchRow } from '../../db/types';
+import { Button } from '../components/Button/Button';
+import { Text } from '../components/Text/Text';
+import { useChanges } from '../changes/useChanges';
+import styles from './HomeSearch.module.css';
+
+export interface ProposeChangePickerProps {
+  modelId: UUID;
+  orgId: UUID;
+  userId: UUID | null;
+  onChosen: (branch: BranchRow) => void;
+  onCancel: () => void;
+}
+
+/**
+ * Handoff — Flow: Add a system, decision 5: a contributor viewing main has
+ * no direct create-on-main path (`roleGates.ts`'s `canEditOnMain`) — this
+ * is the "propose a change" picker `roleGates.ts`'s own comment on
+ * `canEditOnMain` named as still-unbuilt ("a contributor's real path to
+ * editing is creating or opening a change branch first"). Pick one of the
+ * contributor's own open drafts, or start a new one inline — `useChanges`
+ * does the real work either way (same hook `ChangesView.tsx` uses); this is
+ * a narrower, inline-first surface for it, not a second implementation.
+ */
+export function ProposeChangePicker({ modelId, orgId, userId, onChosen, onCancel }: ProposeChangePickerProps) {
+  const { status, branches, error, createChange } = useChanges(modelId, orgId, userId);
+  const [selectedId, setSelectedId] = useState('');
+  const [newName, setNewName] = useState('');
+  const myDrafts = branches.filter((b) => b.created_by === userId && b.status === 'draft');
+
+  return (
+    <div className={styles.proposePanel}>
+      <Text as="p" size="sm">
+        You can propose this as part of a change, not add it to main directly.
+      </Text>
+      {status === 'loading' && (
+        <Text as="p" tone="muted" size="sm">
+          Loading your changes…
+        </Text>
+      )}
+      {myDrafts.length > 0 && (
+        <div className={styles.proposeRow}>
+          <select
+            className={styles.select}
+            value={selectedId}
+            onChange={(e) => {
+              setSelectedId(e.target.value);
+            }}
+          >
+            <option value="">Choose one of your changes…</option>
+            {myDrafts.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.title ?? b.name}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="secondary"
+            disabled={selectedId === ''}
+            onClick={() => {
+              const chosen = myDrafts.find((b) => b.id === selectedId);
+              if (chosen) onChosen(chosen);
+            }}
+          >
+            Use this change
+          </Button>
+        </div>
+      )}
+      <Text as="p" tone="muted" size="sm">
+        or start a new change:
+      </Text>
+      <div className={styles.proposeRow}>
+        <input
+          type="text"
+          className={styles.input}
+          placeholder="Name (e.g. retire-northgate)"
+          value={newName}
+          onChange={(e) => {
+            setNewName(e.target.value);
+          }}
+        />
+        <Button
+          variant="primary"
+          disabled={status === 'creating' || newName.trim().length === 0}
+          onClick={() => {
+            void createChange({ name: newName, title: '', description: '', targetDate: '' }).then((branch) => {
+              if (branch) onChosen(branch);
+            });
+          }}
+        >
+          {status === 'creating' ? 'Creating…' : 'Create & continue'}
+        </Button>
+      </div>
+      <Button variant="ghost" onClick={onCancel}>
+        Cancel
+      </Button>
+      {error !== null && (
+        <Text as="p" size="sm">
+          {error}
+        </Text>
+      )}
+    </div>
+  );
+}

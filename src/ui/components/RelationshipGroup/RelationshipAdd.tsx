@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { RelationshipType, UUID } from '../../../contracts/delta';
 import type { FactsRow, RelationshipsHeadRow } from '../../../contracts/rows';
 import type { RelationshipGroupSlot } from '../../../contracts/relationshipTypeRules';
@@ -28,7 +28,8 @@ export interface RelationshipAddProps {
   searchCommitId: UUID;
   branch: BranchRow;
   expectedHeadCommitId: UUID;
-  onCreated: () => void;
+  /** The other endpoint's element id, once creation succeeds — lets the caller mark the new row "just added" (Handoff — Flow: Add a system, step 7) without a second round trip. */
+  onCreated: (otherElementId: UUID) => void;
 }
 
 const DIRECTION_VERB: Record<RelationshipType, { outbound: string; inbound: string }> = {
@@ -49,6 +50,11 @@ interface PendingTarget {
  * create-new fallback (`useRelationshipTargetSearch`'s own module comment)
  * — pick an existing element of a legal target type, and this element
  * gains a `relationshipType` relationship to it in the given `direction`.
+ * Creating one reports the other endpoint's id to `onCreated` (Handoff —
+ * Flow: Add a system, step 7's "just added" marking, `RelationshipsSection`'s
+ * own `justAddedElementId`) — a plain immediate pick reports it right away;
+ * either staged flow below (asking "primary?" or a verb phrase first)
+ * reports it once that stage's own create actually lands.
  *
  * Sprint U4-1 B4 adds one more step for `supports`/outbound only (a
  * system's own "what does this support" side, the landscape lane a
@@ -82,6 +88,10 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
   const [pendingTarget, setPendingTarget] = useState<PendingTarget | null>(null);
   const [labelDraft, setLabelDraft] = useState('');
   const search = useRelationshipTargetSearch(searchCommitId, modelId, slot.targetTypes, elementId);
+  // Set right before each `create()` call so the hook's own success callback
+  // (which carries no arguments of its own) can still report which element
+  // the new relationship points at (Handoff — Flow: Add a system, step 7).
+  const targetIdRef = useRef<UUID | null>(null);
   const { status, error, create } = useRelationshipCreate({
     modelId,
     orgId,
@@ -96,7 +106,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
       setOpen(false);
       setPendingTarget(null);
       setLabelDraft('');
-      onCreated();
+      if (targetIdRef.current) onCreated(targetIdRef.current);
     },
   });
 
@@ -115,24 +125,36 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
       setPendingTarget(target);
       return;
     }
+    targetIdRef.current = target.elementId;
     void create(target.elementId, target.name, defaultAttributesForPlainPick(slot.relationshipType));
   }
 
   function answerPrimary(primary: boolean): void {
     if (!pendingTarget) return;
+    targetIdRef.current = pendingTarget.elementId;
     void create(pendingTarget.elementId, pendingTarget.name, { role: primary ? 'primary' : 'secondary' }, primary ? currentPrimaryDemotion() : null);
   }
 
   function submitLabel(): void {
     const label = labelDraft.trim();
     if (!pendingTarget || label.length === 0) return;
+    targetIdRef.current = pendingTarget.elementId;
     void create(pendingTarget.elementId, pendingTarget.name, { description: label });
   }
 
+  // Distinct from `close`: backs out of the primary/label stage to the
+  // search results (`open` stays true), rather than closing the whole "+
+  // Add" control — the search the user already typed is still there.
   function cancelPending(): void {
     setPendingTarget(null);
     setLabelDraft('');
   }
+
+  const close = () => {
+    setOpen(false);
+    setPendingTarget(null);
+    setLabelDraft('');
+  };
 
   if (!open) {
     return (
@@ -159,6 +181,9 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
             No
           </Button>
           <Button variant="ghost" onClick={cancelPending} disabled={status === 'creating'}>
+            Back
+          </Button>
+          <Button variant="ghost" onClick={close} disabled={status === 'creating'}>
             Cancel
           </Button>
         </div>
@@ -191,6 +216,9 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
             {status === 'creating' ? 'Adding…' : 'Add'}
           </Button>
           <Button variant="ghost" onClick={cancelPending} disabled={status === 'creating'}>
+            Back
+          </Button>
+          <Button variant="ghost" onClick={close} disabled={status === 'creating'}>
             Cancel
           </Button>
         </div>
@@ -245,7 +273,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
         </ul>
       )}
       <div className={styles.actions}>
-        <Button variant="ghost" onClick={() => { setOpen(false); }} disabled={status === 'creating'}>
+        <Button variant="ghost" onClick={close} disabled={status === 'creating'}>
           Cancel
         </Button>
       </div>

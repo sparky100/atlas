@@ -26,10 +26,16 @@ export interface UseRelationshipCreateResult {
    * (`describeEnvelope`'s `nameLookup`, e.g. "Link PowerON supports Outage
    * & Fault Management") — the caller already has it in hand, it's the
    * very search result being clicked. `attributesOverride`, when given,
-   * replaces this hook's own default attributes entirely (B4's `supports`
-   * picker builds `{ role: 'primary' | 'secondary' }` itself, since only
-   * the caller knows the answer to "primary?"). `demotion`, when given,
-   * folds one extra `relationship.update` into the same commit.
+   * replaces this hook's own default attributes entirely — B4's `supports`
+   * picker builds `{ role: 'primary' | 'secondary' }` itself (only the
+   * caller knows the answer to "primary?"), and Handoff — Flow: Add a
+   * system, step 6's `uses`/`flows_to` verb phrase builds `{ description }`
+   * the same way (there is no separate verb field in the contract —
+   * `UsesAttributes`/`FlowsToAttributes.description` is it). Every real
+   * caller's own default (`relationshipType === 'owns' ? {primary:true} :
+   * {}`) is `{}` whenever it passes an override at all, so replace-vs-merge
+   * never actually differs for any of them — override is simpler. `demotion`,
+   * when given, folds one extra `relationship.update` into the same commit.
    */
   create: (otherElementId: UUID, otherElementName: string, attributesOverride?: Record<string, Json>, demotion?: RelationshipCreateDemotion | null) => Promise<void>;
 }
@@ -85,8 +91,8 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
         // See this hook's own module comment for why `owns` alone gets a
         // real default here rather than `{}` — every other relationship
         // type's attributes are entirely optional (SupportsAttributes/
-        // UsesAttributes/FlowsToAttributes). `attributesOverride` (B4's
-        // `supports` picker) always replaces this when given.
+        // UsesAttributes/FlowsToAttributes). `attributesOverride` always
+        // replaces this when given.
         const attributes = attributesOverride ?? (relationshipType === 'owns' ? { primary: true } : {});
 
         const createDelta = {

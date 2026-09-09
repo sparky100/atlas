@@ -69,10 +69,15 @@ test('from an empty model, add two systems and a uses relationship between them,
   await expect(page.getByRole('heading', { name: 'Payment Gateway' })).toBeVisible();
 
   // Search-first actually works, not just create: searching "Billing"
-  // from here finds the real Billing Service, not a second one.
+  // from here finds the real Billing Service, not a second one. `uses`
+  // is one of the verb-phrase relationship types (Handoff — Flow: Add a
+  // system, decision 6), so picking the target moves to a second stage
+  // in the same overlay before the relationship is actually created.
   await page.getByRole('button', { name: '+ Add uses' }).click();
   await page.getByPlaceholder('Search…').fill('Billing');
   await page.getByRole('button', { name: /Billing Service/ }).click();
+  await page.getByPlaceholder('e.g. reads customer records from').fill('reads invoices from');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
 
   // Sprint U4-1 B5: uses requires a verb-phrase label before the
   // relationship is actually created — "Add" stays disabled until one is

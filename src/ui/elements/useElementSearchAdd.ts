@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import { getElementHead, listRelationshipsForElement } from '../../db/elements';
 import { loadSearchPool, matchElements, type SearchPoolElement } from '../../db/elementSearch';
-import { attributesRecord } from './attributesRecord';
+import { enrichElementMatches, type MatchEnrichment } from './enrichElementMatches';
 import { supabase } from '../supabaseClient';
 
 export interface SearchResultRow {
@@ -39,7 +38,7 @@ export function useElementSearchAdd(commitId: UUID, modelId: UUID, elementType: 
   const [pool, setPool] = useState<SearchPoolElement[] | null>(null);
   const [poolError, setPoolError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [enriched, setEnriched] = useState<Map<UUID, { relationshipCount: number; owner: ElementsHeadRow | null }>>(new Map());
+  const [enriched, setEnriched] = useState<Map<UUID, MatchEnrichment>>(new Map());
 
   useEffect(() => {
     let cancelled = false;
@@ -62,18 +61,9 @@ export function useElementSearchAdd(commitId: UUID, modelId: UUID, elementType: 
   useEffect(() => {
     if (matches.length === 0) return undefined;
     let cancelled = false;
-    Promise.all(
-      matches.map(async (element) => {
-        const relationships = await listRelationshipsForElement(supabase, commitId, element.element_id);
-        const ownerRelationship = relationships.find(
-          (r) => r.relationship_type === 'owns' && r.to_element_id === element.element_id && attributesRecord(r.attributes).primary === true,
-        );
-        const owner = ownerRelationship ? await getElementHead(supabase, commitId, ownerRelationship.from_element_id) : null;
-        return [element.element_id, { relationshipCount: relationships.length, owner }] as const;
-      }),
-    )
+    enrichElementMatches(commitId, matches)
       .then((entries) => {
-        if (!cancelled) setEnriched(new Map(entries));
+        if (!cancelled) setEnriched(entries);
       })
       .catch(() => {
         // Enrichment (relationship count, owner) is a nice-to-have on top of
