@@ -85,8 +85,10 @@ test('seeding from a starter map carries the map item\'s own description onto th
 
   // Bug A2 itself: the map's own description text shows up (it was
   // previously silently dropped at seed time), on the Description row
-  // specifically — not just present somewhere on the page (Code/Template
-  // reference are seeded from the same template source too).
+  // specifically — not just present somewhere on the page (Code is
+  // seeded from the same template source too; templateRef itself is
+  // hidden from this list entirely — Sprint U4-1 D2,
+  // e2e/element-template-reference.spec.ts).
   const descriptionValue = page.getByText('Description', { exact: true }).locator('xpath=following-sibling::*[1]');
   await expect(descriptionValue).toContainText(description);
 

@@ -33,6 +33,17 @@ describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
   it('has no `level` field on capability — it is computed from parent_id depth (ADR-016), never a stored, independently-editable attribute', () => {
     expect(ATTRIBUTE_SCHEMA_BY_TYPE.capability.some((f) => f.key === 'level')).toBe(false);
   });
+
+  it('Sprint U4-1 D2: only Capability.templateRef is hidden from the read-only attributes list — every other field, including its own not-editable sibling `order`, still shows', () => {
+    const capability = ATTRIBUTE_SCHEMA_BY_TYPE.capability;
+    expect(capability.find((f) => f.key === 'templateRef')?.hidden).toBe(true);
+    expect(capability.find((f) => f.key === 'order')?.hidden).not.toBe(true);
+    for (const type of ELEMENT_TYPES) {
+      for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[type]) {
+        if (field.key !== 'templateRef') expect(field.hidden).not.toBe(true);
+      }
+    }
+  });
 });
 
 describe('validateAttributeValue', () => {

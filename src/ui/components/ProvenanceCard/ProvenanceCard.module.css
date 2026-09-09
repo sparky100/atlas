@@ -16,6 +16,10 @@
   gap: var(--space-4);
 }
 
+.seededFrom {
+  margin: 0;
+}
+
 .confidenceValue {
   display: inline-flex;
   align-items: center;

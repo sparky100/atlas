@@ -41,6 +41,8 @@ export interface AttributeFieldMeta {
   options?: readonly string[];
   /** False only for a field no one sets by hand (Capability.templateRef, seed-derived) — excluded from the edit form entirely. Defaults to true. */
   editable?: boolean;
+  /** Sprint U4-1 D2: true only for Capability.templateRef — "not a user-facing attribute... hide from the attributes list". Excluded from the read-only Attributes display entirely (`ElementPage.tsx`'s `AttributesTable`), not merely non-editable — its information still surfaces, reworded, on the provenance card of any fact seeded alongside it (`ProvenanceCard.tsx`'s `seededFrom`). Defaults to false/shown; distinct from `editable: false`, which several other fields (`Capability.order`, e.g.) also set while staying genuinely useful to see. */
+  hidden?: boolean;
 }
 
 export interface AttributeFieldSchema extends AttributeFieldMeta {
@@ -54,7 +56,7 @@ function schemaOf<T extends string>(order: readonly T[], meta: Record<T, Attribu
 const CAPABILITY_META: Record<keyof CapabilityAttributes, AttributeFieldMeta> = {
   code: { label: 'Code', required: false, kind: 'text' },
   description: { label: 'Description', required: false, kind: 'text' },
-  templateRef: { label: 'Template reference', required: false, kind: 'text', editable: false },
+  templateRef: { label: 'Template reference', required: false, kind: 'text', editable: false, hidden: true },
   // Not a user-facing edit field, same reasoning as templateRef — Sprint
   // U4-1 C1's reorder control (src/ui/capabilityMap/useCapabilityReorder.ts)
   // is the only writer. `kind: 'text'`, not a real "this is text" claim: no

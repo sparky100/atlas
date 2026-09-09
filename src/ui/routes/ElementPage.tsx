@@ -284,7 +284,11 @@ function AttributesTable({
   aliases: AliasRow[];
   aliasSources: Map<UUID, SourceRow>;
 }) {
-  const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type];
+  // Sprint U4-1 D2: `hidden` fields (Capability.templateRef) never show
+  // in the read-only list either — its own information still surfaces,
+  // reworded, on a seeded fact's provenance card instead
+  // (ProvenanceCard.tsx's `seededFrom`).
+  const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type].filter((field) => field.hidden !== true);
   return (
     <div>
       {schema.map((field) => {
