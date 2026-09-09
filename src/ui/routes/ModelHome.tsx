@@ -37,7 +37,7 @@ export function ModelHome() {
   // Both doors have no branch selector (UI-principles §3.1/§3.2) — the
   // search box's create action always writes to main, gated the same way
   // every other main-only affordance in this product is (ADR-015).
-  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   const canEdit = canEditOnMain(role);
   const searchCommitId = mainBranch?.head_commit_id ?? null;
 
@@ -84,6 +84,7 @@ export function ModelHome() {
               expectedHeadCommitId={searchCommitId}
               orgSlug={organisation?.slug ?? ''}
               modelSlug={model.slug}
+              onCreated={reloadMainBranch}
             />
           ) : (
             <EmptyState>Only an owner or architect can add elements from here.</EmptyState>

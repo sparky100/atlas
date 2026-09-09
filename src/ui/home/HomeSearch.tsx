@@ -18,6 +18,8 @@ export interface HomeSearchProps {
   expectedHeadCommitId: UUID;
   orgSlug: string;
   modelSlug: string;
+  /** Called after a successful create, in addition to navigating to the new element's page — e.g. the caller's own `useMainBranch` reload (Sprint U4-1 A1: `searchCommitId` above only stays valid for future searches if the page refreshes it once its commit lands). */
+  onCreated?: () => void;
 }
 
 /**
@@ -31,7 +33,7 @@ export interface HomeSearchProps {
  * page it's on) and this control does, since a home-page search has no
  * such fixed context.
  */
-export function HomeSearch({ modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, orgSlug, modelSlug }: HomeSearchProps) {
+export function HomeSearch({ modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, orgSlug, modelSlug, onCreated }: HomeSearchProps) {
   const navigate = useNavigate();
   const search = useHomeSearch(searchCommitId, modelId);
   const [createType, setCreateType] = useState<ElementType>('system');
@@ -46,6 +48,7 @@ export function HomeSearch({ modelId, orgId, userId, searchCommitId, branch, exp
     branch,
     expectedHeadCommitId,
     onCreated: (elementId) => {
+      onCreated?.();
       void navigate(elementHref(elementId));
     },
   });

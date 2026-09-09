@@ -46,7 +46,7 @@ export function ComponentPage() {
   const { label: branchLabel } = useBranchLabel(ref);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
-  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   const canEdit = editingBranch !== null && canEditBranch(role, editingBranch);
   // See LandscapePage.tsx's identical comment: ADR-018 guarantees both are
   // never null in practice; BranchRow's own type hasn't been narrowed yet.
@@ -146,6 +146,7 @@ export function ComponentPage() {
                   orgSlug={organisation?.slug ?? ''}
                   modelSlug={model.slug}
                   refParam={refParam}
+                  onCreated={reloadMainBranch}
                 />
               ) : undefined
             }

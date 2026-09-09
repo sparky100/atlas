@@ -70,7 +70,7 @@ export function ElementPage() {
 
   const { state, reload } = useElementPage(model?.id ?? '', elementId ?? '', ref);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
-  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   const canEdit = editingBranch !== null && canEditBranch(role, editingBranch);
   // See LandscapePage.tsx's identical comment: ADR-018 guarantees main's
   // head is never null in practice; `BranchRow`'s own type hasn't been
@@ -78,6 +78,18 @@ export function ElementPage() {
   // itself reuses `state.data.commitId`, already established below.
   const searchCommitId = mainBranch?.head_commit_id ?? null;
   const canAddRelationship = canEdit && searchCommitId !== null;
+
+  // Sprint U4-1 A1: any commit made from this page — a relationship, an
+  // attribute edit, a capability tailoring action — can move `main`'s head,
+  // which is exactly the commit id the relationship-add search pool reads
+  // against (`searchCommitId`, above). Reloading the page's own data
+  // without also reloading `mainBranch` left `searchCommitId` pointing at a
+  // commit `elements_head` no longer has any rows for, so a second search
+  // in the same visit found nothing at all.
+  const reloadAfterCommit = () => {
+    reload();
+    reloadMainBranch();
+  };
 
   const data = state.status === 'ready' ? state.data : null;
   const editor = useElementEditor({
@@ -88,7 +100,7 @@ export function ElementPage() {
     facts: data?.facts ?? EMPTY_FACTS,
     branch: editingBranch ?? PLACEHOLDER_BRANCH,
     expectedHeadCommitId: data?.commitId ?? '',
-    onSaved: reload,
+    onSaved: reloadAfterCommit,
   });
 
   if (orgLoading || modelsLoading || !model) {
@@ -147,7 +159,7 @@ export function ElementPage() {
                 branch={editingBranch}
                 expectedHeadCommitId={state.data.commitId}
                 canRetract={state.data.children.length === 0 && state.data.relationships.length === 0}
-                onChanged={reload}
+                onChanged={reloadAfterCommit}
               />
             )}
             <div className={styles.columns}>
@@ -178,7 +190,7 @@ export function ElementPage() {
                             searchCommitId,
                             branch: editingBranch,
                             expectedHeadCommitId: state.data.commitId,
-                            onCreated: reload,
+                            onCreated: reloadAfterCommit,
                           }
                         : undefined
                     }

@@ -60,7 +60,7 @@ export function LandscapePage() {
   // Search always scans main's real head, regardless of which ref/branch is
   // being viewed (src/db/elementSearch.ts's own module comment) — only the
   // write target (`editingBranch`) varies with the ref.
-  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   const canEdit = editingBranch !== null && canEditBranch(role, editingBranch);
   // ADR-018 guarantees both are never null in practice (every branch always
   // has a real head, from genesis onward) — `BranchRow`'s own type hasn't
@@ -124,6 +124,7 @@ export function LandscapePage() {
                     orgSlug={organisation?.slug ?? ''}
                     modelSlug={model.slug}
                     refParam={refParam}
+                    onCreated={reloadMainBranch}
                   />
                   <ElementSearchAdd
                     elementType="actor"
@@ -138,6 +139,7 @@ export function LandscapePage() {
                     orgSlug={organisation?.slug ?? ''}
                     modelSlug={model.slug}
                     refParam={refParam}
+                    onCreated={reloadMainBranch}
                   />
                 </>
               )}
@@ -183,6 +185,7 @@ export function LandscapePage() {
                   orgSlug={organisation?.slug ?? ''}
                   modelSlug={model.slug}
                   refParam={refParam}
+                  onCreated={reloadMainBranch}
                 />
               </div>
             )}
