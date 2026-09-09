@@ -403,6 +403,10 @@ export const COMMIT_INVARIANTS = [
   { id: 'C14', text: 'kind === "merge" iff mergedBranchHeadCommitId is non-null. A merge commit on main is created only by the merge procedure, never by a direct insert.' },
   { id: 'C15', text: 'Merge commit: every fact key changed to different values on both sides since the merge base has exactly one delta in this commit (a resolution); no delta addresses a fact key that is not a field conflict.' },
   { id: 'C16', text: 'The resulting head passes the validation level required for the branch kind: capture_draft → structural only; change → structural, schema advisory; main → structural and schema (SPEC §6.3).' },
+  {
+    id: 'C17',
+    text: "relationship.create/relationship.update setting supports.role = 'primary' or owns.primary = true: no other live relationship in the resulting head already has that same primary flag on the same anchor element — supports' anchor is fromElementId (one primary capability per system), owns' is toElementId (one primary owner per owned element). A same-commit delta demoting the existing one first (earlier in seq order) makes the promotion legal.",
+  },
 ] as const;
 
 export type CommitInvariantId = (typeof COMMIT_INVARIANTS)[number]['id'];

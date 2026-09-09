@@ -184,7 +184,9 @@ Primary key `(subject_type, type_name, schema_version)`. No `org_id`: this is pr
 
 **Superseded by a constant, not a migrated table (Sprint H1).** Unlike `type_schemas` above, this table's content was fully known from ADR-001 from the start and simply had no runtime enforcement anywhere in the codebase — not a table, not an engine check, not an application-level validation (flagged in docs/AUDIT-2026-09-U2.md §6.2/§6.3). Sprint H1 closes that gap with `RELATIONSHIP_TYPE_RULES`, a constant in `src/contracts/relationshipTypeRules.ts`: the seed rows below are that constant's content, kept here as the documented reference, not read from a live table at runtime. C9 and V3 are both checked against the constant — in `src/engine/deltas.ts`'s `apply()` (so every caller of `fold`, including `commitToBranch`, inherits the check), and therefore at the commit boundary in `src/db/commits.ts`. **Superseded, not deferred (§11 lists this alongside this document's genuinely-deferred items, marked "never"):** migrating this to a real table isn't scheduled anywhere and isn't expected to be — it would only be worth doing if the ruleset needed to become live-editable product content without a code change (e.g. an admin screen), and nothing today requires that.
 
-**Correction (Sprint U4-1, found while adding `max_primary_per_from` below).** The paragraph above overstates what `apply()` actually checks: only C9 (the `(type, from.type, to.type)` triple itself) is enforced there — `isRelationshipTripleAllowed`, `src/engine/deltas.ts`. Neither `max_per_from` nor `max_primary_per_to` (V3's cardinality half) has ever been checked anywhere, engine or database; `owns.primary`'s own "at most one primary owner" has no runtime enforcement today. `max_primary_per_from` is the one exception, and only for `supports`: enforced by a real database constraint (a partial unique index, `relationships_head_one_primary_supports_per_system` — Postgres has no cross-row `CHECK`, this is its standard equivalent), not by `apply()`. Fixing `max_primary_per_to`/`max_per_from` in general is a real, pre-existing gap, left as one — it wasn't this sprint's item to close.
+**Correction (Sprint U4-1 B4, found while adding `max_primary_per_from` below; superseded by the C17 note directly below it).** The paragraph above overstates what `apply()` checked at the time: only C9 (the `(type, from.type, to.type)` triple itself) was enforced there — `isRelationshipTripleAllowed`, `src/engine/deltas.ts`. Neither `max_per_from` nor `max_primary_per_to` (V3's cardinality half) was checked anywhere, engine or database; `owns.primary`'s own "at most one primary owner" had no runtime enforcement. `max_primary_per_from` was the one exception, and only for `supports`: enforced by a database constraint (a partial unique index, `relationships_head_one_primary_supports_per_system`), not by `apply()`.
+
+**C17 (Sprint U4-1, addressed the gap above the same sprint it was found).** `apply()` now enforces both primary-cardinality rules inline, alongside C8/C9, on every fold — `checkPrimaryCardinality`, `src/engine/deltas.ts`: a `relationship.create`/`relationship.update` that would set `supports.role = 'primary'` (anchored on `fromElementId`, one system) or `owns.primary = true` (anchored on `toElementId`, one owned target) is rejected if the resulting head would already hold another live edge with that same primary flag on the same anchor — unless the same commit demotes the existing one first (an earlier delta in `seq` order). Because `fold`/`apply` are the same functions `commitToBranch` calls for every branch kind, this is checked at commit time on a `change` branch's own commits, not only once they reach `main` — closing the branch-time gap the partial-unique-index approach alone left open (§6.3, C10/C11 discussion). `rebuildHead` (`src/db/rebuildHead.ts`) re-folding a model's full history from genesis means a pre-existing violation (written before this check existed) surfaces there too, as a thrown error, with no separate detection code. `max_per_from` (a non-primary per-type count cap) is not used by any seed row today and remains unenforced — a real gap, but a different one, and not this item's to close. The partial unique index stays in place as a database-level backstop for `supports.role`; an equivalent index for `owns.primary` is not yet defined (`relationships_head` is materialised for `main`/tags only, so it only ever backstops main — `apply()`'s C17 is what actually covers a change branch).
 
 Which `(relationship_type, from_type, to_type)` triples are legal, and cardinality (ADR-001).
 
@@ -683,13 +685,13 @@ Kinds:
 
 ### 5.2 Invariants
 
-`COMMIT_INVARIANTS` in `delta.ts` is the list (C1–C16). They are checked in this order, and the first failure rejects the whole commit:
+`COMMIT_INVARIANTS` in `delta.ts` is the list (C1–C17). They are checked in this order, and the first failure rejects the whole commit:
 
 1. Shape: C1, C2, C3, C14.
 2. Intra-commit: C4.
 3. Against history: C5 (id never used), C13 (parent is current head), C12 (source in model).
 4. Against parent head: C6 (previousDeltaId matches `facts`), C7 (exists/not-exists preconditions).
-5. Against resulting head: C8, C9, C10, C11, C15.
+5. Against resulting head: C8, C9, C10, C11, C15, C17 (Sprint U4-1: at most one primary `supports`/`owns` edge per anchor element).
 6. Validation level for the branch kind: C16 → §6.3.
 
 C6 is the one that turns concurrent editing into a rejected commit rather than a lost update. Two people editing the same attribute of the same element on the same branch: the second submit fails C6 and must re-read.
@@ -775,7 +777,7 @@ A tombstone `$exists` fact with `live = false` is kept in memory for C7 checks a
 |---|---|---|
 | V1 | schema | every `elements_head.attributes` and `relationships_head.attributes` validates against `type_schemas` for `(type, models.schema_version)`; required attributes present |
 | V2 | structural | every `parent_id` references an element in the same head with the required type: capability→capability, container→system, component→container; capability/system/actor parents are null or (capability only) a capability. Every relationship endpoint references an element in the same head. |
-| V3 | schema | every relationship's `(type, from.type, to.type)` is in `relationship_type_rules`; `max_per_from`, `max_primary_per_to`, and `max_primary_per_from` respected — as of Sprint U4-1, only the triple-legality half and `supports`' own `max_primary_per_from` (a database constraint, not this check) have real enforcement; see `relationship_type_rules`'s own correction note in §3.3 |
+| V3 | schema | every relationship's `(type, from.type, to.type)` is in `relationship_type_rules`; `max_per_from`, `max_primary_per_to`, and `max_primary_per_from` respected — as of Sprint U4-1, the triple-legality half (C9) and both primary-cardinality rules (`max_primary_per_to` for `owns`, `max_primary_per_from` for `supports`) are enforced in `apply()` as C17, on every fold, with a database partial-unique-index as backstop for each; `max_per_from` (a non-primary per-type count cap, unused by any seed row today) has no enforcement anywhere — see `relationship_type_rules`'s own correction note in §3.3 |
 | V4 | structural | no cycle in `parent_id` |
 | V5 | structural | no element id in the head appears as `merged_element_id` in `element_merges` |
 | V6 | structural | no two relationships in the head share `(type, from, to)` |
@@ -1280,7 +1282,7 @@ All property tests use generated inputs (fast-check or equivalent) with shrinkin
 
 | Id | Property |
 |---|---|
-| P-8 | For each invariant C1–C16 there is a generator that produces an otherwise-valid envelope violating exactly that invariant, and `atlas.commit_deltas` (Sprint H1 rename, see RT-2) rejects it naming that id. Valid envelopes are accepted. |
+| P-8 | For each invariant C1–C17 there is a generator that produces an otherwise-valid envelope violating exactly that invariant, and `atlas.commit_deltas` (Sprint H1 rename, see RT-2) rejects it naming that id. Valid envelopes are accepted. |
 | P-9 | For each rule V1–V6 there is a generator that mutates a valid head to violate exactly that rule, and the gate reports exactly that rule; the resulting head is refused on main and (structural rules) on change branches, and accepted on `capture_draft` with the finding recorded. |
 | P-10 | Concurrency: two envelopes with the same `parentCommitId` submitted to the same branch → exactly one succeeds (C13); two envelopes on sequential parents updating the same fact key with the same `previousDeltaId` → the second fails C6. |
 | P-11 | Id reuse: an `element.create` with an id that appears in any delta of the model on any branch (including a retracted or merged-away one) is rejected (C5). |
