@@ -128,6 +128,10 @@ export function LandscapePage() {
   const refParam = refParamOf(ref);
   const segments: BreadcrumbSegment[] = capability ? [{ label: capability.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/capability-map?ref=${refParam}` }] : [];
   const nodeHref = (systemId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/context/${systemId}?${zoomQueryString({ ref, capabilityId })}`;
+  // Landscape canvas, structural (item 3): an actor has no Context view of
+  // its own (the zoom chain is system-specific), so this goes straight to
+  // the actor's own element page instead.
+  const actorHref = (actorId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${actorId}?ref=${refParam}`;
 
   // Shared between the >=768px inline row and the <768px "+ Add" menu
   // (E1) — same two controls, a different wrapper around them.
@@ -256,7 +260,7 @@ export function LandscapePage() {
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
-        {state.status === 'ready' && state.data.layout.nodes.length === 0 && (
+        {state.status === 'ready' && state.data.layout.nodes.length === 0 && state.data.layout.actorNodes.length === 0 && (
           <div>
             <EmptyState>{capability ? 'No systems support this capability yet.' : 'No systems yet.'}</EmptyState>
             {!capability && canAdd && (
@@ -280,14 +284,16 @@ export function LandscapePage() {
             )}
           </div>
         )}
-        {state.status === 'ready' && state.data.layout.nodes.length > 0 && (
+        {state.status === 'ready' && (state.data.layout.nodes.length > 0 || state.data.layout.actorNodes.length > 0) && (
           <div className={styles.canvasRow}>
             <LandscapeCanvas
               layout={state.data.layout}
               systemsById={state.data.systemsById}
+              actorsById={state.data.actorsById}
               edges={state.data.edges}
               diff={state.data.diff}
               nodeHref={nodeHref}
+              actorHref={actorHref}
               unresolvedCommentCounts={unresolvedCounts}
               onCommentMarkerClick={(elementId) => {
                 setCommentsPanelElementId(elementId);

@@ -36,6 +36,26 @@ export async function listSystemsForLandscape(supabase: Client, commitId: UUID):
 }
 
 /**
+ * Every Actor at this commit — the landscape canvas, structural pass's own
+ * row above the top band (item 3, the C4 landscape convention), both
+ * `isExternal` and internal together (`src/ui/landscape/layout.ts`'s own
+ * `computeLandscapeLayout` doesn't separate them into distinct rows,
+ * `LandscapeCanvas.tsx` just draws them differently). Same `selectAll`/
+ * max_rows treatment as `listSystemsForLandscape` above, for the same
+ * reason (SPEC §6.7).
+ */
+export async function listActorsForLandscape(supabase: Client, commitId: UUID): Promise<ElementsHeadRow[]> {
+  const query = supabase
+    .from('elements_head')
+    .select(ELEMENTS_HEAD_COLUMNS, { count: 'exact' })
+    .eq('commit_id', commitId)
+    .eq('element_type', 'actor')
+    .order('name')
+    .order('element_id');
+  return selectAll<ElementsHeadRow>(query);
+}
+
+/**
  * `uses`/`flows_to` relationships between two Systems — the landscape's
  * edges. Sprint C1-H item 1d (SPEC §6.7): this used to add
  * `.in('from_element_id', systemIds).in('to_element_id', systemIds)` on top

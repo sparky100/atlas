@@ -20,6 +20,7 @@ export interface LayoutWorkerRequest {
   supportsEdges: RelationshipsHeadRow[];
   /** `Map` isn't guaranteed identical across every structured-clone implementation this app might run under — an entries array is the portable wire shape. */
   capabilities: [UUID, ElementsHeadRow][];
+  actors: ElementsHeadRow[];
 }
 
 export interface LayoutWorkerResponse {
@@ -35,7 +36,7 @@ interface WorkerLike {
 const ctx = self as unknown as WorkerLike;
 
 ctx.onmessage = (event) => {
-  const { requestId, systems, supportsEdges, capabilities } = event.data;
-  const layout = computeLandscapeLayout(systems, supportsEdges, new Map(capabilities));
+  const { requestId, systems, supportsEdges, capabilities, actors } = event.data;
+  const layout = computeLandscapeLayout(systems, supportsEdges, new Map(capabilities), actors);
   ctx.postMessage({ requestId, layout });
 };

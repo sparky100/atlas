@@ -11,10 +11,15 @@
  *
  * The canvas is Canvas 2D, not DOM (LandscapeCanvas.tsx's own module
  * comment) — the marker click below uses the exact same
- * `computeLandscapeLayout` + identity-transform technique
- * e2e/landscape-navigation.spec.ts already established, offset into the
- * node's own bottom-right corner (LandscapeCanvas.tsx's
- * `COMMENT_MARKER_INSET`/`_WIDTH`/`_HEIGHT`) rather than its centre.
+ * `computeLandscapeLayout` technique e2e/landscape-navigation.spec.ts
+ * already established, offset into the node's own bottom-right corner
+ * (LandscapeCanvas.tsx's `COMMENT_MARKER_INSET`/`_WIDTH`/`_HEIGHT`) rather
+ * than its centre, converted from world to screen coordinates via the
+ * canvas's own live `data-scale`/`data-tx`/`data-ty` transform (Landscape
+ * canvas, structural, item 1: the canvas now fits the whole diagram to
+ * view on load, so the transform is never a plain identity
+ * `{scale:1,tx:0,ty:0}` by the time this fixture's one-system diagram has
+ * rendered).
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
@@ -130,15 +135,21 @@ test('comments: post/resolve/reopen a thread on the element page, then find it v
   if (!node) throw new Error('computeLandscapeLayout did not place the seeded system');
 
   // The marker's own geometry (LandscapeCanvas.tsx): an 18x16 plate inset
-  // 4px into the node's bottom-right corner. This waits for the batched
+  // 4px into the node's bottom-right corner, in world space — converted to
+  // screen coordinates via the canvas's own live fit-to-view transform
+  // (item 1), never assumed to be identity. This waits for the batched
   // unresolved-count RPC to land (the marker isn't drawn until then) by
   // polling the click itself via Playwright's built-in retrying assertion
   // on the panel it should open.
-  const markerX = node.x + NODE_WIDTH - 4 - 9;
-  const markerY = node.y + NODE_HEIGHT - 4 - 8;
+  const markerWorldX = node.x + NODE_WIDTH - 4 - 9;
+  const markerWorldY = node.y + NODE_HEIGHT - 4 - 8;
+  const wrapper = page.locator('[data-scale]');
 
   await expect(async () => {
-    await canvas.click({ position: { x: markerX, y: markerY } });
+    const scale = Number(await wrapper.getAttribute('data-scale'));
+    const tx = Number(await wrapper.getAttribute('data-tx'));
+    const ty = Number(await wrapper.getAttribute('data-ty'));
+    await canvas.click({ position: { x: markerWorldX * scale + tx, y: markerWorldY * scale + ty } });
     await expect(page.getByRole('complementary', { name: `Comments on ${systemName}` })).toBeVisible({ timeout: 2_000 });
   }).toPass({ timeout: 30_000 });
 

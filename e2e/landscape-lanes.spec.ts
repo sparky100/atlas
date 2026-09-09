@@ -127,11 +127,19 @@ test('a system supporting a level-2 capability and a level-1 capability appears 
   expect(node.y).toBe(assetManagementLane.y + 28); // LANE_LABEL_HEIGHT — placed in the primary's own lane
   expect(node.extraLaneCount).toBeUndefined(); // an explicit primary was set — this isn't the "no primary" fallback
 
-  // A reference in the other lane (Network Operations) — not a second tile.
-  expect(layout.referenceMarkers).toEqual([{ elementId: systemId, laneKey: networkOperationsId }]);
+  // A reference in the other lane (Network Operations) — not a second tile,
+  // positioned as a real chip at that lane's own right edge (Landscape
+  // canvas, structural, item 2), never text folded into its label.
+  expect(layout.referenceMarkers).toEqual([{ elementId: systemId, laneKey: networkOperationsId, x: expect.any(Number), y: expect.any(Number) }]);
 
-  // The one real tile is clickable, at exactly the position computed above.
-  await canvas.click({ position: { x: node.x + NODE_WIDTH / 2, y: node.y + NODE_HEIGHT / 2 } });
+  // The one real tile is clickable, at exactly the position computed above
+  // — converted from world to screen coordinates via the canvas's own live
+  // fit-to-view transform (item 1), never assumed to be identity.
+  const wrapper = page.locator('[data-scale]');
+  const scale = Number(await wrapper.getAttribute('data-scale'));
+  const tx = Number(await wrapper.getAttribute('data-tx'));
+  const ty = Number(await wrapper.getAttribute('data-ty'));
+  await canvas.click({ position: { x: (node.x + NODE_WIDTH / 2) * scale + tx, y: (node.y + NODE_HEIGHT / 2) * scale + ty } });
   await expect(page).toHaveURL(new RegExp(`/context/${systemId}\\?ref=main`));
   await expect(page.getByRole('heading', { name: 'Context' })).toBeVisible();
 });

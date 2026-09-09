@@ -44,14 +44,19 @@ function getWorker(): Worker {
  * the result is written against a `Promise<LandscapeLayout>` either way, so
  * this is the only place that distinction lives.
  */
-export function computeLandscapeLayoutInWorker(systems: readonly ElementsHeadRow[], supportsEdges: readonly RelationshipsHeadRow[], capabilitiesById: Map<UUID, ElementsHeadRow>): Promise<LandscapeLayout> {
+export function computeLandscapeLayoutInWorker(
+  systems: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  capabilitiesById: Map<UUID, ElementsHeadRow>,
+  actors: readonly ElementsHeadRow[] = [],
+): Promise<LandscapeLayout> {
   if (typeof Worker === 'undefined') {
-    return Promise.resolve(computeLandscapeLayout(systems, supportsEdges, capabilitiesById));
+    return Promise.resolve(computeLandscapeLayout(systems, supportsEdges, capabilitiesById, actors));
   }
   const requestId = nextRequestId++;
   return new Promise((resolve, reject) => {
     pending.set(requestId, { resolve, reject });
-    const request: LayoutWorkerRequest = { requestId, systems: [...systems], supportsEdges: [...supportsEdges], capabilities: [...capabilitiesById.entries()] };
+    const request: LayoutWorkerRequest = { requestId, systems: [...systems], supportsEdges: [...supportsEdges], capabilities: [...capabilitiesById.entries()], actors: [...actors] };
     getWorker().postMessage(request);
   });
 }
