@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { UUID } from '../../contracts/delta';
+import type { Delta, UUID } from '../../contracts/delta';
 import type { CommitRow, ElementsHeadRow } from '../../contracts/rows';
+import { fromDeltaRow } from '../../contracts/rows';
 import { getMainBranch, listChangeBranches } from '../../db/branches';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
+import { getElementsByIds } from '../../db/elements';
 import {
   computeStaleAttributesFinding,
   findCapabilitiesWithoutOwner,
@@ -13,12 +15,23 @@ import {
 } from '../../db/healthFindings';
 import { listSystemsForLandscape } from '../../db/landscape';
 import { listOpenMergeRequestsForModel } from '../../db/mergeRequests';
-import { listAllSupportsEdges, listRecentCommits } from '../../db/modelHome';
-import type { BranchRow, MergeRequestRow } from '../../db/types';
+import { listAllSupportsEdges, listDeltasForCommits, listRecentCommits } from '../../db/modelHome';
+import { listProfilesByIds } from '../../db/profiles';
+import type { BranchRow, MergeRequestRow, ProfileRow } from '../../db/types';
+import { envelopeSubjects } from '../../engine/describeEnvelope';
 import { supabase } from '../supabaseClient';
 
+/** One "Recent commits" row's own extras beyond the bare `CommitRow` — author display and named subjects, both resolved in a batch across every shown commit rather than per-row (Sprint U4-1 B2). */
+export interface RecentCommitRow {
+  commit: CommitRow;
+  /** `atlas.profiles.display_name`, falling back to `handle`, then the bare author id — same fallback chain `useDirectorHome.ts`'s `VersionStamp.authorDisplay` already uses for a tag's author. */
+  authorDisplay: string;
+  /** This commit's own named subjects (`envelopeSubjects`), resolved to their current name — empty for a relationship.update/retract/restore-only commit (no endpoint ids to resolve, `describeEnvelope.ts`'s own module comment) or one whose subjects no longer exist at main's current head. */
+  subjects: { elementId: UUID; name: string }[];
+}
+
 export interface ArchitectHomeData {
-  recentCommits: CommitRow[];
+  recentCommits: RecentCommitRow[];
   reviewQueueCount: number;
   oldestReviewItem: MergeRequestRow | null;
   myOpenBranches: BranchRow[];
@@ -62,7 +75,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
         return;
       }
 
-      const [recentCommits, reviewQueue, changeBranches, capabilities, systems, supportsEdges, ownsEdges, facts] = await Promise.all([
+      const [commits, reviewQueue, changeBranches, capabilities, systems, supportsEdges, ownsEdges, facts] = await Promise.all([
         listRecentCommits(supabase, main.id, 10),
         listOpenMergeRequestsForModel(supabase, modelId),
         listChangeBranches(supabase, modelId),
@@ -75,6 +88,40 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
 
       const myOpenBranches = changeBranches.filter((b) => b.created_by === userId && MY_OPEN_STATUSES.includes(b.status));
       const systemIds = new Set(systems.map((s) => s.element_id));
+
+      // Sprint U4-1 B2: author display name and named-subject links for
+      // each shown commit, both batched once across every row rather than
+      // per-row — the same "resolve the shown rows' own ids in one extra
+      // round trip" shape `useDirectorHome.ts`'s `VersionStamp` build uses
+      // for a tag's author.
+      const deltaRows = await listDeltasForCommits(supabase, commits.map((c) => c.id));
+      const deltasByCommit = new Map<UUID, Delta[]>();
+      for (const row of deltaRows) {
+        const delta = fromDeltaRow(row);
+        const existing = deltasByCommit.get(row.commit_id);
+        if (existing) existing.push(delta);
+        else deltasByCommit.set(row.commit_id, [delta]);
+      }
+      const subjectIdsByCommit = new Map<UUID, UUID[]>(commits.map((c) => [c.id, envelopeSubjects(deltasByCommit.get(c.id) ?? [])]));
+      const allSubjectIds = [...new Set([...subjectIdsByCommit.values()].flat())];
+
+      const [authorProfiles, subjectElements] = await Promise.all([
+        listProfilesByIds(supabase, [...new Set(commits.map((c) => c.author_id))]),
+        getElementsByIds(supabase, main.head_commit_id, allSubjectIds),
+      ]);
+      const profileById = new Map<UUID, ProfileRow>(authorProfiles.map((p) => [p.user_id, p]));
+
+      const recentCommits: RecentCommitRow[] = commits.map((commit) => {
+        const profile = profileById.get(commit.author_id);
+        const authorDisplay = profile?.display_name ?? profile?.handle ?? commit.author_id;
+        const subjects = (subjectIdsByCommit.get(commit.id) ?? [])
+          .map((elementId) => {
+            const element = subjectElements.get(elementId);
+            return element ? { elementId, name: element.name } : null;
+          })
+          .filter((s): s is { elementId: UUID; name: string } => s !== null);
+        return { commit, authorDisplay, subjects };
+      });
 
       if (!cancelled) {
         setState({

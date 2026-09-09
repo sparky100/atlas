@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Delta } from '../contracts/delta';
-import { describeEnvelope, type NameLookup } from './describeEnvelope';
+import { describeEnvelope, envelopeSubjects, type NameLookup } from './describeEnvelope';
 
 const NAMES: Record<string, string> = {
   powerOn: 'PowerON',
@@ -134,5 +134,35 @@ describe('describeEnvelope', () => {
 
   it('zero deltas (a merge commit\'s own valid empty case, C1) never throws', () => {
     expect(describeEnvelope([], nameLookup)).toBe('No changes');
+  });
+});
+
+describe('envelopeSubjects', () => {
+  it('element.create/update/retract/restore: the one elementId each carries', () => {
+    expect(envelopeSubjects([base({ kind: 'element.create', elementId: 'powerOn', elementType: 'system', name: 'PowerON', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false } })])).toEqual(['powerOn']);
+    expect(envelopeSubjects([base({ kind: 'element.update', elementId: 'powerOn', elementType: 'system', attribute: 'vendor', value: 'Acme', previousDeltaId: 'p1' })])).toEqual(['powerOn']);
+    expect(envelopeSubjects([base({ kind: 'element.retract', elementId: 'powerOn', elementType: 'system', previousDeltaId: 'p1' })])).toEqual(['powerOn']);
+    expect(envelopeSubjects([base({ kind: 'element.restore', elementId: 'powerOn', elementType: 'system', previousDeltaId: 'p1' })])).toEqual(['powerOn']);
+  });
+
+  it('relationship.create: both endpoints, from then to', () => {
+    const delta = base({ kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'supports', fromElementId: 'powerOn', toElementId: 'outageAndFault', attributes: {} });
+    expect(envelopeSubjects([delta])).toEqual(['powerOn', 'outageAndFault']);
+  });
+
+  it('relationship.update/retract/restore: nothing — no endpoint ids are on the delta at all', () => {
+    expect(envelopeSubjects([base({ kind: 'relationship.update', relationshipId: 'r1', relationshipType: 'owns', attribute: 'primary', value: false, previousDeltaId: 'p1' })])).toEqual([]);
+    expect(envelopeSubjects([base({ kind: 'relationship.retract', relationshipId: 'r1', relationshipType: 'supports', previousDeltaId: 'p1' })])).toEqual([]);
+    expect(envelopeSubjects([base({ kind: 'relationship.restore', relationshipId: 'r1', relationshipType: 'supports', previousDeltaId: 'p1' })])).toEqual([]);
+  });
+
+  it('de-duplicates across deltas, keeping first-appearance order', () => {
+    const create = base({ kind: 'element.create', elementId: 'powerOn', elementType: 'system', name: 'PowerON', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false } });
+    const link = base({ id: 'd2', kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'owns', fromElementId: 'networkControl', toElementId: 'powerOn', attributes: { primary: true } });
+    expect(envelopeSubjects([create, link])).toEqual(['powerOn', 'networkControl']);
+  });
+
+  it('no deltas: empty, not a crash', () => {
+    expect(envelopeSubjects([])).toEqual([]);
   });
 });

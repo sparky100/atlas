@@ -17,8 +17,8 @@ describe('parseRefParam', () => {
     expect(parseRefParam('branch:11111111-1111-1111-1111-111111111111')).toEqual({ kind: 'branch', branchId: '11111111-1111-1111-1111-111111111111' });
   });
 
-  it('falls back to main for commit: (real grammar, not yet reachable by any page)', () => {
-    expect(parseRefParam('commit:abc')).toEqual({ kind: 'main' });
+  it('parses commit:{id} (Sprint U4-1 B2 — the activity row link to a commit diff)', () => {
+    expect(parseRefParam('commit:11111111-1111-1111-1111-111111111111')).toEqual({ kind: 'commit', commitId: '11111111-1111-1111-1111-111111111111' });
   });
 });
 
@@ -40,5 +40,11 @@ describe('refParamOf / refLabelOf round-trip', () => {
     expect(refParamOf(ref)).toBe('branch:11111111-1111-1111-1111-111111111111');
     expect(refLabelOf(ref, 'Retire the legacy CRM')).toBe('Change: Retire the legacy CRM');
     expect(refLabelOf(ref)).toBe('Change: 11111111');
+  });
+
+  it('commit', () => {
+    const ref = parseRefParam('commit:11111111-1111-1111-1111-111111111111');
+    expect(refParamOf(ref)).toBe('commit:11111111-1111-1111-1111-111111111111');
+    expect(refLabelOf(ref)).toBe('commit 11111111');
   });
 });

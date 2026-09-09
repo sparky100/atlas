@@ -61,6 +61,20 @@
   gap: var(--space-2);
 }
 
+.commitMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.commitMeta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
 /* Handoff 7d's architect-door Health findings: four plates, the first
    blueprint-framed (rendered via <BlueprintFrame>, not this class). */
 .findingPlates {

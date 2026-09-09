@@ -141,3 +141,43 @@ export function describeEnvelope(deltas: readonly Delta[], nameLookup: NameLooku
   }
   return `${describeDelta(first, nameLookup)} (${String(deltas.length)} changes)`;
 }
+
+/**
+ * Every element a commit's own deltas actually name (Sprint U4-1 B2's
+ * "named subjects link to their pages" — ArchitectHome.tsx's activity
+ * rows): `elementId` for every `element.*` kind, `fromElementId`/
+ * `toElementId` for `relationship.create` — the one relationship kind
+ * whose delta carries them at all (`relationship.update`/`retract`/
+ * `restore` don't, this module's own top comment explains why, and there's
+ * nothing this function can report for those). First-appearance order,
+ * de-duplicated — a "link to Y" commit that also creates Y would otherwise
+ * list it twice.
+ */
+export function envelopeSubjects(deltas: readonly Delta[]): UUID[] {
+  const seen = new Set<UUID>();
+  const ids: UUID[] = [];
+  const add = (id: UUID): void => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    ids.push(id);
+  };
+  for (const delta of deltas) {
+    switch (delta.kind) {
+      case 'element.create':
+      case 'element.update':
+      case 'element.retract':
+      case 'element.restore':
+        add(delta.elementId);
+        break;
+      case 'relationship.create':
+        add(delta.fromElementId);
+        add(delta.toElementId);
+        break;
+      case 'relationship.update':
+      case 'relationship.retract':
+      case 'relationship.restore':
+        break;
+    }
+  }
+  return ids;
+}

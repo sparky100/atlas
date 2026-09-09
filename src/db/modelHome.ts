@@ -81,6 +81,21 @@ export async function listRecentCommits(supabase: Client, mainBranchId: UUID, li
   return data as CommitRow[];
 }
 
+/**
+ * Every delta of the given commits (Sprint U4-1 B2's activity row: which
+ * elements a commit's own deltas name, via `describeEnvelope.ts`'s
+ * `envelopeSubjects`, for "named subjects link to their pages"). Bounded by
+ * `listRecentCommits`'s own fixed `limit`, not by model size — same shape
+ * `loadCommitDepths`/`loadChangeTouchCounts` above already use for a
+ * caller-scoped, fixed-size id list.
+ */
+export async function listDeltasForCommits(supabase: Client, commitIds: readonly UUID[]): Promise<DeltaRow[]> {
+  if (commitIds.length === 0) return [];
+  assertInFilterSize('listDeltasForCommits', 'commit_id', commitIds);
+  const query = supabase.from('deltas').select('*', { count: 'exact' }).in('commit_id', commitIds as UUID[]).order('commit_id').order('seq');
+  return selectAll<DeltaRow>(query);
+}
+
 export type ExposureTone = 'ok' | 'warn' | 'info';
 
 /**

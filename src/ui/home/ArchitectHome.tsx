@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Link } from 'react-router';
 import { BlueprintFrame } from '../components/BlueprintFrame/BlueprintFrame';
 import { Chip } from '../components/Chip/Chip';
@@ -7,7 +8,8 @@ import { Text } from '../components/Text/Text';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { monthsSince } from '../../contracts/thresholds';
 import { branchStatusTone } from '../changes/branchStatus';
-import type { ArchitectHomeData } from './useArchitectHome';
+import { formatCommitActivityTime } from './commitActivityTime';
+import type { ArchitectHomeData, RecentCommitRow } from './useArchitectHome';
 import styles from './DoorHome.module.css';
 
 export interface ArchitectHomeProps {
@@ -52,6 +54,12 @@ function plural(count: number, singular: string, pluralForm: string): string {
 export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) {
   const now = new Date();
   const elementsHref = `/o/${orgSlug}/m/${modelSlug}/elements`;
+  const elementHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}`;
+  // A commit's diff against its own parent (Sprint U4-1 B2) — main's genesis
+  // commit has no parent to diff against, so it stays plain text below
+  // rather than linking anywhere.
+  const commitDiffHref = (commit: RecentCommitRow['commit']) =>
+    commit.parent_commit_id ? `/o/${orgSlug}/m/${modelSlug}/diff?ref=commit:${commit.id}&diff=commit:${commit.parent_commit_id}` : null;
 
   return (
     <div className={styles.columns}>
@@ -64,16 +72,44 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
             <EmptyState>No commits on main yet.</EmptyState>
           ) : (
             <ul className={styles.commitList}>
-              {data.recentCommits.map((commit) => (
-                <li key={commit.id} className={styles.commitRow}>
-                  <Text as="span" size="sm">
-                    {commit.title}
-                  </Text>
-                  <Text as="span" tone="faint" size="sm">
-                    {formatAge(commit.created_at, now)}
-                  </Text>
-                </li>
-              ))}
+              {data.recentCommits.map(({ commit, authorDisplay, subjects }) => {
+                const diffHref = commitDiffHref(commit);
+                return (
+                  <li key={commit.id} className={styles.commitRow}>
+                    <div className={styles.commitMain}>
+                      {diffHref ? (
+                        <Link to={diffHref}>
+                          <Text as="span" size="sm">
+                            {commit.title}
+                          </Text>
+                        </Link>
+                      ) : (
+                        <Text as="span" size="sm">
+                          {commit.title}
+                        </Text>
+                      )}
+                      {subjects.length > 0 && (
+                        <Text as="p" tone="faint" size="xs">
+                          {subjects.map((subject, index) => (
+                            <Fragment key={subject.elementId}>
+                              {index > 0 && ', '}
+                              <Link to={elementHref(subject.elementId)}>{subject.name}</Link>
+                            </Fragment>
+                          ))}
+                        </Text>
+                      )}
+                    </div>
+                    <div className={styles.commitMeta}>
+                      <Text as="span" tone="muted" size="sm">
+                        {authorDisplay}
+                      </Text>
+                      <Text as="span" tone="faint" size="sm">
+                        {formatCommitActivityTime(commit.created_at, now)}
+                      </Text>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Panel>

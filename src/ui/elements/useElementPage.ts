@@ -70,7 +70,10 @@ async function loadFacts(commitId: UUID, subjectId: UUID): Promise<Map<string, F
  * real edit on a change branch left `✎ Edit` never reappearing, tracing
  * back not to a rejected commit or a swallowed error — the two suspects
  * named going in — but to the post-save reload landing on
- * `notPresentAtRef` for an element that plainly still exists).
+ * `notPresentAtRef` for an element that plainly still exists). A `commit:`
+ * ref (Sprint U4-1 B2's commit-diff view links) has the identical problem
+ * for the identical reason — almost never main's current head — and gets
+ * the same fix below.
  */
 interface ElementSource {
   commitId: UUID;
@@ -110,6 +113,16 @@ async function resolveElementSource(modelId: UUID, ref: Ref): Promise<ElementSou
     if (!branch) return null;
     const projection = await loadProjectionAtCommit(supabase, modelId, branch.head_commit_id);
     return projectionSource(branch.head_commit_id, projection);
+  }
+  if (ref.kind === 'commit') {
+    // Same gap as a branch head (this file's own comment above `ElementSource`):
+    // an arbitrary `commit:` ref (Sprint U4-1 B2's commit-diff links) is
+    // essentially never main's *current* head, so `elements_head` has no
+    // rows for it — fold it in memory instead, exactly like a branch head.
+    const commitId = await resolveRef(supabase, modelId, ref);
+    if (!commitId) return null;
+    const projection = await loadProjectionAtCommit(supabase, modelId, commitId);
+    return projectionSource(commitId, projection);
   }
   const commitId = await resolveRef(supabase, modelId, ref);
   if (!commitId) return null;
