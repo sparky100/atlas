@@ -42,6 +42,14 @@ export async function getOrganisationBySlug(supabase: Client, slug: string): Pro
   return data as OrganisationRow | null;
 }
 
+/** The reverse lookup — id to slug, for anything that only has an id in hand and needs a real URL (Sprint M1b's notification tray deep link: a notification names a `model_id`, `getModelById` gets its `org_id`, and this gets that org's own slug — see `useNotificationTray.ts`'s own module comment). */
+export async function getOrganisationById(supabase: Client, id: UUID): Promise<OrganisationRow | null> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.from('organisations').select('*').eq('id', id).maybeSingle();
+  if (error) throw new Error(`getOrganisationById: ${error.message}`);
+  return data as OrganisationRow | null;
+}
+
 /** The caller's own membership row in `orgId` — their role, for UI role-gating (RLS is the real enforcement; this is what the UI reads to decide what to show). */
 export async function getMyMembership(supabase: Client, orgId: UUID, userId: UUID): Promise<MemberRow | null> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.

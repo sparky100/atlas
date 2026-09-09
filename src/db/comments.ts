@@ -15,6 +15,7 @@
 import type { UUID } from '../contracts/delta';
 import { getMainBranch } from './branches';
 import type { Client } from './client';
+import { assertInFilterSize } from './inFilterLimit';
 import type { AnchorType, CommentRow, ViewKind } from './types';
 
 export interface CreateCommentInput {
@@ -96,6 +97,21 @@ export async function listCommentsForAnchor(supabase: Client, modelId: UUID, anc
   const anchorRetracted = anchorType === 'element' || anchorType === 'relationship' ? await isAnchorRetracted(supabase, modelId, anchorType, anchorId) : false;
 
   return { threads, anchorRetracted };
+}
+
+/**
+ * Every comment named by `ids` — the notification tray's own lookup
+ * (Sprint M1b: a `notifications` row only carries `comment_id`; the tray
+ * needs the comment's own body/anchor/author to render a row at all).
+ * Bounded by the notification list on screen, which is always small, but
+ * goes through the same rule 8 ceiling every other batch id lookup does.
+ */
+export async function listCommentsByIds(supabase: Client, ids: readonly UUID[]): Promise<CommentRow[]> {
+  if (ids.length === 0) return [];
+  assertInFilterSize('listCommentsByIds', 'id', ids);
+  const { data, error } = await supabase.from('comments').select('*').in('id', ids as UUID[]);
+  if (error) throw new Error(`listCommentsByIds: ${error.message}`);
+  return (data as CommentRow[] | null) ?? [];
 }
 
 /** True if `anchorId` (an element or relationship) has no row in `elements_head`/`relationships_head` at main's current head — it was created (or this anchor would never have passed `atlas.check_anchor`) but is not currently live. */
