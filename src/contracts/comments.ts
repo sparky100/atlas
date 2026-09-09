@@ -12,7 +12,8 @@
 
 export type AnchorType = 'element' | 'relationship' | 'change' | 'decision' | 'version';
 export type CommentStatus = 'open' | 'resolved';
-export type NotificationKind = 'mention';
+/** Sprint M1b adds `reply` (`supabase/migrations/20260906340000_notification_kind_reply.sql`/`20260906350000_comment_reply_notifications.sql`) — a reply notifies its thread's other participants, not just an @handle. */
+export type NotificationKind = 'mention' | 'reply';
 
 /** `atlas.profiles.handle`'s allowed charset — lowercase, matching the table's own CHECK constraint. */
 const HANDLE_CHARSET = /^[a-z0-9_-]+$/;

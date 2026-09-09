@@ -57,7 +57,7 @@ export function ChangePage() {
               {branch?.title ?? branch?.name ?? 'Change'}
             </Text>
           </div>
-          <ChangeView modelId={model.id} branchId={branchId ?? ''} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canEdit={canEdit} />
+          <ChangeView orgId={organisation?.id ?? ''} modelId={model.id} branchId={branchId ?? ''} orgSlug={orgSlug ?? ''} modelSlug={model.slug} role={role} canEdit={canEdit} />
         </main>
       </div>
     </div>

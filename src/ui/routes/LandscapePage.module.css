@@ -64,3 +64,20 @@
 .menu.open {
   display: flex;
 }
+
+/**
+ * Sprint M1b's comments panel (5a): the canvas reflows rather than being
+ * covered, so this is a flex row, not an overlay — the panel is a sibling
+ * that takes its own fixed width (`--comments-panel-width`,
+ * `CommentsPanel.module.css`) and the canvas fills what's left.
+ */
+.canvasRow {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.canvasRow > *:first-child {
+  flex: 1;
+  min-width: 0;
+}

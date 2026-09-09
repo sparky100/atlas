@@ -12,6 +12,7 @@ import { Button } from '../components/Button/Button';
 import { CapabilityRetractAction } from '../components/CapabilityRetractAction/CapabilityRetractAction';
 import { ChangesTouchingSection } from '../components/ChangesTouchingSection/ChangesTouchingSection';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
+import { CommentsSection } from '../components/CommentsSection/CommentsSection';
 import { ElementHeader } from '../components/ElementHeader/ElementHeader';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { HistoryTimeline } from '../components/HistoryTimeline/HistoryTimeline';
@@ -269,7 +270,15 @@ export function ElementPage() {
                   <EmptyState>Decisions aren't built yet — see Sprint D1.</EmptyState>
                 </CollapsibleSection>
                 <CollapsibleSection title="Comments">
-                  <EmptyState>Comments aren't built yet — see Sprint M1.</EmptyState>
+                  <CommentsSection
+                    orgId={organisation?.id ?? ''}
+                    modelId={model.id}
+                    userId={userId}
+                    role={role}
+                    anchorType="element"
+                    anchorId={state.data.element.element_id}
+                    branchId={ref.kind === 'branch' ? (editingBranch?.id ?? null) : null}
+                  />
                 </CollapsibleSection>
               </div>
             </div>
