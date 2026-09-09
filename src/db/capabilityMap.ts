@@ -64,3 +64,21 @@ export async function listSupportsEdgesForCapabilities(supabase: Client, commitI
   const rows = await selectAll<RelationshipsHeadRow>(query);
   return rows.filter((r) => ids.has(r.to_element_id));
 }
+
+/**
+ * Whether this commit has any System element at all — Sprint U4-1 C4's
+ * "'None' only while the model has no systems". Deliberately not derived
+ * from `useCapabilityMap.ts`'s own `systemsById`: that map only ever
+ * holds systems with a live `supports` edge into *some* capability, so a
+ * model with real, unlinked systems would read as `systemsById.size ===
+ * 0` there — a different fact ("nothing's linked yet") from this one
+ * ("there's nothing to link"). An exact count via `head: true` (no rows
+ * returned) is the same shape `loadModelCounts` (src/db/modelHome.ts)
+ * already uses for the identical "count of systems at this commit"
+ * query — this only needs the boolean, not the number.
+ */
+export async function hasAnySystem(supabase: Client, commitId: UUID): Promise<boolean> {
+  const { count, error } = await supabase.from('elements_head').select('element_id', { count: 'exact', head: true }).eq('commit_id', commitId).eq('element_type', 'system');
+  if (error) throw new Error(`hasAnySystem: ${error.message}`);
+  return (count ?? 0) > 0;
+}

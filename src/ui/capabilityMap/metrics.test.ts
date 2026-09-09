@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateTileColourFor, lifecycleExposure, oldestLifecycleStage, supportingSystemIds, tileColourFor } from './metrics';
+import { aggregateTileColourFor, lifecycleExposure, oldestLifecycleStage, resolveDefaultColourBy, supportingSystemIds, tileColourFor } from './metrics';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 
 function system(id: string, lifecycleStatus?: string, plannedEnd?: string): ElementsHeadRow {
@@ -154,5 +154,23 @@ describe('aggregateTileColourFor (Sprint U4-1 C3 review note: L1 group header)',
 
   it('coverage: warn only when literally none of the group\'s descendants have a supporting system', () => {
     expect(aggregateTileColourFor('metric:supportingSystemCount', ['cap-1', 'cap-2'], [], new Map())).toEqual({ tone: 'warn', label: '0/2 capabilities supported' });
+  });
+});
+
+describe('resolveDefaultColourBy (Sprint U4-1 C4)', () => {
+  it('a saved choice always wins, regardless of home mode or whether the model has systems', () => {
+    expect(resolveDefaultColourBy('metric:oldestLifecycleStage', 'director', true)).toBe('metric:oldestLifecycleStage');
+    expect(resolveDefaultColourBy('none', 'architect', true)).toBe('none');
+    expect(resolveDefaultColourBy('metric:supportingSystemCount', 'director', false)).toBe('metric:supportingSystemCount');
+  });
+
+  it('"none" while the model has no systems at all, no saved choice, regardless of home mode', () => {
+    expect(resolveDefaultColourBy(null, 'director', false)).toBe('none');
+    expect(resolveDefaultColourBy(null, 'architect', false)).toBe('none');
+  });
+
+  it('exposure for a director, coverage for an architect, once the model has real systems', () => {
+    expect(resolveDefaultColourBy(null, 'director', true)).toBe('metric:lifecycleExposure');
+    expect(resolveDefaultColourBy(null, 'architect', true)).toBe('metric:supportingSystemCount');
   });
 });

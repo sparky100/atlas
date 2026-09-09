@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
-import { listSupportsEdgesForCapabilities, listCapabilitiesForMap } from '../../db/capabilityMap';
+import { hasAnySystem, listSupportsEdgesForCapabilities, listCapabilitiesForMap } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
 import { getOrCreateModelView } from '../../db/views';
@@ -15,6 +15,8 @@ export interface CapabilityMapData {
   tree: CapabilityMapTree;
   supportsEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
+  /** Sprint U4-1 C4: the model-wide answer, not derived from `systemsById` above — see `hasAnySystem`'s own comment for why those are different facts. */
+  hasSystems: boolean;
 }
 
 export type CapabilityMapState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: CapabilityMapData };
@@ -53,7 +55,7 @@ export function useCapabilityMap(modelId: UUID, orgId: UUID, userId: UUID | null
         return;
       }
 
-      const capabilities = await listCapabilitiesForMap(supabase, commitId);
+      const [capabilities, hasSystems] = await Promise.all([listCapabilitiesForMap(supabase, commitId), hasAnySystem(supabase, commitId)]);
       const capabilityIds = capabilities.map((c) => c.element_id);
       const supportsEdges = await listSupportsEdgesForCapabilities(supabase, commitId, capabilityIds);
       const systemIds = [...new Set(supportsEdges.map((edge) => edge.from_element_id))];
@@ -62,7 +64,7 @@ export function useCapabilityMap(modelId: UUID, orgId: UUID, userId: UUID | null
       const view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'capability_map', name: 'Capability map', createdBy: currentUserId });
       const tree = computeCapabilityMapTree(capabilities);
 
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems } });
     }
 
     load().catch((e: unknown) => {

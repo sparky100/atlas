@@ -118,9 +118,16 @@ test('capability map: two-level tree with an orphan, L2→L3 expand, orphan flag
   await page.getByRole('button', { name: /▸\s*1/ }).click();
   await expect(page.getByText('Repairs')).toBeVisible();
 
-  // Colour-by actually changes a tile's tone: no coverage chip before,
-  // a real one (naming the same count the "→ Landscape" link already
-  // shows) after switching.
+  // Colour-by actually changes a tile's tone: no coverage chip once
+  // explicitly set to None, a real one (naming the same count the
+  // "→ Landscape" link already shows) after switching to Coverage.
+  // Starts from an explicit "None" selection, not an assumed default —
+  // Sprint U4-1 C4 gives this model a real default colour-by the instant
+  // it loads (this fixture's own user owns their org, so home_mode
+  // defaults to architect, and coverage is the architect default on a
+  // model that already has a system) — this test is about the *switch*
+  // working, not about which mode happens to load first.
+  await page.getByLabel('Colour by').selectOption({ label: 'None' });
   await expect(page.getByText('1 supporting system')).toHaveCount(0);
   await page.getByLabel('Colour by').selectOption({ label: 'Coverage (supporting-system count)' });
   await expect(page.getByText('1 supporting system')).toBeVisible();

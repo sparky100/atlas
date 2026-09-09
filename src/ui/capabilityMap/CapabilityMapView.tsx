@@ -26,6 +26,11 @@ export interface CapabilityMapViewProps {
   tree: CapabilityMapTree;
   supportsEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
+  /** Sprint U4-1 C4: the model-wide "does this model have any systems at all" answer — see `useCapabilityMap.ts`'s own `hasSystems` comment for why this isn't derived from `systemsById` above. Drives the "link systems to capabilities to see coverage" hint. */
+  hasSystems: boolean;
+  /** Sprint U4-1 C4: resolved and persisted by the caller (`useColourByPreference`) — this component no longer owns colour-by as local state, so its default (director→exposure, architect→coverage, none-until-systems-exist) and "remember last choice per user" both live in one place. */
+  colourBy: ColourByMode;
+  onColourByChange: (mode: ColourByMode) => void;
   orgSlug: string;
   modelSlug: string;
   /** `?ref=...` — carried into every "→ Landscape" zoom link so it lands on the same ref the map itself is showing (§2.4's deep-link rule). */
@@ -52,9 +57,13 @@ export interface CapabilityMapViewProps {
  * L1 as columns, L2 as stacked cards, L3 revealed inline on expand. Plain
  * DOM/CSS, not Canvas — see src/ui/capabilityMap/layout.ts's module
  * comment for why. Colour-by (src/ui/capabilityMap/metrics.ts) is a
- * toolbar toggle, defaulting to `none`; every mode still shows the
- * supporting-system count as text regardless (§4.3-style "never
- * colour-only").
+ * toolbar toggle — `colourBy`/`onColourByChange` are controlled from the
+ * caller (`CapabilityMapPage.tsx`'s `useColourByPreference`, Sprint U4-1
+ * C4), not local state here, since its default depends on context
+ * (home mode, whether the model has systems yet) and its choice needs to
+ * persist across visits, both concerns this component itself shouldn't
+ * own. Every mode still shows the supporting-system count as text
+ * regardless (§4.3-style "never colour-only").
  *
  * Sprint U2 step 3: every tile's supporting-system count is now also the
  * zoom chain's entry point — a link to the landscape filtered to exactly
@@ -97,8 +106,7 @@ export interface CapabilityMapViewProps {
  * "plain-text name" reasoning as the tile component's own primary link,
  * without becoming a stretched-link tile itself.
  */
-export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, modelSlug, refParam, addCapability, reorderCapability }: CapabilityMapViewProps) {
-  const [colourBy, setColourBy] = useState<ColourByMode>('none');
+export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, colourBy, onColourByChange, orgSlug, modelSlug, refParam, addCapability, reorderCapability }: CapabilityMapViewProps) {
   const [expanded, setExpanded] = useState<Set<UUID>>(new Set());
   const colourById = useId();
 
@@ -132,7 +140,7 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, m
             Colour by
           </Text>
         </label>
-        <select id={colourById} className={styles.select} value={colourBy} onChange={(e) => { setColourBy(e.target.value as ColourByMode); }}>
+        <select id={colourById} className={styles.select} value={colourBy} onChange={(e) => { onColourByChange(e.target.value as ColourByMode); }}>
           <option value="none">None</option>
           {COLOUR_BY_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -140,6 +148,12 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, m
             </option>
           ))}
         </select>
+        {/* Sprint U4-1 C4: "'None' only while the model has no systems, with hint..." — shown for that specific state, not every time someone happens to have colour-by off (a user who manually picks None on a populated model doesn't need a nudge to link systems that are already linked). */}
+        {colourBy === 'none' && !hasSystems && (
+          <Text as="span" size="sm" tone="muted">
+            Link systems to capabilities to see coverage.
+          </Text>
+        )}
         {addCapability && <CapabilityMapAddForm tree={tree} {...addCapability} />}
       </div>
 

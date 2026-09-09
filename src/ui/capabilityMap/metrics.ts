@@ -40,12 +40,18 @@
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { LifecycleStatus, UUID } from '../../contracts/delta';
+import type { HomeMode } from '../../contracts/userPreferences';
 import type { ChipTone } from '../components/Chip/Chip';
 import { STALE_AFTER_MONTHS } from '../../contracts/thresholds';
 import { attributesRecord } from '../elements/attributesRecord';
 import { LIFECYCLE_ORDER, LIFECYCLE_TONE } from '../elements/lifecycleTone';
 
-export type ColourByMode = 'none' | 'metric:supportingSystemCount' | 'metric:oldestLifecycleStage' | 'metric:lifecycleExposure';
+// The mode identifiers themselves are canonical in src/contracts/userPreferences.ts
+// (Sprint U4-1 C4: they're now persisted, `user_preferences.capability_map_colour_by`)
+// — re-exported under this file's own established name so its two existing
+// callers (CapabilityMapView.tsx, this file) don't need to change.
+export type { CapabilityMapColourByMode as ColourByMode } from '../../contracts/userPreferences';
+import type { CapabilityMapColourByMode as ColourByMode } from '../../contracts/userPreferences';
 
 export const COLOUR_BY_OPTIONS: { value: ColourByMode; label: string }[] = [
   { value: 'metric:supportingSystemCount', label: 'Coverage (supporting-system count)' },
@@ -180,4 +186,23 @@ export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityI
       return exposed ? { tone: 'danger', label: 'exposed' } : { tone: undefined, label: undefined };
     }
   }
+}
+
+/**
+ * Sprint U4-1 C4's "default colour-by": exposure for a director, coverage
+ * for an architect; "none" only while the model has no systems at all
+ * (`hasSystems` — `src/db/capabilityMap.ts`'s `hasAnySystem`, the real
+ * model-wide answer, not `useCapabilityMap.ts`'s own `systemsById`, which
+ * only ever holds systems that already support *some* capability — a
+ * model can have real systems and still show 0 there); a saved choice
+ * (`user_preferences.capability_map_colour_by`, `saved` here) always
+ * wins over both, since "remember last choice per user" is the whole
+ * point of persisting it at all — this only ever runs the default logic
+ * for the *first* time a person opens a map, or after using it on a
+ * model with no systems yet.
+ */
+export function resolveDefaultColourBy(saved: ColourByMode | null, homeMode: HomeMode, hasSystems: boolean): ColourByMode {
+  if (saved !== null) return saved;
+  if (!hasSystems) return 'none';
+  return homeMode === 'director' ? 'metric:lifecycleExposure' : 'metric:supportingSystemCount';
 }

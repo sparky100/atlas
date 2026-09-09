@@ -14,6 +14,8 @@ import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPa
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
 import { SyncDescriptionsAction } from '../capabilityMap/SyncDescriptionsAction';
 import { useCapabilityMap } from '../capabilityMap/useCapabilityMap';
+import { useColourByPreference } from '../capabilityMap/useColourByPreference';
+import { useHomeMode } from '../home/useHomeMode';
 import styles from './CapabilityMapPage.module.css';
 
 /**
@@ -50,6 +52,14 @@ export function CapabilityMapPage() {
   const { branch: mainBranch } = useMainBranch(model?.id ?? null);
 
   const { state, reload } = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref);
+
+  // Sprint U4-1 C4: "exposure for director home mode, coverage for
+  // architect" — the same home_mode this org's ModelHome.tsx switches
+  // doors on, not a capability-map-local concept. `hasSystems` only
+  // exists once the load resolves; `false` while it hasn't is a harmless
+  // transient default (colourBy isn't rendered anywhere until `ready`).
+  const { homeMode } = useHomeMode(userId, canEditOnMain(role));
+  const { colourBy, setColourBy } = useColourByPreference(userId, homeMode, state.status === 'ready' ? state.data.hasSystems : false);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -99,6 +109,9 @@ export function CapabilityMapPage() {
             tree={state.data.tree}
             supportsEdges={state.data.supportsEdges}
             systemsById={state.data.systemsById}
+            hasSystems={state.data.hasSystems}
+            colourBy={colourBy}
+            onColourByChange={setColourBy}
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}
             refParam={refParam}

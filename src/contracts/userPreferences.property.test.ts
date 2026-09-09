@@ -7,6 +7,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
+  CAPABILITY_MAP_COLOUR_BY_MODES,
   DENSITY_PREFERENCES,
   fromUserPreferencesRow,
   HOME_MODES,
@@ -20,6 +21,9 @@ const userPreferencesArb: fc.Arbitrary<UserPreferences> = fc.record({
   homeMode: fc.constantFrom(...HOME_MODES),
   density: fc.constantFrom(...DENSITY_PREFERENCES),
   theme: fc.constantFrom(...THEME_PREFERENCES),
+  // Sprint U4-1 C4: nullable, unlike its three siblings above — `null`
+  // ("no saved override") is as much a real value here as any mode name.
+  capabilityMapColourBy: fc.option(fc.constantFrom(...CAPABILITY_MAP_COLOUR_BY_MODES), { nil: null }),
   updatedAt: fc.date({ noInvalidDate: true }).map((d) => d.toISOString()),
 });
 
