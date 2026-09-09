@@ -4,10 +4,11 @@ import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows
 import type { UUID } from '../../contracts/delta';
 import type { BranchRow } from '../../db/types';
 import { CapabilityTile } from '../components/CapabilityTile/CapabilityTile';
+import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { CapabilityMapAddForm } from './CapabilityMapAddForm';
-import { COLOUR_BY_OPTIONS, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
+import { COLOUR_BY_OPTIONS, aggregateTileColourFor, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
 import type { CapabilityMapTree, L1Column, L2Card } from './layout';
 import { useCapabilityReorder } from './useCapabilityReorder';
 import styles from './CapabilityMapView.module.css';
@@ -85,9 +86,16 @@ export interface CapabilityMapViewProps {
  * blueprint-framed, plain-text name, whole tile as the click target,
  * colour-by tone filling the tile rather than sitting in a separate
  * chip alone). Not L1: an L1 column holds several independently-
- * clickable L2 cards, not one clickable unit, and doesn't participate in
- * colour-by — see `L1ColumnView`'s own header markup below, unchanged by
- * C3.
+ * clickable L2 cards, not one clickable unit, so a tile-style whole-
+ * column click target and fill don't apply the same way — but the
+ * human's own review of C3 did ask for a *group-level* signal at L1: a
+ * Chip (a strip, not a fill — `aggregateTileColourFor`, metrics.ts)
+ * aggregated across every L2 *and* L3 descendant, worst-of-children for
+ * exposure/lifecycle stage, fraction-supported for coverage — so a
+ * capability exposed only at L3 still shows at its L1 ancestor, and the
+ * L1 name link itself just loses its underline (`.columnLink`), the same
+ * "plain-text name" reasoning as the tile component's own primary link,
+ * without becoming a stretched-link tile itself.
  */
 export function CapabilityMapView({ tree, supportsEdges, systemsById, orgSlug, modelSlug, refParam, addCapability, reorderCapability }: CapabilityMapViewProps) {
   const [colourBy, setColourBy] = useState<ColourByMode>('none');
@@ -271,14 +279,20 @@ function L1ColumnView({
   reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
 }) {
   const count = supportingSystemIds(column.capability.element_id, supportsEdges).length;
+  // Every L2 *and* L3 descendant — not just this column's direct L2
+  // children — so an L1 whose only exposed capability sits at L3 still
+  // reads as exposed at the group level (Sprint U4-1 C3 review note).
+  const descendantIds = column.l2.flatMap((card) => [card.capability.element_id, ...card.l3.map((leaf) => leaf.element_id)]);
+  const aggregateColour = aggregateTileColourFor(colourBy, descendantIds, supportsEdges, systemsById);
   return (
     <div className={styles.column} role="listitem">
       <div className={styles.columnHeader}>
-        <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${column.capability.element_id}`}>
+        <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${column.capability.element_id}`} className={styles.columnLink}>
           <Text as="span" size="lg">
             {column.capability.name}
           </Text>
         </Link>
+        {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <Chip tone={aggregateColour.tone}>{aggregateColour.label}</Chip>}
         <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
         {reorderCapability && (
           <ReorderButtons
