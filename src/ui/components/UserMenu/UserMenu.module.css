@@ -2,17 +2,20 @@
   position: relative;
 }
 
+/* Sprint U4-2a item 6: round, avatar-styled, and shown at every width now —
+   no `display: none` gated behind a breakpoint any more. */
 .toggle {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   height: var(--row-height);
   width: var(--row-height);
-  border-radius: var(--radius-sm);
+  border-radius: 50%;
   border: var(--border-width) solid var(--border-strong);
   background: var(--surface);
   color: var(--text);
-  font-size: 1.1em;
+  font-size: 0.9em;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -28,37 +31,25 @@
   border: 0;
 }
 
+/* The disclosure panel — hidden until `.open`, on every viewport (item 6:
+   "matching mobile" is literal now, not just a shared breakpoint). */
 .menu {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
+  display: none;
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--surface-raised-shadow);
+  min-width: 200px;
+  z-index: 10;
 }
 
-/* Sprint U3b's mobile header collapse — the same 768px breakpoint
-   src/ui/home/DoorHome.module.css's own two-column layout collapses at. */
-@media (max-width: 768px) {
-  .toggle {
-    display: flex;
-  }
-
-  .menu {
-    display: none;
-    position: absolute;
-    top: calc(100% + var(--space-2));
-    right: 0;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-3);
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: var(--border-width) solid var(--border-strong);
-    background: var(--surface);
-    box-shadow: var(--surface-raised-shadow);
-    min-width: 200px;
-    z-index: 10;
-  }
-
-  .menu.open {
-    display: flex;
-  }
+.menu.open {
+  display: flex;
 }

@@ -170,12 +170,17 @@ export function LandscapePage() {
     </>
   );
 
+  // Sprint U4-2a item 5: "canvas routes fill the viewport" — only once the
+  // canvas itself is actually rendered (see the same condition below); the
+  // loading/error/empty states keep the ordinary centred-column `.main`.
+  const hasCanvas = state.status === 'ready' && (state.data.layout.nodes.length > 0 || state.data.layout.actorNodes.length > 0);
+
   return (
     <div>
       <AppHeader />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
-        <main className={styles.main}>
+        <main className={[styles.main, hasCanvas ? styles.mainWithCanvas : ''].filter(Boolean).join(' ')}>
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}

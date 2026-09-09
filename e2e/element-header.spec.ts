@@ -113,7 +113,7 @@ test('element header: raw id is hidden behind the header menu, an alias renders 
   // own menu, already open from the click above. Distinct accessible
   // names ("Menu" vs. "Element actions") are why the two don't collide.
   await page.setViewportSize({ width: 375, height: 812 });
-  const appMenuToggle = page.getByRole('button', { name: 'Menu' });
+  const appMenuToggle = page.getByRole('button', { name: 'Account menu' });
   await expect(appMenuToggle).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign out' })).not.toBeVisible();
   await expect(copyButton).toBeVisible();
