@@ -20,7 +20,7 @@ Separate product, separate repo, separate Supabase project. Shares code with the
 **Order from here.**
 1. Fix the failing Workers Builds check (not investigated by the session that committed this pack — status as of PR #18's own head is "failing", not re-checked since); `pnpm release`; use the DNO model for the human sentence. (Merging PR #18 is done — see above.)
 2. Remaining housekeeping: **create the `design`/`missing` issue labels** (the one sub-item still open — needs a human or a session with real GitHub label-admin access, `gh label create` or the web UI; everything else this item named is done, see the State lines above).
-3. **M1b** — comments UI, built to `docs/HANDOFF-M1b-comments.md` (corrected against the codebase first).
+3. **M1b** — comments UI, built to `docs/HANDOFF-M1b-comments.md` — **exists now, reviewed and corrected against the codebase (2026-09-09)**: one wrong token fixed, `describeDelta`'s real strings substituted for invented ones, and one real gap flagged rather than silently resolved (the comment marker and the landscape's existing "+N" extra-lane marker both want the same node corner — pick one before touching `LandscapeCanvas.tsx`, see the handoff's own closing decision row). Ready to build from.
 4. Hour of use → issues → **U4-2** (drag-to-reorder is already queued there; expect the change flow, versions and the architect door's remaining §3.2 items to surface).
 5. Repeat until the definition of usable holds.
 6. Then C2 (split), K1 (capture), D1 (decisions), Q1 (duplicates), R1 (roadmap).
