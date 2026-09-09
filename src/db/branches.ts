@@ -12,6 +12,7 @@
  * return point rather than threading an unsafe `any` further — the
  * `eslint-disable` comments mark exactly that boundary, nowhere else.
  */
+import { assertRealId } from './assertRealId';
 import type { Client } from './client';
 import { assertInFilterSize } from './inFilterLimit';
 import type { BranchRow } from './types';
@@ -55,6 +56,7 @@ export async function createChangeBranch(supabase: Client, input: CreateChangeBr
 }
 
 export async function getBranch(supabase: Client, branchId: UUID): Promise<BranchRow | null> {
+  assertRealId('getBranch', 'id', branchId);
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('branches').select('*').eq('id', branchId).maybeSingle();
   if (error) throw new Error(`getBranch: ${error.message}`);
@@ -62,6 +64,7 @@ export async function getBranch(supabase: Client, branchId: UUID): Promise<Branc
 }
 
 export async function getMainBranch(supabase: Client, modelId: UUID): Promise<BranchRow | null> {
+  assertRealId('getMainBranch', 'model_id', modelId);
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('branches').select('*').eq('model_id', modelId).eq('kind', 'main').maybeSingle();
   if (error) throw new Error(`getMainBranch: ${error.message}`);
@@ -69,6 +72,7 @@ export async function getMainBranch(supabase: Client, modelId: UUID): Promise<Br
 }
 
 export async function listBranchesForModel(supabase: Client, modelId: UUID): Promise<BranchRow[]> {
+  assertRealId('listBranchesForModel', 'model_id', modelId);
   const { data, error } = await supabase.from('branches').select('*').eq('model_id', modelId);
   if (error) throw new Error(`listBranchesForModel: ${error.message}`);
   return data as BranchRow[];
@@ -93,6 +97,7 @@ export async function listBranchesByIds(supabase: Client, ids: readonly UUID[]):
 
 /** Every change branch on a model — main excluded — newest-updated first, for the "Changes" list (UI-principles §2.4's `/changes` route). */
 export async function listChangeBranches(supabase: Client, modelId: UUID): Promise<BranchRow[]> {
+  assertRealId('listChangeBranches', 'model_id', modelId);
   const { data, error } = await supabase.from('branches').select('*').eq('model_id', modelId).eq('kind', 'change').order('updated_at', { ascending: false });
   if (error) throw new Error(`listChangeBranches: ${error.message}`);
   return data as BranchRow[];
@@ -115,6 +120,7 @@ export interface UpdateBranchMetadataInput {
 }
 
 export async function updateBranchMetadata(supabase: Client, branchId: UUID, input: UpdateBranchMetadataInput): Promise<void> {
+  assertRealId('updateBranchMetadata', 'id', branchId);
   const patch: Record<string, unknown> = {};
   if (input.title !== undefined) patch.title = input.title;
   if (input.sharedForReview !== undefined) patch.shared_for_review = input.sharedForReview;
@@ -127,6 +133,7 @@ export async function updateBranchMetadata(supabase: Client, branchId: UUID, inp
 
 /** Every branch split out of `branchId` (ADR-006 amendment, SPEC §1 S-22) — empty until the review queue's split-into-a-new-branch mechanic exists to create one. */
 export async function listSplitBranches(supabase: Client, branchId: UUID): Promise<BranchRow[]> {
+  assertRealId('listSplitBranches', 'split_from', branchId);
   const { data, error } = await supabase.from('branches').select('*').eq('split_from', branchId).order('updated_at', { ascending: false });
   if (error) throw new Error(`listSplitBranches: ${error.message}`);
   return data as BranchRow[];

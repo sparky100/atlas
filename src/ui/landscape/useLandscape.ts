@@ -98,13 +98,24 @@ export interface UseLandscapeResult {
  * unchanged either way. `mode` is meaningless for `main`/`tag` (the As-is/
  * To-be/Diff control is hidden there, §6.2) and is only read for a branch.
  */
-export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, ref: Ref, mode: ViewMode, capabilityId: UUID | null = null): UseLandscapeResult {
+export function useLandscape(modelId: UUID | null, orgId: UUID | null, userId: UUID | null, ref: Ref, mode: ViewMode, capabilityId: UUID | null = null): UseLandscapeResult {
   const [state, setState] = useState<LandscapeState>({ status: 'loading' });
   const [resetToken, setResetToken] = useState(0);
   const refParam = refParamOf(ref);
 
   useEffect(() => {
-    if (!userId) return undefined;
+    // Sprint U4-2a item 2's resolved-model gate: `modelId`/`orgId` used to
+    // be typed as plain `UUID`, which just meant every caller fed this
+    // `model?.id ?? ''` (LandscapePage.tsx's own fix, alongside
+    // useBreadcrumbElement.ts) rather than the `?? null` convention every
+    // other model-scoped hook uses — this effect never checked them, so it
+    // ran `resolveRef(supabase, '', ref)` on the render before the page's
+    // own model resolved. Gating here means the effect (and every child
+    // hook downstream of `state`) simply doesn't run yet, rather than
+    // running once with a hollow id and once for real.
+    if (!userId || !modelId || !orgId) return undefined;
+    const currentModelId = modelId;
+    const currentOrgId = orgId;
     const currentUserId = userId;
     let cancelled = false;
     setState({ status: 'loading' });
@@ -128,7 +139,7 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
           if (!cancelled) setState({ status: 'refNotFound' });
           return;
         }
-        const resolved = await resolveBranchModeProjection(supabase, modelId, branch, mode);
+        const resolved = await resolveBranchModeProjection(supabase, currentModelId, branch, mode);
         if (!resolved) {
           if (!cancelled) setState({ status: 'refNotFound' });
           return;
@@ -145,7 +156,7 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
           supportingSystemIds: (capId) => new Set(resolved.projection.relationshipsHead.filter((r) => r.relationship_type === 'supports' && r.to_element_id === capId).map((r) => r.from_element_id)),
         };
       } else {
-        const resolvedCommitId = await resolveRef(supabase, modelId, ref);
+        const resolvedCommitId = await resolveRef(supabase, currentModelId, ref);
         if (!resolvedCommitId) {
           if (!cancelled) setState({ status: 'refNotFound' });
           return;
@@ -163,7 +174,7 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
       const byIds: (ids: readonly UUID[]) => Promise<Map<UUID, ElementsHeadRow>> = systemsSource ? (ids) => Promise.resolve(systemsSource.byIds([...ids])) : (ids) => getElementsByIds(supabase, commitId, ids);
       const l1AncestorByCapabilityId = await loadL1AncestorByCapabilityId(byIds, supportsEdges);
 
-      const view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'landscape', name: 'Landscape', createdBy: currentUserId, branchId });
+      const view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId: currentOrgId, modelId: currentModelId, kind: 'landscape', name: 'Landscape', createdBy: currentUserId, branchId });
       const savedLayout = await listViewLayouts(supabase, view.id);
       const savedById = new Map(
         savedLayout
@@ -188,7 +199,7 @@ export function useLandscape(modelId: UUID, orgId: UUID, userId: UUID | null, re
       if (missing.length > 0) {
         await upsertViewLayouts(
           supabase,
-          missing.map((node) => ({ orgId, viewId: view.id, subjectType: 'element' as const, subjectId: node.elementId, x: node.x, y: node.y, updatedBy: currentUserId })),
+          missing.map((node) => ({ orgId: currentOrgId, viewId: view.id, subjectType: 'element' as const, subjectId: node.elementId, x: node.x, y: node.y, updatedBy: currentUserId })),
         );
       }
 

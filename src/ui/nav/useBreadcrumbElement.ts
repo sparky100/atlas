@@ -13,13 +13,22 @@ import { supabase } from '../supabaseClient';
  * param (src/ui/nav/zoomParams.ts) and, on the Component page, the
  * system a container's own `parent_id` names — same "resolve one extra
  * element for a breadcrumb label" shape either way.
+ *
+ * Sprint U4-2a item 2: takes `UUID | null`, not just `UUID` — this used to
+ * guard on `elementId` alone, so a caller passing `model?.id ?? ''` (every
+ * call site's own convention is `?? null`; this was the one miss) fired a
+ * real `resolveRef(supabase, '', ref)` on every render before the page's
+ * own `model` resolved, three-for-three landing a `model_id=eq.` 400 on
+ * the Landscape route, caught live via the console-open route audit this
+ * item asked for. Guarding here on `modelId` too is the actual fix;
+ * `assertRealId` in `resolveRef` itself is only the backstop.
  */
-export function useBreadcrumbElement(modelId: UUID, ref: Ref, elementId: UUID | null): ElementsHeadRow | null {
+export function useBreadcrumbElement(modelId: UUID | null, ref: Ref, elementId: UUID | null): ElementsHeadRow | null {
   const [element, setElement] = useState<ElementsHeadRow | null>(null);
   const refParam = refParamOf(ref);
 
   useEffect(() => {
-    if (!elementId) {
+    if (!elementId || !modelId) {
       setElement(null);
       return undefined;
     }

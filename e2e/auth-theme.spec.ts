@@ -28,6 +28,9 @@ test('switching theme persists across reload, including from user_preferences al
   await expect(page.getByRole('heading', { name: 'Your organisations' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
+  // Sprint U4-2a item 6: theme/density/sign-out sit behind the single
+  // avatar menu on every viewport now, not open in the header bar.
+  await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('radio', { name: 'Dark' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 

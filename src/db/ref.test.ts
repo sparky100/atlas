@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRefParam, refLabelOf, refParamOf } from './ref';
+import { parseRefParam, refLabelOf, refParamOf, resolveRef } from './ref';
 
 describe('parseRefParam', () => {
   it('parses main, absent, and empty as main', () => {
@@ -46,5 +46,12 @@ describe('refParamOf / refLabelOf round-trip', () => {
     const ref = parseRefParam('commit:11111111-1111-1111-1111-111111111111');
     expect(refParamOf(ref)).toBe('commit:11111111-1111-1111-1111-111111111111');
     expect(refLabelOf(ref)).toBe('commit 11111111');
+  });
+});
+
+describe('resolveRef', () => {
+  it('throws (no network round trip) rather than sending an empty model_id filter — Sprint U4-2a item 2, the live 400 found on the Landscape route via a caller that hadn\'t resolved its own model yet', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument -- the guard fires before `supabase` is ever touched, so a real client isn't needed here.
+    await expect(resolveRef(undefined as any, '', parseRefParam('main'))).rejects.toThrow(/resolveRef/);
   });
 });

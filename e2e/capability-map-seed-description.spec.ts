@@ -63,7 +63,7 @@ test('seeding from a starter map carries the map item\'s own description onto th
 
   const { error: mapError } = await service.from('capability_maps').insert({ id: capabilityMapId, sector, version, status: 'draft', source_description: 'Bug A2 e2e fixture' });
   if (mapError) throw new Error(`capability_maps fixture: ${mapError.message}`);
-  const { error: itemError } = await service.from('capability_map_items').insert({ id: itemId, map_id: capabilityMapId, code: '1', parent_code: null, name: 'Network Operations', description, level: 1 });
+  const { error: itemError } = await service.from('capability_map_items').insert({ id: itemId, map_id: capabilityMapId, code: '1', parent_code: null, name: 'Network Operations', description, level: 1, item_order: 10 });
   if (itemError) throw new Error(`capability_map_items fixture: ${itemError.message}`);
   const { error: publishError } = await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', capabilityMapId);
   if (publishError) throw new Error(`capability_maps fixture publish: ${publishError.message}`);

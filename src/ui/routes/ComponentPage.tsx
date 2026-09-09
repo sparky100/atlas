@@ -42,7 +42,7 @@ export function ComponentPage() {
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
-  const capability = useBreadcrumbElement(model?.id ?? '', ref, capabilityId);
+  const capability = useBreadcrumbElement(model?.id ?? null, ref, capabilityId);
   const { label: branchLabel } = useBranchLabel(ref);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
@@ -56,7 +56,7 @@ export function ComponentPage() {
 
   const state = useStructureView('component', model?.id ?? '', organisation?.id ?? '', userId, containerId ?? '', ref, mode);
   const systemId = state.status === 'ready' ? state.data.group.parent.parent_id : null;
-  const system = useBreadcrumbElement(model?.id ?? '', ref, systemId);
+  const system = useBreadcrumbElement(model?.id ?? null, ref, systemId);
 
   if (orgLoading || modelsLoading || !model) {
     return (
