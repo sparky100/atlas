@@ -77,6 +77,7 @@ export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabil
         const result = await seedModelFromCapabilityMap(supabase, {
           modelId,
           branchId: main.id,
+          expectedHeadCommitId: main.head_commit_id,
           authorId: userId,
           capabilityMapId: mapId,
           sector: map.sector,

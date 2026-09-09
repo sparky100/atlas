@@ -21,10 +21,18 @@
  * folds them through the real engine (src/engine/deltas.ts's `fold`, from
  * `emptyHead()` rather than an existing head — a seed has no history to
  * fold onto) to get a validated, hashed projection, then hands the result
- * to `atlas.seed_from_map` (supabase/migrations/20260906120000_seed_from_map.sql)
- * to persist atomically. That function, not this one, is where "only
+ * to `atlas.seed_from_map` (supabase/migrations/20260906120000_seed_from_map.sql,
+ * most recently 20260906370000_seed_from_map_parent_commit_fix.sql) to
+ * persist atomically. That function, not this one, is where "only
  * owner/architect", "only once per model", and "the map must be published"
  * are actually enforced — this is a client, not the authority.
+ *
+ * `expectedHeadCommitId`, like every other commit path (`commitToBranch`'s
+ * own field of the same name): the caller's own `getMainBranch` read of
+ * `main.head_commit_id` — main's genesis commit for a real, never-yet-
+ * seeded model (ADR-018 guarantees this is never null). The RPC re-reads
+ * the real head itself and rejects if it has moved since, the same
+ * optimistic-concurrency shape as every other write here.
  */
 import type { CapabilityMapItemRow } from './capabilityMapTemplates';
 import type { CapabilityAttributes, UUID } from '../contracts/delta';
@@ -101,6 +109,8 @@ export function buildSeedDeltas(
 export interface SeedModelFromCapabilityMapInput {
   modelId: UUID;
   branchId: UUID;
+  /** `main`'s own current head — its genesis commit, for a real never-yet-seeded model (ADR-018). The RPC's own optimistic-concurrency check (`p_expected_head_commit_id`, 20260906370000_seed_from_map_parent_commit_fix.sql). */
+  expectedHeadCommitId: UUID;
   authorId: UUID;
   capabilityMapId: UUID;
   /** e.g. "local_government" — used only to build `p_title`/`p_source_name`; the RPC re-derives everything it actually checks from `capabilityMapId` itself. */
@@ -119,7 +129,7 @@ export type SeedResult = { ok: true; commitId: UUID } | { ok: false; message: st
  * src/db/commits.ts, not a second call here.
  */
 export async function seedModelFromCapabilityMap(supabase: Client, input: SeedModelFromCapabilityMapInput): Promise<SeedResult> {
-  const { modelId, branchId, authorId, capabilityMapId, sector, version, items } = input;
+  const { modelId, branchId, expectedHeadCommitId, authorId, capabilityMapId, sector, version, items } = input;
   if (items.length === 0) {
     return { ok: false, message: 'this capability map has no items to seed' };
   }
@@ -138,6 +148,7 @@ export async function seedModelFromCapabilityMap(supabase: Client, input: SeedMo
     p_commit_id: commitId,
     p_model_id: modelId,
     p_branch_id: branchId,
+    p_expected_head_commit_id: expectedHeadCommitId,
     p_title: `Seed from ${sector} v${String(version)}`,
     p_capability_map_id: capabilityMapId,
     p_source_id: sourceId,
