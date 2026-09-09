@@ -228,15 +228,30 @@ function render(maps: LoadedMap[]): string {
   return out.join('\n');
 }
 
-function main(): void {
+/**
+ * Exported so scripts/exportCapabilityMap.ts can regenerate the review
+ * doc right after writing a new content file, in the same process — the
+ * sprint item's own "regenerates docs/review/capability-maps.md" — rather
+ * than shelling out to `pnpm content:review-capability-maps` as a second
+ * step. Reads `content/capability-maps/` itself (this is the one script
+ * of the pair that touches the filesystem directly, per this file's own
+ * module comment), so it always regenerates from whatever the caller just
+ * wrote, not from a value passed in.
+ */
+export function regenerateCapabilityMapsReviewDoc(): { mapCount: number } {
   const maps = loadMaps();
   if (maps.length === 0) {
     console.log('No content/capability-maps/<sector>/<version>.json files found — nothing to review.');
-    return;
+    return { mapCount: 0 };
   }
   mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
   writeFileSync(OUTPUT_PATH, render(maps) + '\n', 'utf8');
   console.log(`Wrote ${path.relative(REPO_ROOT, OUTPUT_PATH)} from ${String(maps.length)} map(s).`);
+  return { mapCount: maps.length };
 }
 
-main();
+// Only run when this is the CLI entrypoint (`pnpm content:review-capability-maps`),
+// not when scripts/exportCapabilityMap.ts imports regenerateCapabilityMapsReviewDoc.
+if (process.argv[1] && import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+  regenerateCapabilityMapsReviewDoc();
+}

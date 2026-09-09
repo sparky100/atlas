@@ -591,7 +591,7 @@ A versioned sector starter map (ADR-012).
 | `source_description` | text | not null |
 | `published_at` | timestamptz | nullable; not null iff `status <> 'draft'` — set once, on first publish, and kept through a later `deprecated` transition (`20260906200000_capability_maps_deprecated_keeps_published_at.sql`): when a map was actually published is real provenance a supersession shouldn't erase. |
 
-No `org_id`; product content. Readable by all authenticated users; writable by service role.
+No `org_id`; product content. Readable by all authenticated users; directly writable only by service role (`scripts/loadCapabilityMaps.ts`) — Sprint U4-1 C6 adds one gated, indirect write path for an authenticated session: `atlas.export_capability_map_as_draft` (below), always producing `status = 'draft'`.
 
 #### `capability_map_items`
 
@@ -603,6 +603,7 @@ No `org_id`; product content. Readable by all authenticated users; writable by s
 | `name` | text | not null |
 | `description` | text | |
 | `level` | int | not null, `check (level between 1 and 3)` |
+| `item_order` | int | not null (Sprint U4-1 C1, `20260906300000_capability_map_item_order.sql`) — display order among siblings (same `parent_code`); independent of `code`, which stays a stable reference id. Named `item_order`, not `order` (a reserved SQL keyword). |
 
 Trigger: `level = 1` ⇔ `parent_code is null`; parent's level = level − 1.
 
@@ -617,6 +618,44 @@ Trigger: `level = 1` ⇔ `parent_code is null`; parent's level = level − 1.
 | `reviewed_at` | date | not null |
 
 Seeding a model from a map (ADR-012) creates one `sources` row of kind `template` and one `template_seed` commit whose `element_create` deltas have `attributes.code`/`attributes.templateRef` set (plus `attributes.description`, copied from the map item's own description when it has one — Bug A2: this was silently dropped until Sprint U4-1, and `scripts/syncDescriptionsFromMap.ts`/its owner-action equivalent is the one-off fix for a model already seeded before then) and an `aliases` row of type `template_code` per element.
+
+**Sprint U4-1 C6: export the other direction, and seeding a draft.** A
+model's own tailored capability tree can become new starter content two
+ways, both built on the same read/transform (`src/db/exportCapabilityMap.ts`'s
+`buildCapabilityMapExport`: fresh, sequential codes from the tree's
+resolved structure and display order, never a capability's own
+`attributes.code`/`order` — that's this model's own seed provenance, not
+something a new starter map should inherit) —
+
+- `pnpm content:export-capability-map <org> <model> <sector> <version>`
+  (`scripts/exportCapabilityMap.ts`) writes a real
+  `content/capability-maps/<sector>/<version>.json` file (service role;
+  read-only against model data) and regenerates
+  `docs/review/capability-maps.md`, joining the ordinary hand-authored
+  workflow from there (`content/capability-maps/README.md`).
+- `atlas.export_capability_map_as_draft(p_model_id, p_sector, p_version,
+  p_source_description, p_items, p_sources)` — security definer, granted
+  to `authenticated`, gated owner/architect (ADR-015, same check
+  `atlas.seed_from_map` uses) — is the same export for a browser session,
+  which has no filesystem to write a content file to: it upserts
+  `capability_maps`/`capability_map_items`/`capability_map_sources`
+  directly, always as `status = 'draft'` regardless of what's passed, and
+  refuses outright if `(sector, version)` already exists as anything but
+  `draft` (a published or deprecated map is fixed history;
+  `capability_map_items_guard_immutable` would reject the item writes
+  regardless, but this function gives a clearer reason first).
+
+`atlas.seed_from_map` itself now accepts a `draft` map, not just
+`published` (`20260906320000_seed_from_draft_map.sql`, superseding
+`20260906120000_seed_from_map.sql`'s original `<> 'published'` check) —
+"draft maps are seedable into a model for review": an owner/architect can
+seed their own (or a colleague's) fresh export into a real model to see
+how it reads before deciding whether to publish it. `deprecated` is still
+refused either way. The picker itself
+(`src/db/capabilityMapTemplates.ts`'s `listSeedableCapabilityMaps`,
+superseding `listPublishedCapabilityMaps`) lists both statuses, flagged
+"Draft" in the UI — never indistinguishable from a reviewed, published
+map.
 
 ---
 

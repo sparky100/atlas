@@ -13,6 +13,7 @@ import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
 import { CapabilityMapAddForm } from '../capabilityMap/CapabilityMapAddForm';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
+import { ExportCapabilityMapAction } from '../capabilityMap/ExportCapabilityMapAction';
 import { SyncDescriptionsAction } from '../capabilityMap/SyncDescriptionsAction';
 import { useCapabilityMap } from '../capabilityMap/useCapabilityMap';
 import { useColourByPreference } from '../capabilityMap/useColourByPreference';
@@ -118,7 +119,17 @@ export function CapabilityMapPage() {
           <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reload} />
         )}
         {state.status === 'ready' && (state.data.tree.l1.length > 0 || state.data.tree.orphans.length > 0) && canEdit && (
-          <SyncDescriptionsAction modelId={model.id} userId={userId} onSynced={reload} />
+          <div className={styles.maintenanceActions}>
+            <SyncDescriptionsAction modelId={model.id} userId={userId} onSynced={reload} />
+            <ExportCapabilityMapAction
+              modelId={model.id}
+              modelName={model.name}
+              orgName={organisation?.name ?? ''}
+              orgSlug={organisation?.slug ?? ''}
+              modelSlug={model.slug}
+              userId={userId}
+            />
+          </div>
         )}
         {state.status === 'ready' && (
           <CapabilityMapView

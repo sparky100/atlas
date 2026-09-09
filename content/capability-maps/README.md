@@ -110,11 +110,50 @@ Once a map is published (below), re-running the loader against its
 `(sector, version)` fails loudly instead — publish content by adding a
 new version, not by editing a version that's already out.
 
+## Starting a map from a real model (`content:export-capability-map`)
+
+A file under this directory doesn't have to start from a blank page: Sprint
+U4-1 C6's `pnpm content:export-capability-map <org> <model> <sector>
+<version>` walks a model's own tailored capability tree at main head and
+writes `content/capability-maps/<sector>/<version>.json` for you — names,
+definitions, order and parent structure carried over; every model-specific
+attribute (an element id, `attributes.code`/`templateRef` from whatever
+originally seeded it) dropped, and fresh, sequential codes generated purely
+from the tree's own structure and display order. It regenerates
+`docs/review/capability-maps.md` afterwards, same as running
+`content:review-capability-maps` by hand.
+
+The written file is a `draft` with the same drafting placeholder every
+hand-authored map starts with ("Pending human review — exported from model
+\"...\""), and this script only writes the file — it does not load it: run
+`pnpm content:load-capability-maps` next, exactly as if you'd hand-authored
+it, then follow the same review/publish workflow below. Refuses to
+overwrite a file that already exists, so re-exporting an in-progress review
+never silently discards a human's edits to it.
+
+The owner-only "Export as starter map" action on the capability map page
+does the same underlying export, but for a browser session — which has no
+filesystem to write a content file to — it writes the result straight into
+`capability_maps`/`capability_map_items`/`capability_map_sources` as a new
+draft, via a privileged database function rather than this script's file.
+Both paths produce the same content from the same model at the same
+commit; only where the result lands differs.
+
+## Seeding a draft for review
+
+A `draft` map is real, loaded, queryable, **and seedable** — Sprint U4-1
+C6 relaxed the tailoring flow's import picker (and `atlas.seed_from_map`
+itself, which enforces this regardless of what the picker shows) to offer
+draft maps alongside published ones, flagged "Draft" in the list, so an
+owner or architect can seed one into a real model to see how it actually
+reads before deciding whether to publish it. A `deprecated` map is never
+offered either way.
+
 ## Publishing: draft → review doc → a human runs `content:publish-capability-map`
 
-A map stays `draft` — real, loaded, queryable, but not offered by the
-tailoring flow's import picker — until someone actually reviews it. The
-workflow:
+A map stays `draft` — real, loaded, queryable and seedable for review, but
+flagged as such everywhere it appears, not indistinguishable from a
+reviewed, published map — until someone actually reviews it. The workflow:
 
 1. Load the map (`pnpm content:load-capability-maps`) and regenerate the
    review document (`pnpm content:review-capability-maps`); read
