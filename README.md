@@ -19,13 +19,20 @@ pnpm test:integration        # requires `pnpm db:start` first
 pnpm dev                     # the app, at http://localhost:5173
 pnpm storybook               # every src/ui primitive in isolation, at http://localhost:6006
 pnpm test:e2e                # Playwright, requires `pnpm db:start` and `pnpm build` (playwright.config.ts serves the built app)
+pnpm check:case-collisions   # case-only path collisions (e.g. Foo.ts / foo.ts) — a local script, no git hook runs it for you
 ```
 
-`pnpm db:reset` replays every migration in `supabase/migrations` against a fresh database — the same check CI runs on every push.
+`pnpm db:reset` replays every migration in `supabase/migrations` against a fresh database.
 
-`pnpm build` / `pnpm build-storybook` are what CI's `build` job runs; run them locally before pushing a UI change that touches build config or addon wiring, since typecheck/lint alone don't catch every build-time failure.
+`pnpm build` / `pnpm build-storybook` — run them locally before pushing a UI change that touches build config or addon wiring, since typecheck/lint alone don't catch every build-time failure.
 
 The browser only ever reads the `VITE_`-prefixed environment variables (`src/ui/env.ts`) — `SUPABASE_SERVICE_ROLE_KEY` has no `VITE_` counterpart and must never get one.
+
+## What runs when
+
+**Locally, before every push — nothing is enforced automatically, CLAUDE.md's Definition of Done requires it and the sprint summary reports it:** `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:integration`, `pnpm build` + `pnpm exec playwright test`, `pnpm check:case-collisions`. All of it, every time, on the commit actually being pushed.
+
+**In GitHub Actions, on every push to `main` — and only that:** `.github/workflows/deploy-migrations.yml` runs `supabase db push` against the live "Architecture" project. No lint, no typecheck, no tests of any kind, no Docker, no Playwright, and nothing at all on a branch push or a pull request — CI's only job is getting an already-verified migration onto the live database, not verifying anything itself. See CLAUDE.md's "Verification (all local)" section for why, and the note below for exactly what that one workflow does.
 
 ## Environments
 
@@ -40,7 +47,7 @@ pnpm exec supabase link --project-ref xakqcssapdiatwrmnjop
 
 `supabase link` writes `supabase/.temp/project-ref` (gitignored — this is per-checkout state, never committed).
 
-**How migrations reach the live project:** CI's `deploy-migrations` job (`.github/workflows/ci.yml`) runs `supabase db push` automatically on every push to `main`, once every other job (`lint`, `typecheck`, `unit-test`, `build`, `database`, `e2e`) has passed. It needs two repository secrets a human with access to the Supabase project must set under Settings → Secrets and variables → Actions — `SUPABASE_ACCESS_TOKEN` (from https://supabase.com/dashboard/account/tokens) and `SUPABASE_PROJECT_ID` (`xakqcssapdiatwrmnjop`) — this session had no way to add them itself. Until they're set, the job fails fast on `supabase link` rather than silently skipping. Before Sprint H1, no such pipeline existed at all: every migration on the live project had been applied by hand, interactively, one at a time, and its recorded version numbers had drifted from the repo's own filenames (fixed once, Sprint H1, via `supabase_migrations.schema_migrations` — see `docs/AUDIT-2026-09-U2.md` §8 for the state this replaced). To repair a similar drift by hand in future, compare `pnpm exec supabase migration list` (or the Supabase dashboard's Migrations page) against `supabase/migrations/` by name, and use `pnpm exec supabase migration repair --status applied <correct-version>` per mismatched entry.
+**How migrations reach the live project:** `.github/workflows/deploy-migrations.yml` runs `supabase db push` automatically on every push to `main` — GitHub Actions' only job, per "What runs when" above; it trusts that verification already happened locally, the same way `git push` trusts a build already ran. It needs two repository secrets a human with access to the Supabase project must set under Settings → Secrets and variables → Actions — `SUPABASE_ACCESS_TOKEN` (from https://supabase.com/dashboard/account/tokens) and `SUPABASE_DB_PASSWORD` (the project's own Postgres password, Settings → Database on the Supabase dashboard) — this session had no way to add them itself. Until they're set, the job fails fast on `supabase link` rather than silently skipping. The project ref (`xakqcssapdiatwrmnjop`) is a literal in the workflow, not a secret — it's not sensitive, and it's already named here. Before Sprint H1, no such pipeline existed at all: every migration on the live project had been applied by hand, interactively, one at a time, and its recorded version numbers had drifted from the repo's own filenames (fixed once, Sprint H1, via `supabase_migrations.schema_migrations` — see `docs/AUDIT-2026-09-U2.md` §8 for the state this replaced). To repair a similar drift by hand in future, compare `pnpm exec supabase migration list` (or the Supabase dashboard's Migrations page) against `supabase/migrations/` by name, and use `pnpm exec supabase migration repair --status applied <correct-version>` per mismatched entry.
 
 No edge function is deployed to this project — `supabase/functions/` doesn't exist in this repository. The `llm-proxy` function ADR-014 discusses is the existing suite's own, deployed to "Des-studio", not to Atlas's project, and Atlas's code never calls it.
 

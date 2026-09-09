@@ -1,0 +1,61 @@
+name: Deploy migrations
+
+# GitHub Actions is deliberately reduced to this one job. Every check that
+# used to run here (lint, typecheck, unit/property tests, build, a fresh-
+# database migration check, integration tests, Playwright/e2e, and the
+# case-collisions check) now runs locally before every push and is reported
+# in the sprint summary with the exact commands used — see CLAUDE.md's
+# "Verification (all local)" section and README's "What runs when". This
+# workflow's only job is to get supabase/migrations onto the live project
+# once a change has actually merged to main; it trusts that local
+# verification already happened, the same way `git push` trusts a
+# developer ran their own build.
+on:
+  push:
+    branches: [main]
+
+# Migrations must apply in the order they land on main, one at a time — a
+# second push arriving mid-deploy queues behind the first rather than
+# racing it or cancelling it. `cancel-in-progress: false` is the whole
+# point: an in-flight `supabase db push` is a live migration against the
+# real project, not disposable CI work that's safe to kill.
+concurrency:
+  group: migrations
+  cancel-in-progress: false
+
+jobs:
+  deploy-migrations:
+    name: Deploy migrations to the linked Supabase project
+    runs-on: ubuntu-latest
+    # Read by every supabase CLI command below, not just one step — link
+    # and push both authenticate against the management API with it.
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned action tag and pinned CLI version, matching the
+      # `"supabase": "^2.116.0"` devDependency package.json installs
+      # locally — the same CLI version everywhere, not just in this job.
+      - uses: supabase/setup-cli@v3.0.0
+        with:
+          version: 2.116.0
+
+      # The project ref itself isn't sensitive — it's already public in
+      # README's "Environments" section — so it's a literal here, not a
+      # secret. `db push` operates on whichever project is linked; this is
+      # that link, not a separate deploy step.
+      - name: Link the Supabase project
+        run: supabase link --project-ref xakqcssapdiatwrmnjop
+
+      # SUPABASE_ACCESS_TOKEN (job env, above) authenticates `link` and the
+      # management-API side of `db push`; SUPABASE_DB_PASSWORD is the
+      # separate secret `db push` needs to open its own direct Postgres
+      # connection and actually apply the migrations — two different
+      # credentials for two different connections, both required.
+      # Idempotent: a run with nothing new in supabase/migrations is a
+      # no-op, not a failure.
+      - name: Push new migrations
+        run: supabase db push
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}

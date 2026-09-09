@@ -39,12 +39,22 @@ docs/            ADRs, specs, this file's companions. Kept current — see Defin
 
 A change that needs to cross these boundaries in an unexpected direction (e.g. `src/ui` computing a merge classification itself instead of calling `src/engine`) is a sign the layering is being worked around, not a sign the layering is wrong — raise it rather than route around it.
 
+## Verification (all local)
+
+GitHub Actions runs exactly one workflow, `.github/workflows/deploy-migrations.yml`: on every push to `main`, it pushes `supabase/migrations` to the live project and does nothing else. There is no test CI — "CI green" is not a real signal, because CI does not run tests. Every check that used to run there now runs on the machine making the change, before every push, and its result is reported in the sprint summary alongside the exact command used:
+
+- `pnpm lint` / `pnpm typecheck`
+- `pnpm test` — unit and property tests
+- `pnpm db:start`, then `pnpm test:integration` — real Supabase, real RLS, no shortcuts
+- `pnpm build`, then `pnpm exec playwright test` — the full Playwright suite, the required perf tests included
+- `pnpm check:case-collisions` — case-only path collisions; a local pre-push script (`scripts/checkCaseCollisions.ts`), not a workflow — there is no git hook enforcing it, so run it and say so
+
 ## Definition of done for a sprint
 
 A sprint is not done until all of the following are true, not merely attempted:
 
-- **Tests green.** Unit, property (the RT-/P- suites named in `SPEC-data-model.md` §10 for anything they cover), and integration tests all pass. A skipped or `.only`'d test is not green.
-- **Migration applied to a fresh project from zero.** `supabase/migrations` replayed against an empty database produces the schema this sprint's code expects, with no manual steps. If a migration only works against an already-running project, it's broken.
+- **All three suites green, locally, on the final commit.** Unit, property (the RT-/P- suites named in `SPEC-data-model.md` §10 for anything they cover), integration, and Playwright tests all pass — run locally per "Verification" above, not "green last time" or green on an earlier commit. A skipped or `.only`'d test is not green. The sprint summary states which commands were run and that they passed.
+- **Migration applied to a fresh project from zero.** `pnpm db:reset` — `supabase/migrations` replayed against an empty database — produces the schema this sprint's code expects, with no manual steps. If a migration only works against an already-running project, it's broken.
 - **Playwright smoke passes, from the first UI sprint onward.** The core user path the sprint touched is exercised end-to-end, not just unit-tested. Not applicable to a sprint that ships no UI at all — a backend-only sprint has nothing a browser could smoke-test, and a Playwright test against an API-only backend would itself be the kind of demo shortcut rule 7 rules out. `docs/SPRINT-F1-STATUS.md` raised this as a genuinely open question after Sprint F1 (option (a): treat the bullet as not-yet-applicable until a UI sprint exists, and revisit it then; or (b): require some backend-appropriate substitute instead). Closed here, as option (a): the bullet is suspended, not replaced, for a sprint with no UI, and applies in full to every sprint from the first one that ships UI onward (Sprint U1 and every sprint since).
 - **Docs updated.** If the sprint changed the data model, the delta format, merge behaviour, or an ADR-level decision, `docs/` reflects it before the sprint is called done — not as a follow-up ticket.
 - **No known data-loss path.** Nobody on the team can name a sequence of actions that loses a fact, a comment, a decision, or history, without it either being fixed or explicitly written down as an accepted, reviewed risk.
