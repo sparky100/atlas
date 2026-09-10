@@ -87,6 +87,11 @@ test('reordering: move-right swaps two L1 capabilities, move-down swaps two L2 c
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await expect(page.getByText('Root Alpha')).toBeVisible();
 
+  // Sprint U4-2a item 3: the move buttons hide behind "Reorder mode" now
+  // (off by default — see CapabilityMapView.tsx's own comment on why),
+  // so they don't exist in the DOM at all until this is turned on.
+  await page.getByLabel('Reorder mode').check();
+
   // --- L1: move Root Alpha right, swapping places with Root Beta ---
   // Every move button's own accessible name already names the capability
   // it moves ("Move Root Alpha right") — no need to scope into a
