@@ -52,6 +52,20 @@ export interface AttributeFieldMeta {
    * `text` field still gets. Defaults to false.
    */
   multiline?: boolean;
+  /**
+   * ADR-020: true only for Capability.code ("Reference"). §4.3's default
+   * is "a gap made visible, never hidden" — an empty optional field still
+   * renders its row, as a bare "—" (`AttributeRow.tsx`) — but a purely
+   * seed-derived field that's empty on the large majority of capabilities
+   * by design (every hand-added one, and every seeded one nobody has
+   * given an organisation-specific reference yet) reads as clutter under
+   * that default, not a genuine gap worth flagging. Distinct from
+   * `hidden`, which excludes a field regardless of whether it has a
+   * value (`templateRef`) — this only excludes it when empty; once a
+   * real value exists, the row shows exactly like any other. Defaults to
+   * false.
+   */
+  hideWhenEmpty?: boolean;
 }
 
 export interface AttributeFieldSchema extends AttributeFieldMeta {
@@ -63,7 +77,7 @@ function schemaOf<T extends string>(order: readonly T[], meta: Record<T, Attribu
 }
 
 const CAPABILITY_META: Record<keyof CapabilityAttributes, AttributeFieldMeta> = {
-  code: { label: 'Code', required: false, kind: 'text' },
+  code: { label: 'Reference', required: false, kind: 'text', hideWhenEmpty: true },
   description: { label: 'Description', required: false, kind: 'text', multiline: true },
   templateRef: { label: 'Template reference', required: false, kind: 'text', editable: false, hidden: true },
   // Not a user-facing edit field, same reasoning as templateRef — Sprint

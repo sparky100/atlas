@@ -617,7 +617,7 @@ Trigger: `level = 1` ⇔ `parent_code is null`; parent's level = level − 1.
 | `reviewed_by` | text | not null — a name, not a user id; reviewers are often external |
 | `reviewed_at` | date | not null |
 
-Seeding a model from a map (ADR-012) creates one `sources` row of kind `template` and one `template_seed` commit whose `element_create` deltas have `attributes.code`/`attributes.templateRef` set (plus `attributes.description`, copied from the map item's own description when it has one — Bug A2: this was silently dropped until Sprint U4-1, and `scripts/syncDescriptionsFromMap.ts`/its owner-action equivalent is the one-off fix for a model already seeded before then) and an `aliases` row of type `template_code` per element.
+Seeding a model from a map (ADR-012) creates one `sources` row of kind `template` and one `template_seed` commit whose `element_create` deltas have `attributes.templateRef` set (plus `attributes.description`, copied from the map item's own description when it has one — Bug A2: this was silently dropped until Sprint U4-1, and `scripts/syncDescriptionsFromMap.ts`/its owner-action equivalent is the one-off fix for a model already seeded before then) and an `aliases` row of type `template_code` per element. `attributes.code` is deliberately **not** set at seed time (ADR-020, amended from the original "sets `attributes.code`/`attributes.templateRef`" wording this line carried) — it's an organisation's own optional reference now, not a copy of the template's code, which stays reachable via `templateRef` and the `template_code` alias alone.
 
 **Sprint U4-1 C6: export the other direction, and seeding a draft.** A
 model's own tailored capability tree can become new starter content two

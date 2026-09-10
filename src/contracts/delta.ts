@@ -77,7 +77,15 @@ export type SupportsRole = 'primary' | 'secondary';
  */
 export interface CapabilityAttributes {
   description?: string;
-  /** Reference code from a starter capability map, e.g. "2.3". */
+  /**
+   * ADR-020: an organisation's own optional reference (an internal
+   * catalog number, a cross-reference into another system) — never
+   * populated by `atlas.seed_from_map`/`buildSeedDeltas`. A seeded
+   * capability's template code stays reachable via `templateRef` and its
+   * `template_code` alias, not this field; was previously "reference code
+   * from a starter capability map, e.g. '2.3'," copied onto every seeded
+   * element unconditionally.
+   */
   code?: string;
   /** `capability_map_items.id` this capability was seeded from. */
   templateRef?: UUID;

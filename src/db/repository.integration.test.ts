@@ -185,7 +185,7 @@ describe('repository layer against a real local Supabase', () => {
       expect(child?.parent_id).toBe(root?.element_id);
     });
 
-    it('every seeded element has attributes.code/templateRef and a matching template_code alias (RT-4)', async () => {
+    it('every seeded element has attributes.templateRef, a matching template_code alias, and no seed-populated attributes.code (RT-4, ADR-020)', async () => {
       const { data: elementsHead, error } = await service
         .from('elements_head')
         .select('element_id, attributes')
@@ -197,10 +197,10 @@ describe('repository layer against a real local Supabase', () => {
       if (aliasError) throw new Error(`reading aliases: ${aliasError.message}`);
 
       for (const row of elementsHead) {
-        const attrs = row.attributes as { code: string; templateRef: string };
-        expect(attrs.code).toEqual(expect.any(String));
+        const attrs = row.attributes as { code?: string; templateRef: string };
         expect(attrs.templateRef).toEqual(expect.any(String));
-        expect(aliasRows).toContainEqual({ element_id: row.element_id, alias_value: attrs.code, alias_type: 'template_code' });
+        expect(attrs.code).toBeUndefined();
+        expect(aliasRows.some((a) => a.element_id === row.element_id && a.alias_type === 'template_code' && typeof a.alias_value === 'string' && a.alias_value.length > 0)).toBe(true);
       }
     });
 

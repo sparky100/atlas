@@ -3,6 +3,14 @@
  * on the provenance card as 'Seeded from electricity_network v1'; hide
  * from the attributes list."
  *
+ * Also covers ADR-020 (Sprint U4-2a check C1): `code`/"Reference" is no
+ * longer seed-populated either, so a freshly-seeded capability shows
+ * neither "Template reference" (always hidden) nor "Reference" (hidden
+ * only while it has no fact — `hideWhenEmpty`). The provenance-card
+ * demonstration below now uses Order (always seeded, ADR-020 doesn't
+ * touch it) instead of Code, since Code/Reference no longer has a seeded
+ * value to hang it on.
+ *
  * Same "needs a real Supabase" limitation as every Playwright test in
  * this repo, and the same real-seed-via-the-actual-import-UI fixture
  * shape as e2e/capability-map-seed-description.spec.ts (a random,
@@ -68,16 +76,20 @@ test('element page: templateRef is hidden from Attributes, and its own "seeded f
   await page.getByRole('link', { name: 'Network Operations' }).click();
   await expect(page.getByRole('heading', { name: 'Network Operations' })).toBeVisible();
 
-  // Hidden from the attributes list — the seeded capability's own
-  // Code row is there (attributes.code, "1"), but no "Template reference"
-  // row at all, even though templateRef was seeded onto it too.
-  await expect(page.getByText('Code', { exact: true })).toBeVisible();
+  // Hidden from the attributes list — no "Template reference" row at all,
+  // even though templateRef was seeded onto it. ADR-020: "Reference"
+  // (attributes.code) is never seed-populated any more either, so it's
+  // absent here too (hideWhenEmpty — omitted entirely, not a bare "—").
   await expect(page.getByText('Template reference', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Reference', { exact: true })).toHaveCount(0);
 
   // Its information still surfaces — reworded — on the provenance card
   // of a fact seeded alongside it (the same template source, per
-  // capability-map-seed-description.spec.ts's own comment on this).
-  const codeValue = page.getByText('Code', { exact: true }).locator('xpath=following-sibling::*[1]');
-  await codeValue.locator('button').focus();
+  // capability-map-seed-description.spec.ts's own comment on this) — here,
+  // Order (attributes.order, always set at seed time, ADR-020 doesn't
+  // touch it), since Reference/Code no longer carries a seeded value to
+  // hang this on.
+  const orderValue = page.getByText('Order', { exact: true }).locator('xpath=following-sibling::*[1]');
+  await orderValue.locator('button').focus();
   await expect(page.getByText(`Seeded from ${sector} v${String(version)}`)).toBeVisible();
 });

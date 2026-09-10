@@ -22,7 +22,7 @@ function asCreates(deltas: ReturnType<typeof buildSeedDeltas>['deltas']): Elemen
 }
 
 describe('buildSeedDeltas', () => {
-  it('builds one element.create per item, root before child, with code/templateRef/order set', () => {
+  it('builds one element.create per item, root before child, with templateRef/order set and no code (ADR-020: never seed-populated)', () => {
     const items = [item({ code: '1', name: 'Root', level: 1, parent_code: null, item_order: 10 }), item({ code: '1.1', name: 'Child', level: 2, parent_code: '1', item_order: 20 })];
     let n = 0;
     const { deltas } = buildSeedDeltas(items, 'source-1', () => `id-${String(n++)}`);
@@ -31,10 +31,10 @@ describe('buildSeedDeltas', () => {
     expect(creates).toHaveLength(2);
     expect(creates[0]?.name).toBe('Root');
     expect(creates[0]?.parentId).toBeNull();
-    expect(creates[0]?.attributes).toEqual({ code: '1', templateRef: 'item-1', order: 10 });
+    expect(creates[0]?.attributes).toEqual({ templateRef: 'item-1', order: 10 });
     expect(creates[1]?.name).toBe('Child');
     expect(creates[1]?.parentId).toBe(creates[0]?.elementId);
-    expect(creates[1]?.attributes).toEqual({ code: '1.1', templateRef: 'item-1.1', order: 20 });
+    expect(creates[1]?.attributes).toEqual({ templateRef: 'item-1.1', order: 20 });
   });
 
   it('every delta shares the given sourceId and confidence 1 (template seeds are always fully confident)', () => {
@@ -47,7 +47,7 @@ describe('buildSeedDeltas', () => {
     const items = [item({ code: '1', name: 'Root', level: 1, parent_code: null, description: 'What this capability covers.', item_order: 10 })];
     const { deltas } = buildSeedDeltas(items, 'source-1');
     const creates = asCreates(deltas);
-    expect(creates[0]?.attributes).toEqual({ code: '1', templateRef: 'item-1', description: 'What this capability covers.', order: 10 });
+    expect(creates[0]?.attributes).toEqual({ templateRef: 'item-1', description: 'What this capability covers.', order: 10 });
     expect(creates[0]?.sourceId).toBe('source-1');
     expect(creates[0]?.confidence).toBe(1);
   });
@@ -77,13 +77,17 @@ describe('buildSeedDeltas', () => {
       item({ code: '1', name: 'Root', level: 1, parent_code: null }),
       item({ code: '1.1', name: 'Child', level: 2, parent_code: '1' }),
     ];
-    const { deltas } = buildSeedDeltas(items, 'source-1');
+    const { deltas, aliases } = buildSeedDeltas(items, 'source-1');
     const creates = asCreates(deltas);
-    const byCode = new Map(creates.map((c) => [c.attributes.code, c]));
+    // ADR-020: `attributes.code` is never set at seed time — the
+    // `template_code` alias (`aliasValue` = the item's own code) is what
+    // still identifies which created element came from which item.
+    const elementIdByCode = new Map(aliases.map((a) => [a.aliasValue, a.elementId]));
+    const byCode = new Map(creates.map((c) => [c.elementId, c]));
 
-    const root = byCode.get('1');
-    const child = byCode.get('1.1');
-    const grandchild = byCode.get('1.1.1');
+    const root = byCode.get(elementIdByCode.get('1') ?? '');
+    const child = byCode.get(elementIdByCode.get('1.1') ?? '');
+    const grandchild = byCode.get(elementIdByCode.get('1.1.1') ?? '');
     expect(root?.parentId).toBeNull();
     expect(child?.parentId).toBe(root?.elementId);
     expect(grandchild?.parentId).toBe(child?.elementId);
@@ -94,15 +98,17 @@ describe('buildSeedDeltas', () => {
     expect(() => buildSeedDeltas(items, 'source-1')).toThrow(/names parent "missing"/);
   });
 
-  it('builds one template_code alias per item, matching its minted elementId', () => {
+  it('builds one template_code alias per item, matching its minted elementId, and carries no attributes.code (ADR-020)', () => {
     const items = [item({ code: '1', name: 'Root', level: 1, parent_code: null }), item({ code: '1.1', name: 'Child', level: 2, parent_code: '1' })];
     const { deltas, aliases } = buildSeedDeltas(items, 'source-1');
     const creates = asCreates(deltas);
 
     expect(aliases).toHaveLength(2);
+    expect(new Set(aliases.map((a) => a.aliasValue))).toEqual(new Set(['1', '1.1']));
     for (const alias of aliases) {
       const matching = creates.find((c) => c.elementId === alias.elementId);
-      expect(matching?.attributes.code).toBe(alias.aliasValue);
+      expect(matching).toBeDefined();
+      expect(matching?.attributes).not.toHaveProperty('code');
     }
   });
 
