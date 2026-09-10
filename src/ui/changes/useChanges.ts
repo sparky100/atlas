@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { createChangeBranch, getMainBranch, listChangeBranches } from '../../db/branches';
 import type { BranchRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export type ChangesStatus = 'loading' | 'idle' | 'creating';
@@ -50,8 +51,18 @@ export function useChanges(modelId: UUID, orgId: UUID, userId: UUID | null): Use
       })
       .catch((e: unknown) => {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Failed to load changes.');
+          const message = e instanceof Error ? e.message : 'Failed to load changes.';
+          setError(message);
           setStatus('idle');
+          // Prompt 7g's own Bug (1): this hook's local `error` only ever
+          // renders inside the create-form panel (ChangesView.tsx), which
+          // doesn't exist at all when `canCreate` is false — a load
+          // failure for a contributor with no create rights was
+          // previously invisible outright, the same silent-failure shape
+          // Sprint U4-2a item 2 already fixed on useMainBranch/
+          // useEditingBranch. The global banner is a floor under the
+          // local text, not a replacement for it.
+          reportError(`Couldn't load this model's changes: ${message}`);
         }
       });
     return () => {
@@ -97,8 +108,18 @@ export function useChanges(modelId: UUID, orgId: UUID, userId: UUID | null): Use
         reload();
         return branch;
       } catch (e) {
+        const message = e instanceof Error ? e.message : 'Could not create this change.';
         setStatus('idle');
-        setError(e instanceof Error ? e.message : 'Could not create this change.');
+        setError(message);
+        // Same reasoning as the load effect's own catch above: a real
+        // failure from `createChangeBranch` (RLS denial, a dropped
+        // connection, a constraint violation) must be visible even if
+        // this component unmounts before its own local `error` text ever
+        // paints, or if a future caller renders the form without also
+        // rendering `error` (ProposeChangePicker.tsx already does — this
+        // makes that safe by construction rather than by each caller
+        // remembering to check).
+        reportError(`Couldn't create this change: ${message}`);
         return null;
       }
     },
