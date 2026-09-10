@@ -16,6 +16,12 @@ export interface AttributeValueInputProps {
  * still produces a plain string except `boolean`'s checkbox; normalising
  * that into a real value is `validateAttributeValue`'s job at save time,
  * not this component's.
+ *
+ * Check C2 (docs/CHECK-U4-2a.md): a `text` field with `multiline: true`
+ * (every `description`, `attributeSchema.ts`'s own comment on the flag) is
+ * a `<textarea>` instead — min 2 rows, growing with content up to ~8 via
+ * `.textarea`'s own `field-sizing: content` (`AttributeValueInput.module.css`),
+ * not a fixed-height box the value scrolls inside from the first line.
  */
 export function AttributeValueInput({ id, field, value, onChange, invalid }: AttributeValueInputProps) {
   const stringValue = typeof value === 'string' ? value : '';
@@ -68,6 +74,21 @@ export function AttributeValueInput({ id, field, value, onChange, invalid }: Att
           </option>
         ))}
       </select>
+    );
+  }
+
+  if (field.multiline === true) {
+    return (
+      <textarea
+        id={id}
+        rows={2}
+        className={styles.textarea}
+        value={stringValue}
+        onChange={(e) => {
+          onChange(e.target.value);
+        }}
+        aria-invalid={invalid}
+      />
     );
   }
 

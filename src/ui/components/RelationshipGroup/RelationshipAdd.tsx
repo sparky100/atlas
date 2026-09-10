@@ -82,6 +82,13 @@ interface PendingTarget {
  * src/db/healthFindings.ts) is what catches one that predates this or
  * slips through some other path, exactly the "review checklist flags any
  * without one" the sprint item asked for.
+ *
+ * Check C2 (docs/CHECK-U4-2a.md): that label prompt is a `.labelTextarea`
+ * (auto-growing, min 2 rows/max ~8, same `field-sizing: content` technique
+ * `AttributeValueInput.module.css`'s own `.textarea` uses for `description`
+ * attributes) rather than a single-line `<input>` — a verb phrase is
+ * exactly the kind of free text this item names, not a short field like
+ * the search box above it.
  */
 export function RelationshipAdd({ slot, direction, elementId, elementName, existingRows, relationshipFacts, modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, onCreated }: RelationshipAddProps) {
   const [open, setOpen] = useState(false);
@@ -202,11 +209,11 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
         <Text as="p" size="sm">
           What does this {slot.relationshipType === 'uses' ? 'use' : 'flow'} do? ({DIRECTION_VERB[slot.relationshipType][direction]} {pendingTarget.name})
         </Text>
-        <input
+        <textarea
           // eslint-disable-next-line jsx-a11y/no-autofocus -- picking a target is the request to type its label next.
           autoFocus
-          type="text"
-          className={styles.input}
+          rows={2}
+          className={styles.labelTextarea}
           placeholder="e.g. reads customer records from"
           value={labelDraft}
           onChange={(e) => { setLabelDraft(e.target.value); }}
