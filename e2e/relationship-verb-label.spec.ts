@@ -88,9 +88,14 @@ test('flows_to requires a label; cancelling the label step returns to search; ad
   await page.getByPlaceholder('Search…').fill('Billing Platform');
   await page.getByRole('button', { name: /Billing Platform/ }).click();
 
-  // Cancelling the label step goes back to search, not all the way closed —
-  // the search box (not the "+ Add flows to" button) is what's visible next.
-  await page.getByRole('button', { name: 'Cancel' }).click();
+  // "Back" (not "Cancel", which closes the whole control) goes back to
+  // search — the search box (not the "+ Add flows to" button) is what's
+  // visible next. Pre-existing test/component naming mismatch found
+  // while touching this same file for check C2: the label step's own two
+  // buttons are "Back" (→ cancelPending, search) and "Cancel" (→ close,
+  // the whole control) — this test asserted on "Cancel" but described
+  // "Back"'s actual behaviour.
+  await page.getByRole('button', { name: 'Back' }).click();
   await expect(page.getByPlaceholder('Search…')).toBeVisible();
 
   await page.getByPlaceholder('Search…').fill('Billing Platform');

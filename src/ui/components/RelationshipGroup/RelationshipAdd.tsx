@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import type { RelationshipType, UUID } from '../../../contracts/delta';
 import type { FactsRow, RelationshipsHeadRow } from '../../../contracts/rows';
 import type { RelationshipGroupSlot } from '../../../contracts/relationshipTypeRules';
@@ -89,11 +89,22 @@ interface PendingTarget {
  * attributes) rather than a single-line `<input>` — a verb phrase is
  * exactly the kind of free text this item names, not a short field like
  * the search box above it.
+ *
+ * Bug found while touching this same branch for check C2: Sprint U4-1
+ * B5's own commit (`e18176b`, "relationship verb label") never actually
+ * rendered a "Verb phrase" label — only a `placeholder`, which
+ * `e2e/add-a-system-flow.spec.ts`/`e2e/relationship-verb-label.spec.ts`
+ * already asserted on (`getByText('Verb phrase')`) and neither test had
+ * ever actually been run against a real Supabase (that commit's own
+ * message: "written and typechecked, not executed"). Fixed here with a
+ * real `<label htmlFor={labelId}>` — a placeholder was never a substitute
+ * for one.
  */
 export function RelationshipAdd({ slot, direction, elementId, elementName, existingRows, relationshipFacts, modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, onCreated }: RelationshipAddProps) {
   const [open, setOpen] = useState(false);
   const [pendingTarget, setPendingTarget] = useState<PendingTarget | null>(null);
   const [labelDraft, setLabelDraft] = useState('');
+  const labelId = useId();
   const search = useRelationshipTargetSearch(searchCommitId, modelId, slot.targetTypes, elementId);
   // Set right before each `create()` call so the hook's own success callback
   // (which carries no arguments of its own) can still report which element
@@ -209,7 +220,13 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
         <Text as="p" size="sm">
           What does this {slot.relationshipType === 'uses' ? 'use' : 'flow'} do? ({DIRECTION_VERB[slot.relationshipType][direction]} {pendingTarget.name})
         </Text>
+        <label htmlFor={labelId}>
+          <Text as="span" size="sm" tone="muted">
+            Verb phrase
+          </Text>
+        </label>
         <textarea
+          id={labelId}
           // eslint-disable-next-line jsx-a11y/no-autofocus -- picking a target is the request to type its label next.
           autoFocus
           rows={2}
