@@ -27,6 +27,7 @@
 .maintenanceActions {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
