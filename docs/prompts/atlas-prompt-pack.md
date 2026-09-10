@@ -21,10 +21,11 @@ Separate product, separate repo, separate Supabase project. Shares code with the
 1. Merge PR #18; fix the failing Workers Builds check; `pnpm release`; use the DNO model for the human sentence.
 2. Housekeeping (one short sprint): commit this pack to `docs/prompts/`; reduce Actions; `pnpm release` script; create issue labels; fix ADR-000 preface; SPEC §11 add the untracked C1 items (structural-conflict resolution actions → C2; capture-draft queue item kind → K1) and remove the stale `base_commit_id` note.
 3. **U4-2a** (Prompt 7f) — partly done 10 September; **close-out is Prompt 7g** (process, three bugs, the partial and unstarted items).
-4. **M1b** — comments UI, built to `docs/HANDOFF-M1b-comments.md` (corrected against the codebase first).
-5. Hour of use → issues → **U4-2b** (drag-to-reorder is already queued there; expect the change flow, versions and the architect door's remaining §3.2 items to surface).
-6. Repeat until the definition of usable holds.
-7. Then C2 (split), K1 (capture), D1 (decisions), Q1 (duplicates), R1 (roadmap).
+4. **U4-2b** (Prompt 7h) — UI tweaks from use: capability map text and tiles, landscape auto-layout and width, context header.
+5. **M1b** — comments UI, built to `docs/HANDOFF-M1b-comments.md` (corrected against the codebase first).
+6. Hour of use → issues → **U4-3** (drag-to-reorder is queued there; expect the change flow, versions and the architect door's remaining §3.2 items to surface).
+7. Repeat until the definition of usable holds.
+8. Then C2 (split), K1 (capture), D1 (decisions), Q1 (duplicates), R1 (roadmap).
 
 **Plumbing track (may run alongside the UI track; engine changes allowed; every item ends with integration tests against local Supabase):** delta-apply in SQL (SPEC §11 row 4, before K1) → capture design and pipeline backend (Prompts 10–11 without the queue UI) → C2 engine half (closure, `split_branch`) → D1 tables (decisions, assumptions, evidence, links) → duplicates job → LLM proxy edge function extracted and deployed. The two tracks never touch the same files in the same week.
 
@@ -289,6 +290,32 @@ The ordering matters. Prompts 0–2 produce documents that every later prompt re
 > **D1 (restated):** capability map, context, container and component are DOM views, not canvases; remove their 1,400px max-width and fill from the rail to the right edge.
 >
 > Summary: every item as done / not done with evidence; the human's sentence about using it.
+
+---
+
+## Prompt 7h — Claude Code: U4-2b, UI tweaks from use (10 September)
+> Sprint U4-2b, after 7g. One PR per group; three suites on the final commit of each; `pnpm release`; issues first. Engine frozen.
+> **Bugs:** (1) Bug: the search-first create option disappears when any partial match exists. Rule: "Create '<typed>' as [type]" is always the last row unless there is an exact, case-insensitive match on a name or alias; near-matches are listed above it. Apply to HomeSearch, ElementSearchAdd and the relationship target picker (where create doesn't apply, no change). Playwright: typing "Enter" with "Enterprise Architecture & Standards" present shows the match and the create row; typing the exact name hides create.
+> **Capability map**
+> 1. L1 names never truncate; the chip and "N systems →" wrap under the name or collapse to dot + count when the column is narrow.
+> 2. L2 names wrap to two lines inside the tile.
+> 3. Every tile reserves the chip row so tiles in a column are equal height.
+> 4. Try the blueprint frame on hover/focus/selected only with a plain 1px border otherwise; screenshot both for a decision before committing.
+> 5. Remove "Sync descriptions from starter map" from the UI (keep the script with a note that it repairs models seeded before commit 4e63ca5, delete once the DNO model is repaired). Overflow menu keeps Export as starter map and Backfill capability order (remove the latter once run everywhere).
+>
+> **Landscape**
+> 6. Auto-layout on every open: no `view_layouts` reads or writes for the landscape kind; remove Reset layout; drags allowed within the session only. Record in UI-principles §6.
+> 7. `LAYOUT_WIDTH` = canvas width at layout time (min 1280); bands fill the canvas.
+> 8. Band height from content; nothing overlaps a label; empty bands collapse to label + reference chips (keep the chips; they show shared-system support).
+> 9. Edges do not cross unrelated tiles: route around, or offset tiles to leave an edge lane.
+> 10. Page header on canvas routes follows the canvas's full-width rule; actions never clip.
+> 11. Tap on a "+N" chip lists the other capabilities with links.
+>
+> **Context view**
+> 12. Header shows "Supports: <capabilities, primary first>" and "Owned by: <team>" with links; empty state reads "No connections to other systems or actors yet" with the add link.
+> 13. Landscape on mobile (<768px): render a list, not the canvas. Collapsible groups per level-1 capability (name, system count, shared-system chips), actors first, Unassigned last; systems as rows with icon, name, lifecycle dot, "+N" chip, "uses N · used by N" text, tap → element page, "Context →" link. Desktop canvas unchanged. Playwright at 390px: groups render, expand one, tap a system.
+
+> Playwright: no text overflow on the map at 1280 and 1920 for the longest names in the eight maps; ten systems across five lanes with no tile/label intersection and no edge across a non-endpoint tile; context header for a system with supports but no uses.
 
 ---
 
