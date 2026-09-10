@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
 import type { BranchRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface UseMainBranchResult {
@@ -49,8 +50,16 @@ export function useMainBranch(modelId: UUID | null): UseMainBranchResult {
       .then((row) => {
         if (!cancelled) setBranch(row);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
         if (!cancelled) setBranch(null);
+        // Sprint U4-2a item 2: this used to swallow the failure entirely —
+        // `branch` just stays `null`, indistinguishable from "this model
+        // has no main branch yet" (which can't actually happen, ADR-018,
+        // but the type never said so). Every caller of this hook reads
+        // `main.head_commit_id` for something real (search, canAdd,
+        // canEdit) — silently disabling all of that with no visible cause
+        // is worse than a banner naming what failed.
+        reportError(e instanceof Error ? `Couldn't load this model's main branch: ${e.message}` : "Couldn't load this model's main branch.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

@@ -3,6 +3,7 @@ import type { UUID } from '../../contracts/delta';
 import { getBranch, getMainBranch } from '../../db/branches';
 import type { BranchRow } from '../../db/types';
 import type { Ref } from '../../db/ref';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface UseEditingBranchResult {
@@ -47,8 +48,13 @@ export function useEditingBranch(modelId: UUID | null, ref: Ref): UseEditingBran
       .then((row) => {
         if (!cancelled) setBranch(row);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
         if (!cancelled) setBranch(null);
+        // Sprint U4-2a item 2: same silent-swallow gap as useMainBranch.ts
+        // — `branch: null` here means "nothing is editable," which every
+        // caller's own `canEdit`/`canAdd` computation just quietly treats
+        // as "no write controls," with no indication anything failed.
+        reportError(e instanceof Error ? `Couldn't load the branch to edit: ${e.message}` : "Couldn't load the branch to edit.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
