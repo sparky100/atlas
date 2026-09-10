@@ -10,6 +10,22 @@
   gap: var(--space-1);
 }
 
+/**
+ * Check C3: a single-line fact — "Level 1", "Parent: Finance" — label
+ * and value share one row instead of `.group`'s label-over-value column.
+ * `flex-wrap: wrap` (not `nowrap`): the level's own "not a clean 1–3
+ * chain" fallback text or a long parent name still needs to be able to
+ * drop to its own line rather than forcing the row wider than its
+ * container — the same overflow class of bug this session's own bug #39
+ * fix already guards against elsewhere.
+ */
+.groupInline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
 .list {
   list-style: none;
   margin: 0;
