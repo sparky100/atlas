@@ -645,14 +645,20 @@ describe('comments, mentions, notifications, and realtime against a real local S
     const root = await createComment(alice.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementId, body: 'root comment, no mentions', authorId: alice.id });
 
     const aliceBefore = await getUnreadNotificationCount(alice.client, alice.id);
+    const bobBeforeOwnReply = await getUnreadNotificationCount(bob.client, bob.id);
     const bobReply = await createComment(bob.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementId, parentCommentId: root.id, body: 'a plain reply, no mentions', authorId: bob.id });
 
     // Alice (the root's author) is notified; Bob never notifies himself for
-    // his own reply, the same self-skip the mention loop already uses.
+    // his own reply, the same self-skip the mention loop already uses. Both
+    // a delta against each user's own pre-action count, not an absolute
+    // `toBe(0)`/`toBe(1)` — an earlier, unrelated test elsewhere in this
+    // file may have already left either of them a legitimate unread
+    // notification of their own (see the comment on `daveBeforeOwnReply`
+    // below for the real case that traced to exactly this).
     const aliceAfterBobReply = await getUnreadNotificationCount(alice.client, alice.id);
     expect(aliceAfterBobReply).toBe(aliceBefore + 1);
-    const bobUnaffected = await getUnreadNotificationCount(bob.client, bob.id);
-    expect(bobUnaffected).toBe(0);
+    const bobAfterOwnReply = await getUnreadNotificationCount(bob.client, bob.id);
+    expect(bobAfterOwnReply).toBe(bobBeforeOwnReply);
     const aliceNotifications = await listMyNotifications(alice.client, alice.id, { unreadOnly: true });
     expect(aliceNotifications.find((n) => n.comment_id === bobReply.id)).toMatchObject({ kind: 'reply', user_id: alice.id, comment_id: bobReply.id });
 
@@ -662,6 +668,16 @@ describe('comments, mentions, notifications, and realtime against a real local S
     // not two and not "reply". Alice, a participant but not mentioned,
     // still gets her "reply" notification as before.
     const aliceBeforeDaveReply = await getUnreadNotificationCount(alice.client, alice.id);
+    // Prompt 7g Bug (2)'s own diagnosis traced to here: this must be a
+    // delta, like every other check in this test — an *absolute* `toBe(0)`
+    // for Dave below broke the moment any earlier, unrelated test in this
+    // same file left Dave with a legitimate unread notification of his own
+    // (the "resolve permission matrix" test's Alice-replies-to-Dave's-own-
+    // thread case, line ~538, correctly notifies Dave as that thread's
+    // root author — nothing to do with self-notification). The trigger
+    // itself (atlas.process_comment_mentions) was never actually
+    // self-notifying anyone; this test's own absolute assertion was.
+    const daveBeforeOwnReply = await getUnreadNotificationCount(dave.client, dave.id);
     const daveReply = await createComment(dave.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementId, parentCommentId: root.id, body: `agreed, @${bobHandle}`, authorId: dave.id });
 
     const aliceAfterDaveReply = await getUnreadNotificationCount(alice.client, alice.id);
@@ -674,9 +690,10 @@ describe('comments, mentions, notifications, and realtime against a real local S
     expect(bobOnDaveReply).toHaveLength(1);
     expect(bobOnDaveReply[0]).toMatchObject({ kind: 'mention', user_id: bob.id, comment_id: daveReply.id });
 
-    // Dave never notifies himself for his own reply either.
-    const daveUnaffected = await getUnreadNotificationCount(dave.client, dave.id);
-    expect(daveUnaffected).toBe(0);
+    // Dave never notifies himself for his own reply either — no change
+    // from his own pre-reply count, whatever that count already was.
+    const daveAfterOwnReply = await getUnreadNotificationCount(dave.client, dave.id);
+    expect(daveAfterOwnReply).toBe(daveBeforeOwnReply);
   }, 30_000);
 
   // ---------------------------------------------------------------------
