@@ -41,13 +41,26 @@
   font-size: var(--text-2xl-size);
 }
 
+/* Prompt 7h bug fix: tapping the title opens the same inline rename as
+   the "⋯" menu's own "Rename" item — a plain, unstyled button so the
+   title still *reads* like the static text it replaces, not a control. */
+.titleButton {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
 /* Sprint U4-1 D1's header overflow menu ("Copy element ID"; Sprint U4-1
-   D3 adds "Rename", capability-only) — kept as a menu (not bare buttons)
-   since the raw id itself is deliberately not shown unconditionally any
-   more (see ElementHeader.tsx's own comment). Always collapsed, at every
-   viewport width — unlike UserMenu.module.css's own `.toggle`/`.menu`,
-   which only collapse on a narrow viewport; there's no "always-open bar"
-   mode here. */
+   D3 adds "Rename", every element type as of the Prompt 7h bug fix) —
+   kept as a menu (not bare buttons) since the raw id itself is
+   deliberately not shown unconditionally any more (see ElementHeader.tsx's
+   own comment). Always collapsed, at every viewport width — unlike
+   UserMenu.module.css's own `.toggle`/`.menu`, which only collapse on a
+   narrow viewport; there's no "always-open bar" mode here. */
 .menuWrapper {
   position: relative;
 }
