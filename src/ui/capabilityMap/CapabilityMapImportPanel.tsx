@@ -1,9 +1,11 @@
-import { Button } from '../components/Button/Button';
-import { Chip } from '../components/Chip/Chip';
+import { useId, useState } from 'react';
+import type { UUID } from '../../contracts/delta';
+import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { filterCapabilityMaps } from './capabilityMapPickerFilter';
+import { CapabilityMapPickerCard } from './CapabilityMapPickerCard';
 import { useCapabilityImport } from './useCapabilityImport';
-import type { UUID } from '../../contracts/delta';
 import styles from './CapabilityMapImportPanel.module.css';
 
 export interface CapabilityMapImportPanelProps {
@@ -24,14 +26,26 @@ export interface CapabilityMapImportPanelProps {
  * yet" plainly, not hidden, per CLAUDE.md rule 7 — "Add a capability" is
  * still there either way.
  *
- * Sprint U4-1 C6: the picker now also lists draft maps ("draft maps are
- * seedable into a model for review"), each carrying a plain-text "Draft"
- * Chip next to its sector/version — never colour alone (§6.3/§8.4/§8.7),
- * and never silently indistinguishable from a real, reviewed, published
- * map, which is exactly what seeding one is meant to let a reviewer check.
+ * Sprint U4-1 C6: the picker also lists draft maps ("draft maps are
+ * seedable into a model for review") — `CapabilityMapPickerCard`'s own
+ * "Draft" Chip is never colour alone (§6.3/§8.4/§8.7), and never silently
+ * indistinguishable from a real, reviewed, published map, which is
+ * exactly what seeding one is meant to let a reviewer check.
+ *
+ * Sprint U4-2a item 4: cards (`CapabilityMapPickerCard.tsx`) replace the
+ * old plain list — each with its own "Preview" and "About this map"
+ * disclosures — plus this component's own search box, once eight-plus
+ * starter maps stopped being scannable as a bare list. The search box
+ * itself is omitted while there's nothing worth filtering (0 or 1 map) —
+ * same "omit, don't disable" convention this file already follows for
+ * "No starter maps are available yet."
  */
 export function CapabilityMapImportPanel({ modelId, userId, onImported }: CapabilityMapImportPanelProps) {
   const { status, maps, error, importMap } = useCapabilityImport({ modelId, userId, onImported });
+  const [query, setQuery] = useState('');
+  const searchId = useId();
+
+  const filteredMaps = filterCapabilityMaps(maps, query);
 
   return (
     <Panel>
@@ -47,23 +61,36 @@ export function CapabilityMapImportPanel({ modelId, userId, onImported }: Capabi
           No starter maps are available yet.
         </Text>
       )}
-      {maps.length > 0 && (
-        <ul className={styles.list}>
-          {maps.map((map) => (
-            <li key={map.id} className={styles.row}>
-              <div>
-                <Text as="span">
-                  {map.sector} v{map.version}
-                </Text>{' '}
-                {map.status === 'draft' && <Chip tone="neutral">Draft</Chip>}
-                <Text as="p" tone="muted" size="sm">
-                  {map.source_description}
-                </Text>
-              </div>
-              <Button variant="secondary" disabled={status === 'seeding'} onClick={() => void importMap(map.id)}>
-                {status === 'seeding' ? 'Importing…' : 'Import'}
-              </Button>
-            </li>
+
+      {maps.length > 1 && (
+        <div className={styles.search}>
+          <label htmlFor={searchId}>
+            <Text as="span" size="sm" tone="muted">
+              Search
+            </Text>
+          </label>
+          <input
+            id={searchId}
+            type="search"
+            className={styles.searchInput}
+            placeholder="Search by name, sector, or what it covers…"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); }}
+          />
+        </div>
+      )}
+
+      {maps.length > 0 && filteredMaps.length === 0 && <EmptyState>No starter maps match &ldquo;{query}&rdquo;.</EmptyState>}
+
+      {filteredMaps.length > 0 && (
+        <ul className={styles.grid}>
+          {filteredMaps.map((map) => (
+            <CapabilityMapPickerCard
+              key={map.id}
+              map={map}
+              importDisabled={status === 'seeding'}
+              onImport={(mapId) => { void importMap(mapId); }}
+            />
           ))}
         </ul>
       )}
