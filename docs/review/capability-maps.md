@@ -6,7 +6,9 @@ Maps: 9 (`electricity_network/1.json`, `electricity_network/2.json`, `hei/1.json
 
 ## 1. Per sector: full tree with definitions
 
-## electricity_network — v1 (published, 12 level-1, 71 items)
+## Electricity Network Operator — electricity_network v1 (published, 12 level-1, 71 items)
+
+Asset management, network operations, customer and metering, and regulatory compliance, specialised for an electricity distribution or transmission operator.
 
 Starter capability map for an electricity network operator (a distribution network operator taking on distribution system operator functions, or a transmission owner), drafted 2026-09-07 as the worked example of the utility map: the four utility-specific level-1 capabilities (codes 9-12) use exactly the utility map's level-1 wording, and every level-2 under them is electricity-specific rather than a restatement of the generic utility level-2s — except Connections and Emergency Response, which are the same capability and keep the same wording. Drafted from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
@@ -136,7 +138,9 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
 
-## electricity_network — v2 (draft, 12 level-1, 77 items)
+## Electricity Network Operator — electricity_network v2 (draft, 12 level-1, 77 items)
+
+Adds control-room operations, billing and settlement, vulnerable-customer support, and vegetation management to v1's network-operator capabilities. Pending review.
 
 Starter capability map for an electricity network operator, v2: adds six level-2 capabilities to v1 (2026-09-08) under the four utility-specific level-1s (9-12), found by comparing v1 against the generic utility map's own analogous level-2 sets (10.1 Control Room & Real-Time Operations, 11.2 Billing & Settlement and 11.3 Vulnerable Customer Support in utility/1.json had no electricity-specific counterpart in v1) plus one gap neither map had (Vegetation Management, a distinct and safety-critical capability for an overhead electricity network). Codes 1-8 and every existing 9-12 item are unchanged from v1; only new leaves were added, so v1 seedings are unaffected. Drafted from the same sources as v1 (sources.md); nothing copied verbatim. Pending human review.
 
@@ -272,7 +276,9 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
 
-## hei — v1 (published, 12 level-1, 74 items)
+## University or College — hei v1 (published, 12 level-1, 74 items)
+
+Teaching and learning, research and innovation, student support, and recruitment and admissions, alongside the capabilities every organisation shares.
 
 Starter capability map for a university or college (a higher-education institution; a further-education college would carry Teaching & Learning and Student Support but a much smaller Research & Innovation), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (teaching and learning, research and innovation, student support, recruitment and admissions). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
@@ -404,7 +410,9 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
 
-## housing — v1 (published, 12 level-1, 73 items)
+## Housing Association — housing v1 (published, 12 level-1, 73 items)
+
+Tenancy and lettings, housing stock, development and regeneration, and tenant support, alongside the capabilities every organisation shares.
 
 Starter capability map for a housing association (a registered social landlord / registered provider), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (tenancy and lettings, housing stock as the core asset — distinct from the shared Estates capability, which covers the corporate estate — development and regeneration, tenant support). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
@@ -535,7 +543,9 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
 
-## local_government_england — v1 (published, 12 level-1, 75 items)
+## English Local Authority — local_government_england v1 (published, 12 level-1, 75 items)
+
+Adult social care, children's and SEND services, public health, and council tax support and business rates, alongside the capabilities every organisation shares.
 
 Starter capability map for an English local authority (unitary, county or district functions combined — a district-only council would not carry Adult Social Care or Children's Services), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four England-specific ones (Care Act 2014 adult social care, SEND and children's social care, public health, Council Tax Support and business rates). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
@@ -668,7 +678,9 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
 
-## local_government_scotland — v1 (published, 12 level-1, 75 items)
+## Scottish Local Authority — local_government_scotland v1 (published, 12 level-1, 75 items)
+
+Curriculum for Excellence, integration joint boards, council tax reduction, and the Scottish Welfare Fund, alongside the capabilities every organisation shares.
 
 Starter capability map for a Scottish local authority (a council under the Local Government etc. (Scotland) Act 1994), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four Scotland-specific ones (Curriculum for Excellence, Integration Joint Boards, Council Tax Reduction, the Scottish Welfare Fund). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
@@ -801,7 +813,9 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
 
-## nhs — v1 (published, 12 level-1, 73 items)
+## NHS Board or Trust — nhs v1 (published, 12 level-1, 73 items)
+
+Patient care, clinical quality and safety, population health, and diagnostics and clinical support, alongside the capabilities every organisation shares.
 
 Starter capability map for an NHS board or trust (a Scottish territorial board or an English provider trust — the level-2 wording is deliberately neutral between them), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four health-specific ones (patient care, clinical quality and safety, population health, diagnostics and clinical support). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
@@ -932,7 +946,9 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
 
-## public_body — v1 (published, 11 level-1, 64 items)
+## Public Body (Generic) — public_body v1 (published, 11 level-1, 64 items)
+
+Policy development, public engagement, and grants and funding, alongside the capabilities every organisation shares - for an executive agency or non-departmental public body.
 
 Starter capability map for a generic public body (an executive agency, non-departmental public body or similar that makes policy, engages the public and often administers funding, but does not itself run schools, hospitals, homes or networks), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus three generic-public-body ones (policy development, public engagement, grants and funding). Renamed from the original 'generic' sector. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 
@@ -1050,7 +1066,9 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 - **8.5 Corporate Governance** — Operating the board, committees and scheme of delegation transparently.
 - **8.6 Business Continuity & Emergency Planning** — Preparing to keep essential activity going through disruption.
 
-## utility — v1 (published, 12 level-1, 72 items)
+## Utility (Generic) — utility v1 (published, 12 level-1, 72 items)
+
+Asset management, network operations, customer and metering, and regulatory compliance, for a generic regulated water, gas or electricity network company.
 
 Starter capability map for a generic regulated, asset-owning UK utility (a water, gas or electricity network company under Ofwat or Ofgem price control), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four utility-specific ones (asset management, network operations, customer and metering, regulatory compliance and price-control reporting) whose level-1 wording the electricity_network map shares exactly, adding its own sector-specific level-2 entries rather than restating these. Connections and Emergency Response are level-2 here because they belong to Network Operations, and the 12 level-1 ceiling is already reached. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.
 

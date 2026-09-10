@@ -35,6 +35,7 @@ import { createServiceRoleClient, type Client } from '../src/db/client';
 import { loadEnv } from '../src/db/env';
 import { selectAll } from '../src/db/selectAll';
 import { describeEnvelope } from '../src/engine/describeEnvelope';
+import { isCliEntrypoint } from './isCliEntrypoint';
 
 interface CommitScanRow {
   id: UUID;
@@ -125,7 +126,7 @@ async function main(): Promise<void> {
 }
 
 // Only run main() when this is the CLI entrypoint, not when a test imports backfillCommitTitles.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+if (isCliEntrypoint(import.meta.url)) {
   main().catch((e: unknown) => {
     console.error(e instanceof Error ? e.message : e);
     process.exitCode = 1;

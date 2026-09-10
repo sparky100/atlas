@@ -2,6 +2,8 @@
   "sector": "electricity_network",
   "version": 2,
   "status": "draft",
+  "title": "Electricity Network Operator",
+  "summary": "Adds control-room operations, billing and settlement, vulnerable-customer support, and vegetation management to v1's network-operator capabilities. Pending review.",
   "sourceDescription": "Starter capability map for an electricity network operator, v2: adds six level-2 capabilities to v1 (2026-09-08) under the four utility-specific level-1s (9-12), found by comparing v1 against the generic utility map's own analogous level-2 sets (10.1 Control Room & Real-Time Operations, 11.2 Billing & Settlement and 11.3 Vulnerable Customer Support in utility/1.json had no electricity-specific counterpart in v1) plus one gap neither map had (Vegetation Management, a distinct and safety-critical capability for an overhead electricity network). Codes 1-8 and every existing 9-12 item are unchanged from v1; only new leaves were added, so v1 seedings are unaffected. Drafted from the same sources as v1 (sources.md); nothing copied verbatim. Pending human review.",
   "sources": [
     { "citation": "Ofgem RIIO-ED2 price-control framework and the Distribution Code / Grid Code (consulted for regulatory and operational vocabulary; not copied)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-09" },

@@ -40,6 +40,7 @@ import { getOrganisationBySlug } from '../src/db/organisations';
 import { getModelBySlug } from '../src/db/models';
 import { exportCapabilityMap } from '../src/db/exportCapabilityMap';
 import { parseCapabilityMapContent, SECTORS, type CapabilityMapContent, type CapabilityMapItemContent, type CapabilityMapSourceContent } from '../src/contracts/capabilityMapContent';
+import { isCliEntrypoint } from './isCliEntrypoint';
 import { regenerateCapabilityMapsReviewDoc } from './reviewCapabilityMaps';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -66,7 +67,16 @@ function serializeItem(item: CapabilityMapItemContent): string {
 
 /** Matches this repo's own hand-authored formatting exactly (content/capability-maps/*.json): 2-space indent, one compact single-line object per source/item — not `JSON.stringify(..., null, 2)`, which would spread each item across many lines and produce a much noisier diff for anyone reviewing the export. */
 export function serializeCapabilityMapContent(content: CapabilityMapContent): string {
-  const lines: string[] = ['{', `  "sector": ${JSON.stringify(content.sector)},`, `  "version": ${String(content.version)},`, `  "status": ${JSON.stringify(content.status)},`, `  "sourceDescription": ${JSON.stringify(content.sourceDescription)},`, '  "sources": ['];
+  const lines: string[] = [
+    '{',
+    `  "sector": ${JSON.stringify(content.sector)},`,
+    `  "version": ${String(content.version)},`,
+    `  "status": ${JSON.stringify(content.status)},`,
+    `  "title": ${JSON.stringify(content.title)},`,
+    `  "summary": ${JSON.stringify(content.summary)},`,
+    `  "sourceDescription": ${JSON.stringify(content.sourceDescription)},`,
+    '  "sources": [',
+  ];
   content.sources.forEach((source, i) => {
     lines.push(`    ${serializeSource(source)}${i < content.sources.length - 1 ? ',' : ''}`);
   });
@@ -130,7 +140,7 @@ async function main(): Promise<void> {
 }
 
 // Only run main() when this is the CLI entrypoint.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+if (isCliEntrypoint(import.meta.url)) {
   main().catch((e: unknown) => {
     console.error(e instanceof Error ? e.message : e);
     process.exitCode = 1;

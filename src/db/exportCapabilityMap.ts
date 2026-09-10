@@ -40,6 +40,8 @@ import type { Client } from './client';
 export interface BuildCapabilityMapExportInput {
   sector: Sector;
   version: number;
+  title: string;
+  summary: string;
   sourceDescription: string;
   source: CapabilityMapSourceContent;
 }
@@ -87,6 +89,8 @@ export function buildCapabilityMapExport(capabilities: readonly ElementsHeadRow[
     sector: input.sector,
     version: input.version,
     status: 'draft',
+    title: input.title,
+    summary: input.summary,
     sourceDescription: input.sourceDescription,
     sources: [input.source],
     items,
@@ -132,6 +136,14 @@ export async function exportCapabilityMap(supabase: Client, input: ExportCapabil
   return buildCapabilityMapExport(capabilities, {
     sector: input.sector,
     version: input.version,
+    // Sprint U4-2a item 4: derived, not a new form field — the same
+    // "everything exportCapabilityMap doesn't already know is exactly
+    // sector/version" reasoning ExportCapabilityMapAction.tsx's own
+    // comment gives for keeping that form to two inputs. The model's own
+    // name is the picker card's most honest title for something exported
+    // from a real model, not a fresh piece of authored content.
+    title: input.modelName,
+    summary: `Exported from the "${input.modelName}" model. Not yet reviewed — review and edit before publishing.`,
     sourceDescription: `Exported from the "${input.modelName}" model (organisation "${input.orgName}") on ${reviewedAt}. Not yet reviewed against any external framework or reference model — review before publishing.`,
     source: {
       citation: `Exported from Atlas model "${input.modelName}" (${input.orgSlug}/${input.modelSlug})`,
@@ -164,6 +176,8 @@ export async function exportCapabilityMapAsDraft(supabase: Client, input: Export
     p_model_id: input.modelId,
     p_sector: content.sector,
     p_version: content.version,
+    p_title: content.title,
+    p_summary: content.summary,
     p_source_description: content.sourceDescription,
     p_items: content.items,
     p_sources: content.sources,

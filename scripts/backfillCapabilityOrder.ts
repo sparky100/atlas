@@ -21,6 +21,7 @@
 import { backfillCapabilityOrder } from '../src/db/backfillCapabilityOrder';
 import { createSupabaseClient } from '../src/db/client';
 import { loadEnv } from '../src/db/env';
+import { isCliEntrypoint } from './isCliEntrypoint';
 
 async function main(): Promise<void> {
   const [modelId, email, password] = process.argv.slice(2);
@@ -57,7 +58,7 @@ async function main(): Promise<void> {
 }
 
 // Only run main() when this is the CLI entrypoint, not when a test imports something from this file.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+if (isCliEntrypoint(import.meta.url)) {
   main().catch((e: unknown) => {
     console.error(e instanceof Error ? e.message : e);
     process.exitCode = 1;

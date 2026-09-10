@@ -2,6 +2,8 @@
   "sector": "local_government_england",
   "version": 1,
   "status": "published",
+  "title": "English Local Authority",
+  "summary": "Adult social care, children's and SEND services, public health, and council tax support and business rates, alongside the capabilities every organisation shares.",
   "sourceDescription": "Starter capability map for an English local authority (unitary, county or district functions combined — a district-only council would not carry Adult Social Care or Children's Services), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four England-specific ones (Care Act 2014 adult social care, SEND and children's social care, public health, Council Tax Support and business rates). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
     { "citation": "Socitm Local Public Services Business Capability Model (consulted for scope and level-1 shape; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },

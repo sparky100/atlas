@@ -63,6 +63,22 @@ export const capabilityMapContentSchema = z
     sector: sectorSchema,
     version: z.number().int().positive(),
     status: z.enum(['draft', 'published', 'deprecated']),
+    /**
+     * Sprint U4-2a item 4: the picker card's own display name — short,
+     * e.g. "NHS Acute Trust", not a restatement of `sector`/`version`
+     * (the card already shows those alongside it). Required on every
+     * file, not optional: a picker with eight-plus maps needs a real name
+     * to scan, search, and filter by (item 4's own "search/filter"), not
+     * a sector code.
+     */
+    title: z.string().min(1),
+    /**
+     * Sprint U4-2a item 4: one or two plain-English sentences on the
+     * card face — what this map covers, not how it was drafted or
+     * reviewed (that stays `sourceDescription`, shown behind the card's
+     * info affordance, not on its face).
+     */
+    summary: z.string().min(1),
     sourceDescription: z.string().min(1),
     sources: z.array(sourceSchema),
     items: z.array(itemSchema).min(1),

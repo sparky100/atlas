@@ -2,6 +2,8 @@
   "sector": "hei",
   "version": 1,
   "status": "published",
+  "title": "University or College",
+  "summary": "Teaching and learning, research and innovation, student support, and recruitment and admissions, alongside the capabilities every organisation shares.",
   "sourceDescription": "Starter capability map for a university or college (a higher-education institution; a further-education college would carry Teaching & Learning and Student Support but a much smaller Research & Innovation), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (teaching and learning, research and innovation, student support, recruitment and admissions). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
     { "citation": "UCISA Higher Education Capability Model (consulted for scope and level-1 shape; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },

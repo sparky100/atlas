@@ -2,6 +2,8 @@
   "sector": "electricity_network",
   "version": 1,
   "status": "published",
+  "title": "Electricity Network Operator",
+  "summary": "Asset management, network operations, customer and metering, and regulatory compliance, specialised for an electricity distribution or transmission operator.",
   "sourceDescription": "Starter capability map for an electricity network operator (a distribution network operator taking on distribution system operator functions, or a transmission owner), drafted 2026-09-07 as the worked example of the utility map: the four utility-specific level-1 capabilities (codes 9-12) use exactly the utility map's level-1 wording, and every level-2 under them is electricity-specific rather than a restatement of the generic utility level-2s — except Connections and Emergency Response, which are the same capability and keep the same wording. Drafted from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
     { "citation": "Ofgem RIIO-ED2 price-control framework and the Distribution Code / Grid Code (consulted for regulatory and operational vocabulary; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },
