@@ -32,6 +32,10 @@ import styles from './ViewPage.module.css';
  * system's context page for containers" read against this page rather than
  * ContextPage.tsx, which shows a system's neighbouring systems, not its
  * containers (`Containers →` on ContextView.tsx links here).
+ *
+ * Check D1: `<main>` escapes the page's usual centred max-width once
+ * there's real content — `ViewPage.module.css`'s own `.mainWithView`
+ * comment has the full reasoning, shared with Context/Component.
  */
 export function ContainerPage() {
   const { orgSlug, modelSlug, systemId } = useParams<{ orgSlug: string; modelSlug: string; systemId: string }>();
@@ -83,7 +87,7 @@ export function ContainerPage() {
       <AppHeader />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
-        <main className={styles.main}>
+        <main className={[styles.main, state.status === 'ready' ? styles.mainWithView : ''].filter(Boolean).join(' ')}>
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}

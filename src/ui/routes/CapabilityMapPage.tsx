@@ -50,6 +50,11 @@ import styles from './CapabilityMapPage.module.css';
  * pattern `ElementHeader.tsx`'s own overflow menu uses. Gated on the tree
  * being non-empty (same condition the old standalone row used) — nothing
  * to sync or export from an empty map.
+ *
+ * Check D1: `<main>` escapes the page's usual centred max-width once the
+ * map has real content (`hasContent`, below) — `.mainWithMap`'s own
+ * comment in this file's module CSS has the full reasoning, same pattern
+ * `LandscapePage.tsx`'s `hasCanvas`/`.mainWithCanvas` already uses.
  */
 export function CapabilityMapPage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
@@ -104,13 +109,18 @@ export function CapabilityMapPage() {
   }
 
   const refParam = refParamOf(ref);
+  // Check D1: same "only once there's real content" condition
+  // LandscapePage.tsx's own `hasCanvas` uses — the empty-map/import-panel
+  // state keeps the ordinary centred column, since there's no map yet to
+  // give the width to.
+  const hasContent = state.status === 'ready' && (state.data.tree.l1.length > 0 || state.data.tree.orphans.length > 0);
 
   return (
     <div>
       <AppHeader />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
-        <main className={styles.main}>
+        <main className={[styles.main, hasContent ? styles.mainWithMap : ''].filter(Boolean).join(' ')}>
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}

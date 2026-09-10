@@ -22,6 +22,10 @@ import styles from './ViewPage.module.css';
  * The Context view route (UI-principles §6.1/§2.1 — Sprint U2 step 3): one
  * system, everything it connects to. The zoom chain's third stop
  * (capability → landscape → **context** → containers → components).
+ *
+ * Check D1: `<main>` escapes the page's usual centred max-width once
+ * there's real content (`ViewPage.module.css`'s own `.mainWithView`
+ * comment has the full reasoning, shared with Container/Component).
  */
 export function ContextPage() {
   const { orgSlug, modelSlug, systemId } = useParams<{ orgSlug: string; modelSlug: string; systemId: string }>();
@@ -63,7 +67,7 @@ export function ContextPage() {
       <AppHeader />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
-        <main className={styles.main}>
+        <main className={[styles.main, state.status === 'ready' ? styles.mainWithView : ''].filter(Boolean).join(' ')}>
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
