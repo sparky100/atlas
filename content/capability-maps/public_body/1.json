@@ -2,6 +2,8 @@
   "sector": "public_body",
   "version": 1,
   "status": "published",
+  "title": "Public Body (Generic)",
+  "summary": "Policy development, public engagement, and grants and funding, alongside the capabilities every organisation shares - for an executive agency or non-departmental public body.",
   "sourceDescription": "Starter capability map for a generic public body (an executive agency, non-departmental public body or similar that makes policy, engages the public and often administers funding, but does not itself run schools, hospitals, homes or networks), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus three generic-public-body ones (policy development, public engagement, grants and funding). Renamed from the original 'generic' sector. Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
     { "citation": "UK Government Functional Standards GovS 001-016 (consulted for both the shared corporate capabilities and the generic policy/engagement/grants shape)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },

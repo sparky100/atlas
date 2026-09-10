@@ -15,7 +15,7 @@ describe('buildCapabilityMapExport (Sprint U4-1 C6)', () => {
       capability('mid', 'Housing', 'root', { code: 'stale-1.1' }),
       capability('leaf', 'Repairs', 'mid'),
     ];
-    const content = buildCapabilityMapExport(capabilities, { sector: 'housing', version: 1, sourceDescription: 'desc', source: SOURCE });
+    const content = buildCapabilityMapExport(capabilities, { sector: 'housing', version: 1, title: 'Housing Association', summary: 'summary', sourceDescription: 'desc', source: SOURCE });
     expect(content.items).toEqual([
       { code: '1', name: 'Digital Services', description: undefined, level: 1, parentCode: null, order: 10 },
       { code: '1.1', name: 'Housing', description: undefined, level: 2, parentCode: '1', order: 10 },
@@ -25,7 +25,7 @@ describe('buildCapabilityMapExport (Sprint U4-1 C6)', () => {
 
   it('orders siblings by multiples of ten, in display order (compareCapabilities), not by input array order', () => {
     const capabilities = [capability('b', 'Beta', null, { order: 5 }), capability('a', 'Alpha', null, { order: 1 })];
-    const content = buildCapabilityMapExport(capabilities, { sector: 'housing', version: 1, sourceDescription: 'desc', source: SOURCE });
+    const content = buildCapabilityMapExport(capabilities, { sector: 'housing', version: 1, title: 'Housing Association', summary: 'summary', sourceDescription: 'desc', source: SOURCE });
     expect(content.items.map((i) => [i.code, i.name, i.order])).toEqual([
       ['1', 'Alpha', 10],
       ['2', 'Beta', 20],
@@ -38,25 +38,25 @@ describe('buildCapabilityMapExport (Sprint U4-1 C6)', () => {
       capability('b', 'Beta', null, { description: '   ' }),
       capability('c', 'Gamma', null),
     ];
-    const content = buildCapabilityMapExport(capabilities, { sector: 'housing', version: 1, sourceDescription: 'desc', source: SOURCE });
+    const content = buildCapabilityMapExport(capabilities, { sector: 'housing', version: 1, title: 'Housing Association', summary: 'summary', sourceDescription: 'desc', source: SOURCE });
     expect(content.items.map((i) => i.description)).toEqual(['What this capability covers.', undefined, undefined]);
   });
 
   it('excludes orphans (a broken or too-deep parent chain) — nothing to export for a shape the schema cannot represent', () => {
     const capabilities = [capability('a', 'Alpha', null), capability('orphan', 'Orphaned', 'missing-parent')];
-    const content = buildCapabilityMapExport(capabilities, { sector: 'housing', version: 1, sourceDescription: 'desc', source: SOURCE });
+    const content = buildCapabilityMapExport(capabilities, { sector: 'housing', version: 1, title: 'Housing Association', summary: 'summary', sourceDescription: 'desc', source: SOURCE });
     expect(content.items.map((i) => i.name)).toEqual(['Alpha']);
   });
 
   it('drops every model-specific attribute — only code/name/description/level/parentCode/order survive', () => {
     const capabilities = [capability('a', 'Alpha', null, { code: 'x', templateRef: 'y', order: 42, someFutureAttribute: 'z' })];
-    const content = buildCapabilityMapExport(capabilities, { sector: 'housing', version: 1, sourceDescription: 'desc', source: SOURCE });
+    const content = buildCapabilityMapExport(capabilities, { sector: 'housing', version: 1, title: 'Housing Association', summary: 'summary', sourceDescription: 'desc', source: SOURCE });
     expect(Object.keys(content.items[0] ?? {}).sort()).toEqual(['code', 'description', 'level', 'name', 'order', 'parentCode']);
   });
 
   it('carries sector, version, sourceDescription and the one source through, always as a draft', () => {
     const capabilities = [capability('a', 'Alpha', null)];
-    const content = buildCapabilityMapExport(capabilities, { sector: 'nhs', version: 3, sourceDescription: 'Exported on 2026-01-01.', source: SOURCE });
+    const content = buildCapabilityMapExport(capabilities, { sector: 'nhs', version: 3, title: 'NHS Board or Trust', summary: 'summary', sourceDescription: 'Exported on 2026-01-01.', source: SOURCE });
     expect(content.sector).toBe('nhs');
     expect(content.version).toBe(3);
     expect(content.status).toBe('draft');

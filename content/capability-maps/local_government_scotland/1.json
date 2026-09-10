@@ -2,6 +2,8 @@
   "sector": "local_government_scotland",
   "version": 1,
   "status": "published",
+  "title": "Scottish Local Authority",
+  "summary": "Curriculum for Excellence, integration joint boards, council tax reduction, and the Scottish Welfare Fund, alongside the capabilities every organisation shares.",
   "sourceDescription": "Starter capability map for a Scottish local authority (a council under the Local Government etc. (Scotland) Act 1994), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four Scotland-specific ones (Curriculum for Excellence, Integration Joint Boards, Council Tax Reduction, the Scottish Welfare Fund). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
     { "citation": "Socitm Local Public Services Business Capability Model (consulted for scope and level-1 shape; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },

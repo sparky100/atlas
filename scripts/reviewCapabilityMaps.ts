@@ -21,6 +21,7 @@ import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'n
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseCapabilityMapContent, type CapabilityMapContent, type CapabilityMapItemContent } from '../src/contracts/capabilityMapContent';
+import { isCliEntrypoint } from './isCliEntrypoint';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONTENT_ROOT = path.join(REPO_ROOT, 'content', 'capability-maps');
@@ -204,7 +205,7 @@ function render(maps: LoadedMap[]): string {
 
   for (const map of maps) {
     const l1Count = map.content.items.filter((i) => i.level === 1).length;
-    out.push(`## ${map.content.sector} — v${String(map.content.version)} (${map.content.status}, ${String(l1Count)} level-1, ${String(map.content.items.length)} items)`, '', map.content.sourceDescription, '');
+    out.push(`## ${map.content.title} — ${map.content.sector} v${String(map.content.version)} (${map.content.status}, ${String(l1Count)} level-1, ${String(map.content.items.length)} items)`, '', map.content.summary, '', map.content.sourceDescription, '');
     if (map.content.sources.length > 0) {
       out.push('Sources:', '');
       for (const s of map.content.sources) out.push(`- ${s.citation}${s.url ? ` — <${s.url}>` : ''} (reviewed by ${s.reviewedBy}, ${s.reviewedAt})`);
@@ -252,6 +253,6 @@ export function regenerateCapabilityMapsReviewDoc(): { mapCount: number } {
 
 // Only run when this is the CLI entrypoint (`pnpm content:review-capability-maps`),
 // not when scripts/exportCapabilityMap.ts imports regenerateCapabilityMapsReviewDoc.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+if (isCliEntrypoint(import.meta.url)) {
   regenerateCapabilityMapsReviewDoc();
 }

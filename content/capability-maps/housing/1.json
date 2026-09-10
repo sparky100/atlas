@@ -2,6 +2,8 @@
   "sector": "housing",
   "version": 1,
   "status": "published",
+  "title": "Housing Association",
+  "summary": "Tenancy and lettings, housing stock, development and regeneration, and tenant support, alongside the capabilities every organisation shares.",
   "sourceDescription": "Starter capability map for a housing association (a registered social landlord / registered provider), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four sector-specific ones (tenancy and lettings, housing stock as the core asset — distinct from the shared Estates capability, which covers the corporate estate — development and regeneration, tenant support). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
     { "citation": "HACT UK Housing Data Standards (consulted for sector vocabulary; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },

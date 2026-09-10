@@ -13,6 +13,8 @@ interface MutableContent {
   sector: string;
   version: number;
   status: string;
+  title: string;
+  summary: string;
   sourceDescription: string;
   sources: { citation: string; reviewedBy: string; reviewedAt: string }[];
   items: MutableItem[];
@@ -23,6 +25,8 @@ function validContent(): MutableContent {
     sector: 'local_government_scotland',
     version: 1,
     status: 'draft',
+    title: 'Test Map',
+    summary: 'A one-sentence summary of what this test map covers.',
     sourceDescription: 'A test map',
     sources: [{ citation: 'Some framework', reviewedBy: 'Jane Reviewer', reviewedAt: '2026-01-01' }],
     items: [

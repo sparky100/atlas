@@ -2,6 +2,8 @@
   "sector": "nhs",
   "version": 1,
   "status": "published",
+  "title": "NHS Board or Trust",
+  "summary": "Patient care, clinical quality and safety, population health, and diagnostics and clinical support, alongside the capabilities every organisation shares.",
   "sourceDescription": "Starter capability map for an NHS board or trust (a Scottish territorial board or an English provider trust — the level-2 wording is deliberately neutral between them), drafted 2026-09-07 from general familiarity with the reference models named in sources.md; nothing is copied verbatim. Two levels: eight capabilities shared with every other map (codes 1-8, identical wording) plus four health-specific ones (patient care, clinical quality and safety, population health, diagnostics and clinical support). Reviewed by Simon Parkinson and published 2026-09-08. Licence: CC BY 4.0.",
   "sources": [
     { "citation": "NHS England enterprise-architecture business capability model (consulted for scope and level-1 shape; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-08" },

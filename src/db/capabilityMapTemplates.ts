@@ -15,6 +15,17 @@ export interface CapabilityMapRow {
   sector: string;
   version: number;
   status: MapStatus;
+  /**
+   * Sprint U4-2a item 4. `null` only for a row loaded before
+   * 20260910010000_capability_maps_title_summary.sql added these columns
+   * and not yet reloaded since — `src/contracts/capabilityMapContent.ts`'s
+   * schema requires both on every *new* content file, but the column
+   * itself is nullable (that migration's own comment explains why).
+   * Callers fall back to `sector`/`version` (`title`) or omit the summary
+   * line entirely (`summary`) rather than assume it's always there.
+   */
+  title: string | null;
+  summary: string | null;
   source_description: string;
   published_at: string | null;
   created_at: string;

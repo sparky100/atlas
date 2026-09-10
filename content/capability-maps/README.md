@@ -37,7 +37,9 @@ Adding a sector is one edit there plus its tests, not a migration.
   "sector": "nhs",
   "version": 1,
   "status": "draft",
-  "sourceDescription": "One paragraph: what this map is, who reviewed it, how current it is.",
+  "title": "NHS Acute Trust",
+  "summary": "One or two plain-English sentences: what this map covers, for the starter-map picker's card face.",
+  "sourceDescription": "One paragraph: what this map is, who reviewed it, how current it is — provenance, shown behind the picker card's info affordance, not on its face.",
   "sources": [
     {
       "citation": "A named framework or standard consulted (see sources.md)",
@@ -66,6 +68,12 @@ passes the parser can't fail the database):
   Write the canonical name.
 - `<sector>/<version>.json`'s path must match the file's own
   `sector`/`version` fields (the loader checks both, not just the path).
+- `title` (a short display name, e.g. "NHS Acute Trust" — not a
+  restatement of `sector`/`version`) and `summary` (one or two
+  plain-English sentences on what the map covers) are both required
+  (Sprint U4-2a item 4) — the starter-map picker's card shows these on
+  its face; `sourceDescription` (how the map was drafted, who reviewed
+  it) stays behind the card's info affordance.
 - `items` codes are unique within the file.
 - A root item (`parentCode: null`) must have `level: 1`; a non-root item's
   `level` is exactly one more than its parent's (so at most three levels).
