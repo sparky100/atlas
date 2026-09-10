@@ -88,6 +88,10 @@ test('capability map export: "Export as starter map" writes a draft, flagged as 
   await page.goto(`/o/${orgSlug}/m/${sourceModelSlug}/capability-map`);
   await expect(page.getByText('Grid Operations')).toBeVisible();
 
+  // Sprint U4-2a check B5: "Export as starter map" now sits behind the
+  // "⋯" overflow menu beside "+ Add capability", not as a button of its
+  // own — open it first.
+  await page.getByRole('button', { name: 'Capability map actions' }).click();
   await page.getByRole('button', { name: 'Export as starter map' }).click();
   await page.getByLabel('Sector').selectOption('electricity_network');
   await page.getByLabel('Version').fill(String(version));

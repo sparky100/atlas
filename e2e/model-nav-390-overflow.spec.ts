@@ -12,16 +12,19 @@
  * e2e/change-branch-merge.spec.ts's own "Point Billing Service at the new
  * vendor"), and since `ModelNav` renders on every model-scoped route, the
  * overflow was systemic, not page-specific — matching the bug's own plural
- * wording. `CapabilityMapPage.module.css`'s `.maintenanceActions` (the
- * other implicated spot) doesn't reliably overflow on its own — its
- * buttons wrap text rather than forcing a fixed width — but `flex-wrap:
- * wrap` was added there too, as a straightforward hardening against the
- * same class of failure.
+ * wording. `CapabilityMapPage.module.css`'s maintenance-actions row (the
+ * other implicated spot — since folded into a "⋯" overflow menu beside
+ * "+ Add capability" by Sprint U4-2a check B5, but at the time of this
+ * bug still its own always-visible row) didn't reliably overflow on its
+ * own — its buttons wrapped text rather than forcing a fixed width — but
+ * `flex-wrap: wrap` was added there too, as a straightforward hardening
+ * against the same class of failure.
  *
  * This spec seeds a change branch whose title is long enough to have
- * reproduced the bug pre-fix, and a capability so `.maintenanceActions`
- * renders, then visits every model-scoped route at 390px width asserting
- * no horizontal scroll — the check the bug report itself asks for.
+ * reproduced the bug pre-fix, and a capability so the capability map's
+ * own maintenance actions render, then visits every model-scoped route
+ * at 390px width asserting no horizontal scroll — the check the bug
+ * report itself asks for.
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
@@ -75,8 +78,8 @@ test('model-scoped routes: no horizontal scroll at 390px, including a long branc
   const { data: sourceRow } = await signedIn.from('sources').select('id').eq('model_id', modelId).eq('user_id', userId).single();
   const seedSourceId = (sourceRow as { id: string }).id;
 
-  // One capability (so CapabilityMapPage's `.maintenanceActions` renders —
-  // it's gated on the tree being non-empty) and one system.
+  // One capability (so CapabilityMapPage's "⋯" maintenance-actions menu
+  // renders — it's gated on the tree being non-empty) and one system.
   const envelope: CommitEnvelope = {
     id: randomUUID(),
     branchId: main.id,

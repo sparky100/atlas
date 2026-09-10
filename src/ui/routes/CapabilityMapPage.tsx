@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
@@ -42,6 +42,14 @@ import styles from './CapabilityMapPage.module.css';
  * the map is empty or not, not just CapabilityMapView's own former
  * empty-state fallback) is already visible above it — both owner/
  * architect only, same gate as `Edit` (ADR-015).
+ *
+ * Sprint U4-2a check B5: "Sync descriptions"/"Export as starter map"
+ * (Sprint U4-1 C6's owner-only maintenance actions) sit in a "⋯" overflow
+ * menu beside "+ Add capability", not as two buttons of their own below
+ * the header — same always-collapsed `menuWrapper`/`menuToggle`/`menu`
+ * pattern `ElementHeader.tsx`'s own overflow menu uses. Gated on the tree
+ * being non-empty (same condition the old standalone row used) — nothing
+ * to sync or export from an empty map.
  */
 export function CapabilityMapPage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
@@ -72,6 +80,14 @@ export function CapabilityMapPage() {
   // silently reset a toggle living inside it back to `false` after every
   // single move. See CapabilityMapView.tsx's own prop comment.
   const [reorderMode, setReorderMode] = useState(false);
+  // Sprint U4-2a check B5: "Sync descriptions"/"Export as starter map" move
+  // from two always-visible buttons of their own into one "⋯" overflow
+  // menu beside "+ Add capability" — same always-collapsed pattern
+  // ElementHeader.tsx's own overflow menu uses (ElementHeader.module.css's
+  // own comment: unlike LandscapePage's E1 disclosures, this one isn't
+  // viewport-conditional, so no `useIsNarrowViewport` here).
+  const [maintenanceMenuOpen, setMaintenanceMenuOpen] = useState(false);
+  const maintenanceMenuId = useId();
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -115,6 +131,33 @@ export function CapabilityMapPage() {
                 expectedHeadCommitId={state.data.commitId}
                 onCreated={reload}
               />
+              {(state.data.tree.l1.length > 0 || state.data.tree.orphans.length > 0) && (
+                <div className={styles.menuWrapper}>
+                  <button
+                    type="button"
+                    className={styles.menuToggle}
+                    aria-expanded={maintenanceMenuOpen}
+                    aria-controls={maintenanceMenuId}
+                    aria-label="Capability map actions"
+                    onClick={() => {
+                      setMaintenanceMenuOpen((o) => !o);
+                    }}
+                  >
+                    <span aria-hidden="true">⋯</span>
+                  </button>
+                  <div id={maintenanceMenuId} className={[styles.menu, maintenanceMenuOpen ? styles.open : ''].filter(Boolean).join(' ')}>
+                    <SyncDescriptionsAction modelId={model.id} userId={userId} onSynced={reload} />
+                    <ExportCapabilityMapAction
+                      modelId={model.id}
+                      modelName={model.name}
+                      orgName={organisation?.name ?? ''}
+                      orgSlug={organisation?.slug ?? ''}
+                      modelSlug={model.slug}
+                      userId={userId}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -125,19 +168,6 @@ export function CapabilityMapPage() {
         {state.status === 'refNotFound' && !canEdit && <Text as="p">This model has no commits yet at this ref.</Text>}
         {state.status === 'ready' && state.data.tree.l1.length === 0 && state.data.tree.orphans.length === 0 && canEdit && (
           <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reload} />
-        )}
-        {state.status === 'ready' && (state.data.tree.l1.length > 0 || state.data.tree.orphans.length > 0) && canEdit && (
-          <div className={styles.maintenanceActions}>
-            <SyncDescriptionsAction modelId={model.id} userId={userId} onSynced={reload} />
-            <ExportCapabilityMapAction
-              modelId={model.id}
-              modelName={model.name}
-              orgName={organisation?.name ?? ''}
-              orgSlug={organisation?.slug ?? ''}
-              modelSlug={model.slug}
-              userId={userId}
-            />
-          </div>
         )}
         {state.status === 'ready' && (
           <CapabilityMapView
