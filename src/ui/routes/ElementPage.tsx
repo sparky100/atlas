@@ -353,6 +353,11 @@ function AttributesTable({
     <div>
       {schema.map((field) => {
         const fact = facts.get(field.key);
+        // ADR-020: `hideWhenEmpty` (Capability.code/"Reference") omits the
+        // row entirely rather than rendering AttributeRow's own bare "—"
+        // — distinct from `hidden` above, which excludes it regardless of
+        // whether a fact exists.
+        if (field.hideWhenEmpty === true && !fact) return null;
         return <AttributeRow key={field.key} label={field.label} required={field.required} fact={fact} source={fact ? sources.get(fact.source_id) : undefined} />;
       })}
       <AliasRows elementId={element.element_id} aliases={aliases} aliasSources={aliasSources} />

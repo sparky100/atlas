@@ -45,11 +45,21 @@ describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
     }
   });
 
-  it('check C2: every `description` field is multiline; no other field is — a short field like Code/Vendor/Email never gets the auto-growing textarea', () => {
+  it('check C2: every `description` field is multiline; no other field is — a short field like Reference/Vendor/Email never gets the auto-growing textarea', () => {
     for (const type of ELEMENT_TYPES) {
       for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[type]) {
         if (field.key === 'description') expect(field.multiline).toBe(true);
         else expect(field.multiline).not.toBe(true);
+      }
+    }
+  });
+
+  it('ADR-020: only Capability.code ("Reference") hides when empty — every other field still shows a bare "—" per §4.3\'s default', () => {
+    const capability = ATTRIBUTE_SCHEMA_BY_TYPE.capability;
+    expect(capability.find((f) => f.key === 'code')).toMatchObject({ label: 'Reference', hideWhenEmpty: true });
+    for (const type of ELEMENT_TYPES) {
+      for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[type]) {
+        if (!(type === 'capability' && field.key === 'code')) expect(field.hideWhenEmpty).not.toBe(true);
       }
     }
   });

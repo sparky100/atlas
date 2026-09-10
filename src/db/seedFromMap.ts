@@ -5,12 +5,16 @@
  * parented on main's existing genesis commit (ADR-018: main always has a
  * real head, even before this runs — only the trigger-inserted `genesis`
  * commit itself is ever allowed a null parent), whose `element.create`
- * deltas carry `attributes.code`/`attributes.templateRef`/`attributes.order`
+ * deltas carry `attributes.templateRef`/`attributes.order`
  * (Sprint U4-1 C1: `capability_map_items.item_order`, always present —
  * the content schema requires one on every item)/(when the map item has
  * one) `attributes.description`, plus one `sources` row (kind `template`)
  * and one `aliases` row per element (`template_code`, RT-4) recording
- * which starter map and version seeded this model.
+ * which starter map and version seeded this model. `attributes.code`
+ * ("Reference") is deliberately **not** set here (ADR-020) — it's an
+ * organisation's own optional field now, not a copy of the template's
+ * code, which stays reachable via `templateRef` and the `template_code`
+ * alias alone.
  *
  * `attributes.description` (Bug A2 fix — it was previously dropped
  * silently) carries the same provenance as `name`: it's the map item's own
@@ -86,7 +90,11 @@ export function buildSeedDeltas(
     }
 
     const deltaId = mintId();
-    const attributes: CapabilityAttributes = { code: item.code, templateRef: item.id, order: item.item_order };
+    // ADR-020: `code` ("Reference") is never set at seed time — an
+    // organisation's own optional field, not a copy of the template's
+    // code, which stays reachable via `templateRef` and the
+    // `template_code` alias (`aliases.push` below) alone.
+    const attributes: CapabilityAttributes = { templateRef: item.id, order: item.item_order };
     const description = item.description?.trim();
     if (description) attributes.description = description;
     deltas.push({
