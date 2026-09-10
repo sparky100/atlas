@@ -6,13 +6,27 @@ name: Deploy migrations
 # case-collisions check) now runs locally before every push and is reported
 # in the sprint summary with the exact commands used — see CLAUDE.md's
 # "Verification (all local)" section and README's "What runs when". This
-# workflow's only job is to get supabase/migrations onto the live project
-# once a change has actually merged to main; it trusts that local
-# verification already happened, the same way `git push` trusts a
-# developer ran their own build.
+# workflow's job is to get supabase/migrations onto the live project and
+# the app itself onto Cloudflare, once a change has actually merged to
+# main; it trusts that local verification already happened, the same way
+# `git push` trusts a developer ran their own build.
+#
+# Prompt 7g's own A3 close-out: rewritten to actually deploy the app too
+# (a Cloudflare Pages/Workers deploy-hook POST, run only once the migration
+# push ahead of it has succeeded), not just the database half the previous
+# version of this workflow covered — Workers Builds' own auto-build on
+# push is turned off (dashboard-side, not a file in this repo) precisely so
+# this workflow is the one place that sequences "migrations first, then
+# the app," rather than the two racing each other on every push.
 on:
   push:
     branches: [main]
+  # Lets a human re-run this by hand from the Actions tab (or `gh workflow
+  # run deploy-migrations.yml`) without needing an empty commit — for the
+  # first run after wiring the four secrets below, or to retry a push that
+  # failed for a reason unrelated to the migrations/app themselves (a
+  # transient Supabase/Cloudflare outage).
+  workflow_dispatch:
 
 # Migrations must apply in the order they land on main, one at a time — a
 # second push arriving mid-deploy queues behind the first rather than
@@ -20,12 +34,12 @@ on:
 # point: an in-flight `supabase db push` is a live migration against the
 # real project, not disposable CI work that's safe to kill.
 concurrency:
-  group: migrations
+  group: deploy
   cancel-in-progress: false
 
 jobs:
-  deploy-migrations:
-    name: Deploy migrations to the linked Supabase project
+  deploy:
+    name: Deploy migrations, then the app
     runs-on: ubuntu-latest
     # Read by every supabase CLI command below, not just one step — link
     # and push both authenticate against the management API with it.
@@ -34,19 +48,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Pinned action tag and pinned CLI version, matching the
-      # `"supabase": "^2.116.0"` devDependency package.json installs
-      # locally — the same CLI version everywhere, not just in this job.
+      # Pinned action tag and pinned CLI version — the same version
+      # everywhere, not just in this job (see package.json's own
+      # `"supabase"` devDependency for the local-desktop half of that).
       - uses: supabase/setup-cli@v3.0.0
         with:
-          version: 2.116.0
+          version: 2.101.0
 
-      # The project ref itself isn't sensitive — it's already public in
-      # README's "Environments" section — so it's a literal here, not a
-      # secret. `db push` operates on whichever project is linked; this is
-      # that link, not a separate deploy step.
+      # The project ref is a repo secret here, not the literal this
+      # workflow used to hardcode — SUPABASE_PROJECT_ID, so the same
+      # workflow file could point at a different project without editing
+      # it, and so the ref isn't sitting in git history as a side effect
+      # of a decision ("it isn't sensitive") this rewrite no longer makes
+      # unilaterally. `db push` operates on whichever project is linked;
+      # this is that link, not a separate deploy step.
       - name: Link the Supabase project
-        run: supabase link --project-ref xakqcssapdiatwrmnjop
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+        env:
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
 
       # SUPABASE_ACCESS_TOKEN (job env, above) authenticates `link` and the
       # management-API side of `db push`; SUPABASE_DB_PASSWORD is the
@@ -59,3 +78,17 @@ jobs:
         run: supabase db push
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      # Runs only once migrations have actually succeeded (the step
+      # above) — this workflow's whole reason for sequencing the two
+      # rather than letting Cloudflare's own push-triggered auto-build
+      # race the migration: the app should never start serving a schema
+      # change before that schema change is live. `-fsS`: fail the step
+      # (and the run) on a non-2xx response rather than silently
+      # "succeeding" against a broken or rotated hook URL; `-S` keeps the
+      # error body visible even with `-s`'s otherwise-silent progress
+      # meter.
+      - name: Deploy the app (Cloudflare)
+        run: curl -fsS -X POST "$CLOUDFLARE_DEPLOY_HOOK"
+        env:
+          CLOUDFLARE_DEPLOY_HOOK: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK }}

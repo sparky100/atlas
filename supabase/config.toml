@@ -28,16 +28,20 @@ extra_search_path = ["public", "extensions"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size
 # for accidental or malicious requests.
 max_rows = 1000
-# Controls whether new tables, views, sequences and functions created in the `public` schema by
-# `postgres` are reachable through the Data API roles (`anon`, `authenticated`, `service_role`)
-# without explicit GRANTs, matching the cloud default. Set to `false` to require explicit GRANTs
-# instead. Left unset, a fresh project falls back to `true`.
-#
-# Atlas sets this to false: RLS alone controls row visibility, but a table
-# with RLS enabled and no GRANT is still unreachable outright, which is the
-# posture CLAUDE.md and SPEC-data-model.md §9 want — every table's exposure
-# is a deliberate line in its migration, not an implicit default.
-auto_expose_new_tables = false
+# `auto_expose_new_tables` used to be set `false` here — a *local-dev CLI*
+# convenience toggle for tables created ad hoc (dashboard, SQL editor)
+# without a migration; Atlas never creates a table any other way (CLAUDE.md
+# rule 1: every schema change ships with a migration, which always writes
+# its own explicit `grant`), so this key was never load-bearing for this
+# repo's real security posture either way. Removed, not reset: the
+# `supabase` CLI running locally this sprint (2.116.0+) had already
+# stopped accepting the key — `supabase db reset`/`db push` were silently
+# rewriting this file to strip it on every run, so the explicit line was
+# stale config-schema drift, not an enforced setting. The actual posture
+# (RLS alone controls row visibility; a table with RLS enabled and no
+# GRANT is unreachable regardless of this key) is unchanged — it was
+# always enforced per-table by each migration's own `grant`/`revoke`
+# statements, never by this file.
 
 [api.tls]
 # Enable HTTPS endpoints locally using a self-signed certificate.
@@ -115,18 +119,6 @@ port = 54323
 api_url = "http://127.0.0.1"
 # OpenAI API Key to use for Supabase AI in the Supabase Studio.
 openai_api_key = "env(OPENAI_API_KEY)"
-
-# Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
-# are monitored, and you can view the emails that would have been sent from the web interface.
-[local_smtp]
-enabled = true
-# Port to use for the email testing server web interface.
-port = 54324
-# Uncomment to expose additional ports for testing user applications that send emails.
-# smtp_port = 54325
-# pop3_port = 54326
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
 
 [storage]
 enabled = true
