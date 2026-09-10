@@ -132,6 +132,20 @@ function main(): void {
     console.warn(JSON.stringify(remoteOnly, null, 2));
     console.warn('Consider backporting these into supabase/migrations before pushing more changes on top.');
   }
+
+  // Sprint U4-2a item 3: "capability order backfill run against dev,
+  // idempotent, in `pnpm release` until done everywhere." A genuinely
+  // automatic version can't exist as written — `atlas.commit_deltas`
+  // derives its author from `auth.uid()` with no grant to `service_role`
+  // at all (ADR-007/ADR-015: no fact without provenance, only owner/
+  // architect commits to main), so there's no session for a release
+  // script to write through for a model it doesn't already have a signed-
+  // in owner/architect's credentials for. This reminder — not an
+  // automatic run — is the deliberate answer, until "every model" no
+  // longer needs saying because every model created since Sprint U4-1 C1
+  // already gets `order` at creation (`useCapabilityCreate.ts`) and
+  // nothing predates it any more; remove this block then.
+  console.log('releasePreflight: reminder — if any model still predates Sprint U4-1 C1 (capabilities created without an explicit order), run `pnpm backfill:capability-order <modelId> <email> <password>` for it. Idempotent (reports "nothing to backfill" once done); no automatic way to run this for every model at once — see this script\'s own comment for why.');
 }
 
 main();
