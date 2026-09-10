@@ -43,6 +43,15 @@ export interface AttributeFieldMeta {
   editable?: boolean;
   /** Sprint U4-1 D2: true only for Capability.templateRef — "not a user-facing attribute... hide from the attributes list". Excluded from the read-only Attributes display entirely (`ElementPage.tsx`'s `AttributesTable`), not merely non-editable — its information still surfaces, reworded, on the provenance card of any fact seeded alongside it (`ProvenanceCard.tsx`'s `seededFrom`). Defaults to false/shown; distinct from `editable: false`, which several other fields (`Capability.order`, e.g.) also set while staying genuinely useful to see. */
   hidden?: boolean;
+  /**
+   * Check C2 (docs/CHECK-U4-2a.md): `kind: 'text'` only — true for a
+   * field whose value is prose someone actually writes sentences into
+   * (every `description`), not a short label like `Code`/`Vendor`/`Email`.
+   * `AttributeValueInput.tsx` renders this as an auto-growing textarea
+   * (min 2 rows, max ~8) instead of the single-line `<input>` every other
+   * `text` field still gets. Defaults to false.
+   */
+  multiline?: boolean;
 }
 
 export interface AttributeFieldSchema extends AttributeFieldMeta {
@@ -55,7 +64,7 @@ function schemaOf<T extends string>(order: readonly T[], meta: Record<T, Attribu
 
 const CAPABILITY_META: Record<keyof CapabilityAttributes, AttributeFieldMeta> = {
   code: { label: 'Code', required: false, kind: 'text' },
-  description: { label: 'Description', required: false, kind: 'text' },
+  description: { label: 'Description', required: false, kind: 'text', multiline: true },
   templateRef: { label: 'Template reference', required: false, kind: 'text', editable: false, hidden: true },
   // Not a user-facing edit field, same reasoning as templateRef — Sprint
   // U4-1 C1's reorder control (src/ui/capabilityMap/useCapabilityReorder.ts)
@@ -72,7 +81,7 @@ const LIFECYCLE_STATUS_OPTIONS = ['planned', 'active', 'retiring', 'retired'] as
 const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   lifecycleStatus: { label: 'Lifecycle', required: true, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
   vendor: { label: 'Vendor', required: false, kind: 'text' },
-  description: { label: 'Description', required: false, kind: 'text' },
+  description: { label: 'Description', required: false, kind: 'text', multiline: true },
   isExternal: { label: 'External', required: true, kind: 'boolean' },
   externalOrganisation: { label: 'External organisation', required: false, kind: 'text' },
   introduced: { label: 'Introduced', required: false, kind: 'date' },
@@ -82,7 +91,7 @@ const SYSTEM_ORDER: (keyof SystemAttributes)[] = ['lifecycleStatus', 'vendor', '
 
 const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   technology: { label: 'Technology', required: false, kind: 'text' },
-  description: { label: 'Description', required: false, kind: 'text' },
+  description: { label: 'Description', required: false, kind: 'text', multiline: true },
   isExternal: { label: 'External', required: true, kind: 'boolean' },
   introduced: { label: 'Introduced', required: false, kind: 'date' },
   plannedEnd: { label: 'Planned end', required: false, kind: 'date' },
@@ -91,7 +100,7 @@ const CONTAINER_ORDER: (keyof ContainerAttributes)[] = ['technology', 'descripti
 
 const COMPONENT_META: Record<keyof ComponentAttributes, AttributeFieldMeta> = {
   technology: { label: 'Technology', required: false, kind: 'text' },
-  description: { label: 'Description', required: false, kind: 'text' },
+  description: { label: 'Description', required: false, kind: 'text', multiline: true },
 };
 const COMPONENT_ORDER: (keyof ComponentAttributes)[] = ['technology', 'description'];
 

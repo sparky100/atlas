@@ -14,6 +14,37 @@
   border-color: var(--status-danger);
 }
 
+/**
+ * Check C2: an auto-growing textarea for free-text attributes
+ * (`description`, every element type) — min 2 rows (the `rows={2}`
+ * attribute itself), growing with content up to ~8 lines via
+ * `field-sizing: content` (the same technique the check's own search
+ * looked for and found nowhere), then scrolling internally past that
+ * rather than pushing the rest of the edit form further down. `line-height:
+ * var(--text-md-lh)` (not `font: inherit`'s own value alone) is what makes
+ * "2 rows"/"~8 rows" a real, calculable height rather than an approximation.
+ */
+.textarea {
+  width: 100%;
+  max-width: 320px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  line-height: var(--text-md-lh);
+  resize: none;
+  field-sizing: content;
+  min-height: calc(2 * var(--text-md-lh) + 2 * var(--space-1) + 2 * var(--border-width));
+  max-height: calc(8 * var(--text-md-lh) + 2 * var(--space-1) + 2 * var(--border-width));
+  overflow-y: auto;
+}
+
+.textarea[aria-invalid='true'] {
+  border-color: var(--status-danger);
+}
+
 .checkbox {
   width: 18px;
   height: 18px;
