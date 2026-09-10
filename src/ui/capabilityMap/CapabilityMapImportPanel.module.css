@@ -1,18 +1,46 @@
-.list {
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.searchInput {
+  flex: 1;
+  height: var(--row-height);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+/**
+ * Sprint U4-2a item 4: cards, not the old single-column list — a
+ * responsive grid, same breakpoint shape as CapabilityMapView.module.css's
+ * own `.columns` (this repo's one existing precedent for "several
+ * independent cards, narrower at mobile"), though this list is rarely
+ * more than eight-or-so items, so it never needs that file's own 5-column
+ * top tier.
+ */
+.grid {
   list-style: none;
   margin: var(--space-4) 0 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: var(--space-3);
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
