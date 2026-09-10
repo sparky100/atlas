@@ -83,18 +83,31 @@ export async function listRelationshipsForElement(supabase: Client, commitId: UU
 
 /**
  * Batch lookup so a page with N badges makes one query, not N (§4.9's paint
- * budget). `assertInFilterSize` already keeps `elementIds` at or under 50,
- * so this never actually pages — routed through `selectAll` anyway for the
- * same reason every other `elements_head`/`relationships_head`/`facts`/
- * `deltas`/`commits` read is (SPEC §6.7, and this module's own enforcement
- * test, `headTableReads.test.ts`, requires it of every one of them).
+ * budget). Used to put `elementIds` straight into `.in('element_id', ...)`,
+ * guarded by `assertInFilterSize` — real, live 400 on dev, 2026-09-10: the
+ * architect door's own health-findings/duplicates rollup calls this with
+ * every capability in the model, and a starter-map-seeded model clears 50
+ * on its own (an NHS import alone is 73). CLAUDE.md rule 8's own fix for
+ * exactly this shape (a caller-supplied id list that grows with the model,
+ * not a small fixed enum): query the commit scope alone —
+ * `.eq('commit_id', commitId)`, no `.in()` at all — and filter to
+ * `elementIds` client-side, the same rewrite `src/db/landscape.ts`'s
+ * `listLandscapeEdges`/`listSupportsEdgesForSystems` already did for the
+ * identical reason (their own comments cite the same rule). Still routed
+ * through `selectAll` (SPEC §6.7, and this module's own enforcement test,
+ * `headTableReads.test.ts`) since the *unfiltered* commit scope is exactly
+ * the kind of read that can now genuinely page.
  */
 export async function getElementsByIds(supabase: Client, commitId: UUID, elementIds: readonly UUID[]): Promise<Map<UUID, ElementsHeadRow>> {
   if (elementIds.length === 0) return new Map();
-  assertInFilterSize('getElementsByIds', 'element_id', elementIds);
-  const query = supabase.from('elements_head').select(ELEMENTS_HEAD_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).in('element_id', elementIds).order('element_id');
+  const wanted = new Set(elementIds);
+  const query = supabase.from('elements_head').select(ELEMENTS_HEAD_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).order('element_id');
   const rows = await selectAll<ElementsHeadRow>(query);
-  return new Map(rows.map((row) => [row.element_id, row]));
+  const result = new Map<UUID, ElementsHeadRow>();
+  for (const row of rows) {
+    if (wanted.has(row.element_id)) result.set(row.element_id, row);
+  }
+  return result;
 }
 
 export async function getSourcesByIds(supabase: Client, sourceIds: readonly UUID[]): Promise<Map<UUID, SourceRow>> {
