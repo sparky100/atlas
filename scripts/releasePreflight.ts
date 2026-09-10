@@ -25,7 +25,19 @@
 import { execFileSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 
-/** Every migration file's own version prefix (`YYYYMMDDHHMMSS`) — the same token `supabase migration list` keys its own rows by. */
+/**
+ * Every migration file's own version prefix (`YYYYMMDDHHMMSS`) — the same
+ * token `supabase migration list` keys its own rows by. Warns (does not
+ * fail) on a prefix whose hour component isn't a real hour (00-23) —
+ * Prompt 7g's own A3 close-out: several of this sprint's own migrations
+ * (2026-09-06, hours 24 through 37) used a fake incrementing "hour" purely
+ * to keep same-day files sorted, not a real timestamp. Left as-is here
+ * (renaming an already-applied migration's version is exactly the drift
+ * `supabase migration repair` exists to fix, not something to do casually
+ * after the fact), but flagged so a *new* migration doesn't repeat it —
+ * same-day ordering has 59 real minutes and 59 real seconds per hour to
+ * work with instead.
+ */
 function localMigrationVersions(): string[] {
   return readdirSync('supabase/migrations')
     .filter((name) => name.endsWith('.sql'))
@@ -33,6 +45,10 @@ function localMigrationVersions(): string[] {
       const match = /^(\d{14})_/.exec(name);
       const version = match?.[1];
       if (!version) throw new Error(`releasePreflight: migration file "${name}" doesn't start with a 14-digit version prefix`);
+      const hour = Number(version.slice(8, 10));
+      if (hour > 23) {
+        console.warn(`releasePreflight: migration "${name}" has version prefix "${version}" whose hour component (${String(hour)}) isn't a real hour (00-23) — fine for an already-applied migration, but new migrations should use real timestamps.`);
+      }
       return version;
     });
 }
@@ -114,23 +130,52 @@ function main(): void {
   // link` (a one-time, machine-local setup) to ask the remote project
   // anything at all, which this script can't assume every environment has
   // done. When it *can* check, it's worth checking — see this file's own
-  // module comment for a real case it would have caught.
+  // module comment for a real case it would have caught. `linked` tracks
+  // whether this and the dry-run check below actually ran, versus were
+  // skipped for lack of a link — neither is allowed to short-circuit the
+  // rest of `main` (the backfill reminder below still always prints; a
+  // dev who hasn't linked yet shouldn't lose that too).
   const remoteRows = runMigrationList(['--linked']);
-  if (!remoteRows) {
+  const linked = remoteRows !== null;
+  if (!linked) {
     console.warn('releasePreflight: could not check the linked remote project for drift (not linked? run `supabase link`) — proceeding without that check.');
-    return;
+  } else {
+    const remoteOnly = remoteRows.filter((row) => {
+      if (typeof row !== 'object' || row === null) return false;
+      const r = row as MigrationListRow;
+      const remoteVersion = APPLIED_KEYS.remote.map((key) => r[key]).find((v) => typeof v === 'string');
+      if (typeof remoteVersion !== 'string' || remoteVersion === '') return false;
+      return !versions.includes(remoteVersion);
+    });
+    if (remoteOnly.length > 0) {
+      console.warn(`releasePreflight: the linked remote project has migration(s) with no matching local file — likely an ad hoc hotfix applied directly and never captured (exactly what happened with seed_from_map this sprint):`);
+      console.warn(JSON.stringify(remoteOnly, null, 2));
+      console.warn('Consider backporting these into supabase/migrations before pushing more changes on top.');
+    }
   }
-  const remoteOnly = remoteRows.filter((row) => {
-    if (typeof row !== 'object' || row === null) return false;
-    const r = row as MigrationListRow;
-    const remoteVersion = APPLIED_KEYS.remote.map((key) => r[key]).find((v) => typeof v === 'string');
-    if (typeof remoteVersion !== 'string' || remoteVersion === '') return false;
-    return !versions.includes(remoteVersion);
-  });
-  if (remoteOnly.length > 0) {
-    console.warn(`releasePreflight: the linked remote project has migration(s) with no matching local file — likely an ad hoc hotfix applied directly and never captured (exactly what happened with seed_from_map this sprint):`);
-    console.warn(JSON.stringify(remoteOnly, null, 2));
-    console.warn('Consider backporting these into supabase/migrations before pushing more changes on top.');
+
+  // Prompt 7g's own A3 close-out: `db push --dry-run` against the same
+  // linked project the check above either confirmed reachable or warned
+  // about — this is the actual push's own preview, so a failure here (bad
+  // SQL, a migration that only works against a schema shape this project
+  // no longer has, a permissions problem) means the real
+  // `supabase db push` a few lines later in `pnpm release` would fail
+  // too, just later and after this script's own green light. Catching
+  // that here, before the real push runs, is the whole point of a
+  // pre-flight. Skipped, not failed, when there's no link (same
+  // limitation as the drift check just above) — not run standalone either
+  // (this repo has no `pnpm release:dry-run` — it's one more check inside
+  // the existing pre-flight, not a separate command to remember).
+  if (linked) {
+    try {
+      execFileSync('supabase', ['db', 'push', '--dry-run'], { stdio: 'inherit' });
+      console.log('releasePreflight: `supabase db push --dry-run` succeeded — the real push should too.');
+    } catch (e) {
+      console.error('releasePreflight: `supabase db push --dry-run` failed — the real push would fail the same way. Fix the migration(s) above before running `pnpm release` for real.');
+      console.error(e instanceof Error ? e.message : String(e));
+      process.exit(1);
+      return;
+    }
   }
 
   // Sprint U4-2a item 3: "capability order backfill run against dev,
