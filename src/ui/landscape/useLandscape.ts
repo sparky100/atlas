@@ -98,7 +98,33 @@ export interface UseLandscapeResult {
  * unchanged either way. `mode` is meaningless for `main`/`tag` (the As-is/
  * To-be/Diff control is hidden there, §6.2) and is only read for a branch.
  */
-export function useLandscape(modelId: UUID | null, orgId: UUID | null, userId: UUID | null, ref: Ref, mode: ViewMode, capabilityId: UUID | null = null): UseLandscapeResult {
+export function useLandscape(
+  modelId: UUID | null,
+  orgId: UUID | null,
+  userId: UUID | null,
+  ref: Ref,
+  mode: ViewMode,
+  capabilityId: UUID | null = null,
+  /**
+   * Sprint U4-2a item 2 ("main-branch lookup once per route, shared"): the
+   * caller's own already-fetched `main` head. `LandscapePage` already calls
+   * `useMainBranch` itself (for its own search-pool/canAdd logic) — without
+   * this, `ref.kind === 'main'` (the common case: no `?ref=` at all) meant
+   * this hook *also* resolved the exact same row itself via `resolveRef`, a
+   * second identical `branches?...kind=eq.main` request racing the first
+   * one on every load, confirmed live via the network log.
+   *
+   * For a `main` ref this hook now *waits* for the hint rather than falling
+   * back to its own `resolveRef` when it's momentarily absent (its own
+   * effect comment explains why: racing the two would occasionally still
+   * dedupe correctly, but just as often mean the hint arriving a beat later
+   * re-triggers this whole effect — a duplicate full landscape load, worse
+   * than the duplicate branch-row request this was meant to remove).
+   * Meaningless for `tag:`/`commit:`/`branch:` refs (there's no `main` row
+   * in play) — `null` there is the only ever value and never blocks them.
+   */
+  mainCommitIdHint: UUID | null = null,
+): UseLandscapeResult {
   const [state, setState] = useState<LandscapeState>({ status: 'loading' });
   const [resetToken, setResetToken] = useState(0);
   const refParam = refParamOf(ref);
@@ -114,6 +140,16 @@ export function useLandscape(modelId: UUID | null, orgId: UUID | null, userId: U
     // hook downstream of `state`) simply doesn't run yet, rather than
     // running once with a hollow id and once for real.
     if (!userId || !modelId || !orgId) return undefined;
+    // Wait for the caller's own main-branch fetch rather than racing it:
+    // if this fired its own `resolveRef` in parallel with the caller's
+    // `useMainBranch` (as it used to, unconditionally) and only used the
+    // hint when it happened to already be there, the hint arriving a beat
+    // later would change this effect's own dependencies and re-run the
+    // *entire* load a second time — trading one small duplicate branch-row
+    // request for a duplicate full landscape load, worse than the bug this
+    // was meant to fix. Waiting means this effect runs exactly once for a
+    // `main` ref, using the caller's already-resolved commit id.
+    if (ref.kind === 'main' && !mainCommitIdHint) return undefined;
     const currentModelId = modelId;
     const currentOrgId = orgId;
     const currentUserId = userId;
@@ -155,6 +191,14 @@ export function useLandscape(modelId: UUID | null, orgId: UUID | null, userId: U
           byIds: (ids) => projectionElementsByIds(resolved.projection, ids),
           supportingSystemIds: (capId) => new Set(resolved.projection.relationshipsHead.filter((r) => r.relationship_type === 'supports' && r.to_element_id === capId).map((r) => r.from_element_id)),
         };
+      } else if (ref.kind === 'main' && mainCommitIdHint) {
+        // Shared lookup: the caller already resolved `main`, so skip this
+        // hook's own `resolveRef` round trip entirely — see this
+        // parameter's own doc comment above. Everything past the commit id
+        // itself (systems/actors) is unique to this hook, same as the
+        // fallback branch below.
+        commitId = mainCommitIdHint;
+        [allSystems, allActors] = await Promise.all([listSystemsForLandscape(supabase, commitId), listActorsForLandscape(supabase, commitId)]);
       } else {
         const resolvedCommitId = await resolveRef(supabase, currentModelId, ref);
         if (!resolvedCommitId) {
@@ -218,7 +262,7 @@ export function useLandscape(modelId: UUID | null, orgId: UUID | null, userId: U
     // `ref`'s string form (`refParam`) is the real dependency, same pitfall
     // and same fix as useElementPage.ts — `ref` itself is read from the
     // closure, always the latest one.
-  }, [modelId, orgId, userId, refParam, mode, resetToken, capabilityId]);
+  }, [modelId, orgId, userId, refParam, mode, resetToken, capabilityId, mainCommitIdHint]);
 
   const resetLayout = useCallback(() => {
     setState((prev) => {
