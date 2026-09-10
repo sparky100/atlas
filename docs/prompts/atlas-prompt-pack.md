@@ -5,29 +5,26 @@ Separate product, separate repo, separate Supabase project. Shares code with the
 
 ---
 
-## State — 9 September 2026, updated same day (read this first; supersedes the earlier reset)
+## State — 9 September 2026 (read this first; supersedes the earlier reset)
 
-**Done and on `main`:** F1, U1, U2, H1, C1, C1-H, U3a (creation), persistent model navigation, U3b (front doors, browse, mobile header), director door rebuilt to its handoff, architect door health findings, ADR-019, the add-a-system flow, M1a (comments backend: profiles, comments, mentions, notifications, realtime), eight starter maps published, **PR #18** (U4-1: search-pool refresh, commit titles, activity rows, lane roll-up and `supports.role`, relationship verb, health findings, capability map order/grid/tiles/colour-by/export, element header cleanup, mobile landscape actions, electricity map v2 draft), and **PR #19** (GitHub Actions reduced to the single `deploy-migrations.yml` workflow described below — `CLAUDE.md`'s "Verification (all local)" and `README.md`'s "What runs when" already document the result; nothing further to do on that front). Housekeeping item 2 below (this same day) additionally lands: this pack committed at its own named path, the `pnpm release` script, the ADR-000 preface fix, and the two SPEC §11 additions — see that item's own line for exactly which parts and which don't.
+**Done and on `main`:** F1, U1, U2, H1, C1, C1-H, U3a (creation), persistent model navigation, U3b (front doors, browse, mobile header), director door rebuilt to its handoff, architect door health findings, ADR-019, the add-a-system flow, M1a (comments backend: profiles, comments, mentions, notifications, realtime), eight starter maps published. **Open:** PR #18 (U4-1: search-pool refresh, commit titles, activity rows, lane roll-up and `supports.role`, relationship verb, health findings, capability map order/grid/tiles/colour-by/export, element header cleanup, mobile landscape actions, electricity map v2 draft).
 
-**Built, not yet on `main`:** M1b (comments UI, item 3 below) — on branch `sprint/m1b-comments`, based on `docs/atlas-prompt-pack`'s own head; needs a PR (against `main`, after rebasing off this branch once it merges) before it's the repo's real state, not just this pack's.
+**How verification and deployment actually work (and will from here):** all three suites run locally on the desktop before push and are reported in the sprint summary with the commands. GitHub Actions is reduced to nothing, or to one `supabase db push` job on push to `main`. Migrations are applied with `supabase db push` from the desktop (`pnpm release`); Cloudflare Workers Builds deploys on push. "CI green" in the definition of done means "all three suites green locally on the final commit"; `main` has never had a green Actions run and that is no longer the gate.
 
-**Open:** the `design`/`missing` labels (item 2); M1b's own PR (above); next is the ordering below.
+**Paths:** handoff docs live at `docs/HANDOFF-*.md` (not `docs/design/`). This pack is committed at `docs/prompts/atlas-prompt-pack.md`. ADR numbering in this file follows the repo (`docs/ADR-000-foundations.md`, ADR-001–019; fix its preface, which still says "through 014").
 
-**How verification and deployment actually work:** all three suites run locally on the desktop before push and are reported in the sprint summary with the commands. GitHub Actions is reduced to nothing, or to one `supabase db push` job on push to `main` — done, not aspirational, as of PR #19. Migrations are applied with `supabase db push` from the desktop (`pnpm release`, added this same day: runs `supabase db push`, then a reminder that Cloudflare Workers Builds deploys the app itself automatically on push — nothing else to run); the GitHub Actions workflow does the same automatically on every push to `main`, as a backstop. "CI green" in the definition of done means "all three suites green locally on the final commit"; `main` has never had a green Actions run and that is no longer the gate.
-
-**Paths:** handoff docs live at `docs/HANDOFF-*.md` (not `docs/design/`). This pack is committed at `docs/prompts/atlas-prompt-pack.md` — done. ADR numbering in this file follows the repo (`docs/ADR-000-foundations.md`, ADR-001–019; its preface now says so — fixed this same day, it used to say "through 014").
-
-**Findings loop:** the GitHub issue list is the backlog. Every finding from use becomes an issue with a label (`bug`, `design`, `missing`) before it becomes a prompt. The `bug` label exists; **`design` and `missing` still need creating** — the tooling available when this pack was committed had no way to create a GitHub label (no `gh` CLI, no label-create call in the GitHub MCP server used), so this one sub-item of housekeeping item 2 is still open, not done. U4-n sprints take the top 8–12 issues.
+**Findings loop:** the GitHub issue list is the backlog. Every finding from use becomes an issue with a label (`bug`, `design`, `missing`) before it becomes a prompt; create the two missing labels. U4-n sprints take the top 8–12 issues.
 
 **Definition of usable (unchanged):** an architect can sign up, seed or build a capability tree, add twenty systems with owners, lifecycle dates and verb-labelled relationships, see them on the landscape and capability map, make one change through a branch (retire a system, add its replacement) and merge it, tag before and after, and show a director the capability map with exposure colouring, on a phone and a desktop.
 
 **Order from here.**
-1. Fix the failing Workers Builds check (not investigated by the session that committed this pack — status as of PR #18's own head is "failing", not re-checked since); `pnpm release`; use the DNO model for the human sentence. (Merging PR #18 is done — see above.)
-2. Remaining housekeeping: **create the `design`/`missing` issue labels** (the one sub-item still open — needs a human or a session with real GitHub label-admin access, `gh label create` or the web UI; everything else this item named is done, see the State lines above).
-3. ~~**M1b** — comments UI~~ — **built, same day (2026-09-09), on `sprint/m1b-comments`** (based on `docs/atlas-prompt-pack`'s own head, since it needed the just-written handoff — rebase onto `main` once this branch's own PR merges): backend reply notifications (`notification_kind` gets `reply`, one trigger extended not duplicated), the shared comment primitives (composer with @mention autocomplete, thread, avatar), the element page's own section (6a), the landscape's marker + 372px panel (5a — bottom-right ink plate, per the resolved corner rule; marker click opens the panel, `c`/`n` act on the hovered node), the review/change page's per-subject threads and change-level column (6b), and the notification tray (6c — bell, inbox, mark-all-read, deep link for `element`/`change` anchors). Two real gaps deferred rather than faked, both recorded in `docs/SPEC-data-model.md` §11: the canvas's "hollow" (all-resolved) marker state and its "Comments on this view" filter (need a `view_kind`-aware/total-vs-unresolved RPC that doesn't exist yet), and the tray's deep link for `relationship`/`version`/`decision` anchors (no page to link to yet, unrelated to comments). Playwright written (`e2e/comments.spec.ts`) but not run — same sandbox limitation as everywhere else in this pack.
-4. Hour of use → issues → **U4-2** (drag-to-reorder is already queued there; expect the change flow, versions and the architect door's remaining §3.2 items to surface).
-5. Repeat until the definition of usable holds.
-6. Then C2 (split), K1 (capture), D1 (decisions), Q1 (duplicates), R1 (roadmap).
+1. Merge PR #18; fix the failing Workers Builds check; `pnpm release`; use the DNO model for the human sentence.
+2. Housekeeping (one short sprint): commit this pack to `docs/prompts/`; reduce Actions; `pnpm release` script; create issue labels; fix ADR-000 preface; SPEC §11 add the untracked C1 items (structural-conflict resolution actions → C2; capture-draft queue item kind → K1) and remove the stale `base_commit_id` note.
+3. **U4-2a** (Prompt 7f) — partly done 10 September; **close-out is Prompt 7g** (process, three bugs, the partial and unstarted items).
+4. **M1b** — comments UI, built to `docs/HANDOFF-M1b-comments.md` (corrected against the codebase first).
+5. Hour of use → issues → **U4-2b** (drag-to-reorder is already queued there; expect the change flow, versions and the architect door's remaining §3.2 items to surface).
+6. Repeat until the definition of usable holds.
+7. Then C2 (split), K1 (capture), D1 (decisions), Q1 (duplicates), R1 (roadmap).
 
 **Plumbing track (may run alongside the UI track; engine changes allowed; every item ends with integration tests against local Supabase):** delta-apply in SQL (SPEC §11 row 4, before K1) → capture design and pipeline backend (Prompts 10–11 without the queue UI) → C2 engine half (closure, `split_branch`) → D1 tables (decisions, assumptions, evidence, links) → duplicates job → LLM proxy edge function extracted and deployed. The two tracks never touch the same files in the same week.
 
@@ -232,6 +229,69 @@ The ordering matters. Prompts 0–2 produce documents that every later prompt re
 
 ---
 
+## Prompt 7f — Claude Code: U4-2a, findings from use (9–10 September)
+
+> Sprint U4-2a. Items are grouped by screen; do them in order, one PR per group is fine. All three suites locally before each push; `pnpm release` at the end; one summary listing each item as done / not done, with the human's sentence about using it. Engine frozen except where an item says otherwise. Log each item as a GitHub issue first (labels bug / design / missing) and reference the issue in the commit.
+>
+> **A. Blockers**
+> A1. `seed_from_map` reads main's current head inside the transaction and uses it as the new commit's parent; the client passes `expectedHeadCommitId`; grep and fix every remaining "first commit on main" assumption (perf fixture, integration seeds). Integration test: seed into a genesis-only model and into a model with commits. Playwright: import a starter map on a fresh model.
+> A2. Db-layer guard: any id-column filter with an empty/undefined value throws before the request. A resolved-model gate at the route so child hooks never run with undefined ids; the main-branch lookup happens once per route and is shared. 4xx/5xx responses surface a visible error banner naming the operation. Run every route on dev with the console open and report what remains.
+> A3. `pnpm release` pre-flight fails on unapplied local migrations. The deploy workflow (push to main): `supabase link` + `db push` with `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID`, `SUPABASE_DB_PASSWORD`, then POST the `CLOUDFLARE_DEPLOY_HOOK`; Workers Builds auto-build on push turned off; `workflow_dispatch` enabled. README documents the secrets and the deploy hook.
+>
+> **B. Capability map**
+> B1. Order backfill run against dev (idempotent; in `pnpm release` until applied everywhere); the disabled reorder state and its message removed; a missing order is assigned on the fly.
+> B2. Reorder controls only in a Reorder mode toggled from page actions, at all levels.
+> B3. L1 header on one row: name, coverage chip, "N systems →" right-aligned; columns start at the same height.
+> B4. Coverage counts a `supports` on the L1 itself ("1/5 + group-level"; tone treats the group as covered).
+> B5. Admin actions (Sync descriptions from starter map, Export as starter map) into an overflow menu beside "+ Add capability".
+> B6. Mobile (<768px): L1 groups as a collapsed list (name, aggregate tone strip, coverage chip, counts), one expanded at a time; L2 as dense rows with a leading tone dot and count, no blueprint frame; L3 on tap. Desktop unchanged. Playwright at 390px: twelve L1 groups within one screen; expand one.
+> B7. Starter map picker: content gains `title` and `summary` (all eight maps; review script checks them); cards with Preview (read-only tree in a drawer) and Import; slug and authoring notes hidden, provenance behind an info icon; search/filter; alphabetical by title.
+>
+> **C. Element page**
+> C1. Capability attributes: Template code moves to the provenance card; Code becomes an optional "Reference" attribute, not pre-filled by seed, hidden when empty; migration strips seed-copied codes equal to the template code.
+> C2. Free-text attributes (description, relationship verb phrases) edit in an auto-growing textarea (min 2 rows, max ~8), mobile and desktop.
+> C3. Structure section: single-line facts inline ("Level 1", "Parent: Finance", "Children: 5"); label-over-value only for values that wrap.
+>
+> **D. Landscape and canvas routes**
+> D1. Canvas routes (landscape, capability map, context, container, component) escape the page max-width and fill the viewport from the nav rail to the right edge and the full height below the page header; Fit computes against that box.
+> D2. Zoom about the cursor, clamped 0.25×–4×; fit on load and on Reset layout; +, −, Fit controls; `0` for fit. Playwright: ten wheel steps leave the diagram ≥25% and Fit restores it.
+> D3. Lanes as full-width horizontal bands; systems flow left-to-right and wrap; empty lanes collapse to a header; Unassigned last; cross-lane references as chips at the band's right edge. Actors above the top band; enterprise boundary around internal bands with externals outside.
+> D4. Mobile: landscape actions collapse to a single "+ Add" menu at 390px.
+>
+> **E. Front doors and header**
+> E1. Architect door: replace `getElementsByIds` with a read of `elements_head` by commit_id filtered client-side; check the other findings and the browse table for the same pattern. Ownership inherits: a capability is unowned only if it and every ancestor lack `owns`; findings list the highest unowned ancestor.
+> E2. Health findings: collapsed rows (count, one line, first three names, "and N more", link to the browse table pre-filtered); expand paginates at 20; "Review and link →" opens the browse table filtered to unlinked systems with the supports picker inline per row; zero findings collapse to one line.
+> E3. Desktop header: single avatar menu with theme, density and sign-out at every width, matching mobile.
+>
+> **Playwright** per item as stated; console must be clean on every route at the end.
+
+---
+
+## Prompt 7g — Claude Code: U4-2a close-out (from docs/CHECK-U4-2a.md, 10 September)
+
+> Sprint U4-2a close-out. Process first, then items. One PR per group. The three suites (`pnpm test`, `pnpm test:integration`, `pnpm exec playwright test`) run together on the final commit of every PR with the commands quoted in the PR body. `pnpm release` at the end; no migration is ever applied via MCP (it produced version drift again on 10 September).
+>
+> **Process:** commit this file to `docs/prompts/atlas-prompt-pack.md`; create labels `design` and `missing`; open one issue per item and per bug below and reference issues in commits; add the dev URL (atlas.simmodlr.app) to README.
+>
+> **Bugs:** (1) Changes page "Create change" fires no request and shows no error — find why the handler exits, fix, wire `useChanges` to `reportError`, Playwright create-a-change from the UI. (2) Reply/@mention fan-out notifies the actor themself — exclude the actor; test. (3) 390px horizontal overflow on model-scoped routes (ModelNav, `.maintenanceActions`) — fix; Playwright asserts no horizontal scroll on every model route at 390px.
+>
+> **A2 complete:** `mainCommitIdHint` dedup on all nine `resolveRef` call sites; `reportError` wired into every model-scoped hook (list them); route-by-route console audit written to `docs/CHECK-console.md`.
+> **A3 complete:** rewrite `deploy-migrations.yml` (link, `db push`, POST `CLOUDFLARE_DEPLOY_HOOK`, `workflow_dispatch`); README documents the secrets; the human sets `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID`, `SUPABASE_DB_PASSWORD`, `CLOUDFLARE_DEPLOY_HOOK` and turns off Workers Builds auto-build; report the first successful run.
+> **B1:** on-the-fly order assignment in `useCapabilityReorder` (remove the refusal); owner-only "Backfill capability order" action in the maintenance menu, idempotent, reporting rows changed.
+> **B2:** toggle location accepted as built. **D4:** accepted as previously documented.
+> **B3:** "N systems →" right-aligned; explicit shared header height.
+> **B5:** Sync descriptions, Export as starter map, Backfill order into an overflow menu beside "+ Add capability".
+> **B6:** mobile capability map as specified in 7f; Playwright at 390px.
+> **B7 remainder:** picker cards alphabetical by title.
+> **C1:** Code → optional "Reference", not pre-filled by seed, row hidden when empty; migration strips seed-copied codes equal to template code; fix the e2e test asserting the old behaviour.
+> **C2:** auto-growing textarea for description and verb phrases (min 2, max ~8 rows).
+> **C3:** Structure facts inline.
+> **D1 (restated):** capability map, context, container and component are DOM views, not canvases; remove their 1,400px max-width and fill from the rail to the right edge.
+>
+> Summary: every item as done / not done with evidence; the human's sentence about using it.
+
+---
+
 ## Prompt 8 — Claude Code: comments (M1a backend, M1b UI)
 
 > **Sprint M1a — comments backend.** Plumbing track; runs now. One summary at the end. No UI beyond what tests need.
@@ -333,6 +393,4 @@ Recorded here so they land in the right sprint rather than only in conversation.
 - Never let a sprint start from a screenshot of a competitor; start from `docs/UI-principles.md`.
 - If a sprint's summary contains "for now" or "placeholder", the sprint isn't done.
 - Keep this file in the repo at `docs/prompts/` so every sprint is citable by number in a fresh session.
-- **Handoff-review checklist** (grows as real mistakes turn up — this is the first entry, added 2026-09-09 after `--color-accent-700` turned up invented in *two* handoffs, HANDOFF-U4-element-page.md then HANDOFF-M1b-comments.md, before either was caught in review):
-  - **Every design token named must exist in `src/ui/styles/tokens.css`, spelled exactly.** Grep it before writing it into a handoff, not after — a token that reads as plausible (`--color-accent-700` looks exactly like a real one) is invented, not verified, until it's actually found in the file.
-- Current order (also in `docs/NEXT.md`, if that file exists — it doesn't yet in this repository as of this pack's own commit): U4-1 merged → housekeeping (labels still open) → M1b → U4-2 (repeat until usable) → C2 → K1 → D1 → Q1 → R1, with the plumbing track alongside. See the State section at the top.
+- Current order (also in `docs/NEXT.md`): merge U4-1 → housekeeping → M1b → U4-2 (repeat until usable) → C2 → K1 → D1 → Q1 → R1, with the plumbing track alongside. See the State section at the top.
