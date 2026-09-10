@@ -1,4 +1,5 @@
 import { Link, useParams, useSearchParams } from 'react-router';
+import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { ModelNav } from '../components/ModelNav/ModelNav';
@@ -20,6 +21,32 @@ import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import styles from './ModelHome.module.css';
+
+/**
+ * Sprint U4-2a item 2's own finding, live in the network panel: both doors'
+ * entire data sets were fetching on every load, unconditionally — this
+ * page called `useDirectorHome` *and* `useArchitectHome` every render
+ * regardless of `homeMode`, so switching doors never saved any work and a
+ * single page load duplicated the systems/actors/capabilities queries
+ * both hooks happen to share. Splitting each door into its own tiny
+ * component means React only ever mounts (and therefore only ever calls
+ * the hook of) whichever one `homeMode` actually selects — "child hooks
+ * never run" unless their data is actually needed, the same principle
+ * this item's own resolved-model gate applies to an unresolved id.
+ */
+function DirectorDoor({ modelId, orgId, userId, orgSlug, modelSlug }: { modelId: UUID; orgId: UUID; userId: UUID | null; orgSlug: string; modelSlug: string }) {
+  const directorState = useDirectorHome(modelId, orgId);
+  if (directorState.status === 'loading') return <Text tone="muted">Loading…</Text>;
+  if (directorState.status === 'error') return <Text as="p">{directorState.message}</Text>;
+  return <DirectorHome data={directorState.data} reload={directorState.reload} modelId={modelId} userId={userId} orgSlug={orgSlug} modelSlug={modelSlug} />;
+}
+
+function ArchitectDoor({ modelId, userId, orgSlug, modelSlug }: { modelId: UUID; userId: UUID | null; orgSlug: string; modelSlug: string }) {
+  const architectState = useArchitectHome(modelId, userId);
+  if (architectState.status === 'loading') return <Text tone="muted">Loading…</Text>;
+  if (architectState.status === 'error') return <Text as="p">{architectState.message}</Text>;
+  return <ArchitectHome data={architectState.data} orgSlug={orgSlug} modelSlug={modelSlug} />;
+}
 
 /**
  * Model home — Sprint U3b (UI-principles §3): the two front doors,
@@ -48,9 +75,6 @@ export function ModelHome() {
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
   const canShowSearch = canCreateChangeBranch(role);
   const searchCommitId = mainBranch?.head_commit_id ?? null;
-
-  const directorState = useDirectorHome(model?.id ?? '', organisation?.id ?? '');
-  const architectState = useArchitectHome(model?.id ?? '', userId);
 
   const loading = orgLoading || modelsLoading;
 
@@ -112,17 +136,8 @@ export function ModelHome() {
           </Link>
         </div>
 
-        {homeMode === 'director' && directorState.status === 'loading' && <Text tone="muted">Loading…</Text>}
-        {homeMode === 'director' && directorState.status === 'error' && <Text as="p">{directorState.message}</Text>}
-        {homeMode === 'director' && directorState.status === 'ready' && (
-          <DirectorHome data={directorState.data} reload={directorState.reload} modelId={model.id} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
-        )}
-
-        {homeMode === 'architect' && architectState.status === 'loading' && <Text tone="muted">Loading…</Text>}
-        {homeMode === 'architect' && architectState.status === 'error' && <Text as="p">{architectState.message}</Text>}
-        {homeMode === 'architect' && architectState.status === 'ready' && (
-          <ArchitectHome data={architectState.data} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
-        )}
+        {homeMode === 'director' && <DirectorDoor modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
+        {homeMode === 'architect' && <ArchitectDoor modelId={model.id} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
         </main>
       </div>
     </div>

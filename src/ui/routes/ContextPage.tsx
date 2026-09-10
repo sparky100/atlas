@@ -34,7 +34,7 @@ export function ContextPage() {
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
-  const capability = useBreadcrumbElement(model?.id ?? '', ref, capabilityId);
+  const capability = useBreadcrumbElement(model?.id ?? null, ref, capabilityId);
   const { label: branchLabel } = useBranchLabel(ref);
 
   const state = useSystemContext(model?.id ?? '', organisation?.id ?? '', userId, systemId ?? '', ref, mode);

@@ -73,7 +73,7 @@ export function LandscapePage() {
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
-  const capability = useBreadcrumbElement(model?.id ?? '', ref, capabilityId);
+  const capability = useBreadcrumbElement(model?.id ?? null, ref, capabilityId);
   const { label: branchLabel } = useBranchLabel(ref);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
@@ -91,7 +91,7 @@ export function LandscapePage() {
   const writeHeadCommitId = editingBranch?.head_commit_id ?? null;
   const canAdd = canEdit && searchCommitId !== null && writeHeadCommitId !== null;
 
-  const { state, resetLayout } = useLandscape(model?.id ?? '', organisation?.id ?? '', userId, ref, mode, capabilityId);
+  const { state, resetLayout } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId);
 
   // Sprint U4-1 E1: see this component's own module comment.
   const narrow = useIsNarrowViewport(768);

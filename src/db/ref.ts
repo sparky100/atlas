@@ -18,6 +18,7 @@
  * those are unreached by it (nothing else builds one), not silently wrong
  * for it.
  */
+import { assertRealId } from './assertRealId';
 import { getBranch, getMainBranch } from './branches';
 import type { Client } from './client';
 import type { UUID } from '../contracts/delta';
@@ -63,6 +64,13 @@ export function refLabelOf(ref: Ref, branchLabel?: string): string {
 
 /** The commit_id a ref resolves to, or `null` if it doesn't resolve (an unknown tag name, an unknown/deleted branch, an unknown commit id, or a model with no commits yet). A branch ref resolves to its **to-be** head — §6.2's default lens — not its as-is base; `resolveBranchRef` is what a caller building the As-is/To-be/Diff selector itself needs instead. */
 export async function resolveRef(supabase: Client, modelId: UUID, ref: Ref): Promise<UUID | null> {
+  // This is the chokepoint every model-scoped hook's ref resolution funnels
+  // through — the guard belongs here once rather than re-added at each of
+  // the four branches below (SPEC's own "empty/undefined id filters throw
+  // before the request", item 2). See assertRealId.ts's own module comment
+  // for the exact live 400 (`useBreadcrumbElement` calling this with `''`)
+  // this closes off.
+  assertRealId('resolveRef', 'model_id', modelId);
   if (ref.kind === 'main') {
     const main = await getMainBranch(supabase, modelId);
     return main?.head_commit_id ?? null;

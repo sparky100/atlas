@@ -116,8 +116,8 @@ describe('repository layer against a real local Supabase', () => {
     const { error: mapError } = await service.from('capability_maps').insert({ id: capabilityMapId, sector: 'public_body', version: 1, status: 'draft', source_description: 'Integration test fixture' });
     if (mapError) throw new Error(`capability_maps fixture: ${mapError.message}`);
     const { error: itemsError } = await service.from('capability_map_items').insert([
-      { id: rootItemId, map_id: capabilityMapId, code: '1', parent_code: null, name: 'Root Capability', description: 'Top-level fixture capability.', level: 1 },
-      { id: childItemId, map_id: capabilityMapId, code: '1.1', parent_code: '1', name: 'Child Capability', description: 'Second-level fixture capability.', level: 2 },
+      { id: rootItemId, map_id: capabilityMapId, code: '1', parent_code: null, name: 'Root Capability', description: 'Top-level fixture capability.', level: 1, item_order: 10 },
+      { id: childItemId, map_id: capabilityMapId, code: '1.1', parent_code: '1', name: 'Child Capability', description: 'Second-level fixture capability.', level: 2, item_order: 10 },
     ]);
     if (itemsError) throw new Error(`capability_map_items fixture: ${itemsError.message}`);
     const { error: publishError } = await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', capabilityMapId);
@@ -1137,7 +1137,7 @@ describe('repository layer against a real local Supabase', () => {
       const { error: draftMapError } = await service.from('capability_maps').insert({ id: draftMapId, sector: 'nhs', version: 999, status: 'draft', source_description: 'Publish-flow integration test fixture' });
       if (draftMapError) throw new Error(`draft map fixture: ${draftMapError.message}`);
       const itemId = randomUUID();
-      const { error: itemError } = await service.from('capability_map_items').insert({ id: itemId, map_id: draftMapId, code: '1', parent_code: null, name: 'Test Capability', level: 1 });
+      const { error: itemError } = await service.from('capability_map_items').insert({ id: itemId, map_id: draftMapId, code: '1', parent_code: null, name: 'Test Capability', level: 1, item_order: 10 });
       if (itemError) throw new Error(`item fixture: ${itemError.message}`);
 
       // No sources at all.
@@ -1161,7 +1161,7 @@ describe('repository layer against a real local Supabase', () => {
       expect((publishedRow as { published_at: string | null } | null)?.published_at).not.toBeNull();
 
       // Immutable once published: insert, update and delete on its items are all rejected.
-      const { error: insertAfterPublish } = await service.from('capability_map_items').insert({ id: randomUUID(), map_id: draftMapId, code: '2', parent_code: null, name: 'Too Late', level: 1 });
+      const { error: insertAfterPublish } = await service.from('capability_map_items').insert({ id: randomUUID(), map_id: draftMapId, code: '2', parent_code: null, name: 'Too Late', level: 1, item_order: 20 });
       expect(insertAfterPublish?.message).toMatch(/published and immutable/);
       const { error: updateAfterPublish } = await service.from('capability_map_items').update({ name: 'Renamed' }).eq('id', itemId);
       expect(updateAfterPublish?.message).toMatch(/published and immutable/);
