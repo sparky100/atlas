@@ -40,6 +40,8 @@ The browser only ever reads the `VITE_`-prefixed environment variables (`src/ui/
 
 ## Environments
 
+The app itself is live at **https://atlas.simmodlr.app** — Cloudflare Pages/Workers, deployed by `.github/workflows/deploy-migrations.yml`'s own deploy-hook step (see "What runs when" above), pointed at the Supabase project below.
+
 There is one live Supabase project this repository deploys to: **"Architecture"** (ref `xakqcssapdiatwrmnjop`, `eu-central-1`, org `eyuhmtxtmcddtsptqvyv`) — the closest thing this product has to a "dev" environment today. There is no separate staging/production split yet; every migration in `supabase/migrations` is applied there. (A sibling project, "Des-studio", exists in the same organisation and belongs to the unrelated "existing suite" ADR-014/ADR-017 discuss — never target it. The "Architecture" project's own `public` schema was also found, during Sprint H1's environment work, to hold a handful of tables with no connection to Atlas or to that existing suite at all — `events`, `lap_data`, `strava_activities`, `training_metrics`, and a few `v_*` views — left over from unrelated use of the same project. They are not Atlas's; nothing here reads or writes them, and nothing in this repo should.)
 
 To link a local checkout to it (needed for `supabase link`-dependent commands like `db push`/`db pull`/`migration repair`):
