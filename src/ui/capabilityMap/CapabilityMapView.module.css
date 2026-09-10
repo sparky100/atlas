@@ -1,6 +1,19 @@
+/**
+ * Pre-existing gap found while verifying check B6's own 390px Playwright
+ * coverage (e2e/capability-map-mobile-accordion.spec.ts): no `flex-wrap`
+ * here at all, predating and unrelated to B6 — "Colour by" + the select +
+ * the "Link systems to capabilities to see coverage." hint (shown
+ * whenever `colourBy === 'none' && !hasSystems`, CapabilityMapView.tsx's
+ * own comment) + "Reorder mode" packed into one un-wrapping row overflowed
+ * a 390px viewport regardless of B6's own accordion markup below it —
+ * e2e/capability-map-layout.spec.ts (Sprint U4-1 C2, untouched by any of
+ * B5/B6/this check) hits the exact same failure, confirming it. `flex-
+ * wrap: wrap` lets these controls stack instead of forcing `.main` open.
+ */
 .toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
@@ -187,12 +200,26 @@
  * single full-width button, not `.columnHeader`'s link-plus-controls row,
  * since the whole point of this header at this width is picking which
  * group to open.
+ *
+ * `min-width: 0` is load-bearing, not decorative: `.column` is `display:
+ * flex; flex-direction: column`, and this button is one of its (cross-
+ * axis, i.e. width) items — a flex item's automatic minimum width
+ * defaults to its own min-content size unless overridden, so without
+ * this the button's un-wrapped row of name + counts + chevron set an
+ * unshrinkable floor wider than a 390px viewport, forcing `.main` (and
+ * everything inside it) open regardless of `width: 100%` above — the
+ * exact class of bug `ModelNav.module.css`'s own `.refChip` fix (bug
+ * #39) and `.columnLink`'s `flex: 1 1 auto; min-width: 0` already guard
+ * against elsewhere in this same file family. Found via
+ * e2e/capability-map-mobile-accordion.spec.ts's own horizontal-scroll
+ * check at 390px.
  */
 .mobileGroupHeader {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
+  min-width: 0;
   padding: var(--space-3);
   border: var(--border-width) solid var(--border-strong);
   border-radius: var(--radius-md);
@@ -264,14 +291,21 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  min-width: 0;
   padding: var(--space-2) var(--space-2) var(--space-2) calc(4px + var(--space-3));
 }
 
+/* `min-width: 0` on every direct child below, same reasoning as
+   `.mobileGroupHeader`'s own comment: each is a flex item of a `flex-
+   direction: column` ancestor (`.column`/`.mobileGroupBody`), so without
+   it its own row of content sets an unshrinkable width floor instead of
+   actually fitting the column it's stacked in. */
 .mobileGroupPrimaryRow {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+  min-width: 0;
   padding-bottom: var(--space-1);
   border-bottom: var(--border-width) solid var(--border);
 }
@@ -282,6 +316,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
   padding: var(--space-2);
   border-radius: var(--radius-sm);
   border-left: 3px solid var(--border);
@@ -329,6 +364,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
   margin-top: var(--space-1);
   padding-left: var(--space-4);
   border-top: var(--border-width) solid var(--border);

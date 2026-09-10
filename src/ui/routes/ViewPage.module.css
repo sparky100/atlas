@@ -4,6 +4,30 @@
   margin: 0 auto;
 }
 
+/**
+ * Check D1 (docs/CHECK-U4-2a.md): "canvas routes... escape page max-width,
+ * fill the viewport from the nav rail to the right edge." Shared by
+ * Context/Container/Component (ContextPage.tsx/ContainerPage.tsx/
+ * ComponentPage.tsx all import this one module) — applied only once
+ * `state.status === 'ready'`, same as LandscapePage.module.css's own
+ * `.mainWithCanvas`/`hasCanvas` condition: the loading/error/empty states
+ * keep the ordinary centred column, since there's no content yet to give
+ * the width to.
+ *
+ * Deliberately *not* a copy of `.mainWithCanvas`'s fixed `height: calc(
+ * 100vh - var(--app-header-height))`: these three are plain scrollable
+ * DOM lists (ContextView.tsx's own module comment — no canvas, no Fit
+ * computation to serve, per D1's own "Fit computes against that box"
+ * clause, which only ever applied to Landscape), not a fixed-size
+ * viewport a zoom/pan engine needs an exact box for. Forcing one here
+ * would just trade the page's own natural scroll for a second, nested
+ * one inside `<main>` — width escapes, height doesn't.
+ */
+.mainWithView {
+  max-width: none;
+  margin: 0;
+}
+
 .header {
   margin-bottom: var(--space-4);
 }

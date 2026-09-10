@@ -123,8 +123,11 @@ test('a System\'s Description edits in an auto-growing textarea: starts around 2
   expect(twentyLineOverflow).toBeGreaterThan(0);
 
   // Saving still round-trips the full value — capping the box's own
-  // height never truncates what was actually typed.
+  // height never truncates what was actually typed. `.first()`: the
+  // saved text appears more than once (the attribute row's own value,
+  // plus provenance/history text elsewhere on the page) — same pattern
+  // e2e/element-edit.spec.ts's own "Acme Corp" check uses.
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible();
-  await expect(page.getByText('Line 20 of a much longer description.')).toBeVisible();
+  await expect(page.getByText('Line 20 of a much longer description.').first()).toBeVisible();
 });
