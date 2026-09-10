@@ -22,7 +22,21 @@ function lifecycleOf(row: ElementsHeadRow): string | null {
   return typeof value === 'string' ? value : null;
 }
 
-/** §4.5: level (capability only, computed — see capabilityLevel prop), parent and children. For a capability, the systems it supports repeat here too — not yet built (needs the "supports" group's own data). */
+/**
+ * §4.5: level (capability only, computed — see capabilityLevel prop),
+ * parent and children. For a capability, the systems it supports repeat
+ * here too — not yet built (needs the "supports" group's own data).
+ *
+ * Check C3 (docs/CHECK-U4-2a.md): "single-line facts inline ('Level 1',
+ * 'Parent: Finance', 'Children: 5'); label-over-value only for values
+ * that wrap." Level and Parent are each one short scalar/single link —
+ * `.groupInline` puts the label and value on the same line, same
+ * distinction §4.3's attribute rows already draw between a plain value
+ * and one that needs its own block. Children keeps `.group`'s
+ * label-over-value layout for the actual reason that rule exists: the
+ * list of child links below the "Children (N)" summary genuinely wraps
+ * across multiple lines, the same as any other list-shaped fact.
+ */
 export function StructureSection({ orgSlug, modelSlug, parent, capabilityLevel, children }: StructureSectionProps) {
   if (capabilityLevel === undefined && !parent && children.length === 0) {
     return <EmptyState>No parent or children — this element stands alone in the structure.</EmptyState>;
@@ -31,7 +45,7 @@ export function StructureSection({ orgSlug, modelSlug, parent, capabilityLevel, 
   return (
     <div className={styles.section}>
       {capabilityLevel !== undefined && (
-        <div className={styles.group}>
+        <div className={styles.groupInline}>
           <Text tone="muted" size="sm" as="span">
             Level
           </Text>
@@ -39,9 +53,9 @@ export function StructureSection({ orgSlug, modelSlug, parent, capabilityLevel, 
         </div>
       )}
       {parent && (
-        <div className={styles.group}>
+        <div className={styles.groupInline}>
           <Text tone="muted" size="sm" as="span">
-            Parent
+            Parent:
           </Text>
           <ElementLink orgSlug={orgSlug} modelSlug={modelSlug} element={parent} />
         </div>
