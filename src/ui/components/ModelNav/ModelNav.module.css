@@ -25,7 +25,31 @@
 @media (max-width: 768px) {
   .body {
     flex-direction: column;
+    /* `align-items: stretch` (overriding the base `flex-start` above) is
+       the semantically-correct half of the fix — without it, `<main>`'s
+       cross-axis (width) in this `flex-direction: column` container was
+       sized "fit-content" instead of filling the viewport. Kept for
+       correctness/documentation even though `.body > main`'s explicit
+       `width: 100%` below is the operative fix — measured directly
+       (getBoundingClientRect) against a real Chromium instance,
+       `align-items: stretch` alone still left `<main>` wider than 390px
+       whenever a descendant several levels down had enough unwrapped
+       content, for reasons that didn't resolve to a satisfying single
+       CSS-spec explanation in the time spent chasing it; an explicit
+       width removes the ambiguity outright rather than relying on
+       stretch's cross-axis sizing behaving as expected in every nested
+       case. Found while verifying checks B5/B6/bug #39's own Playwright
+       coverage — every individual overflow chased and fixed elsewhere
+       this session (ModelNav's own `.refChip`, `CapabilityMapView`'s
+       `.toolbar`/`.mobileGroupHeader`) was a real bug in its own right,
+       but none of them were *why* one too-wide line could force the
+       whole page open — `<main>` was never actually held to 390px. */
+    align-items: stretch;
     padding-bottom: 64px;
+  }
+
+  .body > main {
+    width: 100%;
   }
 }
 

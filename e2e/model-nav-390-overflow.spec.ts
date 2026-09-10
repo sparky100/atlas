@@ -20,6 +20,24 @@
  * `flex-wrap: wrap` was added there too, as a straightforward hardening
  * against the same class of failure.
  *
+ * Deeper root cause, found while re-verifying this same spec against a
+ * real browser after checks B5/B6 landed: `ModelNav.module.css`'s own
+ * `.body` never overrides its base `align-items: flex-start` for the
+ * mobile `flex-direction: column` layout, so `<main>`'s cross-axis
+ * (width) was never actually forced to the viewport — every fix above
+ * (the ref chip, `CapabilityMapView`'s `.toolbar`/`.mobileGroupHeader`)
+ * was independently real, but none of them was *why* one too-wide line
+ * could force the whole page open: `<main>` itself was sized
+ * "fit-content," bounded only by `max-width: 1400px`, not the 390px
+ * this breakpoint is supposed to guarantee. `align-items: stretch` on
+ * `.body`'s mobile rule is the semantically-correct half of the fix;
+ * empirically (measured with `getBoundingClientRect` against a real
+ * Chromium instance) it alone still left `<main>` wider than 390px in
+ * this exact scenario, so `.body > main`'s own explicit `width: 100%`
+ * at the same breakpoint is the operative fix — it removes the
+ * ambiguity outright rather than relying on stretch's cross-axis sizing
+ * behaving as expected through every nested descendant.
+ *
  * This spec seeds a change branch whose title is long enough to have
  * reproduced the bug pre-fix, and a capability so the capability map's
  * own maintenance actions render, then visits every model-scoped route
