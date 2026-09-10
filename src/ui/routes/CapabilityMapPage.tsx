@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
@@ -64,6 +65,13 @@ export function CapabilityMapPage() {
   // transient default (colourBy isn't rendered anywhere until `ready`).
   const { homeMode } = useHomeMode(userId, canEditOnMain(role));
   const { colourBy, setColourBy } = useColourByPreference(userId, homeMode, state.status === 'ready' ? state.data.hasSystems : false);
+  // Sprint U4-2a item 3: owned here, not inside CapabilityMapView itself —
+  // that component gets unmounted/remounted by this page's own
+  // `state.status === 'ready' &&` gate every time a reorder's `onReordered`
+  // triggers `reload` (state cycles through 'loading' first), which would
+  // silently reset a toggle living inside it back to `false` after every
+  // single move. See CapabilityMapView.tsx's own prop comment.
+  const [reorderMode, setReorderMode] = useState(false);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -145,6 +153,8 @@ export function CapabilityMapPage() {
             reorderCapability={
               canEdit && mainBranch ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: mainBranch, expectedHeadCommitId: state.data.commitId, onReordered: reload } : undefined
             }
+            reorderMode={reorderMode}
+            onReorderModeChange={setReorderMode}
           />
         )}
         </main>

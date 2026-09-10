@@ -48,6 +48,20 @@ export interface CapabilityMapViewProps {
    * convention as `ElementHeader`'s `onEdit`.
    */
   reorderCapability?: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
+  /**
+   * Sprint U4-2a item 3's "Reorder mode" toggle — controlled from the
+   * caller (`CapabilityMapPage.tsx`), same reasoning as `colourBy` just
+   * above: this component gets unmounted and remounted by its own parent
+   * every time `reorderCapability`'s own `onReordered` triggers a reload
+   * (`state.status` cycles through `'loading'` before `'ready'` again,
+   * and the parent only renders this component at all while `'ready'`) —
+   * local state here would silently reset to `false` after literally
+   * every successful move, found live via this session's own e2e run
+   * (the spec's second move failed because the toggle it had just turned
+   * on was already gone again).
+   */
+  reorderMode: boolean;
+  onReorderModeChange: (mode: boolean) => void;
 }
 
 /**
@@ -114,9 +128,20 @@ export interface CapabilityMapViewProps {
  * action that changes the model — the same distinction `LandscapePage.tsx`
  * draws between its own header actions and `BranchViewModeControl`.
  */
-export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, colourBy, onColourByChange, orgSlug, modelSlug, refParam, reorderCapability }: CapabilityMapViewProps) {
+export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, colourBy, onColourByChange, orgSlug, modelSlug, refParam, reorderCapability, reorderMode, onReorderModeChange }: CapabilityMapViewProps) {
   const [expanded, setExpanded] = useState<Set<UUID>>(new Set());
   const colourById = useId();
+  const reorderModeId = useId();
+  // Sprint U4-2a item 3: "reorder controls behind a Reorder mode" — the
+  // move buttons used to render inline on every tile whenever the caller
+  // had edit rights at all, which meant an owner/architect saw two extra
+  // buttons crowding *every* L1 header and L2 card just to browse the map
+  // (and directly caused item 3's other complaint, "L1 header on one
+  // row" — that's what was pushing the header onto a second line at the
+  // narrower desktop breakpoints). Gating on an explicit toggle — off by
+  // default — means reordering stays exactly as capable as before but
+  // costs nothing when someone's just reading the map, editor or not.
+  const activeReorderCapability = reorderMode ? reorderCapability : undefined;
 
   function toggleExpanded(id: UUID): void {
     setExpanded((prev) => {
@@ -157,6 +182,17 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
             Link systems to capabilities to see coverage.
           </Text>
         )}
+        {/* Sprint U4-2a item 3 — omitted entirely (not shown disabled) when the caller has no edit rights, same convention as `reorderCapability` itself. */}
+        {reorderCapability && (
+          <span className={styles.reorderModeToggle}>
+            <input id={reorderModeId} type="checkbox" checked={reorderMode} onChange={(e) => { onReorderModeChange(e.target.checked); }} />
+            <label htmlFor={reorderModeId}>
+              <Text as="span" size="sm" tone="muted">
+                Reorder mode
+              </Text>
+            </label>
+          </span>
+        )}
       </div>
 
       {tree.l1.length > 0 && (
@@ -175,7 +211,7 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
               onToggleExpand={toggleExpanded}
               previousSibling={tree.l1[index - 1]?.capability}
               nextSibling={tree.l1[index + 1]?.capability}
-              reorderCapability={reorderCapability}
+              reorderCapability={activeReorderCapability}
             />
           ))}
         </div>
@@ -295,10 +331,16 @@ function L1ColumnView({
   reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
 }) {
   const count = supportingSystemIds(column.capability.element_id, supportsEdges).length;
-  // Every L2 *and* L3 descendant — not just this column's direct L2
-  // children — so an L1 whose only exposed capability sits at L3 still
-  // reads as exposed at the group level (Sprint U4-1 C3 review note).
-  const descendantIds = column.l2.flatMap((card) => [card.capability.element_id, ...card.l3.map((leaf) => leaf.element_id)]);
+  // Every L2 *and* L3 descendant, *and* the L1 capability itself (Sprint
+  // U4-2a item 3: "L1-level supports counted in coverage") — a `supports`
+  // edge can land directly on an L1 capability (nothing stops a system
+  // supporting a top-level capability with no children of its own yet, or
+  // in addition to its descendants), and the group-level Chip above used
+  // to only ever look at `column.l2`'s own descendants, silently dropping
+  // that edge from the aggregate even though `count`/the zoom link right
+  // next to it (both keyed on `column.capability.element_id` directly)
+  // already accounted for it correctly.
+  const descendantIds = [column.capability.element_id, ...column.l2.flatMap((card) => [card.capability.element_id, ...card.l3.map((leaf) => leaf.element_id)])];
   const aggregateColour = aggregateTileColourFor(colourBy, descendantIds, supportsEdges, systemsById);
   return (
     <div className={styles.column} role="listitem">

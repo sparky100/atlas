@@ -15,6 +15,13 @@
   font: inherit;
 }
 
+/* Sprint U4-2a item 3's "Reorder mode" toggle — a plain labelled checkbox, same left-margin-via-gap spacing as every other .toolbar control, not a bespoke switch. */
+.reorderModeToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 /**
  * Sprint U4-1 C2: a responsive grid of L1 groups, replacing the old
  * horizontally-scrolling row — the item's own text is "whole map visible
@@ -66,22 +73,49 @@
   min-width: 0;
 }
 
+/**
+ * Sprint U4-2a item 3: "L1 header on one row" — `flex-wrap: wrap` used to
+ * let a long name plus the Chip, zoom link, and (previously always-on)
+ * reorder buttons overflow onto a second line at the narrower desktop
+ * column widths (4-5 columns, CapabilityMapView.module.css's own
+ * breakpoint table). Reorder now hides behind item 3's own "Reorder mode"
+ * toggle, which frees most of that width back up, but `nowrap` plus the
+ * name link's own truncation (`.columnLink` below) is what actually
+ * guarantees one row regardless of name length or column width, rather
+ * than relying on there merely being fewer controls most of the time.
+ */
 .columnHeader {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-2);
   padding-bottom: var(--space-1);
   border-bottom: var(--border-width-emphasis) solid var(--border-strong);
 }
 
-/* Sprint U4-1 C3 review note: the L1 header's own name link, unlike its
-   L2/L3 children, is plain text-in-a-header, not a whole-tile click
-   target — just the underline removal `CapabilityTile`'s primary link
-   gets for the same reason (plain-text name). */
+/**
+ * Sprint U4-1 C3 review note: the L1 header's own name link, unlike its
+ * L2/L3 children, is plain text-in-a-header, not a whole-tile click
+ * target — just the underline removal `CapabilityTile`'s primary link
+ * gets for the same reason (plain-text name).
+ *
+ * Sprint U4-2a item 3: `flex: 1 1 auto` + `min-width: 0` is what lets this
+ * shrink below its own text width inside a `nowrap` flex row (a flex
+ * item's default `min-width: auto` would otherwise force the row wider
+ * than the column instead) — combined with the truncation trio below, a
+ * name too long for the remaining space ellipsizes instead of wrapping or
+ * overflowing, while the Chip/zoom-link/reorder-toggle siblings (each
+ * `flex: 0 0 auto` already, individually) keep their own natural width.
+ */
 .columnLink {
   color: inherit;
   text-decoration: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 /**
