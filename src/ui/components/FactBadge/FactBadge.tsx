@@ -39,8 +39,13 @@ export function FactBadge({ fact, source }: FactBadgeProps) {
         if (!cancelled) setChain({ deltas, sources });
       })
       .catch(() => {
-        // A card that fails to load its chain still shows the badge and
-        // the top-level fact fields — not worth surfacing as a page error.
+        // Prompt 7h bug fix: a card that fails to load its chain still
+        // shows the badge and the top-level fact fields — not worth
+        // surfacing as a page error — but `chain` must still leave `null`
+        // (ProvenanceCard's own "loading" state) or the card is stuck
+        // reading "Loading history…" forever instead of simply omitting
+        // the "Previously" section, its behaviour for a real empty chain.
+        if (!cancelled) setChain({ deltas: [], sources: new Map() });
       });
     return () => {
       cancelled = true;

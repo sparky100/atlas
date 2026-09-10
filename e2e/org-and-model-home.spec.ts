@@ -37,6 +37,14 @@ test('sign-up through org and model creation to ModelHome\'s front doors', async
   await page.getByPlaceholder('Organisation name').fill(orgName);
   await page.getByRole('button', { name: 'Create' }).click();
 
+  // Prompt 7h bug fix: creating this, this account's first organisation,
+  // is also the first time `atlas.ensure_profile` gives it a profile —
+  // Home's own display-name gate replaces the page until one is given.
+  await expect(page.getByRole('heading', { name: 'What should we call you?' })).toBeVisible();
+  const displayName = `Org Home Owner ${randomUUID().slice(0, 8)}`;
+  await page.getByLabel('Display name').fill(displayName);
+  await page.getByRole('button', { name: 'Continue' }).click();
+
   const orgLink = page.getByRole('link', { name: orgName });
   await expect(orgLink).toBeVisible();
   await orgLink.click();
