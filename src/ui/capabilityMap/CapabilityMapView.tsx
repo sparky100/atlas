@@ -7,6 +7,7 @@ import { CapabilityTile } from '../components/CapabilityTile/CapabilityTile';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
+import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { COLOUR_BY_OPTIONS, aggregateTileColourFor, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
 import type { CapabilityMapTree, L1Column, L2Card } from './layout';
 import { useCapabilityReorder } from './useCapabilityReorder';
@@ -127,11 +128,38 @@ export interface CapabilityMapViewProps {
  * was: a view control that changes how this view reads, not a page
  * action that changes the model — the same distinction `LandscapePage.tsx`
  * draws between its own header actions and `BranchViewModeControl`.
+ *
+ * Check B6 (docs/CHECK-U4-2a.md): below 768px, each L1 column collapses
+ * to an accordion group — name, tone strip, coverage chip, counts — only
+ * one open at a time (`expandedL1` above); its L2 children render as
+ * dense rows (`MobileL2Row`) instead of blueprint-framed `CapabilityTile`
+ * cards, with L3 revealed by the same tap-to-expand toggle desktop
+ * already has. See `L1ColumnView`'s own comment for why this branches on
+ * a JS `narrow` flag rather than a CSS media query.
  */
 export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, colourBy, onColourByChange, orgSlug, modelSlug, refParam, reorderCapability, reorderMode, onReorderModeChange }: CapabilityMapViewProps) {
   const [expanded, setExpanded] = useState<Set<UUID>>(new Set());
   const colourById = useId();
   const reorderModeId = useId();
+  // Check B6: "Mobile (<768px): L1 groups as a collapsed list [...] one
+  // expanded at a time; L2 dense rows, no blueprint frame; L3 on tap" —
+  // the same JS-driven breakpoint LandscapePage.tsx's own E1 disclosures
+  // use (`useIsNarrowViewport`'s own comment explains why this needs to
+  // be a real conditional mount, not a CSS-only restyle: L1's header goes
+  // from a plain-text Link + row of controls to a single accordion toggle
+  // button — those aren't the same markup restyled, they're two different
+  // interaction models). `.columns`/`.column` (the grid + its
+  // `role="list"`/`role="listitem"` pair Sprint U4-1 C2 added) stay the
+  // outer structure at every width — narrow collapses each column's own
+  // L2 content behind its header instead of swapping the grid out for a
+  // different container, so e2e/capability-map-layout.spec.ts's own
+  // "1 column at 390px" / list-role assertions still hold unchanged.
+  const narrow = useIsNarrowViewport(768);
+  const [expandedL1, setExpandedL1] = useState<UUID | null>(null);
+
+  function toggleExpandedL1(id: UUID): void {
+    setExpandedL1((prev) => (prev === id ? null : id));
+  }
   // Sprint U4-2a item 3: "reorder controls behind a Reorder mode" — the
   // move buttons used to render inline on every tile whenever the caller
   // had edit rights at all, which meant an owner/architect saw two extra
@@ -212,6 +240,9 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
               previousSibling={tree.l1[index - 1]?.capability}
               nextSibling={tree.l1[index + 1]?.capability}
               reorderCapability={activeReorderCapability}
+              narrow={narrow}
+              l1Expanded={expandedL1 === column.capability.element_id}
+              onToggleL1={toggleExpandedL1}
             />
           ))}
         </div>
@@ -316,6 +347,9 @@ function L1ColumnView({
   previousSibling,
   nextSibling,
   reorderCapability,
+  narrow,
+  l1Expanded,
+  onToggleL1,
 }: {
   column: L1Column;
   colourBy: ColourByMode;
@@ -329,7 +363,12 @@ function L1ColumnView({
   previousSibling: ElementsHeadRow | undefined;
   nextSibling: ElementsHeadRow | undefined;
   reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
+  /** Check B6: <768px, this column collapses to an accordion group — see `CapabilityMapView`'s own comment for why this is a prop, not a CSS media query. */
+  narrow: boolean;
+  l1Expanded: boolean;
+  onToggleL1: (id: UUID) => void;
 }) {
+  const panelId = useId();
   const count = supportingSystemIds(column.capability.element_id, supportsEdges).length;
   // Every L2 *and* L3 descendant, *and* the L1 capability itself (Sprint
   // U4-2a item 3: "L1-level supports counted in coverage") — a `supports`
@@ -342,6 +381,109 @@ function L1ColumnView({
   // already accounted for it correctly.
   const descendantIds = [column.capability.element_id, ...column.l2.flatMap((card) => [card.capability.element_id, ...card.l3.map((leaf) => leaf.element_id)])];
   const aggregateColour = aggregateTileColourFor(colourBy, descendantIds, supportsEdges, systemsById);
+  const l2Count = column.l2.length;
+
+  const l2Content = column.l2.map((card, index) =>
+    narrow ? (
+      <MobileL2Row
+        key={card.capability.element_id}
+        card={card}
+        colourBy={colourBy}
+        supportsEdges={supportsEdges}
+        systemsById={systemsById}
+        orgSlug={orgSlug}
+        modelSlug={modelSlug}
+        refParam={refParam}
+        expanded={expanded.has(card.capability.element_id)}
+        onToggleExpand={onToggleExpand}
+        previousSibling={column.l2[index - 1]?.capability}
+        nextSibling={column.l2[index + 1]?.capability}
+        reorderCapability={reorderCapability}
+      />
+    ) : (
+      <L2CardView
+        key={card.capability.element_id}
+        card={card}
+        colourBy={colourBy}
+        supportsEdges={supportsEdges}
+        systemsById={systemsById}
+        orgSlug={orgSlug}
+        modelSlug={modelSlug}
+        refParam={refParam}
+        expanded={expanded.has(card.capability.element_id)}
+        onToggleExpand={onToggleExpand}
+        previousSibling={column.l2[index - 1]?.capability}
+        nextSibling={column.l2[index + 1]?.capability}
+        reorderCapability={reorderCapability}
+      />
+    ),
+  );
+
+  if (narrow) {
+    // Check B6: a collapsed accordion group — name, tone strip, coverage
+    // chip, counts, one expanded at a time (`CapabilityMapView`'s own
+    // `expandedL1` state). The header is a single toggle button, not a
+    // link plus separate controls: a link and a button can't nest inside
+    // each other, and this group's whole point at this width is picking
+    // which one to open, not navigating away from the list — "Open →"
+    // below, inside the expanded panel, is where direct navigation to
+    // the L1 capability's own element page still lives.
+    return (
+      <div className={styles.column} role="listitem">
+        <button
+          type="button"
+          className={styles.mobileGroupHeader}
+          aria-expanded={l1Expanded}
+          aria-controls={panelId}
+          onClick={() => {
+            onToggleL1(column.capability.element_id);
+          }}
+        >
+          <span className={styles.mobileToneStrip} data-tone={aggregateColour.tone ?? 'none'} aria-hidden="true" />
+          <span className={styles.mobileGroupHeaderText}>
+            <Text as="span" size="lg" className={styles.mobileGroupName}>
+              {column.capability.name}
+            </Text>
+            <span className={styles.mobileGroupMeta}>
+              {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <Chip tone={aggregateColour.tone}>{aggregateColour.label}</Chip>}
+              <Text as="span" size="sm" tone="muted">
+                {l2Count} capabilit{l2Count === 1 ? 'y' : 'ies'} · {count} system{count === 1 ? '' : 's'}
+              </Text>
+            </span>
+          </span>
+          <span className={styles.mobileChevron} aria-hidden="true">
+            {l1Expanded ? '▾' : '▸'}
+          </span>
+        </button>
+        {l1Expanded && (
+          <div id={panelId} className={styles.mobileGroupBody}>
+            <div className={styles.mobileGroupPrimaryRow}>
+              <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${column.capability.element_id}`} className={styles.mobileRowLink}>
+                <Text as="span" size="sm">
+                  Open {column.capability.name} →
+                </Text>
+              </Link>
+              <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+              {reorderCapability && (
+                <ReorderButtons
+                  capability={column.capability}
+                  previous={previousSibling}
+                  next={nextSibling}
+                  context={reorderCapability}
+                  previousGlyph="↑"
+                  previousLabel={`Move ${column.capability.name} up`}
+                  nextGlyph="↓"
+                  nextLabel={`Move ${column.capability.name} down`}
+                />
+              )}
+            </div>
+            {l2Content}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={styles.column} role="listitem">
       <div className={styles.columnHeader}>
@@ -365,23 +507,104 @@ function L1ColumnView({
           />
         )}
       </div>
-      {column.l2.map((card, index) => (
-        <L2CardView
-          key={card.capability.element_id}
-          card={card}
-          colourBy={colourBy}
-          supportsEdges={supportsEdges}
-          systemsById={systemsById}
-          orgSlug={orgSlug}
-          modelSlug={modelSlug}
-          refParam={refParam}
-          expanded={expanded.has(card.capability.element_id)}
-          onToggleExpand={onToggleExpand}
-          previousSibling={column.l2[index - 1]?.capability}
-          nextSibling={column.l2[index + 1]?.capability}
-          reorderCapability={reorderCapability}
-        />
-      ))}
+      {l2Content}
+    </div>
+  );
+}
+
+/**
+ * Check B6's "L2 dense rows, no blueprint frame; L3 on tap": the mobile
+ * counterpart to `L2CardView` — a plain row (name, tone chip, secondary
+ * controls) instead of a `CapabilityTile`, and its L3 children (when
+ * expanded via the same `expanded` Set/`onToggleExpand` desktop's L2→L3
+ * toggle already uses) render as further dense rows rather than compact
+ * tiles. Kept as its own component, not a `dense` prop on `L2CardView`,
+ * since the two render genuinely different markup (a `CapabilityTile`
+ * wrapper vs. a plain `div`), the same reasoning `L1ColumnView`'s own
+ * narrow/wide split uses.
+ */
+function MobileL2Row({
+  card,
+  colourBy,
+  supportsEdges,
+  systemsById,
+  orgSlug,
+  modelSlug,
+  refParam,
+  expanded,
+  onToggleExpand,
+  previousSibling,
+  nextSibling,
+  reorderCapability,
+}: {
+  card: L2Card;
+  colourBy: ColourByMode;
+  supportsEdges: RelationshipsHeadRow[];
+  systemsById: Map<UUID, ElementsHeadRow>;
+  orgSlug: string;
+  modelSlug: string;
+  refParam: string;
+  expanded: boolean;
+  onToggleExpand: (id: UUID) => void;
+  previousSibling: ElementsHeadRow | undefined;
+  nextSibling: ElementsHeadRow | undefined;
+  reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
+}) {
+  const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById);
+  const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
+
+  return (
+    <div className={styles.mobileL2Row} data-tone={colour.tone ?? 'none'}>
+      <div className={styles.mobileRowMain}>
+        <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`} className={styles.mobileRowLink}>
+          <Text as="span" size="md">
+            {card.capability.name}
+          </Text>
+        </Link>
+        {colour.tone !== undefined && colour.label !== undefined && <Chip tone={colour.tone}>{colour.label}</Chip>}
+      </div>
+      <div className={styles.mobileRowSecondary}>
+        {reorderCapability && (
+          <ReorderButtons
+            capability={card.capability}
+            previous={previousSibling}
+            next={nextSibling}
+            context={reorderCapability}
+            previousGlyph="↑"
+            previousLabel={`Move ${card.capability.name} up`}
+            nextGlyph="↓"
+            nextLabel={`Move ${card.capability.name} down`}
+          />
+        )}
+        <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+        {card.l3.length > 0 && (
+          // Check B6: "L3 on tap" — the same expand toggle desktop's dense-
+          // frame tile already has (`.expandButton`, unchanged), just on a
+          // plain row instead of a blueprint-framed card.
+          <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { onToggleExpand(card.capability.element_id); }}>
+            {expanded ? '▾' : '▸'} {card.l3.length}
+          </button>
+        )}
+      </div>
+      {expanded && card.l3.length > 0 && (
+        <div className={styles.mobileL3List}>
+          {card.l3.map((leaf) => {
+            const leafColour = tileColourFor(colourBy, leaf.element_id, supportsEdges, systemsById);
+            const leafCount = supportingSystemIds(leaf.element_id, supportsEdges).length;
+            return (
+              <div key={leaf.element_id} className={styles.mobileL3Row} data-tone={leafColour.tone ?? 'none'}>
+                <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${leaf.element_id}`} className={styles.mobileRowLink}>
+                  <Text as="span" size="sm">
+                    {leaf.name}
+                  </Text>
+                </Link>
+                {leafColour.tone !== undefined && leafColour.label !== undefined && <Chip tone={leafColour.tone}>{leafColour.label}</Chip>}
+                <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
