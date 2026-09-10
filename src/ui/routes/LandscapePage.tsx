@@ -91,7 +91,12 @@ export function LandscapePage() {
   const writeHeadCommitId = editingBranch?.head_commit_id ?? null;
   const canAdd = canEdit && searchCommitId !== null && writeHeadCommitId !== null;
 
-  const { state, resetLayout } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId);
+  // Sprint U4-2a item 2: `searchCommitId` above is already `mainBranch`'s
+  // head, from the one `useMainBranch` call this route makes — handing it
+  // to `useLandscape` as its main-commit hint means `ref.kind === 'main'`
+  // (no `?ref=` at all, the common case) never re-fetches the identical
+  // `main` row a second time. See useLandscape.ts's own doc comment.
+  const { state, resetLayout } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId, searchCommitId);
 
   // Sprint U4-1 E1: see this component's own module comment.
   const narrow = useIsNarrowViewport(768);
