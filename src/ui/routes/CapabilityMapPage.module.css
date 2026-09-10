@@ -19,15 +19,51 @@
   gap: var(--space-2);
 }
 
-/* Sprint U4-1 C6: "Export as starter map" sits alongside the existing
-   "Sync descriptions" maintenance action — both owner-only, both
-   secondary to the map's normal workflow (SyncDescriptionsAction.tsx's
-   own comment on why it's `ghost`), so grouped together rather than in
-   the primary header actions above. */
-.maintenanceActions {
+/* Sprint U4-2a check B5: "Sync descriptions"/"Export as starter map" —
+   both owner-only, both secondary to the map's normal workflow
+   (SyncDescriptionsAction.tsx's own comment on why it's `ghost`) — sit
+   behind this "⋯" trigger beside "+ Add capability", not as their own
+   always-visible row. Same always-collapsed shape as
+   ElementHeader.module.css's own `.menuWrapper`/`.menuToggle`/`.menu`
+   (no viewport condition, unlike LandscapePage.module.css's narrow-only
+   disclosures) — deliberately not shared as a component yet, since this
+   is the second copy, not the third (CLAUDE.md's own layering note: two
+   near-identical copies is still a judgement call, not yet a rule). */
+.menuWrapper {
+  position: relative;
+}
+
+.menuToggle {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--row-height);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.1em;
+  cursor: pointer;
+}
+
+.menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  flex-direction: column;
   align-items: flex-start;
-  flex-wrap: wrap;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--surface-raised-shadow);
+  min-width: 260px;
+  z-index: 10;
+}
+
+.menu.open {
+  display: flex;
 }
