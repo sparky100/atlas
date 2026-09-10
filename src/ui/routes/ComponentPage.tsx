@@ -30,6 +30,10 @@ import styles from './ViewPage.module.css';
  * Blocking: element creation's search-first "Add" control lives here for
  * components (parented on this page's own `containerId`) — "on a container
  * page for components" per the brief.
+ *
+ * Check D1: `<main>` escapes the page's usual centred max-width once
+ * there's real content — `ViewPage.module.css`'s own `.mainWithView`
+ * comment has the full reasoning, shared with Context/Container.
  */
 export function ComponentPage() {
   const { orgSlug, modelSlug, containerId } = useParams<{ orgSlug: string; modelSlug: string; containerId: string }>();
@@ -87,7 +91,7 @@ export function ComponentPage() {
       <AppHeader />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
-        <main className={styles.main}>
+        <main className={[styles.main, state.status === 'ready' ? styles.mainWithView : ''].filter(Boolean).join(' ')}>
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}

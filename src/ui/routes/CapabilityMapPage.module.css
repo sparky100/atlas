@@ -4,6 +4,29 @@
   margin: 0 auto;
 }
 
+/**
+ * Check D1 (docs/CHECK-U4-2a.md): "canvas routes... escape page max-width,
+ * fill the viewport from the nav rail to the right edge." Applied only
+ * once the map has real content (`CapabilityMapPage.tsx`'s own
+ * `hasContent`) — the empty-map/import-panel state keeps the ordinary
+ * centred column, same condition `LandscapePage.module.css`'s own
+ * `.mainWithCanvas`/`hasCanvas` uses.
+ *
+ * Deliberately *not* a copy of `.mainWithCanvas`'s fixed `height: calc(
+ * 100vh - var(--app-header-height))`: the map is a plain reflowing CSS
+ * grid (`.columns`), not a fixed-size viewport a zoom/pan engine needs an
+ * exact box for — D1's own "Fit computes against that box" clause only
+ * ever applied to Landscape. Forcing a fixed height here would just trade
+ * the page's own natural scroll for a second, nested one inside `<main>`
+ * — width escapes, height doesn't (`ViewPage.module.css`'s own
+ * `.mainWithView`, shared by Context/Container/Component, makes the same
+ * call for the same reason).
+ */
+.mainWithMap {
+  max-width: none;
+  margin: 0;
+}
+
 /* Sprint U4-1 C5: "'+ Add capability' moves to the page action area" —
    same header/actions split LandscapePage.module.css already uses for
    its own "+ Add system"/"+ Add actor". */
