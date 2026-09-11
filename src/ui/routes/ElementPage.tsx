@@ -270,7 +270,12 @@ export function ElementPage() {
                   <HistoryTimeline history={state.data.history} />
                 </CollapsibleSection>
                 <CollapsibleSection title="Decisions">
-                  <EmptyState>Decisions aren't built yet — see Sprint D1.</EmptyState>
+                  {/* Prompt 7h bug B6: no developer wording ("Sprint D1") in a
+                      user-facing string — decisions themselves are still a
+                      genuinely absent feature (CLAUDE.md rule 7: absent, not
+                      faked), just said plainly rather than naming the
+                      internal roadmap item that will eventually build it. */}
+                  <EmptyState>No decisions recorded</EmptyState>
                 </CollapsibleSection>
                 <CollapsibleSection title="Comments">
                   <CommentsSection
