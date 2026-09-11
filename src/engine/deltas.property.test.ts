@@ -834,3 +834,77 @@ describe('C17: at most one primary supports edge per system, one owns edge per r
     expect(() => fold(changeBranchHead, [promoteOnBranch], ctx)).toThrow(/C17/);
   });
 });
+
+describe('C18 (Prompt 7k item 4): uses.via/flows_to.via must reference a live integration_platform system', () => {
+  function elementCreate(id: UUID, elementId: UUID, elementType: ElementType, name: string, attributes: Record<string, Json> = {}): Delta {
+    const base = elementType === 'system' ? { lifecycleStatus: 'active', isExternal: false } : {};
+    return { kind: 'element.create', id, elementId, elementType, name, parentId: null, attributes: { ...base, ...attributes } as never, sourceId: 'src', confidence: 1 };
+  }
+
+  /** Two application systems (the flow's own endpoints) plus one system explicitly marked `kind: 'integration_platform'` — a fixture wide enough for both the accepted and rejected `via` scenarios. */
+  function twoSystemsAndAPlatform(): Head {
+    return fold(
+      emptyHead(),
+      [
+        elementCreate('d-a', 'sys-a', 'system', 'Meter Reading Service'),
+        elementCreate('d-b', 'sys-b', 'system', 'Billing Platform'),
+        elementCreate('d-platform', 'sys-platform', 'system', 'Enterprise Service Bus', { kind: 'integration_platform' }),
+      ],
+      ctx,
+    );
+  }
+
+  function flowsToCreate(relationshipId: UUID, via?: UUID): Delta {
+    return { kind: 'relationship.create', id: `d-${relationshipId}`, relationshipId, relationshipType: 'flows_to', fromElementId: 'sys-a', toElementId: 'sys-b', attributes: via ? { via } : {}, sourceId: 'src', confidence: 1 };
+  }
+
+  it('accepts a flows_to edge with via set to a live integration_platform system', () => {
+    const head = twoSystemsAndAPlatform();
+    expect(() => fold(head, [flowsToCreate('rel-1', 'sys-platform')], ctx)).not.toThrow();
+  });
+
+  it('accepts a flows_to edge with no via at all (the default, direct edge)', () => {
+    const head = twoSystemsAndAPlatform();
+    expect(() => fold(head, [flowsToCreate('rel-1')], ctx)).not.toThrow();
+  });
+
+  it('rejects via pointing at a system whose kind is not integration_platform, naming C18', () => {
+    const head = twoSystemsAndAPlatform();
+    const attempt = () => fold(head, [flowsToCreate('rel-1', 'sys-a')], ctx);
+    expect(attempt).toThrow(EngineError);
+    expect(attempt).toThrow(/C18/);
+  });
+
+  it('rejects via pointing at a non-existent element', () => {
+    const head = twoSystemsAndAPlatform();
+    expect(() => fold(head, [flowsToCreate('rel-1', 'no-such-element')], ctx)).toThrow(/C18/);
+  });
+
+  it('rejects via pointing at a capability, even one named the same as a real system id would be — via must resolve to a system, not just any element', () => {
+    const head = fold(twoSystemsAndAPlatform(), [elementCreate('d-cap', 'cap-1', 'capability', 'Asset Management')], ctx);
+    expect(() => fold(head, [flowsToCreate('rel-1', 'cap-1')], ctx)).toThrow(/C18/);
+  });
+
+  it('the same rule applies to uses, not just flows_to', () => {
+    const head = twoSystemsAndAPlatform();
+    const usesCreate: Delta = { kind: 'relationship.create', id: 'd-rel-1', relationshipId: 'rel-1', relationshipType: 'uses', fromElementId: 'sys-a', toElementId: 'sys-b', attributes: { via: 'sys-a' }, sourceId: 'src', confidence: 1 };
+    expect(() => fold(head, [usesCreate], ctx)).toThrow(/C18/);
+  });
+
+  it('relationship.update: setting via later is checked the same way as at create', () => {
+    const head = twoSystemsAndAPlatform();
+    fold(head, [flowsToCreate('rel-1')], ctx);
+    const setVia: Delta = { kind: 'relationship.update', id: 'd-set-via', relationshipId: 'rel-1', relationshipType: 'flows_to', attribute: 'via', value: 'sys-platform', previousDeltaId: 'd-rel-1', sourceId: 'src', confidence: 1 };
+    expect(() => fold(head, [setVia], ctx)).not.toThrow();
+
+    const badVia: Delta = { kind: 'relationship.update', id: 'd-bad-via', relationshipId: 'rel-1', relationshipType: 'flows_to', attribute: 'via', value: 'sys-a', previousDeltaId: 'd-set-via', sourceId: 'src', confidence: 1 };
+    expect(() => fold(head, [badVia], ctx)).toThrow(/C18/);
+  });
+
+  it('relationship.update: clearing via (setting it to null) is always accepted, no check needed', () => {
+    const head = twoSystemsAndAPlatform();
+    fold(head, [flowsToCreate('rel-1', 'sys-platform')], ctx);
+    const clearVia: Delta = { kind: 'relationship.update', id: 'd-clear-via', relationshipId: 'rel-1', relationshipType: 'flows_to', attribute: 'via', value: null, previousDeltaId: 'd-rel-1', sourceId: 'src', confidence: 1 };
+    expect(() => fold(head, [clearVia], ctx)).not.toThrow();
+  });
+});

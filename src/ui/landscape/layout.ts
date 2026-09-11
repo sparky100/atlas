@@ -66,6 +66,7 @@
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import { attributesRecord } from '../elements/attributesRecord';
+import { isNonApplicationKind } from '../elements/systemKind';
 import { domainOf } from '../elements/systemDomain';
 
 export const EXTERNAL_LANE_KEY = '$external';
@@ -83,6 +84,22 @@ export const UNASSIGNED_LANE_KEY = '$unassigned';
  * the more fundamental fact of the two).
  */
 export const OT_ZONE_LANE_KEY = '$ot';
+/**
+ * Prompt 7k item 4: "a platform band along the bottom spanning the
+ * capability lanes for non-application kinds" — structurally the same
+ * shape as `OT_ZONE_LANE_KEY` (a non-`'application'`-kind system is pulled
+ * out of capability-lane placement before any `supports` edge is
+ * considered), placed inside the boundary and ordered last of all —
+ * "along the bottom" read literally, after `OT_ZONE_LANE_KEY` and even
+ * `UNASSIGNED_LANE_KEY`, a judgment call recorded here since the prompt
+ * names no explicit order among the three. Checked after both
+ * `isExternal` and `domainOf(...) === 'ot'`: a system that is external, or
+ * OT, keeps that more specific placement even if it also happens to be a
+ * non-application kind — this band is this sprint's last, least specific
+ * zone, not a fourth check every other one has to be re-litigated
+ * against.
+ */
+export const PLATFORM_BAND_KEY = '$platform';
 
 export const NODE_WIDTH = 160;
 export const NODE_HEIGHT = 48;
@@ -129,12 +146,12 @@ export interface LandscapeReferenceMarker {
   y: number;
 }
 
-export type LandscapeLaneRegion = 'capability' | 'unassigned' | 'external' | 'ot';
+export type LandscapeLaneRegion = 'capability' | 'unassigned' | 'external' | 'ot' | 'platform';
 
 export interface LandscapeLane {
   key: string;
   label: string;
-  /** `'external'` lanes sit outside the enterprise boundary (`boundary`, below); `'capability'`/`'unassigned'`/`'ot'` are what the boundary actually encloses — `'ot'` (Prompt 7k item 3) is `LandscapeCanvas.tsx`'s own cue to draw its zone rectangle. */
+  /** `'external'` lanes sit outside the enterprise boundary (`boundary`, below); `'capability'`/`'unassigned'`/`'ot'`/`'platform'` are what the boundary actually encloses — `'ot'` (Prompt 7k item 3) and `'platform'` (item 4) are `LandscapeCanvas.tsx`'s own cues to draw each one's zone rectangle. */
   region: LandscapeLaneRegion;
   y: number;
   height: number;
@@ -190,6 +207,7 @@ interface LanePlacement {
 function placementFor(system: ElementsHeadRow, supportsEdges: readonly RelationshipsHeadRow[], l1AncestorByCapabilityId: ReadonlyMap<UUID, ElementsHeadRow>): LanePlacement {
   if (isExternal(system)) return { primaryLaneKey: EXTERNAL_LANE_KEY, otherLaneKeys: [], isFallback: false };
   if (domainOf(system) === 'ot') return { primaryLaneKey: OT_ZONE_LANE_KEY, otherLaneKeys: [], isFallback: false };
+  if (isNonApplicationKind(system)) return { primaryLaneKey: PLATFORM_BAND_KEY, otherLaneKeys: [], isFallback: false };
 
   const resolved: ResolvedEdge[] = [];
   for (const edge of supportsEdges) {
@@ -221,8 +239,9 @@ function byNameThenId(a: ElementsHeadRow, b: ElementsHeadRow): number {
   return a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id);
 }
 
-/** Capability lanes first (by name), then the OT zone (Prompt 7k item 3 — a judgment call: real domain-based grouping reads more like "another lane" than a leftover bucket, so it sits ahead of Unassigned), Unassigned last (item 2) — External isn't part of this ordering at all any more, see this module's own top comment. */
+/** Capability lanes first (by name), then the OT zone (Prompt 7k item 3 — a judgment call: real domain-based grouping reads more like "another lane" than a leftover bucket, so it sits ahead of Unassigned), then Unassigned (item 2), then the platform band last of all (Prompt 7k item 4 — "along the bottom," `PLATFORM_BAND_KEY`'s own comment) — External isn't part of this ordering at all any more, see this module's own top comment. */
 function laneSortKey(key: string, l1CapabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>): [number, string] {
+  if (key === PLATFORM_BAND_KEY) return [3, ''];
   if (key === UNASSIGNED_LANE_KEY) return [2, ''];
   if (key === OT_ZONE_LANE_KEY) return [1, ''];
   return [0, l1CapabilitiesById.get(key)?.name ?? key];
@@ -336,7 +355,7 @@ export function computeLandscapeLayout(
 
   function placeLane(key: string, region: LandscapeLaneRegion): void {
     const members = [...(byLane.get(key) ?? [])].sort(byNameThenId);
-    const label = key === EXTERNAL_LANE_KEY ? 'External' : key === OT_ZONE_LANE_KEY ? 'OT' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
+    const label = key === EXTERNAL_LANE_KEY ? 'External' : key === OT_ZONE_LANE_KEY ? 'OT' : key === PLATFORM_BAND_KEY ? 'Platforms' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
     const row = layoutRow(members, y + LANE_LABEL_HEIGHT, itemsPerRow);
     const laneHeight = members.length === 0 ? LANE_LABEL_HEIGHT + EMPTY_LANE_GUTTER_Y : LANE_LABEL_HEIGHT + row.height + LANE_GUTTER_Y;
     lanes.push({ key, label, region, y, height: laneHeight });
@@ -359,7 +378,7 @@ export function computeLandscapeLayout(
     y += laneHeight;
   }
 
-  for (const key of boundaryKeys) placeLane(key, key === UNASSIGNED_LANE_KEY ? 'unassigned' : key === OT_ZONE_LANE_KEY ? 'ot' : 'capability');
+  for (const key of boundaryKeys) placeLane(key, key === UNASSIGNED_LANE_KEY ? 'unassigned' : key === OT_ZONE_LANE_KEY ? 'ot' : key === PLATFORM_BAND_KEY ? 'platform' : 'capability');
   const boundaryBottom = y;
 
   if (hasExternalLane) {
@@ -526,4 +545,23 @@ export function routeLandscapeEdge(from: LandscapeNodePosition, to: LandscapeNod
     points.push(point);
   }
   return points;
+}
+
+/**
+ * Prompt 7k item 4's "route via platforms" toggle: which node (if any) an
+ * edge should route through instead of drawing direct — extracted as its
+ * own pure function so the decision itself (as opposed to
+ * `LandscapeCanvas.tsx`'s own two-leg `routeLandscapeEdge` calls once a
+ * via node is found) is unit-testable without a canvas.
+ *
+ * `false`/`routeViaPlatforms` off always returns `undefined` regardless of
+ * `via` — direct edges by default, per the prompt's own parenthetical. A
+ * `via` that doesn't resolve to a node actually on this map (the platform
+ * system exists in the model but isn't itself placed here) also returns
+ * `undefined`, so the caller falls back to the direct edge rather than
+ * drawing nothing.
+ */
+export function viaPositionFor(via: string | undefined, positionById: ReadonlyMap<UUID, LandscapeNodePosition>, routeViaPlatforms: boolean): LandscapeNodePosition | undefined {
+  if (!routeViaPlatforms || via === undefined) return undefined;
+  return positionById.get(via);
 }

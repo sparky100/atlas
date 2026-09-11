@@ -97,7 +97,8 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
     data.systemsWithoutTechnicalOwner.length === 0 &&
     data.criticalSystemsWithoutBusinessOwner.length === 0 &&
     data.criticalExposedSystems.length === 0 &&
-    data.boundaryCrossingsMissingClassificationOrVerb.length === 0;
+    data.boundaryCrossingsMissingClassificationOrVerb.length === 0 &&
+    data.unusedIntegrationPlatforms.length === 0;
 
   return (
     <div className={styles.columns}>
@@ -290,6 +291,14 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
                 <HealthFinding
                   summary={`${String(data.boundaryCrossingsMissingClassificationOrVerb.length)} boundary crossing${data.boundaryCrossingsMissingClassificationOrVerb.length === 1 ? '' : 's'} with no data classification or verb`}
                   items={boundaryCrossingItems(data.boundaryCrossingsMissingClassificationOrVerb)}
+                />
+              </div>
+
+              <div className={styles.findingPlate}>
+                <HealthFinding
+                  summary={`${String(data.unusedIntegrationPlatforms.length)} unused integration ${plural(data.unusedIntegrationPlatforms.length, 'platform', 'platforms')} (nothing flows via it)`}
+                  items={elementItems(data.unusedIntegrationPlatforms)}
+                  browseHref={browseHref('unused-integration-platform')}
                 />
               </div>
 

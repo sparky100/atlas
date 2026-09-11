@@ -19,6 +19,7 @@ import { HistoryTimeline } from '../components/HistoryTimeline/HistoryTimeline';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Panel } from '../components/Panel/Panel';
+import { PlatformFlowsSection } from '../components/PlatformFlowsSection/PlatformFlowsSection';
 import { RelationshipsSection } from '../components/RelationshipGroup/RelationshipsSection';
 import { StructureSection } from '../components/StructureSection/StructureSection';
 import { Text } from '../components/Text/Text';
@@ -36,6 +37,7 @@ import { ALIAS_TYPE_LABELS, aliasAsFact } from '../elements/aliasLabels';
 import { useElementPage } from '../elements/useElementPage';
 import { useElementEditor, type DraftValue } from '../elements/useElementEditor';
 import { useElementRename } from '../elements/useElementRename';
+import { isIntegrationPlatform } from '../elements/systemKind';
 import styles from './ElementPage.module.css';
 
 /**
@@ -290,6 +292,11 @@ export function ElementPage() {
                 <CollapsibleSection title="Structure">
                   <StructureSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} parent={state.data.parent} capabilityLevel={state.data.capabilityLevel} children={state.data.children} />
                 </CollapsibleSection>
+                {state.data.element.element_type === 'system' && isIntegrationPlatform(state.data.element) && (
+                  <CollapsibleSection title="Flows via this platform" meta={`(${String(state.data.flowsViaThisPlatform.length)})`}>
+                    <PlatformFlowsSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} flows={state.data.flowsViaThisPlatform} endpoints={state.data.flowsViaThisPlatformEndpoints} />
+                  </CollapsibleSection>
+                )}
               </div>
               <div className={styles.rightColumn}>
                 <CollapsibleSection title="Changes touching this">

@@ -11,6 +11,7 @@ import {
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
+  findUnusedIntegrationPlatforms,
   isCapabilityOwnedWithAncestry,
 } from './healthFindings';
 
@@ -430,5 +431,29 @@ describe('findBoundaryCrossingsMissingClassificationOrVerb (Prompt 7k item 3)', 
     ]);
     const edges = [relationship('r1', 'uses', 'sys-it-1', 'sys-it-2')];
     expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, bothIt)).toEqual([]);
+  });
+});
+
+describe('findUnusedIntegrationPlatforms (Prompt 7k item 4)', () => {
+  it('flags a kind: integration_platform system with no edge naming it as via', () => {
+    const systems = [system('sys-esb', { kind: 'integration_platform' })];
+    expect(findUnusedIntegrationPlatforms(systems, [])).toEqual([system('sys-esb', { kind: 'integration_platform' })]);
+  });
+
+  it('does not flag a platform that at least one edge routes via', () => {
+    const systems = [system('sys-esb', { kind: 'integration_platform' })];
+    const edges = [relationship('r1', 'flows_to', 'sys-a', 'sys-b', { via: 'sys-esb' })];
+    expect(findUnusedIntegrationPlatforms(systems, edges)).toEqual([]);
+  });
+
+  it('never flags a system whose kind is not integration_platform, whether or not it is used', () => {
+    const systems = [system('sys-app'), system('sys-data', { kind: 'data_platform' })];
+    expect(findUnusedIntegrationPlatforms(systems, [])).toEqual([]);
+  });
+
+  it('a via naming a different platform does not clear this one', () => {
+    const systems = [system('sys-esb-a', { kind: 'integration_platform' }), system('sys-esb-b', { kind: 'integration_platform' })];
+    const edges = [relationship('r1', 'uses', 'sys-a', 'sys-b', { via: 'sys-esb-b' })];
+    expect(findUnusedIntegrationPlatforms(systems, edges).map((s) => s.element_id)).toEqual(['sys-esb-a']);
   });
 });

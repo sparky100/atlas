@@ -284,3 +284,109 @@ describe('System criticality, hostingModel and hostingProvider (Prompt 7k item 1
     expect(fromDeltaRow(toDeltaRow(setHostingModel, ctx))).toEqual(setHostingModel);
   });
 });
+
+describe('System domain (Prompt 7k item 3)', () => {
+  it('is accepted at create, optional, and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-17',
+      elementId: 'el-5',
+      elementType: 'system',
+      name: 'PLC Controller',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false, domain: 'ot' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('can be set later via an update', () => {
+    const setDomain: Delta = {
+      kind: 'element.update',
+      id: 'delta-18',
+      elementId: 'el-5',
+      elementType: 'system',
+      attribute: 'domain',
+      value: 'hybrid',
+      previousDeltaId: 'delta-17',
+      sourceId: 'src-1',
+      confidence: 0.8,
+    };
+    expect(fromDeltaRow(toDeltaRow(setDomain, ctx))).toEqual(setDomain);
+  });
+});
+
+describe('System kind and relationship via (Prompt 7k item 4)', () => {
+  it('kind is accepted at create, optional, and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-19',
+      elementId: 'el-6',
+      elementType: 'system',
+      name: 'Enterprise Service Bus',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false, kind: 'integration_platform' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('kind can be set later via an update', () => {
+    const setKind: Delta = {
+      kind: 'element.update',
+      id: 'delta-20',
+      elementId: 'el-6',
+      elementType: 'system',
+      attribute: 'kind',
+      value: 'data_platform',
+      previousDeltaId: 'delta-19',
+      sourceId: 'src-1',
+      confidence: 0.8,
+    };
+    expect(fromDeltaRow(toDeltaRow(setKind, ctx))).toEqual(setKind);
+  });
+
+  it('flows_to.via is accepted at create, optional, and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'relationship.create',
+      id: 'delta-21',
+      relationshipId: 'rel-1',
+      relationshipType: 'flows_to',
+      fromElementId: 'el-a',
+      toElementId: 'el-b',
+      attributes: { description: 'sends readings via', via: 'el-6' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('uses.via can be set later via an update, with none recorded at create', () => {
+    const create: Delta = {
+      kind: 'relationship.create',
+      id: 'delta-22',
+      relationshipId: 'rel-2',
+      relationshipType: 'uses',
+      fromElementId: 'el-a',
+      toElementId: 'el-b',
+      attributes: { description: 'polls' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    const setVia: Delta = {
+      kind: 'relationship.update',
+      id: 'delta-23',
+      relationshipId: 'rel-2',
+      relationshipType: 'uses',
+      attribute: 'via',
+      value: 'el-6',
+      previousDeltaId: 'delta-22',
+      sourceId: 'src-1',
+      confidence: 0.9,
+    };
+    expect(fromDeltaRow(toDeltaRow(create, ctx))).toEqual(create);
+    expect(fromDeltaRow(toDeltaRow(setVia, ctx))).toEqual(setVia);
+  });
+});

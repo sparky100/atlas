@@ -151,6 +151,11 @@ export function LandscapePage() {
   // comments-only filter above.
   const { colourBy, setColourBy } = useLandscapeColourByPreference(userId);
   const colourById = useId();
+  // Prompt 7k item 4: "route via platforms" — direct edges by default,
+  // same unpersisted-per-session shape as `commentsOnlyFilter` above
+  // (the plan's own note: "unpersisted local/URL state, not a new
+  // preference column, to keep this item's migration footprint at zero").
+  const [routeViaPlatforms, setRouteViaPlatforms] = useState(false);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -299,6 +304,23 @@ export function LandscapePage() {
               </label>
             </div>
           )}
+          {/* Prompt 7k item 4: "route via platforms" — off (direct edges) by default, desktop canvas only, same unpersisted per-session toggle shape as the comments-only filter above. */}
+          {state.status === 'ready' && showCanvas && (
+            <div className={styles.actions}>
+              <label className={styles.commentsOnlyToggle}>
+                <input
+                  type="checkbox"
+                  checked={routeViaPlatforms}
+                  onChange={(e) => {
+                    setRouteViaPlatforms(e.target.checked);
+                  }}
+                />
+                <Text as="span" size="sm" tone="muted">
+                  Route via platforms
+                </Text>
+              </label>
+            </div>
+          )}
           {state.status === 'ready' && !narrow && addControls && <div className={styles.actions}>{addControls}</div>}
           {state.status === 'ready' && narrow && canAdd && (
             <div className={styles.actions}>
@@ -379,6 +401,7 @@ export function LandscapePage() {
               threadCounts={threadCounts}
               commentsOnlyFilter={commentsOnlyFilter}
               colourBy={colourBy}
+              routeViaPlatforms={routeViaPlatforms}
               onCommentMarkerClick={(elementId) => {
                 setCommentsPanelElementId(elementId);
                 setAutoFocusComposer(false);

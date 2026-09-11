@@ -77,6 +77,19 @@ export type HostingModel = 'on_premises' | 'private_cloud' | 'public_cloud' | 's
  * out of sync with it.
  */
 export type SystemDomain = 'it' | 'ot' | 'hybrid';
+/**
+ * Prompt 7k item 4: what a system *is*, for landscape/routing purposes —
+ * a categorical, unordered set, no colour-by of its own (unlike
+ * `Criticality`/`HostingModel`/`SystemDomain`): this drives structural
+ * layout (the landscape's platform band, `src/ui/landscape/layout.ts`)
+ * and the `via` reference below, not a tone anyone would want to see
+ * tinted. Absent reads as `'application'` (the read-time-default pattern
+ * `SystemDomain` already established) — the common case is an ordinary
+ * application; only a system that genuinely mediates flows between
+ * others (an ESB, an API gateway, a data platform, a piece of
+ * infrastructure like a message bus) needs marking.
+ */
+export type SystemKind = 'application' | 'integration_platform' | 'data_platform' | 'infrastructure';
 export type ActorSubtype = 'person' | 'team';
 export type DataClassification = 'public' | 'official' | 'official_sensitive' | 'special_category';
 /** Sprint U4-1 B4: which of a system's `supports` edges anchors its one landscape lane (relationship_type_rules' new `maxPrimaryPerFrom: 1`, `supports`-only). Always set at creation, defaulting to `secondary` unless the picker's "primary?" prompt is answered yes — never left unset the way `SupportsAttributes.description` is, since lane placement has to read *something* off every edge. */
@@ -141,6 +154,8 @@ export interface SystemAttributes {
   hostingProvider?: string;
   /** Prompt 7k item 3: IT, OT, or hybrid — drives the landscape's OT zone/colour-by, the capability map's "OT share" colour-by, and the boundary-crossings finding/list. Optional; absent reads as `'it'` (`SystemDomain`'s own comment). */
   domain?: SystemDomain;
+  /** Prompt 7k item 4: application, integration/data platform, or infrastructure — drives the landscape's platform band and which systems `via` (below) may reference. Optional; absent reads as `'application'` (`SystemKind`'s own comment). */
+  kind?: SystemKind;
 }
 
 export interface ContainerAttributes {
@@ -183,6 +198,8 @@ export interface SupportsAttributes {
 }
 export interface UsesAttributes {
   description?: string;
+  /** Prompt 7k item 4: an optional element ref to the `system` (of `kind: 'integration_platform'`) this flow actually goes via — an ESB/API gateway/message bus sitting between `fromElementId` and `toElementId`, not a third real endpoint of its own (C18, `src/engine/deltas.ts`'s `apply()`, validates the reference at commit time). Direct edges (no `via`) are the default; the landscape only routes an edge through its `via` node when the "route via platforms" toggle is on (unpersisted view state, `src/ui/landscape/LandscapeCanvas.tsx` — never a stored preference, keeping this item's migration footprint at zero). */
+  via?: UUID;
 }
 export interface OwnsAttributes {
   /** See `OwnsRole`'s own doc comment. At most one live edge per `(toElementId, role)` (relationship_type_rules, C17). Required — every new `owns` edge sets it at creation, unlike `primary` below, which no new code ever sets again. */
@@ -205,6 +222,8 @@ export interface FlowsToAttributes {
   description?: string;
   dataClassification?: DataClassification;
   protocol?: string;
+  /** See `UsesAttributes.via`'s own doc comment — identical meaning and validation, `flows_to`'s own copy since each relationship type's attributes are their own interface. */
+  via?: UUID;
 }
 
 export interface RelationshipAttributesByType {
@@ -467,6 +486,10 @@ export const COMMIT_INVARIANTS = [
   {
     id: 'C17',
     text: "relationship.create/relationship.update/relationship.restore setting (or reviving, for restore) supports.role = 'primary', or setting an owns.role of any value: no other live relationship in the resulting head already holds the same value on the same anchor element — supports' anchor is fromElementId, one primary capability per system (a 'secondary' supports.role has no cardinality limit); owns' anchor is toElementId, one owner per role per owned element (Prompt 7k item 2 — 'business'/'technical'/'service' are each independently capped at one, so a target may have up to three owners at once, never two of the same role). A same-commit delta demoting/reassigning the existing one first (earlier in seq order) makes the promotion legal; a restore is checked against the head as it stands now, not as it stood when the relationship was retracted.",
+  },
+  {
+    id: 'C18',
+    text: "relationship.create/relationship.update setting uses.via or flows_to.via to a non-null value: the referenced element exists in the head as it stands at the point this delta is applied and is a system with kind === 'integration_platform' (Prompt 7k item 4). Not re-checked at relationship.restore, matching C9's own endpoint check, which restore also does not re-run — a restored edge is trusted to reconstruct exactly the state it last held, not re-validated against the current head.",
   },
 ] as const;
 

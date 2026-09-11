@@ -8,7 +8,7 @@ import type { ChipTone } from '../components/Chip/Chip';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff, VersionDiffState } from '../../engine/versionDiff';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
-import { BOUNDARY_MARGIN, computeLandscapeChannels, NODE_HEIGHT, NODE_WIDTH, routeLandscapeEdge, type LandscapeLayout, type LandscapeNodePosition } from './layout';
+import { BOUNDARY_MARGIN, computeLandscapeChannels, NODE_HEIGHT, NODE_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
 import { landscapeTileColourFor } from './landscapeColour';
 import { quantizeScale } from './zoom';
 import styles from './LandscapeCanvas.module.css';
@@ -54,6 +54,15 @@ export interface LandscapeCanvasProps {
    * with the flat neutral fill this canvas has always used.
    */
   colourBy?: LandscapeColourByMode | undefined;
+  /**
+   * Prompt 7k item 4: "route via platforms" — off (the default, direct
+   * edges) draws every `uses`/`flows_to` edge straight between its two
+   * real endpoints, ignoring `via` entirely; on, an edge carrying `via`
+   * draws as two legs through that platform's own node instead. Plain,
+   * unpersisted view state (`LandscapePage.tsx`'s own `useState`) — never
+   * a stored preference, keeping this item's migration footprint at zero.
+   */
+  routeViaPlatforms?: boolean | undefined;
 }
 
 interface Transform {
@@ -312,6 +321,7 @@ export function LandscapeCanvas({
   onNewCommentShortcut,
   commentsOnlyFilter = false,
   colourBy = 'none',
+  routeViaPlatforms = false,
 }: LandscapeCanvasProps) {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -338,16 +348,36 @@ export function LandscapeCanvas({
     const allPositions: LandscapeNodePosition[] = [...layout.nodes, ...layout.actorNodes];
     const positionById = new Map(layout.nodes.map((n) => [n.elementId, n]));
     const channels = computeLandscapeChannels(layout);
-    return edges
-      .map((edge) => {
-        const from = positionById.get(edge.from_element_id);
-        const to = positionById.get(edge.to_element_id);
-        if (!from || !to) return null;
-        const obstacles = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== edge.to_element_id);
-        return { edge, points: routeLandscapeEdge(from, to, obstacles, channels) };
-      })
-      .filter((r): r is { edge: RelationshipsHeadRow; points: { x: number; y: number }[] } => r !== null);
-  }, [layout, edges]);
+    const result: { edge: RelationshipsHeadRow; points: { x: number; y: number }[] }[] = [];
+    for (const edge of edges) {
+      const from = positionById.get(edge.from_element_id);
+      const to = positionById.get(edge.to_element_id);
+      if (!from || !to) continue;
+
+      // Prompt 7k item 4's "route via platforms" toggle: off (the default)
+      // draws the direct edge regardless of `via` — on, and a `via`
+      // resolving to a node actually on this map, draws two legs
+      // (from→via, via→to) instead of one, each independently routed
+      // around obstacles the same way a direct edge already is. A `via`
+      // that doesn't resolve on this map (the platform system exists but
+      // isn't itself placed here — shouldn't happen in practice, since the
+      // platform is a system too, but not asserted away) falls back to the
+      // direct edge rather than drawing nothing.
+      const via = attributesRecord(edge.attributes).via;
+      const viaPosition = viaPositionFor(typeof via === 'string' ? via : undefined, positionById, routeViaPlatforms);
+      if (viaPosition) {
+        const obstaclesToVia = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== viaPosition.elementId);
+        const obstaclesFromVia = allPositions.filter((n) => n.elementId !== viaPosition.elementId && n.elementId !== edge.to_element_id);
+        result.push({ edge, points: routeLandscapeEdge(from, viaPosition, obstaclesToVia, channels) });
+        result.push({ edge, points: routeLandscapeEdge(viaPosition, to, obstaclesFromVia, channels) });
+        continue;
+      }
+
+      const obstacles = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== edge.to_element_id);
+      result.push({ edge, points: routeLandscapeEdge(from, to, obstacles, channels) });
+    }
+    return result;
+  }, [layout, edges, routeViaPlatforms]);
 
   const fitToView = useCallback(() => {
     const wrapper = wrapperRef.current;
@@ -479,6 +509,23 @@ export function LandscapeCanvas({
         ctx.lineWidth = 1.5;
         ctx.setLineDash([3, 3]);
         roundRectPath(ctx, BOUNDARY_MARGIN * 2, otLane.y - BOUNDARY_MARGIN / 2, layout.width - BOUNDARY_MARGIN * 4, otLane.height - BOUNDARY_MARGIN, 8);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+
+      // Prompt 7k item 4: the platform band — the same "own smaller dashed
+      // rectangle inside the boundary" zone cue as the OT zone above, in
+      // `tokens.statusInfo` rather than `statusWarn` (an integration/data
+      // platform isn't "needs attention" the way an OT system is — it's
+      // just a different kind of system, `systemKind.ts`'s own reasoning).
+      const platformLane = layout.lanes.find((lane) => lane.region === 'platform');
+      if (platformLane) {
+        ctx.save();
+        ctx.strokeStyle = tokens.statusInfo;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        roundRectPath(ctx, BOUNDARY_MARGIN * 2, platformLane.y - BOUNDARY_MARGIN / 2, layout.width - BOUNDARY_MARGIN * 4, platformLane.height - BOUNDARY_MARGIN, 8);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.restore();

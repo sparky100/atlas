@@ -15,6 +15,7 @@ import {
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
+  findUnusedIntegrationPlatforms,
   listAllOwnsEdges,
   listAllUsesAndFlowsToEdges,
   listFactsForCommit,
@@ -63,6 +64,8 @@ export interface ArchitectHomeData {
   boundaryCrossingsMissingClassificationOrVerb: BoundaryCrossing[];
   /** Prompt 7k item 3's "Boundary crossings" count-and-link block — every IT/OT crossing, not just the ones missing metadata (that's the health finding above); the full list lives at `BoundaryCrossingsPage.tsx`. */
   boundaryCrossingsCount: number;
+  /** Prompt 7k item 4's own health finding: integration platforms with nothing routed via them. */
+  unusedIntegrationPlatforms: ElementsHeadRow[];
 }
 
 export type ArchitectHomeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeData };
@@ -165,6 +168,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             criticalExposedSystems: findCriticalExposedSystems(systems),
             boundaryCrossingsMissingClassificationOrVerb: findBoundaryCrossingsMissingClassificationOrVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             boundaryCrossingsCount: findBoundaryCrossings(usesAndFlowsToEdges, usesAndFlowsToEndpointsById).length,
+            unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges),
           },
         });
       }

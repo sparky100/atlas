@@ -9,7 +9,9 @@ import {
   findCriticalSystemsWithoutBusinessOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
+  findUnusedIntegrationPlatforms,
   listAllOwnsEdges,
+  listAllUsesAndFlowsToEdges,
   listFactsForCommit,
 } from '../../db/healthFindings';
 import { listAllSupportsEdges } from '../../db/modelHome';
@@ -25,9 +27,18 @@ export type ElementBrowseSortKey = 'name' | 'type' | 'owner' | 'lifecycle';
  * `browseHref`), read from the page's own `?filter=` param
  * (`ElementsPage.tsx`). `null` is the ordinary, unfiltered browse table.
  * Prompt 7k item 2 adds `no-technical-owner`; item 1 adds
- * `critical-no-business-owner` and `critical-exposed`.
+ * `critical-no-business-owner` and `critical-exposed`; item 4 adds
+ * `unused-integration-platform`.
  */
-export type ElementBrowseFilter = 'unlinked-systems' | 'unowned-capabilities' | 'stale-attributes' | 'no-technical-owner' | 'critical-no-business-owner' | 'critical-exposed' | null;
+export type ElementBrowseFilter =
+  | 'unlinked-systems'
+  | 'unowned-capabilities'
+  | 'stale-attributes'
+  | 'no-technical-owner'
+  | 'critical-no-business-owner'
+  | 'critical-exposed'
+  | 'unused-integration-platform'
+  | null;
 
 export type ElementBrowseState =
   | { status: 'loading' }
@@ -136,6 +147,10 @@ export function useElementBrowse(modelId: UUID, filter: ElementBrowseFilter = nu
       } else if (filter === 'critical-exposed') {
         const systems = elements.filter((e) => e.element_type === 'system');
         ids = new Set(findCriticalExposedSystems(systems).map((e) => e.element_id));
+      } else if (filter === 'unused-integration-platform') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const usesAndFlowsToEdges = await listAllUsesAndFlowsToEdges(supabase, resolvedCommitId);
+        ids = new Set(findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges).map((e) => e.element_id));
       }
 
       const rows: BrowseRow[] = elements.map((element) => ({

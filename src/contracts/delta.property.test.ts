@@ -25,6 +25,8 @@ import {
   type OwnsAttributes,
   type SupportsAttributes,
   type SystemAttributes,
+  type SystemDomain,
+  type SystemKind,
   type UsesAttributes,
   type UUID,
   factKeyOf,
@@ -49,6 +51,8 @@ const lifecycleStatus: LifecycleStatus[] = ['planned', 'active', 'retiring', 're
 const dataClassification: DataClassification[] = ['public', 'official', 'official_sensitive', 'special_category'];
 const criticality: Criticality[] = ['critical', 'high', 'medium', 'low'];
 const hostingModel: HostingModel[] = ['on_premises', 'private_cloud', 'public_cloud', 'saas', 'hybrid'];
+const systemDomain: SystemDomain[] = ['it', 'ot', 'hybrid'];
+const systemKind: SystemKind[] = ['application', 'integration_platform', 'data_platform', 'infrastructure'];
 
 const capabilityAttributes: fc.Arbitrary<CapabilityAttributes> = fc.record(
   { description: fc.string(), code: fc.string({ minLength: 1, maxLength: 6 }), templateRef: fc.uuid() },
@@ -66,6 +70,8 @@ const systemAttributes: fc.Arbitrary<SystemAttributes> = fc.record(
     criticality: fc.constantFrom(...criticality),
     hostingModel: fc.constantFrom(...hostingModel),
     hostingProvider: fc.string(),
+    domain: fc.constantFrom(...systemDomain),
+    kind: fc.constantFrom(...systemKind),
   },
   { requiredKeys: ['lifecycleStatus', 'isExternal'] },
 );
@@ -83,10 +89,10 @@ const supportsAttributes: fc.Arbitrary<SupportsAttributes> = fc.record(
   { description: fc.string(), role: fc.constantFrom('primary' as const, 'secondary' as const) },
   { requiredKeys: ['role'] },
 );
-const usesAttributes: fc.Arbitrary<UsesAttributes> = fc.record({ description: fc.string() }, { requiredKeys: [] });
+const usesAttributes: fc.Arbitrary<UsesAttributes> = fc.record({ description: fc.string(), via: uuid }, { requiredKeys: [] });
 const ownsAttributes: fc.Arbitrary<OwnsAttributes> = fc.record({ role: fc.constantFrom('business' as const, 'technical' as const, 'service' as const) }, { requiredKeys: ['role'] });
 const flowsToAttributes: fc.Arbitrary<FlowsToAttributes> = fc.record(
-  { description: fc.string(), dataClassification: fc.constantFrom(...dataClassification), protocol: fc.string() },
+  { description: fc.string(), dataClassification: fc.constantFrom(...dataClassification), protocol: fc.string(), via: uuid },
   { requiredKeys: [] },
 );
 
@@ -142,6 +148,14 @@ const elementUpdateArb: fc.Arbitrary<Delta> = fc.oneof(
   fc.tuple(provenanceBase, uuid, uuid, fc.option(fc.string(), { nil: null })).map(
     ([base, elementId, previousDeltaId, value]) =>
       ({ ...base, kind: 'element.update', elementId, elementType: 'system', attribute: 'hostingProvider', value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.constantFrom(...systemDomain, null)).map(
+    ([base, elementId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'element.update', elementId, elementType: 'system', attribute: 'domain', value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.constantFrom(...systemKind, null)).map(
+    ([base, elementId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'element.update', elementId, elementType: 'system', attribute: 'kind', value, previousDeltaId }) satisfies Delta,
   ),
 );
 
@@ -202,6 +216,14 @@ const relationshipUpdateArb: fc.Arbitrary<Delta> = fc.oneof(
   fc.tuple(provenanceBase, uuid, uuid, fc.option(fc.string(), { nil: null })).map(
     ([base, relationshipId, previousDeltaId, value]) =>
       ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'flows_to', attribute: 'protocol', value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.option(uuid, { nil: null })).map(
+    ([base, relationshipId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'uses', attribute: 'via', value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.option(uuid, { nil: null })).map(
+    ([base, relationshipId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'flows_to', attribute: 'via', value, previousDeltaId }) satisfies Delta,
   ),
 );
 

@@ -9,15 +9,25 @@ import {
   listChildrenOf,
   listDeltaHistoryForSubject,
   listFactsForSubject,
+  listFlowsViaElement,
   listInFlightBranchesTouchingSubject,
   listRelationshipsForElement,
   type DeltaHistoryRow,
 } from '../../db/elements';
-import { loadProjectionAtCommit, projectionChildrenOf, projectionElementById, projectionElementsByIds, projectionFactsForSubject, projectionRelationshipsForElement } from '../../db/branchProjection';
+import {
+  loadProjectionAtCommit,
+  projectionChildrenOf,
+  projectionElementById,
+  projectionElementsByIds,
+  projectionFactsForSubject,
+  projectionFlowsViaElement,
+  projectionRelationshipsForElement,
+} from '../../db/branchProjection';
 import type { HeadProjection } from '../../engine/projection';
 import type { AliasRow, BranchRow, SourceRow } from '../../db/types';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import { capabilityLevel } from './capabilityDepth';
+import { isIntegrationPlatform } from './systemKind';
 import { supabase } from '../supabaseClient';
 
 export interface ElementPageData {
@@ -37,6 +47,10 @@ export interface ElementPageData {
   sources: Map<UUID, SourceRow>;
   history: DeltaHistoryRow[];
   inFlightBranches: BranchRow[];
+  /** Prompt 7k item 4's "Flows via this platform" — every `uses`/`flows_to` edge naming this element as `via`, only ever populated when `element` is a system with `kind: 'integration_platform'` (`isIntegrationPlatform`); `[]` for every other element, not `undefined`, so the section can render an honest empty state rather than needing a second "is this even a platform" check downstream. */
+  flowsViaThisPlatform: RelationshipsHeadRow[];
+  /** The endpoints (`from`/`to`) of every edge in `flowsViaThisPlatform` — never this element itself, which is only ever the `via`, not an endpoint, of these edges. */
+  flowsViaThisPlatformEndpoints: Map<UUID, ElementsHeadRow>;
 }
 
 export type ElementPageState =
@@ -82,6 +96,8 @@ interface ElementSource {
   children: (parentId: UUID) => Promise<ElementsHeadRow[]>;
   relationships: (elementId: UUID) => Promise<RelationshipsHeadRow[]>;
   facts: (subjectId: UUID) => Promise<Map<string, FactsRow>>;
+  /** Prompt 7k item 4 — see `ElementPageData.flowsViaThisPlatform`'s own doc comment. */
+  flowsViaElement: (platformElementId: UUID) => Promise<RelationshipsHeadRow[]>;
 }
 
 function projectionSource(commitId: UUID, projection: HeadProjection): ElementSource {
@@ -92,6 +108,7 @@ function projectionSource(commitId: UUID, projection: HeadProjection): ElementSo
     children: (parentId) => Promise.resolve(projectionChildrenOf(projection, parentId)),
     relationships: (elementId) => Promise.resolve(projectionRelationshipsForElement(projection, elementId)),
     facts: (subjectId) => Promise.resolve(projectionFactsForSubject(projection, subjectId)),
+    flowsViaElement: (platformElementId) => Promise.resolve(projectionFlowsViaElement(projection, platformElementId)),
   };
 }
 
@@ -103,6 +120,7 @@ function commitSource(commitId: UUID): ElementSource {
     children: (parentId) => listChildrenOf(supabase, commitId, parentId),
     relationships: (elementId) => listRelationshipsForElement(supabase, commitId, elementId),
     facts: (subjectId) => loadFacts(commitId, subjectId),
+    flowsViaElement: (platformElementId) => listFlowsViaElement(supabase, commitId, platformElementId),
   };
 }
 
@@ -191,10 +209,39 @@ export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): UseEle
       const aliasSourceIds = [...new Set(aliases.map((a) => a.source_id))];
       const [sources, aliasSources] = await Promise.all([getSourcesByIds(supabase, allSourceIds), getSourcesByIds(supabase, aliasSourceIds)]);
 
+      // Prompt 7k item 4: only a system with `kind: 'integration_platform'`
+      // can ever be named as anyone's `via` — every other element type
+      // skips this fetch entirely rather than paying for a commit-scoped
+      // uses/flows_to scan it can never have a match in.
+      let flowsViaThisPlatform: RelationshipsHeadRow[] = [];
+      let flowsViaThisPlatformEndpoints = new Map<UUID, ElementsHeadRow>();
+      if (element.element_type === 'system' && isIntegrationPlatform(element)) {
+        flowsViaThisPlatform = await source.flowsViaElement(elementId);
+        const endpointIds = flowsViaThisPlatform.flatMap((r) => [r.from_element_id, r.to_element_id]);
+        flowsViaThisPlatformEndpoints = await source.elementsByIds(endpointIds);
+      }
+
       if (!cancelled) {
         setState({
           status: 'ready',
-          data: { commitId, element, facts, parent, capabilityLevel: elementCapabilityLevel, children, relationships, relationshipEndpoints, relationshipFacts, aliases, aliasSources, sources, history, inFlightBranches },
+          data: {
+            commitId,
+            element,
+            facts,
+            parent,
+            capabilityLevel: elementCapabilityLevel,
+            children,
+            relationships,
+            relationshipEndpoints,
+            relationshipFacts,
+            aliases,
+            aliasSources,
+            sources,
+            history,
+            inFlightBranches,
+            flowsViaThisPlatform,
+            flowsViaThisPlatformEndpoints,
+          },
         });
       }
     }

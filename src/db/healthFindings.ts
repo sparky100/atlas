@@ -163,6 +163,26 @@ export function findBoundaryCrossingsMissingClassificationOrVerb(edges: readonly
   return findBoundaryCrossings(edges, elementsById).filter((crossing) => crossing.missingVerb || crossing.missingDataClassification);
 }
 
+/**
+ * Prompt 7k item 4's own health finding: every system with
+ * `kind: 'integration_platform'` that no live `uses`/`flows_to` edge
+ * names as its `via` — a platform recorded in the model but not actually
+ * routing anything, worth a second look (has it been decommissioned? is
+ * a real flow missing its `via`?). `usesAndFlowsToEdges` is the same
+ * commit-scoped edge list `findBoundaryCrossings`/
+ * `findUnlabeledVerbRelationships` already read (`listAllUsesAndFlowsToEdges`)
+ * — reused here rather than a second query, since `via` presence is just
+ * another attribute on the same rows.
+ */
+export function findUnusedIntegrationPlatforms(systems: readonly ElementsHeadRow[], usesAndFlowsToEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
+  const platformIdsInUse = new Set<UUID>();
+  for (const edge of usesAndFlowsToEdges) {
+    const via = attributesRecord(edge.attributes).via;
+    if (typeof via === 'string') platformIdsInUse.add(via);
+  }
+  return systems.filter((system) => attributesRecord(system.attributes).kind === 'integration_platform' && !platformIdsInUse.has(system.element_id));
+}
+
 /** Every fact at `commitId`, unfiltered by subject — callers scope to the systems they care about (health findings only reads systems' own attributes, not every subject in the model). Routed through `selectAll` (SPEC §6.7): `facts` is one of the tables `max_rows` can silently truncate. */
 export async function listFactsForCommit(supabase: Client, commitId: string): Promise<FactsRow[]> {
   const query = supabase.from('facts').select('*', { count: 'exact' }).eq('commit_id', commitId).order('subject_id').order('attribute');
