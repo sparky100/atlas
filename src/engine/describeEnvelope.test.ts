@@ -78,13 +78,13 @@ describe('describeEnvelope', () => {
   });
 
   it('relationship.create (owns): "Set {to} owner to {from}", not "Link {from} owns {to}"', () => {
-    const delta = base({ kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'owns', fromElementId: 'networkControl', toElementId: 'powerOn', attributes: { primary: true } });
+    const delta = base({ kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'owns', fromElementId: 'networkControl', toElementId: 'powerOn', attributes: { role: 'business' } });
     expect(describeEnvelope([delta], nameLookup)).toBe('Set PowerON owner to Network Control');
   });
 
   it('relationship.update: no endpoint ids are on the delta, so this names the relationship type, not its endpoints', () => {
-    const delta = base({ kind: 'relationship.update', relationshipId: 'r1', relationshipType: 'owns', attribute: 'primary', value: false, previousDeltaId: 'p1' });
-    expect(describeEnvelope([delta], nameLookup)).toBe('Set owns primary to No');
+    const delta = base({ kind: 'relationship.update', relationshipId: 'r1', relationshipType: 'owns', attribute: 'role', value: 'technical', previousDeltaId: 'p1' });
+    expect(describeEnvelope([delta], nameLookup)).toBe('Set owns role to technical');
   });
 
   it('relationship.update (cleared): "Clear {type} {label}"', () => {
@@ -104,7 +104,7 @@ describe('describeEnvelope', () => {
 
   it('a create-and-link pair: "Add {type} {name} and link to {other} (2 changes)"', () => {
     const create = base({ kind: 'element.create', elementId: 'powerOn', elementType: 'system', name: 'PowerON', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false } });
-    const link = base({ kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'owns', fromElementId: 'networkControl', toElementId: 'powerOn', attributes: { primary: true } });
+    const link = base({ kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'owns', fromElementId: 'networkControl', toElementId: 'powerOn', attributes: { role: 'business' } });
     expect(describeEnvelope([create, link], nameLookup)).toBe('Add system PowerON and link to Network Control (2 changes)');
   });
 
@@ -151,14 +151,14 @@ describe('envelopeSubjects', () => {
   });
 
   it('relationship.update/retract/restore: nothing — no endpoint ids are on the delta at all', () => {
-    expect(envelopeSubjects([base({ kind: 'relationship.update', relationshipId: 'r1', relationshipType: 'owns', attribute: 'primary', value: false, previousDeltaId: 'p1' })])).toEqual([]);
+    expect(envelopeSubjects([base({ kind: 'relationship.update', relationshipId: 'r1', relationshipType: 'owns', attribute: 'role', value: 'technical', previousDeltaId: 'p1' })])).toEqual([]);
     expect(envelopeSubjects([base({ kind: 'relationship.retract', relationshipId: 'r1', relationshipType: 'supports', previousDeltaId: 'p1' })])).toEqual([]);
     expect(envelopeSubjects([base({ kind: 'relationship.restore', relationshipId: 'r1', relationshipType: 'supports', previousDeltaId: 'p1' })])).toEqual([]);
   });
 
   it('de-duplicates across deltas, keeping first-appearance order', () => {
     const create = base({ kind: 'element.create', elementId: 'powerOn', elementType: 'system', name: 'PowerON', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false } });
-    const link = base({ id: 'd2', kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'owns', fromElementId: 'networkControl', toElementId: 'powerOn', attributes: { primary: true } });
+    const link = base({ id: 'd2', kind: 'relationship.create', relationshipId: 'r1', relationshipType: 'owns', fromElementId: 'networkControl', toElementId: 'powerOn', attributes: { role: 'business' } });
     expect(envelopeSubjects([create, link])).toEqual(['powerOn', 'networkControl']);
   });
 

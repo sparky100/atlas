@@ -9,7 +9,7 @@
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { ELEMENT_TYPES, RELATIONSHIP_TYPES, type Delta, type DeltaKind, type ElementType, type LifecycleStatus, type RelationshipType, type UUID } from '../contracts/delta';
+import { ELEMENT_TYPES, RELATIONSHIP_TYPES, type Delta, type DeltaKind, type ElementType, type LifecycleStatus, type OwnsRole, type RelationshipType, type UUID } from '../contracts/delta';
 import { isRelationshipTripleAllowed, RELATIONSHIP_TYPE_RULES } from '../contracts/relationshipTypeRules';
 import type { Json } from '../contracts/rows';
 import { EngineError } from './errors';
@@ -414,7 +414,7 @@ function createOwnsDelta(id: UUID, relationshipId: UUID): Delta {
     relationshipType: 'owns',
     fromElementId: 'fixture-actor',
     toElementId: 'fixture-target',
-    attributes: { primary: true },
+    attributes: { role: 'business' },
     sourceId: FIXTURE_SOURCE,
     confidence: 1,
   };
@@ -476,8 +476,8 @@ const fixturesByKind: Record<DeltaKind, () => KindFixture> = {
       id: 'd-rupdate',
       relationshipId: 'rel-1',
       relationshipType: 'owns',
-      attribute: 'primary',
-      value: false,
+      attribute: 'role',
+      value: 'technical',
       previousDeltaId: 'd-rcreate',
       sourceId: FIXTURE_SOURCE,
       confidence: 1,
@@ -611,7 +611,7 @@ describe('C9: relationship.create enforces RELATIONSHIP_TYPE_RULES', () => {
       relationshipType,
       fromElementId: 'from-el',
       toElementId: 'to-el',
-      attributes: (relationshipType === 'owns' ? { primary: true } : {}) as never,
+      attributes: (relationshipType === 'owns' ? { role: 'business' } : {}) as never,
       sourceId: 'src',
       confidence: 1,
     };
@@ -659,7 +659,7 @@ describe('C9: relationship.create enforces RELATIONSHIP_TYPE_RULES', () => {
   });
 });
 
-describe('C17: at most one primary supports edge per system, one primary owns edge per owned element', () => {
+describe('C17: at most one primary supports edge per system, one owns edge per role per owned element', () => {
   // `fold`/`apply` take no branch-kind argument — `commitToBranch`
   // (src/db/commits.ts) calls the exact same `fold` for a `main` commit
   // and a `change` branch's own commit, so a check inside `apply()` is, by
@@ -680,8 +680,8 @@ describe('C17: at most one primary supports edge per system, one primary owns ed
     return { kind: 'relationship.create', id, relationshipId, relationshipType: 'supports', fromElementId: systemId, toElementId: capabilityId, attributes: { role }, sourceId: 'src', confidence: 1 };
   }
 
-  function ownsCreate(id: UUID, relationshipId: UUID, actorId: UUID, targetId: UUID, primary: boolean): Delta {
-    return { kind: 'relationship.create', id, relationshipId, relationshipType: 'owns', fromElementId: actorId, toElementId: targetId, attributes: { primary }, sourceId: 'src', confidence: 1 };
+  function ownsCreate(id: UUID, relationshipId: UUID, actorId: UUID, targetId: UUID, role: OwnsRole): Delta {
+    return { kind: 'relationship.create', id, relationshipId, relationshipType: 'owns', fromElementId: actorId, toElementId: targetId, attributes: { role }, sourceId: 'src', confidence: 1 };
   }
 
   function relationshipRetract(id: UUID, relationshipId: UUID, relationshipType: RelationshipType, previousDeltaId: UUID): Delta {
@@ -740,30 +740,30 @@ describe('C17: at most one primary supports edge per system, one primary owns ed
     expect(() => fold(buildHead(), [demote, promote], ctx)).not.toThrow();
   });
 
-  it('owns.create: a second primary owner of the same target, with no demotion, is rejected naming C17, the target, and the existing owner', () => {
+  it('owns.create: a second business owner of the same target, with no reassignment, is rejected naming C17, the target, and the existing owner', () => {
     const head = twoActorsAndOneSystem();
-    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
-    const attempt = () => fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', true)], ctx);
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', 'business')], ctx);
+    const attempt = () => fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', 'business')], ctx);
     expect(attempt).toThrow(EngineError);
     expect(attempt).toThrow(/C17/);
-    // Names the target (the anchor) and the *existing* primary owner —
+    // Names the target (the anchor) and the *existing* business owner —
     // not the new one being attempted, which the caller already knows.
     expect(attempt).toThrow(/PowerON/);
     expect(attempt).toThrow(/Network Control/);
   });
 
-  it('owns.create: a non-primary second owner of the same target is always accepted', () => {
+  it('owns.create: a second owner of the same target in a different role is always accepted', () => {
     const head = twoActorsAndOneSystem();
-    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
-    expect(() => fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', false)], ctx)).not.toThrow();
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', 'business')], ctx);
+    expect(() => fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', 'technical')], ctx)).not.toThrow();
   });
 
-  it('owns.create: promoting a second owner is accepted when the same commit demotes the first one earlier in seq order', () => {
+  it('owns.create: a second owner in the same role is accepted when the same commit reassigns the first one to a different role earlier in seq order', () => {
     const head = twoActorsAndOneSystem();
-    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
-    const demote: Delta = { kind: 'relationship.update', id: 'd-demote', relationshipId: 'rel-1', relationshipType: 'owns', attribute: 'primary', value: false, previousDeltaId: 'd-r1', sourceId: 'src', confidence: 1 };
-    const promote = ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', true);
-    expect(() => fold(head, [demote, promote], ctx)).not.toThrow();
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', 'business')], ctx);
+    const reassign: Delta = { kind: 'relationship.update', id: 'd-reassign', relationshipId: 'rel-1', relationshipType: 'owns', attribute: 'role', value: 'technical', previousDeltaId: 'd-r1', sourceId: 'src', confidence: 1 };
+    const promote = ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', 'business');
+    expect(() => fold(head, [reassign, promote], ctx)).not.toThrow();
   });
 
   it('supports.restore: reviving a retracted primary is rejected once a new edge has taken over as primary; restoring after that new one is retracted too succeeds', () => {
@@ -782,11 +782,11 @@ describe('C17: at most one primary supports edge per system, one primary owns ed
     expect(() => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'supports', 'd-retract-r1')], ctx)).not.toThrow();
   });
 
-  it('owns.restore: reviving a retracted primary owner is rejected once a new owner has taken over as primary; restoring after that new one is retracted too succeeds', () => {
+  it('owns.restore: reviving a retracted business owner is rejected once a new business owner has taken over; restoring after that new one is retracted too succeeds', () => {
     const head = twoActorsAndOneSystem();
-    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', 'business')], ctx);
     fold(head, [relationshipRetract('d-retract-r1', 'rel-1', 'owns', 'd-r1')], ctx);
-    fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', true)], ctx);
+    fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', 'business')], ctx);
 
     const attempt = () => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'owns', 'd-retract-r1')], ctx);
     expect(attempt).toThrow(EngineError);
@@ -832,5 +832,79 @@ describe('C17: at most one primary supports edge per system, one primary owns ed
 
     expect(() => fold(mainHead, [promoteOnMain], ctx)).toThrow(/C17/);
     expect(() => fold(changeBranchHead, [promoteOnBranch], ctx)).toThrow(/C17/);
+  });
+});
+
+describe('C18 (Prompt 7k item 4): uses.via/flows_to.via must reference a live integration_platform system', () => {
+  function elementCreate(id: UUID, elementId: UUID, elementType: ElementType, name: string, attributes: Record<string, Json> = {}): Delta {
+    const base = elementType === 'system' ? { lifecycleStatus: 'active', isExternal: false } : {};
+    return { kind: 'element.create', id, elementId, elementType, name, parentId: null, attributes: { ...base, ...attributes } as never, sourceId: 'src', confidence: 1 };
+  }
+
+  /** Two application systems (the flow's own endpoints) plus one system explicitly marked `kind: 'integration_platform'` — a fixture wide enough for both the accepted and rejected `via` scenarios. */
+  function twoSystemsAndAPlatform(): Head {
+    return fold(
+      emptyHead(),
+      [
+        elementCreate('d-a', 'sys-a', 'system', 'Meter Reading Service'),
+        elementCreate('d-b', 'sys-b', 'system', 'Billing Platform'),
+        elementCreate('d-platform', 'sys-platform', 'system', 'Enterprise Service Bus', { kind: 'integration_platform' }),
+      ],
+      ctx,
+    );
+  }
+
+  function flowsToCreate(relationshipId: UUID, via?: UUID): Delta {
+    return { kind: 'relationship.create', id: `d-${relationshipId}`, relationshipId, relationshipType: 'flows_to', fromElementId: 'sys-a', toElementId: 'sys-b', attributes: via ? { via } : {}, sourceId: 'src', confidence: 1 };
+  }
+
+  it('accepts a flows_to edge with via set to a live integration_platform system', () => {
+    const head = twoSystemsAndAPlatform();
+    expect(() => fold(head, [flowsToCreate('rel-1', 'sys-platform')], ctx)).not.toThrow();
+  });
+
+  it('accepts a flows_to edge with no via at all (the default, direct edge)', () => {
+    const head = twoSystemsAndAPlatform();
+    expect(() => fold(head, [flowsToCreate('rel-1')], ctx)).not.toThrow();
+  });
+
+  it('rejects via pointing at a system whose kind is not integration_platform, naming C18', () => {
+    const head = twoSystemsAndAPlatform();
+    const attempt = () => fold(head, [flowsToCreate('rel-1', 'sys-a')], ctx);
+    expect(attempt).toThrow(EngineError);
+    expect(attempt).toThrow(/C18/);
+  });
+
+  it('rejects via pointing at a non-existent element', () => {
+    const head = twoSystemsAndAPlatform();
+    expect(() => fold(head, [flowsToCreate('rel-1', 'no-such-element')], ctx)).toThrow(/C18/);
+  });
+
+  it('rejects via pointing at a capability, even one named the same as a real system id would be — via must resolve to a system, not just any element', () => {
+    const head = fold(twoSystemsAndAPlatform(), [elementCreate('d-cap', 'cap-1', 'capability', 'Asset Management')], ctx);
+    expect(() => fold(head, [flowsToCreate('rel-1', 'cap-1')], ctx)).toThrow(/C18/);
+  });
+
+  it('the same rule applies to uses, not just flows_to', () => {
+    const head = twoSystemsAndAPlatform();
+    const usesCreate: Delta = { kind: 'relationship.create', id: 'd-rel-1', relationshipId: 'rel-1', relationshipType: 'uses', fromElementId: 'sys-a', toElementId: 'sys-b', attributes: { via: 'sys-a' }, sourceId: 'src', confidence: 1 };
+    expect(() => fold(head, [usesCreate], ctx)).toThrow(/C18/);
+  });
+
+  it('relationship.update: setting via later is checked the same way as at create', () => {
+    const head = twoSystemsAndAPlatform();
+    fold(head, [flowsToCreate('rel-1')], ctx);
+    const setVia: Delta = { kind: 'relationship.update', id: 'd-set-via', relationshipId: 'rel-1', relationshipType: 'flows_to', attribute: 'via', value: 'sys-platform', previousDeltaId: 'd-rel-1', sourceId: 'src', confidence: 1 };
+    expect(() => fold(head, [setVia], ctx)).not.toThrow();
+
+    const badVia: Delta = { kind: 'relationship.update', id: 'd-bad-via', relationshipId: 'rel-1', relationshipType: 'flows_to', attribute: 'via', value: 'sys-a', previousDeltaId: 'd-set-via', sourceId: 'src', confidence: 1 };
+    expect(() => fold(head, [badVia], ctx)).toThrow(/C18/);
+  });
+
+  it('relationship.update: clearing via (setting it to null) is always accepted, no check needed', () => {
+    const head = twoSystemsAndAPlatform();
+    fold(head, [flowsToCreate('rel-1', 'sys-platform')], ctx);
+    const clearVia: Delta = { kind: 'relationship.update', id: 'd-clear-via', relationshipId: 'rel-1', relationshipType: 'flows_to', attribute: 'via', value: null, previousDeltaId: 'd-rel-1', sourceId: 'src', confidence: 1 };
+    expect(() => fold(head, [clearVia], ctx)).not.toThrow();
   });
 });

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { computeLandscapeLayout, EXTERNAL_LANE_KEY, MIN_LAYOUT_WIDTH, UNASSIGNED_LANE_KEY } from './layout';
-import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
+import { computeLandscapeLayout, EXTERNAL_LANE_KEY, MIN_LAYOUT_WIDTH, OT_ZONE_LANE_KEY, PLATFORM_BAND_KEY, UNASSIGNED_LANE_KEY, viaPositionFor } from './layout';
+import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 
-function system(id: string, name: string, isExternal = false): ElementsHeadRow {
-  return { element_id: id, element_type: 'system', name, parent_id: null, attributes: { isExternal }, exists_delta_id: `d-${id}` };
+function system(id: string, name: string, isExternal = false, domain?: Json, kind?: Json): ElementsHeadRow {
+  const attributes: Record<string, Json> = { isExternal };
+  if (domain !== undefined) attributes.domain = domain;
+  if (kind !== undefined) attributes.kind = kind;
+  return { element_id: id, element_type: 'system', name, parent_id: null, attributes, exists_delta_id: `d-${id}` };
 }
 
 function actor(id: string, name: string, isExternal = false): ElementsHeadRow {
@@ -52,6 +55,75 @@ describe('computeLandscapeLayout', () => {
     const layout = computeLandscapeLayout([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]));
     expect(layout.lanes.map((l) => l.key)).toEqual([EXTERNAL_LANE_KEY]);
     expect(layout.lanes[0]?.region).toBe('external');
+  });
+
+  it('groups every domain: ot system into its own OT zone, inside the boundary-enclosed lane list (Prompt 7k item 3)', () => {
+    const cap = capability('cap-1', 'Payments');
+    const sys = system('sys-1', 'PLC Controller', false, 'ot');
+    const layout = computeLandscapeLayout([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]));
+    expect(layout.lanes.map((l) => l.key)).toEqual([OT_ZONE_LANE_KEY]);
+    expect(layout.lanes[0]).toMatchObject({ label: 'OT', region: 'ot' });
+  });
+
+  it('a hybrid-domain system stays in its normal capability lane, not the OT zone', () => {
+    const cap = capability('cap-1', 'Payments');
+    const sys = system('sys-1', 'Bridge System', false, 'hybrid');
+    const layout = computeLandscapeLayout([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]));
+    expect(layout.lanes.map((l) => l.key)).toEqual(['cap-1']);
+  });
+
+  it('an external OT system lands in the external band, not the OT zone — external is checked first', () => {
+    const sys = system('sys-1', 'Vendor SCADA', true, 'ot');
+    const layout = computeLandscapeLayout([sys], [], new Map());
+    expect(layout.lanes.map((l) => l.key)).toEqual([EXTERNAL_LANE_KEY]);
+  });
+
+  it('orders the OT zone after capability lanes but before Unassigned', () => {
+    const cap = capability('cap-1', 'Payments');
+    const systems = [system('sys-cap', 'S-Cap'), system('sys-ot', 'S-OT', false, 'ot'), system('sys-u', 'S-Unassigned')];
+    const supportsEdges = [supports('sys-cap', 'cap-1')];
+    const layout = computeLandscapeLayout(systems, supportsEdges, new Map([['cap-1', cap]]));
+    expect(layout.lanes.map((l) => l.key)).toEqual(['cap-1', OT_ZONE_LANE_KEY, UNASSIGNED_LANE_KEY]);
+  });
+
+  it('groups every non-application-kind system into its own platform band, inside the boundary-enclosed lane list (Prompt 7k item 4)', () => {
+    const cap = capability('cap-1', 'Payments');
+    const sys = system('sys-1', 'Enterprise Service Bus', false, undefined, 'integration_platform');
+    const layout = computeLandscapeLayout([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]));
+    expect(layout.lanes.map((l) => l.key)).toEqual([PLATFORM_BAND_KEY]);
+    expect(layout.lanes[0]).toMatchObject({ label: 'Platforms', region: 'platform' });
+  });
+
+  it('an application-kind system (explicit or default) stays in its normal capability lane, not the platform band', () => {
+    const cap = capability('cap-1', 'Payments');
+    const sys = system('sys-1', 'Billing Service', false, undefined, 'application');
+    const layout = computeLandscapeLayout([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]));
+    expect(layout.lanes.map((l) => l.key)).toEqual(['cap-1']);
+  });
+
+  it('an external non-application system lands in the external band, not the platform band — external is checked first', () => {
+    const sys = system('sys-1', 'Vendor Bus', true, undefined, 'integration_platform');
+    const layout = computeLandscapeLayout([sys], [], new Map());
+    expect(layout.lanes.map((l) => l.key)).toEqual([EXTERNAL_LANE_KEY]);
+  });
+
+  it('an OT non-application system lands in the OT zone, not the platform band — domain is checked before kind', () => {
+    const sys = system('sys-1', 'OT Historian', false, 'ot', 'integration_platform');
+    const layout = computeLandscapeLayout([sys], [], new Map());
+    expect(layout.lanes.map((l) => l.key)).toEqual([OT_ZONE_LANE_KEY]);
+  });
+
+  it('orders the platform band last of all — after capability lanes, the OT zone, and Unassigned', () => {
+    const cap = capability('cap-1', 'Payments');
+    const systems = [
+      system('sys-cap', 'S-Cap'),
+      system('sys-ot', 'S-OT', false, 'ot'),
+      system('sys-u', 'S-Unassigned'),
+      system('sys-platform', 'S-Platform', false, undefined, 'data_platform'),
+    ];
+    const supportsEdges = [supports('sys-cap', 'cap-1')];
+    const layout = computeLandscapeLayout(systems, supportsEdges, new Map([['cap-1', cap]]));
+    expect(layout.lanes.map((l) => l.key)).toEqual(['cap-1', OT_ZONE_LANE_KEY, UNASSIGNED_LANE_KEY, PLATFORM_BAND_KEY]);
   });
 
   it('orders lanes: capability lanes by name, then unassigned, then external always last', () => {
@@ -321,5 +393,26 @@ describe('computeLandscapeLayout', () => {
     if (!laneB) throw new Error('expected a Beta lane');
     expect(laneB.height).toBe(28 + 8); // LANE_LABEL_HEIGHT + EMPTY_LANE_GUTTER_Y — collapsed regardless of reference count
     expect(layout.referenceMarkers.filter((m) => m.laneKey === 'cap-b')).toHaveLength(2); // both chips still present
+  });
+});
+
+describe('viaPositionFor (Prompt 7k item 4)', () => {
+  const platformPosition = { elementId: 'sys-platform', x: 100, y: 200 };
+  const positionById = new Map([['sys-platform', platformPosition]]);
+
+  it('returns the via node\'s position when routing is on and via resolves to a node on this map', () => {
+    expect(viaPositionFor('sys-platform', positionById, true)).toBe(platformPosition);
+  });
+
+  it('returns undefined when routing is off, regardless of via', () => {
+    expect(viaPositionFor('sys-platform', positionById, false)).toBeUndefined();
+  });
+
+  it('returns undefined when there is no via at all', () => {
+    expect(viaPositionFor(undefined, positionById, true)).toBeUndefined();
+  });
+
+  it('returns undefined when via does not resolve to a node on this map (the platform exists but isn\'t placed here)', () => {
+    expect(viaPositionFor('sys-not-on-map', positionById, true)).toBeUndefined();
   });
 });

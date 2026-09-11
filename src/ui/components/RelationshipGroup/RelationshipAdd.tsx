@@ -1,9 +1,10 @@
 import { useId, useRef, useState } from 'react';
-import type { RelationshipType, UUID } from '../../../contracts/delta';
+import type { ElementType, OwnsRole, RelationshipType, UUID } from '../../../contracts/delta';
 import type { FactsRow, RelationshipsHeadRow } from '../../../contracts/rows';
 import type { RelationshipGroupSlot } from '../../../contracts/relationshipTypeRules';
 import type { BranchRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
+import { isIntegrationPlatform } from '../../elements/systemKind';
 import { useRelationshipCreate, type RelationshipCreateDemotion } from '../../elements/useRelationshipCreate';
 import { useRelationshipTargetSearch } from '../../elements/useRelationshipTargetSearch';
 import { Button } from '../Button/Button';
@@ -18,6 +19,8 @@ export interface RelationshipAddProps {
   elementId: UUID;
   /** Same element's name — only for the generated commit title (`useRelationshipCreate`'s own doc comment). */
   elementName: string;
+  /** This element's own type — Prompt 7k item 2's `owns` staged role prompt needs it for the `inbound` direction (elementId is the *owned* side then, so its type, not the picked target's, decides capability-default-vs-system-prompt; `outbound` instead reads the picked target's own type, `PendingTarget.elementType` below). */
+  elementType: ElementType;
   /** This exact type+direction's own existing rows (`RelationshipsSection.tsx`'s already-computed `outboundRows`/`inboundRows`) — only read for `supports`/outbound, B4's "asks 'primary?' only when the system already has a supports link". */
   existingRows: readonly RelationshipsHeadRow[];
   /** Needed alongside `existingRows` for the same B4 flow: demoting the system's current primary supports edge (if the new one is answered "yes, primary") is a `relationship.update` on that *other* relationship, and C6 needs the delta currently asserting its `role` as `previousDeltaId`. */
@@ -42,6 +45,8 @@ const DIRECTION_VERB: Record<RelationshipType, { outbound: string; inbound: stri
 interface PendingTarget {
   elementId: UUID;
   name: string;
+  /** Prompt 7k item 2: which capability/system the picked target is, needed for `owns`' own staged-role decision on the `outbound` direction (see `RelationshipAddProps.elementType`'s own comment). */
+  elementType: ElementType;
 }
 
 /**
@@ -99,13 +104,45 @@ interface PendingTarget {
  * message: "written and typechecked, not executed"). Fixed here with a
  * real `<label htmlFor={labelId}>` — a placeholder was never a substitute
  * for one.
+ *
+ * Prompt 7k item 2 adds a third staged question, for `owns` only, and only
+ * when the *owned* side of the edge (never the actor side — `owns` has no
+ * role concept for the actor) is a `system`: "which role?"
+ * (business/technical/service). A capability target skips the question
+ * entirely and defaults to `business` (`defaultAttributesForPlainPick`) —
+ * the item's own "defaults to business on capability targets, prompts on
+ * system targets" wording. Which side is the owned one depends on
+ * `direction`: `outbound` picks a target that's the owned side (this
+ * control lives on the owning actor's own page), so the picked target's
+ * own type decides; `inbound` puts the *current* element at the owned
+ * side (this control lives on the owned system/capability's own page,
+ * searching for an owning actor), so `elementType` decides instead.
+ *
+ * Prompt 7k item 4 adds a genuine third stage, for uses/flows_to only,
+ * after the mandatory label stage above: "does this go via an
+ * integration platform?" - a second search-first picker (`viaSearch`,
+ * scoped to systems of kind integration_platform, C18's own requirement)
+ * with a prominent skip option, since `via` is optional and most edges
+ * won't have one. `showViaStage` is the real stage discriminator this
+ * needed (the label stage's own "Add" button becomes "Next", advancing
+ * here instead of creating immediately); `asksPrimary`/`asksOwnsRole`
+ * never reach this far, since a relationship is only ever supports,
+ * owns, or uses/flows_to at once - still enough to keep every other
+ * stage's own boolean branch mutually exclusive without a fully
+ * generalised stage enum across the whole component.
  */
-export function RelationshipAdd({ slot, direction, elementId, elementName, existingRows, relationshipFacts, modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, onCreated }: RelationshipAddProps) {
+export function RelationshipAdd({ slot, direction, elementId, elementName, elementType, existingRows, relationshipFacts, modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, onCreated }: RelationshipAddProps) {
   const [open, setOpen] = useState(false);
   const [pendingTarget, setPendingTarget] = useState<PendingTarget | null>(null);
   const [labelDraft, setLabelDraft] = useState('');
+  const [showViaStage, setShowViaStage] = useState(false);
   const labelId = useId();
   const search = useRelationshipTargetSearch(searchCommitId, modelId, slot.targetTypes, elementId);
+  const needsLabel = slot.relationshipType === 'uses' || slot.relationshipType === 'flows_to';
+  // Only mounted (its own fetch enabled) for uses/flows_to slots — see this
+  // hook's own `enabled` doc comment for why every other slot on the same
+  // element page must not also pay for a redundant system-pool query.
+  const viaSearch = useRelationshipTargetSearch(searchCommitId, modelId, ['system'], elementId, needsLabel);
   // Set right before each `create()` call so the hook's own success callback
   // (which carries no arguments of its own) can still report which element
   // the new relationship points at (Handoff — Flow: Add a system, step 7).
@@ -124,12 +161,19 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
       setOpen(false);
       setPendingTarget(null);
       setLabelDraft('');
+      setShowViaStage(false);
       if (targetIdRef.current) onCreated(targetIdRef.current);
     },
   });
 
   const asksPrimary = slot.relationshipType === 'supports' && direction === 'outbound' && existingRows.length > 0;
-  const needsLabel = slot.relationshipType === 'uses' || slot.relationshipType === 'flows_to';
+
+  // See this component's own doc comment for why `direction` picks which
+  // side's type decides.
+  function ownedElementTypeFor(target: PendingTarget): ElementType {
+    return direction === 'outbound' ? target.elementType : elementType;
+  }
+  const asksOwnsRole = slot.relationshipType === 'owns' && pendingTarget !== null && ownedElementTypeFor(pendingTarget) === 'system';
 
   function currentPrimaryDemotion(): RelationshipCreateDemotion | null {
     const currentPrimary = existingRows.find((row) => attributesRecord(row.attributes).role === 'primary');
@@ -139,12 +183,13 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
   }
 
   function pickResult(target: PendingTarget): void {
-    if (asksPrimary || needsLabel) {
+    const willAskOwnsRole = slot.relationshipType === 'owns' && ownedElementTypeFor(target) === 'system';
+    if (asksPrimary || needsLabel || willAskOwnsRole) {
       setPendingTarget(target);
       return;
     }
     targetIdRef.current = target.elementId;
-    void create(target.elementId, target.name, defaultAttributesForPlainPick(slot.relationshipType));
+    void create(target.elementId, target.name, defaultAttributesForPlainPick(slot.relationshipType, ownedElementTypeFor(target)));
   }
 
   function answerPrimary(primary: boolean): void {
@@ -153,11 +198,27 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
     void create(pendingTarget.elementId, pendingTarget.name, { role: primary ? 'primary' : 'secondary' }, primary ? currentPrimaryDemotion() : null);
   }
 
-  function submitLabel(): void {
+  // The label stage's own "Add" — no longer creates directly (Prompt 7k
+  // item 4): uses/flows_to now have a third stage after this one, so this
+  // just advances to it, keeping labelDraft for `finalizeWithVia` below.
+  function proceedToViaStage(): void {
     const label = labelDraft.trim();
     if (!pendingTarget || label.length === 0) return;
+    setShowViaStage(true);
+  }
+
+  /** The via stage's own two exits — a picked platform, or `undefined` for "Skip" (the default, direct edge). Either way the edge is created now, with the label already captured by the previous stage. */
+  function finalizeWithVia(via: UUID | undefined): void {
+    if (!pendingTarget) return;
     targetIdRef.current = pendingTarget.elementId;
-    void create(pendingTarget.elementId, pendingTarget.name, { description: label });
+    const description = labelDraft.trim();
+    void create(pendingTarget.elementId, pendingTarget.name, via ? { description, via } : { description });
+  }
+
+  function answerOwnsRole(role: OwnsRole): void {
+    if (!pendingTarget) return;
+    targetIdRef.current = pendingTarget.elementId;
+    void create(pendingTarget.elementId, pendingTarget.name, { role });
   }
 
   // Distinct from `close`: backs out of the primary/label stage to the
@@ -166,12 +227,21 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
   function cancelPending(): void {
     setPendingTarget(null);
     setLabelDraft('');
+    setShowViaStage(false);
+  }
+
+  // The via stage's own "Back" — returns to the label stage (keeping the
+  // target and the label already typed), distinct from `cancelPending`
+  // above, which drops all the way back to search.
+  function backToLabelStage(): void {
+    setShowViaStage(false);
   }
 
   const close = () => {
     setOpen(false);
     setPendingTarget(null);
     setLabelDraft('');
+    setShowViaStage(false);
   };
 
   if (!open) {
@@ -214,7 +284,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
     );
   }
 
-  if (pendingTarget && needsLabel) {
+  if (pendingTarget && needsLabel && !showViaStage) {
     return (
       <div className={styles.panel}>
         <Text as="p" size="sm">
@@ -236,8 +306,103 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
           onChange={(e) => { setLabelDraft(e.target.value); }}
         />
         <div className={styles.actions}>
-          <Button variant="secondary" onClick={submitLabel} disabled={status === 'creating' || labelDraft.trim().length === 0}>
-            {status === 'creating' ? 'Adding…' : 'Add'}
+          <Button variant="secondary" onClick={proceedToViaStage} disabled={labelDraft.trim().length === 0}>
+            Next
+          </Button>
+          <Button variant="ghost" onClick={cancelPending} disabled={status === 'creating'}>
+            Back
+          </Button>
+          <Button variant="ghost" onClick={close} disabled={status === 'creating'}>
+            Cancel
+          </Button>
+        </div>
+        {error !== null && (
+          <Text as="p" size="sm">
+            {error}
+          </Text>
+        )}
+      </div>
+    );
+  }
+
+  if (pendingTarget && needsLabel && showViaStage) {
+    const platformResults = viaSearch.results.filter((el) => isIntegrationPlatform(el) && el.element_id !== pendingTarget.elementId);
+    return (
+      <div className={styles.panel}>
+        <Text as="p" size="sm">
+          Does this go via an integration platform?
+        </Text>
+        <input
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- reaching this stage is the request to type a platform search next.
+          autoFocus
+          type="text"
+          className={styles.input}
+          placeholder="Search platforms…"
+          value={viaSearch.query}
+          onChange={(e) => { viaSearch.setQuery(e.target.value); }}
+        />
+        {viaSearch.status === 'loading' && (
+          <Text as="p" tone="muted" size="sm">
+            Loading…
+          </Text>
+        )}
+        {viaSearch.status === 'ready' && viaSearch.query.trim().length > 0 && platformResults.length === 0 && (
+          <Text as="p" tone="muted" size="sm">
+            No integration platforms match.
+          </Text>
+        )}
+        {platformResults.length > 0 && (
+          <ul className={styles.results}>
+            {platformResults.map((platform) => (
+              <li key={platform.element_id}>
+                <button type="button" className={styles.resultRow} disabled={status === 'creating'} onClick={() => { finalizeWithVia(platform.element_id); }}>
+                  <ElementTypeGlyph type={platform.element_type} />
+                  <Text as="span">{platform.name}</Text>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className={styles.actions}>
+          <Button variant="secondary" onClick={() => { finalizeWithVia(undefined); }} disabled={status === 'creating'}>
+            {status === 'creating' ? 'Adding…' : 'Skip — direct edge'}
+          </Button>
+          <Button variant="ghost" onClick={backToLabelStage} disabled={status === 'creating'}>
+            Back
+          </Button>
+          <Button variant="ghost" onClick={close} disabled={status === 'creating'}>
+            Cancel
+          </Button>
+        </div>
+        {error !== null && (
+          <Text as="p" size="sm">
+            {error}
+          </Text>
+        )}
+      </div>
+    );
+  }
+
+  if (pendingTarget && asksOwnsRole) {
+    const ownerName = direction === 'outbound' ? elementName : pendingTarget.name;
+    const ownedName = direction === 'outbound' ? pendingTarget.name : elementName;
+    return (
+      <div className={styles.panel}>
+        <Text as="p" size="sm">
+          What role does {ownerName} have for {ownedName}?
+        </Text>
+        <Text as="p" tone="muted" size="sm">
+          A system can have up to three owners at once — one business, one technical, one service.
+        </Text>
+        <div className={styles.actions}>
+          <Button variant="secondary" onClick={() => { answerOwnsRole('business'); }} disabled={status === 'creating'}>
+            {status === 'creating' ? 'Adding…' : 'Business'}
+          </Button>
+          <Button variant="secondary" onClick={() => { answerOwnsRole('technical'); }} disabled={status === 'creating'}>
+            Technical
+          </Button>
+          <Button variant="secondary" onClick={() => { answerOwnsRole('service'); }} disabled={status === 'creating'}>
+            Service
           </Button>
           <Button variant="ghost" onClick={cancelPending} disabled={status === 'creating'}>
             Back
@@ -285,7 +450,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
         <ul className={styles.results}>
           {search.results.map((result) => (
             <li key={result.element_id}>
-              <button type="button" className={styles.resultRow} disabled={status === 'creating'} onClick={() => { pickResult({ elementId: result.element_id, name: result.name }); }}>
+              <button type="button" className={styles.resultRow} disabled={status === 'creating'} onClick={() => { pickResult({ elementId: result.element_id, name: result.name, elementType: result.element_type }); }}>
                 <ElementTypeGlyph type={result.element_type} />
                 <Text as="span">{result.name}</Text>
                 <Text as="span" tone="muted" size="sm">

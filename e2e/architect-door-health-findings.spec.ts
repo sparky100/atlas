@@ -85,7 +85,7 @@ test('architect door: health findings name systems with no capability, capabilit
       { kind: 'element.create', id: randomUUID(), elementId: labeledTargetSystemId, elementType: 'system', name: 'Labeled Consumer System', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: ownedSystemId, toElementId: ownedCapabilityId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: unownedSystemId, toElementId: unownedCapabilityId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
-      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'owns', fromElementId: actorId, toElementId: ownedSystemId, attributes: { primary: true }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'owns', fromElementId: actorId, toElementId: ownedSystemId, attributes: { role: 'business' }, sourceId: seedSourceId, confidence: 1 },
       // B5: a uses edge with no label (attributes: {}, predating the
       // creation-time requirement — nothing enforces it retroactively) is
       // the finding's own target; a second, labeled one proves the finding
@@ -288,7 +288,7 @@ test('Sprint U4-1 B3: capability ownership inherits from an owned ancestor; an u
       // Directly on the capability (Bug found during B3: owns can target a
       // capability, actor→capability, not only a system) — Owned Root's
       // child inherits this, so neither should be flagged.
-      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'owns', fromElementId: actorId, toElementId: ownedRootId, attributes: { primary: true }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'owns', fromElementId: actorId, toElementId: ownedRootId, attributes: { role: 'business' }, sourceId: seedSourceId, confidence: 1 },
     ],
   };
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope: seedEnvelope });
@@ -334,10 +334,14 @@ test('Sprint U4-1 B3: a model with nothing to flag collapses the whole panel to 
   await createModel(signedIn, { id: modelId, orgId, name: 'Health Findings Clean Test Model', slug: modelSlug, createdBy: userId });
 
   // Genesis-only main — a brand-new model has nothing to flag at all
-  // (ADR-018: main already has a real head, no bootstrap needed).
+  // (ADR-018: main already has a real head, no bootstrap needed). Prompt
+  // 7k item 5's own "Assurance" panel gates independently (its own doc
+  // comment, ArchitectHome.tsx) — a genuinely clean model shows "No
+  // findings." twice, once per panel, not once combined.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await expect(page.getByRole('heading', { name: 'Health findings' })).toBeVisible();
-  await expect(page.getByText('No findings.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
+  await expect(page.getByText('No findings.')).toHaveCount(2);
   await expect(page.getByText(/not linked to a capability/)).toHaveCount(0);
   await expect(page.getByText(/with no owner/)).toHaveCount(0);
   await expect(page.getByText(/duplicates flagged/)).toHaveCount(0);

@@ -22,6 +22,7 @@
  */
 import type { RelationshipType, UUID } from '../contracts/delta';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
+import { attributesRecord } from '../ui/elements/attributesRecord';
 import { cloneHead, type Head } from '../engine/deltas';
 import { foldFromGenesis } from '../engine/head';
 import { serializeHeadProjection, type HeadProjection } from '../engine/projection';
@@ -116,6 +117,11 @@ export function projectionChildrenOf(projection: HeadProjection, parentId: UUID)
 /** Mirrors src/db/elements.ts's `listRelationshipsForElement` — both directions. */
 export function projectionRelationshipsForElement(projection: HeadProjection, elementId: UUID): RelationshipsHeadRow[] {
   return projection.relationshipsHead.filter((r) => r.from_element_id === elementId || r.to_element_id === elementId);
+}
+
+/** Mirrors src/db/elements.ts's `listFlowsViaElement` — Prompt 7k item 4's "Flows via this platform". */
+export function projectionFlowsViaElement(projection: HeadProjection, platformElementId: UUID): RelationshipsHeadRow[] {
+  return projection.relationshipsHead.filter((r) => (r.relationship_type === 'uses' || r.relationship_type === 'flows_to') && attributesRecord(r.attributes).via === platformElementId);
 }
 
 /** Mirrors src/db/elements.ts's `listFactsForSubject`, keyed the same way `useElementPage.ts`'s own `loadFacts` keys its result (by attribute). */

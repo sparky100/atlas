@@ -46,7 +46,7 @@ Today this is masked, not absent: `mergeApprovedRequest` sends `fold(branch.head
 ### 1.3 Three smaller findings the fix has to carry
 
 1. **Converged retractions throw today.** Both sides retract `E` (no conflict class; `classifyMerge` reports nothing): refresh replays main's `element.retract E` onto a head where B already removed it — throws. A plain refresh with zero conflicts fails. Not yet reported from use because two people retiring the same system in the same week hasn't happened; it will.
-2. **`classifyMerge` misses half of C17.** `structural:cardinality` is detected only for `owns.primary = true` created on both sides. `supports.role = 'primary'` (Sprint U4-1 B4, enforced by `apply` on every fold) is not classified at all, and neither type is classified when one side *promotes an existing* relationship while the other creates a primary. The resolution builder consumes findings; a missing finding is a refresh that throws with no card to act on.
+2. **`classifyMerge` misses half of C17.** `structural:cardinality` is detected only for a same-role `owns` edge created on both sides (Prompt 7k item 2 generalised the check itself from a single `primary: true` flag to `role`, without closing this gap). `supports.role = 'primary'` (Sprint U4-1 B4, enforced by `apply` on every fold) is not classified at all, and neither type is classified when one side *promotes an existing* relationship while the other creates one that collides (a primary `supports`, or an `owns` edge in the same role). The resolution builder consumes findings; a missing finding is a refresh that throws with no card to act on.
 3. **`buildSplitDeltas` replays verbatim, in original order.** After a structurally-resolved refresh, a branch's own delta list contains the conflicting delta first and its resolution later (the pattern in §1.2). Replaying that list over the merge base (`atlas.split_branch`) hits the same order problem. `computeSplitClosure`'s property test ("folding accepted ∪ pulledIn over the merge base passes C8/C9") will fail as soon as its generators include a resolved refresh.
 
 ---
@@ -226,22 +226,24 @@ resolved_conflicts: {winning: rcreate(survivor), discarded: rcreate(loser), reso
 ```
 The card shows both relationships' attributes; if the loser carried an attribute value the survivor lacks, the reviewer edits the survivor afterwards through the ordinary editor — that is a field edit, not part of the conflict.
 
-### 4.3 Cardinality — primary pick
+### 4.3 Cardinality — primary pick (`supports`), role pick (`owns`, Prompt 7k item 2)
 
-Main's replay would make a second primary on the same anchor (`supports` on `from`, `owns` on `to`): main created a primary `R_t` or promoted an existing `R_t`, while `O` has primary `R_o`.
+Main's replay would collide with `O`'s own live edge on the same anchor (`supports` on `from`, `owns` on `to`): main created or promoted `R_t` holding the same cardinality-limited value `O`'s own `R_o` already holds — for `supports`, that value is always `'primary'` (a `'secondary'` edge has no cardinality limit at all, so this whole section never applies to one); for `owns`, it's whichever of `'business'`/`'technical'`/`'service'` both sides picked.
 
 ```
-P:  upd(R_o.role = 'secondary')  |  upd(R_o.primary = false)      prev = the delta asserting R_o's primary   [C17 for the replay]
-M:  replay X   → R_t's primary applies
-M own, if the reviewer keeps ours as primary:
-    upd(R_t.role = 'secondary') | upd(R_t.primary = false)         prev = main's promoting delta
-    upd(R_o.role = 'primary')   | upd(R_o.primary = true)          prev = P's demotion       (demote first, promote second — same-commit order, C17)
+P:  upd(R_o.role = 'secondary')  |  upd(R_o.role = <reassigned>)   prev = the delta asserting R_o's role   [C17 for the replay]
+M:  replay X   → R_t's role applies
+M own, if the reviewer keeps ours:
+    upd(R_t.role = 'secondary') | upd(R_t.role = <reassigned>)     prev = main's promoting delta
+    upd(R_o.role = 'primary')   | upd(R_o.role = <original role>)  prev = P's reassignment   (reassign first, restore second — same-commit order, C17)
 M own, if the reviewer keeps theirs: nothing
 resolved_conflicts:
     keep ours:   {winning: R_o's promoting delta, discarded: main's promoting delta, resolution: M's promote(R_o), 'primary'}
-    keep theirs: {winning: main's promoting delta, discarded: R_o's promoting delta, resolution: P's demote(R_o), 'primary'}
+    keep theirs: {winning: main's promoting delta, discarded: R_o's promoting delta, resolution: P's reassign(R_o), 'primary'}
 ```
-When the pair is also a duplicate (§4.2), the survivor pick subsumes the primary pick: the loser is retracted, and `P` demotes `R_o` only if the loser is `R_t` and `R_t`'s replay would otherwise throw — i.e. always, since `R_o` is primary on `O` at replay time.
+For `supports` the reassigned value is always `'secondary'` — the one other state the type has. For `owns` there is no equivalent natural "next" role: `'business'`/`'technical'`/`'service'` aren't ordered, so "demote" doesn't name a single target value the way it does for `supports`. **Open sub-question, not resolved by this amendment** (Prompt 7k item 2 only changed the contract/cardinality `classifyMerge` and the engine check against; it did not build C2b): when C2b's builder is actually implemented, the loser's own reassignment target for an `owns` collision needs an explicit answer — retract the loser's edge outright (simplest, but loses the fact that someone *is* an owner of that target in some capacity, just not this one) versus prompting the reviewer for which role the loser becomes (more information-preserving, more UI surface). Decide this when `buildStructuralResolutions` (§5 item 2) is actually written, not silently here.
+
+When the pair is also a duplicate (§4.2), the survivor pick subsumes the primary/role pick: the loser is retracted, and `P` reassigns `R_o` only if the loser is `R_t` and `R_t`'s replay would otherwise throw — i.e. always, since `R_o` holds the colliding value on `O` at replay time.
 
 ---
 

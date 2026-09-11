@@ -2,7 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { listAllElements, loadOwnersByElementId, lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
-import { computeStaleAttributesFinding, findCapabilitiesWithoutOwner, findSystemsWithoutCapability, listAllOwnsEdges, listFactsForCommit } from '../../db/healthFindings';
+import {
+  computeStaleAttributesFinding,
+  findCapabilitiesWithoutOwner,
+  findCriticalExposedSystems,
+  findCriticalSystemsPastOrNearSupportEnd,
+  findCriticalSystemsWithoutBusinessOwner,
+  findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
+  findSystemsWithoutCapability,
+  findSystemsWithoutTechnicalOwner,
+  findUnusedIntegrationPlatforms,
+  listAllOwnsEdges,
+  listAllUsesAndFlowsToEdges,
+  listFactsForCommit,
+} from '../../db/healthFindings';
 import { listAllSupportsEdges } from '../../db/modelHome';
 import { resolveRef } from '../../db/ref';
 import { supabase } from '../supabaseClient';
@@ -11,12 +24,26 @@ export type ElementBrowseStatus = 'loading' | 'error' | 'ready';
 export type ElementBrowseSortKey = 'name' | 'type' | 'owner' | 'lifecycle';
 
 /**
- * Sprint U4-1 B3: the three "pre-filtered to the finding" links the
- * architect door's Health findings panel offers (`ArchitectHome.tsx`'s own
+ * Sprint U4-1 B3: the "pre-filtered to the finding" links the architect
+ * door's Health findings panel offers (`ArchitectHome.tsx`'s own
  * `browseHref`), read from the page's own `?filter=` param
  * (`ElementsPage.tsx`). `null` is the ordinary, unfiltered browse table.
+ * Prompt 7k item 2 adds `no-technical-owner`; item 1 adds
+ * `critical-no-business-owner` and `critical-exposed`; item 4 adds
+ * `unused-integration-platform`; item 5 adds `essential-no-technical-owner`
+ * and `critical-support-end`.
  */
-export type ElementBrowseFilter = 'unlinked-systems' | 'unowned-capabilities' | 'stale-attributes' | null;
+export type ElementBrowseFilter =
+  | 'unlinked-systems'
+  | 'unowned-capabilities'
+  | 'stale-attributes'
+  | 'no-technical-owner'
+  | 'critical-no-business-owner'
+  | 'critical-exposed'
+  | 'unused-integration-platform'
+  | 'essential-no-technical-owner'
+  | 'critical-support-end'
+  | null;
 
 export type ElementBrowseState =
   | { status: 'loading' }
@@ -116,6 +143,26 @@ export function useElementBrowse(modelId: UUID, filter: ElementBrowseFilter = nu
         const systems = elements.filter((e) => e.element_type === 'system');
         const facts = await listFactsForCommit(supabase, resolvedCommitId);
         ids = new Set(computeStaleAttributesFinding(facts, systems).staleSystems.map((e) => e.element_id));
+      } else if (filter === 'no-technical-owner') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        ids = new Set(findSystemsWithoutTechnicalOwner(systems, ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'critical-no-business-owner') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        ids = new Set(findCriticalSystemsWithoutBusinessOwner(systems, ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'critical-exposed') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        ids = new Set(findCriticalExposedSystems(systems).map((e) => e.element_id));
+      } else if (filter === 'unused-integration-platform') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const usesAndFlowsToEdges = await listAllUsesAndFlowsToEdges(supabase, resolvedCommitId);
+        ids = new Set(findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges).map((e) => e.element_id));
+      } else if (filter === 'essential-no-technical-owner') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const capabilities = elements.filter((e) => e.element_type === 'capability');
+        ids = new Set(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'critical-support-end') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        ids = new Set(findCriticalSystemsPastOrNearSupportEnd(systems).map((e) => e.element_id));
       }
 
       const rows: BrowseRow[] = elements.map((element) => ({

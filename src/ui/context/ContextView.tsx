@@ -12,6 +12,19 @@ import { attributesRecord } from '../elements/attributesRecord';
 import type { ContextGroup, ContextNeighbour } from './contextGrouping';
 import styles from './ContextView.module.css';
 
+// Prompt 7k item 2: "Business owner: Housing · Technical owner: IT
+// Operations" — a fixed, deterministic role order (not alphabetical: reads
+// business-first, the same priority `elementBrowse.ts`'s own owner-column
+// preference gives it), each rendered only when at least one owner holds
+// it. A role this product doesn't know about (shouldn't happen — `OwnsRole`
+// is a closed union — but this reads plain strings off stored data) falls
+// back to the raw value, capitalised, rather than being silently dropped.
+const OWNS_ROLE_ORDER = ['business', 'technical', 'service'] as const;
+function ownsRoleLabel(role: string): string {
+  const known: Record<string, string> = { business: 'Business', technical: 'Technical', service: 'Service' };
+  return known[role] ?? role.charAt(0).toUpperCase() + role.slice(1);
+}
+
 export interface ContextViewProps {
   group: ContextGroup;
   orgSlug: string;
@@ -96,11 +109,23 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }
           )}
           {group.owners.length > 0 && (
             <Text as="p" tone="muted" size="sm">
-              Owned by:{' '}
-              {group.owners.map((owner, i) => (
-                <span key={owner.element_id}>
-                  {i > 0 && ', '}
-                  <Link to={elementHref(owner.element_id)}>{owner.name}</Link>
+              {/* Prompt 7k item 2: grouped by role ("Business owner: Housing
+                  · Technical owner: IT Operations"), not a single flat
+                  "Owned by:" list — computeContextGroup already sorted
+                  `owners` by role, so within each role group the actors are
+                  already in the right order too. */}
+              {OWNS_ROLE_ORDER.filter((role) => group.owners.some((o) => o.role === role)).map((role, groupIndex) => (
+                <span key={role}>
+                  {groupIndex > 0 && ' · '}
+                  {ownsRoleLabel(role)} owner:{' '}
+                  {group.owners
+                    .filter((o) => o.role === role)
+                    .map((owner, i) => (
+                      <span key={owner.actor.element_id}>
+                        {i > 0 && ', '}
+                        <Link to={elementHref(owner.actor.element_id)}>{owner.actor.name}</Link>
+                      </span>
+                    ))}
                 </span>
               ))}
             </Text>

@@ -20,7 +20,7 @@ export interface UseModelSettingsResult {
 /**
  * Sprint 7j item 1: model settings' rename/Archive/Restore/Delete — one
  * status/error pair around the four `db/models.ts` mutations, the same
- * shape `useElementRetract.ts`/`useElementRename.ts` already use for a
+ * shape `useElementRetire.ts`/`useElementRename.ts` already use for a
  * single-purpose write hook. `onChanged` re-fetches the caller's own model
  * row rather than this hook keeping its own copy — `ModelSettingsView.tsx`
  * already has one from its route.

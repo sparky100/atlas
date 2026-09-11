@@ -87,10 +87,20 @@ const CAPABILITY_META: Record<keyof CapabilityAttributes, AttributeFieldMeta> = 
   // from the edit form regardless (editable: false) — the display-only
   // AttributeRow.formatValue already renders a number correctly.
   order: { label: 'Order', required: false, kind: 'text', editable: false },
+  // Prompt 7k item 5 — see `CapabilityAttributes.essentialFunction`'s own
+  // doc comment (delta.ts) for why this is a capability-level field.
+  essentialFunction: { label: 'Essential function (NIS/CAF)', required: false, kind: 'boolean' },
 };
-const CAPABILITY_ORDER: (keyof CapabilityAttributes)[] = ['code', 'description', 'templateRef', 'order'];
+const CAPABILITY_ORDER: (keyof CapabilityAttributes)[] = ['code', 'description', 'templateRef', 'order', 'essentialFunction'];
 
 const LIFECYCLE_STATUS_OPTIONS = ['planned', 'active', 'retiring', 'retired'] as const;
+/** Prompt 7k item 1 — see `Criticality`'s own doc comment (`delta.ts`) for the ordering these options mirror. */
+const CRITICALITY_OPTIONS = ['critical', 'high', 'medium', 'low'] as const;
+const HOSTING_MODEL_OPTIONS = ['on_premises', 'private_cloud', 'public_cloud', 'saas', 'hybrid'] as const;
+/** Prompt 7k item 3 — see `SystemDomain`'s own doc comment (`delta.ts`) for why absent reads as `'it'`. */
+const DOMAIN_OPTIONS = ['it', 'ot', 'hybrid'] as const;
+/** Prompt 7k item 4 — see `SystemKind`'s own doc comment (`delta.ts`) for why absent reads as `'application'`. */
+const KIND_OPTIONS = ['application', 'integration_platform', 'data_platform', 'infrastructure'] as const;
 
 const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   lifecycleStatus: { label: 'Lifecycle', required: true, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
@@ -100,8 +110,30 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   externalOrganisation: { label: 'External organisation', required: false, kind: 'text' },
   introduced: { label: 'Introduced', required: false, kind: 'date' },
   plannedEnd: { label: 'Planned end', required: false, kind: 'date' },
+  criticality: { label: 'Criticality', required: false, kind: 'enum', options: CRITICALITY_OPTIONS },
+  hostingModel: { label: 'Hosting model', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
+  hostingProvider: { label: 'Hosting provider', required: false, kind: 'text' },
+  domain: { label: 'Domain', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
+  kind: { label: 'Kind', required: false, kind: 'enum', options: KIND_OPTIONS },
+  // Prompt 7k item 5 — see `SystemAttributes.supportEndsAt`'s own doc
+  // comment (delta.ts) for why this is distinct from `plannedEnd`.
+  supportEndsAt: { label: 'Vendor support ends', required: false, kind: 'date' },
 };
-const SYSTEM_ORDER: (keyof SystemAttributes)[] = ['lifecycleStatus', 'vendor', 'description', 'isExternal', 'externalOrganisation', 'introduced', 'plannedEnd'];
+const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
+  'lifecycleStatus',
+  'vendor',
+  'description',
+  'isExternal',
+  'externalOrganisation',
+  'introduced',
+  'plannedEnd',
+  'supportEndsAt',
+  'criticality',
+  'hostingModel',
+  'hostingProvider',
+  'kind',
+  'domain',
+];
 
 const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   technology: { label: 'Technology', required: false, kind: 'text' },

@@ -91,6 +91,7 @@ export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementTyp
               direction="outbound"
               slot={outboundSlot}
               elementId={elementId}
+              elementType={elementType}
               orgSlug={orgSlug}
               modelSlug={modelSlug}
               endpoints={endpoints}
@@ -107,6 +108,7 @@ export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementTyp
               direction="inbound"
               slot={inboundSlot}
               elementId={elementId}
+              elementType={elementType}
               orgSlug={orgSlug}
               modelSlug={modelSlug}
               endpoints={endpoints}
@@ -128,6 +130,7 @@ function RelationshipDirectionGroup({
   direction,
   slot,
   elementId,
+  elementType,
   orgSlug,
   modelSlug,
   endpoints,
@@ -141,6 +144,7 @@ function RelationshipDirectionGroup({
   direction: 'outbound' | 'inbound';
   slot: RelationshipGroupSlot | undefined;
   elementId: UUID;
+  elementType: ElementType;
   orgSlug: string;
   modelSlug: string;
   endpoints: Map<UUID, ElementsHeadRow>;
@@ -161,7 +165,10 @@ function RelationshipDirectionGroup({
         const existsFact = facts?.get('$exists');
         const attrs = attributesRecord(rel.attributes);
         const dataClassification = attrs.dataClassification;
-        const isPrimaryOwner = rel.relationship_type === 'owns' && attrs.primary === true;
+        // Prompt 7k item 2: owns.role replaces owns.primary — the row shows
+        // which role this owns edge asserts (a target can have up to three
+        // owners at once, one per role), not a single ★ "the owner" marker.
+        const ownsRole = rel.relationship_type === 'owns' && typeof attrs.role === 'string' ? attrs.role : null;
         // The verb-phrase label (Sprint U4-1 B5: required at creation for
         // uses/flows_to, optional elsewhere) — shown whenever one exists,
         // not gated to those two types, since `description` is the same
@@ -193,11 +200,7 @@ function RelationshipDirectionGroup({
                 “{description}”
               </Text>
             )}
-            {isPrimaryOwner && (
-              <span aria-label="primary owner" title="Primary owner">
-                ★
-              </span>
-            )}
+            {ownsRole !== null && <Chip tone="neutral">{ownsRole} owner</Chip>}
             {typeof dataClassification === 'string' && dataClassification.length > 0 && <Chip tone="info">{dataClassification}</Chip>}
             {justAdded && <Chip tone="info">just added</Chip>}
             {existsFact && <FactBadge fact={existsFact} source={sources.get(existsFact.source_id)} />}
@@ -209,6 +212,7 @@ function RelationshipDirectionGroup({
           slot={slot}
           direction={direction}
           elementId={elementId}
+          elementType={elementType}
           elementName={addRelationship.elementName}
           existingRows={rows}
           relationshipFacts={relationshipFacts}

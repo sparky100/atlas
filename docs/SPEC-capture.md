@@ -24,7 +24,7 @@ This document turns ADR-004 ("capture lands as draft branches"), ADR-007 (fact-l
 | K-10 | **LLM calls are made only by the `capture-run` edge function**, through the shared LLM proxy (ADR-014) when configured, otherwise directly with the Anthropic SDK behind the same `LlmClient` interface. Model `claude-opus-5` by default (`CAPTURE_MODEL`), structured outputs with a strict JSON schema, no prefill, `refusal` handled as a failure mode. Every response is logged with the job id; every fixture run replays recorded responses. | The browser never holds a key. Rule 6: the model's output is an *input* to the deterministic half of the pipeline, never something the pipeline's determinism rests on — recorded responses make the whole run reproducible, and a live run is scored separately (§12.6). |
 | K-11 | **Spreadsheets are extracted deterministically after one LLM call per sheet for column mapping** (and one batched call per 50 rows for capability assignment when a capability-shaped column exists). Row → candidate is code, not a prompt. PDF and pasted text are extracted by the LLM, per chunk, with a mandatory verbatim passage that the pipeline verifies against the extracted text. | A spreadsheet is already structured; asking a model to re-read 2,000 rows is slower, costlier and less reproducible than mapping the columns once. Prose has no structure to exploit, so the model does the reading — but never gets to invent its evidence. |
 | K-12 | **The `capture-run` function is step-driven and resumable**: each invocation does bounded work (≤ 60 s), persists `capture_jobs.progress`, and returns `{status: 'continue' | 'parsed' | 'failed'}`; the client re-invokes until done. No scheduler, no background queue. | Edge-function wall-clock limits make a 200-page PDF or a 5,000-row workbook a multi-invocation job. Persisting progress after every chunk also means a crash loses one chunk, not the run. |
-| K-13 | **`supports` and `owns` proposals default to `role = 'secondary'` / `primary = false`.** A candidate becomes primary only when the target has no live primary on main *and* the candidate is the first (or only) such edge the row proposes. | SPEC C17 rejects a second primary at fold time, on every branch kind. Capture must never produce a draft commit `commit_deltas` refuses; a reviewer promotes to primary on the element page if they want to. |
+| K-13 | **`supports` proposals default to `role = 'secondary'`; a candidate becomes primary only when the target has no live primary on main *and* the candidate is the first (or only) such edge the row proposes. `owns` proposals get their `role` directly from which header matched them** (`owner` → `business`, `technicalOwner` → `technical`, Prompt 7k item 2) **— never a rank-based default** — a row proposing a second owner of the same role the target already has on main is `conflict`/`update`, not silently retried under a different role. | SPEC C17 rejects a second primary `supports` edge, or a second `owns` edge of the same role on the same target, at fold time, on every branch kind. Capture must never produce a draft commit `commit_deltas` refuses; a reviewer resolves the conflict (promotes to primary, or picks which owner keeps the role) on the element page if they want to. |
 | K-14 | **A `gone` candidate (present last run, absent this run) proposes retirement, staged as *undecided*, confidence 0.50.** Systems: `lifecycleStatus = 'retired'`; other types: `element.retract`. | Absence from a document is weak evidence — never an automatic retract (rule 5's spirit), never hidden either (UI §4.3: a gap made visible). Confidence 0.50 renders `●○○` so a reviewer sees it for what it is. |
 | K-15 | **Edge-function attribute validation imports `src/contracts` directly** (Deno import of the same TypeScript the client uses) rather than waiting for the `type_schemas` JSON-Schema generator. RT-5 stays deferred (SPEC §11). | SPEC §11 named K1's edge function as "the first consumer outside the TypeScript runtime" that would need the generator — but a Deno edge function *is* a TypeScript runtime. Importing the contract removes the need rather than meeting it; the generator can land when a non-TS consumer actually appears. |
 | K-16 | **Limits:** 5,000 rows per workbook, 200 pages per PDF, 200,000 characters of pasted text, 50 MB per upload. Over any limit is a failure at upload, not a truncation. | "Don't truncate inputs" — silently capturing 5,000 of 7,000 rows is the decay pattern this product exists to stop. Limits are named so the failure is a stated reason. |
@@ -258,7 +258,7 @@ Assigned by `classify()` (`src/capture/classify.ts`) from the proposal, the matc
 | `invalid` | Cannot be a legal delta: unresolved required parent, illegal relationship triple (C9), duplicate `(type, from, to)` already live on main (S-6), required attribute missing and not defaultable, name empty. | **none** | none; `e` is the only path |
 | `unsourced` | Grounding failed: the quoted passage isn't in the source, or the ref doesn't resolve. | **none** | none; `e` attaches a source |
 
-A relationship candidate uses the same classes: `new` (edge not live on main), `confirm` (edge live with equal attributes), `update`/`conflict` (edge live, attributes differ — only `owns.primary`, `supports.role`, `flows_to.*`, `*.description` can differ), `invalid` (C9, S-6, or an endpoint that is `unresolved`).
+A relationship candidate uses the same classes: `new` (edge not live on main), `confirm` (edge live with equal attributes), `update`/`conflict` (edge live, attributes differ — only `owns.role`, `supports.role`, `flows_to.*`, `uses.via`, `*.description` can differ), `invalid` (C9, C18, S-6, or an endpoint/`via` that is `unresolved`).
 
 `ambiguous` and `unsourced` take precedence over `update`/`confirm`/`conflict` when they apply; `invalid` takes precedence over everything.
 
@@ -302,14 +302,18 @@ A workbook over 5,000 data rows, a PDF over 200 pages, text over 200,000 chars �
 | `introduced` | `System.introduced` / `Container.introduced` | `Go-live`, `Implemented`, `Start date`, `In service since` |
 | `plannedEnd` | `plannedEnd` | `End of life`, `Contract end`, `Decommission date`, `Retire by` |
 | `isExternal` | `isExternal` | `Hosted`, `SaaS?`, `External`, `Internal/External` |
-| `externalOrganisation` | `externalOrganisation` | `Hosting provider`, `Operated by` |
+| `externalOrganisation` | `externalOrganisation` | `Operated by`, `Third party` |
+| `hostingModel` | `System.hostingModel` (Prompt 7k item 1) | `Hosting model`, `Deployment model`, `On-prem/cloud` |
+| `hostingProvider` | `System.hostingProvider` (Prompt 7k item 1; free text, not the closed `hostingModel` set) | `Hosting provider`, `Data centre`, `Cloud provider` |
 | `technology` | `Container.technology` / `Component.technology` | `Technology`, `Platform`, `Stack` |
 | `parent` | container/component parent (system/container name) | `Parent system`, `Part of`, `System`, `Application` (on a Modules sheet) |
-| `owner` | Actor candidate (`team` unless the value looks like a person) + `owns` | `Owner`, `Business owner`, `Service owner`, `Accountable`, `Team` |
+| `owner` | Actor candidate (`team` unless the value looks like a person) + `owns` (`role: 'business'`) | `Owner`, `Business owner`, `Service owner`, `Accountable`, `Team` |
 | `ownerEmail` | `Actor.email` (person) | `Owner email`, `Contact` |
+| `technicalOwner` | Actor candidate (`team` unless the value looks like a person) + `owns` (`role: 'technical'`, Prompt 7k item 2 — parallel to `owner`, never the same header) | `Technical owner`, `IT owner`, `Engineering contact`, `Support team` |
 | `capability` | `supports` proposal via §6.3 | `Business area`, `Service`, `Function`, `Capability`, `Directorate`, `Domain` |
 | `usesSystems` | `uses` proposals (multi-value) | `Depends on`, `Integrations`, `Interfaces with`, `Upstream` |
 | `flowsTo` | `flows_to` proposals (multi-value) | `Sends data to`, `Feeds`, `Downstream` |
+| `integrationPlatform` | `via` on the row's own `usesSystems`/`flowsTo` proposals (Prompt 7k item 4 — a name resolved against candidates of `kind: 'integration_platform'` first, then main, same two-pass resolution `parent`/endpoint text already gets, §7.4) | `Via`, `Integration platform`, `Routed through`, `Middleware` |
 | `notes` | ignored, but shown in the passage | `Notes`, `Comments` |
 | `ignore` | ignored | anything the mapping says to ignore |
 
@@ -324,17 +328,20 @@ candidate = ElementProposal(type = sheetType, name = trim(row[name]))
 for role in mapped columns:
   raw = row[col]; skip if blank
   switch role:
-    description, vendor, technology, externalOrganisation, orgUnit: attributes[role] = collapseWhitespace(raw)
+    description, vendor, technology, externalOrganisation, hostingProvider, orgUnit: attributes[role] = collapseWhitespace(raw)
     lifecycleStatus: parseLifecycle(raw)   // §5.4; ENUM_FUZZY warning when not exact
+    hostingModel: parseEnumFuzzy(raw, HOSTING_MODEL_VALUES)  // same ENUM_FUZZY shape as lifecycleStatus
     introduced, plannedEnd: parseDate(raw)  // §5.4; AMBIGUOUS_DATE when dd/mm vs mm/dd undecidable
     isExternal: parseBool(raw)              // yes/true/external/saas/hosted → true; no/false/internal/on-prem → false
     sourceKey: aliasProposals += {type: source_system_key, value: raw}
     atlasId: candidate.atlasId = raw        // consumed by §7.3 level 1
     parent: candidate.parent = {kind:'unresolved', text: raw}  // resolved in §7 against candidates first, then main
-    owner: actorCandidate(raw) + RelationshipProposal(owns, from: actor, to: this, {primary: false})
+    owner: actorCandidate(raw) + RelationshipProposal(owns, from: actor, to: this, {role: 'business'})
     ownerEmail: attach to the actor candidate; subtype = person
+    technicalOwner: actorCandidate(raw) + RelationshipProposal(owns, from: actor, to: this, {role: 'technical'})
     capability: deferred to §6.3 (batched)
     usesSystems, flowsTo: split on ; , / newline → one RelationshipProposal per value, endpoint {kind:'unresolved', text}
+    integrationPlatform: attach {kind:'unresolved', text: raw} as `via` on every RelationshipProposal this row's usesSystems/flowsTo columns produced — resolved the same pass as their own endpoints (§7.4), against candidates of kind integration_platform first, then main
 passage = header cells + row cells joined ' | '
 sourceRef = sheet:{name}!{A}{row}:{lastCol}{row}; attributeRefs[role] = sheet:{name}!{col}{row}
 ```
@@ -408,8 +415,8 @@ The model has five element types: capability, system, container, component, acto
 sheet usually lists one type. The column roles you may assign are exactly:
 
   atlasId, sourceKey, name, description, vendor, lifecycleStatus, introduced, plannedEnd,
-  isExternal, externalOrganisation, technology, parent, owner, ownerEmail, capability,
-  usesSystems, flowsTo, notes, ignore
+  isExternal, externalOrganisation, hostingModel, hostingProvider, technology, parent, owner,
+  ownerEmail, technicalOwner, capability, usesSystems, flowsTo, integrationPlatform, notes, ignore
 
 Role meanings:
 - atlasId: a UUID column written by this product's own export.
@@ -422,13 +429,17 @@ Role meanings:
 - plannedEnd: planned decommission, contract end, or end-of-life date.
 - isExternal: whether the system is operated outside the organisation (SaaS, hosted, third party).
 - externalOrganisation: who operates it, when external.
+- hostingModel: on-premises, private cloud, public cloud, SaaS, or hybrid — a closed set, not free text.
+- hostingProvider: the specific hosting provider, data centre or region, when named. Free text, distinct from hostingModel.
 - technology: platform or stack of a container or component.
 - parent: the system (for a container) or container (for a component) this row belongs to.
-- owner: the team or person accountable for the row.
+- owner: the team or person accountable for the row (its business owner).
 - ownerEmail: the owner's email.
+- technicalOwner: the team or person who runs the row day to day, when distinct from owner.
 - capability: a business area, service, function or capability the system supports.
 - usesSystems: other systems this one depends on.
 - flowsTo: systems this one sends data to.
+- integrationPlatform: the integration platform (ESB, API gateway, message bus) a usesSystems/flowsTo relationship in this row actually goes via, when named.
 - notes: commentary to show a reviewer but not to extract.
 - ignore: anything else (costs, risk scores, maturity ratings, project names, process steps —
   these are deliberately outside the model).
@@ -790,7 +801,7 @@ The layout, keys and three panes are UI-principles §5, unchanged. This section 
 | `invalid` | Red bar with the reason (`PARENT_UNRESOLVED "Housing Platform"`, `ILLEGAL_RELATIONSHIP actor uses capability`, `DUPLICATE_RELATIONSHIP supports already exists`). No proposed badge. | `e` only (fix the parent/endpoint via picker, or the type); `r` |
 | `unsourced` | Red bar: "No passage found for this fact in the source." The model's claimed text shown in a distinct "claimed" style, not as evidence. | `e` (attach a source ref by selecting in the source pane, then re-grounded), `r` |
 
-Relationship units render as `type · from → to` with the endpoint elements' breadcrumbs, and for `supports`/`owns` the primary/secondary flag with the K-13 note when the candidate was demoted to secondary because a primary already exists.
+Relationship units render as `type · from → to` with the endpoint elements' breadcrumbs, and for `supports` the primary/secondary flag with the K-13 note when the candidate was demoted to secondary because a primary already exists; `owns` shows its `role` (business/technical/service) directly, and `uses`/`flows_to` show `via` when the row named an integration platform.
 
 **Queue-level.** The left pane groups units by class in the order `unsourced, invalid, ambiguous, conflict, new, update, gone, confirm` — things that need a decision first, bulk-accepted confirmations last. Filters: class, `reimport_status`, sheet, warning code. The header shows `stats`, the diff summary (§9.2), the target branch (`t`), and the "Apply decisions" button state with its reason when disabled (`2 unsourced candidates are staged accepted` can't happen — `a` is blocked on them — but `target branch not chosen` and `target branch is under review (proposed)` can).
 
@@ -862,7 +873,7 @@ Every fixture is deliberately messy in a *named* way; the expected outcome lists
 
 | # | Fixture | Input | Model state | What it tests | Expected outcome (summary) |
 |---|---|---|---|---|---|
-| 01 | `clean-register` | CSV, 12 rows, headers `Application, Supplier, Status, Go-live, Business owner, Service area` | empty model seeded with `local_government_scotland` v1 capabilities | the happy path; synonym mapping only (no LLM call for mapping); capability assignment via alias/name match against seeded capabilities, prompt C for the two rows whose "Service area" doesn't match | 12 `new` systems, each with vendor/lifecycle/introduced; 12 `new` actors (teams) + 12 `owns` (all `primary: false`); ≥ 10 `supports` with the named capability codes; 0 `invalid`, 0 `unsourced`; every confidence in [0.85, 0.95] except defaulted `isExternal` at 0.60 |
+| 01 | `clean-register` | CSV, 12 rows, headers `Application, Supplier, Status, Go-live, Business owner, Service area` | empty model seeded with `local_government_scotland` v1 capabilities | the happy path; synonym mapping only (no LLM call for mapping); capability assignment via alias/name match against seeded capabilities, prompt C for the two rows whose "Service area" doesn't match | 12 `new` systems, each with vendor/lifecycle/introduced; 12 `new` actors (teams) + 12 `owns` (all `role: 'business'`); ≥ 10 `supports` with the named capability codes; 0 `invalid`, 0 `unsourced`; every confidence in [0.85, 0.95] except defaulted `isExternal` at 0.60 |
 | 02 | `odd-headers` | XLSX, 18 rows, headers `Solution, Who supplies it, Live?, Retire by, Accountable, Directorate, Ref no., Hosted where` plus a title row and a "Generated 03/04/2026" banner | empty + seeded capabilities | header detection past banner rows; prompt A mapping for every column; `Live?` → lifecycle booleans (`Y`/`N` → active/retired); `Hosted where` → isExternal + externalOrganisation; `Ref no.` → `source_system_key` aliases | 18 `new` systems; mapping cassette produces the expected roles; `LOW_MAPPING_CONFIDENCE` on ≤ 1 column; 18 `source_system_key` alias proposals; `Live? = N` rows have `lifecycleStatus: retired` with `ENUM_FUZZY` |
 | 03 | `roundtrip-export` | CSV exported by Atlas itself: `Atlas ID, Name, Vendor, Lifecycle, …`, 15 rows; 2 rows carry an id that was merged away; 1 carries an id from another model | 15 systems on main with those ids; 2 `merged_id` aliases; facts with mixed sources | level 1 matching incl. `merged_id` resolution; `confirm` vs `update`; `conflict` strength rule | 12 `confirm` (values unchanged), 2 `update` (vendor changed, main's fact is a capture from 2 years ago), 1 `conflict` (lifecycle differs, main's fact is manual 1.0 dated last month), 2 `RESOLVED_THROUGH_MERGED_ID`, 1 `ATLAS_ID_NOT_FOUND` falling through to a level-3 match |
 | 04 | `duplicates-within` | CSV, 20 rows in which `PowerON`, `Power On`, `PowerOn (Enzen)` and `POWERON` appear as separate rows with partially disagreeing vendors | empty | intra-document grouping; `ROWS_DISAGREE`; alias proposals for every variant | 17 `new` systems (4 rows → 1 candidate); the PowerON candidate has 4 `attributeRefs` rows, a `ROWS_DISAGREE` warning on vendor, and 4 `name` alias proposals; no two `new` candidates share a normalised name |

@@ -58,10 +58,44 @@ export const DELIBERATELY_NOT_MODELLED = [
 ] as const;
 
 export type LifecycleStatus = 'planned' | 'active' | 'retiring' | 'retired';
+/** Prompt 7k item 1: how much a system matters to the estate — ordered, `critical` the highest (`src/ui/elements/criticalityTone.ts`'s `CRITICALITY_ORDER`), for the same "worst-of among supporting systems" capability-map aggregation `LifecycleStatus`'s own ordering already supports. */
+export type Criticality = 'critical' | 'high' | 'medium' | 'low';
+/** Prompt 7k item 1: where a system runs — a closed, unordered set (unlike `Criticality`), each value its own colour-by tone, never aggregated "worst of" for a capability (there is no "worse" hosting model — see `src/ui/capabilityMap/metrics.ts`'s own module comment for why capability-map colour-by only ever offers criticality, not this). */
+export type HostingModel = 'on_premises' | 'private_cloud' | 'public_cloud' | 'saas' | 'hybrid';
+/**
+ * Prompt 7k item 3: IT/OT domain — a categorical, unordered set like
+ * `HostingModel` (no "worse" domain to aggregate a capability's worst-of
+ * to). Absent means `'it'` (the prompt's own stated default — the common
+ * case for a regulated estate is IT, so only OT/hybrid systems need
+ * marking) — this is a read-time default applied by
+ * `src/ui/elements/systemDomain.ts`'s `domainOf`, never written back onto
+ * a system that never recorded one, the same "an unset fact isn't the
+ * same as a recorded 'it' fact" stance every other optional attribute
+ * here takes. `ContainerAttributes` has no `domain` field of its own: a
+ * container inherits its parent system's domain at read time
+ * (`resolveElementDomain`), so there's no second copy that could drift
+ * out of sync with it.
+ */
+export type SystemDomain = 'it' | 'ot' | 'hybrid';
+/**
+ * Prompt 7k item 4: what a system *is*, for landscape/routing purposes —
+ * a categorical, unordered set, no colour-by of its own (unlike
+ * `Criticality`/`HostingModel`/`SystemDomain`): this drives structural
+ * layout (the landscape's platform band, `src/ui/landscape/layout.ts`)
+ * and the `via` reference below, not a tone anyone would want to see
+ * tinted. Absent reads as `'application'` (the read-time-default pattern
+ * `SystemDomain` already established) — the common case is an ordinary
+ * application; only a system that genuinely mediates flows between
+ * others (an ESB, an API gateway, a data platform, a piece of
+ * infrastructure like a message bus) needs marking.
+ */
+export type SystemKind = 'application' | 'integration_platform' | 'data_platform' | 'infrastructure';
 export type ActorSubtype = 'person' | 'team';
 export type DataClassification = 'public' | 'official' | 'official_sensitive' | 'special_category';
 /** Sprint U4-1 B4: which of a system's `supports` edges anchors its one landscape lane (relationship_type_rules' new `maxPrimaryPerFrom: 1`, `supports`-only). Always set at creation, defaulting to `secondary` unless the picker's "primary?" prompt is answered yes — never left unset the way `SupportsAttributes.description` is, since lane placement has to read *something* off every edge. */
 export type SupportsRole = 'primary' | 'secondary';
+/** Prompt 7k item 2: which capacity an `owns` edge asserts ownership in — replaces the earlier `OwnsAttributes.primary: boolean` (Sprint U4-1), which only ever distinguished "the" owner from a secondary one and had no room for more than one kind of owner at once. Always set at creation, defaulting to `'business'` on a capability target and prompted for on a system target (`RelationshipAdd.tsx`) — never left unset, same reasoning `SupportsRole` above already gives. Cardinality is per `(toElementId, role)` (C17, `20260911070000_owns_role.sql`'s backstop index): a target may have at most one `business`, one `technical` and one `service` owner, but all three may be different actors at once. */
+export type OwnsRole = 'business' | 'technical' | 'service';
 
 /**
  * Attributes stored in `elements_head.attributes` (jsonb). `name` and
@@ -100,6 +134,17 @@ export interface CapabilityAttributes {
    * capability sorts after every ordered sibling, never before.
    */
   order?: number;
+  /**
+   * Prompt 7k item 5: NIS/CAF's "essential function" — defined at
+   * capability level (a regulator asks "which capabilities are essential",
+   * not "which systems") and derived down to systems through `supports`
+   * (`findSystemsSupportingEssentialFunctionWithoutTechnicalOwner`,
+   * `src/db/healthFindings.ts`), never stored redundantly on a system
+   * itself. Optional, defaulting to `false` when absent — the common case
+   * for a regulated estate's capability map is that most capabilities are
+   * not, themselves, an essential function under the regulation.
+   */
+  essentialFunction?: boolean;
 }
 
 export interface SystemAttributes {
@@ -112,6 +157,28 @@ export interface SystemAttributes {
   introduced?: ISODate;
   /** Planned decommission/retirement date, if one is known. Not the same as `lifecycleStatus: 'retired'` — a system can have a planned end date well before it actually retires. */
   plannedEnd?: ISODate;
+  /** Prompt 7k item 1: how much this system matters to the estate — drives the landscape/capability-map "criticality" colour-by and the "critical systems without a business owner"/"critical, exposed, no planned replacement" health findings. Optional: unrated until someone records it, same as `vendor`. */
+  criticality?: Criticality;
+  /** Prompt 7k item 1. Optional, same reasoning as `criticality`. */
+  hostingModel?: HostingModel;
+  /** Free text (a specific vendor/data-centre/region) — deliberately not an enum, unlike `hostingModel` itself: the set of real hosting providers is open-ended in a way on/prem-vs-cloud-vs-SaaS is not. */
+  hostingProvider?: string;
+  /** Prompt 7k item 3: IT, OT, or hybrid — drives the landscape's OT zone/colour-by, the capability map's "OT share" colour-by, and the boundary-crossings finding/list. Optional; absent reads as `'it'` (`SystemDomain`'s own comment). */
+  domain?: SystemDomain;
+  /** Prompt 7k item 4: application, integration/data platform, or infrastructure — drives the landscape's platform band and which systems `via` (below) may reference. Optional; absent reads as `'application'` (`SystemKind`'s own comment). */
+  kind?: SystemKind;
+  /**
+   * Prompt 7k item 5: vendor support end (e.g. an OS/platform's end-of-
+   * support date) — distinct from `plannedEnd`, which is *this estate's*
+   * planned decommission date. A system can be well past vendor support
+   * with no decommission planned yet (the exact case the "critical, past
+   * or within 12 months of vendor support end" health finding exists to
+   * catch,`findCriticalSystemsPastOrNearSupportEnd` in
+   * `src/db/healthFindings.ts`) or have a `plannedEnd` long before its
+   * vendor support actually lapses. Optional, same reasoning as
+   * `plannedEnd`.
+   */
+  supportEndsAt?: ISODate;
 }
 
 export interface ContainerAttributes {
@@ -154,15 +221,32 @@ export interface SupportsAttributes {
 }
 export interface UsesAttributes {
   description?: string;
+  /** Prompt 7k item 4: an optional element ref to the `system` (of `kind: 'integration_platform'`) this flow actually goes via — an ESB/API gateway/message bus sitting between `fromElementId` and `toElementId`, not a third real endpoint of its own (C18, `src/engine/deltas.ts`'s `apply()`, validates the reference at commit time). Direct edges (no `via`) are the default; the landscape only routes an edge through its `via` node when the "route via platforms" toggle is on (unpersisted view state, `src/ui/landscape/LandscapeCanvas.tsx` — never a stored preference, keeping this item's migration footprint at zero). */
+  via?: UUID;
 }
 export interface OwnsAttributes {
-  /** At most one primary owner per owned element (relationship_type_rules). */
-  primary: boolean;
+  /** See `OwnsRole`'s own doc comment. At most one live edge per `(toElementId, role)` (relationship_type_rules, C17). Required — every new `owns` edge sets it at creation, unlike `primary` below, which no new code ever sets again. */
+  role: OwnsRole;
+  /**
+   * @deprecated Superseded by `role` (Prompt 7k item 2) — kept on the type,
+   * not removed, so a pre-migration `owns` edge's stored attributes (which
+   * only ever had `primary`, never `role`) still type-checks when read
+   * back narrowly, and so a reader of this interface can see the history
+   * rather than wonder where the field went. Never set by new code: every
+   * write path now sets `role` only. Existing data is migrated to `role`
+   * via a real `relationship.update` commit
+   * (`src/db/backfillOwnsRole.ts`/`scripts/backfillOwnsRole.ts`, run once
+   * per model), never a raw row edit — SPEC §6.8's "data changes are
+   * commits, never row rewrites."
+   */
+  primary?: boolean;
 }
 export interface FlowsToAttributes {
   description?: string;
   dataClassification?: DataClassification;
   protocol?: string;
+  /** See `UsesAttributes.via`'s own doc comment — identical meaning and validation, `flows_to`'s own copy since each relationship type's attributes are their own interface. */
+  via?: UUID;
 }
 
 export interface RelationshipAttributesByType {
@@ -424,7 +508,11 @@ export const COMMIT_INVARIANTS = [
   { id: 'C16', text: 'The resulting head passes the validation level required for the branch kind: capture_draft → structural only; change → structural, schema advisory; main → structural and schema (SPEC §6.3).' },
   {
     id: 'C17',
-    text: "relationship.create/relationship.update/relationship.restore setting (or reviving, for restore) supports.role = 'primary' or owns.primary = true: no other live relationship in the resulting head already has that same primary flag on the same anchor element — supports' anchor is fromElementId (one primary capability per system), owns' is toElementId (one primary owner per owned element). A same-commit delta demoting the existing one first (earlier in seq order) makes the promotion legal; a restore is checked against the head as it stands now, not as it stood when the relationship was retracted.",
+    text: "relationship.create/relationship.update/relationship.restore setting (or reviving, for restore) supports.role = 'primary', or setting an owns.role of any value: no other live relationship in the resulting head already holds the same value on the same anchor element — supports' anchor is fromElementId, one primary capability per system (a 'secondary' supports.role has no cardinality limit); owns' anchor is toElementId, one owner per role per owned element (Prompt 7k item 2 — 'business'/'technical'/'service' are each independently capped at one, so a target may have up to three owners at once, never two of the same role). A same-commit delta demoting/reassigning the existing one first (earlier in seq order) makes the promotion legal; a restore is checked against the head as it stands now, not as it stood when the relationship was retracted.",
+  },
+  {
+    id: 'C18',
+    text: "relationship.create/relationship.update setting uses.via or flows_to.via to a non-null value: the referenced element exists in the head as it stands at the point this delta is applied and is a system with kind === 'integration_platform' (Prompt 7k item 4). Not re-checked at relationship.restore, matching C9's own endpoint check, which restore also does not re-run — a restored edge is trusted to reconstruct exactly the state it last held, not re-validated against the current head.",
   },
 ] as const;
 

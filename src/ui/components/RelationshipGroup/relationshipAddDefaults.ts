@@ -7,27 +7,35 @@
  * VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY set — exactly the environment a
  * plain `vitest run` unit test doesn't have.
  */
-import type { RelationshipType } from '../../../contracts/delta';
+import type { ElementType, RelationshipType } from '../../../contracts/delta';
 import type { Json } from '../../../contracts/rows';
 
 /**
- * The attributes a picked target gets when neither the primary-prompt nor
- * the verb-label prompt (RelationshipAdd.tsx) intercepts it first (Sprint
- * U4-1 B5 bugfix). This used to be a literal `{ role: 'secondary' }` in
- * `pickResult` itself, unconditionally — correct for `supports`' own
- * first-link-or-inbound case, but wrong for `owns`: `role` isn't an
- * `OwnsAttributes` key at all, so an owner added through this control
- * (reachable today — `owns` has real outbound/inbound groups,
- * relationshipTypeRules.ts) got an edge with no `primary` value set,
- * silently never counting as anyone's owner (`findCapabilitiesWithoutOwner`,
- * `checkPrimaryCardinality`'s C17 both key off `attributes.primary`).
- * `uses`/`flows_to` never reach this function at all any more —
- * RelationshipAdd's `needsLabel` intercepts them first — so today this
- * only ever returns something for `supports`; `owns` (and anything else
- * added later) falls through to `undefined`, letting
- * `useRelationshipCreate`'s own per-type default (`{ primary: true }` for
- * `owns`) apply instead of this control inventing one.
+ * The attributes a picked target gets when no staged prompt (RelationshipAdd.tsx's
+ * primary/label/owns-role questions) intercepts it first (Sprint U4-1 B5
+ * bugfix, extended by Prompt 7k item 2). This used to be a literal
+ * `{ role: 'secondary' }` in `pickResult` itself, unconditionally — correct
+ * for `supports`' own first-link-or-inbound case, but wrong for `owns`:
+ * before item 2, `role` wasn't an `OwnsAttributes` key at all, so an owner
+ * added through this control got an edge with no ownership attribute set.
+ * `uses`/`flows_to` never reach this function any more — RelationshipAdd's
+ * `needsLabel` intercepts them first.
+ *
+ * `owns` only reaches here for a *capability* target — a system target is
+ * always intercepted by RelationshipAdd's own staged "which role?" prompt
+ * (item 1's "defaults to business on capability targets, prompts on
+ * system targets" — the default below is that capability-target default;
+ * `ownedElementType` is `undefined` only for a relationship type that
+ * never needs it, i.e. never `owns`, so this being undefined for an
+ * `owns` call would be a caller bug, not a legitimate case to silently
+ * fall through). `owns` on a system target instead returns `undefined`
+ * from here (defensive; RelationshipAdd's own staging should have already
+ * intercepted it), letting `useRelationshipCreate`'s own bare fallback
+ * (`{ role: 'business' }`) apply — the same default this function would
+ * have returned anyway.
  */
-export function defaultAttributesForPlainPick(relationshipType: RelationshipType): Record<string, Json> | undefined {
-  return relationshipType === 'supports' ? { role: 'secondary' } : undefined;
+export function defaultAttributesForPlainPick(relationshipType: RelationshipType, ownedElementType?: ElementType): Record<string, Json> | undefined {
+  if (relationshipType === 'supports') return { role: 'secondary' };
+  if (relationshipType === 'owns' && ownedElementType === 'capability') return { role: 'business' };
+  return undefined;
 }

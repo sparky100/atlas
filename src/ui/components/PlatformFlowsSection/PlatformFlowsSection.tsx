@@ -1,0 +1,74 @@
+import { Link } from 'react-router';
+import type { UUID } from '../../../contracts/delta';
+import type { ElementsHeadRow, RelationshipsHeadRow } from '../../../contracts/rows';
+import { Chip } from '../Chip/Chip';
+import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
+import { EmptyState } from '../EmptyState/EmptyState';
+import { Text } from '../Text/Text';
+import { attributesRecord } from '../../elements/attributesRecord';
+import styles from './PlatformFlowsSection.module.css';
+
+export interface PlatformFlowsSectionProps {
+  orgSlug: string;
+  modelSlug: string;
+  flows: readonly RelationshipsHeadRow[];
+  endpoints: ReadonlyMap<UUID, ElementsHeadRow>;
+}
+
+/**
+ * Prompt 7k item 4's "Flows via this platform" — every `uses`/`flows_to`
+ * edge naming this element (a `kind: 'integration_platform'` system) as
+ * `via`. `ElementPage.tsx` only mounts this section at all when the
+ * current element actually is one (`isIntegrationPlatform`), so the empty
+ * state here means "a real platform with nothing routed through it yet"
+ * — exactly the fact `findUnusedIntegrationPlatforms`
+ * (`src/db/healthFindings.ts`) turns into its own health finding.
+ */
+export function PlatformFlowsSection({ orgSlug, modelSlug, flows, endpoints }: PlatformFlowsSectionProps) {
+  if (flows.length === 0) {
+    return <EmptyState>Nothing flows via this platform yet.</EmptyState>;
+  }
+
+  return (
+    <ul className={styles.list}>
+      {flows.map((flow) => {
+        const from = endpoints.get(flow.from_element_id);
+        const to = endpoints.get(flow.to_element_id);
+        const description = attributesRecord(flow.attributes).description;
+        return (
+          <li key={flow.relationship_id} className={styles.row}>
+            <div className={styles.endpoints}>
+              <EndpointLink orgSlug={orgSlug} modelSlug={modelSlug} elementId={flow.from_element_id} element={from} />
+              <Text as="span" tone="muted" size="sm">
+                →
+              </Text>
+              <EndpointLink orgSlug={orgSlug} modelSlug={modelSlug} elementId={flow.to_element_id} element={to} />
+              <Chip tone="neutral">{flow.relationship_type.replace('_', ' ')}</Chip>
+            </div>
+            {typeof description === 'string' && description.trim() !== '' && (
+              <Text as="p" tone="muted" size="sm">
+                “{description}”
+              </Text>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function EndpointLink({ orgSlug, modelSlug, elementId, element }: { orgSlug: string; modelSlug: string; elementId: UUID; element: ElementsHeadRow | undefined }) {
+  if (!element) {
+    return (
+      <Text as="span" tone="faint">
+        {elementId}
+      </Text>
+    );
+  }
+  return (
+    <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${element.element_id}`} className={styles.link}>
+      <ElementTypeGlyph type={element.element_type} />
+      <Text as="span">{element.name}</Text>
+    </Link>
+  );
+}

@@ -12,6 +12,7 @@
  */
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow, DeltaRow } from '../contracts/rows';
 import type { UUID } from '../contracts/delta';
+import { attributesRecord } from '../ui/elements/attributesRecord';
 import type { Client } from './client';
 import { assertInFilterSize } from './inFilterLimit';
 import { selectAll } from './selectAll';
@@ -79,6 +80,28 @@ export async function listRelationshipsForElement(supabase: Client, commitId: UU
     .or(`from_element_id.eq.${elementId},to_element_id.eq.${elementId}`)
     .order('relationship_id');
   return selectAll<RelationshipsHeadRow>(query);
+}
+
+/**
+ * Every `uses`/`flows_to` edge whose `via` names `platformElementId` —
+ * Prompt 7k item 4's "Flows via this platform" element-page section.
+ * `attributes ->> 'via'` can't be pushed into a `.eq()` alongside the
+ * `relationship_type` filter without a raw-jsonb postgrest operator this
+ * codebase has no other precedent for, so this queries the commit's whole
+ * `uses`/`flows_to` scope (bounded by the model, not by how many flows
+ * happen to have a `via` — CLAUDE.md rule 8's own reference shape) and
+ * filters to `via` client-side, the same "query the scope once" pattern
+ * `listRelationshipsForElement` above already gives a real precedent for.
+ */
+export async function listFlowsViaElement(supabase: Client, commitId: UUID, platformElementId: UUID): Promise<RelationshipsHeadRow[]> {
+  const query = supabase
+    .from('relationships_head')
+    .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
+    .eq('commit_id', commitId)
+    .in('relationship_type', ['uses', 'flows_to'])
+    .order('relationship_id');
+  const rows = await selectAll<RelationshipsHeadRow>(query);
+  return rows.filter((row) => attributesRecord(row.attributes).via === platformElementId);
 }
 
 /**

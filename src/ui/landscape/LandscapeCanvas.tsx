@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router';
 import type { ActorSubtype, ElementType } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
+import type { LandscapeColourByMode } from '../../contracts/userPreferences';
+import type { ChipTone } from '../components/Chip/Chip';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff, VersionDiffState } from '../../engine/versionDiff';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
-import { BOUNDARY_MARGIN, computeLandscapeChannels, NODE_HEIGHT, NODE_WIDTH, routeLandscapeEdge, type LandscapeLayout, type LandscapeNodePosition } from './layout';
+import { BOUNDARY_MARGIN, computeLandscapeChannels, NODE_HEIGHT, NODE_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
+import { landscapeTileColourFor } from './landscapeColour';
 import { quantizeScale } from './zoom';
 import styles from './LandscapeCanvas.module.css';
 
@@ -43,6 +46,23 @@ export interface LandscapeCanvasProps {
   onNewCommentShortcut?: (elementId: UUID) => void;
   /** M1 close-out item 1: "the per-session 'comments on this view' filter" — every node with no thread at all (`threadCounts` absent or `total === 0`) recedes to a low, diff-style alpha instead of being removed from the layout outright (removing nodes would change lane placement and edge routing for everything else on screen, which this is a read-only lens over, not a re-query). `false`/omitted draws every node at full opacity, same as before this item. */
   commentsOnlyFilter?: boolean | undefined;
+  /**
+   * Prompt 7k item 1: the landscape's own colour-by mode. Applied only to
+   * the plain (no active diff) fill branch of `drawNode` — never mixed
+   * with an active diff-state tint, per UI-principles §8.4's "status and
+   * diff must not be read across". `undefined`/`'none'` draws every tile
+   * with the flat neutral fill this canvas has always used.
+   */
+  colourBy?: LandscapeColourByMode | undefined;
+  /**
+   * Prompt 7k item 4: "route via platforms" — off (the default, direct
+   * edges) draws every `uses`/`flows_to` edge straight between its two
+   * real endpoints, ignoring `via` entirely; on, an edge carrying `via`
+   * draws as two legs through that platform's own node instead. Plain,
+   * unpersisted view state (`LandscapePage.tsx`'s own `useState`) — never
+   * a stored preference, keeping this item's migration footprint at zero.
+   */
+  routeViaPlatforms?: boolean | undefined;
 }
 
 interface Transform {
@@ -77,6 +97,12 @@ interface CanvasTokens {
   diffAdded: string;
   diffRemoved: string;
   diffChanged: string;
+  /** Prompt 7k item 1's colour-by tint — the same `--status-*` tokens `Chip.module.css` already maps `ChipTone` onto, read here as resolved values for the same `var()`-doesn't-work-in-`fillStyle` reason as every other token in this interface. */
+  statusOk: string;
+  statusWarn: string;
+  statusDanger: string;
+  statusInfo: string;
+  statusNeutral: string;
 }
 
 function readTokens(el: HTMLElement): CanvasTokens {
@@ -93,7 +119,28 @@ function readTokens(el: HTMLElement): CanvasTokens {
     diffAdded: v('--diff-added'),
     diffRemoved: v('--diff-removed'),
     diffChanged: v('--diff-changed'),
+    statusOk: v('--status-ok'),
+    statusWarn: v('--status-warn'),
+    statusDanger: v('--status-danger'),
+    statusInfo: v('--status-info'),
+    statusNeutral: v('--status-neutral'),
   };
+}
+
+/** `ChipTone` → the matching resolved `--status-*` token — the canvas's own version of `Chip.module.css`'s `styles[tone]` class lookup, since a 2D context can't use CSS classes. */
+function statusColourFor(tone: ChipTone, tokens: CanvasTokens): string {
+  switch (tone) {
+    case 'ok':
+      return tokens.statusOk;
+    case 'warn':
+      return tokens.statusWarn;
+    case 'danger':
+      return tokens.statusDanger;
+    case 'info':
+      return tokens.statusInfo;
+    case 'neutral':
+      return tokens.statusNeutral;
+  }
 }
 
 /** The node's own diff border colour (§6.3's colour token column) — `null` for `unchanged`, which uses the same neutral border every non-diff render already draws. */
@@ -273,6 +320,8 @@ export function LandscapeCanvas({
   onToggleCommentsPanel,
   onNewCommentShortcut,
   commentsOnlyFilter = false,
+  colourBy = 'none',
+  routeViaPlatforms = false,
 }: LandscapeCanvasProps) {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -299,16 +348,36 @@ export function LandscapeCanvas({
     const allPositions: LandscapeNodePosition[] = [...layout.nodes, ...layout.actorNodes];
     const positionById = new Map(layout.nodes.map((n) => [n.elementId, n]));
     const channels = computeLandscapeChannels(layout);
-    return edges
-      .map((edge) => {
-        const from = positionById.get(edge.from_element_id);
-        const to = positionById.get(edge.to_element_id);
-        if (!from || !to) return null;
-        const obstacles = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== edge.to_element_id);
-        return { edge, points: routeLandscapeEdge(from, to, obstacles, channels) };
-      })
-      .filter((r): r is { edge: RelationshipsHeadRow; points: { x: number; y: number }[] } => r !== null);
-  }, [layout, edges]);
+    const result: { edge: RelationshipsHeadRow; points: { x: number; y: number }[] }[] = [];
+    for (const edge of edges) {
+      const from = positionById.get(edge.from_element_id);
+      const to = positionById.get(edge.to_element_id);
+      if (!from || !to) continue;
+
+      // Prompt 7k item 4's "route via platforms" toggle: off (the default)
+      // draws the direct edge regardless of `via` — on, and a `via`
+      // resolving to a node actually on this map, draws two legs
+      // (from→via, via→to) instead of one, each independently routed
+      // around obstacles the same way a direct edge already is. A `via`
+      // that doesn't resolve on this map (the platform system exists but
+      // isn't itself placed here — shouldn't happen in practice, since the
+      // platform is a system too, but not asserted away) falls back to the
+      // direct edge rather than drawing nothing.
+      const via = attributesRecord(edge.attributes).via;
+      const viaPosition = viaPositionFor(typeof via === 'string' ? via : undefined, positionById, routeViaPlatforms);
+      if (viaPosition) {
+        const obstaclesToVia = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== viaPosition.elementId);
+        const obstaclesFromVia = allPositions.filter((n) => n.elementId !== viaPosition.elementId && n.elementId !== edge.to_element_id);
+        result.push({ edge, points: routeLandscapeEdge(from, viaPosition, obstaclesToVia, channels) });
+        result.push({ edge, points: routeLandscapeEdge(viaPosition, to, obstaclesFromVia, channels) });
+        continue;
+      }
+
+      const obstacles = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== edge.to_element_id);
+      result.push({ edge, points: routeLandscapeEdge(from, to, obstacles, channels) });
+    }
+    return result;
+  }, [layout, edges, routeViaPlatforms]);
 
   const fitToView = useCallback(() => {
     const wrapper = wrapperRef.current;
@@ -421,6 +490,42 @@ export function LandscapeCanvas({
         ctx.lineWidth = 1.5;
         ctx.setLineDash([6, 4]);
         roundRectPath(ctx, BOUNDARY_MARGIN, layout.boundary.top - BOUNDARY_MARGIN, layout.width - BOUNDARY_MARGIN * 2, layout.boundary.bottom - layout.boundary.top + BOUNDARY_MARGIN * 2, 12);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+
+      // Prompt 7k item 3: the OT zone — its own smaller dashed rectangle,
+      // inside the enterprise boundary, around just that lane's own
+      // y-range. The lane's own label ("OT") already groups it visually
+      // like any other lane; this extra rectangle is the "zone" cue the
+      // prompt asks for, distinguishing it from an ordinary capability
+      // lane the same way the enterprise boundary itself distinguishes
+      // internal from external.
+      const otLane = layout.lanes.find((lane) => lane.region === 'ot');
+      if (otLane) {
+        ctx.save();
+        ctx.strokeStyle = tokens.statusWarn;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        roundRectPath(ctx, BOUNDARY_MARGIN * 2, otLane.y - BOUNDARY_MARGIN / 2, layout.width - BOUNDARY_MARGIN * 4, otLane.height - BOUNDARY_MARGIN, 8);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+
+      // Prompt 7k item 4: the platform band — the same "own smaller dashed
+      // rectangle inside the boundary" zone cue as the OT zone above, in
+      // `tokens.statusInfo` rather than `statusWarn` (an integration/data
+      // platform isn't "needs attention" the way an OT system is — it's
+      // just a different kind of system, `systemKind.ts`'s own reasoning).
+      const platformLane = layout.lanes.find((lane) => lane.region === 'platform');
+      if (platformLane) {
+        ctx.save();
+        ctx.strokeStyle = tokens.statusInfo;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        roundRectPath(ctx, BOUNDARY_MARGIN * 2, platformLane.y - BOUNDARY_MARGIN / 2, layout.width - BOUNDARY_MARGIN * 4, platformLane.height - BOUNDARY_MARGIN, 8);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.restore();
@@ -578,7 +683,15 @@ export function LandscapeCanvas({
           ctx.fillStyle = `color-mix(in srgb, ${diffColour} 12%, ${tokens.surfaceRaised})`;
           ctx.fill();
         } else {
-          ctx.fillStyle = tokens.surfaceRaised;
+          // Colour-by only ever applies here — the one fill branch reached
+          // when no diff view is active at all — never mixed with a diff
+          // tint above, per UI-principles §8.4 ("status and diff must not
+          // be read across"). Actors carry neither `criticality` nor
+          // `hostingModel`, so `landscapeTileColourFor` naturally returns
+          // no tone for them (`attributesRecord` on an actor's attributes
+          // just won't have the key).
+          const statusTone = !diff && colourBy !== 'none' ? landscapeTileColourFor(colourBy, element).tone : undefined;
+          ctx.fillStyle = statusTone ? `color-mix(in srgb, ${statusColourFor(statusTone, tokens)} 16%, ${tokens.surfaceRaised})` : tokens.surfaceRaised;
           ctx.fill();
         }
         ctx.strokeStyle = diffColour ?? (isHovered ? tokens.accent : tokens.borderStrong);
@@ -726,7 +839,7 @@ export function LandscapeCanvas({
     return () => {
       observer.disconnect();
     };
-  }, [layout, routedEdges, systemsById, actorsById, diff, diffByElementId, diffByRelationshipId, transform, hover, threadCounts, commentsOnlyFilter]);
+  }, [layout, routedEdges, systemsById, actorsById, diff, diffByElementId, diffByRelationshipId, transform, hover, threadCounts, commentsOnlyFilter, colourBy]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -813,6 +926,11 @@ export function LandscapeCanvas({
   const hoveredElement = hover ? (hover.elementType === 'system' ? systemsById.get(hover.elementId) : actorsById.get(hover.elementId)) : undefined;
   // §6.3: "Hover on any marker shows the changed attributes" — base -> new isn't shown here (the canvas has no per-field value, only the diff's element-grain summary); the element page's own history is where that detail lives. Actors carry no diff state (diff is system/relationship-grained).
   const hoveredDiff = diff && hover?.elementType === 'system' ? diffByElementId.get(hover.elementId) : undefined;
+  // Colour-by's own tone is never the only place its value is shown (§8.7)
+  // — the tooltip is this canvas's one place to put the label text a Chip
+  // would otherwise carry. Computed once here, not inline in the JSX
+  // below, so its `string | undefined` result narrows cleanly.
+  const hoveredColourByLabel = colourBy !== 'none' && hover?.elementType === 'system' && hoveredElement ? landscapeTileColourFor(colourBy, hoveredElement).label : undefined;
 
   // Item 11: the popover's own content — every other level-1 lane the
   // popover's node also supports (`layout.referenceMarkers`, filtered to
@@ -867,6 +985,7 @@ export function LandscapeCanvas({
           {hoveredElement.name}
           {attributesRecord(hoveredElement.attributes).isExternal === true ? ' (external)' : ''}
           {hoveredDiff && hoveredDiff.state !== 'unchanged' && hoveredDiff.changedAttributes.length > 0 && ` — changed: ${hoveredDiff.changedAttributes.join(', ')}`}
+          {hoveredColourByLabel !== undefined && ` — ${hoveredColourByLabel}`}
         </div>
       )}
       {extraLanesPopover && (

@@ -71,6 +71,25 @@
   flex: 0 0 auto;
 }
 
+/* Prompt 7k item 1: the colour-by control — same shape as
+   CapabilityMapView.module.css's own `.select`, copied rather than shared
+   since the two views' toolbars don't otherwise share a stylesheet. */
+.select {
+  height: var(--row-height);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.colourByControl {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 /* M1 close-out item 1: "the per-session 'comments on this view' filter" —
    a plain checkbox + label, the same row height as the `+ Add` controls
    next to it, not a bespoke switch control this design system has no

@@ -7,13 +7,23 @@ import { listCapabilitiesForMap } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
 import {
   computeStaleAttributesFinding,
+  findBoundaryCrossings,
+  findBoundaryCrossingsMissingClassification,
+  findBoundaryCrossingsMissingClassificationOrVerb,
   findCapabilitiesWithoutOwner,
+  findCriticalExposedSystems,
+  findCriticalSystemsPastOrNearSupportEnd,
+  findCriticalSystemsWithoutBusinessOwner,
+  findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
+  findSystemsWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
+  findUnusedIntegrationPlatforms,
   listAllOwnsEdges,
   listAllUsesAndFlowsToEdges,
   listFactsForCommit,
   listUsesAndFlowsToEndpointElements,
+  type BoundaryCrossing,
   type StaleAttributesFinding,
   type UnlabeledVerbRelationship,
 } from '../../db/healthFindings';
@@ -47,6 +57,24 @@ export interface ArchitectHomeData {
   staleAttributes: StaleAttributesFinding;
   /** Sprint U4-1 B5's fifth finding: `uses`/`flows_to` relationships with no verb-phrase label. */
   unlabeledVerbRelationships: UnlabeledVerbRelationship[];
+  /** Prompt 7k item 2's role-aware finding: systems with no `owns` edge carrying `role: 'technical'`. */
+  systemsWithoutTechnicalOwner: ElementsHeadRow[];
+  /** Prompt 7k item 1: critical systems with no `owns` edge carrying `role: 'business'`. */
+  criticalSystemsWithoutBusinessOwner: ElementsHeadRow[];
+  /** Prompt 7k item 1: critical systems whose `plannedEnd` falls within `STALE_AFTER_MONTHS`, with no planned replacement (see `findCriticalExposedSystems`'s own comment on that half). */
+  criticalExposedSystems: ElementsHeadRow[];
+  /** Prompt 7k item 3's own health finding: `uses`/`flows_to` edges crossing the IT/OT boundary with no verb-phrase label or (for `flows_to`) data classification. */
+  boundaryCrossingsMissingClassificationOrVerb: BoundaryCrossing[];
+  /** Prompt 7k item 3's "Boundary crossings" count-and-link block — every IT/OT crossing, not just the ones missing metadata (that's the health finding above); the full list lives at `BoundaryCrossingsPage.tsx`. */
+  boundaryCrossingsCount: number;
+  /** Prompt 7k item 4's own health finding: integration platforms with nothing routed via them. */
+  unusedIntegrationPlatforms: ElementsHeadRow[];
+  /** Prompt 7k item 5's first Assurance finding: systems supporting an `essentialFunction` capability with no `role: 'technical'` owner. */
+  systemsSupportingEssentialFunctionWithoutTechnicalOwner: ElementsHeadRow[];
+  /** Prompt 7k item 5's second Assurance finding: boundary crossings missing a data classification (the CAF A3/B4-relevant subset of item 3's own wider finding). */
+  boundaryCrossingsMissingClassification: BoundaryCrossing[];
+  /** Prompt 7k item 5's third Assurance finding: critical systems past or within `STALE_AFTER_MONTHS` of vendor support end. */
+  criticalSystemsPastOrNearSupportEnd: ElementsHeadRow[];
 }
 
 export type ArchitectHomeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeData };
@@ -144,6 +172,15 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges),
             staleAttributes: computeStaleAttributesFinding(facts, systems),
             unlabeledVerbRelationships: findUnlabeledVerbRelationships(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
+            systemsWithoutTechnicalOwner: findSystemsWithoutTechnicalOwner(systems, ownsEdges),
+            criticalSystemsWithoutBusinessOwner: findCriticalSystemsWithoutBusinessOwner(systems, ownsEdges),
+            criticalExposedSystems: findCriticalExposedSystems(systems),
+            boundaryCrossingsMissingClassificationOrVerb: findBoundaryCrossingsMissingClassificationOrVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
+            boundaryCrossingsCount: findBoundaryCrossings(usesAndFlowsToEdges, usesAndFlowsToEndpointsById).length,
+            unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges),
+            systemsSupportingEssentialFunctionWithoutTechnicalOwner: findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supportsEdges, ownsEdges),
+            boundaryCrossingsMissingClassification: findBoundaryCrossingsMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
+            criticalSystemsPastOrNearSupportEnd: findCriticalSystemsPastOrNearSupportEnd(systems),
           },
         });
       }

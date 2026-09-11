@@ -24,10 +24,11 @@
  * way — and the finding lists only the *highest* unowned ancestor in each
  * unowned subtree, since fixing that one fixes everything under it.
  */
-import { isStale, monthsSince, STALE_AFTER_MONTHS } from '../contracts/thresholds';
+import { isStale, monthsSince, monthsUntil, STALE_AFTER_MONTHS } from '../contracts/thresholds';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
-import type { UUID } from '../contracts/delta';
+import type { SystemDomain, UUID } from '../contracts/delta';
 import { attributesRecord } from '../ui/elements/attributesRecord';
+import { resolveElementDomain } from '../ui/elements/systemDomain';
 import type { Client } from './client';
 import { selectAll } from './selectAll';
 
@@ -107,6 +108,93 @@ export function findUnlabeledVerbRelationships(edges: readonly RelationshipsHead
   return result;
 }
 
+export interface BoundaryCrossing {
+  relationshipId: UUID;
+  relationshipType: 'uses' | 'flows_to';
+  fromName: string;
+  toName: string;
+  fromDomain: SystemDomain;
+  toDomain: SystemDomain;
+  /** No verb-phrase label recorded — the same "empty/missing description" check `findUnlabeledVerbRelationships` already uses. */
+  missingVerb: boolean;
+  /** Only ever `true` for a `flows_to` edge — a `uses` edge has no `dataClassification` attribute to be missing, so it's always `false` here (this crossing is only ever flagged for a missing verb, never for a fact `uses` was never going to carry). */
+  missingDataClassification: boolean;
+}
+
+/** One domain is `'it'` and the other `'ot'` — `'hybrid'` never participates on either side (ambiguous by construction: a hybrid endpoint isn't clearly on one side of the boundary or the other), Prompt 7k item 3's own judgment call for what counts as a "crossing" at all. */
+function isBoundaryCrossingPair(a: SystemDomain, b: SystemDomain): boolean {
+  return (a === 'it' && b === 'ot') || (a === 'ot' && b === 'it');
+}
+
+/**
+ * Every `uses`/`flows_to` edge whose two endpoints resolve to opposite
+ * sides of the IT/OT boundary (`resolveElementDomain`, walking up to the
+ * nearest System for a Container/Component endpoint) — Prompt 7k item 3's
+ * "Boundary crossings" list, reachable from the architect door
+ * (`BoundaryCrossingsPage.tsx`), and the shared basis both this item's own
+ * health finding (`findBoundaryCrossingsMissingClassificationOrVerb`,
+ * below) and item 5's narrower Assurance finding (classification only,
+ * PR5) are built from — one crossing-detection pass, not two.
+ */
+export function findBoundaryCrossings(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): BoundaryCrossing[] {
+  const result: BoundaryCrossing[] = [];
+  for (const edge of edges) {
+    if (edge.relationship_type !== 'uses' && edge.relationship_type !== 'flows_to') continue;
+    const from = elementsById.get(edge.from_element_id);
+    const to = elementsById.get(edge.to_element_id);
+    if (!from || !to) continue;
+    const fromDomain = resolveElementDomain(from, elementsById);
+    const toDomain = resolveElementDomain(to, elementsById);
+    if (!isBoundaryCrossingPair(fromDomain, toDomain)) continue;
+
+    const attrs = attributesRecord(edge.attributes);
+    const description = attrs.description;
+    const missingVerb = !(typeof description === 'string' && description.trim() !== '');
+    const dataClassification = attrs.dataClassification;
+    const missingDataClassification = edge.relationship_type === 'flows_to' && !(typeof dataClassification === 'string' && dataClassification.trim() !== '');
+
+    result.push({ relationshipId: edge.relationship_id, relationshipType: edge.relationship_type, fromName: from.name, toName: to.name, fromDomain, toDomain, missingVerb, missingDataClassification });
+  }
+  return result;
+}
+
+/** Prompt 7k item 3's own health finding: "a crossing with no data classification or verb" — the wider of the two crossing-metadata findings (item 5's Assurance finding, below, checks classification alone). */
+export function findBoundaryCrossingsMissingClassificationOrVerb(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): BoundaryCrossing[] {
+  return findBoundaryCrossings(edges, elementsById).filter((crossing) => crossing.missingVerb || crossing.missingDataClassification);
+}
+
+/**
+ * Prompt 7k item 5's own narrower Assurance finding: boundary crossings
+ * missing a data classification specifically — the CAF A3/B4-relevant
+ * subset of item 3's own wider finding above (which also flags a missing
+ * verb, a labelling concern rather than a regulatory-data one). Same
+ * `findBoundaryCrossings` pass, not a second detection (that function's own
+ * module comment).
+ */
+export function findBoundaryCrossingsMissingClassification(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): BoundaryCrossing[] {
+  return findBoundaryCrossings(edges, elementsById).filter((crossing) => crossing.missingDataClassification);
+}
+
+/**
+ * Prompt 7k item 4's own health finding: every system with
+ * `kind: 'integration_platform'` that no live `uses`/`flows_to` edge
+ * names as its `via` — a platform recorded in the model but not actually
+ * routing anything, worth a second look (has it been decommissioned? is
+ * a real flow missing its `via`?). `usesAndFlowsToEdges` is the same
+ * commit-scoped edge list `findBoundaryCrossings`/
+ * `findUnlabeledVerbRelationships` already read (`listAllUsesAndFlowsToEdges`)
+ * — reused here rather than a second query, since `via` presence is just
+ * another attribute on the same rows.
+ */
+export function findUnusedIntegrationPlatforms(systems: readonly ElementsHeadRow[], usesAndFlowsToEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
+  const platformIdsInUse = new Set<UUID>();
+  for (const edge of usesAndFlowsToEdges) {
+    const via = attributesRecord(edge.attributes).via;
+    if (typeof via === 'string') platformIdsInUse.add(via);
+  }
+  return systems.filter((system) => attributesRecord(system.attributes).kind === 'integration_platform' && !platformIdsInUse.has(system.element_id));
+}
+
 /** Every fact at `commitId`, unfiltered by subject — callers scope to the systems they care about (health findings only reads systems' own attributes, not every subject in the model). Routed through `selectAll` (SPEC §6.7): `facts` is one of the tables `max_rows` can silently truncate. */
 export async function listFactsForCommit(supabase: Client, commitId: string): Promise<FactsRow[]> {
   const query = supabase.from('facts').select('*', { count: 'exact' }).eq('commit_id', commitId).order('subject_id').order('attribute');
@@ -139,18 +227,35 @@ export function isCapabilityOwnedWithAncestry(capability: ElementsHeadRow, selfO
 }
 
 /**
- * Every capability with a direct `primary: true` `owns` edge, or reached
- * by a `supports` edge from a system that has one — a capability's own
- * "owned by itself" set, before ancestry is taken into account
+ * Every capability with a direct `role: 'business'` `owns` edge, or
+ * reached by a `supports` edge from a system that has one — a capability's
+ * own "owned by itself" set, before ancestry is taken into account
  * (`isCapabilityOwnedWithAncestry` above). Exported for the same reuse
  * reason as that function.
+ *
+ * Prompt 7k item 2's own finding is specifically "capabilities without a
+ * *business* owner" — deliberately narrower than "any owner at all" (a
+ * capability with only a technical or service owner still counts as
+ * unowned here), the same distinction `findSystemsWithoutTechnicalOwner`
+ * below draws in the other direction. This also preserves this finding's
+ * pre-7k behaviour exactly once a model's data is migrated: the backfill
+ * (`src/db/backfillOwnsRole.ts`, a real commit, not a row edit — see its
+ * own comment) sets every existing `primary: true` edge's `role` to
+ * `'business'`, so a capability that counted as owned before this sprint
+ * still does, once that commit lands on its model's main.
  */
 export function computeSelfOwnedCapabilityIds(capabilities: readonly ElementsHeadRow[], supportsEdges: readonly RelationshipsHeadRow[], ownsEdges: readonly RelationshipsHeadRow[]): Set<UUID> {
-  const primaryOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).primary === true).map((edge) => edge.to_element_id));
+  const businessOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).role === 'business').map((edge) => edge.to_element_id));
   const capabilityIds = new Set(capabilities.map((c) => c.element_id));
-  const directlyOwned = [...primaryOwnedIds].filter((id) => capabilityIds.has(id));
-  const ownedViaSupportingSystem = supportsEdges.filter((edge) => primaryOwnedIds.has(edge.from_element_id)).map((edge) => edge.to_element_id);
+  const directlyOwned = [...businessOwnedIds].filter((id) => capabilityIds.has(id));
+  const ownedViaSupportingSystem = supportsEdges.filter((edge) => businessOwnedIds.has(edge.from_element_id)).map((edge) => edge.to_element_id);
   return new Set([...directlyOwned, ...ownedViaSupportingSystem]);
+}
+
+/** Systems with no `owns` edge carrying `role: 'technical'` — Prompt 7k item 2's "systems without a technical owner" finding, the same shape `findSystemsWithoutCapability` above already uses. */
+export function findSystemsWithoutTechnicalOwner(systems: readonly ElementsHeadRow[], ownsEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
+  const technicallyOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).role === 'technical').map((edge) => edge.to_element_id));
+  return systems.filter((system) => !technicallyOwnedIds.has(system.element_id));
 }
 
 /**
@@ -209,6 +314,87 @@ export function computeStaleAttributesFinding(facts: readonly FactsRow[], system
     .sort((a, b) => a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id));
 
   return { staleFactCount, staleSystems, oldestAgeYears: staleFactCount > 0 ? Math.floor(oldestMonths / 12) : null };
+}
+
+/**
+ * Prompt 7k item 1's first new finding: "critical systems without a
+ * business owner" — depends on item 2's role data, the same
+ * `role === 'business'` reading `computeSelfOwnedCapabilityIds` above uses,
+ * applied to systems directly rather than capabilities (`owns` can already
+ * target either — `relationshipTypeRules.ts`).
+ */
+export function findCriticalSystemsWithoutBusinessOwner(systems: readonly ElementsHeadRow[], ownsEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
+  const businessOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).role === 'business').map((edge) => edge.to_element_id));
+  return systems.filter((system) => attributesRecord(system.attributes).criticality === 'critical' && !businessOwnedIds.has(system.element_id));
+}
+
+/**
+ * Prompt 7k item 1's second new finding: "critical systems exposed with no
+ * planned replacement" — a system-level analogue of
+ * `src/ui/capabilityMap/metrics.ts`'s own `lifecycleExposure` (a
+ * capability-level rollup over its supporting systems); this reads a
+ * system's own `plannedEnd` directly, no rollup needed. Same "no planned
+ * replacement" simplification that file's module comment documents:
+ * nothing today can record a planned replacement (UI-principles §10
+ * decision 4's review-queue machinery doesn't exist yet), so that half of
+ * the condition is vacuously true — this narrows correctly once it does,
+ * not silently wrong now.
+ */
+export function findCriticalExposedSystems(systems: readonly ElementsHeadRow[], now: Date = new Date()): ElementsHeadRow[] {
+  return systems.filter((system) => {
+    const attrs = attributesRecord(system.attributes);
+    if (attrs.criticality !== 'critical') return false;
+    const plannedEndValue = attrs.plannedEnd;
+    if (typeof plannedEndValue !== 'string') return false;
+    const plannedEnd = new Date(plannedEndValue);
+    if (Number.isNaN(plannedEnd.getTime())) return false;
+    return monthsUntil(plannedEnd, now) <= STALE_AFTER_MONTHS;
+  });
+}
+
+/**
+ * Prompt 7k item 5's first Assurance finding: "systems supporting an
+ * essential function without a technical owner" — NIS essential functions
+ * are recorded at capability level (`CapabilityAttributes.essentialFunction`)
+ * and derived down to systems through `supports`, the same rollup shape
+ * `computeSelfOwnedCapabilityIds` above already uses in the other direction
+ * (capability ownership derived from a supporting system's `owns` edge).
+ * "Technical owner" reuses `findSystemsWithoutTechnicalOwner`'s own
+ * `role: 'technical'` definition, scoped down to just the systems this
+ * finding cares about.
+ */
+export function findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(
+  systems: readonly ElementsHeadRow[],
+  capabilities: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  ownsEdges: readonly RelationshipsHeadRow[],
+): ElementsHeadRow[] {
+  const essentialFunctionIds = new Set(capabilities.filter((c) => attributesRecord(c.attributes).essentialFunction === true).map((c) => c.element_id));
+  if (essentialFunctionIds.size === 0) return [];
+  const supportingSystemIds = new Set(supportsEdges.filter((edge) => essentialFunctionIds.has(edge.to_element_id)).map((edge) => edge.from_element_id));
+  const technicallyOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).role === 'technical').map((edge) => edge.to_element_id));
+  return systems.filter((system) => supportingSystemIds.has(system.element_id) && !technicallyOwnedIds.has(system.element_id));
+}
+
+/**
+ * Prompt 7k item 5's third Assurance finding: "critical systems past or
+ * within 12 months of vendor support end" — a system-level check against
+ * `supportEndsAt`, deliberately distinct from `findCriticalExposedSystems`
+ * above, which reads `plannedEnd` (this estate's own decommission date, not
+ * the vendor's support horizon). Same `monthsUntil`/`STALE_AFTER_MONTHS`
+ * shape: negative once the date is in the past, so an already-lapsed
+ * support date reads as exposed too, not less so.
+ */
+export function findCriticalSystemsPastOrNearSupportEnd(systems: readonly ElementsHeadRow[], now: Date = new Date()): ElementsHeadRow[] {
+  return systems.filter((system) => {
+    const attrs = attributesRecord(system.attributes);
+    if (attrs.criticality !== 'critical') return false;
+    const supportEndsAtValue = attrs.supportEndsAt;
+    if (typeof supportEndsAtValue !== 'string') return false;
+    const supportEndsAt = new Date(supportEndsAtValue);
+    if (Number.isNaN(supportEndsAt.getTime())) return false;
+    return monthsUntil(supportEndsAt, now) <= STALE_AFTER_MONTHS;
+  });
 }
 
 export { STALE_AFTER_MONTHS };

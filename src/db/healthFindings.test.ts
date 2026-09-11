@@ -1,9 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../contracts/rows';
-import { computeSelfOwnedCapabilityIds, computeStaleAttributesFinding, findCapabilitiesWithoutOwner, findSystemsWithoutCapability, findUnlabeledVerbRelationships, isCapabilityOwnedWithAncestry } from './healthFindings';
+import {
+  computeSelfOwnedCapabilityIds,
+  computeStaleAttributesFinding,
+  findBoundaryCrossings,
+  findBoundaryCrossingsMissingClassification,
+  findBoundaryCrossingsMissingClassificationOrVerb,
+  findCapabilitiesWithoutOwner,
+  findCriticalExposedSystems,
+  findCriticalSystemsPastOrNearSupportEnd,
+  findCriticalSystemsWithoutBusinessOwner,
+  findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
+  findSystemsWithoutCapability,
+  findSystemsWithoutTechnicalOwner,
+  findUnlabeledVerbRelationships,
+  findUnusedIntegrationPlatforms,
+  isCapabilityOwnedWithAncestry,
+} from './healthFindings';
 
-function system(id: string): ElementsHeadRow {
-  return { element_id: id, element_type: 'system', name: `System ${id}`, parent_id: null, attributes: {}, exists_delta_id: `delta-${id}` };
+function system(id: string, attributes: Record<string, Json> = {}): ElementsHeadRow {
+  return { element_id: id, element_type: 'system', name: `System ${id}`, parent_id: null, attributes, exists_delta_id: `delta-${id}` };
+}
+
+function container(id: string, parentId: string): ElementsHeadRow {
+  return { element_id: id, element_type: 'container', name: `Container ${id}`, parent_id: parentId, attributes: {}, exists_delta_id: `delta-${id}` };
 }
 
 function capability(id: string, parentId: string | null = null): ElementsHeadRow {
@@ -39,30 +59,30 @@ describe('findSystemsWithoutCapability', () => {
 });
 
 describe('computeSelfOwnedCapabilityIds', () => {
-  it('a capability owned via a supporting system\'s primary owns edge', () => {
+  it('a capability owned via a supporting system\'s business owns edge', () => {
     const capabilities = [capability('cap-1')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
-    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { primary: true })];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
     expect(computeSelfOwnedCapabilityIds(capabilities, supports, owns)).toEqual(new Set(['cap-1']));
   });
 
   it('a capability owned directly (Bug found during Sprint U4-1 B3: owns can target a capability, actor→capability, not only actor→system)', () => {
     const capabilities = [capability('cap-1')];
-    const owns = [relationship('r1', 'owns', 'actor-1', 'cap-1', { primary: true })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'cap-1', { role: 'business' })];
     expect(computeSelfOwnedCapabilityIds(capabilities, [], owns)).toEqual(new Set(['cap-1']));
   });
 
-  it('a non-primary owns relationship does not count, on either target shape', () => {
+  it("a technical- or service-role owns relationship does not count — this finding is specifically business ownership (Prompt 7k item 2)", () => {
     const capabilities = [capability('cap-1'), capability('cap-2')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
-    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { primary: false }), relationship('r3', 'owns', 'actor-1', 'cap-2', { primary: false })];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'technical' }), relationship('r3', 'owns', 'actor-1', 'cap-2', { role: 'service' })];
     expect(computeSelfOwnedCapabilityIds(capabilities, supports, owns)).toEqual(new Set());
   });
 
   it('ownership of an unrelated system does not cover a different capability', () => {
     const capabilities = [capability('cap-1'), capability('cap-2')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
-    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { primary: true })];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
     expect(computeSelfOwnedCapabilityIds(capabilities, supports, owns)).toEqual(new Set(['cap-1']));
   });
 });
@@ -105,29 +125,29 @@ describe('isCapabilityOwnedWithAncestry', () => {
 });
 
 describe('findCapabilitiesWithoutOwner', () => {
-  it('a capability is owned when a supporting system has a primary owns relationship', () => {
+  it('a capability is owned when a supporting system has a business owns relationship', () => {
     const capabilities = [capability('cap-1')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
-    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { primary: true })];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
     expect(findCapabilitiesWithoutOwner(capabilities, supports, owns)).toEqual([]);
   });
 
   it('a capability with a direct owns edge is owned (Bug found during Sprint U4-1 B3)', () => {
     const capabilities = [capability('cap-1')];
-    const owns = [relationship('r1', 'owns', 'actor-1', 'cap-1', { primary: true })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'cap-1', { role: 'business' })];
     expect(findCapabilitiesWithoutOwner(capabilities, [], owns)).toEqual([]);
   });
 
-  it('a capability is unowned when its supporting system has no primary owns relationship', () => {
+  it('a capability is unowned when its supporting system has no business owns relationship', () => {
     const capabilities = [capability('cap-1')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
     expect(findCapabilitiesWithoutOwner(capabilities, supports, [])).toEqual([capability('cap-1')]);
   });
 
-  it('a non-primary owns relationship does not count as ownership', () => {
+  it('a technical-role owns relationship does not count as (business) ownership — Prompt 7k item 2\'s own finding is specifically about a business owner', () => {
     const capabilities = [capability('cap-1')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
-    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { primary: false })];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'technical' })];
     expect(findCapabilitiesWithoutOwner(capabilities, supports, owns)).toEqual([capability('cap-1')]);
   });
 
@@ -138,14 +158,14 @@ describe('findCapabilitiesWithoutOwner', () => {
   it('ownership of an unrelated system does not cover a different capability', () => {
     const capabilities = [capability('cap-1'), capability('cap-2')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
-    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { primary: true })];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
     expect(findCapabilitiesWithoutOwner(capabilities, supports, owns).map((c) => c.element_id)).toEqual(['cap-2']);
   });
 
   it('Sprint U4-1 B3: a child inherits its parent\'s ownership and is not itself listed', () => {
     const root = capability('root');
     const child = capability('child', 'root');
-    const owns = [relationship('r1', 'owns', 'actor-1', 'root', { primary: true })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'root', { role: 'business' })];
     expect(findCapabilitiesWithoutOwner([root, child], [], owns)).toEqual([]);
   });
 
@@ -161,9 +181,83 @@ describe('findCapabilitiesWithoutOwner', () => {
     const root = capability('root'); // owned directly
     const childA = capability('child-a', 'root');
     const childB = capability('child-b', 'root');
-    const owns = [relationship('r1', 'owns', 'actor-1', 'root', { primary: true })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'root', { role: 'business' })];
     const result = findCapabilitiesWithoutOwner([root, childA, childB], [], owns);
     expect(result).toEqual([]);
+  });
+});
+
+describe('findSystemsWithoutTechnicalOwner (Prompt 7k item 2)', () => {
+  it('returns systems with no owns edge carrying role: technical', () => {
+    const systems = [system('sys-1'), system('sys-2')];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'technical' })];
+    expect(findSystemsWithoutTechnicalOwner(systems, owns).map((s) => s.element_id)).toEqual(['sys-2']);
+  });
+
+  it('a business-role owns edge does not count as a technical owner', () => {
+    const systems = [system('sys-1')];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
+    expect(findSystemsWithoutTechnicalOwner(systems, owns).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('is empty when every system has a technical owner', () => {
+    const systems = [system('sys-1')];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'technical' })];
+    expect(findSystemsWithoutTechnicalOwner(systems, owns)).toEqual([]);
+  });
+});
+
+describe('findCriticalSystemsWithoutBusinessOwner (Prompt 7k item 1)', () => {
+  it('returns only critical systems, and only those with no business-role owns edge', () => {
+    const systems = [system('sys-1', { criticality: 'critical' }), system('sys-2', { criticality: 'low' }), system('sys-3', { criticality: 'critical' })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sys-3', { role: 'business' })];
+    expect(findCriticalSystemsWithoutBusinessOwner(systems, owns).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('a technical-role owns edge does not count as a business owner', () => {
+    const systems = [system('sys-1', { criticality: 'critical' })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'technical' })];
+    expect(findCriticalSystemsWithoutBusinessOwner(systems, owns).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('a system with no recorded criticality at all is never flagged', () => {
+    const systems = [system('sys-1')];
+    expect(findCriticalSystemsWithoutBusinessOwner(systems, [])).toEqual([]);
+  });
+
+  it('is empty when every critical system has a business owner', () => {
+    const systems = [system('sys-1', { criticality: 'critical' })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
+    expect(findCriticalSystemsWithoutBusinessOwner(systems, owns)).toEqual([]);
+  });
+});
+
+describe('findCriticalExposedSystems (Prompt 7k item 1)', () => {
+  const now = new Date('2026-06-15T00:00:00Z');
+
+  it('flags a critical system whose plannedEnd falls within STALE_AFTER_MONTHS (12)', () => {
+    const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2027-01-01' })]; // ~6.5 months out
+    expect(findCriticalExposedSystems(systems, now).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('flags a critical system already past its planned end (more exposed, not less)', () => {
+    const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2026-01-01' })];
+    expect(findCriticalExposedSystems(systems, now).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('does not flag a non-critical system with the same near plannedEnd', () => {
+    const systems = [system('sys-1', { criticality: 'medium', plannedEnd: '2027-01-01' })];
+    expect(findCriticalExposedSystems(systems, now)).toEqual([]);
+  });
+
+  it('does not flag a critical system whose plannedEnd is well beyond the 12-month horizon', () => {
+    const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2030-01-01' })];
+    expect(findCriticalExposedSystems(systems, now)).toEqual([]);
+  });
+
+  it('does not flag a critical system with no plannedEnd at all', () => {
+    const systems = [system('sys-1', { criticality: 'critical' })];
+    expect(findCriticalExposedSystems(systems, now)).toEqual([]);
   });
 });
 
@@ -225,12 +319,237 @@ describe('findUnlabeledVerbRelationships (Sprint U4-1 B5)', () => {
   });
 
   it('supports/owns edges are never flagged, labeled or not — this finding is uses/flows_to only', () => {
-    const edges = [relationship('r1', 'supports', 'sys-1', 'sys-2', { role: 'secondary' }), relationship('r2', 'owns', 'sys-1', 'sys-2', { primary: true })];
+    const edges = [relationship('r1', 'supports', 'sys-1', 'sys-2', { role: 'secondary' }), relationship('r2', 'owns', 'sys-1', 'sys-2', { role: 'business' })];
     expect(findUnlabeledVerbRelationships(edges, elementsById)).toEqual([]);
   });
 
   it('falls back to the raw element id when an endpoint is missing from elementsById', () => {
     const edges = [relationship('r1', 'uses', 'sys-1', 'sys-missing')];
     expect(findUnlabeledVerbRelationships(edges, elementsById)).toEqual([{ relationshipId: 'r1', relationshipType: 'uses', fromName: 'System sys-1', toName: 'sys-missing' }]);
+  });
+});
+
+describe('findBoundaryCrossings (Prompt 7k item 3)', () => {
+  it('flags a uses/flows_to edge between an it and an ot system, either direction', () => {
+    const elementsById = new Map([
+      ['sys-it', system('sys-it')],
+      ['sys-ot', system('sys-ot', { domain: 'ot' })],
+    ]);
+    const edges = [relationship('r1', 'uses', 'sys-it', 'sys-ot'), relationship('r2', 'flows_to', 'sys-ot', 'sys-it')];
+    const crossings = findBoundaryCrossings(edges, elementsById);
+    expect(crossings.map((c) => c.relationshipId)).toEqual(['r1', 'r2']);
+    expect(crossings[0]).toMatchObject({ fromDomain: 'it', toDomain: 'ot' });
+  });
+
+  it('does not flag an edge between two it systems, or two ot systems', () => {
+    const elementsById = new Map([
+      ['sys-it-1', system('sys-it-1')],
+      ['sys-it-2', system('sys-it-2')],
+      ['sys-ot-1', system('sys-ot-1', { domain: 'ot' })],
+      ['sys-ot-2', system('sys-ot-2', { domain: 'ot' })],
+    ]);
+    const edges = [relationship('r1', 'uses', 'sys-it-1', 'sys-it-2'), relationship('r2', 'uses', 'sys-ot-1', 'sys-ot-2')];
+    expect(findBoundaryCrossings(edges, elementsById)).toEqual([]);
+  });
+
+  it('a hybrid endpoint never participates in a crossing, on either side', () => {
+    const elementsById = new Map([
+      ['sys-hybrid', system('sys-hybrid', { domain: 'hybrid' })],
+      ['sys-ot', system('sys-ot', { domain: 'ot' })],
+      ['sys-it', system('sys-it')],
+    ]);
+    const edges = [relationship('r1', 'uses', 'sys-hybrid', 'sys-ot'), relationship('r2', 'uses', 'sys-hybrid', 'sys-it')];
+    expect(findBoundaryCrossings(edges, elementsById)).toEqual([]);
+  });
+
+  it('a container endpoint resolves its domain from its parent system', () => {
+    const sys = system('sys-ot', { domain: 'ot' });
+    const cont = container('cont-1', 'sys-ot');
+    const elementsById = new Map([
+      ['sys-ot', sys],
+      ['cont-1', cont],
+      ['sys-it', system('sys-it')],
+    ]);
+    const edges = [relationship('r1', 'uses', 'cont-1', 'sys-it')];
+    const crossings = findBoundaryCrossings(edges, elementsById);
+    expect(crossings).toHaveLength(1);
+    expect(crossings[0]).toMatchObject({ fromDomain: 'ot', toDomain: 'it' });
+  });
+
+  it('supports/owns edges are never crossings, even between it and ot systems', () => {
+    const elementsById = new Map([
+      ['sys-it', system('sys-it')],
+      ['sys-ot', system('sys-ot', { domain: 'ot' })],
+    ]);
+    const edges = [relationship('r1', 'supports', 'sys-it', 'sys-ot')];
+    expect(findBoundaryCrossings(edges, elementsById)).toEqual([]);
+  });
+
+  it('records whether a verb and (for flows_to) a data classification are missing', () => {
+    const elementsById = new Map([
+      ['sys-it', system('sys-it')],
+      ['sys-ot', system('sys-ot', { domain: 'ot' })],
+    ]);
+    const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to', dataClassification: 'official' })];
+    expect(findBoundaryCrossings(edges, elementsById)).toEqual([
+      { relationshipId: 'r1', relationshipType: 'flows_to', fromName: 'System sys-it', toName: 'System sys-ot', fromDomain: 'it', toDomain: 'ot', missingVerb: false, missingDataClassification: false },
+    ]);
+  });
+
+  it('a uses crossing is never flagged for missing data classification — uses has no such attribute', () => {
+    const elementsById = new Map([
+      ['sys-it', system('sys-it')],
+      ['sys-ot', system('sys-ot', { domain: 'ot' })],
+    ]);
+    const edges = [relationship('r1', 'uses', 'sys-it', 'sys-ot', { description: 'polls' })];
+    expect(findBoundaryCrossings(edges, elementsById)[0]).toMatchObject({ missingVerb: false, missingDataClassification: false });
+  });
+});
+
+describe('findBoundaryCrossingsMissingClassificationOrVerb (Prompt 7k item 3)', () => {
+  const elementsById = new Map([
+    ['sys-it', system('sys-it')],
+    ['sys-ot', system('sys-ot', { domain: 'ot' })],
+  ]);
+
+  it('flags a crossing with no verb-phrase label', () => {
+    const edges = [relationship('r1', 'uses', 'sys-it', 'sys-ot')];
+    expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, elementsById).map((c) => c.relationshipId)).toEqual(['r1']);
+  });
+
+  it('flags a flows_to crossing with a verb but no data classification', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to' })];
+    expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, elementsById).map((c) => c.relationshipId)).toEqual(['r1']);
+  });
+
+  it('does not flag a fully-classified crossing', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to', dataClassification: 'official' })];
+    expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, elementsById)).toEqual([]);
+  });
+
+  it('does not flag a non-crossing edge at all, regardless of metadata', () => {
+    const bothIt = new Map([
+      ['sys-it-1', system('sys-it-1')],
+      ['sys-it-2', system('sys-it-2')],
+    ]);
+    const edges = [relationship('r1', 'uses', 'sys-it-1', 'sys-it-2')];
+    expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, bothIt)).toEqual([]);
+  });
+});
+
+describe('findUnusedIntegrationPlatforms (Prompt 7k item 4)', () => {
+  it('flags a kind: integration_platform system with no edge naming it as via', () => {
+    const systems = [system('sys-esb', { kind: 'integration_platform' })];
+    expect(findUnusedIntegrationPlatforms(systems, [])).toEqual([system('sys-esb', { kind: 'integration_platform' })]);
+  });
+
+  it('does not flag a platform that at least one edge routes via', () => {
+    const systems = [system('sys-esb', { kind: 'integration_platform' })];
+    const edges = [relationship('r1', 'flows_to', 'sys-a', 'sys-b', { via: 'sys-esb' })];
+    expect(findUnusedIntegrationPlatforms(systems, edges)).toEqual([]);
+  });
+
+  it('never flags a system whose kind is not integration_platform, whether or not it is used', () => {
+    const systems = [system('sys-app'), system('sys-data', { kind: 'data_platform' })];
+    expect(findUnusedIntegrationPlatforms(systems, [])).toEqual([]);
+  });
+
+  it('a via naming a different platform does not clear this one', () => {
+    const systems = [system('sys-esb-a', { kind: 'integration_platform' }), system('sys-esb-b', { kind: 'integration_platform' })];
+    const edges = [relationship('r1', 'uses', 'sys-a', 'sys-b', { via: 'sys-esb-b' })];
+    expect(findUnusedIntegrationPlatforms(systems, edges).map((s) => s.element_id)).toEqual(['sys-esb-a']);
+  });
+});
+
+describe('findSystemsSupportingEssentialFunctionWithoutTechnicalOwner (Prompt 7k item 5)', () => {
+  it('flags a system supporting an essentialFunction capability with no technical owner', () => {
+    const systems = [system('sys-1')];
+    const capabilities = [{ ...capability('cap-1'), attributes: { essentialFunction: true } }];
+    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
+    expect(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supports, [])).toEqual(systems);
+  });
+
+  it('does not flag it once a technical owner exists', () => {
+    const systems = [system('sys-1')];
+    const capabilities = [{ ...capability('cap-1'), attributes: { essentialFunction: true } }];
+    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'technical' })];
+    expect(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supports, owns)).toEqual([]);
+  });
+
+  it('a business-role owns edge does not count as a technical owner', () => {
+    const systems = [system('sys-1')];
+    const capabilities = [{ ...capability('cap-1'), attributes: { essentialFunction: true } }];
+    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
+    expect(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supports, owns).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('a system supporting a non-essential capability is never flagged, even with no technical owner', () => {
+    const systems = [system('sys-1')];
+    const capabilities = [capability('cap-1')];
+    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
+    expect(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supports, [])).toEqual([]);
+  });
+
+  it('is empty with no capabilities marked essentialFunction at all', () => {
+    const systems = [system('sys-1')];
+    expect(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, [capability('cap-1')], [], [])).toEqual([]);
+  });
+});
+
+describe('findBoundaryCrossingsMissingClassification (Prompt 7k item 5)', () => {
+  const itOt = new Map([
+    ['sys-it', system('sys-it', { domain: 'it' })],
+    ['sys-ot', system('sys-ot', { domain: 'ot' })],
+  ]);
+
+  it('flags a flows_to crossing with a verb but no data classification', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to' })];
+    expect(findBoundaryCrossingsMissingClassification(edges, itOt).map((c) => c.relationshipId)).toEqual(['r1']);
+  });
+
+  it('does not flag a crossing missing only its verb — that is item 3\'s own wider finding, not this one', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { dataClassification: 'official' })];
+    expect(findBoundaryCrossingsMissingClassification(edges, itOt)).toEqual([]);
+  });
+
+  it('does not flag a fully-classified crossing', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to', dataClassification: 'official' })];
+    expect(findBoundaryCrossingsMissingClassification(edges, itOt)).toEqual([]);
+  });
+
+  it('a uses crossing is never flagged — uses has no dataClassification attribute to be missing', () => {
+    const edges = [relationship('r1', 'uses', 'sys-it', 'sys-ot')];
+    expect(findBoundaryCrossingsMissingClassification(edges, itOt)).toEqual([]);
+  });
+});
+
+describe('findCriticalSystemsPastOrNearSupportEnd (Prompt 7k item 5)', () => {
+  const now = new Date('2026-06-15T00:00:00Z');
+
+  it('flags a critical system whose supportEndsAt falls within STALE_AFTER_MONTHS (12)', () => {
+    const systems = [system('sys-1', { criticality: 'critical', supportEndsAt: '2027-01-01' })];
+    expect(findCriticalSystemsPastOrNearSupportEnd(systems, now).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('flags a critical system already past vendor support end (more exposed, not less)', () => {
+    const systems = [system('sys-1', { criticality: 'critical', supportEndsAt: '2026-01-01' })];
+    expect(findCriticalSystemsPastOrNearSupportEnd(systems, now).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('does not flag a non-critical system with the same near supportEndsAt', () => {
+    const systems = [system('sys-1', { criticality: 'medium', supportEndsAt: '2027-01-01' })];
+    expect(findCriticalSystemsPastOrNearSupportEnd(systems, now)).toEqual([]);
+  });
+
+  it('does not flag a critical system whose supportEndsAt is well beyond the 12-month horizon', () => {
+    const systems = [system('sys-1', { criticality: 'critical', supportEndsAt: '2030-01-01' })];
+    expect(findCriticalSystemsPastOrNearSupportEnd(systems, now)).toEqual([]);
+  });
+
+  it('does not flag a critical system with no supportEndsAt at all, even with a near plannedEnd', () => {
+    const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2027-01-01' })];
+    expect(findCriticalSystemsPastOrNearSupportEnd(systems, now)).toEqual([]);
   });
 });

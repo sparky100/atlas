@@ -143,8 +143,8 @@ describe('one worked example per DeltaKind', () => {
       id: 'delta-7',
       relationshipId: 'rel-1',
       relationshipType: 'owns',
-      attribute: 'primary',
-      value: true,
+      attribute: 'role',
+      value: 'technical',
       previousDeltaId: 'delta-6',
       sourceId: 'src-1',
       confidence: 1,
@@ -226,5 +226,253 @@ describe('System/Container introduced and plannedEnd', () => {
     };
     expect(fromDeltaRow(toDeltaRow(create, ctx))).toEqual(create);
     expect(fromDeltaRow(toDeltaRow(update, ctx))).toEqual(update);
+  });
+});
+
+describe('System criticality, hostingModel and hostingProvider (Prompt 7k item 1)', () => {
+  it('are accepted at create, all optional, and survive the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-13',
+      elementId: 'el-3',
+      elementType: 'system',
+      name: 'Payments Gateway',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false, criticality: 'critical', hostingModel: 'saas', hostingProvider: 'Acme Cloud (eu-west-1)' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('can each be set later via an update, with none recorded at create', () => {
+    const create: Delta = {
+      kind: 'element.create',
+      id: 'delta-14',
+      elementId: 'el-4',
+      elementType: 'system',
+      name: 'Legacy Billing',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    const setCriticality: Delta = {
+      kind: 'element.update',
+      id: 'delta-15',
+      elementId: 'el-4',
+      elementType: 'system',
+      attribute: 'criticality',
+      value: 'high',
+      previousDeltaId: 'delta-14',
+      sourceId: 'src-1',
+      confidence: 0.8,
+    };
+    const setHostingModel: Delta = {
+      kind: 'element.update',
+      id: 'delta-16',
+      elementId: 'el-4',
+      elementType: 'system',
+      attribute: 'hostingModel',
+      value: 'on_premises',
+      previousDeltaId: 'delta-15',
+      sourceId: 'src-1',
+      confidence: 0.8,
+    };
+    expect(fromDeltaRow(toDeltaRow(create, ctx))).toEqual(create);
+    expect(fromDeltaRow(toDeltaRow(setCriticality, ctx))).toEqual(setCriticality);
+    expect(fromDeltaRow(toDeltaRow(setHostingModel, ctx))).toEqual(setHostingModel);
+  });
+});
+
+describe('System domain (Prompt 7k item 3)', () => {
+  it('is accepted at create, optional, and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-17',
+      elementId: 'el-5',
+      elementType: 'system',
+      name: 'PLC Controller',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false, domain: 'ot' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('can be set later via an update', () => {
+    const setDomain: Delta = {
+      kind: 'element.update',
+      id: 'delta-18',
+      elementId: 'el-5',
+      elementType: 'system',
+      attribute: 'domain',
+      value: 'hybrid',
+      previousDeltaId: 'delta-17',
+      sourceId: 'src-1',
+      confidence: 0.8,
+    };
+    expect(fromDeltaRow(toDeltaRow(setDomain, ctx))).toEqual(setDomain);
+  });
+});
+
+describe('System kind and relationship via (Prompt 7k item 4)', () => {
+  it('kind is accepted at create, optional, and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-19',
+      elementId: 'el-6',
+      elementType: 'system',
+      name: 'Enterprise Service Bus',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false, kind: 'integration_platform' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('kind can be set later via an update', () => {
+    const setKind: Delta = {
+      kind: 'element.update',
+      id: 'delta-20',
+      elementId: 'el-6',
+      elementType: 'system',
+      attribute: 'kind',
+      value: 'data_platform',
+      previousDeltaId: 'delta-19',
+      sourceId: 'src-1',
+      confidence: 0.8,
+    };
+    expect(fromDeltaRow(toDeltaRow(setKind, ctx))).toEqual(setKind);
+  });
+
+  it('flows_to.via is accepted at create, optional, and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'relationship.create',
+      id: 'delta-21',
+      relationshipId: 'rel-1',
+      relationshipType: 'flows_to',
+      fromElementId: 'el-a',
+      toElementId: 'el-b',
+      attributes: { description: 'sends readings via', via: 'el-6' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('uses.via can be set later via an update, with none recorded at create', () => {
+    const create: Delta = {
+      kind: 'relationship.create',
+      id: 'delta-22',
+      relationshipId: 'rel-2',
+      relationshipType: 'uses',
+      fromElementId: 'el-a',
+      toElementId: 'el-b',
+      attributes: { description: 'polls' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    const setVia: Delta = {
+      kind: 'relationship.update',
+      id: 'delta-23',
+      relationshipId: 'rel-2',
+      relationshipType: 'uses',
+      attribute: 'via',
+      value: 'el-6',
+      previousDeltaId: 'delta-22',
+      sourceId: 'src-1',
+      confidence: 0.9,
+    };
+    expect(fromDeltaRow(toDeltaRow(create, ctx))).toEqual(create);
+    expect(fromDeltaRow(toDeltaRow(setVia, ctx))).toEqual(setVia);
+  });
+});
+
+describe('Capability essentialFunction and system supportEndsAt (Prompt 7k item 5)', () => {
+  it('essentialFunction is accepted at create, optional, and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-24',
+      elementId: 'el-7',
+      elementType: 'capability',
+      name: 'Water Treatment',
+      parentId: null,
+      attributes: { essentialFunction: true },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('essentialFunction can be set later via an update, with none recorded at create', () => {
+    const create: Delta = {
+      kind: 'element.create',
+      id: 'delta-25',
+      elementId: 'el-8',
+      elementType: 'capability',
+      name: 'Meter Reading',
+      parentId: null,
+      attributes: {},
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    const setEssential: Delta = {
+      kind: 'element.update',
+      id: 'delta-26',
+      elementId: 'el-8',
+      elementType: 'capability',
+      attribute: 'essentialFunction',
+      value: true,
+      previousDeltaId: 'delta-25',
+      sourceId: 'src-1',
+      confidence: 0.9,
+    };
+    expect(fromDeltaRow(toDeltaRow(create, ctx))).toEqual(create);
+    expect(fromDeltaRow(toDeltaRow(setEssential, ctx))).toEqual(setEssential);
+  });
+
+  it('supportEndsAt is accepted at create, optional, and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-27',
+      elementId: 'el-9',
+      elementType: 'system',
+      name: 'SCADA Historian',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false, criticality: 'critical', supportEndsAt: '2026-12-31' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('supportEndsAt can be set later via an update, distinct from plannedEnd', () => {
+    const create: Delta = {
+      kind: 'element.create',
+      id: 'delta-28',
+      elementId: 'el-10',
+      elementType: 'system',
+      name: 'Billing Mainframe',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false, plannedEnd: '2030-01-01' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    const setSupportEndsAt: Delta = {
+      kind: 'element.update',
+      id: 'delta-29',
+      elementId: 'el-10',
+      elementType: 'system',
+      attribute: 'supportEndsAt',
+      value: '2027-06-30',
+      previousDeltaId: 'delta-28',
+      sourceId: 'src-1',
+      confidence: 0.8,
+    };
+    expect(fromDeltaRow(toDeltaRow(create, ctx))).toEqual(create);
+    expect(fromDeltaRow(toDeltaRow(setSupportEndsAt, ctx))).toEqual(setSupportEndsAt);
   });
 });

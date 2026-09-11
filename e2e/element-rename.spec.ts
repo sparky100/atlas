@@ -70,20 +70,20 @@ test('element rename: no standalone "Rename" control; the header menu opens it i
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${capabilityId}`);
   await expect(page.getByRole('heading', { name: 'Finance' })).toBeVisible();
 
-  // No stray control between Edit and Attributes: "Retract" (a leaf
-  // capability, so it's offered) is there alone — no "Rename" button
-  // sitting alongside it any more. The one "Rename" control left is
-  // inside the header's own overflow menu, CSS-hidden (same collapsed-
-  // by-default shape as "Copy element ID", D1's own menu item) until
-  // that menu opens — checked by visibility, not DOM presence, since
-  // it's still in the DOM either way.
-  await expect(page.getByRole('button', { name: 'Retract' })).toBeVisible();
+  // No stray control between Edit and Attributes at all any more (Prompt
+  // 7k item 5 folded the old standalone "Retract" button into this same
+  // header menu, generalised to "Remove from model…") — "Rename" is
+  // CSS-hidden (same collapsed-by-default shape as "Copy element ID", D1's
+  // own menu item) until the menu opens, checked by visibility, not DOM
+  // presence, since it's still in the DOM either way.
   const renameMenuItem = page.getByRole('button', { name: 'Rename', exact: true });
   await expect(renameMenuItem).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove from model…' })).not.toBeVisible();
 
-  // The header menu is where it lives now.
+  // The header menu is where both live now.
   await page.getByRole('button', { name: 'Element actions' }).click();
   await expect(renameMenuItem).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove from model…' })).toBeVisible();
   await renameMenuItem.click();
 
   // Picking it swaps the static h1 for an inline input, right where the

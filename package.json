@@ -32,6 +32,7 @@
     "check:case-collisions": "tsx scripts/checkCaseCollisions.ts",
     "backfill:commit-titles": "tsx scripts/backfillCommitTitles.ts",
     "backfill:capability-order": "tsx scripts/backfillCapabilityOrder.ts",
+    "backfill:owns-role": "tsx scripts/backfillOwnsRole.ts",
     "sync:descriptions": "tsx scripts/syncDescriptionsFromMap.ts",
     "strip:seed-codes": "tsx scripts/stripSeedCodes.ts"
   },

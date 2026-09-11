@@ -29,8 +29,21 @@ export type ThemePreference = (typeof THEME_PREFERENCES)[number];
  * already establish for this table's other columns — a UI-layer file
  * shouldn't be what a storage contract depends on.
  */
-export const CAPABILITY_MAP_COLOUR_BY_MODES = ['none', 'metric:supportingSystemCount', 'metric:oldestLifecycleStage', 'metric:lifecycleExposure'] as const;
+export const CAPABILITY_MAP_COLOUR_BY_MODES = ['none', 'metric:supportingSystemCount', 'metric:oldestLifecycleStage', 'metric:lifecycleExposure', 'metric:criticality', 'metric:otShare'] as const;
 export type CapabilityMapColourByMode = (typeof CAPABILITY_MAP_COLOUR_BY_MODES)[number];
+
+/**
+ * Prompt 7k item 1: the landscape's own colour-by mode — a sibling column,
+ * not a second value crammed into `capabilityMapColourBy`, since the two
+ * canvases can show different modes at once (a landscape tile is a
+ * system; a capability-map tile is a capability, whose own "criticality"
+ * is a worst-of aggregate over its supporting systems — the same value,
+ * read two different ways, per `src/ui/capabilityMap/metrics.ts`'s own
+ * module comment on why `hostingModel` colour-by is landscape-only:
+ * hosting model has no "worst of" a capability could aggregate to).
+ */
+export const LANDSCAPE_COLOUR_BY_MODES = ['none', 'metric:criticality', 'metric:hostingModel', 'metric:domain'] as const;
+export type LandscapeColourByMode = (typeof LANDSCAPE_COLOUR_BY_MODES)[number];
 
 export const DEFAULT_DENSITY: DensityPreference = 'comfortable';
 export const DEFAULT_THEME: ThemePreference = 'system';
@@ -52,6 +65,15 @@ export interface UserPreferences {
    * deliberately, not an oversight.
    */
   capabilityMapColourBy: CapabilityMapColourByMode | null;
+  /**
+   * `null` means no explicit choice has ever been saved, same reasoning as
+   * `capabilityMapColourBy` — the landscape has no model-aware default to
+   * fall back to yet (Prompt 7k item 1 ships only `'none'` as the
+   * behaviour when unset), but the column is nullable for the same
+   * "context this table alone doesn't have" reason, not because a default
+   * is pending.
+   */
+  landscapeColourBy: LandscapeColourByMode | null;
   /** ISO 8601 timestamp; DB-assigned, never client-chosen. */
   updatedAt: string;
 }
@@ -63,6 +85,7 @@ export interface UserPreferencesRow {
   density: DensityPreference;
   theme: ThemePreference;
   capability_map_colour_by: CapabilityMapColourByMode | null;
+  landscape_colour_by: LandscapeColourByMode | null;
   updated_at: string;
 }
 
@@ -73,6 +96,7 @@ export function toUserPreferencesRow(prefs: UserPreferences): UserPreferencesRow
     density: prefs.density,
     theme: prefs.theme,
     capability_map_colour_by: prefs.capabilityMapColourBy,
+    landscape_colour_by: prefs.landscapeColourBy,
     updated_at: prefs.updatedAt,
   };
 }
@@ -84,6 +108,7 @@ export function fromUserPreferencesRow(row: UserPreferencesRow): UserPreferences
     density: row.density,
     theme: row.theme,
     capabilityMapColourBy: row.capability_map_colour_by,
+    landscapeColourBy: row.landscape_colour_by,
     updatedAt: row.updated_at,
   };
 }
@@ -105,6 +130,7 @@ export function defaultUserPreferences(userId: UUID, isOwnerOrArchitect: boolean
     density: DEFAULT_DENSITY,
     theme: DEFAULT_THEME,
     capabilityMapColourBy: null,
+    landscapeColourBy: null,
     updatedAt: new Date(0).toISOString(),
   };
 }

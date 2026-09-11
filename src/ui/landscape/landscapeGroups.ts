@@ -24,7 +24,7 @@
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
-import { EXTERNAL_LANE_KEY, groupSystemsByLane, UNASSIGNED_LANE_KEY, type LandscapeLaneRegion } from './layout';
+import { EXTERNAL_LANE_KEY, groupSystemsByLane, OT_ZONE_LANE_KEY, PLATFORM_BAND_KEY, UNASSIGNED_LANE_KEY, type LandscapeLaneRegion } from './layout';
 
 export interface LandscapeGroupMember {
   system: ElementsHeadRow;
@@ -89,7 +89,7 @@ export function computeLandscapeGroups(
   }
 
   function buildGroup(key: string, region: LandscapeLaneRegion): LandscapeGroup {
-    const label = key === EXTERNAL_LANE_KEY ? 'External' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
+    const label = key === EXTERNAL_LANE_KEY ? 'External' : key === OT_ZONE_LANE_KEY ? 'OT' : key === PLATFORM_BAND_KEY ? 'Platforms' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
     const members: LandscapeGroupMember[] = (byLane.get(key) ?? []).map((system) => {
       const extraLaneCount = extraLaneCountByElementId.get(system.element_id);
       const usesCount = usesCountByElementId.get(system.element_id) ?? 0;
@@ -100,7 +100,7 @@ export function computeLandscapeGroups(
     return { key, label, region, members, referencedBy };
   }
 
-  const groups: LandscapeGroup[] = boundaryKeys.map((key) => buildGroup(key, key === UNASSIGNED_LANE_KEY ? 'unassigned' : 'capability'));
+  const groups: LandscapeGroup[] = boundaryKeys.map((key) => buildGroup(key, key === UNASSIGNED_LANE_KEY ? 'unassigned' : key === OT_ZONE_LANE_KEY ? 'ot' : key === PLATFORM_BAND_KEY ? 'platform' : 'capability'));
   if (hasExternalLane) groups.push(buildGroup(EXTERNAL_LANE_KEY, 'external'));
 
   return { actors: [...actors].sort(byNameThenId), groups };

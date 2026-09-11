@@ -63,6 +63,7 @@ function InlineSupportsPicker({ system, config, searchCommitId }: { system: { el
       slot={{ relationshipType: 'supports', targetTypes: ['capability'] }}
       direction="outbound"
       elementId={system.elementId}
+      elementType="system"
       elementName={system.name}
       existingRows={[]}
       relationshipFacts={new Map()}
