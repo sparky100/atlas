@@ -1,7 +1,8 @@
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { useAuth } from '../auth/useAuth';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Chip } from '../components/Chip/Chip';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { ModelList } from '../components/ModelList/ModelList';
 import { OrgSwitcher } from '../components/OrgSwitcher/OrgSwitcher';
 import { Text } from '../components/Text/Text';
@@ -19,6 +20,12 @@ export function OrgHome() {
   const { organisation, loading: orgLoading, error: orgError } = useOrganisationBySlug(orgSlug ?? '');
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { models, loading: modelsLoading, createModel } = useModels(organisation?.id ?? null);
+  // Sprint 7j item 1/3: "hidden from lists" plus item 3's own collapsed
+  // "Archived" section — one fetch (`listModelsForOrg`, deliberately
+  // unfiltered so every route can still resolve an archived model
+  // directly — that function's own comment), split here for display.
+  const activeModels = models.filter((m) => m.archived_at === null);
+  const archivedModels = models.filter((m) => m.archived_at !== null);
 
   if (orgLoading) {
     return (
@@ -59,7 +66,7 @@ export function OrgHome() {
         </Text>
         <ModelList
           orgSlug={organisation.slug}
-          models={models}
+          models={activeModels}
           loading={modelsLoading}
           canCreate={canCreateModel(role)}
           onCreate={async (name, slug) => {
@@ -67,6 +74,20 @@ export function OrgHome() {
             await createModel(name, slug, userId);
           }}
         />
+        {archivedModels.length > 0 && (
+          <CollapsibleSection title="Archived" meta={`(${String(archivedModels.length)})`} defaultOpen={false}>
+            <ul className={styles.archivedList}>
+              {archivedModels.map((model) => (
+                <li key={model.id}>
+                  <Link to={`/o/${organisation.slug}/m/${model.slug}`} className={styles.archivedRow}>
+                    <Text as="span">{model.name}</Text>
+                    <Chip tone="neutral">Archived</Chip>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CollapsibleSection>
+        )}
       </main>
     </div>
   );

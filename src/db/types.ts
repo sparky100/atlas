@@ -40,6 +40,8 @@ export interface ModelRow {
   schema_version: number;
   created_by: UUID;
   created_at: string;
+  /** Sprint 7j item 1: set by `atlas.archive_model`, cleared by `atlas.restore_model` — see that migration's own comment. */
+  archived_at: string | null;
 }
 
 export type BranchKind = 'main' | 'change' | 'capture_draft';

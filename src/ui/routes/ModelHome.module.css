@@ -16,3 +16,69 @@
 .doorLinks {
   margin: var(--space-2) 0 var(--space-6);
 }
+
+/*
+ * Sprint 7j item 1: "Entry from the model home overflow menu." Same
+ * always-collapsed menuWrapper/menuToggle/menu/menuItem pattern
+ * ElementHeader.module.css's own overflow menu already uses — copied, not
+ * imported, since that component is element-scoped and this one isn't.
+ */
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.menuWrapper {
+  position: relative;
+}
+
+.menuToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--row-height);
+  width: var(--row-height);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.1em;
+  cursor: pointer;
+}
+
+.menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--surface-raised-shadow);
+  min-width: 180px;
+  z-index: 10;
+}
+
+.menu.open {
+  display: flex;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  cursor: pointer;
+  text-align: left;
+}
+
+.menuItem:hover {
+  background: var(--bg-subtle);
+}

@@ -75,3 +75,23 @@ export function canReviewMergeRequest(role: MemberRole | null): boolean {
 export function canApproveOrMergeRequest(role: MemberRole | null): boolean {
   return canEditOnMain(role);
 }
+
+/** Sprint 7j item 1: mirrors `atlas.archive_model`'s own role check — rename/slug/description and Archive share this gate (`models_update`'s RLS, owner/architect). */
+export function canArchiveModel(role: MemberRole | null): boolean {
+  return canEditOnMain(role);
+}
+
+/** Narrower than archive — mirrors `atlas.restore_model`'s own role check ("Restore for owners", the prompt's own wording). */
+export function canRestoreModel(role: MemberRole | null): boolean {
+  return role === 'owner';
+}
+
+/** Mirrors `models_delete`'s RLS and `atlas.delete_model`'s own role check — owner only, same floor as restore. */
+export function canDeleteModel(role: MemberRole | null): boolean {
+  return role === 'owner';
+}
+
+/** Sprint 7j item 2: mirrors `organisations_update`/`organisations_delete` and `members_insert`/`members_update`'s RLS — organisation rename/slug, member directory management (role change, remove, invite) and Delete organisation are all owner-only. */
+export function canManageOrgSettings(role: MemberRole | null): boolean {
+  return role === 'owner';
+}
