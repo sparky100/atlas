@@ -9,17 +9,26 @@
 
 /**
  * Sprint U4-2a item 5: "canvas routes fill the viewport (rail to right
- * edge, full height below header); Fit computed against that box." Only
- * applied while the canvas itself is actually rendered (`LandscapePage.tsx`'s
- * own `hasCanvas`) — the loading/error/empty states keep `.main`'s
- * ordinary centred column, since there's no diagram yet to give the width
- * to. Drops the centred max-width so `.main` (already `flex: 1` from
+ * edge, full height below header); Fit computed against that box." Drops
+ * the centred max-width so `.main` (already `flex: 1` from
  * `ModelNav.module.css`'s `.body > main` rule) reaches the rail's own
  * right edge, and fixes its height to exactly the viewport minus the app
  * header, so the canvas wrapper below (itself `flex: 1`, no more
  * hardcoded `height: 520`) fills every remaining pixel — `LandscapeCanvas.tsx`'s
  * `computeFitTransform` reads that real box on mount/resize, never an
  * arbitrary constant.
+ *
+ * Applied whenever the canvas *can* render at this viewport width (desktop,
+ * `LandscapePage.tsx`'s own `canvasWidthClass`) — deliberately NOT gated on
+ * whether it's actually showing content this instant (loading/error/empty
+ * keep this class too). Item 7's `useCanvasWidth` measures this exact
+ * element and feeds the result back into the layout width hint that
+ * decides whether the canvas renders at all; gating this class on load
+ * state used to flip it on every loading→ready transition, resizing
+ * `<main>` and re-triggering the very reload that flips it again — an
+ * infinite loop. Keying it on viewport width alone keeps `<main>`'s width
+ * stable across every load state, since mobile never shows the canvas
+ * regardless of content.
  */
 .mainWithCanvas {
   max-width: none;

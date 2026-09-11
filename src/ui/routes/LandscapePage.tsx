@@ -71,12 +71,13 @@ import styles from './LandscapePage.module.css';
  * *content* renderer mounts below the header — `LandscapeMobileList` (a
  * collapsible list, `landscapeGroups.ts`'s own module comment has the full
  * grouping rules) instead of `LandscapeCanvas`, never both. The desktop
- * canvas itself, and everything about it (`hasContent`'s `.mainWithCanvas`
- * full-width treatment, `useUnresolvedCommentCounts`, the comments panel),
- * stays exactly as it was — the list is a second renderer for the same
- * `state.data`, not a replacement, and doesn't need any of that (no
- * pixels, no viewport culling, no worker), so it renders inside the
- * page's ordinary centred column instead.
+ * canvas itself, and everything about it (the `.mainWithCanvas` full-width
+ * treatment — keyed on viewport width alone, see `canvasWidthClass` below
+ * — `useUnresolvedCommentCounts`, the comments panel), stays exactly as it
+ * was — the list is a second renderer for the same `state.data`, not a
+ * replacement, and doesn't need any of that (no pixels, no viewport
+ * culling, no worker), so it renders inside the page's ordinary centred
+ * column instead.
  */
 export function LandscapePage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
@@ -203,20 +204,31 @@ export function LandscapePage() {
     </>
   );
 
-  // Sprint U4-2a item 5: "canvas routes fill the viewport" — only once the
-  // canvas itself is actually rendered (see the same condition below); the
-  // loading/error/empty states keep the ordinary centred-column `.main`.
-  // Item 13: never on mobile — the list renders inside the ordinary column,
-  // full-width treatment is a canvas-specific need this content doesn't have.
+  // Sprint U4-2a item 5: "canvas routes fill the viewport" — only where the
+  // canvas *can* render at this viewport width. Item 13: never on mobile —
+  // the list renders inside the ordinary column, full-width treatment is a
+  // canvas-specific need this content doesn't have.
   const hasContent = state.status === 'ready' && (state.data.layout.nodes.length > 0 || state.data.layout.actorNodes.length > 0);
   const showCanvas = hasContent && !narrow;
+  // Item 7 regression fix: the CSS-class decision below must NOT depend on
+  // `hasContent` (load state), unlike `showCanvas` above (correct for
+  // deciding *what renders*). `<main>` is the element `canvasWidthRef`
+  // measures, and that measurement feeds `useLandscape`'s `layoutWidthHint`
+  // — itself one of that hook's own effect dependencies. Coupling the class
+  // to `hasContent` meant every loading→ready transition flipped the class,
+  // resized `<main>`, re-fired the `ResizeObserver`, and re-triggered the
+  // very reload that flips `hasContent` again: an infinite loop (confirmed
+  // live — the page never finished loading). Keying the class on `!narrow`
+  // alone keeps `<main>`'s width stable across loading/ready/error/empty,
+  // since the canvas is never shown on mobile regardless of content.
+  const canvasWidthClass = !narrow;
 
   return (
     <div>
       <AppHeader />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
-        <main ref={canvasWidthRef} className={[styles.main, showCanvas ? styles.mainWithCanvas : ''].filter(Boolean).join(' ')}>
+        <main ref={canvasWidthRef} className={[styles.main, canvasWidthClass ? styles.mainWithCanvas : ''].filter(Boolean).join(' ')}>
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}

@@ -7,11 +7,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * own containing block once it's showing (`LandscapePage.module.css`'s
  * `.mainWithCanvas` comment: `<main>` reaches the rail's own right edge
  * there) — `<main>` is rendered in every state (loading/ready/error), so a
- * width is available before the canvas itself ever mounts, and updates
- * again (via the same `ResizeObserver`) the moment `.mainWithCanvas`
- * actually applies once data is ready, converging on the real figure
- * within a layout tick or two rather than needing the canvas element
- * itself to exist first.
+ * width is available before the canvas itself ever mounts.
+ *
+ * `LandscapePage.tsx` applies `.mainWithCanvas` based on viewport width
+ * alone (`!narrow`), never on load state — deliberately, since this same
+ * `ResizeObserver`'s measurement feeds back into the layout width hint
+ * that helps decide what's shown. Gating the class on load state used to
+ * mean converging on a real figure never actually converged: every
+ * loading→ready transition flipped the class, resized `<main>`, re-fired
+ * this observer, and re-triggered the very reload that flips the class
+ * again — an infinite loop (the regression this comment now warns
+ * against). With the class stable across load states, `<main>` only
+ * resizes on an actual viewport change, so this observer only fires again
+ * then.
  *
  * Rounded to the nearest `bucketPx` (default 40 — a third of a tile's own
  * 160+24 column stride, small enough not to visibly under-fill a row, big
