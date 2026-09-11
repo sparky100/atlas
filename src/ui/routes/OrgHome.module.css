@@ -4,6 +4,19 @@
   margin: 0 auto;
 }
 
+/* Sprint 7j item 2: the small settings affordance beside OrgSwitcher's select. */
+.orgSettingsLink {
+  display: flex;
+  align-items: center;
+  height: var(--row-height);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.orgSettingsLink:hover {
+  background: var(--bg-subtle);
+}
+
 .title {
   display: flex;
   align-items: center;

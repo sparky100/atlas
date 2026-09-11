@@ -6,7 +6,7 @@ import { CollapsibleSection } from '../components/CollapsibleSection/Collapsible
 import { ModelList } from '../components/ModelList/ModelList';
 import { OrgSwitcher } from '../components/OrgSwitcher/OrgSwitcher';
 import { Text } from '../components/Text/Text';
-import { canCreateModel, useMembership } from '../orgs/useMembership';
+import { canCreateModel, canManageOrgSettings, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { useOrganisations } from '../orgs/useOrganisations';
 import { useModels } from '../models/useModels';
@@ -53,6 +53,17 @@ export function OrgHome() {
     <div>
       <AppHeader>
         <OrgSwitcher organisations={organisations} currentOrgSlug={organisation.slug} />
+        {canManageOrgSettings(role) && (
+          // Sprint 7j item 2: "a small settings affordance beside
+          // OrgSwitcher.tsx's existing <select>" — the select stays for
+          // switching organisations; this is a separate, small link to
+          // `/o/:org/settings`, not a replacement for it.
+          <Link to={`/o/${organisation.slug}/settings`} className={styles.orgSettingsLink}>
+            <Text as="span" size="sm">
+              Org settings
+            </Text>
+          </Link>
+        )}
       </AppHeader>
       <main className={styles.main}>
         <div className={styles.title}>
