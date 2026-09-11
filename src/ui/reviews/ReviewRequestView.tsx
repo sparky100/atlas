@@ -4,7 +4,7 @@ import { CardComments } from '../components/CardComments/CardComments';
 import { Chip } from '../components/Chip/Chip';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
-import { useUnresolvedCommentCounts } from '../comments/useUnresolvedCommentCounts';
+import { useThreadCounts } from '../comments/useThreadCounts';
 import { canApproveOrMergeRequest, canReviewMergeRequest, useMembership } from '../orgs/useMembership';
 import { useAuth } from '../auth/useAuth';
 import { branchStatusTone } from '../changes/branchStatus';
@@ -57,7 +57,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId }: ReviewRequ
   const cardSubjectIds = readyReview
     ? [...new Set(readyReview.classification.findings.map((f) => f.subjectId).concat(readyReview.classification.clean))]
     : [];
-  const unresolvedState = useUnresolvedCommentCounts(modelId, cardSubjectIds);
+  const threadCountsState = useThreadCounts(modelId, cardSubjectIds);
 
   if (rr.state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (rr.state.status === 'error') return <Text as="p">{rr.state.message}</Text>;
@@ -72,8 +72,8 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId }: ReviewRequ
   const canApproveNow = !classification.hasBlockingConflict && threeWay.upToDateWithMain && canApproveOrMerge && request.status === 'pending';
 
   const heads = [threeWay.ours, threeWay.theirs, threeWay.base];
-  const unresolvedCounts = unresolvedState.status === 'ready' ? unresolvedState.counts : undefined;
-  const totalUnresolved = unresolvedCounts ? [...unresolvedCounts.values()].reduce((sum, n) => sum + n, 0) : 0;
+  const threadCounts = threadCountsState.status === 'ready' ? threadCountsState.counts : undefined;
+  const totalUnresolved = threadCounts ? [...threadCounts.values()].reduce((sum, c) => sum + c.open, 0) : 0;
 
   function renderCardComments(subjectId: UUID) {
     return (
@@ -85,7 +85,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId }: ReviewRequ
         anchorType={subjectAnchorType(heads, subjectId)}
         anchorId={subjectId}
         branchId={branch.id}
-        unresolvedCount={unresolvedCounts?.get(subjectId)}
+        unresolvedCount={threadCounts?.get(subjectId)?.open}
       />
     );
   }

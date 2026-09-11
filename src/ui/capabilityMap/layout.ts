@@ -184,3 +184,15 @@ export function computeCapabilityMapTree(capabilities: readonly ElementsHeadRow[
 
   return { l1, orphans: orphans.sort(compareCapabilities) };
 }
+
+/**
+ * Every L2/L3 capability id in the tree — the ones that actually render as
+ * a `CapabilityTile` (`CapabilityMapView.tsx`'s own module comment: L1 is
+ * a column header, not a tile, so it doesn't participate in colour-by and
+ * doesn't carry a comment marker either, M1 close-out item 2). Used to
+ * batch-fetch thread counts for exactly the tiles a marker could appear
+ * on, not the whole tree.
+ */
+export function tileCapabilityIds(tree: CapabilityMapTree): UUID[] {
+  return tree.l1.flatMap((column) => column.l2.flatMap((card) => [card.capability.element_id, ...card.l3.map((leaf) => leaf.element_id)]));
+}

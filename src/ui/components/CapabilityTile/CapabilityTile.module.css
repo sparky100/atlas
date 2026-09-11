@@ -100,3 +100,41 @@
   position: relative;
   z-index: 1;
 }
+
+/* M1 close-out item 2: the same bottom-right "ink plate" corner rule the
+   landscape canvas draws (`LandscapeCanvas.tsx`'s own comment on
+   `commentMarkers`/`hollowCommentMarkers`) — a DOM button here rather than
+   a canvas draw call, since this tile is plain DOM/CSS to begin with
+   (`CapabilityMapView.tsx`'s own module comment on why the map isn't
+   Canvas). `position: absolute` lifts it above `.primaryLink`'s own
+   stretched-link overlay the same way `.secondary` above does — DOM order
+   after `.primaryLink` decides the paint order between two positioned
+   siblings at the same (default) stacking level, so this only needs to
+   come later in the markup, not a z-index bump to match `.secondary`'s. */
+.commentMarker {
+  position: absolute;
+  right: var(--space-1);
+  bottom: var(--space-1);
+  min-width: 18px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 2px;
+  border: none;
+  font-size: var(--text-xs-size);
+  line-height: 16px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.commentMarker[data-state='ink'] {
+  background: var(--text);
+  color: var(--surface-raised);
+}
+
+/* All threads resolved: background reverts to the surface, border/no fill
+   reads as the ~45% ink `docs/HANDOFF-M1b-comments.md` describes for this
+   state — outline only, same as the landscape canvas's own hollow plate. */
+.commentMarker[data-state='hollow'] {
+  background: transparent;
+  border: 1px solid var(--text-muted);
+}

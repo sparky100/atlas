@@ -11,7 +11,7 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
-import { useUnresolvedCommentCounts } from '../comments/useUnresolvedCommentCounts';
+import { useThreadCounts } from '../comments/useThreadCounts';
 import { useModels } from '../models/useModels';
 import { canEditBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -72,7 +72,7 @@ import styles from './LandscapePage.module.css';
  * collapsible list, `landscapeGroups.ts`'s own module comment has the full
  * grouping rules) instead of `LandscapeCanvas`, never both. The desktop
  * canvas itself, and everything about it (`hasContent`'s `.mainWithCanvas`
- * full-width treatment, `useUnresolvedCommentCounts`, the comments panel),
+ * full-width treatment, `useThreadCounts`, the comments panel),
  * stays exactly as it was — the list is a second renderer for the same
  * `state.data`, not a replacement, and doesn't need any of that (no
  * pixels, no viewport culling, no worker), so it renders inside the
@@ -133,8 +133,15 @@ export function LandscapePage() {
   const [commentsPanelElementId, setCommentsPanelElementId] = useState<UUID | null>(null);
   const [autoFocusComposer, setAutoFocusComposer] = useState(false);
   const anchorIds = state.status === 'ready' ? [...state.data.systemsById.keys()] : [];
-  const unresolvedState = useUnresolvedCommentCounts(model?.id ?? null, anchorIds);
-  const unresolvedCounts = unresolvedState.status === 'ready' ? unresolvedState.counts : undefined;
+  const threadCountsState = useThreadCounts(model?.id ?? null, anchorIds);
+  const threadCounts = threadCountsState.status === 'ready' ? threadCountsState.counts : undefined;
+  // M1 close-out item 1's own "per-session 'comments on this view' filter"
+  // — plain component state, not `user_preferences` or anything else
+  // persisted server-side: it resets on every fresh visit to this page
+  // (a new tab, a reload), the same "per session" scope `reorderMode`
+  // (CapabilityMapPage.tsx) already gives a view-only toggle that isn't
+  // worth carrying across visits.
+  const [commentsOnlyFilter, setCommentsOnlyFilter] = useState(false);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -227,6 +234,23 @@ export function LandscapePage() {
           <Text as="h1" size="2xl" className={styles.title}>
             Landscape{capability ? `: systems supporting ${capability.name}` : ''}
           </Text>
+          {/* M1 close-out item 1: "the per-session 'comments on this view' filter" — desktop canvas only (mobile's own list carries no comment wiring yet, item 13's own comment above); toggled independently of `+ Add`, so it's its own `.actions` group rather than folded into `addControls`. */}
+          {state.status === 'ready' && showCanvas && (
+            <div className={styles.actions}>
+              <label className={styles.commentsOnlyToggle}>
+                <input
+                  type="checkbox"
+                  checked={commentsOnlyFilter}
+                  onChange={(e) => {
+                    setCommentsOnlyFilter(e.target.checked);
+                  }}
+                />
+                <Text as="span" size="sm" tone="muted">
+                  Comments on this view
+                </Text>
+              </label>
+            </div>
+          )}
           {state.status === 'ready' && !narrow && addControls && <div className={styles.actions}>{addControls}</div>}
           {state.status === 'ready' && narrow && canAdd && (
             <div className={styles.actions}>
@@ -304,7 +328,8 @@ export function LandscapePage() {
               nodeHref={nodeHref}
               actorHref={elementHref}
               capabilityHref={capabilityHref}
-              unresolvedCommentCounts={unresolvedCounts}
+              threadCounts={threadCounts}
+              commentsOnlyFilter={commentsOnlyFilter}
               onCommentMarkerClick={(elementId) => {
                 setCommentsPanelElementId(elementId);
                 setAutoFocusComposer(false);
@@ -331,7 +356,7 @@ export function LandscapePage() {
                 anchorType="element"
                 anchorId={commentsPanelElementId}
                 subjectName={state.data.systemsById.get(commentsPanelElementId)?.name ?? ''}
-                unresolvedCount={unresolvedCounts?.get(commentsPanelElementId) ?? 0}
+                unresolvedCount={threadCounts?.get(commentsPanelElementId)?.open ?? 0}
                 branchId={ref.kind === 'branch' ? (editingBranch?.id ?? null) : null}
                 viewKind="landscape"
                 autoFocusComposer={autoFocusComposer}

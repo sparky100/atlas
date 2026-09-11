@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareCapabilities, computeCapabilityMapTree, nextSiblingOrder } from './layout';
+import { compareCapabilities, computeCapabilityMapTree, nextSiblingOrder, tileCapabilityIds } from './layout';
 import type { ElementsHeadRow } from '../../contracts/rows';
 
 function capability(id: string, name: string, parentId: string | null, code?: string): ElementsHeadRow {
@@ -139,5 +139,38 @@ describe('nextSiblingOrder (Sprint U4-1 C1)', () => {
   it('an unresolvable parentId (not a real L1/L2 in this tree) has no siblings to consider — always 1', () => {
     const tree = computeCapabilityMapTree([withOrder('a', 'Alpha', null, 10)]);
     expect(nextSiblingOrder(tree, 'does-not-exist')).toBe(1);
+  });
+});
+
+describe('tileCapabilityIds (M1 close-out item 2)', () => {
+  it('returns every L2 and L3 id, in tree order, but never an L1 id — L1 is a column header, not a CapabilityTile', () => {
+    const tree = computeCapabilityMapTree([
+      capability('l1', 'Root', null),
+      capability('l2', 'Mid', 'l1'),
+      capability('l3', 'Leaf', 'l2'),
+    ]);
+    expect(tileCapabilityIds(tree)).toEqual(['l2', 'l3']);
+  });
+
+  it('an L1 with no L2 children contributes nothing', () => {
+    const tree = computeCapabilityMapTree([capability('l1', 'Root', null)]);
+    expect(tileCapabilityIds(tree)).toEqual([]);
+  });
+
+  it('flattens across every L1 column, and every L2 sibling within one', () => {
+    const tree = computeCapabilityMapTree([
+      capability('l1-a', 'A', null),
+      capability('l2-a1', 'A1', 'l1-a'),
+      capability('l2-a2', 'A2', 'l1-a'),
+      capability('l1-b', 'B', null),
+      capability('l2-b1', 'B1', 'l1-b'),
+    ]);
+    expect(tileCapabilityIds(tree)).toEqual(['l2-a1', 'l2-a2', 'l2-b1']);
+  });
+
+  it('an orphan (broken/too-deep parent chain) is never a tile either', () => {
+    const tree = computeCapabilityMapTree([capability('orphan', 'Orphan', 'missing-parent')]);
+    expect(tree.orphans.map((c) => c.element_id)).toEqual(['orphan']);
+    expect(tileCapabilityIds(tree)).toEqual([]);
   });
 });

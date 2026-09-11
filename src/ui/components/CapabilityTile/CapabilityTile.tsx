@@ -24,6 +24,18 @@ export interface CapabilityTileProps {
    * readers handle unreliably even for a `<button>`.
    */
   children?: ReactNode;
+  /**
+   * M1 close-out item 2: "markers on tiles (bottom-right, same rule)" —
+   * `docs/HANDOFF-M1b-comments.md`'s corner rule ("on every tile type this
+   * design touches") extended from the landscape's own nodes to this
+   * shared tile, the same component both L2 cards and L3 tiles already
+   * use. `'ink'` (at least one open thread) or `'hollow'` (every thread
+   * resolved) — omitted entirely for a tile with no comment thread at
+   * all, the same convention every other optional badge here follows.
+   */
+  commentMarker?: { state: 'ink'; count: number } | { state: 'hollow' } | undefined;
+  /** Required together with `commentMarker` — opens the comments panel scoped to this capability, without following the tile's own primary link. */
+  onCommentMarkerClick?: (() => void) | undefined;
 }
 
 /**
@@ -62,7 +74,7 @@ export interface CapabilityTileProps {
  * tile is the click target" doesn't apply to it the same way, and L1
  * doesn't participate in colour-by today either.
  */
-export function CapabilityTile({ href, name, tone, toneLabel, size = 'card', children }: CapabilityTileProps) {
+export function CapabilityTile({ href, name, tone, toneLabel, size = 'card', children, commentMarker, onCommentMarkerClick }: CapabilityTileProps) {
   const hasChip = tone !== undefined && toneLabel !== undefined;
   return (
     <BlueprintFrame interactive>
@@ -72,6 +84,25 @@ export function CapabilityTile({ href, name, tone, toneLabel, size = 'card', chi
             {name}
           </Text>
         </Link>
+        {/* Bottom-right, above the primary link's own overlay — same
+            "positioned element paints above plain in-flow content"
+            reasoning `.secondary`'s own comment below explains, not a
+            z-index race with it (`.commentMarker` only ever occupies its
+            own small corner, never overlapping `.secondary`'s content). */}
+        {commentMarker && (
+          <button
+            type="button"
+            className={styles.commentMarker}
+            data-state={commentMarker.state}
+            aria-label={commentMarker.state === 'ink' ? `${String(commentMarker.count)} unresolved comment${commentMarker.count === 1 ? '' : 's'}` : 'All comments resolved'}
+            onClick={(e) => {
+              e.preventDefault();
+              onCommentMarkerClick?.();
+            }}
+          >
+            {commentMarker.state === 'ink' ? commentMarker.count : null}
+          </button>
+        )}
         {/*
          * Sprint U4-2b item 3: "every tile reserves the chip row so tiles
          * in a column are equal height" — a tile whose colour-by mode has
