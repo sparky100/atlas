@@ -22,6 +22,7 @@ import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
+import { LandscapeMobileList } from '../landscape/LandscapeMobileList';
 import { useCanvasWidth } from '../landscape/useCanvasWidth';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { useLandscape } from '../landscape/useLandscape';
@@ -61,6 +62,21 @@ import styles from './LandscapePage.module.css';
  * to be the narrow viewport's only occupant of) is gone entirely — the
  * landscape auto-lays-out on every open now, with no `view_layouts` row to
  * reset (`useLandscape.ts`'s own comment, UI-principles §6.4).
+ *
+ * Sprint U4-2b item 7: `useCanvasWidth` measures `<main>` and feeds that
+ * width through `useLandscape` as the layout's width hint — see that
+ * hook's own comment.
+ *
+ * Sprint U4-2b item 13: the same 768px breakpoint also decides which
+ * *content* renderer mounts below the header — `LandscapeMobileList` (a
+ * collapsible list, `landscapeGroups.ts`'s own module comment has the full
+ * grouping rules) instead of `LandscapeCanvas`, never both. The desktop
+ * canvas itself, and everything about it (`hasContent`'s `.mainWithCanvas`
+ * full-width treatment, `useUnresolvedCommentCounts`, the comments panel),
+ * stays exactly as it was — the list is a second renderer for the same
+ * `state.data`, not a replacement, and doesn't need any of that (no
+ * pixels, no viewport culling, no worker), so it renders inside the
+ * page's ordinary centred column instead.
  */
 export function LandscapePage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
@@ -139,11 +155,13 @@ export function LandscapePage() {
   const nodeHref = (systemId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/context/${systemId}?${zoomQueryString({ ref, capabilityId })}`;
   // Landscape canvas, structural (item 3): an actor has no Context view of
   // its own (the zoom chain is system-specific), so this goes straight to
-  // the actor's own element page instead.
-  const actorHref = (actorId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${actorId}?ref=${refParam}`;
+  // the actor's own element page instead — the same target item 13's
+  // mobile list uses for both its system and actor rows' own tap target
+  // ("tap → element page", `LandscapeMobileList.tsx`'s own prop comment).
+  const elementHref = (elementId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${elementId}?ref=${refParam}`;
   // Item 11: a lane key that isn't `$external`/`$unassigned` is a level-1
   // capability's own element id (`layout.ts`'s `placementFor`) — its
-  // element page, same shape as `actorHref` above, works regardless of
+  // element page, same shape as `elementHref` above, works regardless of
   // where in the capability tree it sits (unlike a capability-map anchor,
   // which would need to know the map's own scroll position).
   const capabilityHref = (capabilityId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${capabilityId}?ref=${refParam}`;
@@ -188,14 +206,17 @@ export function LandscapePage() {
   // Sprint U4-2a item 5: "canvas routes fill the viewport" — only once the
   // canvas itself is actually rendered (see the same condition below); the
   // loading/error/empty states keep the ordinary centred-column `.main`.
-  const hasCanvas = state.status === 'ready' && (state.data.layout.nodes.length > 0 || state.data.layout.actorNodes.length > 0);
+  // Item 13: never on mobile — the list renders inside the ordinary column,
+  // full-width treatment is a canvas-specific need this content doesn't have.
+  const hasContent = state.status === 'ready' && (state.data.layout.nodes.length > 0 || state.data.layout.actorNodes.length > 0);
+  const showCanvas = hasContent && !narrow;
 
   return (
     <div>
       <AppHeader />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
-        <main ref={canvasWidthRef} className={[styles.main, hasCanvas ? styles.mainWithCanvas : ''].filter(Boolean).join(' ')}>
+        <main ref={canvasWidthRef} className={[styles.main, showCanvas ? styles.mainWithCanvas : ''].filter(Boolean).join(' ')}>
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
@@ -270,7 +291,9 @@ export function LandscapePage() {
             )}
           </div>
         )}
-        {state.status === 'ready' && (state.data.layout.nodes.length > 0 || state.data.layout.actorNodes.length > 0) && (
+        {/* Item 13: <768px renders the list, never the canvas — same `state.data`, no comments panel/unresolved-count wiring (this list carries none of that yet), no viewport-fit math. */}
+        {state.status === 'ready' && hasContent && narrow && <LandscapeMobileList groups={state.data.groups} elementHref={elementHref} contextHref={nodeHref} />}
+        {state.status === 'ready' && showCanvas && (
           <div className={styles.canvasRow}>
             <LandscapeCanvas
               layout={state.data.layout}
@@ -279,7 +302,7 @@ export function LandscapePage() {
               edges={state.data.edges}
               diff={state.data.diff}
               nodeHref={nodeHref}
-              actorHref={actorHref}
+              actorHref={elementHref}
               capabilityHref={capabilityHref}
               unresolvedCommentCounts={unresolvedCounts}
               onCommentMarkerClick={(elementId) => {

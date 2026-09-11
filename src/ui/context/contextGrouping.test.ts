@@ -48,13 +48,39 @@ describe('computeContextGroup', () => {
     expect(group.external).toEqual([]);
   });
 
-  it('ignores a supports edge entirely (never a Context node, never an edge)', () => {
+  it('a supports edge is never a Context node or a drawn edge, but is captured in group.supports (item 12)', () => {
     const hub = system('hub', 'Hub');
     const capability: ElementsHeadRow = { element_id: 'cap1', element_type: 'capability', name: 'Cap', parent_id: null, attributes: {}, exists_delta_id: 'd-cap1' };
     const group = computeContextGroup(hub, [rel('r1', 'supports', 'hub', 'cap1')], new Map([['cap1', capability]]));
     expect(group.internal).toEqual([]);
     expect(group.external).toEqual([]);
     expect(group.owners).toEqual([]);
+    expect(group.supports).toEqual([{ capability, primary: false }]);
+  });
+
+  it('ignores a supports edge in the other direction (the hub is the capability end, which never actually happens, but this function never assumes it can\'t)', () => {
+    const hub = system('hub', 'Hub');
+    const other: ElementsHeadRow = { element_id: 'sys1', element_type: 'system', name: 'Other System', parent_id: null, attributes: {}, exists_delta_id: 'd-sys1' };
+    const group = computeContextGroup(hub, [rel('r1', 'supports', 'sys1', 'hub')], new Map([['sys1', other]]));
+    expect(group.supports).toEqual([]);
+    expect(group.internal).toEqual([]);
+  });
+
+  it('item 12: supports edges sort primary first, then by name/id', () => {
+    const hub = system('hub', 'Hub');
+    const capA: ElementsHeadRow = { element_id: 'cap-a', element_type: 'capability', name: 'Alpha', parent_id: null, attributes: {}, exists_delta_id: 'd-cap-a' };
+    const capZ: ElementsHeadRow = { element_id: 'cap-z', element_type: 'capability', name: 'Zeta', parent_id: null, attributes: {}, exists_delta_id: 'd-cap-z' };
+    const primaryEdge: RelationshipsHeadRow = { relationship_id: 'r2', relationship_type: 'supports', from_element_id: 'hub', to_element_id: 'cap-z', attributes: { role: 'primary' }, exists_delta_id: 'd-r2' };
+    const group = computeContextGroup(hub, [rel('r1', 'supports', 'hub', 'cap-a'), primaryEdge], new Map([['cap-a', capA], ['cap-z', capZ]]));
+    expect(group.supports.map((s) => s.capability.element_id)).toEqual(['cap-z', 'cap-a']); // primary (Zeta) first, even though Alpha sorts first alphabetically
+    expect(group.supports[0]?.primary).toBe(true);
+    expect(group.supports[1]?.primary).toBe(false);
+  });
+
+  it('item 12: a supports edge naming a capability that never resolved is dropped, not rendered as a gap', () => {
+    const hub = system('hub', 'Hub');
+    const group = computeContextGroup(hub, [rel('r1', 'supports', 'hub', 'missing-cap')], new Map());
+    expect(group.supports).toEqual([]);
   });
 
   it('ignores an owns edge where the hub is the owner, not the owned (a system never owns anything the model allows)', () => {

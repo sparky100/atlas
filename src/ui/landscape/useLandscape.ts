@@ -11,6 +11,7 @@ import type { ViewMode } from '../../db/viewMode';
 import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
 import { l1AncestorOf, loadCapabilityAncestry } from '../elements/capabilityDepth';
+import { computeLandscapeGroups, type LandscapeGroups } from './landscapeGroups';
 import type { LandscapeLayout } from './layout';
 import { computeLandscapeLayoutInWorker } from './layoutWorkerClient';
 import { supabase } from '../supabaseClient';
@@ -23,6 +24,8 @@ export interface LandscapeData {
   actorsById: Map<UUID, ElementsHeadRow>;
   edges: RelationshipsHeadRow[];
   layout: LandscapeLayout;
+  /** Sprint U4-2b item 13: the same systems/actors, grouped for the <768px list renderer (`LandscapeMobileList.tsx`) instead of laid out in pixels — computed once here, alongside `layout`, from the exact same inputs, rather than re-derived from `layout`'s own pixel output. */
+  groups: LandscapeGroups;
   /** Populated only when `ref` is a branch and `mode === 'diff'` (UI-principles §6.2/§6.3) — `null` for `main`/`tag`, and for `asIs`/`toBe`, where there's nothing to highlight against. */
   diff: VersionDiff | null;
 }
@@ -93,9 +96,7 @@ export interface UseLandscapeResult {
  * UI-principles §6.1's Landscape row itself names — *not* a separate view:
  * `scope_element_id` must be null for `landscape` (SPEC §3.9's own check
  * constraint), so a filtered landscape is still the model's one landscape
- * `views` row, just rendering a subset of its systems. Positions saved
- * under the unfiltered view are reused as-is for whichever of them are
- * currently in scope.
+ * `views` row, just rendering a subset of its systems.
  *
  * Sprint C1: when `ref.kind === 'branch'`, this folds the branch's own
  * as-is/to-be state via the engine instead of querying `elements_head`/
@@ -245,7 +246,12 @@ export function useLandscape(
 
       const systemsById = new Map(systems.map((s) => [s.element_id, s]));
       const actorsById = new Map(allActors.map((a) => [a.element_id, a]));
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, actorsById, edges, layout, diff } });
+      // Item 13: the same classification `computeLandscapeLayoutInWorker`
+      // used for pixel placement, without any of the pixel math — cheap
+      // enough (a handful of Map operations) to run on the main thread,
+      // unlike `layout` itself.
+      const groups = computeLandscapeGroups(systems, supportsEdges, l1AncestorByCapabilityId, allActors, edges);
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, actorsById, edges, layout, groups, diff } });
     }
 
     load().catch((e: unknown) => {

@@ -39,6 +39,16 @@ export interface ContextViewProps {
  * relationship the ring metaphor describes (closer vs. further out), in a
  * form that is, per §8.7, already its own accessible view (a list), not a
  * diagram standing in need of one.
+ *
+ * Sprint U4-2b item 12: the hub block's own "Supports: ..."/"Owned by: ..."
+ * lines (`.headerSummary` below) are real header content, not part of the
+ * internal/external groups — `group.supports`/`group.owners` are exactly
+ * the two things `contextGrouping.ts`'s own module comment already keeps
+ * out of both (never a Context node, never a drawn edge). The empty-state
+ * condition below still checks only `internal`/`external`/`owners` — a
+ * system that supports a capability but connects to no other system or
+ * actor is still "no connections to other systems or actors yet", even
+ * though its own "Supports:" line renders above that message.
  */
 export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }: ContextViewProps) {
   const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?ref=${refParam}`;
@@ -66,17 +76,41 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }
         </LinkButton>
       </div>
 
-      {group.owners.length > 0 && (
-        <div className={styles.owners}>
-          <Text as="p" tone="muted" size="sm">
-            Owned by {group.owners.map((owner) => owner.name).join(', ')}
-          </Text>
+      {(group.supports.length > 0 || group.owners.length > 0) && (
+        <div className={styles.headerSummary}>
+          {/* Item 12: "Supports: <capabilities, primary first>", each one a
+              link — computeContextGroup already sorted the list; this just
+              renders it, and the capability's own element page is the link
+              target (the same page every other Context/element-page link in
+              this view already points at). */}
+          {group.supports.length > 0 && (
+            <Text as="p" tone="muted" size="sm">
+              Supports:{' '}
+              {group.supports.map((s, i) => (
+                <span key={s.capability.element_id}>
+                  {i > 0 && ', '}
+                  <Link to={elementHref(s.capability.element_id)}>{s.capability.name}</Link>
+                </span>
+              ))}
+            </Text>
+          )}
+          {group.owners.length > 0 && (
+            <Text as="p" tone="muted" size="sm">
+              Owned by:{' '}
+              {group.owners.map((owner, i) => (
+                <span key={owner.element_id}>
+                  {i > 0 && ', '}
+                  <Link to={elementHref(owner.element_id)}>{owner.name}</Link>
+                </span>
+              ))}
+            </Text>
+          )}
         </div>
       )}
 
       {group.internal.length === 0 && group.external.length === 0 && group.owners.length === 0 && (
         <div>
-          <EmptyState>No relationships yet.</EmptyState>
+          <EmptyState>No connections to other systems or actors yet.</EmptyState>
           <LinkButton to={elementHref(group.hub.element_id)} variant="secondary">
             Add a relationship on the element page →
           </LinkButton>
