@@ -34,3 +34,16 @@ export function monthsSince(date: Date, now: Date = new Date()): number {
 export function isStale(date: Date, now: Date = new Date()): boolean {
   return monthsSince(date, now) >= STALE_AFTER_MONTHS;
 }
+
+/**
+ * Whole months from `now` until `date` — negative once `date` is in the
+ * past. The mirror of `monthsSince` (which measures the other direction);
+ * canonical here so every "is this within `STALE_AFTER_MONTHS`" check
+ * (capability-level in `src/ui/capabilityMap/metrics.ts`'s
+ * `lifecycleExposure`, system-level in `src/db/healthFindings.ts`'s
+ * `findCriticalExposedSystems`, Prompt 7k item 1) uses one definition.
+ */
+export function monthsUntil(date: Date, now: Date = new Date()): number {
+  const months = (date.getFullYear() - now.getFullYear()) * 12 + (date.getMonth() - now.getMonth());
+  return date.getDate() < now.getDate() ? months - 1 : months;
+}

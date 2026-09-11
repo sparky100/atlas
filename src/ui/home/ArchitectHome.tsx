@@ -85,7 +85,9 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
     data.capabilitiesWithoutOwner.length === 0 &&
     data.staleAttributes.staleFactCount === 0 &&
     data.unlabeledVerbRelationships.length === 0 &&
-    data.systemsWithoutTechnicalOwner.length === 0;
+    data.systemsWithoutTechnicalOwner.length === 0 &&
+    data.criticalSystemsWithoutBusinessOwner.length === 0 &&
+    data.criticalExposedSystems.length === 0;
 
   return (
     <div className={styles.columns}>
@@ -236,6 +238,22 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
                   summary={`${String(data.systemsWithoutTechnicalOwner.length)} ${plural(data.systemsWithoutTechnicalOwner.length, 'system', 'systems')} with no technical owner`}
                   items={elementItems(data.systemsWithoutTechnicalOwner)}
                   browseHref={browseHref('no-technical-owner')}
+                />
+              </div>
+
+              <div className={styles.findingPlate}>
+                <HealthFinding
+                  summary={`${String(data.criticalSystemsWithoutBusinessOwner.length)} critical ${plural(data.criticalSystemsWithoutBusinessOwner.length, 'system', 'systems')} with no business owner`}
+                  items={elementItems(data.criticalSystemsWithoutBusinessOwner)}
+                  browseHref={browseHref('critical-no-business-owner')}
+                />
+              </div>
+
+              <div className={styles.findingPlate}>
+                <HealthFinding
+                  summary={`${String(data.criticalExposedSystems.length)} critical ${plural(data.criticalExposedSystems.length, 'system', 'systems')} exposed with no planned replacement`}
+                  items={elementItems(data.criticalExposedSystems)}
+                  browseHref={browseHref('critical-exposed')}
                 />
               </div>
 

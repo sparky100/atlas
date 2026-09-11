@@ -8,6 +8,8 @@ import { getElementsByIds } from '../../db/elements';
 import {
   computeStaleAttributesFinding,
   findCapabilitiesWithoutOwner,
+  findCriticalExposedSystems,
+  findCriticalSystemsWithoutBusinessOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
@@ -50,6 +52,10 @@ export interface ArchitectHomeData {
   unlabeledVerbRelationships: UnlabeledVerbRelationship[];
   /** Prompt 7k item 2's role-aware finding: systems with no `owns` edge carrying `role: 'technical'`. */
   systemsWithoutTechnicalOwner: ElementsHeadRow[];
+  /** Prompt 7k item 1: critical systems with no `owns` edge carrying `role: 'business'`. */
+  criticalSystemsWithoutBusinessOwner: ElementsHeadRow[];
+  /** Prompt 7k item 1: critical systems whose `plannedEnd` falls within `STALE_AFTER_MONTHS`, with no planned replacement (see `findCriticalExposedSystems`'s own comment on that half). */
+  criticalExposedSystems: ElementsHeadRow[];
 }
 
 export type ArchitectHomeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeData };
@@ -148,6 +154,8 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             staleAttributes: computeStaleAttributesFinding(facts, systems),
             unlabeledVerbRelationships: findUnlabeledVerbRelationships(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             systemsWithoutTechnicalOwner: findSystemsWithoutTechnicalOwner(systems, ownsEdges),
+            criticalSystemsWithoutBusinessOwner: findCriticalSystemsWithoutBusinessOwner(systems, ownsEdges),
+            criticalExposedSystems: findCriticalExposedSystems(systems),
           },
         });
       }

@@ -15,10 +15,12 @@ import {
   type CapabilityAttributes,
   type ComponentAttributes,
   type ContainerAttributes,
+  type Criticality,
   type Delta,
   type DataClassification,
   type DeltaKind,
   type FlowsToAttributes,
+  type HostingModel,
   type LifecycleStatus,
   type OwnsAttributes,
   type SupportsAttributes,
@@ -45,6 +47,8 @@ const provenanceBase = fc.record(
 
 const lifecycleStatus: LifecycleStatus[] = ['planned', 'active', 'retiring', 'retired'];
 const dataClassification: DataClassification[] = ['public', 'official', 'official_sensitive', 'special_category'];
+const criticality: Criticality[] = ['critical', 'high', 'medium', 'low'];
+const hostingModel: HostingModel[] = ['on_premises', 'private_cloud', 'public_cloud', 'saas', 'hybrid'];
 
 const capabilityAttributes: fc.Arbitrary<CapabilityAttributes> = fc.record(
   { description: fc.string(), code: fc.string({ minLength: 1, maxLength: 6 }), templateRef: fc.uuid() },
@@ -59,6 +63,9 @@ const systemAttributes: fc.Arbitrary<SystemAttributes> = fc.record(
     externalOrganisation: fc.string(),
     introduced: isoDate,
     plannedEnd: isoDate,
+    criticality: fc.constantFrom(...criticality),
+    hostingModel: fc.constantFrom(...hostingModel),
+    hostingProvider: fc.string(),
   },
   { requiredKeys: ['lifecycleStatus', 'isExternal'] },
 );
@@ -123,6 +130,18 @@ const elementUpdateArb: fc.Arbitrary<Delta> = fc.oneof(
   fc.tuple(provenanceBase, uuid, uuid, fc.constantFrom('introduced' as const, 'plannedEnd' as const), fc.option(isoDate, { nil: null })).map(
     ([base, elementId, previousDeltaId, attribute, value]) =>
       ({ ...base, kind: 'element.update', elementId, elementType: 'system', attribute, value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.constantFrom(...criticality, null)).map(
+    ([base, elementId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'element.update', elementId, elementType: 'system', attribute: 'criticality', value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.constantFrom(...hostingModel, null)).map(
+    ([base, elementId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'element.update', elementId, elementType: 'system', attribute: 'hostingModel', value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.option(fc.string(), { nil: null })).map(
+    ([base, elementId, previousDeltaId, value]) =>
+      ({ ...base, kind: 'element.update', elementId, elementType: 'system', attribute: 'hostingProvider', value, previousDeltaId }) satisfies Delta,
   ),
 );
 

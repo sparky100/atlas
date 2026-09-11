@@ -91,6 +91,9 @@ const CAPABILITY_META: Record<keyof CapabilityAttributes, AttributeFieldMeta> = 
 const CAPABILITY_ORDER: (keyof CapabilityAttributes)[] = ['code', 'description', 'templateRef', 'order'];
 
 const LIFECYCLE_STATUS_OPTIONS = ['planned', 'active', 'retiring', 'retired'] as const;
+/** Prompt 7k item 1 — see `Criticality`'s own doc comment (`delta.ts`) for the ordering these options mirror. */
+const CRITICALITY_OPTIONS = ['critical', 'high', 'medium', 'low'] as const;
+const HOSTING_MODEL_OPTIONS = ['on_premises', 'private_cloud', 'public_cloud', 'saas', 'hybrid'] as const;
 
 const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   lifecycleStatus: { label: 'Lifecycle', required: true, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
@@ -100,8 +103,22 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   externalOrganisation: { label: 'External organisation', required: false, kind: 'text' },
   introduced: { label: 'Introduced', required: false, kind: 'date' },
   plannedEnd: { label: 'Planned end', required: false, kind: 'date' },
+  criticality: { label: 'Criticality', required: false, kind: 'enum', options: CRITICALITY_OPTIONS },
+  hostingModel: { label: 'Hosting model', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
+  hostingProvider: { label: 'Hosting provider', required: false, kind: 'text' },
 };
-const SYSTEM_ORDER: (keyof SystemAttributes)[] = ['lifecycleStatus', 'vendor', 'description', 'isExternal', 'externalOrganisation', 'introduced', 'plannedEnd'];
+const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
+  'lifecycleStatus',
+  'vendor',
+  'description',
+  'isExternal',
+  'externalOrganisation',
+  'introduced',
+  'plannedEnd',
+  'criticality',
+  'hostingModel',
+  'hostingProvider',
+];
 
 const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   technology: { label: 'Technology', required: false, kind: 'text' },

@@ -14,7 +14,7 @@ import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { useElementBrowse, type ElementBrowseFilter } from '../elements/useElementBrowse';
 import styles from './ElementsPage.module.css';
 
-const VALID_FILTERS: readonly ElementBrowseFilter[] = ['unlinked-systems', 'unowned-capabilities', 'stale-attributes', 'no-technical-owner'];
+const VALID_FILTERS: readonly ElementBrowseFilter[] = ['unlinked-systems', 'unowned-capabilities', 'stale-attributes', 'no-technical-owner', 'critical-no-business-owner', 'critical-exposed'];
 
 function parseFilterParam(value: string | null): ElementBrowseFilter {
   return VALID_FILTERS.includes(value as ElementBrowseFilter) ? (value as ElementBrowseFilter) : null;

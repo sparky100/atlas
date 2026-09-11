@@ -24,7 +24,7 @@
  * way — and the finding lists only the *highest* unowned ancestor in each
  * unowned subtree, since fixing that one fixes everything under it.
  */
-import { isStale, monthsSince, STALE_AFTER_MONTHS } from '../contracts/thresholds';
+import { isStale, monthsSince, monthsUntil, STALE_AFTER_MONTHS } from '../contracts/thresholds';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { UUID } from '../contracts/delta';
 import { attributesRecord } from '../ui/elements/attributesRecord';
@@ -226,6 +226,42 @@ export function computeStaleAttributesFinding(facts: readonly FactsRow[], system
     .sort((a, b) => a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id));
 
   return { staleFactCount, staleSystems, oldestAgeYears: staleFactCount > 0 ? Math.floor(oldestMonths / 12) : null };
+}
+
+/**
+ * Prompt 7k item 1's first new finding: "critical systems without a
+ * business owner" — depends on item 2's role data, the same
+ * `role === 'business'` reading `computeSelfOwnedCapabilityIds` above uses,
+ * applied to systems directly rather than capabilities (`owns` can already
+ * target either — `relationshipTypeRules.ts`).
+ */
+export function findCriticalSystemsWithoutBusinessOwner(systems: readonly ElementsHeadRow[], ownsEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
+  const businessOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).role === 'business').map((edge) => edge.to_element_id));
+  return systems.filter((system) => attributesRecord(system.attributes).criticality === 'critical' && !businessOwnedIds.has(system.element_id));
+}
+
+/**
+ * Prompt 7k item 1's second new finding: "critical systems exposed with no
+ * planned replacement" — a system-level analogue of
+ * `src/ui/capabilityMap/metrics.ts`'s own `lifecycleExposure` (a
+ * capability-level rollup over its supporting systems); this reads a
+ * system's own `plannedEnd` directly, no rollup needed. Same "no planned
+ * replacement" simplification that file's module comment documents:
+ * nothing today can record a planned replacement (UI-principles §10
+ * decision 4's review-queue machinery doesn't exist yet), so that half of
+ * the condition is vacuously true — this narrows correctly once it does,
+ * not silently wrong now.
+ */
+export function findCriticalExposedSystems(systems: readonly ElementsHeadRow[], now: Date = new Date()): ElementsHeadRow[] {
+  return systems.filter((system) => {
+    const attrs = attributesRecord(system.attributes);
+    if (attrs.criticality !== 'critical') return false;
+    const plannedEndValue = attrs.plannedEnd;
+    if (typeof plannedEndValue !== 'string') return false;
+    const plannedEnd = new Date(plannedEndValue);
+    if (Number.isNaN(plannedEnd.getTime())) return false;
+    return monthsUntil(plannedEnd, now) <= STALE_AFTER_MONTHS;
+  });
 }
 
 export { STALE_AFTER_MONTHS };

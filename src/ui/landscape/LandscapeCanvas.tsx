@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router';
 import type { ActorSubtype, ElementType } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
+import type { LandscapeColourByMode } from '../../contracts/userPreferences';
+import type { ChipTone } from '../components/Chip/Chip';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff, VersionDiffState } from '../../engine/versionDiff';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { BOUNDARY_MARGIN, computeLandscapeChannels, NODE_HEIGHT, NODE_WIDTH, routeLandscapeEdge, type LandscapeLayout, type LandscapeNodePosition } from './layout';
+import { landscapeTileColourFor } from './landscapeColour';
 import { quantizeScale } from './zoom';
 import styles from './LandscapeCanvas.module.css';
 
@@ -43,6 +46,14 @@ export interface LandscapeCanvasProps {
   onNewCommentShortcut?: (elementId: UUID) => void;
   /** M1 close-out item 1: "the per-session 'comments on this view' filter" — every node with no thread at all (`threadCounts` absent or `total === 0`) recedes to a low, diff-style alpha instead of being removed from the layout outright (removing nodes would change lane placement and edge routing for everything else on screen, which this is a read-only lens over, not a re-query). `false`/omitted draws every node at full opacity, same as before this item. */
   commentsOnlyFilter?: boolean | undefined;
+  /**
+   * Prompt 7k item 1: the landscape's own colour-by mode. Applied only to
+   * the plain (no active diff) fill branch of `drawNode` — never mixed
+   * with an active diff-state tint, per UI-principles §8.4's "status and
+   * diff must not be read across". `undefined`/`'none'` draws every tile
+   * with the flat neutral fill this canvas has always used.
+   */
+  colourBy?: LandscapeColourByMode | undefined;
 }
 
 interface Transform {
@@ -77,6 +88,12 @@ interface CanvasTokens {
   diffAdded: string;
   diffRemoved: string;
   diffChanged: string;
+  /** Prompt 7k item 1's colour-by tint — the same `--status-*` tokens `Chip.module.css` already maps `ChipTone` onto, read here as resolved values for the same `var()`-doesn't-work-in-`fillStyle` reason as every other token in this interface. */
+  statusOk: string;
+  statusWarn: string;
+  statusDanger: string;
+  statusInfo: string;
+  statusNeutral: string;
 }
 
 function readTokens(el: HTMLElement): CanvasTokens {
@@ -93,7 +110,28 @@ function readTokens(el: HTMLElement): CanvasTokens {
     diffAdded: v('--diff-added'),
     diffRemoved: v('--diff-removed'),
     diffChanged: v('--diff-changed'),
+    statusOk: v('--status-ok'),
+    statusWarn: v('--status-warn'),
+    statusDanger: v('--status-danger'),
+    statusInfo: v('--status-info'),
+    statusNeutral: v('--status-neutral'),
   };
+}
+
+/** `ChipTone` → the matching resolved `--status-*` token — the canvas's own version of `Chip.module.css`'s `styles[tone]` class lookup, since a 2D context can't use CSS classes. */
+function statusColourFor(tone: ChipTone, tokens: CanvasTokens): string {
+  switch (tone) {
+    case 'ok':
+      return tokens.statusOk;
+    case 'warn':
+      return tokens.statusWarn;
+    case 'danger':
+      return tokens.statusDanger;
+    case 'info':
+      return tokens.statusInfo;
+    case 'neutral':
+      return tokens.statusNeutral;
+  }
 }
 
 /** The node's own diff border colour (§6.3's colour token column) — `null` for `unchanged`, which uses the same neutral border every non-diff render already draws. */
@@ -273,6 +311,7 @@ export function LandscapeCanvas({
   onToggleCommentsPanel,
   onNewCommentShortcut,
   commentsOnlyFilter = false,
+  colourBy = 'none',
 }: LandscapeCanvasProps) {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -578,7 +617,15 @@ export function LandscapeCanvas({
           ctx.fillStyle = `color-mix(in srgb, ${diffColour} 12%, ${tokens.surfaceRaised})`;
           ctx.fill();
         } else {
-          ctx.fillStyle = tokens.surfaceRaised;
+          // Colour-by only ever applies here — the one fill branch reached
+          // when no diff view is active at all — never mixed with a diff
+          // tint above, per UI-principles §8.4 ("status and diff must not
+          // be read across"). Actors carry neither `criticality` nor
+          // `hostingModel`, so `landscapeTileColourFor` naturally returns
+          // no tone for them (`attributesRecord` on an actor's attributes
+          // just won't have the key).
+          const statusTone = !diff && colourBy !== 'none' ? landscapeTileColourFor(colourBy, element).tone : undefined;
+          ctx.fillStyle = statusTone ? `color-mix(in srgb, ${statusColourFor(statusTone, tokens)} 16%, ${tokens.surfaceRaised})` : tokens.surfaceRaised;
           ctx.fill();
         }
         ctx.strokeStyle = diffColour ?? (isHovered ? tokens.accent : tokens.borderStrong);
@@ -726,7 +773,7 @@ export function LandscapeCanvas({
     return () => {
       observer.disconnect();
     };
-  }, [layout, routedEdges, systemsById, actorsById, diff, diffByElementId, diffByRelationshipId, transform, hover, threadCounts, commentsOnlyFilter]);
+  }, [layout, routedEdges, systemsById, actorsById, diff, diffByElementId, diffByRelationshipId, transform, hover, threadCounts, commentsOnlyFilter, colourBy]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -813,6 +860,11 @@ export function LandscapeCanvas({
   const hoveredElement = hover ? (hover.elementType === 'system' ? systemsById.get(hover.elementId) : actorsById.get(hover.elementId)) : undefined;
   // §6.3: "Hover on any marker shows the changed attributes" — base -> new isn't shown here (the canvas has no per-field value, only the diff's element-grain summary); the element page's own history is where that detail lives. Actors carry no diff state (diff is system/relationship-grained).
   const hoveredDiff = diff && hover?.elementType === 'system' ? diffByElementId.get(hover.elementId) : undefined;
+  // Colour-by's own tone is never the only place its value is shown (§8.7)
+  // — the tooltip is this canvas's one place to put the label text a Chip
+  // would otherwise carry. Computed once here, not inline in the JSX
+  // below, so its `string | undefined` result narrows cleanly.
+  const hoveredColourByLabel = colourBy !== 'none' && hover?.elementType === 'system' && hoveredElement ? landscapeTileColourFor(colourBy, hoveredElement).label : undefined;
 
   // Item 11: the popover's own content — every other level-1 lane the
   // popover's node also supports (`layout.referenceMarkers`, filtered to
@@ -867,6 +919,7 @@ export function LandscapeCanvas({
           {hoveredElement.name}
           {attributesRecord(hoveredElement.attributes).isExternal === true ? ' (external)' : ''}
           {hoveredDiff && hoveredDiff.state !== 'unchanged' && hoveredDiff.changedAttributes.length > 0 && ` — changed: ${hoveredDiff.changedAttributes.join(', ')}`}
+          {hoveredColourByLabel !== undefined && ` — ${hoveredColourByLabel}`}
         </div>
       )}
       {extraLanesPopover && (

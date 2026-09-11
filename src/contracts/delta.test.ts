@@ -228,3 +228,59 @@ describe('System/Container introduced and plannedEnd', () => {
     expect(fromDeltaRow(toDeltaRow(update, ctx))).toEqual(update);
   });
 });
+
+describe('System criticality, hostingModel and hostingProvider (Prompt 7k item 1)', () => {
+  it('are accepted at create, all optional, and survive the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-13',
+      elementId: 'el-3',
+      elementType: 'system',
+      name: 'Payments Gateway',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false, criticality: 'critical', hostingModel: 'saas', hostingProvider: 'Acme Cloud (eu-west-1)' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('can each be set later via an update, with none recorded at create', () => {
+    const create: Delta = {
+      kind: 'element.create',
+      id: 'delta-14',
+      elementId: 'el-4',
+      elementType: 'system',
+      name: 'Legacy Billing',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    const setCriticality: Delta = {
+      kind: 'element.update',
+      id: 'delta-15',
+      elementId: 'el-4',
+      elementType: 'system',
+      attribute: 'criticality',
+      value: 'high',
+      previousDeltaId: 'delta-14',
+      sourceId: 'src-1',
+      confidence: 0.8,
+    };
+    const setHostingModel: Delta = {
+      kind: 'element.update',
+      id: 'delta-16',
+      elementId: 'el-4',
+      elementType: 'system',
+      attribute: 'hostingModel',
+      value: 'on_premises',
+      previousDeltaId: 'delta-15',
+      sourceId: 'src-1',
+      confidence: 0.8,
+    };
+    expect(fromDeltaRow(toDeltaRow(create, ctx))).toEqual(create);
+    expect(fromDeltaRow(toDeltaRow(setCriticality, ctx))).toEqual(setCriticality);
+    expect(fromDeltaRow(toDeltaRow(setHostingModel, ctx))).toEqual(setHostingModel);
+  });
+});

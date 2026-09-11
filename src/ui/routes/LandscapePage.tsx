@@ -23,10 +23,12 @@ import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
+import { LANDSCAPE_COLOUR_BY_OPTIONS } from '../landscape/landscapeColour';
 import { LandscapeMobileList } from '../landscape/LandscapeMobileList';
 import { useCanvasWidth } from '../landscape/useCanvasWidth';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { useLandscape } from '../landscape/useLandscape';
+import { useLandscapeColourByPreference } from '../landscape/useLandscapeColourByPreference';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import { parseCapabilityParam, zoomQueryString } from '../nav/zoomParams';
 import styles from './LandscapePage.module.css';
@@ -144,6 +146,11 @@ export function LandscapePage() {
   // (CapabilityMapPage.tsx) already gives a view-only toggle that isn't
   // worth carrying across visits.
   const [commentsOnlyFilter, setCommentsOnlyFilter] = useState(false);
+  // Prompt 7k item 1: the landscape's own colour-by mode — desktop canvas
+  // only, same "no comment wiring on mobile's list yet" scoping as the
+  // comments-only filter above.
+  const { colourBy, setColourBy } = useLandscapeColourByPreference(userId);
+  const colourById = useId();
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -248,6 +255,33 @@ export function LandscapePage() {
           <Text as="h1" size="2xl" className={styles.title}>
             Landscape{capability ? `: systems supporting ${capability.name}` : ''}
           </Text>
+          {/* Prompt 7k item 1: the landscape's own colour-by mode — desktop canvas only, same scoping as the comments-only filter beside it. */}
+          {state.status === 'ready' && showCanvas && (
+            <div className={styles.actions}>
+              <div className={styles.colourByControl}>
+                <label htmlFor={colourById}>
+                  <Text as="span" size="sm" tone="muted">
+                    Colour by
+                  </Text>
+                </label>
+                <select
+                  id={colourById}
+                  className={styles.select}
+                  value={colourBy}
+                  onChange={(e) => {
+                    setColourBy(e.target.value as typeof colourBy);
+                  }}
+                >
+                  <option value="none">None</option>
+                  {LANDSCAPE_COLOUR_BY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
           {/* M1 close-out item 1: "the per-session 'comments on this view' filter" — desktop canvas only (mobile's own list carries no comment wiring yet, item 13's own comment above); toggled independently of `+ Add`, so it's its own `.actions` group rather than folded into `addControls`. */}
           {state.status === 'ready' && showCanvas && (
             <div className={styles.actions}>
@@ -344,6 +378,7 @@ export function LandscapePage() {
               capabilityHref={capabilityHref}
               threadCounts={threadCounts}
               commentsOnlyFilter={commentsOnlyFilter}
+              colourBy={colourBy}
               onCommentMarkerClick={(elementId) => {
                 setCommentsPanelElementId(elementId);
                 setAutoFocusComposer(false);

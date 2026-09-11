@@ -2,7 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { listAllElements, loadOwnersByElementId, lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
-import { computeStaleAttributesFinding, findCapabilitiesWithoutOwner, findSystemsWithoutCapability, findSystemsWithoutTechnicalOwner, listAllOwnsEdges, listFactsForCommit } from '../../db/healthFindings';
+import {
+  computeStaleAttributesFinding,
+  findCapabilitiesWithoutOwner,
+  findCriticalExposedSystems,
+  findCriticalSystemsWithoutBusinessOwner,
+  findSystemsWithoutCapability,
+  findSystemsWithoutTechnicalOwner,
+  listAllOwnsEdges,
+  listFactsForCommit,
+} from '../../db/healthFindings';
 import { listAllSupportsEdges } from '../../db/modelHome';
 import { resolveRef } from '../../db/ref';
 import { supabase } from '../supabaseClient';
@@ -15,9 +24,10 @@ export type ElementBrowseSortKey = 'name' | 'type' | 'owner' | 'lifecycle';
  * door's Health findings panel offers (`ArchitectHome.tsx`'s own
  * `browseHref`), read from the page's own `?filter=` param
  * (`ElementsPage.tsx`). `null` is the ordinary, unfiltered browse table.
- * Prompt 7k item 2 adds `no-technical-owner`.
+ * Prompt 7k item 2 adds `no-technical-owner`; item 1 adds
+ * `critical-no-business-owner` and `critical-exposed`.
  */
-export type ElementBrowseFilter = 'unlinked-systems' | 'unowned-capabilities' | 'stale-attributes' | 'no-technical-owner' | null;
+export type ElementBrowseFilter = 'unlinked-systems' | 'unowned-capabilities' | 'stale-attributes' | 'no-technical-owner' | 'critical-no-business-owner' | 'critical-exposed' | null;
 
 export type ElementBrowseState =
   | { status: 'loading' }
@@ -120,6 +130,12 @@ export function useElementBrowse(modelId: UUID, filter: ElementBrowseFilter = nu
       } else if (filter === 'no-technical-owner') {
         const systems = elements.filter((e) => e.element_type === 'system');
         ids = new Set(findSystemsWithoutTechnicalOwner(systems, ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'critical-no-business-owner') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        ids = new Set(findCriticalSystemsWithoutBusinessOwner(systems, ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'critical-exposed') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        ids = new Set(findCriticalExposedSystems(systems).map((e) => e.element_id));
       }
 
       const rows: BrowseRow[] = elements.map((element) => ({

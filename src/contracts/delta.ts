@@ -58,6 +58,10 @@ export const DELIBERATELY_NOT_MODELLED = [
 ] as const;
 
 export type LifecycleStatus = 'planned' | 'active' | 'retiring' | 'retired';
+/** Prompt 7k item 1: how much a system matters to the estate — ordered, `critical` the highest (`src/ui/elements/criticalityTone.ts`'s `CRITICALITY_ORDER`), for the same "worst-of among supporting systems" capability-map aggregation `LifecycleStatus`'s own ordering already supports. */
+export type Criticality = 'critical' | 'high' | 'medium' | 'low';
+/** Prompt 7k item 1: where a system runs — a closed, unordered set (unlike `Criticality`), each value its own colour-by tone, never aggregated "worst of" for a capability (there is no "worse" hosting model — see `src/ui/capabilityMap/metrics.ts`'s own module comment for why capability-map colour-by only ever offers criticality, not this). */
+export type HostingModel = 'on_premises' | 'private_cloud' | 'public_cloud' | 'saas' | 'hybrid';
 export type ActorSubtype = 'person' | 'team';
 export type DataClassification = 'public' | 'official' | 'official_sensitive' | 'special_category';
 /** Sprint U4-1 B4: which of a system's `supports` edges anchors its one landscape lane (relationship_type_rules' new `maxPrimaryPerFrom: 1`, `supports`-only). Always set at creation, defaulting to `secondary` unless the picker's "primary?" prompt is answered yes — never left unset the way `SupportsAttributes.description` is, since lane placement has to read *something* off every edge. */
@@ -114,6 +118,12 @@ export interface SystemAttributes {
   introduced?: ISODate;
   /** Planned decommission/retirement date, if one is known. Not the same as `lifecycleStatus: 'retired'` — a system can have a planned end date well before it actually retires. */
   plannedEnd?: ISODate;
+  /** Prompt 7k item 1: how much this system matters to the estate — drives the landscape/capability-map "criticality" colour-by and the "critical systems without a business owner"/"critical, exposed, no planned replacement" health findings. Optional: unrated until someone records it, same as `vendor`. */
+  criticality?: Criticality;
+  /** Prompt 7k item 1. Optional, same reasoning as `criticality`. */
+  hostingModel?: HostingModel;
+  /** Free text (a specific vendor/data-centre/region) — deliberately not an enum, unlike `hostingModel` itself: the set of real hosting providers is open-ended in a way on/prem-vs-cloud-vs-SaaS is not. */
+  hostingProvider?: string;
 }
 
 export interface ContainerAttributes {

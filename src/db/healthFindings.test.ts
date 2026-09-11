@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../contracts/rows';
-import { computeSelfOwnedCapabilityIds, computeStaleAttributesFinding, findCapabilitiesWithoutOwner, findSystemsWithoutCapability, findSystemsWithoutTechnicalOwner, findUnlabeledVerbRelationships, isCapabilityOwnedWithAncestry } from './healthFindings';
+import {
+  computeSelfOwnedCapabilityIds,
+  computeStaleAttributesFinding,
+  findCapabilitiesWithoutOwner,
+  findCriticalExposedSystems,
+  findCriticalSystemsWithoutBusinessOwner,
+  findSystemsWithoutCapability,
+  findSystemsWithoutTechnicalOwner,
+  findUnlabeledVerbRelationships,
+  isCapabilityOwnedWithAncestry,
+} from './healthFindings';
 
-function system(id: string): ElementsHeadRow {
-  return { element_id: id, element_type: 'system', name: `System ${id}`, parent_id: null, attributes: {}, exists_delta_id: `delta-${id}` };
+function system(id: string, attributes: Record<string, Json> = {}): ElementsHeadRow {
+  return { element_id: id, element_type: 'system', name: `System ${id}`, parent_id: null, attributes, exists_delta_id: `delta-${id}` };
 }
 
 function capability(id: string, parentId: string | null = null): ElementsHeadRow {
@@ -184,6 +194,60 @@ describe('findSystemsWithoutTechnicalOwner (Prompt 7k item 2)', () => {
     const systems = [system('sys-1')];
     const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'technical' })];
     expect(findSystemsWithoutTechnicalOwner(systems, owns)).toEqual([]);
+  });
+});
+
+describe('findCriticalSystemsWithoutBusinessOwner (Prompt 7k item 1)', () => {
+  it('returns only critical systems, and only those with no business-role owns edge', () => {
+    const systems = [system('sys-1', { criticality: 'critical' }), system('sys-2', { criticality: 'low' }), system('sys-3', { criticality: 'critical' })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sys-3', { role: 'business' })];
+    expect(findCriticalSystemsWithoutBusinessOwner(systems, owns).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('a technical-role owns edge does not count as a business owner', () => {
+    const systems = [system('sys-1', { criticality: 'critical' })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'technical' })];
+    expect(findCriticalSystemsWithoutBusinessOwner(systems, owns).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('a system with no recorded criticality at all is never flagged', () => {
+    const systems = [system('sys-1')];
+    expect(findCriticalSystemsWithoutBusinessOwner(systems, [])).toEqual([]);
+  });
+
+  it('is empty when every critical system has a business owner', () => {
+    const systems = [system('sys-1', { criticality: 'critical' })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
+    expect(findCriticalSystemsWithoutBusinessOwner(systems, owns)).toEqual([]);
+  });
+});
+
+describe('findCriticalExposedSystems (Prompt 7k item 1)', () => {
+  const now = new Date('2026-06-15T00:00:00Z');
+
+  it('flags a critical system whose plannedEnd falls within STALE_AFTER_MONTHS (12)', () => {
+    const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2027-01-01' })]; // ~6.5 months out
+    expect(findCriticalExposedSystems(systems, now).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('flags a critical system already past its planned end (more exposed, not less)', () => {
+    const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2026-01-01' })];
+    expect(findCriticalExposedSystems(systems, now).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('does not flag a non-critical system with the same near plannedEnd', () => {
+    const systems = [system('sys-1', { criticality: 'medium', plannedEnd: '2027-01-01' })];
+    expect(findCriticalExposedSystems(systems, now)).toEqual([]);
+  });
+
+  it('does not flag a critical system whose plannedEnd is well beyond the 12-month horizon', () => {
+    const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2030-01-01' })];
+    expect(findCriticalExposedSystems(systems, now)).toEqual([]);
+  });
+
+  it('does not flag a critical system with no plannedEnd at all', () => {
+    const systems = [system('sys-1', { criticality: 'critical' })];
+    expect(findCriticalExposedSystems(systems, now)).toEqual([]);
   });
 });
 

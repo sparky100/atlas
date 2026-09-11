@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateTileColourFor, lifecycleExposure, oldestLifecycleStage, resolveDefaultColourBy, supportingSystemIds, tileColourFor } from './metrics';
+import { aggregateTileColourFor, lifecycleExposure, oldestLifecycleStage, resolveDefaultColourBy, supportingSystemIds, tileColourFor, worstCriticality } from './metrics';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 
-function system(id: string, lifecycleStatus?: string, plannedEnd?: string): ElementsHeadRow {
+function system(id: string, lifecycleStatus?: string, plannedEnd?: string, criticality?: string): ElementsHeadRow {
   const attrs: Record<string, Json> = { isExternal: false };
   if (lifecycleStatus !== undefined) attrs.lifecycleStatus = lifecycleStatus;
   if (plannedEnd !== undefined) attrs.plannedEnd = plannedEnd;
+  if (criticality !== undefined) attrs.criticality = criticality;
   return { element_id: id, element_type: 'system', name: id, parent_id: null, attributes: attrs, exists_delta_id: `d-${id}` };
 }
 
@@ -68,6 +69,26 @@ describe('lifecycleExposure', () => {
   });
 });
 
+describe('worstCriticality (Prompt 7k item 1)', () => {
+  it('returns the most-severe criticality among supporting systems', () => {
+    const systemsById = new Map([
+      ['sys-1', system('sys-1', undefined, undefined, 'medium')],
+      ['sys-2', system('sys-2', undefined, undefined, 'critical')],
+    ]);
+    const edges = [supports('sys-1', 'cap-1'), supports('sys-2', 'cap-1')];
+    expect(worstCriticality('cap-1', edges, systemsById)).toBe('critical');
+  });
+
+  it('returns null when no supporting system has a recorded criticality', () => {
+    const systemsById = new Map([['sys-1', system('sys-1')]]);
+    expect(worstCriticality('cap-1', [supports('sys-1', 'cap-1')], systemsById)).toBeNull();
+  });
+
+  it('returns null for a capability with no supporting systems at all', () => {
+    expect(worstCriticality('cap-1', [], new Map())).toBeNull();
+  });
+});
+
 describe('tileColourFor', () => {
   it('mode "none" never returns a tone or label', () => {
     expect(tileColourFor('none', 'cap-1', [supports('sys-1', 'cap-1')], new Map([['sys-1', system('sys-1', 'retired')]]))).toEqual({ tone: undefined, label: undefined });
@@ -98,6 +119,16 @@ describe('tileColourFor', () => {
 
     const notExposedById = new Map([['sys-1', system('sys-1', 'active')]]);
     expect(tileColourFor('metric:lifecycleExposure', 'cap-1', [supports('sys-1', 'cap-1')], notExposedById)).toEqual({ tone: undefined, label: undefined });
+  });
+
+  it('colours by the worst-of criticality among supporting systems (Prompt 7k item 1)', () => {
+    const systemsById = new Map([['sys-1', system('sys-1', undefined, undefined, 'critical')]]);
+    expect(tileColourFor('metric:criticality', 'cap-1', [supports('sys-1', 'cap-1')], systemsById)).toEqual({ tone: 'danger', label: 'critical' });
+  });
+
+  it('criticality: no tone when no supporting system has a recorded criticality', () => {
+    const systemsById = new Map([['sys-1', system('sys-1')]]);
+    expect(tileColourFor('metric:criticality', 'cap-1', [supports('sys-1', 'cap-1')], systemsById)).toEqual({ tone: undefined, label: undefined });
   });
 });
 
@@ -154,6 +185,19 @@ describe('aggregateTileColourFor (Sprint U4-1 C3 review note: L1 group header)',
 
   it('coverage: warn only when literally none of the group\'s descendants have a supporting system', () => {
     expect(aggregateTileColourFor('metric:supportingSystemCount', ['cap-1', 'cap-2'], [], new Map())).toEqual({ tone: 'warn', label: '0/2 capabilities supported' });
+  });
+
+  it('criticality: worst-of-children, same shape as oldest lifecycle stage (Prompt 7k item 1)', () => {
+    const systemsById = new Map([
+      ['sys-1', system('sys-1', undefined, undefined, 'low')],
+      ['sys-2', system('sys-2', undefined, undefined, 'high')],
+    ]);
+    const edges = [supports('sys-1', 'cap-1'), supports('sys-2', 'cap-2')];
+    expect(aggregateTileColourFor('metric:criticality', ['cap-1', 'cap-2'], edges, systemsById)).toEqual({ tone: 'warn', label: 'high' });
+  });
+
+  it('criticality: no tone when nothing in the group has a recorded criticality', () => {
+    expect(aggregateTileColourFor('metric:criticality', ['cap-1', 'cap-2'], [], new Map())).toEqual({ tone: undefined, label: undefined });
   });
 });
 
