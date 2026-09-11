@@ -7,6 +7,7 @@ import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
+import { reportToast } from '../toasts/toastStore';
 
 /** A field's draft value in the edit form — always a plain string except for `boolean` fields, which a checkbox produces directly. */
 export type DraftValue = string | boolean;
@@ -181,6 +182,10 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
       }
 
       setStatus('idle');
+      // Item 2: "save toasts say the edit went to the change" — only ever
+      // for a change branch; an edit at `main` has nowhere else it could
+      // have gone, so no toast is needed to say so.
+      if (branch.kind === 'change') reportToast(`Saved to change: ${branch.title ?? branch.name}`);
       onSaved();
     } catch (e) {
       setStatus('editing');

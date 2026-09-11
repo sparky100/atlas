@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
+import type { ChangeListSummary } from '../../db/changeSummary';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
+import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { LinkButton } from '../components/Button/LinkButton';
 import { Panel } from '../components/Panel/Panel';
@@ -9,6 +12,7 @@ import { Text } from '../components/Text/Text';
 import { useThreadCounts } from '../comments/useThreadCounts';
 import type { BranchRow } from '../../db/types';
 import { branchStatusTone } from './branchStatus';
+import { useChangeSummaries } from './useChangeSummaries';
 import { useChanges } from './useChanges';
 import styles from './ChangesView.module.css';
 
@@ -47,6 +51,10 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
     branches.map((b) => b.id),
   );
   const threadCounts = threadCountsState.status === 'ready' ? threadCountsState.counts : undefined;
+  // Item 3: affected capabilities + describeEnvelope one-liner, batched for
+  // every card at once — see useChangeSummaries.ts's own comment.
+  const summariesState = useChangeSummaries(modelId, branches);
+  const summaries = summariesState.status === 'ready' ? summariesState.summaries : undefined;
 
   return (
     <div>
@@ -129,11 +137,35 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
         Changes
       </Text>
       {status === 'loading' && <Text tone="muted">Loading…</Text>}
+      {/* Item 5: first-time explainer — the model has never had a change,
+          not just "this page hasn't loaded any yet" (status !== 'loading'
+          already distinguishes that from the ordinary empty-list case
+          below). */}
+      {branches.length === 0 && status !== 'loading' && (
+        <Panel>
+          <Text as="p" size="sm">
+            A change is a branch: a proposed edit to the model that doesn&rsquo;t touch main until it&rsquo;s reviewed and merged.
+          </Text>
+          <Text as="p" size="sm">
+            Contributors never edit main directly — every edit from a contributor goes through a change like this one.
+          </Text>
+          <Text as="p" size="sm">
+            Merging a change updates the landscape, capability map and every view that reads main&rsquo;s current state.
+          </Text>
+        </Panel>
+      )}
       {branches.length === 0 && status !== 'loading' && <EmptyState>No changes yet. {canCreate ? 'Create one above.' : 'Nobody has proposed one.'}</EmptyState>}
       {branches.length > 0 && (
         <ul className={styles.list}>
           {branches.map((branch) => (
-            <ChangeRow key={branch.id} branch={branch} orgSlug={orgSlug} modelSlug={modelSlug} unresolvedCount={threadCounts?.get(branch.id)?.open} />
+            <ChangeRow
+              key={branch.id}
+              branch={branch}
+              orgSlug={orgSlug}
+              modelSlug={modelSlug}
+              unresolvedCount={threadCounts?.get(branch.id)?.open}
+              summary={summaries?.get(branch.id)}
+            />
           ))}
         </ul>
       )}
@@ -141,7 +173,20 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   );
 }
 
-function ChangeRow({ branch, orgSlug, modelSlug, unresolvedCount }: { branch: BranchRow; orgSlug: string; modelSlug: string; unresolvedCount: number | undefined }) {
+function ChangeRow({
+  branch,
+  orgSlug,
+  modelSlug,
+  unresolvedCount,
+  summary,
+}: {
+  branch: BranchRow;
+  orgSlug: string;
+  modelSlug: string;
+  unresolvedCount: number | undefined;
+  /** `undefined` while `useChangeSummaries` is still loading, or if it failed — the card renders without this row rather than a loading placeholder for a nice-to-have. */
+  summary: ChangeListSummary | undefined;
+}) {
   return (
     <li className={styles.row}>
       <div>
@@ -151,6 +196,14 @@ function ChangeRow({ branch, orgSlug, modelSlug, unresolvedCount }: { branch: Br
         {branch.description !== null && (
           <Text as="p" tone="muted" size="sm">
             {branch.description}
+          </Text>
+        )}
+        {/* Item 3's own one-liner — distinct from the free-text description
+            above: what this change actually *does*, derived from its own
+            deltas, not what its author typed. */}
+        {summary && summary.description !== 'No changes yet' && (
+          <Text as="p" tone="muted" size="sm">
+            {summary.description}
           </Text>
         )}
         <div className={styles.rowMeta}>
@@ -174,6 +227,20 @@ function ChangeRow({ branch, orgSlug, modelSlug, unresolvedCount }: { branch: Br
             </Text>
           )}
         </div>
+        {summary && summary.affectedCapabilities.length > 0 && (
+          <ul className={styles.affectedCapabilities}>
+            {summary.affectedCapabilities.map(({ capability }) => (
+              <li key={capability.element_id}>
+                <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${capability.element_id}`} className={styles.affectedCapabilityLink}>
+                  <ElementTypeGlyph type="capability" />
+                  <Text as="span" size="sm">
+                    {capability.name}
+                  </Text>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`} variant="secondary">
         Open →

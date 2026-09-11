@@ -6,6 +6,7 @@ import { describeEnvelope, type NameLookup } from '../../engine/describeEnvelope
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
+import { reportToast } from '../toasts/toastStore';
 
 export type RelationshipCreateStatus = 'idle' | 'creating';
 
@@ -151,6 +152,8 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
         }
 
         setStatus('idle');
+        // Item 2: see useElementEditor.ts's identical comment.
+        if (branch.kind === 'change') reportToast(`Saved to change: ${branch.title ?? branch.name}`);
         onCreated();
       } catch (e) {
         setStatus('idle');

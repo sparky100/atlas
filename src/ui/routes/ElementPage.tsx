@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation, useParams, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ATTRIBUTE_SCHEMA_BY_TYPE } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
@@ -23,10 +23,12 @@ import { RelationshipsSection } from '../components/RelationshipGroup/Relationsh
 import { StructureSection } from '../components/StructureSection/StructureSection';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
+import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
-import { canEditBranch, useMembership } from '../orgs/useMembership';
+import { canCreateChangeBranch, canEditBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
 import { elementBreadcrumbSegments } from '../nav/elementBreadcrumbSegments';
@@ -79,6 +81,10 @@ export function ElementPage() {
   const [justCreatedType] = useState<string | null>(() => (location.state as { justCreated?: string } | null)?.justCreated ?? null);
   const [toastDismissed, setToastDismissed] = useState(false);
   const [justAddedElementId, setJustAddedElementId] = useState<string | null>(null);
+  // Sprint 7i item 4: "Propose a change" — the contributor-at-main path
+  // `ElementHeader.tsx`'s own former comment named as a real, named gap.
+  const [proposingChange, setProposingChange] = useState(false);
+  const navigate = useNavigate();
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
@@ -89,6 +95,10 @@ export function ElementPage() {
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   const canEdit = editingBranch !== null && canEditBranch(role, editingBranch);
+  // The complement of `canEdit` at `main`: a contributor who can create a
+  // change branch but has no direct main-write path gets this instead of
+  // `Edit` — never both (ElementHeader.tsx passes exactly one).
+  const canPropose = ref.kind === 'main' && !canEdit && canCreateChangeBranch(role);
   // See LandscapePage.tsx's identical comment: ADR-018 guarantees main's
   // head is never null in practice; `BranchRow`'s own type hasn't been
   // narrowed yet. `expectedHeadCommitId` for the relationship-add write
@@ -158,6 +168,7 @@ export function ElementPage() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
+        <EditingBranchBanner activeRef={ref} showModeShortcuts={false} />
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
@@ -181,8 +192,26 @@ export function ElementPage() {
               existsFact={state.data.facts.get('$exists')}
               existsSource={state.data.sources.get(state.data.facts.get('$exists')?.source_id ?? '')}
               onEdit={canEdit && editor.status === 'idle' ? editor.startEditing : undefined}
+              onProposeChange={canPropose ? () => { setProposingChange(true); } : undefined}
               rename={canEdit ? rename : undefined}
             />
+            {proposingChange && (
+              <Panel>
+                <ProposeChangePicker
+                  modelId={model.id}
+                  orgId={organisation?.id ?? ''}
+                  userId={userId}
+                  defaultDescription={`Proposes a change to ${state.data.element.name}`}
+                  onChosen={(branch) => {
+                    setProposingChange(false);
+                    void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/e/${elementId ?? ''}?ref=${refParamOf({ kind: 'branch', branchId: branch.id })}`);
+                  }}
+                  onCancel={() => {
+                    setProposingChange(false);
+                  }}
+                />
+              </Panel>
+            )}
             {justCreatedType && !toastDismissed && (
               <Panel className={styles.toast ?? ''} data-testid="add-system-toast">
                 <Text as="p" size="sm">

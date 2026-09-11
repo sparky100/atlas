@@ -13,6 +13,7 @@ import type { Delta, ElementType, RelationshipType, UUID } from '../contracts/de
 import { subjectOf } from '../contracts/delta';
 import type { ElementsHeadRow } from '../contracts/rows';
 import { listOwnDeltas, type BranchFork } from '../engine/branch';
+import { describeEnvelope, type NameLookup } from '../engine/describeEnvelope';
 import type { ElementRow, Head } from '../engine/deltas';
 import { foldFromGenesis } from '../engine/head';
 import { buildCommitLoader } from './commitLoader';
@@ -149,4 +150,61 @@ export async function loadChangeSummary(supabase: Client, modelId: UUID, branch:
   ]);
 
   return { subjects, affectedCapabilities, otherOpenChanges, sourcesById };
+}
+
+export interface ChangeListSummary extends ChangeSummaryCore {
+  /**
+   * Sprint 7i item 3's "one-line 'what this change does' from
+   * describeEnvelope" — over the branch's *entire* accumulated own-delta
+   * set (`listOwnDeltas`'s real chronological order), not one commit's
+   * worth the way `commits.title` itself is computed. `describeEnvelope`
+   * only ever looks at `deltas[0]` plus a count (its own doc comment), so
+   * this reads as "the first thing this change did (+N more)" — an honest
+   * gist, not a full summary.
+   */
+  description: string;
+}
+
+/**
+ * Sprint 7i item 3's list-card data — "affected capabilities" and the
+ * describeEnvelope one-liner, for every branch on the Changes list at
+ * once. Shares exactly one `buildCommitLoader` call across every branch
+ * (it loads the whole model's commits/deltas up front by design — that
+ * module's own comment) rather than `loadChangeSummary`'s one-loader-per-
+ * branch shape, which would rebuild it once per card; batch, not N+1, per
+ * the Working rules' own "batch, don't enumerate" instinct.
+ */
+export async function loadChangeSummariesForModel(supabase: Client, modelId: UUID, branches: readonly BranchRow[]): Promise<Map<UUID, ChangeListSummary>> {
+  const result = new Map<UUID, ChangeListSummary>();
+  if (branches.length === 0) return result;
+
+  const loader = await buildCommitLoader(supabase, modelId);
+  for (const branch of branches) {
+    // ADR-018 guarantees both are real in practice; BranchRow's own type
+    // hasn't been narrowed yet (same gap every other reader of these two
+    // columns still carries, per LandscapePage.tsx's own comment) — skipped
+    // rather than thrown on, since one malformed row shouldn't blank the
+    // whole list.
+    if (!branch.base_commit_id || !branch.head_commit_id) continue;
+
+    const fork: BranchFork = { baseCommitId: branch.base_commit_id, headCommitId: branch.head_commit_id };
+    const ownDeltas = listOwnDeltas(fork, loader);
+    if (ownDeltas.length === 0) {
+      result.set(branch.id, { subjects: [], affectedCapabilities: [], description: 'No changes yet' });
+      continue;
+    }
+
+    const toBeHead = foldFromGenesis(branch.head_commit_id, loader);
+    const asIsHead = foldFromGenesis(branch.base_commit_id, loader);
+    const { subjects, affectedCapabilities } = summarizeOwnDeltas(ownDeltas, asIsHead, toBeHead);
+    // Every element in either head, not just this branch's own touched
+    // subjects — a `relationship.create` delta's endpoint is frequently a
+    // pre-existing element nothing else on this branch touched, and
+    // `describeEnvelope`'s own doc comment is explicit that an unresolved
+    // id falls back to "(unknown)" rather than guessing.
+    const nameLookup: NameLookup = (id) => toBeHead.elements.get(id)?.name ?? asIsHead.elements.get(id)?.name;
+    const description = describeEnvelope(ownDeltas, nameLookup);
+    result.set(branch.id, { subjects, affectedCapabilities, description });
+  }
+  return result;
 }

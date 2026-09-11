@@ -12,6 +12,15 @@ export interface ProposeChangePickerProps {
   userId: UUID | null;
   onChosen: (branch: BranchRow) => void;
   onCancel: () => void;
+  /**
+   * Sprint 7i item 4's "Propose a change" entry point on an element page:
+   * "creates a change scoped to that element" — seeded into the new
+   * change's `description` (there is no element-scoping column on
+   * `branches` itself; the element association is product-level text, not
+   * schema). Omitted (the default, `''`) for `HomeSearch.tsx`'s own use of
+   * this picker, which isn't about any one already-existing element.
+   */
+  defaultDescription?: string;
 }
 
 /**
@@ -24,7 +33,7 @@ export interface ProposeChangePickerProps {
  * does the real work either way (same hook `ChangesView.tsx` uses); this is
  * a narrower, inline-first surface for it, not a second implementation.
  */
-export function ProposeChangePicker({ modelId, orgId, userId, onChosen, onCancel }: ProposeChangePickerProps) {
+export function ProposeChangePicker({ modelId, orgId, userId, onChosen, onCancel, defaultDescription = '' }: ProposeChangePickerProps) {
   const { status, branches, error, createChange } = useChanges(modelId, orgId, userId);
   const [selectedId, setSelectedId] = useState('');
   const [newName, setNewName] = useState('');
@@ -85,7 +94,7 @@ export function ProposeChangePicker({ modelId, orgId, userId, onChosen, onCancel
           variant="primary"
           disabled={status === 'creating' || newName.trim().length === 0}
           onClick={() => {
-            void createChange({ name: newName, title: '', description: '', targetDate: '' }).then((branch) => {
+            void createChange({ name: newName, title: '', description: defaultDescription, targetDate: '' }).then((branch) => {
               if (branch) onChosen(branch);
             });
           }}

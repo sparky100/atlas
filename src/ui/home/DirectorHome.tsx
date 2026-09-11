@@ -1,12 +1,18 @@
-import { Link } from 'react-router';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { BlueprintFrame } from '../components/BlueprintFrame/BlueprintFrame';
+import { Button } from '../components/Button/Button';
 import { Chip, type ChipTone } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
+import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { UUID } from '../../contracts/delta';
+import type { MemberRole } from '../../db/types';
 import { branchStatusTone } from '../changes/branchStatus';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { attributesRecord } from '../elements/attributesRecord';
+import { ProposeChangePicker } from './ProposeChangePicker';
+import { canCreateChangeBranch } from '../orgs/useMembership';
 import type { CapabilityTileData } from '../../db/modelHome';
 import type { DirectorHomeData } from './useDirectorHome';
 import styles from './DirectorHome.module.css';
@@ -15,7 +21,10 @@ export interface DirectorHomeProps {
   data: DirectorHomeData;
   reload: () => void;
   modelId: UUID;
+  orgId: UUID;
   userId: UUID | null;
+  /** Sprint 7i item 4's "Propose a change" entry point — the one deliberate exception to this door's own "no add control anywhere" design (see this component's own module comment); gated the same way every other propose-a-change entry point is. */
+  role: MemberRole | null;
   orgSlug: string;
   modelSlug: string;
 }
@@ -31,8 +40,11 @@ export interface DirectorHomeProps {
  * title/search chrome stays the existing shared header rather than a
  * director-only redesign of it, to avoid touching the architect door).
  */
-export function DirectorHome({ data, reload, modelId, userId, orgSlug, modelSlug }: DirectorHomeProps) {
+export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSlug, modelSlug }: DirectorHomeProps) {
   const capabilityMapHref = `/o/${orgSlug}/m/${modelSlug}/capability-map`;
+  const [proposingChange, setProposingChange] = useState(false);
+  const navigate = useNavigate();
+  const canPropose = canCreateChangeBranch(role);
 
   if (data.tiles.length === 0) {
     return (
@@ -96,7 +108,34 @@ export function DirectorHome({ data, reload, modelId, userId, orgSlug, modelSlug
             <Text as="span" tone="muted" size="sm">
               {data.openChanges.length} open{data.nextTargetDate ? ` · next target ${formatDate(data.nextTargetDate)}` : ''}
             </Text>
+            {canPropose && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setProposingChange(true);
+                }}
+              >
+                Propose a change
+              </Button>
+            )}
           </div>
+          {proposingChange && (
+            <Panel>
+              <ProposeChangePicker
+                modelId={modelId}
+                orgId={orgId}
+                userId={userId}
+                onChosen={(branch) => {
+                  setProposingChange(false);
+                  // ChangePage.tsx routes on the branch id in the path itself, not `?ref=` — there's nothing to select once you're already on that change's own page.
+                  void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`);
+                }}
+                onCancel={() => {
+                  setProposingChange(false);
+                }}
+              />
+            </Panel>
+          )}
           {data.openChanges.length === 0 ? (
             <EmptyState>Nothing changing right now.</EmptyState>
           ) : (
