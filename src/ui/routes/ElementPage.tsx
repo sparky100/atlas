@@ -121,9 +121,12 @@ export function ElementPage() {
   });
   // Sprint U4-1 D3: called unconditionally, same reasoning as `editor`
   // above (the Rules of Hooks) — only actually offered to
-  // ElementHeader.tsx (its `rename` prop) once `canEdit` and the element
-  // is a capability, the same gate `CapabilityRetractAction.tsx`'s own
-  // former bundling with rename already used.
+  // ElementHeader.tsx (its `rename` prop) once `canEdit`. Prompt 7h bug
+  // fix: every element type now, not just capability — `useElementRename`
+  // was already fully generic; the old `element_type === 'capability'`
+  // half of this gate (inherited from `CapabilityRetractAction.tsx`'s own
+  // former bundling with rename) was an artificial restriction on an
+  // already-correct hook, not a real limitation of what renaming does.
   const rename = useElementRename({
     modelId: model?.id ?? '',
     orgId: organisation?.id ?? '',
@@ -178,7 +181,7 @@ export function ElementPage() {
               existsFact={state.data.facts.get('$exists')}
               existsSource={state.data.sources.get(state.data.facts.get('$exists')?.source_id ?? '')}
               onEdit={canEdit && editor.status === 'idle' ? editor.startEditing : undefined}
-              rename={canEdit && state.data.element.element_type === 'capability' ? rename : undefined}
+              rename={canEdit ? rename : undefined}
             />
             {justCreatedType && !toastDismissed && (
               <Panel className={styles.toast ?? ''} data-testid="add-system-toast">

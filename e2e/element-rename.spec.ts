@@ -87,9 +87,12 @@ test('element rename: no standalone "Rename" control; the header menu opens it i
   await renameMenuItem.click();
 
   // Picking it swaps the static h1 for an inline input, right where the
-  // name was — not a separate row.
+  // name was — not a separate row. Scoped to the `<header>` (a plain HTML
+  // landmark, not a CSS-module class — ElementHeader.tsx's own root tag):
+  // a bare `getByRole('textbox')` also matches the Comments section's own
+  // always-open "Write a comment…" textarea further down the same page.
   await expect(page.getByRole('heading', { name: 'Finance' })).toHaveCount(0);
-  const renameInput = page.getByRole('textbox');
+  const renameInput = page.locator('header').getByRole('textbox');
   await expect(renameInput).toHaveValue('Finance');
 
   await renameInput.fill('Financial Management');
@@ -100,7 +103,7 @@ test('element rename: no standalone "Rename" control; the header menu opens it i
   // Cancelling a second rename leaves the name untouched.
   await page.getByRole('button', { name: 'Element actions' }).click();
   await page.getByRole('button', { name: 'Rename', exact: true }).click();
-  await page.getByRole('textbox').fill('Something Else Entirely');
+  await page.locator('header').getByRole('textbox').fill('Something Else Entirely');
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByRole('heading', { name: 'Financial Management' })).toBeVisible();
 });

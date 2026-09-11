@@ -34,14 +34,18 @@ export interface ElementHeaderProps {
   /**
    * Sprint U4-1 D3's "Rename" — omitted entirely, same convention as
    * `onEdit`, when the caller hasn't established edit rights (in
-   * practice always together with `onEdit`, but kept as its own prop:
-   * rename is capability-only today — `ElementPage.tsx`'s own gate,
-   * inherited from the former `CapabilityTailoringActions.tsx` — while
-   * `onEdit` applies to every element type). "Move into Edit mode or the
-   * header menu": both at once — its trigger is a "Rename" item in this
-   * header's own overflow menu; once active, it replaces the static name
-   * with an inline input right here, rather than a standalone control
-   * sitting between Edit and Attributes.
+   * practice always together with `onEdit`, kept as its own prop since
+   * `useElementRename` is a real hook — Rules of Hooks means a caller
+   * can't call it conditionally, only pass its result conditionally).
+   * Prompt 7h bug fix: available for every element type now, not just
+   * capability — `useElementRename.ts` was already fully generic
+   * (`element.element_type` in its own delta); `ElementPage.tsx`'s own
+   * gate was the only thing narrowing it. "Move into Edit mode or the
+   * header menu, and tapping the title": three equivalent triggers for
+   * the same inline rename — a "Rename" item in this header's own
+   * overflow menu, or the title itself (Prompt 7h) — replacing the
+   * static name with an inline input right here, rather than a
+   * standalone control sitting between Edit and Attributes.
    */
   rename?: UseElementRenameResult | undefined;
 }
@@ -137,7 +141,18 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, renam
           </form>
         ) : (
           <Text as="h1" size="2xl">
-            {element.name}
+            {rename ? (
+              // Prompt 7h bug fix: tapping the title opens the same inline
+              // rename the "⋯" menu's own "Rename" item does — a plain
+              // `<button>` inside the still-real `<h1>` (not the h1 itself
+              // made clickable), so the page's heading semantics/outline
+              // are unchanged whether or not the viewer can rename.
+              <button type="button" className={styles.titleButton} onClick={rename.startRenaming}>
+                {element.name}
+              </button>
+            ) : (
+              element.name
+            )}
           </Text>
         )}
         {lifecycleStatus !== null && lifecycleTone !== undefined && <Chip tone={lifecycleTone}>{lifecycleStatus}</Chip>}
