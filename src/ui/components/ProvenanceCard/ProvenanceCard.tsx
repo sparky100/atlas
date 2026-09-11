@@ -1,17 +1,10 @@
 import type { DeltaRow, FactsRow } from '../../../contracts/rows';
-import { monthsSince } from '../../../contracts/thresholds';
 import type { CapabilityMapRow } from '../../../db/capabilityMapTemplates';
 import type { SourceRow } from '../../../db/types';
+import { formatCommitActivityTime } from '../../home/commitActivityTime';
 import { ConfidenceDots } from '../ConfidenceDots/ConfidenceDots';
 import { Text } from '../Text/Text';
 import styles from './ProvenanceCard.module.css';
-
-function formatAge(date: Date, now: Date): string {
-  const months = monthsSince(date, now);
-  if (months < 1) return '< 1mo ago';
-  if (months < 24) return `${String(months)}mo ago`;
-  return `${String(Math.floor(months / 12))}y ago`;
-}
 
 export interface ProvenanceCardProps {
   fact: FactsRow;
@@ -37,10 +30,17 @@ export interface ProvenanceCardProps {
  * and the supersession chain. One hover or focus away from every value on
  * every screen, per §4.3 — this component is the shared implementation;
  * canvas tooltips (step 4) reuse it too.
+ *
+ * Prompt 7h bug fix: "recorded/effective as precise relative time or
+ * date" — the Effective/Recorded rows use `formatCommitActivityTime`
+ * (minutes/hours/yesterday/date), not the coarse monthly staleness
+ * bucket `ProvenanceBadge`'s own compact badge still uses for its
+ * stale-colour threshold; a card the viewer is already hovering to read
+ * closely can afford (and asked for) the precise answer.
  */
 export function ProvenanceCard({ fact, source, supersessionChain, supersessionSources, seededFrom, now = new Date() }: ProvenanceCardProps) {
-  const effectiveDate = fact.effective_date ? new Date(fact.effective_date) : new Date(fact.asserted_at);
-  const recordedDate = new Date(fact.asserted_at);
+  const effectiveDateStr = fact.effective_date ?? fact.asserted_at;
+  const recordedDateStr = fact.asserted_at;
   const superseded = supersessionChain?.filter((d) => d.id !== fact.delta_id) ?? null;
 
   return (
@@ -81,7 +81,7 @@ export function ProvenanceCard({ fact, source, supersessionChain, supersessionSo
           Effective
         </Text>
         <Text size="sm" as="span">
-          {formatAge(effectiveDate, now)}
+          {formatCommitActivityTime(effectiveDateStr, now)}
         </Text>
       </div>
       <div className={styles.row}>
@@ -89,7 +89,7 @@ export function ProvenanceCard({ fact, source, supersessionChain, supersessionSo
           Recorded
         </Text>
         <Text size="sm" as="span">
-          {formatAge(recordedDate, now)}
+          {formatCommitActivityTime(recordedDateStr, now)}
         </Text>
       </div>
       <div className={styles.row}>

@@ -1,15 +1,17 @@
 /**
- * Precise relative time for the activity row (Sprint U4-1 B2): "minutes /
- * hours / yesterday / date" — deliberately not the provenance staleness
- * bucket every `formatAge` in this codebase (ProvenanceCard/ProvenanceBadge/
- * HistoryTimeline/the old ArchitectHome one) already uses ("< 1mo ago",
+ * Precise relative time (Sprint U4-1 B2, activity row): "minutes / hours /
+ * yesterday / date" — deliberately not the provenance staleness bucket
+ * `formatAge` in `ProvenanceBadge`/`HistoryTimeline` uses ("< 1mo ago",
  * "3mo ago", "2y ago"). That bucket exists to answer "is this fact still
  * trustworthy" (SPEC's provenance staleness thresholds) — coarse on
  * purpose, since a fact recorded 6 days ago and one recorded 3 weeks ago
- * are both simply "current" for that question. An activity feed answers a
- * different question — "what just happened, in what order" — where the
- * gap between "2 minutes ago" and "this morning" is the entire point, so
- * this is a distinct function, not a reuse of that one with new labels.
+ * are both simply "current" for that question, and it also drives the
+ * badge's stale-colour threshold, which this function has no opinion on.
+ * An activity feed (and, since the Prompt 7h bug fix, `ProvenanceCard`'s
+ * own "Effective"/"Recorded" rows — "why do we believe this" wants the
+ * precise answer, not the coarse staleness bucket) answers a different
+ * question — "what just happened, when, exactly" — where the gap between
+ * "2 minutes ago" and "this morning" is the entire point.
  *
  * "Yesterday"/older buckets on calendar-day boundaries (midnight to
  * midnight in the viewer's own local time), not a raw 24h/48h cutoff — a

@@ -40,7 +40,13 @@ function CommentRowView({ comment, profile, now }: { comment: CommentRow; profil
           <Text as="span" size="sm" className={styles.authorName}>
             {authorLabel(profile)}
           </Text>
-          {profile && (
+          {/* Prompt 7h bug fix: "display name once, handle only when
+              different" — `authorLabel` above already falls back to
+              `@handle` when there's no display name, so showing the
+              handle again here unconditionally duplicated it. Only worth
+              a second, muted line when it's telling the reader something
+              the display name didn't already: the handle behind it. */}
+          {profile?.display_name && (
             <Text as="span" size="xs" tone="muted">
               @{profile.handle}
             </Text>
