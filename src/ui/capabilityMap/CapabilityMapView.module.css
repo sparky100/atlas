@@ -87,20 +87,20 @@
 }
 
 /**
- * Sprint U4-2a item 3: "L1 header on one row" — `flex-wrap: wrap` used to
- * let a long name plus the Chip, zoom link, and (previously always-on)
- * reorder buttons overflow onto a second line at the narrower desktop
- * column widths (4-5 columns, CapabilityMapView.module.css's own
- * breakpoint table). Reorder now hides behind item 3's own "Reorder mode"
- * toggle, which frees most of that width back up, but `nowrap` plus the
- * name link's own truncation (`.columnLink` below) is what actually
- * guarantees one row regardless of name length or column width, rather
- * than relying on there merely being fewer controls most of the time.
+ * Sprint U4-2a item 3's "L1 header on one row" (`nowrap` + `.columnLink`'s
+ * own ellipsis) turned out to be the wrong fix for the real complaint —
+ * Sprint U4-2b item 1: "L1 names never truncate; the chip and 'N systems
+ * →' wrap under the name". `flex-wrap: wrap` here is what actually
+ * satisfies that: the name link (`flex: 1 1 auto`, still `min-width: 0`,
+ * still shrinkable) takes the row on its own when it's short enough to
+ * fit alongside the chip/zoom-link/reorder-toggle, and wraps them onto
+ * their own line below it, at their natural width, the moment it can't —
+ * never cutting the name itself short to make room.
  */
 .columnHeader {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: var(--space-2);
   padding-bottom: var(--space-1);
   border-bottom: var(--border-width-emphasis) solid var(--border-strong);
@@ -112,22 +112,18 @@
  * target — just the underline removal `CapabilityTile`'s primary link
  * gets for the same reason (plain-text name).
  *
- * Sprint U4-2a item 3: `flex: 1 1 auto` + `min-width: 0` is what lets this
- * shrink below its own text width inside a `nowrap` flex row (a flex
- * item's default `min-width: auto` would otherwise force the row wider
- * than the column instead) — combined with the truncation trio below, a
- * name too long for the remaining space ellipsizes instead of wrapping or
- * overflowing, while the Chip/zoom-link/reorder-toggle siblings (each
- * `flex: 0 0 auto` already, individually) keep their own natural width.
+ * Sprint U4-2b item 1: no truncation at all now — a long name wraps onto
+ * as many lines as it needs, full stop, rather than ellipsizing. `flex: 1
+ * 1 auto` + `min-width: 0` still matter here: without them a long
+ * unbroken word (or `white-space` fighting the wrap) could still force
+ * the row wider than the column before `.columnHeader`'s own `flex-wrap`
+ * gets a chance to push the chip/zoom-link onto their own line.
  */
 .columnLink {
   color: inherit;
   text-decoration: none;
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   display: block;
 }
 

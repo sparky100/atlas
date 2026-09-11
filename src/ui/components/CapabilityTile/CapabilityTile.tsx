@@ -63,15 +63,32 @@ export interface CapabilityTileProps {
  * doesn't participate in colour-by today either.
  */
 export function CapabilityTile({ href, name, tone, toneLabel, size = 'card', children }: CapabilityTileProps) {
+  const hasChip = tone !== undefined && toneLabel !== undefined;
   return (
-    <BlueprintFrame>
+    <BlueprintFrame interactive>
       <div className={size === 'compact' ? styles.tileCompact : styles.tile} data-tone={tone ?? 'none'}>
         <Link to={href} className={styles.primaryLink}>
           <Text as="span" size={size === 'compact' ? 'sm' : 'md'} className={styles.name}>
             {name}
           </Text>
         </Link>
-        {tone !== undefined && toneLabel !== undefined && <Chip tone={tone}>{toneLabel}</Chip>}
+        {/*
+         * Sprint U4-2b item 3: "every tile reserves the chip row so tiles
+         * in a column are equal height" — a tile whose colour-by mode has
+         * nothing to say about it (`tone`/`toneLabel` both undefined)
+         * used to skip the chip row entirely, so it sat shorter than its
+         * siblings that did have one. Always rendering the Chip and
+         * hiding it with `visibility: hidden` (not `display: none`, which
+         * would collapse the row back to nothing) keeps every tile's own
+         * chip-row height identical regardless of whether this one has
+         * something to show — a plain, non-`aria-hidden` invisible
+         * element is already unreachable to assistive tech via
+         * `visibility: hidden` on its own, so no extra `aria-hidden` is
+         * needed for the placeholder case.
+         */}
+        <span className={hasChip ? undefined : styles.chipPlaceholder}>
+          <Chip tone={tone ?? 'neutral'}>{toneLabel ?? ' '}</Chip>
+        </span>
         {children !== undefined && <span className={styles.secondary}>{children}</span>}
       </div>
     </BlueprintFrame>

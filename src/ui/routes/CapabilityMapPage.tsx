@@ -15,7 +15,6 @@ import { CapabilityMapAddForm } from '../capabilityMap/CapabilityMapAddForm';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
 import { ExportCapabilityMapAction } from '../capabilityMap/ExportCapabilityMapAction';
-import { SyncDescriptionsAction } from '../capabilityMap/SyncDescriptionsAction';
 import { useCapabilityMap } from '../capabilityMap/useCapabilityMap';
 import { useColourByPreference } from '../capabilityMap/useColourByPreference';
 import { useHomeMode } from '../home/useHomeMode';
@@ -43,13 +42,22 @@ import styles from './CapabilityMapPage.module.css';
  * empty-state fallback) is already visible above it — both owner/
  * architect only, same gate as `Edit` (ADR-015).
  *
- * Sprint U4-2a check B5: "Sync descriptions"/"Export as starter map"
- * (Sprint U4-1 C6's owner-only maintenance actions) sit in a "⋯" overflow
- * menu beside "+ Add capability", not as two buttons of their own below
- * the header — same always-collapsed `menuWrapper`/`menuToggle`/`menu`
- * pattern `ElementHeader.tsx`'s own overflow menu uses. Gated on the tree
- * being non-empty (same condition the old standalone row used) — nothing
- * to sync or export from an empty map.
+ * Sprint U4-2a check B5: "Export as starter map" (Sprint U4-1 C6's
+ * owner-only maintenance action) sits in a "⋯" overflow menu beside
+ * "+ Add capability", not as a button of its own below the header — same
+ * always-collapsed `menuWrapper`/`menuToggle`/`menu` pattern
+ * `ElementHeader.tsx`'s own overflow menu uses. Gated on the tree being
+ * non-empty (same condition the old standalone row used) — nothing to
+ * export from an empty map.
+ *
+ * Sprint U4-2b item 5: "Sync descriptions from starter map" is gone from
+ * this menu (and from the UI entirely — `SyncDescriptionsAction.tsx`/
+ * `useSyncDescriptions.ts` deleted). It was a one-off repair action for
+ * models seeded before Bug A2's fix (commit 4e63ca5) — real maintenance
+ * surface for a one-time data problem, not a standing part of this page's
+ * own workflow. The underlying repair still exists as
+ * `scripts/syncDescriptionsFromMap.ts` (that script's own comment names
+ * when it's safe to delete entirely).
  *
  * Check D1: `<main>` escapes the page's usual centred max-width once the
  * map has real content (`hasContent`, below) — `.mainWithMap`'s own
@@ -156,7 +164,6 @@ export function CapabilityMapPage() {
                     <span aria-hidden="true">⋯</span>
                   </button>
                   <div id={maintenanceMenuId} className={[styles.menu, maintenanceMenuOpen ? styles.open : ''].filter(Boolean).join(' ')}>
-                    <SyncDescriptionsAction modelId={model.id} userId={userId} onSynced={reload} />
                     <ExportCapabilityMapAction
                       modelId={model.id}
                       modelName={model.name}

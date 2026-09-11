@@ -63,11 +63,27 @@
   inset: 0;
 }
 
+/**
+ * Sprint U4-2b item 2: "L2 names wrap to two lines inside the tile" —
+ * replaces the old single-line ellipsis truncation, which was silently
+ * cutting off names that fit fine on a second line. The standard
+ * cross-browser two-line clamp: a flex-direction-vertical box limited to
+ * two lines, `overflow: hidden` for anything past that (a rarer third
+ * line still ellipsizes rather than overflowing the tile).
+ */
 .name {
   font-weight: 600;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+/* Sprint U4-2b item 3 — CapabilityTile.tsx's own comment: reserves the
+   chip row's height on a tile with nothing to show there, so every tile
+   in a column stays the same height regardless. */
+.chipPlaceholder {
+  visibility: hidden;
 }
 
 /* Lifted above the primary link's overlay (CSS paints/hit-tests a
