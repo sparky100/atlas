@@ -20,7 +20,7 @@ export function Stepper({ derived }: StepperProps) {
     <div className={styles.stepper}>
       <ol className={styles.line}>
         {derived.steps.map((step) => (
-          <li key={step.key} className={[styles.step, styles[step.state]].join(' ')}>
+          <li key={step.key} className={[styles.step, styles[step.state]].join(' ')} data-testid={`stepper-${step.key}`} data-step-state={step.state}>
             <span className={styles.dot} aria-hidden="true" />
             <Text as="span" size="sm" tone={step.state === 'upcoming' ? 'muted' : 'default'}>
               {step.label}

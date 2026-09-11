@@ -58,3 +58,19 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+/* Item 3: "affected capabilities" on each card — a compact inline list, not the detail page's own full rows (ChangeView.module.css's .capabilityList), since a card has far less room. */
+.affectedCapabilities {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.affectedCapabilityLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
