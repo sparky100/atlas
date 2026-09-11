@@ -23,7 +23,7 @@ export interface RelationshipTypeRule {
   toType: ElementType;
   /** Max live relationships of this type from one element. `null` = unbounded. */
   maxPerFrom: number | null;
-  /** Max live relationships with `primary: true` into one element (`owns` only). `null` = unbounded. */
+  /** Max live relationships with any one `role` value into one element (`owns` only — Prompt 7k item 2: cardinality is per `(toElementId, role)`, not "one owner total", so this caps each role independently, not the target's total owner count). `null` = unbounded. */
   maxPrimaryPerTo: number | null;
   /** Max live relationships with `role: 'primary'` from one element (`supports` only, Sprint U4-1 B4 — the landscape lane a system's tile is placed in). `null` = unbounded. Enforced by a partial unique index (`supabase/migrations`), not by engine validation — see that migration's own comment on why. */
   maxPrimaryPerFrom: number | null;

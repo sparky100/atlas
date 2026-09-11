@@ -3,7 +3,11 @@
  * first>' and 'Owned by: <team>' with links; empty state reads 'No
  * connections to other systems or actors yet' with the add link." Also
  * the sprint's own combined Playwright line: "context header for a system
- * with supports but no uses."
+ * with supports but no uses." Prompt 7k item 2 relabels the owner line by
+ * role ("Business owner: <team>" etc, `ContextView.tsx`'s own comment) —
+ * this test's fixture owns edge and assertion are updated to match, the
+ * underlying "owned-by is a header line, not a drawn edge" behaviour this
+ * item originally built is otherwise unchanged.
  *
  * Two systems in one fixture: one supports two capabilities (primary
  * second, to prove sort order isn't insertion order) and is owned by a
@@ -74,7 +78,7 @@ test('context header: a system with supports but no uses shows "Supports:" (prim
     // must appear first in the rendered "Supports:" line despite that.
     { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemId, toElementId: capAlphaId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
     { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemId, toElementId: capZetaId, attributes: { role: 'primary' }, sourceId: seedSourceId, confidence: 1 },
-    { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'owns', fromElementId: teamId, toElementId: systemId, attributes: { primary: true }, sourceId: seedSourceId, confidence: 1 },
+    { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'owns', fromElementId: teamId, toElementId: systemId, attributes: { role: 'business' }, sourceId: seedSourceId, confidence: 1 },
   ];
   const envelope: CommitEnvelope = { id: randomUUID(), branchId: main.id, parentCommitId: genesisCommitId, mergedBranchHeadCommitId: null, kind: 'manual', title: 'seed a system with supports and an owner, but no uses', body: null, deltas };
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });
@@ -93,8 +97,9 @@ test('context header: a system with supports but no uses shows "Supports:" (prim
   const supportsText = await supportsLine.innerText();
   expect(supportsText.indexOf('Zeta')).toBeLessThan(supportsText.indexOf('Alpha'));
 
-  // "Owned by:", linked.
-  const ownedByLine = page.getByText('Owned by:', { exact: false });
+  // "Business owner:" (Prompt 7k item 2: owns.role replaces owns.primary —
+  // the header now labels owners by role rather than a bare "Owned by:"), linked.
+  const ownedByLine = page.getByText('Business owner:', { exact: false });
   await expect(ownedByLine).toBeVisible();
   await expect(ownedByLine.getByRole('link', { name: 'Platform Team' })).toBeVisible();
 

@@ -14,6 +14,11 @@ function rel(id: string, type: RelationshipsHeadRow['relationship_type'], from: 
   return { relationship_id: id, relationship_type: type, from_element_id: from, to_element_id: to, attributes: {}, exists_delta_id: `d-${id}` };
 }
 
+/** Prompt 7k item 2: an `owns` edge always carries `role` in real data — `rel()`'s bare `attributes: {}` is fine for direction/type filtering tests that never read it, but a test asserting an owner actually shows up needs a real role. */
+function ownsRel(id: string, from: string, to: string, role: string): RelationshipsHeadRow {
+  return { relationship_id: id, relationship_type: 'owns', from_element_id: from, to_element_id: to, attributes: { role }, exists_delta_id: `d-${id}` };
+}
+
 describe('computeContextGroup', () => {
   it('groups a uses-neighbour as internal when it is not external', () => {
     const hub = system('hub', 'Hub');
@@ -39,13 +44,21 @@ describe('computeContextGroup', () => {
     expect(group.internal.map((n) => n.element.element_id).sort()).toEqual(['a', 'b']);
   });
 
-  it('groups an owns-the-hub actor as an owner, with no drawn edge (owns is never a canvas edge)', () => {
+  it('groups an owns-the-hub actor as an owner, with its role, with no drawn edge (owns is never a canvas edge)', () => {
+    const hub = system('hub', 'Hub');
+    const owner = actor('owner1', 'Platform Team');
+    const group = computeContextGroup(hub, [ownsRel('r1', 'owner1', 'hub', 'business')], new Map([['owner1', owner]]));
+    expect(group.owners.map((o) => o.actor.element_id)).toEqual(['owner1']);
+    expect(group.owners.map((o) => o.role)).toEqual(['business']);
+    expect(group.internal).toEqual([]);
+    expect(group.external).toEqual([]);
+  });
+
+  it("drops an owns edge with no role recorded — real data always has one; this is defensive, not a case to render", () => {
     const hub = system('hub', 'Hub');
     const owner = actor('owner1', 'Platform Team');
     const group = computeContextGroup(hub, [rel('r1', 'owns', 'owner1', 'hub')], new Map([['owner1', owner]]));
-    expect(group.owners.map((o) => o.element_id)).toEqual(['owner1']);
-    expect(group.internal).toEqual([]);
-    expect(group.external).toEqual([]);
+    expect(group.owners).toEqual([]);
   });
 
   it('a supports edge is never a Context node or a drawn edge, but is captured in group.supports (item 12)', () => {
@@ -81,6 +94,19 @@ describe('computeContextGroup', () => {
     const hub = system('hub', 'Hub');
     const group = computeContextGroup(hub, [rel('r1', 'supports', 'hub', 'missing-cap')], new Map());
     expect(group.supports).toEqual([]);
+  });
+
+  it('owners sort by role first (business, then technical, then service — role names sort alphabetically the same way here), then by name/id within a role', () => {
+    const hub = system('hub', 'Hub');
+    const zoe = actor('zoe', 'Zoe'); // technical
+    const alice = actor('alice', 'Alice'); // business
+    const bob = actor('bob', 'Bob'); // business, sorts after Alice by name
+    const group = computeContextGroup(
+      hub,
+      [ownsRel('r1', 'zoe', 'hub', 'technical'), ownsRel('r2', 'alice', 'hub', 'business'), ownsRel('r3', 'bob', 'hub', 'business')],
+      new Map([['zoe', zoe], ['alice', alice], ['bob', bob]]),
+    );
+    expect(group.owners.map((o) => o.actor.element_id)).toEqual(['alice', 'bob', 'zoe']);
   });
 
   it('ignores an owns edge where the hub is the owner, not the owned (a system never owns anything the model allows)', () => {

@@ -77,7 +77,7 @@ const supportsAttributes: fc.Arbitrary<SupportsAttributes> = fc.record(
   { requiredKeys: ['role'] },
 );
 const usesAttributes: fc.Arbitrary<UsesAttributes> = fc.record({ description: fc.string() }, { requiredKeys: [] });
-const ownsAttributes: fc.Arbitrary<OwnsAttributes> = fc.record({ primary: fc.boolean() }, { requiredKeys: ['primary'] });
+const ownsAttributes: fc.Arbitrary<OwnsAttributes> = fc.record({ role: fc.constantFrom('business' as const, 'technical' as const, 'service' as const) }, { requiredKeys: ['role'] });
 const flowsToAttributes: fc.Arbitrary<FlowsToAttributes> = fc.record(
   { description: fc.string(), dataClassification: fc.constantFrom(...dataClassification), protocol: fc.string() },
   { requiredKeys: [] },
@@ -168,9 +168,9 @@ const relationshipUpdateArb: fc.Arbitrary<Delta> = fc.oneof(
     ([base, relationshipId, previousDeltaId, value]) =>
       ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'uses', attribute: 'description', value, previousDeltaId }) satisfies Delta,
   ),
-  fc.tuple(provenanceBase, uuid, uuid, fc.option(fc.boolean(), { nil: null })).map(
+  fc.tuple(provenanceBase, uuid, uuid, fc.option(fc.constantFrom('business' as const, 'technical' as const, 'service' as const), { nil: null })).map(
     ([base, relationshipId, previousDeltaId, value]) =>
-      ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'owns', attribute: 'primary', value, previousDeltaId }) satisfies Delta,
+      ({ ...base, kind: 'relationship.update', relationshipId, relationshipType: 'owns', attribute: 'role', value, previousDeltaId }) satisfies Delta,
   ),
   fc.tuple(provenanceBase, uuid, uuid, fc.option(fc.string(), { nil: null })).map(
     ([base, relationshipId, previousDeltaId, value]) =>

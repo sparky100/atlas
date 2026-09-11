@@ -29,14 +29,17 @@ export interface UseRelationshipCreateResult {
    * very search result being clicked. `attributesOverride`, when given,
    * replaces this hook's own default attributes entirely — B4's `supports`
    * picker builds `{ role: 'primary' | 'secondary' }` itself (only the
-   * caller knows the answer to "primary?"), and Handoff — Flow: Add a
-   * system, step 6's `uses`/`flows_to` verb phrase builds `{ description }`
-   * the same way (there is no separate verb field in the contract —
-   * `UsesAttributes`/`FlowsToAttributes.description` is it). Every real
-   * caller's own default (`relationshipType === 'owns' ? {primary:true} :
-   * {}`) is `{}` whenever it passes an override at all, so replace-vs-merge
-   * never actually differs for any of them — override is simpler. `demotion`,
-   * when given, folds one extra `relationship.update` into the same commit.
+   * caller knows the answer to "primary?"), Prompt 7k item 2's `owns`
+   * picker builds `{ role: 'business' | 'technical' | 'service' }` the
+   * same way (only the caller knows the answer to "which role?"), and
+   * Handoff — Flow: Add a system, step 6's `uses`/`flows_to` verb phrase
+   * builds `{ description }` the same way (there is no separate verb field
+   * in the contract — `UsesAttributes`/`FlowsToAttributes.description` is
+   * it). Every real caller's own default (`relationshipType === 'owns' ?
+   * {role:'business'} : {}`) is `{}` whenever it passes an override at
+   * all, so replace-vs-merge never actually differs for any of them —
+   * override is simpler. `demotion`, when given, folds one extra
+   * `relationship.update` into the same commit.
    */
   create: (otherElementId: UUID, otherElementName: string, attributesOverride?: Record<string, Json>, demotion?: RelationshipCreateDemotion | null) => Promise<void>;
 }
@@ -64,11 +67,14 @@ export interface UseRelationshipCreateInput {
  * own label, e.g. "uses", already says this element is the subject);
  * inbound puts it at `toElementId` (e.g. "used by").
  *
- * `owns.primary` is the one relationship attribute type that's required
- * (`OwnsAttributes`, src/contracts/delta.ts) — defaulted to `true` here:
- * adding an owner through this control is naming *the* owner, not a
- * secondary one, and `maxPrimaryPerTo: 1` (relationship_type_rules) is
- * enforced server-side regardless of what this default guesses.
+ * `owns.role` is the one relationship attribute type that's required
+ * (`OwnsAttributes`, src/contracts/delta.ts) — defaulted to `'business'`
+ * here (Prompt 7k item 1's own "defaults to business on capability
+ * targets" wording; this bare fallback has no target-type context of its
+ * own to prompt on a system target the way `RelationshipAdd.tsx`'s own
+ * staged prompt does, so it always assumes the more common case), and
+ * `maxPrimaryPerTo: 1` per role (relationship_type_rules, C17) is enforced
+ * server-side regardless of what this default guesses.
  */
 export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRelationshipCreateResult {
   const { modelId, orgId, userId, relationshipType, direction, elementId, elementName, branch, expectedHeadCommitId, onCreated } = input;
@@ -94,7 +100,7 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
         // type's attributes are entirely optional (SupportsAttributes/
         // UsesAttributes/FlowsToAttributes). `attributesOverride` always
         // replaces this when given.
-        const attributes = attributesOverride ?? (relationshipType === 'owns' ? { primary: true } : {});
+        const attributes = attributesOverride ?? (relationshipType === 'owns' ? { role: 'business' } : {});
 
         const createDelta = {
           kind: 'relationship.create',

@@ -9,7 +9,7 @@
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { ELEMENT_TYPES, RELATIONSHIP_TYPES, type Delta, type DeltaKind, type ElementType, type LifecycleStatus, type RelationshipType, type UUID } from '../contracts/delta';
+import { ELEMENT_TYPES, RELATIONSHIP_TYPES, type Delta, type DeltaKind, type ElementType, type LifecycleStatus, type OwnsRole, type RelationshipType, type UUID } from '../contracts/delta';
 import { isRelationshipTripleAllowed, RELATIONSHIP_TYPE_RULES } from '../contracts/relationshipTypeRules';
 import type { Json } from '../contracts/rows';
 import { EngineError } from './errors';
@@ -414,7 +414,7 @@ function createOwnsDelta(id: UUID, relationshipId: UUID): Delta {
     relationshipType: 'owns',
     fromElementId: 'fixture-actor',
     toElementId: 'fixture-target',
-    attributes: { primary: true },
+    attributes: { role: 'business' },
     sourceId: FIXTURE_SOURCE,
     confidence: 1,
   };
@@ -476,8 +476,8 @@ const fixturesByKind: Record<DeltaKind, () => KindFixture> = {
       id: 'd-rupdate',
       relationshipId: 'rel-1',
       relationshipType: 'owns',
-      attribute: 'primary',
-      value: false,
+      attribute: 'role',
+      value: 'technical',
       previousDeltaId: 'd-rcreate',
       sourceId: FIXTURE_SOURCE,
       confidence: 1,
@@ -611,7 +611,7 @@ describe('C9: relationship.create enforces RELATIONSHIP_TYPE_RULES', () => {
       relationshipType,
       fromElementId: 'from-el',
       toElementId: 'to-el',
-      attributes: (relationshipType === 'owns' ? { primary: true } : {}) as never,
+      attributes: (relationshipType === 'owns' ? { role: 'business' } : {}) as never,
       sourceId: 'src',
       confidence: 1,
     };
@@ -659,7 +659,7 @@ describe('C9: relationship.create enforces RELATIONSHIP_TYPE_RULES', () => {
   });
 });
 
-describe('C17: at most one primary supports edge per system, one primary owns edge per owned element', () => {
+describe('C17: at most one primary supports edge per system, one owns edge per role per owned element', () => {
   // `fold`/`apply` take no branch-kind argument — `commitToBranch`
   // (src/db/commits.ts) calls the exact same `fold` for a `main` commit
   // and a `change` branch's own commit, so a check inside `apply()` is, by
@@ -680,8 +680,8 @@ describe('C17: at most one primary supports edge per system, one primary owns ed
     return { kind: 'relationship.create', id, relationshipId, relationshipType: 'supports', fromElementId: systemId, toElementId: capabilityId, attributes: { role }, sourceId: 'src', confidence: 1 };
   }
 
-  function ownsCreate(id: UUID, relationshipId: UUID, actorId: UUID, targetId: UUID, primary: boolean): Delta {
-    return { kind: 'relationship.create', id, relationshipId, relationshipType: 'owns', fromElementId: actorId, toElementId: targetId, attributes: { primary }, sourceId: 'src', confidence: 1 };
+  function ownsCreate(id: UUID, relationshipId: UUID, actorId: UUID, targetId: UUID, role: OwnsRole): Delta {
+    return { kind: 'relationship.create', id, relationshipId, relationshipType: 'owns', fromElementId: actorId, toElementId: targetId, attributes: { role }, sourceId: 'src', confidence: 1 };
   }
 
   function relationshipRetract(id: UUID, relationshipId: UUID, relationshipType: RelationshipType, previousDeltaId: UUID): Delta {
@@ -740,30 +740,30 @@ describe('C17: at most one primary supports edge per system, one primary owns ed
     expect(() => fold(buildHead(), [demote, promote], ctx)).not.toThrow();
   });
 
-  it('owns.create: a second primary owner of the same target, with no demotion, is rejected naming C17, the target, and the existing owner', () => {
+  it('owns.create: a second business owner of the same target, with no reassignment, is rejected naming C17, the target, and the existing owner', () => {
     const head = twoActorsAndOneSystem();
-    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
-    const attempt = () => fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', true)], ctx);
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', 'business')], ctx);
+    const attempt = () => fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', 'business')], ctx);
     expect(attempt).toThrow(EngineError);
     expect(attempt).toThrow(/C17/);
-    // Names the target (the anchor) and the *existing* primary owner —
+    // Names the target (the anchor) and the *existing* business owner —
     // not the new one being attempted, which the caller already knows.
     expect(attempt).toThrow(/PowerON/);
     expect(attempt).toThrow(/Network Control/);
   });
 
-  it('owns.create: a non-primary second owner of the same target is always accepted', () => {
+  it('owns.create: a second owner of the same target in a different role is always accepted', () => {
     const head = twoActorsAndOneSystem();
-    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
-    expect(() => fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', false)], ctx)).not.toThrow();
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', 'business')], ctx);
+    expect(() => fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', 'technical')], ctx)).not.toThrow();
   });
 
-  it('owns.create: promoting a second owner is accepted when the same commit demotes the first one earlier in seq order', () => {
+  it('owns.create: a second owner in the same role is accepted when the same commit reassigns the first one to a different role earlier in seq order', () => {
     const head = twoActorsAndOneSystem();
-    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
-    const demote: Delta = { kind: 'relationship.update', id: 'd-demote', relationshipId: 'rel-1', relationshipType: 'owns', attribute: 'primary', value: false, previousDeltaId: 'd-r1', sourceId: 'src', confidence: 1 };
-    const promote = ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', true);
-    expect(() => fold(head, [demote, promote], ctx)).not.toThrow();
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', 'business')], ctx);
+    const reassign: Delta = { kind: 'relationship.update', id: 'd-reassign', relationshipId: 'rel-1', relationshipType: 'owns', attribute: 'role', value: 'technical', previousDeltaId: 'd-r1', sourceId: 'src', confidence: 1 };
+    const promote = ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', 'business');
+    expect(() => fold(head, [reassign, promote], ctx)).not.toThrow();
   });
 
   it('supports.restore: reviving a retracted primary is rejected once a new edge has taken over as primary; restoring after that new one is retracted too succeeds', () => {
@@ -782,11 +782,11 @@ describe('C17: at most one primary supports edge per system, one primary owns ed
     expect(() => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'supports', 'd-retract-r1')], ctx)).not.toThrow();
   });
 
-  it('owns.restore: reviving a retracted primary owner is rejected once a new owner has taken over as primary; restoring after that new one is retracted too succeeds', () => {
+  it('owns.restore: reviving a retracted business owner is rejected once a new business owner has taken over; restoring after that new one is retracted too succeeds', () => {
     const head = twoActorsAndOneSystem();
-    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', true)], ctx);
+    fold(head, [ownsCreate('d-r1', 'rel-1', 'actor-a', 'sys-1', 'business')], ctx);
     fold(head, [relationshipRetract('d-retract-r1', 'rel-1', 'owns', 'd-r1')], ctx);
-    fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', true)], ctx);
+    fold(head, [ownsCreate('d-r2', 'rel-2', 'actor-b', 'sys-1', 'business')], ctx);
 
     const attempt = () => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'owns', 'd-retract-r1')], ctx);
     expect(attempt).toThrow(EngineError);

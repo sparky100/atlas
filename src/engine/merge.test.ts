@@ -139,22 +139,22 @@ describe('structural: duplicate-relationship', () => {
 });
 
 describe('structural: cardinality', () => {
-  it('both sides creating a primary owns relationship to the same target is blocking, even with different owners', () => {
+  it('both sides creating a same-role owns relationship to the same target is blocking, even with different owners', () => {
     const input = scenario(
       [createActor('d0', 'owner1', 'Team A'), createActor('d1', 'owner2', 'Team B'), createEl('d2', 'target', 'Target System')],
-      [createRel('d-ours', 'rel-ours', 'owns', 'owner1', 'target', { primary: true })],
-      [createRel('d-theirs', 'rel-theirs', 'owns', 'owner2', 'target', { primary: true })],
+      [createRel('d-ours', 'rel-ours', 'owns', 'owner1', 'target', { role: 'business' })],
+      [createRel('d-theirs', 'rel-theirs', 'owns', 'owner2', 'target', { role: 'business' })],
     );
     const result = classifyMerge(input);
     expect(result.hasBlockingConflict).toBe(true);
     expect(result.findings).toContainEqual(expect.objectContaining({ class: 'structural:cardinality', blocking: true, subjectId: 'rel-ours', relatedSubjectId: 'rel-theirs' }));
   });
 
-  it('a primary owns and a non-primary owns to the same target is not a cardinality conflict', () => {
+  it('a business owns and a technical owns to the same target is not a cardinality conflict', () => {
     const input = scenario(
       [createActor('d0', 'owner1', 'Team A'), createActor('d1', 'owner2', 'Team B'), createEl('d2', 'target', 'Target System')],
-      [createRel('d-ours', 'rel-ours', 'owns', 'owner1', 'target', { primary: true })],
-      [createRel('d-theirs', 'rel-theirs', 'owns', 'owner2', 'target', { primary: false })],
+      [createRel('d-ours', 'rel-ours', 'owns', 'owner1', 'target', { role: 'business' })],
+      [createRel('d-theirs', 'rel-theirs', 'owns', 'owner2', 'target', { role: 'technical' })],
     );
     const result = classifyMerge(input);
     expect(result.findings.filter((f) => f.class === 'structural:cardinality')).toEqual([]);

@@ -84,7 +84,8 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
     data.systemsWithoutCapability.length === 0 &&
     data.capabilitiesWithoutOwner.length === 0 &&
     data.staleAttributes.staleFactCount === 0 &&
-    data.unlabeledVerbRelationships.length === 0;
+    data.unlabeledVerbRelationships.length === 0 &&
+    data.systemsWithoutTechnicalOwner.length === 0;
 
   return (
     <div className={styles.columns}>
@@ -227,6 +228,14 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
                 <HealthFinding
                   summary={`${String(data.unlabeledVerbRelationships.length)} ${plural(data.unlabeledVerbRelationships.length, 'relationship', 'relationships')} missing a label`}
                   items={unlabeledRelationshipItems(data.unlabeledVerbRelationships)}
+                />
+              </div>
+
+              <div className={styles.findingPlate}>
+                <HealthFinding
+                  summary={`${String(data.systemsWithoutTechnicalOwner.length)} ${plural(data.systemsWithoutTechnicalOwner.length, 'system', 'systems')} with no technical owner`}
+                  items={elementItems(data.systemsWithoutTechnicalOwner)}
+                  browseHref={browseHref('no-technical-owner')}
                 />
               </div>
 

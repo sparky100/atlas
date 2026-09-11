@@ -9,6 +9,7 @@ import {
   computeStaleAttributesFinding,
   findCapabilitiesWithoutOwner,
   findSystemsWithoutCapability,
+  findSystemsWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
   listAllOwnsEdges,
   listAllUsesAndFlowsToEdges,
@@ -47,6 +48,8 @@ export interface ArchitectHomeData {
   staleAttributes: StaleAttributesFinding;
   /** Sprint U4-1 B5's fifth finding: `uses`/`flows_to` relationships with no verb-phrase label. */
   unlabeledVerbRelationships: UnlabeledVerbRelationship[];
+  /** Prompt 7k item 2's role-aware finding: systems with no `owns` edge carrying `role: 'technical'`. */
+  systemsWithoutTechnicalOwner: ElementsHeadRow[];
 }
 
 export type ArchitectHomeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeData };
@@ -144,6 +147,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges),
             staleAttributes: computeStaleAttributesFinding(facts, systems),
             unlabeledVerbRelationships: findUnlabeledVerbRelationships(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
+            systemsWithoutTechnicalOwner: findSystemsWithoutTechnicalOwner(systems, ownsEdges),
           },
         });
       }

@@ -206,9 +206,15 @@ export function classifyMerge(input: MergeClassifyInput, options: MergeClassifyO
         blockingSubjects.add(oid);
         blockingSubjects.add(tid);
       }
-      if (orow.relationshipType === 'owns' && trow.relationshipType === 'owns' && orow.toElementId === trow.toElementId && orow.attributes.primary === true && trow.attributes.primary === true) {
+      if (
+        orow.relationshipType === 'owns' &&
+        trow.relationshipType === 'owns' &&
+        orow.toElementId === trow.toElementId &&
+        typeof orow.attributes.role === 'string' &&
+        orow.attributes.role === trow.attributes.role
+      ) {
         findings.push(
-          finding('structural:cardinality', true, oid, `both sides created a primary owns relationship targeting ${orow.toElementId}`, { relatedSubjectId: tid }),
+          finding('structural:cardinality', true, oid, `both sides created a ${orow.attributes.role} owns relationship targeting ${orow.toElementId}`, { relatedSubjectId: tid }),
         );
         blockingSubjects.add(oid);
         blockingSubjects.add(tid);

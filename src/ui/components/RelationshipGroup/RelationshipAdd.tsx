@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react';
-import type { RelationshipType, UUID } from '../../../contracts/delta';
+import type { ElementType, OwnsRole, RelationshipType, UUID } from '../../../contracts/delta';
 import type { FactsRow, RelationshipsHeadRow } from '../../../contracts/rows';
 import type { RelationshipGroupSlot } from '../../../contracts/relationshipTypeRules';
 import type { BranchRow } from '../../../db/types';
@@ -18,6 +18,8 @@ export interface RelationshipAddProps {
   elementId: UUID;
   /** Same element's name — only for the generated commit title (`useRelationshipCreate`'s own doc comment). */
   elementName: string;
+  /** This element's own type — Prompt 7k item 2's `owns` staged role prompt needs it for the `inbound` direction (elementId is the *owned* side then, so its type, not the picked target's, decides capability-default-vs-system-prompt; `outbound` instead reads the picked target's own type, `PendingTarget.elementType` below). */
+  elementType: ElementType;
   /** This exact type+direction's own existing rows (`RelationshipsSection.tsx`'s already-computed `outboundRows`/`inboundRows`) — only read for `supports`/outbound, B4's "asks 'primary?' only when the system already has a supports link". */
   existingRows: readonly RelationshipsHeadRow[];
   /** Needed alongside `existingRows` for the same B4 flow: demoting the system's current primary supports edge (if the new one is answered "yes, primary") is a `relationship.update` on that *other* relationship, and C6 needs the delta currently asserting its `role` as `previousDeltaId`. */
@@ -42,6 +44,8 @@ const DIRECTION_VERB: Record<RelationshipType, { outbound: string; inbound: stri
 interface PendingTarget {
   elementId: UUID;
   name: string;
+  /** Prompt 7k item 2: which capability/system the picked target is, needed for `owns`' own staged-role decision on the `outbound` direction (see `RelationshipAddProps.elementType`'s own comment). */
+  elementType: ElementType;
 }
 
 /**
@@ -99,8 +103,21 @@ interface PendingTarget {
  * message: "written and typechecked, not executed"). Fixed here with a
  * real `<label htmlFor={labelId}>` — a placeholder was never a substitute
  * for one.
+ *
+ * Prompt 7k item 2 adds a third staged question, for `owns` only, and only
+ * when the *owned* side of the edge (never the actor side — `owns` has no
+ * role concept for the actor) is a `system`: "which role?"
+ * (business/technical/service). A capability target skips the question
+ * entirely and defaults to `business` (`defaultAttributesForPlainPick`) —
+ * the item's own "defaults to business on capability targets, prompts on
+ * system targets" wording. Which side is the owned one depends on
+ * `direction`: `outbound` picks a target that's the owned side (this
+ * control lives on the owning actor's own page), so the picked target's
+ * own type decides; `inbound` puts the *current* element at the owned
+ * side (this control lives on the owned system/capability's own page,
+ * searching for an owning actor), so `elementType` decides instead.
  */
-export function RelationshipAdd({ slot, direction, elementId, elementName, existingRows, relationshipFacts, modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, onCreated }: RelationshipAddProps) {
+export function RelationshipAdd({ slot, direction, elementId, elementName, elementType, existingRows, relationshipFacts, modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, onCreated }: RelationshipAddProps) {
   const [open, setOpen] = useState(false);
   const [pendingTarget, setPendingTarget] = useState<PendingTarget | null>(null);
   const [labelDraft, setLabelDraft] = useState('');
@@ -131,6 +148,13 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
   const asksPrimary = slot.relationshipType === 'supports' && direction === 'outbound' && existingRows.length > 0;
   const needsLabel = slot.relationshipType === 'uses' || slot.relationshipType === 'flows_to';
 
+  // See this component's own doc comment for why `direction` picks which
+  // side's type decides.
+  function ownedElementTypeFor(target: PendingTarget): ElementType {
+    return direction === 'outbound' ? target.elementType : elementType;
+  }
+  const asksOwnsRole = slot.relationshipType === 'owns' && pendingTarget !== null && ownedElementTypeFor(pendingTarget) === 'system';
+
   function currentPrimaryDemotion(): RelationshipCreateDemotion | null {
     const currentPrimary = existingRows.find((row) => attributesRecord(row.attributes).role === 'primary');
     if (!currentPrimary) return null;
@@ -139,12 +163,13 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
   }
 
   function pickResult(target: PendingTarget): void {
-    if (asksPrimary || needsLabel) {
+    const willAskOwnsRole = slot.relationshipType === 'owns' && ownedElementTypeFor(target) === 'system';
+    if (asksPrimary || needsLabel || willAskOwnsRole) {
       setPendingTarget(target);
       return;
     }
     targetIdRef.current = target.elementId;
-    void create(target.elementId, target.name, defaultAttributesForPlainPick(slot.relationshipType));
+    void create(target.elementId, target.name, defaultAttributesForPlainPick(slot.relationshipType, ownedElementTypeFor(target)));
   }
 
   function answerPrimary(primary: boolean): void {
@@ -158,6 +183,12 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
     if (!pendingTarget || label.length === 0) return;
     targetIdRef.current = pendingTarget.elementId;
     void create(pendingTarget.elementId, pendingTarget.name, { description: label });
+  }
+
+  function answerOwnsRole(role: OwnsRole): void {
+    if (!pendingTarget) return;
+    targetIdRef.current = pendingTarget.elementId;
+    void create(pendingTarget.elementId, pendingTarget.name, { role });
   }
 
   // Distinct from `close`: backs out of the primary/label stage to the
@@ -255,6 +286,43 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
     );
   }
 
+  if (pendingTarget && asksOwnsRole) {
+    const ownerName = direction === 'outbound' ? elementName : pendingTarget.name;
+    const ownedName = direction === 'outbound' ? pendingTarget.name : elementName;
+    return (
+      <div className={styles.panel}>
+        <Text as="p" size="sm">
+          What role does {ownerName} have for {ownedName}?
+        </Text>
+        <Text as="p" tone="muted" size="sm">
+          A system can have up to three owners at once — one business, one technical, one service.
+        </Text>
+        <div className={styles.actions}>
+          <Button variant="secondary" onClick={() => { answerOwnsRole('business'); }} disabled={status === 'creating'}>
+            {status === 'creating' ? 'Adding…' : 'Business'}
+          </Button>
+          <Button variant="secondary" onClick={() => { answerOwnsRole('technical'); }} disabled={status === 'creating'}>
+            Technical
+          </Button>
+          <Button variant="secondary" onClick={() => { answerOwnsRole('service'); }} disabled={status === 'creating'}>
+            Service
+          </Button>
+          <Button variant="ghost" onClick={cancelPending} disabled={status === 'creating'}>
+            Back
+          </Button>
+          <Button variant="ghost" onClick={close} disabled={status === 'creating'}>
+            Cancel
+          </Button>
+        </div>
+        {error !== null && (
+          <Text as="p" size="sm">
+            {error}
+          </Text>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={styles.panel}>
       <input
@@ -285,7 +353,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, exist
         <ul className={styles.results}>
           {search.results.map((result) => (
             <li key={result.element_id}>
-              <button type="button" className={styles.resultRow} disabled={status === 'creating'} onClick={() => { pickResult({ elementId: result.element_id, name: result.name }); }}>
+              <button type="button" className={styles.resultRow} disabled={status === 'creating'} onClick={() => { pickResult({ elementId: result.element_id, name: result.name, elementType: result.element_type }); }}>
                 <ElementTypeGlyph type={result.element_type} />
                 <Text as="span">{result.name}</Text>
                 <Text as="span" tone="muted" size="sm">

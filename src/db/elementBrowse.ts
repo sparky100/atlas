@@ -21,10 +21,16 @@ export async function listAllElements(supabase: Client, commitId: UUID): Promise
 }
 
 /**
- * Every element's primary owner, keyed by the owned element's id — built
- * from every live `owns` relationship at `commitId` (only ever
- * system/capability targets, `RELATIONSHIP_TYPE_RULES`) in one query
- * rather than one lookup per row.
+ * Every element's own "the owner" for this table's single Owner column,
+ * keyed by the owned element's id — built from every live `owns`
+ * relationship at `commitId` (only ever system/capability targets,
+ * `RELATIONSHIP_TYPE_RULES`) in one query rather than one lookup per row.
+ *
+ * Prompt 7k item 2: a target can now have up to three owners at once (one
+ * per role), but this table has one Owner column — prefers the `business`
+ * role (the closest match to what "primary" used to mean) and falls back
+ * to whichever other role is present when there's no business owner, same
+ * preference `enrichElementMatches.ts`'s own compact owner lookup uses.
  */
 export async function loadOwnersByElementId(supabase: Client, commitId: UUID, elementsById: ReadonlyMap<UUID, ElementsHeadRow>): Promise<Map<UUID, ElementsHeadRow>> {
   const query = supabase
@@ -36,10 +42,18 @@ export async function loadOwnersByElementId(supabase: Client, commitId: UUID, el
   const rows = await selectAll<RelationshipsHeadRow>(query);
 
   const owners = new Map<UUID, ElementsHeadRow>();
+  const fallbackOwners = new Map<UUID, ElementsHeadRow>();
   for (const row of rows) {
-    if (attributesRecord(row.attributes).primary !== true) continue;
     const owner = elementsById.get(row.from_element_id);
-    if (owner) owners.set(row.to_element_id, owner);
+    if (!owner) continue;
+    if (attributesRecord(row.attributes).role === 'business') {
+      owners.set(row.to_element_id, owner);
+    } else if (!fallbackOwners.has(row.to_element_id)) {
+      fallbackOwners.set(row.to_element_id, owner);
+    }
+  }
+  for (const [elementId, owner] of fallbackOwners) {
+    if (!owners.has(elementId)) owners.set(elementId, owner);
   }
   return owners;
 }

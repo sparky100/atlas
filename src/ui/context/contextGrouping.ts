@@ -47,14 +47,20 @@ export interface ContextSupport {
   primary: boolean;
 }
 
+/** One actor owning the hub, and in what role (Prompt 7k item 2 — `owns.role`) — `ContextGroup.owners` below, real Context nodes with no drawn edge (see module comment). A target can have up to three of these at once (one per role), never deduped by actor: the same actor could in principle hold two different roles via two separate `owns` edges. */
+export interface ContextOwner {
+  actor: ElementsHeadRow;
+  role: string;
+}
+
 export interface ContextGroup {
   hub: ElementsHeadRow;
   /** Non-external neighbours, reached via a drawn `uses`/`flows_to` edge. */
   internal: ContextNeighbour[];
   /** External neighbours (`isExternal: true`), reached via a drawn edge — UI-principles' "outside a ring". */
   external: ContextNeighbour[];
-  /** Actors that `own` the hub (ADR-001: `owns: actor → system`) — real Context nodes with no drawn edge (see module comment). */
-  owners: ElementsHeadRow[];
+  /** Actors that `own` the hub (ADR-001: `owns: actor → system`), each with its own role — real Context nodes with no drawn edge (see module comment). */
+  owners: ContextOwner[];
   /** Sprint U4-2b item 12: the header's "Supports: <capabilities, primary first>" line — see `ContextSupport`'s own comment for why this is neither a node nor a drawn edge, same as `owners`. */
   supports: ContextSupport[];
 }
@@ -74,7 +80,7 @@ function byNameThenId(a: ElementsHeadRow, b: ElementsHeadRow): number {
  */
 export function computeContextGroup(hub: ElementsHeadRow, relationships: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): ContextGroup {
   const neighbourEdges = new Map<UUID, RelationshipsHeadRow[]>();
-  const ownerIds = new Set<UUID>();
+  const ownerEntries: { actorId: UUID; role: string }[] = [];
   // Keyed by capability id, not a list: at most one supports edge is ever
   // expected between one system and one capability, so the last one seen
   // (there should only ever be one) simply wins.
@@ -85,7 +91,12 @@ export function computeContextGroup(hub: ElementsHeadRow, relationships: readonl
     if (otherId === hub.element_id) continue; // a self-relationship shouldn't exist, but this function never assumes it can't.
 
     if (rel.relationship_type === 'owns' && rel.to_element_id === hub.element_id) {
-      ownerIds.add(rel.from_element_id);
+      const role = attributesRecord(rel.attributes).role;
+      // Named by a relationship but no role recorded: same "never render
+      // for data that isn't there" stance as an unresolved element below —
+      // real `owns` data always carries one (`OwnsAttributes.role` is
+      // required), so this only ever skips malformed/pre-migration data.
+      if (typeof role === 'string') ownerEntries.push({ actorId: rel.from_element_id, role });
       continue;
     }
     if (rel.relationship_type === 'supports' && rel.from_element_id === hub.element_id) {
@@ -109,10 +120,13 @@ export function computeContextGroup(hub: ElementsHeadRow, relationships: readonl
   internal.sort((a, b) => byNameThenId(a.element, b.element));
   external.sort((a, b) => byNameThenId(a.element, b.element));
 
-  const owners = [...ownerIds]
-    .map((id) => elementsById.get(id))
-    .filter((e): e is ElementsHeadRow => e !== undefined)
-    .sort(byNameThenId);
+  const owners: ContextOwner[] = ownerEntries
+    .map(({ actorId, role }): ContextOwner | null => {
+      const actor = elementsById.get(actorId);
+      return actor ? { actor, role } : null; // named by a relationship but not resolved: same "never render for data that isn't there" stance as internal/external above.
+    })
+    .filter((o): o is ContextOwner => o !== null)
+    .sort((a, b) => a.role.localeCompare(b.role) || byNameThenId(a.actor, b.actor));
 
   const supports: ContextSupport[] = [...supportsEdgeByCapabilityId.entries()]
     .map(([capabilityId, edge]): ContextSupport | null => {

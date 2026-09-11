@@ -16,8 +16,9 @@
  *
  * `foldFromGenesis` below re-runs every commit's deltas through the real
  * `apply()` (src/engine/deltas.ts), so any invariant `apply()` enforces
- * inline — C8, C9, C17 (Sprint U4-1: at most one primary `supports`/`owns`
- * edge per anchor) — is re-checked here too. A model whose history already
+ * inline — C8, C9, C17 (Sprint U4-1: at most one primary `supports` edge
+ * per system; Prompt 7k item 2: at most one `owns` edge per role per owned
+ * element) — is re-checked here too. A model whose history already
  * contains a violation (written before the check existed, or landed some
  * other way) makes this throw an `EngineError` instead of returning a
  * result: that's this function surfacing a pre-existing violation, not a

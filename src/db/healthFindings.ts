@@ -139,18 +139,35 @@ export function isCapabilityOwnedWithAncestry(capability: ElementsHeadRow, selfO
 }
 
 /**
- * Every capability with a direct `primary: true` `owns` edge, or reached
- * by a `supports` edge from a system that has one — a capability's own
- * "owned by itself" set, before ancestry is taken into account
+ * Every capability with a direct `role: 'business'` `owns` edge, or
+ * reached by a `supports` edge from a system that has one — a capability's
+ * own "owned by itself" set, before ancestry is taken into account
  * (`isCapabilityOwnedWithAncestry` above). Exported for the same reuse
  * reason as that function.
+ *
+ * Prompt 7k item 2's own finding is specifically "capabilities without a
+ * *business* owner" — deliberately narrower than "any owner at all" (a
+ * capability with only a technical or service owner still counts as
+ * unowned here), the same distinction `findSystemsWithoutTechnicalOwner`
+ * below draws in the other direction. This also preserves this finding's
+ * pre-7k behaviour exactly once a model's data is migrated: the backfill
+ * (`src/db/backfillOwnsRole.ts`, a real commit, not a row edit — see its
+ * own comment) sets every existing `primary: true` edge's `role` to
+ * `'business'`, so a capability that counted as owned before this sprint
+ * still does, once that commit lands on its model's main.
  */
 export function computeSelfOwnedCapabilityIds(capabilities: readonly ElementsHeadRow[], supportsEdges: readonly RelationshipsHeadRow[], ownsEdges: readonly RelationshipsHeadRow[]): Set<UUID> {
-  const primaryOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).primary === true).map((edge) => edge.to_element_id));
+  const businessOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).role === 'business').map((edge) => edge.to_element_id));
   const capabilityIds = new Set(capabilities.map((c) => c.element_id));
-  const directlyOwned = [...primaryOwnedIds].filter((id) => capabilityIds.has(id));
-  const ownedViaSupportingSystem = supportsEdges.filter((edge) => primaryOwnedIds.has(edge.from_element_id)).map((edge) => edge.to_element_id);
+  const directlyOwned = [...businessOwnedIds].filter((id) => capabilityIds.has(id));
+  const ownedViaSupportingSystem = supportsEdges.filter((edge) => businessOwnedIds.has(edge.from_element_id)).map((edge) => edge.to_element_id);
   return new Set([...directlyOwned, ...ownedViaSupportingSystem]);
+}
+
+/** Systems with no `owns` edge carrying `role: 'technical'` — Prompt 7k item 2's "systems without a technical owner" finding, the same shape `findSystemsWithoutCapability` above already uses. */
+export function findSystemsWithoutTechnicalOwner(systems: readonly ElementsHeadRow[], ownsEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
+  const technicallyOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).role === 'technical').map((edge) => edge.to_element_id));
+  return systems.filter((system) => !technicallyOwnedIds.has(system.element_id));
 }
 
 /**

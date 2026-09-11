@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../contracts/rows';
-import { computeSelfOwnedCapabilityIds, computeStaleAttributesFinding, findCapabilitiesWithoutOwner, findSystemsWithoutCapability, findUnlabeledVerbRelationships, isCapabilityOwnedWithAncestry } from './healthFindings';
+import { computeSelfOwnedCapabilityIds, computeStaleAttributesFinding, findCapabilitiesWithoutOwner, findSystemsWithoutCapability, findSystemsWithoutTechnicalOwner, findUnlabeledVerbRelationships, isCapabilityOwnedWithAncestry } from './healthFindings';
 
 function system(id: string): ElementsHeadRow {
   return { element_id: id, element_type: 'system', name: `System ${id}`, parent_id: null, attributes: {}, exists_delta_id: `delta-${id}` };
@@ -39,30 +39,30 @@ describe('findSystemsWithoutCapability', () => {
 });
 
 describe('computeSelfOwnedCapabilityIds', () => {
-  it('a capability owned via a supporting system\'s primary owns edge', () => {
+  it('a capability owned via a supporting system\'s business owns edge', () => {
     const capabilities = [capability('cap-1')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
-    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { primary: true })];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
     expect(computeSelfOwnedCapabilityIds(capabilities, supports, owns)).toEqual(new Set(['cap-1']));
   });
 
   it('a capability owned directly (Bug found during Sprint U4-1 B3: owns can target a capability, actor→capability, not only actor→system)', () => {
     const capabilities = [capability('cap-1')];
-    const owns = [relationship('r1', 'owns', 'actor-1', 'cap-1', { primary: true })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'cap-1', { role: 'business' })];
     expect(computeSelfOwnedCapabilityIds(capabilities, [], owns)).toEqual(new Set(['cap-1']));
   });
 
-  it('a non-primary owns relationship does not count, on either target shape', () => {
+  it("a technical- or service-role owns relationship does not count — this finding is specifically business ownership (Prompt 7k item 2)", () => {
     const capabilities = [capability('cap-1'), capability('cap-2')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
-    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { primary: false }), relationship('r3', 'owns', 'actor-1', 'cap-2', { primary: false })];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'technical' }), relationship('r3', 'owns', 'actor-1', 'cap-2', { role: 'service' })];
     expect(computeSelfOwnedCapabilityIds(capabilities, supports, owns)).toEqual(new Set());
   });
 
   it('ownership of an unrelated system does not cover a different capability', () => {
     const capabilities = [capability('cap-1'), capability('cap-2')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
-    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { primary: true })];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
     expect(computeSelfOwnedCapabilityIds(capabilities, supports, owns)).toEqual(new Set(['cap-1']));
   });
 });
@@ -105,29 +105,29 @@ describe('isCapabilityOwnedWithAncestry', () => {
 });
 
 describe('findCapabilitiesWithoutOwner', () => {
-  it('a capability is owned when a supporting system has a primary owns relationship', () => {
+  it('a capability is owned when a supporting system has a business owns relationship', () => {
     const capabilities = [capability('cap-1')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
-    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { primary: true })];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
     expect(findCapabilitiesWithoutOwner(capabilities, supports, owns)).toEqual([]);
   });
 
   it('a capability with a direct owns edge is owned (Bug found during Sprint U4-1 B3)', () => {
     const capabilities = [capability('cap-1')];
-    const owns = [relationship('r1', 'owns', 'actor-1', 'cap-1', { primary: true })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'cap-1', { role: 'business' })];
     expect(findCapabilitiesWithoutOwner(capabilities, [], owns)).toEqual([]);
   });
 
-  it('a capability is unowned when its supporting system has no primary owns relationship', () => {
+  it('a capability is unowned when its supporting system has no business owns relationship', () => {
     const capabilities = [capability('cap-1')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
     expect(findCapabilitiesWithoutOwner(capabilities, supports, [])).toEqual([capability('cap-1')]);
   });
 
-  it('a non-primary owns relationship does not count as ownership', () => {
+  it('a technical-role owns relationship does not count as (business) ownership — Prompt 7k item 2\'s own finding is specifically about a business owner', () => {
     const capabilities = [capability('cap-1')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
-    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { primary: false })];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'technical' })];
     expect(findCapabilitiesWithoutOwner(capabilities, supports, owns)).toEqual([capability('cap-1')]);
   });
 
@@ -138,14 +138,14 @@ describe('findCapabilitiesWithoutOwner', () => {
   it('ownership of an unrelated system does not cover a different capability', () => {
     const capabilities = [capability('cap-1'), capability('cap-2')];
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
-    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { primary: true })];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
     expect(findCapabilitiesWithoutOwner(capabilities, supports, owns).map((c) => c.element_id)).toEqual(['cap-2']);
   });
 
   it('Sprint U4-1 B3: a child inherits its parent\'s ownership and is not itself listed', () => {
     const root = capability('root');
     const child = capability('child', 'root');
-    const owns = [relationship('r1', 'owns', 'actor-1', 'root', { primary: true })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'root', { role: 'business' })];
     expect(findCapabilitiesWithoutOwner([root, child], [], owns)).toEqual([]);
   });
 
@@ -161,9 +161,29 @@ describe('findCapabilitiesWithoutOwner', () => {
     const root = capability('root'); // owned directly
     const childA = capability('child-a', 'root');
     const childB = capability('child-b', 'root');
-    const owns = [relationship('r1', 'owns', 'actor-1', 'root', { primary: true })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'root', { role: 'business' })];
     const result = findCapabilitiesWithoutOwner([root, childA, childB], [], owns);
     expect(result).toEqual([]);
+  });
+});
+
+describe('findSystemsWithoutTechnicalOwner (Prompt 7k item 2)', () => {
+  it('returns systems with no owns edge carrying role: technical', () => {
+    const systems = [system('sys-1'), system('sys-2')];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'technical' })];
+    expect(findSystemsWithoutTechnicalOwner(systems, owns).map((s) => s.element_id)).toEqual(['sys-2']);
+  });
+
+  it('a business-role owns edge does not count as a technical owner', () => {
+    const systems = [system('sys-1')];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
+    expect(findSystemsWithoutTechnicalOwner(systems, owns).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('is empty when every system has a technical owner', () => {
+    const systems = [system('sys-1')];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'technical' })];
+    expect(findSystemsWithoutTechnicalOwner(systems, owns)).toEqual([]);
   });
 });
 
@@ -225,7 +245,7 @@ describe('findUnlabeledVerbRelationships (Sprint U4-1 B5)', () => {
   });
 
   it('supports/owns edges are never flagged, labeled or not — this finding is uses/flows_to only', () => {
-    const edges = [relationship('r1', 'supports', 'sys-1', 'sys-2', { role: 'secondary' }), relationship('r2', 'owns', 'sys-1', 'sys-2', { primary: true })];
+    const edges = [relationship('r1', 'supports', 'sys-1', 'sys-2', { role: 'secondary' }), relationship('r2', 'owns', 'sys-1', 'sys-2', { role: 'business' })];
     expect(findUnlabeledVerbRelationships(edges, elementsById)).toEqual([]);
   });
 

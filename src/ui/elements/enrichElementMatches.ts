@@ -6,7 +6,7 @@ import { supabase } from '../supabaseClient';
 
 export interface MatchEnrichment {
   relationshipCount: number;
-  /** The `owns` relationship's primary actor into this element, if any (only ever populated for a `system`, per `RELATIONSHIP_TYPE_RULES` — null for every other type, not specially cased). */
+  /** The `owns` relationship's owning actor into this element, if any (only ever populated for a `system`, per `RELATIONSHIP_TYPE_RULES` — null for every other type, not specially cased). Prompt 7k item 2: a target can have up to three owners at once (one per role); this compact row picks the `business` owner when there is one, else whichever other role is present — same preference `elementBrowse.ts`'s own `loadOwnersByElementId` uses. */
   owner: ElementsHeadRow | null;
 }
 
@@ -22,9 +22,9 @@ export async function enrichElementMatches(commitId: UUID, matches: readonly Ele
   const entries = await Promise.all(
     matches.map(async (element) => {
       const relationships = await listRelationshipsForElement(supabase, commitId, element.element_id);
-      const ownerRelationship = relationships.find(
-        (r) => r.relationship_type === 'owns' && r.to_element_id === element.element_id && attributesRecord(r.attributes).primary === true,
-      );
+      const isOwnsEdge = (r: (typeof relationships)[number]) => r.relationship_type === 'owns' && r.to_element_id === element.element_id;
+      const ownerRelationship =
+        relationships.find((r) => isOwnsEdge(r) && attributesRecord(r.attributes).role === 'business') ?? relationships.find((r) => isOwnsEdge(r));
       const owner = ownerRelationship ? await getElementHead(supabase, commitId, ownerRelationship.from_element_id) : null;
       return [element.element_id, { relationshipCount: relationships.length, owner }] as const;
     }),

@@ -62,6 +62,8 @@ export type ActorSubtype = 'person' | 'team';
 export type DataClassification = 'public' | 'official' | 'official_sensitive' | 'special_category';
 /** Sprint U4-1 B4: which of a system's `supports` edges anchors its one landscape lane (relationship_type_rules' new `maxPrimaryPerFrom: 1`, `supports`-only). Always set at creation, defaulting to `secondary` unless the picker's "primary?" prompt is answered yes — never left unset the way `SupportsAttributes.description` is, since lane placement has to read *something* off every edge. */
 export type SupportsRole = 'primary' | 'secondary';
+/** Prompt 7k item 2: which capacity an `owns` edge asserts ownership in — replaces the earlier `OwnsAttributes.primary: boolean` (Sprint U4-1), which only ever distinguished "the" owner from a secondary one and had no room for more than one kind of owner at once. Always set at creation, defaulting to `'business'` on a capability target and prompted for on a system target (`RelationshipAdd.tsx`) — never left unset, same reasoning `SupportsRole` above already gives. Cardinality is per `(toElementId, role)` (C17, `20260911070000_owns_role.sql`'s backstop index): a target may have at most one `business`, one `technical` and one `service` owner, but all three may be different actors at once. */
+export type OwnsRole = 'business' | 'technical' | 'service';
 
 /**
  * Attributes stored in `elements_head.attributes` (jsonb). `name` and
@@ -156,8 +158,21 @@ export interface UsesAttributes {
   description?: string;
 }
 export interface OwnsAttributes {
-  /** At most one primary owner per owned element (relationship_type_rules). */
-  primary: boolean;
+  /** See `OwnsRole`'s own doc comment. At most one live edge per `(toElementId, role)` (relationship_type_rules, C17). Required — every new `owns` edge sets it at creation, unlike `primary` below, which no new code ever sets again. */
+  role: OwnsRole;
+  /**
+   * @deprecated Superseded by `role` (Prompt 7k item 2) — kept on the type,
+   * not removed, so a pre-migration `owns` edge's stored attributes (which
+   * only ever had `primary`, never `role`) still type-checks when read
+   * back narrowly, and so a reader of this interface can see the history
+   * rather than wonder where the field went. Never set by new code: every
+   * write path now sets `role` only. Existing data is migrated to `role`
+   * via a real `relationship.update` commit
+   * (`src/db/backfillOwnsRole.ts`/`scripts/backfillOwnsRole.ts`, run once
+   * per model), never a raw row edit — SPEC §6.8's "data changes are
+   * commits, never row rewrites."
+   */
+  primary?: boolean;
 }
 export interface FlowsToAttributes {
   description?: string;
@@ -424,7 +439,7 @@ export const COMMIT_INVARIANTS = [
   { id: 'C16', text: 'The resulting head passes the validation level required for the branch kind: capture_draft → structural only; change → structural, schema advisory; main → structural and schema (SPEC §6.3).' },
   {
     id: 'C17',
-    text: "relationship.create/relationship.update/relationship.restore setting (or reviving, for restore) supports.role = 'primary' or owns.primary = true: no other live relationship in the resulting head already has that same primary flag on the same anchor element — supports' anchor is fromElementId (one primary capability per system), owns' is toElementId (one primary owner per owned element). A same-commit delta demoting the existing one first (earlier in seq order) makes the promotion legal; a restore is checked against the head as it stands now, not as it stood when the relationship was retracted.",
+    text: "relationship.create/relationship.update/relationship.restore setting (or reviving, for restore) supports.role = 'primary', or setting an owns.role of any value: no other live relationship in the resulting head already holds the same value on the same anchor element — supports' anchor is fromElementId, one primary capability per system (a 'secondary' supports.role has no cardinality limit); owns' anchor is toElementId, one owner per role per owned element (Prompt 7k item 2 — 'business'/'technical'/'service' are each independently capped at one, so a target may have up to three owners at once, never two of the same role). A same-commit delta demoting/reassigning the existing one first (earlier in seq order) makes the promotion legal; a restore is checked against the head as it stands now, not as it stood when the relationship was retracted.",
   },
 ] as const;
 
