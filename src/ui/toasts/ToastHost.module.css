@@ -1,0 +1,54 @@
+/*
+ * Bottom-right stack, distinct from ErrorBanner's full-width top-of-page
+ * placement (ErrorBanner.module.css's own comment) — a save succeeding is
+ * transient good news, not something that should compete with the page's
+ * own content or an active failure banner for the same strip of screen.
+ * Mounted once in ThemedApp.tsx, same reasoning as ErrorBanner.
+ */
+.host {
+  position: fixed;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  z-index: 20;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--space-2);
+  max-width: 320px;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-raised);
+  color: var(--text);
+  border: var(--border-width) solid var(--status-ok);
+  border-radius: var(--radius-md);
+  box-shadow: var(--surface-raised-shadow);
+}
+
+.message {
+  flex: 1;
+  min-width: 0;
+}
+
+.dismiss {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+  padding: 0 var(--space-1);
+  line-height: var(--text-md-lh);
+}
+
+.dismiss:hover {
+  text-decoration: underline;
+}
+
+.dismiss:focus-visible {
+  outline: var(--border-width-emphasis) solid var(--focus);
+  outline-offset: 2px;
+}

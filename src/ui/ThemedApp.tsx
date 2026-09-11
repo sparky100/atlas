@@ -2,6 +2,7 @@ import { App } from './App';
 import { useAuth } from './auth/useAuth';
 import { ErrorBanner } from './components/ErrorBanner/ErrorBanner';
 import { ThemeProvider } from './theme/ThemeProvider';
+import { ToastHost } from './toasts/ToastHost';
 
 /** Bridges auth state into ThemeProvider's `userId` prop — must be a child of AuthProvider to call useAuth(). Its own file so main.tsx (the entry point, no exports) stays a plain bootstrap script. */
 export function ThemedApp() {
@@ -10,6 +11,8 @@ export function ThemedApp() {
     <ThemeProvider userId={userId}>
       {/* Sprint U4-2a item 2: one global host for every route, rather than each of the ~14 model-scoped pages rendering its own — see ErrorBanner.tsx's own module comment. */}
       <ErrorBanner />
+      {/* Sprint 7i item 2: same reasoning, success-toned and auto-dismissing — see toastStore.ts's own module comment for why this is a sibling store, not ErrorBanner extended. */}
+      <ToastHost />
       <App />
     </ThemeProvider>
   );

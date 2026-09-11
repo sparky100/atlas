@@ -14,7 +14,9 @@ import { useAuth } from '../auth/useAuth';
 import type { MemberRole } from '../../db/types';
 import { BranchRebasePanel } from '../reviews/BranchRebasePanel';
 import { branchStatusTone } from './branchStatus';
+import { deriveChangeStep } from './changeStepper';
 import { describeDelta } from './changeSummaryFormat';
+import { Stepper } from './Stepper/Stepper';
 import { useChange } from './useChange';
 import { useChangeSummary } from './useChangeSummary';
 import { useOpenMergeRequest } from './useOpenMergeRequest';
@@ -96,6 +98,14 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           Updated {new Date(branch.updated_at).toLocaleString()}
         </Text>
       </div>
+
+      {/* Item 1: the stepper needs to know whether an open merge request
+          exists (for the Draft/"sent back" sentence and the In
+          review/Approved current-step distinction) — `openRequest` is
+          already fetched for the Review panel below; `undefined` means
+          still loading, so the stepper waits rather than rendering with a
+          momentarily-wrong "no request" assumption. */}
+      {openRequest !== undefined && <Stepper derived={deriveChangeStep(branch, openRequest)} />}
 
       {error !== null && <Text as="p">{error}</Text>}
 
