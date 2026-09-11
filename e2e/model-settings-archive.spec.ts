@@ -8,6 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { createSupabaseClient } from '../src/db/client';
+import { createModel } from '../src/db/models';
 import { loadEnv } from '../src/db/env';
 import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
 
@@ -48,10 +49,10 @@ test('archive a model, see it move to the collapsed Archived section, restore it
   // onChanged), so the real proof is the input's own value on the fresh
   // load, not a text node (an <input>'s value is never one).
   const newName = `Renamed Model ${randomUUID().slice(0, 8)}`;
-  await page.getByLabel('Name').fill(newName);
+  await page.getByLabel('Name', { exact: true }).fill(newName);
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { name: 'Model settings' })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByLabel('Name')).toHaveValue(newName);
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue(newName);
 
   // 3. Archive — another round trip + reload.
   await page.getByRole('button', { name: 'Archive model' }).click();
@@ -72,7 +73,7 @@ test('archive a model, see it move to the collapsed Archived section, restore it
   // 5. A direct link still resolves, read-only — item 1's own "read-only
   // when opened" requirement, distinct from "hidden from lists".
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/settings`);
-  await expect(page.getByLabel('Name')).toBeDisabled();
+  await expect(page.getByLabel('Name', { exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
 
   // 6. Restore is owner-only: the architect sees no Restore control at all.
@@ -101,7 +102,7 @@ test('delete refuses a model that is not archived; archiving first and typing th
   await page.getByRole('button', { name: 'Archive model' }).click();
   await expect(page.getByText('Archived', { exact: true })).toBeVisible({ timeout: 15_000 });
 
-  const modelName = await page.getByLabel('Name').inputValue();
+  const modelName = await page.getByLabel('Name', { exact: true }).inputValue();
   const confirmInput = page.getByLabel(`Type ${modelName} to confirm`);
   const deleteButton = page.getByRole('button', { name: 'Delete model' });
   await expect(deleteButton).toBeDisabled();
@@ -114,4 +115,61 @@ test('delete refuses a model that is not archived; archiving first and typing th
   // Deleted for good — not even in the Archived section.
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}$`));
   await expect(page.getByText(modelName)).toHaveCount(0);
+});
+
+/**
+ * Regression guard for the bug this actually was: not the migration
+ * defaulting `archived_at` to `now()` (it doesn't — `20260911040000_model_archive.sql`
+ * adds the column with no default at all) and not an inverted list filter
+ * (`OrgHome.tsx`'s own `activeModels`/`archivedModels` split was already
+ * correct) — it was this migration not yet having reached the live
+ * project while the app code that reads `archived_at` was already
+ * deployed, so every model's `archived_at` came back `undefined` rather
+ * than `null`, and `undefined !== null` misclassified all of them as
+ * archived. Guards against that class of bug recurring: a freshly
+ * created model must render under "Models," never under a rendered
+ * "Archived" section (which OrgHome.tsx doesn't even render at all while
+ * `archivedModels.length === 0` — so this also fails loudly, not
+ * silently, if that ever regresses), and archiving one must never move
+ * any other model alongside it.
+ */
+test('a freshly created model appears under Models, not Archived; archiving one moves only that one', async ({ page }) => {
+  const env = loadEnv();
+  const fixture = await bootstrapChangeBranchFixture(page, env, 'modelsettingsfresh', 'Placeholder System');
+  const { signedIn, orgId, orgSlug, userId } = fixture;
+
+  const secondModelName = `Second Model ${randomUUID().slice(0, 8)}`;
+  await createModel(signedIn, { id: randomUUID(), orgId, name: secondModelName, slug: `second-model-${randomUUID().slice(0, 8)}`, createdBy: userId });
+
+  // Both models — the fixture's own and this second one — show under the
+  // ordinary "Models" list, and no "Archived" section renders at all.
+  await page.goto(`/o/${orgSlug}/m/${fixture.modelSlug}/settings`);
+  const firstModelName = await page.getByLabel('Name', { exact: true }).inputValue();
+  await page.goto(`/o/${orgSlug}`);
+  await expect(page.getByRole('link', { name: new RegExp(firstModelName) })).toBeVisible();
+  await expect(page.getByRole('link', { name: new RegExp(secondModelName) })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Archived/ })).toHaveCount(0);
+
+  // Archive only the second model.
+  const secondModelLink = page.getByRole('link', { name: new RegExp(secondModelName) });
+  await secondModelLink.click();
+  await page.getByRole('button', { name: 'Model actions' }).click();
+  await page.getByRole('link', { name: 'Model settings' }).click();
+  await page.getByRole('button', { name: 'Archive model' }).click();
+  await expect(page.getByText('Archived', { exact: true })).toBeVisible({ timeout: 15_000 });
+
+  // Only the second model moved — the first is still under "Models,"
+  // never swept into "Archived" alongside it.
+  await page.goto(`/o/${orgSlug}`);
+  await expect(page.getByRole('link', { name: new RegExp(firstModelName) })).toBeVisible();
+  await expect(page.getByRole('link', { name: new RegExp(secondModelName) })).toHaveCount(0);
+  await page.getByRole('button', { name: /Archived/ }).click();
+  // Scoped to the Archived section itself (a `<section>`, per
+  // CollapsibleSection.tsx's own root tag) — the first model's name is
+  // still legitimately visible on this same page, in the ordinary Models
+  // list above; the real assertion is that it's absent from *this*
+  // section specifically, not from the page as a whole.
+  const archivedSection = page.locator('section').filter({ has: page.getByRole('button', { name: /Archived/ }) });
+  await expect(archivedSection.getByText(secondModelName)).toBeVisible();
+  await expect(archivedSection.getByText(firstModelName, { exact: true })).toHaveCount(0);
 });
