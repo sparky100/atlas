@@ -1,5 +1,6 @@
 import { Link, useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
+import type { MemberRole } from '../../db/types';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { ModelNav } from '../components/ModelNav/ModelNav';
@@ -7,6 +8,7 @@ import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
 import { parseRefParam } from '../../db/ref';
@@ -34,11 +36,11 @@ import styles from './ModelHome.module.css';
  * never run" unless their data is actually needed, the same principle
  * this item's own resolved-model gate applies to an unresolved id.
  */
-function DirectorDoor({ modelId, orgId, userId, orgSlug, modelSlug }: { modelId: UUID; orgId: UUID; userId: UUID | null; orgSlug: string; modelSlug: string }) {
+function DirectorDoor({ modelId, orgId, userId, role, orgSlug, modelSlug }: { modelId: UUID; orgId: UUID; userId: UUID | null; role: MemberRole | null; orgSlug: string; modelSlug: string }) {
   const directorState = useDirectorHome(modelId, orgId);
   if (directorState.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (directorState.status === 'error') return <Text as="p">{directorState.message}</Text>;
-  return <DirectorHome data={directorState.data} reload={directorState.reload} modelId={modelId} userId={userId} orgSlug={orgSlug} modelSlug={modelSlug} />;
+  return <DirectorHome data={directorState.data} reload={directorState.reload} modelId={modelId} orgId={orgId} userId={userId} role={role} orgSlug={orgSlug} modelSlug={modelSlug} />;
 }
 
 function ArchitectDoor({ modelId, userId, orgSlug, modelSlug }: { modelId: UUID; userId: UUID | null; orgSlug: string; modelSlug: string }) {
@@ -98,6 +100,7 @@ export function ModelHome() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
+        <EditingBranchBanner activeRef={ref} showModeShortcuts={false} />
         <div className={styles.header}>
           <Text as="h1" size="2xl">
             {model.name}
@@ -136,7 +139,7 @@ export function ModelHome() {
           </Link>
         </div>
 
-        {homeMode === 'director' && <DirectorDoor modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
+        {homeMode === 'director' && <DirectorDoor modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} role={role} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
         {homeMode === 'architect' && <ArchitectDoor modelId={model.id} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
         </main>
       </div>

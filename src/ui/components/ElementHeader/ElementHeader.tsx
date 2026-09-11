@@ -23,14 +23,19 @@ export interface ElementHeaderProps {
    * change branch (Sprint C1 step 9 wired the branch half of this in;
    * step 4 had already generalised the editing hooks themselves to take
    * any branch, but no page actually picked one other than main until
-   * now). A tag is never editable either way. `Propose a change…` (the
-   * contributor path at `main`/a tag, opening a branch picker inline) still
-   * isn't built — a real, named gap, not this component's to fill: a
-   * contributor there gets no `Edit` affordance at all rather than an
-   * inert one (CLAUDE.md rule 7). Omitted entirely otherwise, not shown
-   * disabled, for the same reason.
+   * now). A tag is never editable either way. Omitted entirely otherwise,
+   * not shown disabled, for the same reason `onProposeChange` below is.
    */
   onEdit?: (() => void) | undefined;
+  /**
+   * Sprint 7i item 4: "'Propose a change' on every element page" — the gap
+   * `onEdit`'s own comment used to name (a contributor at `main` got no
+   * affordance here at all). Mutually exclusive with `onEdit` in practice
+   * (a caller passes whichever this ref/role combination actually allows),
+   * but this component doesn't enforce that itself — same
+   * omitted-not-disabled convention as every other optional action here.
+   */
+  onProposeChange?: (() => void) | undefined;
   /**
    * Sprint U4-1 D3's "Rename" — omitted entirely, same convention as
    * `onEdit`, when the caller hasn't established edit rights (in
@@ -51,12 +56,11 @@ export interface ElementHeaderProps {
 }
 
 /**
- * The identity header (§4.2). `Propose a change…` (the contributor path at
- * `main`/a tag, opening a branch picker inline) still isn't built — a real,
- * named gap (see `onEdit`'s own comment) — so `Edit` only ever appears for
- * the role/ref combinations `canEditBranch` actually allows: owner/architect
- * at `main` (ADR-015), or owner/architect/contributor on a draft change
- * branch (Sprint C1).
+ * The identity header (§4.2). `Edit` appears only for the role/ref
+ * combinations `canEditBranch` actually allows: owner/architect at `main`
+ * (ADR-015), or owner/architect/contributor on a draft change branch
+ * (Sprint C1). `onProposeChange` (Sprint 7i item 4) is the contributor's
+ * own path at `main` — `ElementPage.tsx` passes exactly one of the two.
  *
  * Sprint U4-1 D1: the raw element id is no longer shown directly in the
  * meta row — it's an internal identifier a reader almost never needs at a
@@ -80,7 +84,7 @@ export interface ElementHeaderProps {
  * Attributes (`CapabilityTailoringActions.tsx`, now
  * `CapabilityRetractAction.tsx` — retract only) is gone.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, rename }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
@@ -163,6 +167,11 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, renam
         {onEdit && (
           <Button variant="ghost" onClick={onEdit}>
             ✎ Edit
+          </Button>
+        )}
+        {onProposeChange && (
+          <Button variant="ghost" onClick={onProposeChange}>
+            Propose a change
           </Button>
         )}
         <div className={styles.menuWrapper}>
