@@ -41,6 +41,13 @@
  *   unordered set (on-prem/private-cloud/public-cloud/SaaS/hybrid) with no
  *   "worst" value to aggregate to, so it's landscape-only
  *   (`src/ui/landscape/landscapeColour.ts`).
+ * - **OT share** (`otShareOf`), Prompt 7k item 3: fraction of a
+ *   capability's supporting systems whose domain resolves to `'ot'`
+ *   (`systemDomain.ts`'s `domainOf`) — a fraction, not worst-of, the same
+ *   "how many, not just whether any" reasoning `metric:supportingSystemCount`
+ *   already uses; silent (no tone/label) at zero, unlike coverage, since
+ *   "0 OT systems" is the ordinary case for most capabilities in a
+ *   regulated estate and would otherwise be visual noise on every tile.
  *
  * `isExternal` was considered and dropped: a capability isn't external,
  * only (some of) its supporting systems are, and "any support system is
@@ -56,6 +63,7 @@ import { monthsUntil, STALE_AFTER_MONTHS } from '../../contracts/thresholds';
 import { attributesRecord } from '../elements/attributesRecord';
 import { CRITICALITY_ORDER, CRITICALITY_TONE } from '../elements/criticalityTone';
 import { LIFECYCLE_ORDER, LIFECYCLE_TONE } from '../elements/lifecycleTone';
+import { domainOf } from '../elements/systemDomain';
 
 // The mode identifiers themselves are canonical in src/contracts/userPreferences.ts
 // (Sprint U4-1 C4: they're now persisted, `user_preferences.capability_map_colour_by`)
@@ -69,6 +77,7 @@ export const COLOUR_BY_OPTIONS: { value: ColourByMode; label: string }[] = [
   { value: 'metric:oldestLifecycleStage', label: 'Oldest lifecycle stage' },
   { value: 'metric:lifecycleExposure', label: 'Lifecycle exposure' },
   { value: 'metric:criticality', label: 'Criticality' },
+  { value: 'metric:otShare', label: 'OT share' },
 ];
 
 export interface TileColour {
@@ -115,6 +124,17 @@ export function worstCriticality(capabilityId: UUID, supportsEdges: readonly Rel
   return worst;
 }
 
+/** The count of a capability's supporting systems whose domain resolves to `'ot'`, out of the total — Prompt 7k item 3's "OT share". */
+export function otShareOf(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: Map<UUID, ElementsHeadRow>): { ot: number; total: number } {
+  const ids = supportingSystemIds(capabilityId, supportsEdges);
+  let ot = 0;
+  for (const id of ids) {
+    const system = systemsById.get(id);
+    if (system && domainOf(system) === 'ot') ot += 1;
+  }
+  return { ot, total: ids.length };
+}
+
 function plannedEndOf(system: ElementsHeadRow): Date | null {
   const value = attributesRecord(system.attributes).plannedEnd;
   if (typeof value !== 'string') return null;
@@ -158,6 +178,10 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
     case 'metric:criticality': {
       const worst = worstCriticality(capabilityId, supportsEdges, systemsById);
       return worst === null ? { tone: undefined, label: undefined } : { tone: CRITICALITY_TONE[worst], label: worst };
+    }
+    case 'metric:otShare': {
+      const { ot, total } = otShareOf(capabilityId, supportsEdges, systemsById);
+      return ot === 0 ? { tone: undefined, label: undefined } : { tone: 'warn', label: `${String(ot)}/${String(total)} systems OT` };
     }
   }
 }
@@ -219,6 +243,16 @@ export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityI
         if (criticality !== null && (worst === null || CRITICALITY_ORDER[criticality] > CRITICALITY_ORDER[worst])) worst = criticality;
       }
       return worst === null ? { tone: undefined, label: undefined } : { tone: CRITICALITY_TONE[worst], label: worst };
+    }
+    case 'metric:otShare': {
+      let ot = 0;
+      let total = 0;
+      for (const id of descendantCapabilityIds) {
+        const share = otShareOf(id, supportsEdges, systemsById);
+        ot += share.ot;
+        total += share.total;
+      }
+      return ot === 0 ? { tone: undefined, label: undefined } : { tone: 'warn', label: `${String(ot)}/${String(total)} systems OT` };
     }
   }
 }

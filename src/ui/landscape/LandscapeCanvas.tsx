@@ -465,6 +465,25 @@ export function LandscapeCanvas({
         ctx.restore();
       }
 
+      // Prompt 7k item 3: the OT zone — its own smaller dashed rectangle,
+      // inside the enterprise boundary, around just that lane's own
+      // y-range. The lane's own label ("OT") already groups it visually
+      // like any other lane; this extra rectangle is the "zone" cue the
+      // prompt asks for, distinguishing it from an ordinary capability
+      // lane the same way the enterprise boundary itself distinguishes
+      // internal from external.
+      const otLane = layout.lanes.find((lane) => lane.region === 'ot');
+      if (otLane) {
+        ctx.save();
+        ctx.strokeStyle = tokens.statusWarn;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        roundRectPath(ctx, BOUNDARY_MARGIN * 2, otLane.y - BOUNDARY_MARGIN / 2, layout.width - BOUNDARY_MARGIN * 4, otLane.height - BOUNDARY_MARGIN, 8);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+
       const laneLabels: { text: string; worldX: number; worldY: number }[] = [];
       const referenceChips: { text: string; x: number; y: number }[] = [];
       for (const lane of layout.lanes) {

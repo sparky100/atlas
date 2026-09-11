@@ -29,7 +29,7 @@ export type ThemePreference = (typeof THEME_PREFERENCES)[number];
  * already establish for this table's other columns — a UI-layer file
  * shouldn't be what a storage contract depends on.
  */
-export const CAPABILITY_MAP_COLOUR_BY_MODES = ['none', 'metric:supportingSystemCount', 'metric:oldestLifecycleStage', 'metric:lifecycleExposure', 'metric:criticality'] as const;
+export const CAPABILITY_MAP_COLOUR_BY_MODES = ['none', 'metric:supportingSystemCount', 'metric:oldestLifecycleStage', 'metric:lifecycleExposure', 'metric:criticality', 'metric:otShare'] as const;
 export type CapabilityMapColourByMode = (typeof CAPABILITY_MAP_COLOUR_BY_MODES)[number];
 
 /**
@@ -42,7 +42,7 @@ export type CapabilityMapColourByMode = (typeof CAPABILITY_MAP_COLOUR_BY_MODES)[
  * module comment on why `hostingModel` colour-by is landscape-only:
  * hosting model has no "worst of" a capability could aggregate to).
  */
-export const LANDSCAPE_COLOUR_BY_MODES = ['none', 'metric:criticality', 'metric:hostingModel'] as const;
+export const LANDSCAPE_COLOUR_BY_MODES = ['none', 'metric:criticality', 'metric:hostingModel', 'metric:domain'] as const;
 export type LandscapeColourByMode = (typeof LANDSCAPE_COLOUR_BY_MODES)[number];
 
 export const DEFAULT_DENSITY: DensityPreference = 'comfortable';

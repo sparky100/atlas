@@ -7,6 +7,8 @@ import { listCapabilitiesForMap } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
 import {
   computeStaleAttributesFinding,
+  findBoundaryCrossings,
+  findBoundaryCrossingsMissingClassificationOrVerb,
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
   findCriticalSystemsWithoutBusinessOwner,
@@ -17,6 +19,7 @@ import {
   listAllUsesAndFlowsToEdges,
   listFactsForCommit,
   listUsesAndFlowsToEndpointElements,
+  type BoundaryCrossing,
   type StaleAttributesFinding,
   type UnlabeledVerbRelationship,
 } from '../../db/healthFindings';
@@ -56,6 +59,10 @@ export interface ArchitectHomeData {
   criticalSystemsWithoutBusinessOwner: ElementsHeadRow[];
   /** Prompt 7k item 1: critical systems whose `plannedEnd` falls within `STALE_AFTER_MONTHS`, with no planned replacement (see `findCriticalExposedSystems`'s own comment on that half). */
   criticalExposedSystems: ElementsHeadRow[];
+  /** Prompt 7k item 3's own health finding: `uses`/`flows_to` edges crossing the IT/OT boundary with no verb-phrase label or (for `flows_to`) data classification. */
+  boundaryCrossingsMissingClassificationOrVerb: BoundaryCrossing[];
+  /** Prompt 7k item 3's "Boundary crossings" count-and-link block — every IT/OT crossing, not just the ones missing metadata (that's the health finding above); the full list lives at `BoundaryCrossingsPage.tsx`. */
+  boundaryCrossingsCount: number;
 }
 
 export type ArchitectHomeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeData };
@@ -156,6 +163,8 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             systemsWithoutTechnicalOwner: findSystemsWithoutTechnicalOwner(systems, ownsEdges),
             criticalSystemsWithoutBusinessOwner: findCriticalSystemsWithoutBusinessOwner(systems, ownsEdges),
             criticalExposedSystems: findCriticalExposedSystems(systems),
+            boundaryCrossingsMissingClassificationOrVerb: findBoundaryCrossingsMissingClassificationOrVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
+            boundaryCrossingsCount: findBoundaryCrossings(usesAndFlowsToEdges, usesAndFlowsToEndpointsById).length,
           },
         });
       }

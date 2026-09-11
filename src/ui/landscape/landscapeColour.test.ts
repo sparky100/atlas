@@ -28,4 +28,13 @@ describe('landscapeTileColourFor (Prompt 7k item 1)', () => {
   it('hosting model: no tone when the system has no recorded hosting model', () => {
     expect(landscapeTileColourFor('metric:hostingModel', system())).toEqual({ tone: undefined, label: undefined });
   });
+
+  it('domain (Prompt 7k item 3): colours by the recorded domain, warn for ot, info for hybrid', () => {
+    expect(landscapeTileColourFor('metric:domain', system({ domain: 'ot' }))).toEqual({ tone: 'warn', label: 'ot' });
+    expect(landscapeTileColourFor('metric:domain', system({ domain: 'hybrid' }))).toEqual({ tone: 'info', label: 'hybrid' });
+  });
+
+  it('domain: is never silent, unlike criticality/hostingModel — an unrecorded system defaults to it', () => {
+    expect(landscapeTileColourFor('metric:domain', system())).toEqual({ tone: 'neutral', label: 'it' });
+  });
 });

@@ -62,6 +62,21 @@ export type LifecycleStatus = 'planned' | 'active' | 'retiring' | 'retired';
 export type Criticality = 'critical' | 'high' | 'medium' | 'low';
 /** Prompt 7k item 1: where a system runs — a closed, unordered set (unlike `Criticality`), each value its own colour-by tone, never aggregated "worst of" for a capability (there is no "worse" hosting model — see `src/ui/capabilityMap/metrics.ts`'s own module comment for why capability-map colour-by only ever offers criticality, not this). */
 export type HostingModel = 'on_premises' | 'private_cloud' | 'public_cloud' | 'saas' | 'hybrid';
+/**
+ * Prompt 7k item 3: IT/OT domain — a categorical, unordered set like
+ * `HostingModel` (no "worse" domain to aggregate a capability's worst-of
+ * to). Absent means `'it'` (the prompt's own stated default — the common
+ * case for a regulated estate is IT, so only OT/hybrid systems need
+ * marking) — this is a read-time default applied by
+ * `src/ui/elements/systemDomain.ts`'s `domainOf`, never written back onto
+ * a system that never recorded one, the same "an unset fact isn't the
+ * same as a recorded 'it' fact" stance every other optional attribute
+ * here takes. `ContainerAttributes` has no `domain` field of its own: a
+ * container inherits its parent system's domain at read time
+ * (`resolveElementDomain`), so there's no second copy that could drift
+ * out of sync with it.
+ */
+export type SystemDomain = 'it' | 'ot' | 'hybrid';
 export type ActorSubtype = 'person' | 'team';
 export type DataClassification = 'public' | 'official' | 'official_sensitive' | 'special_category';
 /** Sprint U4-1 B4: which of a system's `supports` edges anchors its one landscape lane (relationship_type_rules' new `maxPrimaryPerFrom: 1`, `supports`-only). Always set at creation, defaulting to `secondary` unless the picker's "primary?" prompt is answered yes — never left unset the way `SupportsAttributes.description` is, since lane placement has to read *something* off every edge. */
@@ -124,6 +139,8 @@ export interface SystemAttributes {
   hostingModel?: HostingModel;
   /** Free text (a specific vendor/data-centre/region) — deliberately not an enum, unlike `hostingModel` itself: the set of real hosting providers is open-ended in a way on/prem-vs-cloud-vs-SaaS is not. */
   hostingProvider?: string;
+  /** Prompt 7k item 3: IT, OT, or hybrid — drives the landscape's OT zone/colour-by, the capability map's "OT share" colour-by, and the boundary-crossings finding/list. Optional; absent reads as `'it'` (`SystemDomain`'s own comment). */
+  domain?: SystemDomain;
 }
 
 export interface ContainerAttributes {

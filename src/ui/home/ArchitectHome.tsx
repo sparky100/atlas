@@ -8,7 +8,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { monthsSince } from '../../contracts/thresholds';
-import type { UnlabeledVerbRelationship } from '../../db/healthFindings';
+import type { BoundaryCrossing, UnlabeledVerbRelationship } from '../../db/healthFindings';
 import { branchStatusTone } from '../changes/branchStatus';
 import { formatCommitActivityTime } from './commitActivityTime';
 import type { ArchitectHomeData, RecentCommitRow } from './useArchitectHome';
@@ -42,6 +42,11 @@ function unlabeledRelationshipItems(edges: readonly UnlabeledVerbRelationship[])
   return edges.map((edge) => ({ id: edge.relationshipId, label: `${edge.fromName} → ${edge.toName}` }));
 }
 
+/** Prompt 7k item 3: boundary crossings are relationship pairs too, same shape as `unlabeledRelationshipItems` above. */
+function boundaryCrossingItems(crossings: readonly BoundaryCrossing[]): HealthFindingItem[] {
+  return crossings.map((crossing) => ({ id: crossing.relationshipId, label: `${crossing.fromName} → ${crossing.toName}` }));
+}
+
 /**
  * The architect's door (UI-principles §3.2, built to Handoff 7d's
  * architect-door amendment for Health findings —
@@ -49,17 +54,21 @@ function unlabeledRelationshipItems(edges: readonly UnlabeledVerbRelationship[])
  * three-column dashboard otherwise, see `useArchitectHome.ts`'s own
  * comment for exactly what's deferred). Recent commits on main; the
  * review queue's count and oldest item; the signed-in user's own open
- * branches; five health findings (systems with no capability,
- * capabilities with no owner, stale attributes, `uses`/`flows_to`
- * relationships with no verb-phrase label (Sprint U4-1 B5), duplicates —
- * the last still wired to 0 until Q1, ADR-019), each rendered through
- * `HealthFinding` (Sprint U4-1 B3: collapsed row → expand, paginated at
- * 20, a link into the browse table pre-filtered to the finding where one
- * applies) — collapsing to a single "No findings" line when every one of
- * them is zero at once. Jumping to Changes or the review
- * queue generically is the persistent model nav's job now (ModelNav.tsx)
- * — this used to also carry its own "Start a change"/"Open the queue"
- * links before that existed.
+ * branches; a "Boundary crossings" count-and-link block (Prompt 7k item 3,
+ * same shape as the Review queue block — the full list lives at
+ * `BoundaryCrossingsPage.tsx`); a growing set of Health findings (systems
+ * with no capability, capabilities with no owner, stale attributes,
+ * `uses`/`flows_to` relationships with no verb-phrase label (Sprint U4-1
+ * B5), systems without a technical/business owner and critical-system
+ * findings (Prompt 7k items 1-2), boundary crossings missing a
+ * classification or verb (Prompt 7k item 3), duplicates — the last still
+ * wired to 0 until Q1, ADR-019), each rendered through `HealthFinding`
+ * (Sprint U4-1 B3: collapsed row → expand, paginated at 20, a link into
+ * the browse table pre-filtered to the finding where one applies) —
+ * collapsing to a single "No findings" line when every one of them is
+ * zero at once. Jumping to Changes or the review queue generically is the
+ * persistent model nav's job now (ModelNav.tsx) — this used to also carry
+ * its own "Start a change"/"Open the queue" links before that existed.
  */
 export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) {
   const now = new Date();
@@ -87,7 +96,8 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
     data.unlabeledVerbRelationships.length === 0 &&
     data.systemsWithoutTechnicalOwner.length === 0 &&
     data.criticalSystemsWithoutBusinessOwner.length === 0 &&
-    data.criticalExposedSystems.length === 0;
+    data.criticalExposedSystems.length === 0 &&
+    data.boundaryCrossingsMissingClassificationOrVerb.length === 0;
 
   return (
     <div className={styles.columns}>
@@ -189,6 +199,25 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
 
         <Panel>
           <Text as="h2" size="lg">
+            Boundary crossings
+          </Text>
+          <div className={styles.count}>
+            <Text as="span" size="2xl">
+              {data.boundaryCrossingsCount}
+            </Text>
+            <Text as="span" tone="muted" size="sm">
+              IT/OT crossing{data.boundaryCrossingsCount === 1 ? '' : 's'}
+            </Text>
+          </div>
+          <Link to={`/o/${orgSlug}/m/${modelSlug}/boundary-crossings`}>
+            <Text as="span" size="sm">
+              View all →
+            </Text>
+          </Link>
+        </Panel>
+
+        <Panel>
+          <Text as="h2" size="lg">
             Health findings
           </Text>
           {allFindingsZero ? (
@@ -254,6 +283,13 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
                   summary={`${String(data.criticalExposedSystems.length)} critical ${plural(data.criticalExposedSystems.length, 'system', 'systems')} exposed with no planned replacement`}
                   items={elementItems(data.criticalExposedSystems)}
                   browseHref={browseHref('critical-exposed')}
+                />
+              </div>
+
+              <div className={styles.findingPlate}>
+                <HealthFinding
+                  summary={`${String(data.boundaryCrossingsMissingClassificationOrVerb.length)} boundary crossing${data.boundaryCrossingsMissingClassificationOrVerb.length === 1 ? '' : 's'} with no data classification or verb`}
+                  items={boundaryCrossingItems(data.boundaryCrossingsMissingClassificationOrVerb)}
                 />
               </div>
 

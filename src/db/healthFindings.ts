@@ -26,8 +26,9 @@
  */
 import { isStale, monthsSince, monthsUntil, STALE_AFTER_MONTHS } from '../contracts/thresholds';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
-import type { UUID } from '../contracts/delta';
+import type { SystemDomain, UUID } from '../contracts/delta';
 import { attributesRecord } from '../ui/elements/attributesRecord';
+import { resolveElementDomain } from '../ui/elements/systemDomain';
 import type { Client } from './client';
 import { selectAll } from './selectAll';
 
@@ -105,6 +106,61 @@ export function findUnlabeledVerbRelationships(edges: readonly RelationshipsHead
     });
   }
   return result;
+}
+
+export interface BoundaryCrossing {
+  relationshipId: UUID;
+  relationshipType: 'uses' | 'flows_to';
+  fromName: string;
+  toName: string;
+  fromDomain: SystemDomain;
+  toDomain: SystemDomain;
+  /** No verb-phrase label recorded — the same "empty/missing description" check `findUnlabeledVerbRelationships` already uses. */
+  missingVerb: boolean;
+  /** Only ever `true` for a `flows_to` edge — a `uses` edge has no `dataClassification` attribute to be missing, so it's always `false` here (this crossing is only ever flagged for a missing verb, never for a fact `uses` was never going to carry). */
+  missingDataClassification: boolean;
+}
+
+/** One domain is `'it'` and the other `'ot'` — `'hybrid'` never participates on either side (ambiguous by construction: a hybrid endpoint isn't clearly on one side of the boundary or the other), Prompt 7k item 3's own judgment call for what counts as a "crossing" at all. */
+function isBoundaryCrossingPair(a: SystemDomain, b: SystemDomain): boolean {
+  return (a === 'it' && b === 'ot') || (a === 'ot' && b === 'it');
+}
+
+/**
+ * Every `uses`/`flows_to` edge whose two endpoints resolve to opposite
+ * sides of the IT/OT boundary (`resolveElementDomain`, walking up to the
+ * nearest System for a Container/Component endpoint) — Prompt 7k item 3's
+ * "Boundary crossings" list, reachable from the architect door
+ * (`BoundaryCrossingsPage.tsx`), and the shared basis both this item's own
+ * health finding (`findBoundaryCrossingsMissingClassificationOrVerb`,
+ * below) and item 5's narrower Assurance finding (classification only,
+ * PR5) are built from — one crossing-detection pass, not two.
+ */
+export function findBoundaryCrossings(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): BoundaryCrossing[] {
+  const result: BoundaryCrossing[] = [];
+  for (const edge of edges) {
+    if (edge.relationship_type !== 'uses' && edge.relationship_type !== 'flows_to') continue;
+    const from = elementsById.get(edge.from_element_id);
+    const to = elementsById.get(edge.to_element_id);
+    if (!from || !to) continue;
+    const fromDomain = resolveElementDomain(from, elementsById);
+    const toDomain = resolveElementDomain(to, elementsById);
+    if (!isBoundaryCrossingPair(fromDomain, toDomain)) continue;
+
+    const attrs = attributesRecord(edge.attributes);
+    const description = attrs.description;
+    const missingVerb = !(typeof description === 'string' && description.trim() !== '');
+    const dataClassification = attrs.dataClassification;
+    const missingDataClassification = edge.relationship_type === 'flows_to' && !(typeof dataClassification === 'string' && dataClassification.trim() !== '');
+
+    result.push({ relationshipId: edge.relationship_id, relationshipType: edge.relationship_type, fromName: from.name, toName: to.name, fromDomain, toDomain, missingVerb, missingDataClassification });
+  }
+  return result;
+}
+
+/** Prompt 7k item 3's own health finding: "a crossing with no data classification or verb" — the wider of the two crossing-metadata findings (item 5's Assurance finding, PR5, checks classification alone). */
+export function findBoundaryCrossingsMissingClassificationOrVerb(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): BoundaryCrossing[] {
+  return findBoundaryCrossings(edges, elementsById).filter((crossing) => crossing.missingVerb || crossing.missingDataClassification);
 }
 
 /** Every fact at `commitId`, unfiltered by subject — callers scope to the systems they care about (health findings only reads systems' own attributes, not every subject in the model). Routed through `selectAll` (SPEC §6.7): `facts` is one of the tables `max_rows` can silently truncate. */

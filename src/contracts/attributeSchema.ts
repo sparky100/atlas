@@ -94,6 +94,8 @@ const LIFECYCLE_STATUS_OPTIONS = ['planned', 'active', 'retiring', 'retired'] as
 /** Prompt 7k item 1 — see `Criticality`'s own doc comment (`delta.ts`) for the ordering these options mirror. */
 const CRITICALITY_OPTIONS = ['critical', 'high', 'medium', 'low'] as const;
 const HOSTING_MODEL_OPTIONS = ['on_premises', 'private_cloud', 'public_cloud', 'saas', 'hybrid'] as const;
+/** Prompt 7k item 3 — see `SystemDomain`'s own doc comment (`delta.ts`) for why absent reads as `'it'`. */
+const DOMAIN_OPTIONS = ['it', 'ot', 'hybrid'] as const;
 
 const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   lifecycleStatus: { label: 'Lifecycle', required: true, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
@@ -106,6 +108,7 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   criticality: { label: 'Criticality', required: false, kind: 'enum', options: CRITICALITY_OPTIONS },
   hostingModel: { label: 'Hosting model', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
   hostingProvider: { label: 'Hosting provider', required: false, kind: 'text' },
+  domain: { label: 'Domain', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
 };
 const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
   'lifecycleStatus',
@@ -118,6 +121,7 @@ const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
   'criticality',
   'hostingModel',
   'hostingProvider',
+  'domain',
 ];
 
 const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {

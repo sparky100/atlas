@@ -66,9 +66,23 @@
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import { attributesRecord } from '../elements/attributesRecord';
+import { domainOf } from '../elements/systemDomain';
 
 export const EXTERNAL_LANE_KEY = '$external';
 export const UNASSIGNED_LANE_KEY = '$unassigned';
+/**
+ * Prompt 7k item 3: "OT systems grouped in a labelled zone inside the
+ * enterprise boundary" — structurally analogous to `EXTERNAL_LANE_KEY`
+ * (a system with `domain: 'ot'` is pulled out of its capability lane
+ * placement the same way an external one is, before any `supports` edge
+ * is even considered) but placed *inside* `boundaryKeys`, not outside it
+ * the way External sits below the boundary. `hybrid` stays in its normal
+ * capability lane — only a system whose domain resolves fully to `'ot'`
+ * is zoned out; the external check still runs first (an external OT
+ * system has no home inside the boundary at all, matching "outside" being
+ * the more fundamental fact of the two).
+ */
+export const OT_ZONE_LANE_KEY = '$ot';
 
 export const NODE_WIDTH = 160;
 export const NODE_HEIGHT = 48;
@@ -115,12 +129,12 @@ export interface LandscapeReferenceMarker {
   y: number;
 }
 
-export type LandscapeLaneRegion = 'capability' | 'unassigned' | 'external';
+export type LandscapeLaneRegion = 'capability' | 'unassigned' | 'external' | 'ot';
 
 export interface LandscapeLane {
   key: string;
   label: string;
-  /** `'external'` lanes sit outside the enterprise boundary (`boundary`, below); `'capability'`/`'unassigned'` are what the boundary actually encloses. */
+  /** `'external'` lanes sit outside the enterprise boundary (`boundary`, below); `'capability'`/`'unassigned'`/`'ot'` are what the boundary actually encloses — `'ot'` (Prompt 7k item 3) is `LandscapeCanvas.tsx`'s own cue to draw its zone rectangle. */
   region: LandscapeLaneRegion;
   y: number;
   height: number;
@@ -175,6 +189,7 @@ interface LanePlacement {
  */
 function placementFor(system: ElementsHeadRow, supportsEdges: readonly RelationshipsHeadRow[], l1AncestorByCapabilityId: ReadonlyMap<UUID, ElementsHeadRow>): LanePlacement {
   if (isExternal(system)) return { primaryLaneKey: EXTERNAL_LANE_KEY, otherLaneKeys: [], isFallback: false };
+  if (domainOf(system) === 'ot') return { primaryLaneKey: OT_ZONE_LANE_KEY, otherLaneKeys: [], isFallback: false };
 
   const resolved: ResolvedEdge[] = [];
   for (const edge of supportsEdges) {
@@ -206,9 +221,10 @@ function byNameThenId(a: ElementsHeadRow, b: ElementsHeadRow): number {
   return a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id);
 }
 
-/** Capability lanes first (by name), Unassigned last (item 2) — External isn't part of this ordering at all any more, see this module's own top comment. */
+/** Capability lanes first (by name), then the OT zone (Prompt 7k item 3 — a judgment call: real domain-based grouping reads more like "another lane" than a leftover bucket, so it sits ahead of Unassigned), Unassigned last (item 2) — External isn't part of this ordering at all any more, see this module's own top comment. */
 function laneSortKey(key: string, l1CapabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>): [number, string] {
-  if (key === UNASSIGNED_LANE_KEY) return [1, ''];
+  if (key === UNASSIGNED_LANE_KEY) return [2, ''];
+  if (key === OT_ZONE_LANE_KEY) return [1, ''];
   return [0, l1CapabilitiesById.get(key)?.name ?? key];
 }
 
@@ -320,7 +336,7 @@ export function computeLandscapeLayout(
 
   function placeLane(key: string, region: LandscapeLaneRegion): void {
     const members = [...(byLane.get(key) ?? [])].sort(byNameThenId);
-    const label = key === EXTERNAL_LANE_KEY ? 'External' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
+    const label = key === EXTERNAL_LANE_KEY ? 'External' : key === OT_ZONE_LANE_KEY ? 'OT' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
     const row = layoutRow(members, y + LANE_LABEL_HEIGHT, itemsPerRow);
     const laneHeight = members.length === 0 ? LANE_LABEL_HEIGHT + EMPTY_LANE_GUTTER_Y : LANE_LABEL_HEIGHT + row.height + LANE_GUTTER_Y;
     lanes.push({ key, label, region, y, height: laneHeight });
@@ -343,7 +359,7 @@ export function computeLandscapeLayout(
     y += laneHeight;
   }
 
-  for (const key of boundaryKeys) placeLane(key, key === UNASSIGNED_LANE_KEY ? 'unassigned' : 'capability');
+  for (const key of boundaryKeys) placeLane(key, key === UNASSIGNED_LANE_KEY ? 'unassigned' : key === OT_ZONE_LANE_KEY ? 'ot' : 'capability');
   const boundaryBottom = y;
 
   if (hasExternalLane) {

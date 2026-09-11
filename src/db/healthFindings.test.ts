@@ -3,6 +3,8 @@ import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../c
 import {
   computeSelfOwnedCapabilityIds,
   computeStaleAttributesFinding,
+  findBoundaryCrossings,
+  findBoundaryCrossingsMissingClassificationOrVerb,
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
   findCriticalSystemsWithoutBusinessOwner,
@@ -14,6 +16,10 @@ import {
 
 function system(id: string, attributes: Record<string, Json> = {}): ElementsHeadRow {
   return { element_id: id, element_type: 'system', name: `System ${id}`, parent_id: null, attributes, exists_delta_id: `delta-${id}` };
+}
+
+function container(id: string, parentId: string): ElementsHeadRow {
+  return { element_id: id, element_type: 'container', name: `Container ${id}`, parent_id: parentId, attributes: {}, exists_delta_id: `delta-${id}` };
 }
 
 function capability(id: string, parentId: string | null = null): ElementsHeadRow {
@@ -316,5 +322,113 @@ describe('findUnlabeledVerbRelationships (Sprint U4-1 B5)', () => {
   it('falls back to the raw element id when an endpoint is missing from elementsById', () => {
     const edges = [relationship('r1', 'uses', 'sys-1', 'sys-missing')];
     expect(findUnlabeledVerbRelationships(edges, elementsById)).toEqual([{ relationshipId: 'r1', relationshipType: 'uses', fromName: 'System sys-1', toName: 'sys-missing' }]);
+  });
+});
+
+describe('findBoundaryCrossings (Prompt 7k item 3)', () => {
+  it('flags a uses/flows_to edge between an it and an ot system, either direction', () => {
+    const elementsById = new Map([
+      ['sys-it', system('sys-it')],
+      ['sys-ot', system('sys-ot', { domain: 'ot' })],
+    ]);
+    const edges = [relationship('r1', 'uses', 'sys-it', 'sys-ot'), relationship('r2', 'flows_to', 'sys-ot', 'sys-it')];
+    const crossings = findBoundaryCrossings(edges, elementsById);
+    expect(crossings.map((c) => c.relationshipId)).toEqual(['r1', 'r2']);
+    expect(crossings[0]).toMatchObject({ fromDomain: 'it', toDomain: 'ot' });
+  });
+
+  it('does not flag an edge between two it systems, or two ot systems', () => {
+    const elementsById = new Map([
+      ['sys-it-1', system('sys-it-1')],
+      ['sys-it-2', system('sys-it-2')],
+      ['sys-ot-1', system('sys-ot-1', { domain: 'ot' })],
+      ['sys-ot-2', system('sys-ot-2', { domain: 'ot' })],
+    ]);
+    const edges = [relationship('r1', 'uses', 'sys-it-1', 'sys-it-2'), relationship('r2', 'uses', 'sys-ot-1', 'sys-ot-2')];
+    expect(findBoundaryCrossings(edges, elementsById)).toEqual([]);
+  });
+
+  it('a hybrid endpoint never participates in a crossing, on either side', () => {
+    const elementsById = new Map([
+      ['sys-hybrid', system('sys-hybrid', { domain: 'hybrid' })],
+      ['sys-ot', system('sys-ot', { domain: 'ot' })],
+      ['sys-it', system('sys-it')],
+    ]);
+    const edges = [relationship('r1', 'uses', 'sys-hybrid', 'sys-ot'), relationship('r2', 'uses', 'sys-hybrid', 'sys-it')];
+    expect(findBoundaryCrossings(edges, elementsById)).toEqual([]);
+  });
+
+  it('a container endpoint resolves its domain from its parent system', () => {
+    const sys = system('sys-ot', { domain: 'ot' });
+    const cont = container('cont-1', 'sys-ot');
+    const elementsById = new Map([
+      ['sys-ot', sys],
+      ['cont-1', cont],
+      ['sys-it', system('sys-it')],
+    ]);
+    const edges = [relationship('r1', 'uses', 'cont-1', 'sys-it')];
+    const crossings = findBoundaryCrossings(edges, elementsById);
+    expect(crossings).toHaveLength(1);
+    expect(crossings[0]).toMatchObject({ fromDomain: 'ot', toDomain: 'it' });
+  });
+
+  it('supports/owns edges are never crossings, even between it and ot systems', () => {
+    const elementsById = new Map([
+      ['sys-it', system('sys-it')],
+      ['sys-ot', system('sys-ot', { domain: 'ot' })],
+    ]);
+    const edges = [relationship('r1', 'supports', 'sys-it', 'sys-ot')];
+    expect(findBoundaryCrossings(edges, elementsById)).toEqual([]);
+  });
+
+  it('records whether a verb and (for flows_to) a data classification are missing', () => {
+    const elementsById = new Map([
+      ['sys-it', system('sys-it')],
+      ['sys-ot', system('sys-ot', { domain: 'ot' })],
+    ]);
+    const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to', dataClassification: 'official' })];
+    expect(findBoundaryCrossings(edges, elementsById)).toEqual([
+      { relationshipId: 'r1', relationshipType: 'flows_to', fromName: 'System sys-it', toName: 'System sys-ot', fromDomain: 'it', toDomain: 'ot', missingVerb: false, missingDataClassification: false },
+    ]);
+  });
+
+  it('a uses crossing is never flagged for missing data classification — uses has no such attribute', () => {
+    const elementsById = new Map([
+      ['sys-it', system('sys-it')],
+      ['sys-ot', system('sys-ot', { domain: 'ot' })],
+    ]);
+    const edges = [relationship('r1', 'uses', 'sys-it', 'sys-ot', { description: 'polls' })];
+    expect(findBoundaryCrossings(edges, elementsById)[0]).toMatchObject({ missingVerb: false, missingDataClassification: false });
+  });
+});
+
+describe('findBoundaryCrossingsMissingClassificationOrVerb (Prompt 7k item 3)', () => {
+  const elementsById = new Map([
+    ['sys-it', system('sys-it')],
+    ['sys-ot', system('sys-ot', { domain: 'ot' })],
+  ]);
+
+  it('flags a crossing with no verb-phrase label', () => {
+    const edges = [relationship('r1', 'uses', 'sys-it', 'sys-ot')];
+    expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, elementsById).map((c) => c.relationshipId)).toEqual(['r1']);
+  });
+
+  it('flags a flows_to crossing with a verb but no data classification', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to' })];
+    expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, elementsById).map((c) => c.relationshipId)).toEqual(['r1']);
+  });
+
+  it('does not flag a fully-classified crossing', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to', dataClassification: 'official' })];
+    expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, elementsById)).toEqual([]);
+  });
+
+  it('does not flag a non-crossing edge at all, regardless of metadata', () => {
+    const bothIt = new Map([
+      ['sys-it-1', system('sys-it-1')],
+      ['sys-it-2', system('sys-it-2')],
+    ]);
+    const edges = [relationship('r1', 'uses', 'sys-it-1', 'sys-it-2')];
+    expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, bothIt)).toEqual([]);
   });
 });

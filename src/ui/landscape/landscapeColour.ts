@@ -14,6 +14,13 @@
  *   colour exists to make "is this recorded at all, and does it vary
  *   across the estate" visible at a glance; the actual value is read from
  *   the label (canvas hover tooltip), never the colour alone (§8.7).
+ * - **Domain (IT/OT)**, Prompt 7k item 3: unlike the two modes above, this
+ *   one is never silent — `domainOf` defaults an unrecorded system to
+ *   `'it'`, so every tile gets a tone (`systemDomain.ts`'s own
+ *   `DOMAIN_TONE`). This is the same fact the landscape's OT zone
+ *   (`layout.ts`'s `OT_ZONE_LANE_KEY`) already groups structurally — the
+ *   colour-by mode is the complementary, always-available way to see the
+ *   same fact on every tile, not a duplicate mechanism.
  */
 import type { HostingModel } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
@@ -21,6 +28,7 @@ import type { LandscapeColourByMode } from '../../contracts/userPreferences';
 import type { ChipTone } from '../components/Chip/Chip';
 import { attributesRecord } from '../elements/attributesRecord';
 import { criticalityToneFor } from '../elements/criticalityTone';
+import { domainOf, domainToneFor } from '../elements/systemDomain';
 
 export interface TileColour {
   tone: ChipTone | undefined;
@@ -30,6 +38,7 @@ export interface TileColour {
 export const LANDSCAPE_COLOUR_BY_OPTIONS: { value: LandscapeColourByMode; label: string }[] = [
   { value: 'metric:criticality', label: 'Criticality' },
   { value: 'metric:hostingModel', label: 'Hosting model' },
+  { value: 'metric:domain', label: 'IT/OT domain' },
 ];
 
 const HOSTING_MODEL_LABEL: Record<HostingModel, string> = {
@@ -54,6 +63,10 @@ export function landscapeTileColourFor(mode: LandscapeColourByMode, system: Elem
       const value = attributesRecord(system.attributes).hostingModel;
       if (typeof value !== 'string' || !(value in HOSTING_MODEL_LABEL)) return { tone: undefined, label: undefined };
       return { tone: 'info', label: HOSTING_MODEL_LABEL[value as HostingModel] };
+    }
+    case 'metric:domain': {
+      const domain = domainOf(system);
+      return { tone: domainToneFor(domain), label: domain };
     }
   }
 }

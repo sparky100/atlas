@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { BoundaryCrossingsPage } from './routes/BoundaryCrossingsPage';
 import { CapabilityMapPage } from './routes/CapabilityMapPage';
 import { ChangePage } from './routes/ChangePage';
 import { ChangesPage } from './routes/ChangesPage';
@@ -49,6 +50,7 @@ export function App() {
           <Route path="/o/:orgSlug/m/:modelSlug/diff" element={<VersionDiffPage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/review" element={<ReviewQueuePage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/review/:mergeRequestId" element={<ReviewRequestPage />} />
+          <Route path="/o/:orgSlug/m/:modelSlug/boundary-crossings" element={<BoundaryCrossingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
