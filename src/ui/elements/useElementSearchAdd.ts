@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import { loadSearchPool, matchElements, type SearchPoolElement } from '../../db/elementSearch';
+import { hasExactMatch, loadSearchPool, matchElements, type SearchPoolElement } from '../../db/elementSearch';
 import { enrichElementMatches, type MatchEnrichment } from './enrichElementMatches';
 import { supabase } from '../supabaseClient';
 
@@ -20,7 +20,13 @@ export interface UseElementSearchAddResult {
   status: ElementSearchStatus;
   error: string | null;
   results: SearchResultRow[];
-  /** Blocking: element creation's "'Create <type>' appears only when nothing matches" — true once the pool has loaded, the query is non-empty, and it matched nothing. */
+  /**
+   * Prompt 7h bug fix (was: Blocking: element creation's "'Create <type>'
+   * appears only when nothing matches"): true once the pool has loaded,
+   * the query is non-empty, and nothing matches it *exactly* — a
+   * near-match no longer hides this on its own, only an exact one does
+   * (`hasExactMatch`, src/db/elementSearch.ts).
+   */
   showCreate: boolean;
 }
 
@@ -85,7 +91,11 @@ export function useElementSearchAdd(commitId: UUID, modelId: UUID, elementType: 
   });
 
   const status: ElementSearchStatus = poolError !== null ? 'error' : pool === null ? 'loading' : 'ready';
-  const showCreate = status === 'ready' && query.trim().length > 0 && results.length === 0;
+  // Prompt 7h bug fix: "Create..." is always the last row unless there's
+  // an exact, case-insensitive match on a name or alias — a near-match
+  // (any of `results` above) never hides it on its own. See
+  // src/db/elementSearch.ts's own `hasExactMatch` comment.
+  const showCreate = status === 'ready' && query.trim().length > 0 && pool !== null && !hasExactMatch(pool, query);
 
   return { query, setQuery, status, error: poolError, results, showCreate };
 }

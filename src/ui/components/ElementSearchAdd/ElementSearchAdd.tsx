@@ -36,12 +36,14 @@ export interface ElementSearchAddProps {
  * reversible `atlas.merge_elements`, never a delete; what search alone
  * misses is Q1's own duplicates report to catch, not this control's job).
  * Type a name; existing matches (by name, alias, or description —
- * src/db/elementSearch.ts) show with their owner and relationship count; a
- * "Create …" row appears only once nothing matches. Clicking an existing
- * match just opens it — a search-first control's whole point is finding
- * out something already exists rather than creating a duplicate. Clicking
- * "Create" adds it via `commit_deltas` (`useElementCreate`) and opens the
- * new element's page.
+ * src/db/elementSearch.ts) show with their owner and relationship count.
+ * Prompt 7h bug fix: "Create …" is always the last row unless there's an
+ * exact, case-insensitive match on a name or alias (`useElementSearchAdd.ts`'s
+ * `showCreate`) — a near-match alone never hides it, it only means both
+ * show together. Clicking an existing match just opens it — a
+ * search-first control's whole point is finding out something already
+ * exists rather than creating a duplicate. Clicking "Create" adds it via
+ * `commit_deltas` (`useElementCreate`) and opens the new element's page.
  */
 export function ElementSearchAdd({
   elementType,

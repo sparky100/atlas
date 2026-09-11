@@ -100,3 +100,20 @@ export function matchElements(pool: readonly SearchPoolElement[], query: string,
   }
   return matches;
 }
+
+/**
+ * Prompt 7h bug fix: "the search-first create option disappears when any
+ * partial match exists." The rule is "'Create...' is always the last row
+ * unless there is an exact, case-insensitive match on a name or alias" —
+ * a near-match (a substring `matchElements` already surfaces) should never
+ * hide create, only an exact one should, since an exact match means the
+ * thing being typed almost certainly already exists under that literal
+ * name. Deliberately excludes description (unlike `matchElements`'s own
+ * substring pass): a description matching the typed text exactly is a
+ * coincidence, not evidence this is the same element.
+ */
+export function hasExactMatch(pool: readonly SearchPoolElement[], query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (q === '') return false;
+  return pool.some(({ element, aliases }) => element.name.toLowerCase() === q || aliases.some((alias) => alias.toLowerCase() === q));
+}

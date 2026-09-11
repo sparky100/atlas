@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import { loadSearchPoolForTypes, matchElements, type SearchPoolElement } from '../../db/elementSearch';
+import { hasExactMatch, loadSearchPoolForTypes, matchElements, type SearchPoolElement } from '../../db/elementSearch';
 import { enrichElementMatches, type MatchEnrichment } from '../elements/enrichElementMatches';
 import { supabase } from '../supabaseClient';
 
@@ -22,6 +22,13 @@ export interface UseHomeSearchResult {
   status: HomeSearchStatus;
   error: string | null;
   results: HomeSearchResultRow[];
+  /**
+   * Prompt 7h bug fix: true once the pool has loaded, the query is
+   * non-empty, and nothing matches it *exactly* — a near-match (any of
+   * `results` above) no longer hides this on its own, only an exact one
+   * does (`hasExactMatch`, src/db/elementSearch.ts). Always the last row
+   * when true (`HomeSearch.tsx`'s own JSX order).
+   */
   showCreate: boolean;
 }
 
@@ -84,7 +91,11 @@ export function useHomeSearch(commitId: UUID, modelId: UUID): UseHomeSearchResul
   });
 
   const status: HomeSearchStatus = error !== null ? 'error' : pool === null ? 'loading' : 'ready';
-  const showCreate = status === 'ready' && query.trim().length > 0 && results.length === 0;
+  // Prompt 7h bug fix: "Create..." is always the last row unless there's
+  // an exact, case-insensitive match on a name or alias — a near-match
+  // (any of `results` above) never hides it on its own. See
+  // src/db/elementSearch.ts's own `hasExactMatch` comment.
+  const showCreate = status === 'ready' && query.trim().length > 0 && pool !== null && !hasExactMatch(pool, query);
 
   return { query, setQuery, status, error, results, showCreate };
 }
