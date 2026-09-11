@@ -100,6 +100,8 @@ export interface MergeRequestRow {
   merge_commit_id: UUID | null;
   /** The engine-computed §7 output (threeWayDiff + classifyMerge), cached at request and at each refresh. */
   classification: Record<string, unknown>;
+  /** SPEC §10.2 P-18: identity-warning pairs ("keep both") dismissed for this request — sorted "<idA> <idB>" pair keys, the same shape `useReviewRequest.ts` already derives. Survives `classification` being wholly recomputed on every refresh/resubmit (a separate column for exactly that reason — Sprint C2 step 7). */
+  dismissed_identity_pairs: string[];
   created_at: string;
 }
 

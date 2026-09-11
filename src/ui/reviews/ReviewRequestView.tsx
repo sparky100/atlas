@@ -11,6 +11,7 @@ import { branchStatusTone } from '../changes/branchStatus';
 import { CleanChanges, FieldConflictCard, IdentityWarningCard, StructuralConflictCard } from './ConflictCards';
 import { subjectAnchorType } from './elementBreadcrumb';
 import { mergeRequestStatusTone } from './mergeRequestStatus';
+import { SplitReviewPanel } from './SplitReviewPanel';
 import { useReviewRequest } from './useReviewRequest';
 import styles from './ReviewRequestView.module.css';
 
@@ -62,7 +63,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId }: ReviewRequ
   if (rr.state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (rr.state.status === 'error') return <Text as="p">{rr.state.message}</Text>;
 
-  const { request, branch, review } = rr.state;
+  const { request, branch, review, mainHeadCommitId } = rr.state;
   const { classification, threeWay } = review;
   const blockingFindings = classification.findings.filter((f) => f.blocking);
   const identityFindings = classification.findings.filter((f) => !f.blocking);
@@ -176,6 +177,10 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId }: ReviewRequ
           )}
         </div>
       </Panel>
+
+      {request.status === 'pending' && threeWay.upToDateWithMain && (
+        <SplitReviewPanel modelId={modelId} branch={branch} mainHeadCommitId={mainHeadCommitId} review={review} canSplit={canApproveOrMerge} onSplit={rr.reload} />
+      )}
 
       {structuralFindings.length > 0 && (
         <Panel>

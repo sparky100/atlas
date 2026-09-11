@@ -128,6 +128,14 @@ export async function rejectMergeRequest(supabase: Client, mergeRequestId: UUID,
   return data as MergeRequestRow;
 }
 
+/** SPEC §10.2 P-18 (Sprint C2 step 7): persists an identity-warning "Keep both" dismissal — `pairKey` is the same sorted "<idA> <idB>" string `useReviewRequest.ts` already derives, so a reload or a different reviewer never sees the pair flagged again. `atlas.dismiss_identity_pair` (`20260911030000_persist_identity_dismissals.sql`) is append-only and idempotent — dismissing an already-dismissed pair is a no-op, not an error. */
+export async function dismissIdentityPair(supabase: Client, mergeRequestId: UUID, pairKey: string): Promise<MergeRequestRow> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.schema('atlas').rpc('dismiss_identity_pair', { p_merge_request_id: mergeRequestId, p_pair_key: pairKey });
+  if (error) throw new Error(`dismissIdentityPair: ${error.message}`);
+  return data as MergeRequestRow;
+}
+
 export type MergeApprovedResult = { ok: true; commitId: UUID } | { ok: false; reason: 'refresh_required' | 'error'; message: string };
 
 /**
