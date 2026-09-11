@@ -24,7 +24,10 @@ Separate product, separate repo, separate Supabase project. Shares code with the
 4. **U4-2b** (Prompt 7h) — UI tweaks from use: capability map text and tiles, landscape auto-layout and width, context header.
 5. **M1b** — built 9 September; close-out done 11 September on the desktop (integration and Playwright run, thread-counts RPC, hollow markers and per-view filter, capability map markers, browse-table counts).
 5a. **C2 (Prompt 7b) — done 11 September except step 4** (structural-conflict resolution actions), carved out as **C2b** because refresh folds the other side's deltas before a resolution can apply; engine change needs a design decision first. Steps 1–3, 5, 6 and the step-7 hardening (identity dismissals, concurrent refresh) on main. The review-queue UI (step 3) was built without a design pass: use it on a real partial acceptance and log findings before any redesign.
-5b. **Changes UX (Prompt 7i)**, **admin surfaces (Prompt 7j)** and **system attributes for regulated estates (Prompt 7k)** — all from use on 11 September; schedule after C2's engine half, before any pilot. 7k is the one that touches the engine; run it on the desktop.
+5b. **C19 first** (ADR-021 §2.1: a main merge commit folds to the branch head; P-30; P-2 extension) as its own PR, now.
+5c. **Changes UX (Prompt 7i)**, **admin surfaces (Prompt 7j)** and **system attributes for regulated estates (Prompt 7k)** — all from use on 11 September; 7i and 7j may run in cloud with local verification; 7k on the desktop; merge 7k first if they overlap on the element header.
+5d. **U4-3 (Prompt 7l)** — findings from use on 11 September (relationship attribute editing, capability-scoped landscape as a list, secondary wording), after 7k.
+5e. **C2b** per ADR-021 (§5 items 2–6, §7 tests) after 7l, before K1.
 6. Hour of use → issues → **U4-3** (drag-to-reorder is queued there; expect the change flow, versions and the architect door's remaining §3.2 items to surface).
 7. Repeat until the definition of usable holds.
 8. Then C2 (split), K1 (capture), D1 (decisions), Q1 (duplicates), R1 (roadmap).
@@ -372,6 +375,20 @@ The ordering matters. Prompts 0–2 produce documents that every later prompt re
 
 ---
 
+## Prompt 7l — Claude Code: U4-3, findings from use (11 September)
+
+> After 7k (items 2 and 6 use 7k's attributes). Engine frozen. One PR per item; three suites; `pnpm release`; issues first.
+> 1. ~~Archived-models bug~~ — fixed in 7j on 11 September.
+> 2. **Relationship attribute editing, general.** Each relationship row on an element page expands to show its attributes with provenance (role, description/verb, data classification, via), editable by owner/architect with the same controls as element attributes; edits are `relationship.update` on the selected ref. Type rules stay in the engine. Supports role promotion demotes the current primary in the same commit; demoting the only primary is refused. Role tags at both ends (system page, capability page). Playwright: edit a verb on an existing flow and see it on the context view; promote a secondary supports and see the lane change.
+> 3. **Capability-scoped landscape** (`/landscape?capability=X`, desktop and mobile): a flat list of the systems supporting X, sectioned Primary / Also supports, child capabilities' systems included with the child named; one row each: name, lifecycle dot, role, owner, "uses N · used by N" (only when non-zero), Context → link. No lanes, no cross-lane chips. Title "Systems supporting X (N)".
+> 4. **Secondary-supporter wording.** Mobile landscape expanded groups list every supporting system with a role tag; collapsed headers keep a summary chip "also: SAP" (not "→ SAP"); tapping expands. Desktop lane chip tooltip/tap text: "also supports this capability (secondary)".
+> 5. **Versions in the changes explainer** (7i item 5): one sentence that versions are optional snapshots and a change never needs one.
+> 6. **Comments visibility check**: confirm on dev that markers and panel exist on the capability map and landscape, counts on changes and browse rows, tray in the header; log any missing surface as a bug rather than building here.
+>
+> Playwright per item as stated.
+
+---
+
 ## Prompt 8 — Claude Code: comments (M1a backend, M1b UI)
 
 > **Sprint M1a — comments backend.** Plumbing track; runs now. One summary at the end. No UI beyond what tests need.
@@ -438,9 +455,9 @@ Every parked item, its target, and where it is tracked. A row leaves this list o
 
 | Item | Why parked | Target | Tracked |
 |---|---|---|---|
-| C2b — structural-conflict resolution actions (keep-retraction/keep-element cascade, duplicate-relationship survivor, cardinality primary pick) | Refresh folds the other side's deltas before resolution runs; retract-vs-modify throws. Needs an engine decision: resolution during fold, or two-phase refresh | After 7i–7k, before K1 | SPEC §11; issue (open on C2 PR) |
+| C2b — structural-conflict resolution (ADR-021, design (c): prepare/replay/decide; `preparation` commit kind; `atlas.refresh_branch`; classifier fixes for supports.role cardinality and converged retracts; split-delta ordering; card actions; deferred Playwright) | Design accepted 11 September. C19 fast-forward fold rule + P-30 land first as their own PR (latent head_hash bug on final merge) | C19 now; C2b after 7k, before K1 | ADR-021; SPEC §11; issue #76 |
 | C2 review-queue design pass | Built without a handoff; needs evidence from use first | After first real partial acceptance | issue `design` |
-| Extra Playwright for review queue and BranchRebasePanel | With C2b | C2b | SPEC §11 |
+| Extra Playwright for review queue and BranchRebasePanel | Exercises C2b's resolution flow | C2b | SPEC §11; issue #76 |
 | Landscape context view as C4-style diagram (descriptions in tiles, verb labels, actors as people, boundary) | After M1b markers landed on tiles | U4-3 | decisions-from-use |
 | Drag-and-drop reorder on the capability map | Move buttons suffice for now | U4-3 | SPEC §11 row 13 |
 | Starter-map upgrade flow (model tree vs newer map version, additions proposed as a reviewable branch) | Needs the capture review queue | K1 | issue `missing` |
