@@ -6,7 +6,7 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff, VersionDiffState } from '../../engine/versionDiff';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
-import { BOUNDARY_MARGIN, NODE_HEIGHT, NODE_WIDTH, type LandscapeLayout } from './layout';
+import { BOUNDARY_MARGIN, computeLandscapeChannels, NODE_HEIGHT, NODE_WIDTH, routeLandscapeEdge, type LandscapeLayout, type LandscapeNodePosition } from './layout';
 import { quantizeScale } from './zoom';
 import styles from './LandscapeCanvas.module.css';
 
@@ -24,6 +24,8 @@ export interface LandscapeCanvasProps {
   nodeHref: (elementId: UUID) => string;
   /** Where clicking an actor node navigates to — an actor has no Context view of its own (the zoom chain is system-specific), so this goes straight to the actor's own element page. */
   actorHref: (elementId: UUID) => string;
+  /** Item 11: where a link in the "+N other capabilities" popover goes — a lane's own `key` (a level-1 capability's element id, for every lane but `$external`/`$unassigned`, neither of which a node's `extraLaneCount`/`referenceMarkers` ever point at — see `layout.ts`'s own `placementFor`) is the id this takes. */
+  capabilityHref: (capabilityId: UUID) => string;
   /** Unresolved comment-thread count per system id (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s Canvas section) — `useUnresolvedCommentCounts`'s own batched RPC result. A system absent from the map has zero unresolved threads and paints no marker. Actors carry no comment markers this sprint. */
   unresolvedCommentCounts?: ReadonlyMap<UUID, number> | undefined;
   /** Clicking a node's own comment marker (not the rest of the node, which still navigates via `nodeHref`) — opens the comments panel scoped to that system. */
@@ -153,6 +155,31 @@ function rectIntersects(rect: WorldRect, x: number, y: number, w: number, h: num
   return x + w >= rect.left && x <= rect.right && y + h >= rect.top && y <= rect.bottom;
 }
 
+/** The point halfway along a routed edge's own total length — item 9's routed (possibly multi-segment) paths need this instead of a plain from/to average so a diff marker sits on the line it's marking, not floating off to one side of a detour. */
+function polylineMidpoint(points: readonly { x: number; y: number }[]): { x: number; y: number } {
+  const first = points[0];
+  if (!first || points.length === 1) return first ?? { x: 0, y: 0 };
+
+  const segments: { a: { x: number; y: number }; b: { x: number; y: number }; length: number }[] = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    if (!a || !b) continue;
+    segments.push({ a, b, length: Math.hypot(b.x - a.x, b.y - a.y) });
+  }
+
+  const total = segments.reduce((sum, s) => sum + s.length, 0);
+  let remaining = total / 2;
+  for (const [i, segment] of segments.entries()) {
+    if (remaining <= segment.length || i === segments.length - 1) {
+      const t = segment.length === 0 ? 0 : remaining / segment.length;
+      return { x: segment.a.x + (segment.b.x - segment.a.x) * t, y: segment.a.y + (segment.b.y - segment.a.y) * t };
+    }
+    remaining -= segment.length;
+  }
+  return first;
+}
+
 /** Fit-to-view (item 1): the scale/offset pair that fits the diagram's own world bounds inside a `displayWidth`×`displayHeight` viewport, centred, clamped to `[MIN_SCALE, MAX_SCALE]` — never past `1` even when the diagram is small enough to zoom in past it, since "fit" means "see the whole thing," not "fill the screen." */
 function computeFitTransform(worldWidth: number, worldHeight: number, displayWidth: number, displayHeight: number): Transform {
   if (worldWidth <= 0 || worldHeight <= 0 || displayWidth <= 0 || displayHeight <= 0) return { scale: 1, tx: 0, ty: 0 };
@@ -168,6 +195,8 @@ function computeFitTransform(worldWidth: number, worldHeight: number, displayWid
 const COMMENT_MARKER_WIDTH = 18;
 const COMMENT_MARKER_HEIGHT = 16;
 const COMMENT_MARKER_INSET = 4;
+/** Item 11's "+N" marker hit region — a world-space radius around its drawn centre, generous relative to the ~8px-radius circle drawn at scale 1. */
+const EXTRA_LANE_MARKER_HIT_RADIUS = 12;
 
 /**
  * The landscape's renderer (UI-principles §6.1/§8.6): Canvas 2D for
@@ -182,9 +211,10 @@ const COMMENT_MARKER_INSET = 4;
  *
  * Landscape canvas, structural (item 1): wheel zooms about the cursor
  * (unchanged), clamped to `[MIN_SCALE, MAX_SCALE]` = 0.25×–4×; the diagram
- * fits to view on first draw and whenever `layout` changes identity (a
- * fresh load, or `resetLayout`'s own recompute — see `useLandscape.ts`),
- * via `computeFitTransform`. `+`/`−`/Fit are now real on-canvas buttons in
+ * fits to view on first draw and whenever `layout` changes identity (every
+ * load recomputes a fresh layout now — Sprint U4-2b item 6 removed the old
+ * "same picture until Reset layout" persistence, see `useLandscape.ts`'s
+ * own comment), via `computeFitTransform`. `+`/`−`/Fit are now real on-canvas buttons in
  * the top-right corner (`styles.toolbar`) as well as the existing `+`/`-`/
  * `0` keyboard shortcuts (§8.8's canvas key table) — `0` now fits rather
  * than resetting to an arbitrary identity transform. `data-scale`/
@@ -227,6 +257,7 @@ export function LandscapeCanvas({
   diff = null,
   nodeHref,
   actorHref,
+  capabilityHref,
   unresolvedCommentCounts,
   onCommentMarkerClick,
   onToggleCommentsPanel,
@@ -237,10 +268,36 @@ export function LandscapeCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [transform, setTransform] = useState<Transform>({ scale: 1, tx: 0, ty: 0 });
   const [hover, setHover] = useState<HoverState | null>(null);
+  // Item 11: which node's "+N" popover is open, if any — stays open across
+  // hover changes (unlike `.tooltip`) until dismissed; see this state's own
+  // render-site comment for the dismiss paths.
+  const [extraLanesPopover, setExtraLanesPopover] = useState<{ elementId: UUID; screenX: number; screenY: number } | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; startTransform: Transform; moved: boolean } | null>(null);
 
   const diffByElementId = useMemo(() => new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []), [diff]);
   const diffByRelationshipId = useMemo(() => new Map<UUID, RelationshipVersionDiff>(diff?.relationships.map((r) => [r.relationshipId, r]) ?? []), [diff]);
+
+  // Item 9: routed once per `layout`/`edges` change, not per draw — a
+  // straight line when nothing's in the way (the common case), an
+  // orthogonal detour through a clear channel otherwise (`layout.ts`'s own
+  // comment on `routeLandscapeEdge`). Recomputing this per animation frame
+  // during a pan/zoom drag would repeat the same O(edges × nodes) obstacle
+  // check every frame for no reason — §8.6's performance budget applies
+  // here exactly like viewport culling and LOD already do below.
+  const routedEdges = useMemo(() => {
+    const allPositions: LandscapeNodePosition[] = [...layout.nodes, ...layout.actorNodes];
+    const positionById = new Map(layout.nodes.map((n) => [n.elementId, n]));
+    const channels = computeLandscapeChannels(layout);
+    return edges
+      .map((edge) => {
+        const from = positionById.get(edge.from_element_id);
+        const to = positionById.get(edge.to_element_id);
+        if (!from || !to) return null;
+        const obstacles = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== edge.to_element_id);
+        return { edge, points: routeLandscapeEdge(from, to, obstacles, channels) };
+      })
+      .filter((r): r is { edge: RelationshipsHeadRow; points: { x: number; y: number }[] } => r !== null);
+  }, [layout, edges]);
 
   const fitToView = useCallback(() => {
     const wrapper = wrapperRef.current;
@@ -248,11 +305,9 @@ export function LandscapeCanvas({
     setTransform(computeFitTransform(layout.width, layout.height, wrapper.clientWidth, wrapper.clientHeight));
   }, [layout.width, layout.height]);
 
-  // Item 1: "fit-to-view on load and on Reset layout" — both are exactly
-  // "the `layout` object this component was handed is a new one" (a fresh
-  // load computes a new layout; `resetLayout` clears saved positions and
-  // recomputes), so one effect keyed on `layout`'s own identity covers
-  // both without this component needing to know which happened.
+  // Item 1: "fit-to-view on load" — every load computes a fresh `layout`
+  // object now (item 6), so this effect, keyed on `layout`'s own identity,
+  // fires exactly when it should with nothing else to distinguish.
   useEffect(() => {
     fitToView();
     // Only `layout` itself (a fresh computation) should re-fit — `fitToView`
@@ -298,6 +353,22 @@ export function LandscapeCanvas({
       return null;
     },
     [layout, transform, unresolvedCommentCounts],
+  );
+
+  /** The "+N" marker's own hit region — top-right, only for a node whose lane placement fell back to "most recently added" with other lanes it also touches (`extraLaneCount`, `layout.ts`'s own `placementFor`). A generous fixed *world*-space radius, same reasoning as `COMMENT_MARKER_WIDTH`/`HEIGHT` above: the drawn circle's on-screen size is quantised by zoom step, not worth matching pixel-for-pixel in a hit test. Checked before `nodeAt` (item 11: tapping the chip opens the popover instead of navigating). */
+  const extraLaneMarkerAt = useCallback(
+    (screenX: number, screenY: number): UUID | null => {
+      const worldX = (screenX - transform.tx) / transform.scale;
+      const worldY = (screenY - transform.ty) / transform.scale;
+      for (const node of layout.nodes) {
+        if (node.extraLaneCount === undefined) continue;
+        const cx = node.x + NODE_WIDTH - 4;
+        const cy = node.y + 4;
+        if (Math.hypot(worldX - cx, worldY - cy) <= EXTRA_LANE_MARKER_HIT_RADIUS) return node.elementId;
+      }
+      return null;
+    },
+    [layout, transform],
   );
 
   useEffect(() => {
@@ -367,15 +438,16 @@ export function LandscapeCanvas({
 
       const edgeMarkers: { text: string; worldX: number; worldY: number; colour: string }[] = [];
       if (edgeScreenWidth >= 0.25) {
-        const positionById = new Map(layout.nodes.map((n) => [n.elementId, n]));
         const simplified = edgeScreenWidth < 0.5;
-        for (const edge of edges) {
-          const from = positionById.get(edge.from_element_id);
-          const to = positionById.get(edge.to_element_id);
-          if (!from || !to) continue;
-          const left = Math.min(from.x, to.x);
-          const top = Math.min(from.y, to.y);
-          if (!rectIntersects(visible, left, top, Math.abs(from.x - to.x) + NODE_WIDTH, Math.abs(from.y - to.y) + NODE_HEIGHT)) continue;
+        for (const { edge, points } of routedEdges) {
+          // Culling against the routed path's own bounding box, not just
+          // the two endpoints — item 9's detours can bow out sideways well
+          // past the straight-line box between `from`/`to`.
+          const xs = points.map((p) => p.x);
+          const ys = points.map((p) => p.y);
+          const left = Math.min(...xs);
+          const top = Math.min(...ys);
+          if (!rectIntersects(visible, left, top, Math.max(...xs) - left, Math.max(...ys) - top)) continue;
 
           const edgeDiff = diffByRelationshipId.get(edge.relationship_id);
           const edgeState = edgeDiff?.state ?? 'unchanged';
@@ -386,18 +458,16 @@ export function LandscapeCanvas({
           ctx.globalAlpha = diff && edgeState === 'unchanged' ? 0.6 : 1;
           if (edgeState === 'removed') ctx.setLineDash([6, 4]);
 
-          const fromCx = from.x + NODE_WIDTH / 2;
-          const fromCy = from.y + NODE_HEIGHT / 2;
-          const toCx = to.x + NODE_WIDTH / 2;
-          const toCy = to.y + NODE_HEIGHT / 2;
           ctx.beginPath();
-          ctx.moveTo(fromCx, fromCy);
-          ctx.lineTo(toCx, toCy);
+          const [first, ...rest] = points;
+          if (first) ctx.moveTo(first.x, first.y);
+          for (const point of rest) ctx.lineTo(point.x, point.y);
           ctx.stroke();
           ctx.setLineDash([]);
 
           if (diff && (edgeState === 'added' || edgeState === 'changed') && !simplified) {
-            edgeMarkers.push({ text: edgeState === 'added' ? '+' : '~', worldX: (fromCx + toCx) / 2, worldY: (fromCy + toCy) / 2, colour: diffColour ?? tokens.text });
+            const mid = polylineMidpoint(points);
+            edgeMarkers.push({ text: edgeState === 'added' ? '+' : '~', worldX: mid.x, worldY: mid.y, colour: diffColour ?? tokens.text });
           }
 
           // "Aggregated": below the 0.5px tier, a plain hairline with no
@@ -408,10 +478,15 @@ export function LandscapeCanvas({
             continue;
           }
           // One arrowhead, direction-only semantics (UI-principles §9) —
-          // never a per-relationship-type marker style.
-          const angle = Math.atan2(toCy - fromCy, toCx - fromCx);
-          const arrowX = toCx - Math.cos(angle) * (NODE_WIDTH / 2);
-          const arrowY = toCy - Math.sin(angle) * (NODE_HEIGHT / 2);
+          // never a per-relationship-type marker style. Oriented off the
+          // path's own final segment, not the overall from→to direction,
+          // so a routed (non-straight) edge still points the right way
+          // into its target.
+          const last = points[points.length - 1] ?? { x: 0, y: 0 };
+          const beforeLast = points[points.length - 2] ?? last;
+          const angle = Math.atan2(last.y - beforeLast.y, last.x - beforeLast.x);
+          const arrowX = last.x - Math.cos(angle) * (NODE_WIDTH / 2);
+          const arrowY = last.y - Math.sin(angle) * (NODE_HEIGHT / 2);
           ctx.translate(arrowX, arrowY);
           ctx.rotate(angle);
           ctx.beginPath();
@@ -602,7 +677,7 @@ export function LandscapeCanvas({
     return () => {
       observer.disconnect();
     };
-  }, [layout, edges, systemsById, actorsById, diff, diffByElementId, diffByRelationshipId, transform, hover, unresolvedCommentCounts]);
+  }, [layout, routedEdges, systemsById, actorsById, diff, diffByElementId, diffByRelationshipId, transform, hover, unresolvedCommentCounts]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -637,6 +712,18 @@ export function LandscapeCanvas({
     const drag = dragRef.current;
     dragRef.current = null;
     if (drag?.moved) return;
+    // Item 11: checked first — tapping the "+N" chip opens/closes its own
+    // popover instead of navigating, the same precedence the comment
+    // marker already gets over a plain node click. Any other click on the
+    // canvas closes an already-open popover (the nearest thing this
+    // component has to "click outside" — see the popover's own render-site
+    // comment for the other dismiss paths).
+    const extraLaneElementId = extraLaneMarkerAt(screenX, screenY);
+    if (extraLaneElementId) {
+      setExtraLanesPopover((prev) => (prev?.elementId === extraLaneElementId ? null : { elementId: extraLaneElementId, screenX, screenY }));
+      return;
+    }
+    setExtraLanesPopover(null);
     const markerElementId = commentMarkerAt(screenX, screenY);
     if (markerElementId) {
       onCommentMarkerClick?.(markerElementId);
@@ -671,11 +758,24 @@ export function LandscapeCanvas({
     // §8.8's global `c`/`n` — see this component's own `onToggleCommentsPanel`/`onNewCommentShortcut` prop comments for why the hovered node stands in for "the focused row" here.
     else if (e.key === 'c') onToggleCommentsPanel?.(hover?.elementId ?? null);
     else if (e.key === 'n' && hover) onNewCommentShortcut?.(hover.elementId);
+    else if (e.key === 'Escape' && extraLanesPopover) setExtraLanesPopover(null);
   }
 
   const hoveredElement = hover ? (hover.elementType === 'system' ? systemsById.get(hover.elementId) : actorsById.get(hover.elementId)) : undefined;
   // §6.3: "Hover on any marker shows the changed attributes" — base -> new isn't shown here (the canvas has no per-field value, only the diff's element-grain summary); the element page's own history is where that detail lives. Actors carry no diff state (diff is system/relationship-grained).
   const hoveredDiff = diff && hover?.elementType === 'system' ? diffByElementId.get(hover.elementId) : undefined;
+
+  // Item 11: the popover's own content — every other level-1 lane the
+  // popover's node also supports (`layout.referenceMarkers`, filtered to
+  // this one element id), resolved to that lane's own label via
+  // `layout.lanes`. Computed on render, not memoized — it's only ever a
+  // handful of entries and only exists while the popover itself is open.
+  const extraLanesEntries = extraLanesPopover
+    ? layout.referenceMarkers
+        .filter((m) => m.elementId === extraLanesPopover.elementId)
+        .map((m) => ({ laneKey: m.laneKey, label: layout.lanes.find((l) => l.key === m.laneKey)?.label ?? m.laneKey }))
+    : [];
+  const extraLanesSystemName = extraLanesPopover ? systemsById.get(extraLanesPopover.elementId)?.name : undefined;
 
   return (
     <div
@@ -684,6 +784,8 @@ export function LandscapeCanvas({
       data-scale={transform.scale}
       data-tx={transform.tx}
       data-ty={transform.ty}
+      data-layout-width={layout.width}
+      data-layout-height={layout.height}
     >
       <canvas
         ref={canvasRef}
@@ -716,6 +818,43 @@ export function LandscapeCanvas({
           {hoveredElement.name}
           {attributesRecord(hoveredElement.attributes).isExternal === true ? ' (external)' : ''}
           {hoveredDiff && hoveredDiff.state !== 'unchanged' && hoveredDiff.changedAttributes.length > 0 && ` — changed: ${hoveredDiff.changedAttributes.join(', ')}`}
+        </div>
+      )}
+      {extraLanesPopover && (
+        <div
+          className={styles.extraLanesPopover}
+          style={{ left: extraLanesPopover.screenX, top: extraLanesPopover.screenY }}
+          role="menu"
+          aria-label={extraLanesSystemName ? `Other capabilities ${extraLanesSystemName} also supports` : 'Other capabilities'}
+        >
+          <div className={styles.extraLanesPopoverHeader}>
+            <span>{extraLanesSystemName ? `${extraLanesSystemName} also supports` : 'Also supports'}</span>
+            <button
+              type="button"
+              className={styles.extraLanesPopoverClose}
+              aria-label="Close"
+              onClick={() => {
+                setExtraLanesPopover(null);
+              }}
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          {extraLanesEntries.map((entry) => (
+            <a
+              key={entry.laneKey}
+              href={capabilityHref(entry.laneKey)}
+              className={styles.extraLanesPopoverLink}
+              role="menuitem"
+              onClick={(clickEvent) => {
+                clickEvent.preventDefault();
+                setExtraLanesPopover(null);
+                void navigate(capabilityHref(entry.laneKey));
+              }}
+            >
+              {entry.label}
+            </a>
+          ))}
         </div>
       )}
     </div>

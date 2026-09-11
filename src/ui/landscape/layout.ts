@@ -3,14 +3,26 @@
  * swim-lanes by the level-1 capability they `support`, actors above the
  * top band, an enterprise boundary around the internal lanes, externals
  * outside it. Pure and deterministic — CLAUDE.md rule 6 ("no Math.random in
- * anything deterministic") — the same inputs always produce the same
- * output: grouping and ordering are total orders over real data (capability
- * name/id, system/actor name/id), never a randomised placement, and
- * wrapping/band height are computed against `LAYOUT_WIDTH`, a fixed design
- * width, not a live viewport size — the canvas fits *that* to whatever
- * on-screen size it actually has (`LandscapeCanvas.tsx`'s own fit-to-view),
- * the same way this always has for zoom; a saved `view_layouts` position
- * hint would otherwise go stale every time a window resized.
+ * anything deterministic") — the same inputs (including the width hint,
+ * below) always produce the same output: grouping and ordering are total
+ * orders over real data (capability name/id, system/actor name/id), never a
+ * randomised placement.
+ *
+ * Sprint U4-2b item 7: wrapping/band height are computed against
+ * `layoutWidthHint` (`computeLandscapeLayout`'s own last parameter) —
+ * clamped to a `MIN_LAYOUT_WIDTH` floor, never a fixed design width any
+ * more. Before item 6 removed `view_layouts` persistence for the landscape
+ * kind entirely, a *live* width here would have gone stale the moment a
+ * saved position was reused at a different window size than the one that
+ * produced it; with nothing persisted and auto-layout running fresh on
+ * every open (`useLandscape.ts`'s own comment), that risk is gone, so the
+ * width can now genuinely track "the canvas's own on-screen size at layout
+ * time" — `LandscapePage.tsx` measures `<main>` (`useCanvasWidth.ts`; the
+ * canvas's own containing block once it's showing — `LandscapePage.module.css`'s
+ * `.mainWithCanvas` comment) and hands the result to `useLandscape.ts`,
+ * which passes it straight through here. A caller with no measurement yet
+ * (or one that doesn't care, like this module's own tests) gets
+ * `MIN_LAYOUT_WIDTH` via the parameter's own default.
  *
  * Sprint U1 step 4a runs this synchronously on the main thread; moving it
  * into a Web Worker (UI-principles §8.6) is step 4b's job and does not
@@ -33,8 +45,8 @@
  * visible hint: `extraLaneCount` on that node marks it "+N" that placement
  * was default, not deliberate.
  *
- * Landscape canvas, structural (this pass): lanes now span `LAYOUT_WIDTH`
- * in full regardless of member count (item 2's "each level-1 lane spans
+ * Landscape canvas, structural (this pass): lanes now span the effective
+ * layout width in full regardless of member count (item 2's "each level-1 lane spans
  * the canvas width"); a lane's members wrap left-to-right into rows within
  * that width rather than growing an ever-wider single row, so band height
  * genuinely "fits content" — one row's height for a handful of systems,
@@ -74,10 +86,14 @@ const EXTERNAL_GUTTER_Y = 32;
 /** Margin the boundary rectangle is drawn outside the lanes it encloses. */
 const BOUNDARY_MARGIN = 8;
 
-/** The fixed design width every band spans (item 2: "each level-1 lane spans the canvas width") — independent of the live viewport; `LandscapeCanvas.tsx`'s fit-to-view scales this to whatever on-screen size the canvas actually has, the same way it already does for zoom. Also how many systems/actors fit per wrapped row is computed. */
-export const LAYOUT_WIDTH = 1280;
-const AVAILABLE_ROW_WIDTH = LAYOUT_WIDTH - 2 * PADDING;
-const ITEMS_PER_ROW = Math.max(1, Math.floor((AVAILABLE_ROW_WIDTH + NODE_GUTTER_X) / (NODE_WIDTH + NODE_GUTTER_X)));
+/**
+ * Item 7's own floor — "LAYOUT_WIDTH = canvas width at layout time (min
+ * 1280)". `computeLandscapeLayout`'s effective width is
+ * `Math.max(MIN_LAYOUT_WIDTH, layoutWidthHint)`, never this constant alone
+ * once a real hint is available; a narrow canvas (or no hint at all) still
+ * gets this floor, so bands never shrink to the point of one item per row.
+ */
+export const MIN_LAYOUT_WIDTH = 1280;
 
 const REFERENCE_CHIP_WIDTH = 108;
 const REFERENCE_CHIP_HEIGHT = 18;
@@ -196,15 +212,15 @@ function laneSortKey(key: string, l1CapabilitiesById: ReadonlyMap<UUID, Elements
   return [0, l1CapabilitiesById.get(key)?.name ?? key];
 }
 
-/** One row-wrapped block of members (a lane's systems, or the actor row) — left to right, wrapping at `ITEMS_PER_ROW`, top-anchored at `top`. `height` is exactly as tall as the rows actually used, `0` for an empty list. */
-function layoutRow(members: readonly ElementsHeadRow[], top: number): { nodes: LandscapeNodePosition[]; height: number } {
+/** One row-wrapped block of members (a lane's systems, or the actor row) — left to right, wrapping at `itemsPerRow`, top-anchored at `top`. `height` is exactly as tall as the rows actually used, `0` for an empty list. */
+function layoutRow(members: readonly ElementsHeadRow[], top: number, itemsPerRow: number): { nodes: LandscapeNodePosition[]; height: number } {
   if (members.length === 0) return { nodes: [], height: 0 };
   const nodes = members.map((member, index) => {
-    const row = Math.floor(index / ITEMS_PER_ROW);
-    const col = index % ITEMS_PER_ROW;
+    const row = Math.floor(index / itemsPerRow);
+    const col = index % itemsPerRow;
     return { elementId: member.element_id, x: PADDING + col * (NODE_WIDTH + NODE_GUTTER_X), y: top + row * (NODE_HEIGHT + NODE_GUTTER_Y) };
   });
-  const rows = Math.ceil(members.length / ITEMS_PER_ROW);
+  const rows = Math.ceil(members.length / itemsPerRow);
   const height = rows * NODE_HEIGHT + (rows - 1) * NODE_GUTTER_Y;
   return { nodes, height };
 }
@@ -214,13 +230,19 @@ function layoutRow(members: readonly ElementsHeadRow[], top: number): { nodes: L
  * @param supportsEdges `supports` relationships from a system to a capability (`listSupportsEdgesForSystems`) — used only for lane assignment, never rendered as edges themselves (§6.1: landscape edges are `uses`/`flows_to` only).
  * @param l1AncestorByCapabilityId Every capability actually named by `supportsEdges`' targets, mapped to its own level-1 ancestor row (itself, if it already is one) — `src/ui/elements/capabilityDepth.ts`'s `l1AncestorOf`, resolved by the caller for each distinct target id. Lane labels come from these ancestor rows' own names, never a leaf sub-capability's.
  * @param actors Actors (`src/db/landscape.ts`'s `listActorsForLandscape`) — item 3's own top row, both external and internal together (visually distinguished, not separately grouped — `LandscapeCanvas.tsx`'s own concern).
+ * @param layoutWidthHint Item 7: the canvas's own on-screen width at layout time, when the caller has one — clamped to `MIN_LAYOUT_WIDTH` below. Omitted (this module's own tests, mostly) means "just use the floor."
  */
 export function computeLandscapeLayout(
   systems: readonly ElementsHeadRow[],
   supportsEdges: readonly RelationshipsHeadRow[],
   l1AncestorByCapabilityId: ReadonlyMap<UUID, ElementsHeadRow>,
   actors: readonly ElementsHeadRow[] = [],
+  layoutWidthHint: number = MIN_LAYOUT_WIDTH,
 ): LandscapeLayout {
+  const layoutWidth = Math.max(MIN_LAYOUT_WIDTH, layoutWidthHint);
+  const availableRowWidth = layoutWidth - 2 * PADDING;
+  const itemsPerRow = Math.max(1, Math.floor((availableRowWidth + NODE_GUTTER_X) / (NODE_WIDTH + NODE_GUTTER_X)));
+
   const supportsBySystem = new Map<UUID, RelationshipsHeadRow[]>();
   for (const edge of supportsEdges) {
     const list = supportsBySystem.get(edge.from_element_id) ?? [];
@@ -262,7 +284,7 @@ export function computeLandscapeLayout(
   const referenceMarkers: LandscapeReferenceMarker[] = [];
   let y = PADDING;
 
-  const actorRow = layoutRow([...actors].sort(byNameThenId), y);
+  const actorRow = layoutRow([...actors].sort(byNameThenId), y, itemsPerRow);
   if (actorRow.nodes.length > 0) y += actorRow.height + ACTOR_GUTTER_Y;
 
   const boundaryTop = y;
@@ -270,7 +292,7 @@ export function computeLandscapeLayout(
   function placeLane(key: string, region: LandscapeLaneRegion): void {
     const members = [...(byLane.get(key) ?? [])].sort(byNameThenId);
     const label = key === EXTERNAL_LANE_KEY ? 'External' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
-    const row = layoutRow(members, y + LANE_LABEL_HEIGHT);
+    const row = layoutRow(members, y + LANE_LABEL_HEIGHT, itemsPerRow);
     const laneHeight = members.length === 0 ? LANE_LABEL_HEIGHT + EMPTY_LANE_GUTTER_Y : LANE_LABEL_HEIGHT + row.height + LANE_GUTTER_Y;
     lanes.push({ key, label, region, y, height: laneHeight });
 
@@ -285,7 +307,7 @@ export function computeLandscapeLayout(
     // collapsed (member-less) lane still shows them.
     const refs = referenceTargets.filter((r) => r.laneKey === key);
     refs.forEach((ref, index) => {
-      const chipX = LAYOUT_WIDTH - PADDING - (index + 1) * (REFERENCE_CHIP_WIDTH + REFERENCE_CHIP_GUTTER) + REFERENCE_CHIP_GUTTER;
+      const chipX = layoutWidth - PADDING - (index + 1) * (REFERENCE_CHIP_WIDTH + REFERENCE_CHIP_GUTTER) + REFERENCE_CHIP_GUTTER;
       referenceMarkers.push({ elementId: ref.elementId, laneKey: key, x: chipX, y: y + (LANE_LABEL_HEIGHT - REFERENCE_CHIP_HEIGHT) / 2 });
     });
 
@@ -306,9 +328,157 @@ export function computeLandscapeLayout(
     lanes,
     referenceMarkers,
     boundary: { top: boundaryTop, bottom: boundaryBottom },
-    width: LAYOUT_WIDTH,
+    width: layoutWidth,
     height: y + PADDING,
   };
 }
 
 export { BOUNDARY_MARGIN };
+
+// --- Item 9: edges route around unrelated tiles ---
+//
+// The layout above places every node on a strict column/row grid (a lane's
+// members wrap at `itemsPerRow`, every row across every lane shares the
+// same column x-positions). That means the *gaps* between columns, and the
+// gaps between rows (within a lane, and between lanes), are never occupied
+// by any tile anywhere in the diagram — a "channel" spanning the full
+// height (a column gap) or full width (a row gap) that a routed edge can
+// always travel along without crossing a tile, whichever two nodes it
+// connects. `computeLandscapeChannels` derives both lists straight from
+// the *actual* node positions a completed layout produced — no need to
+// duplicate the grid bookkeeping above — and `routeLandscapeEdge` uses
+// them to build an orthogonal path only when the direct line between two
+// nodes would otherwise cross a third one, keeping the common case (an
+// unobstructed straight line) exactly as simple as it already was.
+
+export interface LandscapeChannels {
+  /** x-coordinates guaranteed clear of every node's column, top to bottom of the diagram. */
+  vertical: number[];
+  /** y-coordinates guaranteed clear of every node's row, left to right of the diagram. */
+  horizontal: number[];
+}
+
+/** The midpoints of every gap between a sorted list of `[start, start+span)` extents — plus one before the first and one after the last, into the given margin. Shared shape for both axes below. */
+function channelsBetween(starts: readonly number[], span: number, marginEnd: number): number[] {
+  const distinct = [...new Set(starts)].sort((a, b) => a - b);
+  const first = distinct[0];
+  const last = distinct[distinct.length - 1];
+  if (first === undefined || last === undefined) return [marginEnd / 2];
+
+  const channels: number[] = [first / 2];
+  for (let i = 0; i < distinct.length - 1; i++) {
+    const current = distinct[i];
+    const next = distinct[i + 1];
+    if (current === undefined || next === undefined) continue;
+    const end = current + span;
+    if (next > end) channels.push((end + next) / 2);
+  }
+  channels.push((last + span + marginEnd) / 2);
+  return channels;
+}
+
+/** Derives both channel lists from a completed layout's own node positions (`nodes` + `actorNodes` together — an actor tile is a tile like any other for routing purposes). Cheap: this is a handful of numbers, computed once per layout, not per edge. */
+export function computeLandscapeChannels(layout: Pick<LandscapeLayout, 'nodes' | 'actorNodes' | 'width' | 'height'>): LandscapeChannels {
+  const all = [...layout.nodes, ...layout.actorNodes];
+  return {
+    vertical: channelsBetween(all.map((n) => n.x), NODE_WIDTH, layout.width),
+    horizontal: channelsBetween(all.map((n) => n.y), NODE_HEIGHT, layout.height),
+  };
+}
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Liang-Barsky segment/AABB clip test — true when the closed segment (x1,y1)-(x2,y2) enters `rect`'s interior at all (touching an edge exactly counts as clear, per the `<`/`>` below, not `<=`/`>=` — a route that just grazes a tile's boundary was never asked to detour around it). */
+export function segmentCrossesRect(x1: number, y1: number, x2: number, y2: number, rect: Rect): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const checks: [number, number][] = [
+    [-dx, x1 - rect.x],
+    [dx, rect.x + rect.w - x1],
+    [-dy, y1 - rect.y],
+    [dy, rect.y + rect.h - y1],
+  ];
+  for (const [p, q] of checks) {
+    if (p === 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+  }
+  return t1 - t0 > 1e-9;
+}
+
+/** The vertical channel immediately to one side of `[start, start+span)` — the gap's own midpoint, always present (`computeLandscapeChannels` seeds a channel before the first extent and after the last, so every extent has a neighbour on both sides). `0` is an unreachable fallback (`channels` is never empty in practice — it always comes from `computeLandscapeChannels`, which always returns at least one entry per axis), needed only to satisfy the type checker. */
+function adjacentChannel(channels: readonly number[], start: number, span: number, side: 'before' | 'after'): number {
+  const sorted = [...channels].sort((a, b) => a - b);
+  if (side === 'before') {
+    const below = sorted.filter((c) => c <= start);
+    return below[below.length - 1] ?? sorted[0] ?? 0;
+  }
+  const above = sorted.filter((c) => c >= start + span);
+  return above[0] ?? sorted[sorted.length - 1] ?? 0;
+}
+
+function nearestChannel(channels: readonly number[], target: number): number {
+  return channels.reduce((best, c) => (Math.abs(c - target) < Math.abs(best - target) ? c : best), channels[0] ?? target);
+}
+
+/**
+ * The polyline (world-space points, first and last are the two node
+ * centres) an edge from `from` to `to` should draw as — a plain 2-point
+ * straight line when nothing else is in the way (the common case, and
+ * visually simplest), or an orthogonal detour through the clear channels
+ * `computeLandscapeChannels` derived, when the direct line would otherwise
+ * cross a third node's tile. `obstacles` is every OTHER node in the
+ * diagram (systems and actors both — the caller excludes `from`/`to`
+ * themselves before calling).
+ */
+export function routeLandscapeEdge(from: LandscapeNodePosition, to: LandscapeNodePosition, obstacles: readonly LandscapeNodePosition[], channels: LandscapeChannels): { x: number; y: number }[] {
+  const fromCentre = { x: from.x + NODE_WIDTH / 2, y: from.y + NODE_HEIGHT / 2 };
+  const toCentre = { x: to.x + NODE_WIDTH / 2, y: to.y + NODE_HEIGHT / 2 };
+
+  const blocked = obstacles.some((n) => segmentCrossesRect(fromCentre.x, fromCentre.y, toCentre.x, toCentre.y, { x: n.x, y: n.y, w: NODE_WIDTH, h: NODE_HEIGHT }));
+  if (!blocked) return [fromCentre, toCentre];
+
+  // Exit `from` sideways into whichever of its two adjacent column
+  // channels leans toward `to` (always safe — the gap next to a tile's own
+  // column is never occupied by anything, regardless of that row's other
+  // content); enter `to` the same way, symmetrically; connect the two via
+  // whichever horizontal channel sits closest to the pair's own vertical
+  // midpoint (always safe too — a horizontal channel spans the full width
+  // by construction).
+  const v1 = adjacentChannel(channels.vertical, from.x, NODE_WIDTH, to.x >= from.x ? 'after' : 'before');
+  const v2 = adjacentChannel(channels.vertical, to.x, NODE_WIDTH, from.x >= to.x ? 'after' : 'before');
+  const h = nearestChannel(channels.horizontal, (fromCentre.y + toCentre.y) / 2);
+
+  const raw = [fromCentre, { x: v1, y: fromCentre.y }, { x: v1, y: h }, { x: v2, y: h }, { x: v2, y: toCentre.y }, toCentre];
+  // Drop a point that adds no direction change (e.g. `v1 === v2` collapses
+  // the middle two into one point) — dedupe on identical consecutive
+  // points and on three consecutive collinear ones.
+  const points: { x: number; y: number }[] = [];
+  for (const point of raw) {
+    const prev = points[points.length - 1];
+    if (prev?.x === point.x && prev.y === point.y) continue;
+    const prev2 = points[points.length - 2];
+    if (prev && prev2 && ((prev2.x === prev.x && prev.x === point.x) || (prev2.y === prev.y && prev.y === point.y))) {
+      points[points.length - 1] = point;
+      continue;
+    }
+    points.push(point);
+  }
+  return points;
+}

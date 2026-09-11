@@ -1,21 +1,26 @@
 /**
  * Sprint U4-1 E1: "Landscape actions collapse to a single '+ Add' menu at
- * 390px; 'Reset layout' moves to overflow menu."
+ * 390px."
  *
  * >= 768px (LandscapePage.tsx's own module comment — the app's existing
  * mobile breakpoint, not the sprint's 390px, which is the narrow-mobile
  * floor to prove no horizontal overflow at, same role it plays in
- * e2e/capability-map-layout.spec.ts) keeps "+ Add system", "+ Add actor"
- * and "Reset layout" inline, unchanged. Below it the two "Add" controls
- * collapse into one "+ Add" disclosure and "Reset layout" moves into its
- * own "⋯" overflow — checked by visibility, not DOM presence, per the
- * lesson in e2e/element-header.spec.ts/e2e/element-rename.spec.ts (both
- * arrangements' menu items are CSS-hidden, not unmounted, until opened).
+ * e2e/capability-map-layout.spec.ts) keeps "+ Add system" and "+ Add
+ * actor" inline, unchanged. Below it the two "Add" controls collapse into
+ * one "+ Add" disclosure — checked by visibility, not DOM presence, per
+ * the lesson in e2e/element-header.spec.ts/e2e/element-rename.spec.ts (the
+ * disclosure's menu items are CSS-hidden, not unmounted, until opened).
+ *
+ * Sprint U4-2b item 6: "Reset layout" and the "⋯" overflow menu it used to
+ * be the only occupant of are gone entirely — the landscape auto-
+ * lays-out on every open now, with nothing to reset. This spec dropped
+ * every assertion about them rather than leaving a dead "not visible"
+ * check for a control that no longer exists at all, at any width.
  *
  * Also covers Sprint U4-1 E2: "header collapsed user menu — verify" —
  * the app header's own mobile user menu (`AppHeader.tsx`/`UserMenu.tsx`,
  * Sprint U3b, unrelated to and untouched by E1) still collapses
- * correctly on the landscape page alongside its own two new disclosures.
+ * correctly on the landscape page alongside its own "+ Add" disclosure.
  *
  * Same "needs a real Supabase" limitation as e2e/element-edit.spec.ts.
  */
@@ -33,7 +38,7 @@ async function hasHorizontalScroll(page: Page): Promise<boolean> {
   return page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
 }
 
-test('landscape actions: "+ Add" and "Reset layout" collapse into disclosures below 768px, with no horizontal scroll at 390px', async ({ page }) => {
+test('landscape actions: "+ Add" collapses into a disclosure below 768px, with no horizontal scroll at 390px', async ({ page }) => {
   const env = loadEnv();
 
   const email = `landscape-actions-${randomUUID()}@example.test`;
@@ -91,23 +96,18 @@ test('landscape actions: "+ Add" and "Reset layout" collapse into disclosures be
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/landscape`);
   await expect(page.getByText('Billing')).toBeVisible();
 
-  // >= 768px: the three controls sit inline, no disclosure involved.
+  // >= 768px: both controls sit inline, no disclosure involved.
   await page.setViewportSize({ width: 1024, height: 900 });
   await expect(page.getByRole('button', { name: '+ Add system' })).toBeVisible();
   await expect(page.getByRole('button', { name: '+ Add actor' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Reset layout' })).toBeVisible();
   expect(await hasHorizontalScroll(page)).toBe(false);
 
-  // < 768px: both collapse. Neither "+ Add system"/"+ Add actor" nor
-  // "Reset layout" sit in the row directly any more — one "+ Add" trigger
-  // and one "⋯" trigger do.
+  // < 768px: both collapse into one "+ Add" disclosure — neither sits in
+  // the row directly any more.
   await page.setViewportSize({ width: 390, height: 800 });
   const addToggle = page.getByRole('button', { name: '+ Add', exact: true });
-  const moreToggle = page.getByRole('button', { name: 'Landscape actions' });
   await expect(addToggle).toBeVisible();
-  await expect(moreToggle).toBeVisible();
   await expect(page.getByRole('button', { name: '+ Add system' })).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Reset layout' })).not.toBeVisible();
   expect(await hasHorizontalScroll(page)).toBe(false);
 
   // The "+ Add" disclosure reveals both add controls in place.
@@ -115,21 +115,13 @@ test('landscape actions: "+ Add" and "Reset layout" collapse into disclosures be
   await expect(page.getByRole('button', { name: '+ Add system' })).toBeVisible();
   await expect(page.getByRole('button', { name: '+ Add actor' })).toBeVisible();
 
-  // The "⋯" disclosure reveals "Reset layout", independently.
-  await moreToggle.click();
-  const resetLayout = page.getByRole('button', { name: 'Reset layout' });
-  await expect(resetLayout).toBeVisible();
-
   // Sprint U4-1 E2: the app header's own mobile menu, a separate
-  // component from Landscape's own two disclosures above, still
-  // collapses correctly here too — opening it disturbs neither of them.
+  // component from Landscape's own "+ Add" disclosure above, still
+  // collapses correctly here too — opening it disturbs neither.
   const appMenuToggle = page.getByRole('button', { name: 'Account menu' });
   await expect(appMenuToggle).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign out' })).not.toBeVisible();
   await appMenuToggle.click();
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   await expect(page.getByRole('button', { name: '+ Add system' })).toBeVisible();
-  await expect(resetLayout).toBeVisible();
-
-  await resetLayout.click();
 });

@@ -27,16 +27,39 @@
   height: calc(100vh - var(--app-header-height));
 }
 
+/**
+ * Sprint U4-2b item 10: "actions never clip." The title is unbounded —
+ * `LandscapePage.tsx`'s own heading interpolates the filter capability's
+ * real name in (`Landscape: systems supporting ${capability.name}`) with
+ * no length cap — so without `flex-wrap` a long one and the header's own
+ * actions (visible only once `hasCanvas`, this item's own full-width row)
+ * would fight over one un-wrapping line and the actions could be pushed
+ * half off-screen rather than clipped cleanly or shown at all. `flex-wrap:
+ * wrap` is the same fix `CapabilityMapView.module.css`'s own `.columnHeader`
+ * comment already made for the identical shape (a name of unknown length
+ * beside fixed-size controls): the title takes the row alone when it's
+ * short enough to share it, and the actions wrap onto their own line at
+ * their natural (never-shrunk) width the moment it can't.
+ */
 .header {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: var(--space-2);
   margin-bottom: var(--space-4);
+}
+
+.title {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
+  flex: 0 0 auto;
 }
 
 /**
