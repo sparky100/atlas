@@ -333,6 +333,8 @@ The folded relationship set at a commit.
 
 Primary key `(commit_id, relationship_id)`. Unique `(commit_id, relationship_type, from_element_id, to_element_id)` (S-6). Indexes `(commit_id, from_element_id)`, `(commit_id, to_element_id)`.
 
+Within `attributes`, `description` on `uses`/`flows_to` (`src/contracts/delta.ts`'s `UsesAttributes`/`FlowsToAttributes`) holds the connection's verb phrase (e.g. "withdraws cash using") and is required at creation — a UI-level requirement, not a NOT NULL, since `attributes` is a single jsonb column with no per-key constraints.
+
 #### `facts`
 Attribute-grain provenance at a commit: which delta currently asserts each fact (S-8, ADR-007).
 
