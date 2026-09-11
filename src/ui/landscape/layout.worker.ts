@@ -21,6 +21,8 @@ export interface LayoutWorkerRequest {
   /** `Map` isn't guaranteed identical across every structured-clone implementation this app might run under — an entries array is the portable wire shape. */
   capabilities: [UUID, ElementsHeadRow][];
   actors: ElementsHeadRow[];
+  /** Item 7: the canvas's own on-screen width at layout time — see `layout.ts`'s own parameter doc. */
+  layoutWidthHint: number;
 }
 
 export interface LayoutWorkerResponse {
@@ -36,7 +38,7 @@ interface WorkerLike {
 const ctx = self as unknown as WorkerLike;
 
 ctx.onmessage = (event) => {
-  const { requestId, systems, supportsEdges, capabilities, actors } = event.data;
-  const layout = computeLandscapeLayout(systems, supportsEdges, new Map(capabilities), actors);
+  const { requestId, systems, supportsEdges, capabilities, actors, layoutWidthHint } = event.data;
+  const layout = computeLandscapeLayout(systems, supportsEdges, new Map(capabilities), actors, layoutWidthHint);
   ctx.postMessage({ requestId, layout });
 };

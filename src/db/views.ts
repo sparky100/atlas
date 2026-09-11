@@ -1,14 +1,19 @@
 /**
- * `views`/`view_layouts` repository operations (SPEC §3.9, ADR-011). Thin,
- * typed wrappers — the layout *algorithm* is src/ui/landscape/layout.ts,
- * which these functions hand real rows to and receive positions back from.
+ * `views` repository operations (SPEC §3.9, ADR-011): get-or-create the one
+ * saved-query row a model/element's view kind hangs off. Thin, typed
+ * wrappers.
+ *
+ * `view_layouts` itself has no repository functions here any more — Sprint
+ * U4-2b item 6 removed the landscape's own read/write of it (this module's
+ * bottom comment has the full reasoning); the layout *algorithm* remains
+ * src/ui/landscape/layout.ts, unrelated to persistence.
  *
  * Same untyped-client caveat as src/db/branches.ts: `data`/`error` come back
  * loosely typed from postgrest-js, asserted to the real row shape at each
  * function's one return point.
  */
 import type { Client } from './client';
-import type { LayoutSubjectType, ViewKind, ViewLayoutRow, ViewRow } from './types';
+import type { ViewKind, ViewRow } from './types';
 import type { UUID } from '../contracts/delta';
 
 export interface GetOrCreateViewInput {
@@ -101,41 +106,13 @@ export async function getOrCreateScopedView(supabase: Client, input: GetOrCreate
   return data as ViewRow;
 }
 
-export async function listViewLayouts(supabase: Client, viewId: UUID): Promise<ViewLayoutRow[]> {
-  const { data, error } = await supabase.from('view_layouts').select('*').eq('view_id', viewId);
-  if (error) throw new Error(`listViewLayouts: ${error.message}`);
-  return data as ViewLayoutRow[];
-}
-
-export interface UpsertLayoutInput {
-  orgId: UUID;
-  viewId: UUID;
-  subjectType: LayoutSubjectType;
-  subjectId: UUID;
-  x: number | null;
-  y: number | null;
-  updatedBy: UUID;
-}
-
-/** One round trip for however many positions need saving — a fresh layout run touches every node at once, not one row at a time. */
-export async function upsertViewLayouts(supabase: Client, inputs: readonly UpsertLayoutInput[]): Promise<void> {
-  if (inputs.length === 0) return;
-  const rows = inputs.map((input) => ({
-    org_id: input.orgId,
-    view_id: input.viewId,
-    subject_type: input.subjectType,
-    subject_id: input.subjectId,
-    x: input.x,
-    y: input.y,
-    updated_by: input.updatedBy,
-    updated_at: new Date().toISOString(),
-  }));
-  const { error } = await supabase.from('view_layouts').upsert(rows, { onConflict: 'view_id,subject_id' });
-  if (error) throw new Error(`upsertViewLayouts: ${error.message}`);
-}
-
-/** "Reset layout" (UI-principles §6.4): delete every position hint for this view. Auto-layout re-runs against whatever's left, computing the same result again — ADR-011's litmus test, exercised for real by the caller re-fetching afterward. */
-export async function clearViewLayouts(supabase: Client, viewId: UUID): Promise<void> {
-  const { error } = await supabase.from('view_layouts').delete().eq('view_id', viewId);
-  if (error) throw new Error(`clearViewLayouts: ${error.message}`);
-}
+// Sprint U4-2b item 6: the landscape was the only view kind that ever read
+// or wrote `view_layouts` (Context/Container/Component never have — see
+// each of their own hooks' "No view_layouts" comments; the capability map
+// never has either — CapabilityMapView.tsx's own layout is plain DOM/CSS).
+// It now auto-lays-out on every open instead (`useLandscape.ts`'s own
+// comment), so nothing in the app calls `list`/`upsert`/`clearViewLayouts`
+// any more — removed rather than left as untested, uncalled exports.
+// `view_layouts` itself stays in the schema (ADR-011: a view is a saved
+// query; a future feature may yet want per-user saved positions), just
+// with nothing currently writing to it.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import { resolveBranchModeProjection, projectionActorsForLandscape, projectionElementsByIds, projectionLandscapeEdges, projectionSupportsEdgesForSystems, projectionSystemsForLandscape } from '../../db/branchProjection';
@@ -6,7 +6,7 @@ import { listSupportsEdgesForCapabilities } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
 import { listActorsForLandscape, listLandscapeEdges, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
-import { clearViewLayouts, getOrCreateModelView, listViewLayouts, upsertViewLayouts } from '../../db/views';
+import { getOrCreateModelView } from '../../db/views';
 import type { ViewMode } from '../../db/viewMode';
 import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
@@ -75,23 +75,28 @@ async function loadL1AncestorByCapabilityId(
 
 export interface UseLandscapeResult {
   state: LandscapeState;
-  /** UI-principles §6.4: deletes every `view_layouts` row for this view and re-runs auto-layout. */
-  resetLayout: () => void;
 }
 
 /**
- * Loads the landscape's data and computes its layout, merging in any
- * previously-saved `view_layouts` positions and persisting whatever's newly
- * computed — so a second visit renders the same picture until someone
- * resets it (UI-principles §6.4).
+ * Loads the landscape's data and computes its layout fresh every time
+ * (Sprint U4-2b item 6, UI-principles §6.4): no `view_layouts` read or
+ * write for the landscape kind any more, and no "Reset layout" action to
+ * go with it — auto-layout runs on every open, full stop. The algorithm is
+ * already deterministic for the same query result (`layout.ts`'s own
+ * module comment — CLAUDE.md rule 6), so two people still see the same
+ * picture; what's gone is the old "first visit's layout wins until
+ * someone resets it" persistence, which bought nothing a deterministic
+ * algorithm doesn't already give for free, at the cost of a stale picture
+ * after the model itself changed shape. A drag (there is no per-node drag
+ * gesture built yet — only the canvas-wide pan `LandscapeCanvas.tsx`
+ * implements) would be session-only state in that component if one is
+ * ever added, never written back here.
  *
  * `capabilityId`, when given, is the "optional capability filter"
  * UI-principles §6.1's Landscape row itself names — *not* a separate view:
  * `scope_element_id` must be null for `landscape` (SPEC §3.9's own check
  * constraint), so a filtered landscape is still the model's one landscape
- * `views` row, just rendering a subset of its systems. Positions saved
- * under the unfiltered view are reused as-is for whichever of them are
- * currently in scope.
+ * `views` row, just rendering a subset of its systems.
  *
  * Sprint C1: when `ref.kind === 'branch'`, this folds the branch's own
  * as-is/to-be state via the engine instead of querying `elements_head`/
@@ -127,9 +132,17 @@ export function useLandscape(
    * in play) — `null` there is the only ever value and never blocks them.
    */
   mainCommitIdHint: UUID | null = null,
+  /**
+   * Item 7: the canvas's own on-screen width at layout time — `LandscapePage.tsx`'s
+   * `useCanvasWidth` measurement of `<main>`, passed straight through to
+   * `computeLandscapeLayoutInWorker`/`computeLandscapeLayout` (their own
+   * parameter doc has the full reasoning). `undefined` (no measurement
+   * yet, e.g. the very first render before the `ResizeObserver` fires)
+   * means "use the floor" there, same as omitting it entirely.
+   */
+  layoutWidthHint?: number,
 ): UseLandscapeResult {
   const [state, setState] = useState<LandscapeState>({ status: 'loading' });
-  const [resetToken, setResetToken] = useState(0);
   const refParam = refParamOf(ref);
 
   useEffect(() => {
@@ -221,34 +234,15 @@ export function useLandscape(
       const byIds: (ids: readonly UUID[]) => Promise<Map<UUID, ElementsHeadRow>> = systemsSource ? (ids) => Promise.resolve(systemsSource.byIds([...ids])) : (ids) => getElementsByIds(supabase, commitId, ids);
       const l1AncestorByCapabilityId = await loadL1AncestorByCapabilityId(byIds, supportsEdges);
 
+      // Still recorded (ADR-011: "a view is a saved query") — just never
+      // consulted for layout any more (item 6). `getOrCreateScopedView`'s
+      // own module comment names capability_map's identical stance.
       const view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId: currentOrgId, modelId: currentModelId, kind: 'landscape', name: 'Landscape', createdBy: currentUserId, branchId });
-      const savedLayout = await listViewLayouts(supabase, view.id);
-      const savedById = new Map(
-        savedLayout
-          .filter((row): row is typeof row & { x: number; y: number } => row.x !== null && row.y !== null)
-          .map((row) => [row.subject_id, row]),
-      );
 
-      // UI-principles §8.6: layout runs off the main thread. Actors have no
-      // saved `view_layouts` positions of their own (there's no drag-to-
-      // reposition feature for them, or for systems either — the saved
-      // positions below exist only so a reload renders the same picture,
-      // not to persist a manual move) — `computed.actorNodes` passes
-      // straight through.
-      const computed = await computeLandscapeLayoutInWorker(systems, supportsEdges, l1AncestorByCapabilityId, allActors);
-      const nodes = computed.nodes.map((node) => {
-        const saved = savedById.get(node.elementId);
-        return saved ? { elementId: node.elementId, x: saved.x, y: saved.y } : node;
-      });
-      const layout: LandscapeLayout = { ...computed, nodes };
-
-      const missing = computed.nodes.filter((node) => !savedById.has(node.elementId));
-      if (missing.length > 0) {
-        await upsertViewLayouts(
-          supabase,
-          missing.map((node) => ({ orgId: currentOrgId, viewId: view.id, subjectType: 'element' as const, subjectId: node.elementId, x: node.x, y: node.y, updatedBy: currentUserId })),
-        );
-      }
+      // UI-principles §8.6: layout runs off the main thread. Fresh every
+      // load (item 6) — no saved position to merge in, for systems or
+      // actors alike.
+      const layout: LandscapeLayout = await computeLandscapeLayoutInWorker(systems, supportsEdges, l1AncestorByCapabilityId, allActors, layoutWidthHint);
 
       const systemsById = new Map(systems.map((s) => [s.element_id, s]));
       const actorsById = new Map(allActors.map((a) => [a.element_id, a]));
@@ -270,20 +264,7 @@ export function useLandscape(
     // `ref`'s string form (`refParam`) is the real dependency, same pitfall
     // and same fix as useElementPage.ts — `ref` itself is read from the
     // closure, always the latest one.
-  }, [modelId, orgId, userId, refParam, mode, resetToken, capabilityId, mainCommitIdHint]);
+  }, [modelId, orgId, userId, refParam, mode, capabilityId, mainCommitIdHint, layoutWidthHint]);
 
-  const resetLayout = useCallback(() => {
-    setState((prev) => {
-      if (prev.status === 'ready' && prev.data.view.id) {
-        clearViewLayouts(supabase, prev.data.view.id)
-          .catch(() => undefined)
-          .finally(() => {
-            setResetToken((t) => t + 1);
-          });
-      }
-      return prev;
-    });
-  }, []);
-
-  return { state, resetLayout };
+  return { state };
 }
