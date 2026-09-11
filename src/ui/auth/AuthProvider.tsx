@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { consumeMyInvites } from '../../db/invites';
 import { supabase } from '../supabaseClient';
 import { AuthContext, type AuthContextValue, type AuthStatus } from './authContext';
 
@@ -18,10 +19,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setStatus(session ? 'signedIn' : 'signedOut');
       setUserId(session?.user.id ?? null);
       setEmail(session?.user.email ?? null);
+      // Sprint 7j item 4: consume any pending invite for this email the
+      // moment a real sign-in establishes a session — not on every token
+      // refresh. Covers both a fresh signup (`atlas.consume_invites_for_new_user`'s
+      // own `auth.users` trigger already catches that case on its own)
+      // and an existing account signing in for the first time after being
+      // invited, which that trigger can't see (`db/invites.ts`'s own
+      // module comment). Fire-and-forget: signing in must never be
+      // blocked by an unrelated invite-consumption hiccup, and a hiccup
+      // just leaves the invite pending for the next sign-in to retry.
+      if (event === 'SIGNED_IN') {
+        void consumeMyInvites(supabase).catch(() => undefined);
+      }
     });
     return () => {
       subscription.unsubscribe();

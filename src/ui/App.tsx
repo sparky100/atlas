@@ -10,6 +10,8 @@ import { ElementsPage } from './routes/ElementsPage';
 import { Home } from './routes/Home';
 import { LandscapePage } from './routes/LandscapePage';
 import { ModelHome } from './routes/ModelHome';
+import { ModelSettingsPage } from './routes/ModelSettingsPage';
+import { OrganisationSettingsPage } from './routes/OrganisationSettingsPage';
 import { OrgHome } from './routes/OrgHome';
 import { RequireAuth } from './routes/RequireAuth';
 import { ReviewQueuePage } from './routes/ReviewQueuePage';
@@ -31,7 +33,9 @@ export function App() {
         <Route element={<RequireAuth />}>
           <Route path="/" element={<Home />} />
           <Route path="/o/:orgSlug" element={<OrgHome />} />
+          <Route path="/o/:orgSlug/settings" element={<OrganisationSettingsPage />} />
           <Route path="/o/:orgSlug/m/:modelSlug" element={<ModelHome />} />
+          <Route path="/o/:orgSlug/m/:modelSlug/settings" element={<ModelSettingsPage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/e/:elementId" element={<ElementPage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/elements" element={<ElementsPage />} />
           <Route path="/o/:orgSlug/m/:modelSlug/landscape" element={<LandscapePage />} />

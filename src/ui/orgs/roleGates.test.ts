@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
-import { canApproveOrMergeRequest, canEditBranch, canReviewMergeRequest } from './roleGates';
+import { canApproveOrMergeRequest, canArchiveModel, canDeleteModel, canEditBranch, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
   return {
@@ -72,5 +72,40 @@ describe('canApproveOrMergeRequest', () => {
     expect(canApproveOrMergeRequest('architect')).toBe(true);
     expect(canApproveOrMergeRequest('contributor')).toBe(false);
     expect(canApproveOrMergeRequest('viewer')).toBe(false);
+  });
+});
+
+describe('canArchiveModel', () => {
+  it('owner/architect only (mirrors models_update RLS)', () => {
+    expect(canArchiveModel('owner')).toBe(true);
+    expect(canArchiveModel('architect')).toBe(true);
+    expect(canArchiveModel('contributor')).toBe(false);
+    expect(canArchiveModel('viewer')).toBe(false);
+    expect(canArchiveModel(null)).toBe(false);
+  });
+});
+
+describe('canRestoreModel', () => {
+  it('owner only — narrower than archive ("Restore for owners")', () => {
+    expect(canRestoreModel('owner')).toBe(true);
+    expect(canRestoreModel('architect')).toBe(false);
+    expect(canRestoreModel('contributor')).toBe(false);
+  });
+});
+
+describe('canDeleteModel', () => {
+  it('owner only (mirrors models_delete RLS)', () => {
+    expect(canDeleteModel('owner')).toBe(true);
+    expect(canDeleteModel('architect')).toBe(false);
+  });
+});
+
+describe('canManageOrgSettings', () => {
+  it('owner only (mirrors organisations_update/delete and members_insert/update/delete RLS)', () => {
+    expect(canManageOrgSettings('owner')).toBe(true);
+    expect(canManageOrgSettings('architect')).toBe(false);
+    expect(canManageOrgSettings('contributor')).toBe(false);
+    expect(canManageOrgSettings('viewer')).toBe(false);
+    expect(canManageOrgSettings(null)).toBe(false);
   });
 });

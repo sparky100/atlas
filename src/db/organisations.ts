@@ -10,8 +10,9 @@
  * session already returns exactly the organisations they belong to.
  */
 import type { Client } from './client';
-import type { MemberRow, OrganisationRow } from './types';
+import type { MemberRow, MemberRole, OrganisationRow, ProfileRow } from './types';
 import type { UUID } from '../contracts/delta';
+import { listProfilesByIds } from './profiles';
 
 export interface CreateOrganisationInput {
   /** Minted by the caller (S-1) — never generated here. Use `crypto.randomUUID()` at the call site. */
@@ -56,4 +57,64 @@ export async function getMyMembership(supabase: Client, orgId: UUID, userId: UUI
   const { data, error } = await supabase.from('members').select('*').eq('org_id', orgId).eq('user_id', userId).maybeSingle();
   if (error) throw new Error(`getMyMembership: ${error.message}`);
   return data as MemberRow | null;
+}
+
+export interface UpdateOrganisationInput {
+  name?: string;
+  slug?: string;
+}
+
+/** Sprint 7j item 2: rename/slug — gated by `organisations_update`'s RLS (owner) and the column-restricted grant `20260911050000_organisation_settings.sql` adds (name/slug only). */
+export async function updateOrganisation(supabase: Client, id: UUID, input: UpdateOrganisationInput): Promise<OrganisationRow> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.from('organisations').update(input).eq('id', id).select('*').single();
+  if (error) throw new Error(`updateOrganisation: ${error.message}`);
+  return data as OrganisationRow;
+}
+
+export type DeleteOrganisationResult = { status: 'deleted' } | { status: 'has_models'; count: number } | { status: 'not_found' };
+
+/** Owner only, only when the organisation has no models (`atlas.delete_organisation`'s own module comment) — `jsonb` status, matching `deleteModel`'s own convention. */
+export async function deleteOrganisation(supabase: Client, id: UUID): Promise<DeleteOrganisationResult> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.schema('atlas').rpc('delete_organisation', { p_org_id: id });
+  if (error) throw new Error(`deleteOrganisation: ${error.message}`);
+  return data as DeleteOrganisationResult;
+}
+
+export interface MemberWithProfile {
+  member: MemberRow;
+  /** `null` only in the impossible-in-practice case `getProfile`'s own doc comment names (no row yet past first membership). */
+  profile: ProfileRow | null;
+}
+
+/**
+ * Sprint 7j item 2's member directory: "profiles, role, joined" — `members`
+ * (`public`) and `atlas.profiles` (`atlas`) in two queries, the same
+ * no-cross-schema-join shape `listOrgMemberProfiles` (`src/db/profiles.ts`)
+ * already established for the @mention composer; this is the directory
+ * page itself, the surface that function's own doc comment named as still
+ * missing.
+ */
+export async function listMembers(supabase: Client, orgId: UUID): Promise<MemberWithProfile[]> {
+  const { data, error } = await supabase.from('members').select('*').eq('org_id', orgId).order('joined_at');
+  if (error) throw new Error(`listMembers: ${error.message}`);
+  const members = (data as MemberRow[] | null) ?? [];
+  const profiles = await listProfilesByIds(supabase, members.map((m) => m.user_id));
+  const profileById = new Map(profiles.map((p) => [p.user_id, p]));
+  return members.map((member) => ({ member, profile: profileById.get(member.user_id) ?? null }));
+}
+
+/** Owner only (`members_update`'s RLS); `atlas.guard_last_owner` (`20260906071200_tenancy.sql`) refuses a demotion that would leave the org with none. */
+export async function changeMemberRole(supabase: Client, orgId: UUID, userId: UUID, role: MemberRole): Promise<MemberRow> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.from('members').update({ role }).eq('org_id', orgId).eq('user_id', userId).select('*').single();
+  if (error) throw new Error(`changeMemberRole: ${error.message}`);
+  return data as MemberRow;
+}
+
+/** Owner removes anyone; anyone may remove themself (`members_delete`'s RLS) — `atlas.guard_last_owner` refuses removing the last owner either way. */
+export async function removeMember(supabase: Client, orgId: UUID, userId: UUID): Promise<void> {
+  const { error } = await supabase.from('members').delete().eq('org_id', orgId).eq('user_id', userId);
+  if (error) throw new Error(`removeMember: ${error.message}`);
 }

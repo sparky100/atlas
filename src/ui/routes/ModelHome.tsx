@@ -1,3 +1,4 @@
+import { useId, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import type { MemberRole } from '../../db/types';
@@ -20,7 +21,7 @@ import { useArchitectHome } from '../home/useArchitectHome';
 import { useDirectorHome } from '../home/useDirectorHome';
 import { useHomeMode } from '../home/useHomeMode';
 import { useModels } from '../models/useModels';
-import { canCreateChangeBranch, canEditOnMain, useMembership } from '../orgs/useMembership';
+import { canArchiveModel, canCreateChangeBranch, canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import styles from './ModelHome.module.css';
 
@@ -64,6 +65,8 @@ export function ModelHome() {
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { homeMode, setHomeMode } = useHomeMode(userId, canEditOnMain(role));
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const settingsMenuId = useId();
 
   // Handoff — Flow: Add a system, decision 5: the search box's create
   // action now follows the current `?ref=` (main, unless the door is
@@ -105,7 +108,32 @@ export function ModelHome() {
           <Text as="h1" size="2xl">
             {model.name}
           </Text>
-          <HomeModeSwitch homeMode={homeMode} onChange={setHomeMode} />
+          <div className={styles.headerActions}>
+            <HomeModeSwitch homeMode={homeMode} onChange={setHomeMode} />
+            {canArchiveModel(role) && (
+              <div className={styles.menuWrapper}>
+                <button
+                  type="button"
+                  className={styles.menuToggle}
+                  aria-expanded={settingsMenuOpen}
+                  aria-controls={settingsMenuId}
+                  aria-label="Model actions"
+                  onClick={() => {
+                    setSettingsMenuOpen((o) => !o);
+                  }}
+                >
+                  <span aria-hidden="true">⋯</span>
+                </button>
+                <div id={settingsMenuId} className={[styles.menu, settingsMenuOpen ? styles.open : ''].filter(Boolean).join(' ')}>
+                  <Link to={`/o/${orgSlug ?? ''}/m/${model.slug}/settings`} className={styles.menuItem}>
+                    <Text as="span" size="sm">
+                      Model settings
+                    </Text>
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <Panel>

@@ -30,6 +30,18 @@ export interface MemberRow {
   joined_at: string;
 }
 
+/** The literal shape of a row in `invites` (Sprint 7j item 4, `20260911060000_invites.sql`). `email` is always lowercase (the table's own check constraint). `consumed_at`/`consumed_by` are both `null` until a matching signup or sign-in consumes it — never written by a client. */
+export interface InviteRow {
+  id: UUID;
+  org_id: UUID;
+  email: string;
+  role: MemberRole;
+  invited_by: UUID;
+  created_at: string;
+  consumed_at: string | null;
+  consumed_by: UUID | null;
+}
+
 /** The literal shape of a row in `models`. */
 export interface ModelRow {
   id: UUID;
@@ -40,6 +52,8 @@ export interface ModelRow {
   schema_version: number;
   created_by: UUID;
   created_at: string;
+  /** Sprint 7j item 1: set by `atlas.archive_model`, cleared by `atlas.restore_model` — see that migration's own comment. */
+  archived_at: string | null;
 }
 
 export type BranchKind = 'main' | 'change' | 'capture_draft';
