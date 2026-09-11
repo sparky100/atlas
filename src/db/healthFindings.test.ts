@@ -4,10 +4,13 @@ import {
   computeSelfOwnedCapabilityIds,
   computeStaleAttributesFinding,
   findBoundaryCrossings,
+  findBoundaryCrossingsMissingClassification,
   findBoundaryCrossingsMissingClassificationOrVerb,
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
+  findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
+  findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
@@ -455,5 +458,98 @@ describe('findUnusedIntegrationPlatforms (Prompt 7k item 4)', () => {
     const systems = [system('sys-esb-a', { kind: 'integration_platform' }), system('sys-esb-b', { kind: 'integration_platform' })];
     const edges = [relationship('r1', 'uses', 'sys-a', 'sys-b', { via: 'sys-esb-b' })];
     expect(findUnusedIntegrationPlatforms(systems, edges).map((s) => s.element_id)).toEqual(['sys-esb-a']);
+  });
+});
+
+describe('findSystemsSupportingEssentialFunctionWithoutTechnicalOwner (Prompt 7k item 5)', () => {
+  it('flags a system supporting an essentialFunction capability with no technical owner', () => {
+    const systems = [system('sys-1')];
+    const capabilities = [{ ...capability('cap-1'), attributes: { essentialFunction: true } }];
+    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
+    expect(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supports, [])).toEqual(systems);
+  });
+
+  it('does not flag it once a technical owner exists', () => {
+    const systems = [system('sys-1')];
+    const capabilities = [{ ...capability('cap-1'), attributes: { essentialFunction: true } }];
+    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'technical' })];
+    expect(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supports, owns)).toEqual([]);
+  });
+
+  it('a business-role owns edge does not count as a technical owner', () => {
+    const systems = [system('sys-1')];
+    const capabilities = [{ ...capability('cap-1'), attributes: { essentialFunction: true } }];
+    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
+    const owns = [relationship('r2', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
+    expect(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supports, owns).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('a system supporting a non-essential capability is never flagged, even with no technical owner', () => {
+    const systems = [system('sys-1')];
+    const capabilities = [capability('cap-1')];
+    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1')];
+    expect(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supports, [])).toEqual([]);
+  });
+
+  it('is empty with no capabilities marked essentialFunction at all', () => {
+    const systems = [system('sys-1')];
+    expect(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, [capability('cap-1')], [], [])).toEqual([]);
+  });
+});
+
+describe('findBoundaryCrossingsMissingClassification (Prompt 7k item 5)', () => {
+  const itOt = new Map([
+    ['sys-it', system('sys-it', { domain: 'it' })],
+    ['sys-ot', system('sys-ot', { domain: 'ot' })],
+  ]);
+
+  it('flags a flows_to crossing with a verb but no data classification', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to' })];
+    expect(findBoundaryCrossingsMissingClassification(edges, itOt).map((c) => c.relationshipId)).toEqual(['r1']);
+  });
+
+  it('does not flag a crossing missing only its verb — that is item 3\'s own wider finding, not this one', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { dataClassification: 'official' })];
+    expect(findBoundaryCrossingsMissingClassification(edges, itOt)).toEqual([]);
+  });
+
+  it('does not flag a fully-classified crossing', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to', dataClassification: 'official' })];
+    expect(findBoundaryCrossingsMissingClassification(edges, itOt)).toEqual([]);
+  });
+
+  it('a uses crossing is never flagged — uses has no dataClassification attribute to be missing', () => {
+    const edges = [relationship('r1', 'uses', 'sys-it', 'sys-ot')];
+    expect(findBoundaryCrossingsMissingClassification(edges, itOt)).toEqual([]);
+  });
+});
+
+describe('findCriticalSystemsPastOrNearSupportEnd (Prompt 7k item 5)', () => {
+  const now = new Date('2026-06-15T00:00:00Z');
+
+  it('flags a critical system whose supportEndsAt falls within STALE_AFTER_MONTHS (12)', () => {
+    const systems = [system('sys-1', { criticality: 'critical', supportEndsAt: '2027-01-01' })];
+    expect(findCriticalSystemsPastOrNearSupportEnd(systems, now).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('flags a critical system already past vendor support end (more exposed, not less)', () => {
+    const systems = [system('sys-1', { criticality: 'critical', supportEndsAt: '2026-01-01' })];
+    expect(findCriticalSystemsPastOrNearSupportEnd(systems, now).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  it('does not flag a non-critical system with the same near supportEndsAt', () => {
+    const systems = [system('sys-1', { criticality: 'medium', supportEndsAt: '2027-01-01' })];
+    expect(findCriticalSystemsPastOrNearSupportEnd(systems, now)).toEqual([]);
+  });
+
+  it('does not flag a critical system whose supportEndsAt is well beyond the 12-month horizon', () => {
+    const systems = [system('sys-1', { criticality: 'critical', supportEndsAt: '2030-01-01' })];
+    expect(findCriticalSystemsPastOrNearSupportEnd(systems, now)).toEqual([]);
+  });
+
+  it('does not flag a critical system with no supportEndsAt at all, even with a near plannedEnd', () => {
+    const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2027-01-01' })];
+    expect(findCriticalSystemsPastOrNearSupportEnd(systems, now)).toEqual([]);
   });
 });

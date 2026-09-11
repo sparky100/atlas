@@ -53,6 +53,24 @@ export interface ElementHeaderProps {
    * standalone control sitting between Edit and Attributes.
    */
   rename?: UseElementRenameResult | undefined;
+  /**
+   * Prompt 7k item 5's "Retire…" (system only — `useElementRetire.ts` sets
+   * `lifecycleStatus`, a field only `SystemAttributes` has). Same
+   * omitted-not-disabled convention, gated on the same `canEditBranch`
+   * check as `onEdit`/`rename` — "both respect the selected ref" is the
+   * prompt's own wording for this and `onRemoveFromModel` below, not a
+   * parallel permission check of their own.
+   */
+  onRetire?: (() => void) | undefined;
+  /**
+   * Prompt 7k item 5's "Remove from model…" — every element type, not
+   * system-only. Omitted entirely (not shown disabled) whenever the
+   * caller's own gate disallows it, same convention as every prop above;
+   * also omitted when the element has any live children, since this
+   * action's own hook (`useElementRemoveFromModel.ts`) does not attempt
+   * C8's re-parenting half — see that hook's doc comment.
+   */
+  onRemoveFromModel?: (() => void) | undefined;
 }
 
 /**
@@ -81,10 +99,14 @@ export interface ElementHeaderProps {
  * static `h1` for an inline input right here, with its own Save/Cancel,
  * independent of the Attributes section's own edit form. The old
  * standalone rename row that used to sit between this header and
- * Attributes (`CapabilityTailoringActions.tsx`, now
- * `CapabilityRetractAction.tsx` — retract only) is gone.
+ * Attributes (`CapabilityTailoringActions.tsx`, then narrowed to
+ * `CapabilityRetractAction.tsx` — retract only) is gone entirely now:
+ * Prompt 7k item 5 generalises retract into "Remove from model…"
+ * (`onRemoveFromModel`, every element type, cascading its relationships)
+ * and adds "Retire…" (`onRetire`, system only) — both live in this same
+ * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
@@ -197,6 +219,30 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onPro
                 {element.element_id.slice(0, 8)}…
               </Text>
             </button>
+            {onRetire && (
+              <button
+                type="button"
+                className={styles.menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onRetire();
+                }}
+              >
+                <Text as="span">Retire…</Text>
+              </button>
+            )}
+            {onRemoveFromModel && (
+              <button
+                type="button"
+                className={styles.menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onRemoveFromModel();
+                }}
+              >
+                <Text as="span">Remove from model…</Text>
+              </button>
+            )}
           </div>
         </div>
       </div>

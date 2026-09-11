@@ -158,9 +158,21 @@ export function findBoundaryCrossings(edges: readonly RelationshipsHeadRow[], el
   return result;
 }
 
-/** Prompt 7k item 3's own health finding: "a crossing with no data classification or verb" — the wider of the two crossing-metadata findings (item 5's Assurance finding, PR5, checks classification alone). */
+/** Prompt 7k item 3's own health finding: "a crossing with no data classification or verb" — the wider of the two crossing-metadata findings (item 5's Assurance finding, below, checks classification alone). */
 export function findBoundaryCrossingsMissingClassificationOrVerb(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): BoundaryCrossing[] {
   return findBoundaryCrossings(edges, elementsById).filter((crossing) => crossing.missingVerb || crossing.missingDataClassification);
+}
+
+/**
+ * Prompt 7k item 5's own narrower Assurance finding: boundary crossings
+ * missing a data classification specifically — the CAF A3/B4-relevant
+ * subset of item 3's own wider finding above (which also flags a missing
+ * verb, a labelling concern rather than a regulatory-data one). Same
+ * `findBoundaryCrossings` pass, not a second detection (that function's own
+ * module comment).
+ */
+export function findBoundaryCrossingsMissingClassification(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): BoundaryCrossing[] {
+  return findBoundaryCrossings(edges, elementsById).filter((crossing) => crossing.missingDataClassification);
 }
 
 /**
@@ -337,6 +349,51 @@ export function findCriticalExposedSystems(systems: readonly ElementsHeadRow[], 
     const plannedEnd = new Date(plannedEndValue);
     if (Number.isNaN(plannedEnd.getTime())) return false;
     return monthsUntil(plannedEnd, now) <= STALE_AFTER_MONTHS;
+  });
+}
+
+/**
+ * Prompt 7k item 5's first Assurance finding: "systems supporting an
+ * essential function without a technical owner" — NIS essential functions
+ * are recorded at capability level (`CapabilityAttributes.essentialFunction`)
+ * and derived down to systems through `supports`, the same rollup shape
+ * `computeSelfOwnedCapabilityIds` above already uses in the other direction
+ * (capability ownership derived from a supporting system's `owns` edge).
+ * "Technical owner" reuses `findSystemsWithoutTechnicalOwner`'s own
+ * `role: 'technical'` definition, scoped down to just the systems this
+ * finding cares about.
+ */
+export function findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(
+  systems: readonly ElementsHeadRow[],
+  capabilities: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  ownsEdges: readonly RelationshipsHeadRow[],
+): ElementsHeadRow[] {
+  const essentialFunctionIds = new Set(capabilities.filter((c) => attributesRecord(c.attributes).essentialFunction === true).map((c) => c.element_id));
+  if (essentialFunctionIds.size === 0) return [];
+  const supportingSystemIds = new Set(supportsEdges.filter((edge) => essentialFunctionIds.has(edge.to_element_id)).map((edge) => edge.from_element_id));
+  const technicallyOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).role === 'technical').map((edge) => edge.to_element_id));
+  return systems.filter((system) => supportingSystemIds.has(system.element_id) && !technicallyOwnedIds.has(system.element_id));
+}
+
+/**
+ * Prompt 7k item 5's third Assurance finding: "critical systems past or
+ * within 12 months of vendor support end" — a system-level check against
+ * `supportEndsAt`, deliberately distinct from `findCriticalExposedSystems`
+ * above, which reads `plannedEnd` (this estate's own decommission date, not
+ * the vendor's support horizon). Same `monthsUntil`/`STALE_AFTER_MONTHS`
+ * shape: negative once the date is in the past, so an already-lapsed
+ * support date reads as exposed too, not less so.
+ */
+export function findCriticalSystemsPastOrNearSupportEnd(systems: readonly ElementsHeadRow[], now: Date = new Date()): ElementsHeadRow[] {
+  return systems.filter((system) => {
+    const attrs = attributesRecord(system.attributes);
+    if (attrs.criticality !== 'critical') return false;
+    const supportEndsAtValue = attrs.supportEndsAt;
+    if (typeof supportEndsAtValue !== 'string') return false;
+    const supportEndsAt = new Date(supportEndsAtValue);
+    if (Number.isNaN(supportEndsAt.getTime())) return false;
+    return monthsUntil(supportEndsAt, now) <= STALE_AFTER_MONTHS;
   });
 }
 

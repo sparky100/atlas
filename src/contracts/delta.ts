@@ -134,6 +134,17 @@ export interface CapabilityAttributes {
    * capability sorts after every ordered sibling, never before.
    */
   order?: number;
+  /**
+   * Prompt 7k item 5: NIS/CAF's "essential function" — defined at
+   * capability level (a regulator asks "which capabilities are essential",
+   * not "which systems") and derived down to systems through `supports`
+   * (`findSystemsSupportingEssentialFunctionWithoutTechnicalOwner`,
+   * `src/db/healthFindings.ts`), never stored redundantly on a system
+   * itself. Optional, defaulting to `false` when absent — the common case
+   * for a regulated estate's capability map is that most capabilities are
+   * not, themselves, an essential function under the regulation.
+   */
+  essentialFunction?: boolean;
 }
 
 export interface SystemAttributes {
@@ -156,6 +167,18 @@ export interface SystemAttributes {
   domain?: SystemDomain;
   /** Prompt 7k item 4: application, integration/data platform, or infrastructure — drives the landscape's platform band and which systems `via` (below) may reference. Optional; absent reads as `'application'` (`SystemKind`'s own comment). */
   kind?: SystemKind;
+  /**
+   * Prompt 7k item 5: vendor support end (e.g. an OS/platform's end-of-
+   * support date) — distinct from `plannedEnd`, which is *this estate's*
+   * planned decommission date. A system can be well past vendor support
+   * with no decommission planned yet (the exact case the "critical, past
+   * or within 12 months of vendor support end" health finding exists to
+   * catch,`findCriticalSystemsPastOrNearSupportEnd` in
+   * `src/db/healthFindings.ts`) or have a `plannedEnd` long before its
+   * vendor support actually lapses. Optional, same reasoning as
+   * `plannedEnd`.
+   */
+  supportEndsAt?: ISODate;
 }
 
 export interface ContainerAttributes {

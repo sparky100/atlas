@@ -17,9 +17,11 @@ export interface TypedNameConfirmProps {
  * settings item 2: "typed-name confirmation"). A genuine extra safety step,
  * not a stand-in for one — CLAUDE.md rule 7 rules out *fake* confirmation
  * UI, not a real extra gate; every other irreversible action in this
- * product (`CapabilityRetractAction.tsx`) uses a plain `window.confirm()`
- * instead, since typing the exact name back is a materially higher bar
- * than a browser dialog's single click, deliberately reserved for the two
+ * product (`RemoveFromModelAction.tsx`'s real listed-content confirm —
+ * the plain `window.confirm()` its own predecessor,
+ * `CapabilityRetractAction.tsx`, used to reach for, is gone as of Prompt
+ * 7k item 5) uses a lighter confirmation instead, since typing the exact
+ * name back is a materially higher bar, deliberately reserved for the two
  * actions in this sprint that delete an entire model or organisation.
  */
 export function TypedNameConfirm({ requiredName, actionLabel, onConfirm, disabled = false }: TypedNameConfirmProps) {

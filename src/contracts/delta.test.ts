@@ -390,3 +390,89 @@ describe('System kind and relationship via (Prompt 7k item 4)', () => {
     expect(fromDeltaRow(toDeltaRow(setVia, ctx))).toEqual(setVia);
   });
 });
+
+describe('Capability essentialFunction and system supportEndsAt (Prompt 7k item 5)', () => {
+  it('essentialFunction is accepted at create, optional, and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-24',
+      elementId: 'el-7',
+      elementType: 'capability',
+      name: 'Water Treatment',
+      parentId: null,
+      attributes: { essentialFunction: true },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('essentialFunction can be set later via an update, with none recorded at create', () => {
+    const create: Delta = {
+      kind: 'element.create',
+      id: 'delta-25',
+      elementId: 'el-8',
+      elementType: 'capability',
+      name: 'Meter Reading',
+      parentId: null,
+      attributes: {},
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    const setEssential: Delta = {
+      kind: 'element.update',
+      id: 'delta-26',
+      elementId: 'el-8',
+      elementType: 'capability',
+      attribute: 'essentialFunction',
+      value: true,
+      previousDeltaId: 'delta-25',
+      sourceId: 'src-1',
+      confidence: 0.9,
+    };
+    expect(fromDeltaRow(toDeltaRow(create, ctx))).toEqual(create);
+    expect(fromDeltaRow(toDeltaRow(setEssential, ctx))).toEqual(setEssential);
+  });
+
+  it('supportEndsAt is accepted at create, optional, and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-27',
+      elementId: 'el-9',
+      elementType: 'system',
+      name: 'SCADA Historian',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false, criticality: 'critical', supportEndsAt: '2026-12-31' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('supportEndsAt can be set later via an update, distinct from plannedEnd', () => {
+    const create: Delta = {
+      kind: 'element.create',
+      id: 'delta-28',
+      elementId: 'el-10',
+      elementType: 'system',
+      name: 'Billing Mainframe',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false, plannedEnd: '2030-01-01' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    const setSupportEndsAt: Delta = {
+      kind: 'element.update',
+      id: 'delta-29',
+      elementId: 'el-10',
+      elementType: 'system',
+      attribute: 'supportEndsAt',
+      value: '2027-06-30',
+      previousDeltaId: 'delta-28',
+      sourceId: 'src-1',
+      confidence: 0.8,
+    };
+    expect(fromDeltaRow(toDeltaRow(create, ctx))).toEqual(create);
+    expect(fromDeltaRow(toDeltaRow(setSupportEndsAt, ctx))).toEqual(setSupportEndsAt);
+  });
+});

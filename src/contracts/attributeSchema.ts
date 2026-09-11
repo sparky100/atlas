@@ -87,8 +87,11 @@ const CAPABILITY_META: Record<keyof CapabilityAttributes, AttributeFieldMeta> = 
   // from the edit form regardless (editable: false) — the display-only
   // AttributeRow.formatValue already renders a number correctly.
   order: { label: 'Order', required: false, kind: 'text', editable: false },
+  // Prompt 7k item 5 — see `CapabilityAttributes.essentialFunction`'s own
+  // doc comment (delta.ts) for why this is a capability-level field.
+  essentialFunction: { label: 'Essential function (NIS/CAF)', required: false, kind: 'boolean' },
 };
-const CAPABILITY_ORDER: (keyof CapabilityAttributes)[] = ['code', 'description', 'templateRef', 'order'];
+const CAPABILITY_ORDER: (keyof CapabilityAttributes)[] = ['code', 'description', 'templateRef', 'order', 'essentialFunction'];
 
 const LIFECYCLE_STATUS_OPTIONS = ['planned', 'active', 'retiring', 'retired'] as const;
 /** Prompt 7k item 1 — see `Criticality`'s own doc comment (`delta.ts`) for the ordering these options mirror. */
@@ -112,6 +115,9 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   hostingProvider: { label: 'Hosting provider', required: false, kind: 'text' },
   domain: { label: 'Domain', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
   kind: { label: 'Kind', required: false, kind: 'enum', options: KIND_OPTIONS },
+  // Prompt 7k item 5 — see `SystemAttributes.supportEndsAt`'s own doc
+  // comment (delta.ts) for why this is distinct from `plannedEnd`.
+  supportEndsAt: { label: 'Vendor support ends', required: false, kind: 'date' },
 };
 const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
   'lifecycleStatus',
@@ -121,6 +127,7 @@ const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
   'externalOrganisation',
   'introduced',
   'plannedEnd',
+  'supportEndsAt',
   'criticality',
   'hostingModel',
   'hostingProvider',

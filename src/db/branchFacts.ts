@@ -7,9 +7,10 @@
  * the only way to know "what does this element's `name` currently say, and
  * which delta asserted it" there is a full fold via the engine.
  *
- * This is what the four commit-writing hooks
+ * This is what the commit-writing hooks
  * (src/ui/elements/useElementEditor.ts, useElementRename.ts,
- * useElementRetract.ts, src/ui/capabilityMap/useCapabilityCreate.ts) call
+ * useElementRetire.ts, useElementRemoveFromModel.ts,
+ * src/ui/capabilityMap/useCapabilityCreate.ts) call
  * to find each field's current `previousDeltaId` before building a delta —
  * they need this regardless of which branch they're writing to, since even
  * an edit at main has always needed "the fact this update supersedes."

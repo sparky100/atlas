@@ -6,7 +6,9 @@ import {
   computeStaleAttributesFinding,
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
+  findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
+  findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
   findUnusedIntegrationPlatforms,
@@ -28,7 +30,8 @@ export type ElementBrowseSortKey = 'name' | 'type' | 'owner' | 'lifecycle';
  * (`ElementsPage.tsx`). `null` is the ordinary, unfiltered browse table.
  * Prompt 7k item 2 adds `no-technical-owner`; item 1 adds
  * `critical-no-business-owner` and `critical-exposed`; item 4 adds
- * `unused-integration-platform`.
+ * `unused-integration-platform`; item 5 adds `essential-no-technical-owner`
+ * and `critical-support-end`.
  */
 export type ElementBrowseFilter =
   | 'unlinked-systems'
@@ -38,6 +41,8 @@ export type ElementBrowseFilter =
   | 'critical-no-business-owner'
   | 'critical-exposed'
   | 'unused-integration-platform'
+  | 'essential-no-technical-owner'
+  | 'critical-support-end'
   | null;
 
 export type ElementBrowseState =
@@ -151,6 +156,13 @@ export function useElementBrowse(modelId: UUID, filter: ElementBrowseFilter = nu
         const systems = elements.filter((e) => e.element_type === 'system');
         const usesAndFlowsToEdges = await listAllUsesAndFlowsToEdges(supabase, resolvedCommitId);
         ids = new Set(findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges).map((e) => e.element_id));
+      } else if (filter === 'essential-no-technical-owner') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const capabilities = elements.filter((e) => e.element_type === 'capability');
+        ids = new Set(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'critical-support-end') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        ids = new Set(findCriticalSystemsPastOrNearSupportEnd(systems).map((e) => e.element_id));
       }
 
       const rows: BrowseRow[] = elements.map((element) => ({

@@ -9,7 +9,6 @@ import { AttributeEditRow } from '../components/AttributeEditRow/AttributeEditRo
 import { AttributeRow } from '../components/AttributeRow/AttributeRow';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { Button } from '../components/Button/Button';
-import { CapabilityRetractAction } from '../components/CapabilityRetractAction/CapabilityRetractAction';
 import { ChangesTouchingSection } from '../components/ChangesTouchingSection/ChangesTouchingSection';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { CommentsSection } from '../components/CommentsSection/CommentsSection';
@@ -21,6 +20,8 @@ import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Panel } from '../components/Panel/Panel';
 import { PlatformFlowsSection } from '../components/PlatformFlowsSection/PlatformFlowsSection';
 import { RelationshipsSection } from '../components/RelationshipGroup/RelationshipsSection';
+import { RemoveFromModelAction } from '../components/RemoveFromModelAction/RemoveFromModelAction';
+import { RetireAction } from '../components/RetireAction/RetireAction';
 import { StructureSection } from '../components/StructureSection/StructureSection';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
@@ -51,8 +52,8 @@ import styles from './ElementPage.module.css';
  * yet.
  *
  * Sprint C1 step 9 closes a gap left open since step 4: `useElementEditor`
- * (and `useElementRetract`/`useElementRename`/`CapabilityRetractAction`,
- * the latter renamed from `CapabilityTailoringActions` in Sprint U4-1 D3)
+ * and `useElementRename` (plus `useElementRetract`, which Prompt 7k item 5
+ * later replaces with `useElementRetire`/`useElementRemoveFromModel`)
  * were already generalised to take any `branch: BranchRow`, but this page
  * kept feeding them `useMainBranch()` regardless of `?ref=` — so "editing
  * while a change is selected writes deltas to the branch" (the user's
@@ -86,6 +87,11 @@ export function ElementPage() {
   // Sprint 7i item 4: "Propose a change" — the contributor-at-main path
   // `ElementHeader.tsx`'s own former comment named as a real, named gap.
   const [proposingChange, setProposingChange] = useState(false);
+  // Prompt 7k item 5: "Retire…"/"Remove from model…" — same inline-panel
+  // convention as `proposingChange` above, one at a time (opening either
+  // closes the other, same as `editor`'s own idle/editing exclusivity).
+  const [retiring, setRetiring] = useState(false);
+  const [removingFromModel, setRemovingFromModel] = useState(false);
   const navigate = useNavigate();
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
@@ -196,7 +202,47 @@ export function ElementPage() {
               onEdit={canEdit && editor.status === 'idle' ? editor.startEditing : undefined}
               onProposeChange={canPropose ? () => { setProposingChange(true); } : undefined}
               rename={canEdit ? rename : undefined}
+              onRetire={canEdit && state.data.element.element_type === 'system' ? () => { setRetiring(true); } : undefined}
+              onRemoveFromModel={canEdit && state.data.children.length === 0 ? () => { setRemovingFromModel(true); } : undefined}
             />
+            {retiring && state.data.element.element_type === 'system' && (
+              <RetireAction
+                modelId={model.id}
+                orgId={organisation?.id ?? ''}
+                userId={userId}
+                element={state.data.element}
+                facts={state.data.facts}
+                relationships={state.data.relationships}
+                relationshipFacts={state.data.relationshipFacts}
+                searchCommitId={searchCommitId ?? state.data.commitId}
+                branch={editingBranch ?? PLACEHOLDER_BRANCH}
+                expectedHeadCommitId={state.data.commitId}
+                onRetired={() => {
+                  setRetiring(false);
+                  reloadAfterCommit();
+                }}
+                onCancel={() => { setRetiring(false); }}
+              />
+            )}
+            {removingFromModel && (
+              <RemoveFromModelAction
+                modelId={model.id}
+                orgId={organisation?.id ?? ''}
+                userId={userId}
+                element={state.data.element}
+                facts={state.data.facts}
+                relationships={state.data.relationships}
+                relationshipFacts={state.data.relationshipFacts}
+                relationshipEndpoints={state.data.relationshipEndpoints}
+                branch={editingBranch ?? PLACEHOLDER_BRANCH}
+                expectedHeadCommitId={state.data.commitId}
+                onRemoved={() => {
+                  setRemovingFromModel(false);
+                  reloadAfterCommit();
+                }}
+                onCancel={() => { setRemovingFromModel(false); }}
+              />
+            )}
             {proposingChange && (
               <Panel>
                 <ProposeChangePicker
@@ -230,19 +276,6 @@ export function ElementPage() {
                   </Button>
                 </div>
               </Panel>
-            )}
-            {canEdit && state.data.element.element_type === 'capability' && (
-              <CapabilityRetractAction
-                modelId={model.id}
-                orgId={organisation?.id ?? ''}
-                userId={userId}
-                element={state.data.element}
-                facts={state.data.facts}
-                branch={editingBranch}
-                expectedHeadCommitId={state.data.commitId}
-                canRetract={state.data.children.length === 0 && state.data.relationships.length === 0}
-                onChanged={reloadAfterCommit}
-              />
             )}
             <div className={styles.columns}>
               <div className={styles.leftColumn}>

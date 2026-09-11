@@ -62,11 +62,16 @@ function boundaryCrossingItems(crossings: readonly BoundaryCrossing[]): HealthFi
  * B5), systems without a technical/business owner and critical-system
  * findings (Prompt 7k items 1-2), boundary crossings missing a
  * classification or verb (Prompt 7k item 3), duplicates — the last still
- * wired to 0 until Q1, ADR-019), each rendered through `HealthFinding`
+ * wired to 0 until Q1, ADR-019); a separate "Assurance" panel groups
+ * Prompt 7k item 5's own three regulatory-alignment findings (essential-
+ * function systems with no technical owner, boundary crossings missing a
+ * data classification, critical systems near vendor support end), each
+ * rendered through `HealthFinding`
  * (Sprint U4-1 B3: collapsed row → expand, paginated at 20, a link into
- * the browse table pre-filtered to the finding where one applies) —
- * collapsing to a single "No findings" line when every one of them is
- * zero at once. Jumping to Changes or the review queue generically is the
+ * the browse table pre-filtered to the finding where one applies) — each
+ * panel collapsing to its own "No findings" line when every finding it
+ * groups is zero at once (the two panels gate independently, not as one
+ * combined zero-check). Jumping to Changes or the review queue generically is the
  * persistent model nav's job now (ModelNav.tsx) — this used to also carry
  * its own "Start a change"/"Open the queue" links before that existed.
  */
@@ -99,6 +104,14 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
     data.criticalExposedSystems.length === 0 &&
     data.boundaryCrossingsMissingClassificationOrVerb.length === 0 &&
     data.unusedIntegrationPlatforms.length === 0;
+
+  // Prompt 7k item 5: a separate Panel, own zero-gate — "the architect
+  // door groups these three under 'Assurance'" (the prompt's own wording),
+  // not folded into the Health findings panel's own all-zero gate above.
+  const allAssuranceFindingsZero =
+    data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length === 0 &&
+    data.boundaryCrossingsMissingClassification.length === 0 &&
+    data.criticalSystemsPastOrNearSupportEnd.length === 0;
 
   return (
     <div className={styles.columns}>
@@ -307,6 +320,42 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
                 <Text as="p" tone="faint" size="sm">
                   Wired to 0 until Q1&rsquo;s matching pipeline can populate the standing duplicates report (ADR-019).
                 </Text>
+              </div>
+            </div>
+          )}
+        </Panel>
+
+        <Panel>
+          <Text as="h2" size="lg">
+            Assurance
+          </Text>
+          {allAssuranceFindingsZero ? (
+            <Text as="p" tone="muted">
+              No findings.
+            </Text>
+          ) : (
+            <div className={styles.findingPlates}>
+              <div className={styles.findingPlate}>
+                <HealthFinding
+                  summary={`${String(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length)} ${plural(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length, 'system', 'systems')} supporting an essential function with no technical owner`}
+                  items={elementItems(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner)}
+                  browseHref={browseHref('essential-no-technical-owner')}
+                />
+              </div>
+
+              <div className={styles.findingPlate}>
+                <HealthFinding
+                  summary={`${String(data.boundaryCrossingsMissingClassification.length)} boundary crossing${data.boundaryCrossingsMissingClassification.length === 1 ? '' : 's'} with no data classification`}
+                  items={boundaryCrossingItems(data.boundaryCrossingsMissingClassification)}
+                />
+              </div>
+
+              <div className={styles.findingPlate}>
+                <HealthFinding
+                  summary={`${String(data.criticalSystemsPastOrNearSupportEnd.length)} critical ${plural(data.criticalSystemsPastOrNearSupportEnd.length, 'system', 'systems')} past or near vendor support end`}
+                  items={elementItems(data.criticalSystemsPastOrNearSupportEnd)}
+                  browseHref={browseHref('critical-support-end')}
+                />
               </div>
             </div>
           )}

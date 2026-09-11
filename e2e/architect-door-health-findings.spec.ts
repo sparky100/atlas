@@ -334,10 +334,14 @@ test('Sprint U4-1 B3: a model with nothing to flag collapses the whole panel to 
   await createModel(signedIn, { id: modelId, orgId, name: 'Health Findings Clean Test Model', slug: modelSlug, createdBy: userId });
 
   // Genesis-only main — a brand-new model has nothing to flag at all
-  // (ADR-018: main already has a real head, no bootstrap needed).
+  // (ADR-018: main already has a real head, no bootstrap needed). Prompt
+  // 7k item 5's own "Assurance" panel gates independently (its own doc
+  // comment, ArchitectHome.tsx) — a genuinely clean model shows "No
+  // findings." twice, once per panel, not once combined.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await expect(page.getByRole('heading', { name: 'Health findings' })).toBeVisible();
-  await expect(page.getByText('No findings.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
+  await expect(page.getByText('No findings.')).toHaveCount(2);
   await expect(page.getByText(/not linked to a capability/)).toHaveCount(0);
   await expect(page.getByText(/with no owner/)).toHaveCount(0);
   await expect(page.getByText(/duplicates flagged/)).toHaveCount(0);

@@ -8,10 +8,13 @@ import { getElementsByIds } from '../../db/elements';
 import {
   computeStaleAttributesFinding,
   findBoundaryCrossings,
+  findBoundaryCrossingsMissingClassification,
   findBoundaryCrossingsMissingClassificationOrVerb,
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
+  findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
+  findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
@@ -66,6 +69,12 @@ export interface ArchitectHomeData {
   boundaryCrossingsCount: number;
   /** Prompt 7k item 4's own health finding: integration platforms with nothing routed via them. */
   unusedIntegrationPlatforms: ElementsHeadRow[];
+  /** Prompt 7k item 5's first Assurance finding: systems supporting an `essentialFunction` capability with no `role: 'technical'` owner. */
+  systemsSupportingEssentialFunctionWithoutTechnicalOwner: ElementsHeadRow[];
+  /** Prompt 7k item 5's second Assurance finding: boundary crossings missing a data classification (the CAF A3/B4-relevant subset of item 3's own wider finding). */
+  boundaryCrossingsMissingClassification: BoundaryCrossing[];
+  /** Prompt 7k item 5's third Assurance finding: critical systems past or within `STALE_AFTER_MONTHS` of vendor support end. */
+  criticalSystemsPastOrNearSupportEnd: ElementsHeadRow[];
 }
 
 export type ArchitectHomeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeData };
@@ -169,6 +178,9 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             boundaryCrossingsMissingClassificationOrVerb: findBoundaryCrossingsMissingClassificationOrVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             boundaryCrossingsCount: findBoundaryCrossings(usesAndFlowsToEdges, usesAndFlowsToEndpointsById).length,
             unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges),
+            systemsSupportingEssentialFunctionWithoutTechnicalOwner: findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supportsEdges, ownsEdges),
+            boundaryCrossingsMissingClassification: findBoundaryCrossingsMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
+            criticalSystemsPastOrNearSupportEnd: findCriticalSystemsPastOrNearSupportEnd(systems),
           },
         });
       }
