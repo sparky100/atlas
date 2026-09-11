@@ -23,7 +23,7 @@ Separate product, separate repo, separate Supabase project. Shares code with the
 3. **U4-2a** (Prompt 7f) — partly done 10 September; **close-out is Prompt 7g** (process, three bugs, the partial and unstarted items).
 4. **U4-2b** (Prompt 7h) — UI tweaks from use: capability map text and tiles, landscape auto-layout and width, context header.
 5. **M1b** — built 9 September; close-out done 11 September on the desktop (integration and Playwright run, thread-counts RPC, hollow markers and per-view filter, capability map markers, browse-table counts).
-5a. **C2 (Prompt 7b) — in progress from 11 September.** Engine and `split_branch` first; stop before the review-queue UI until it has a design handoff.
+5a. **C2 (Prompt 7b) — done 11 September except step 4** (structural-conflict resolution actions), carved out as **C2b** because refresh folds the other side's deltas before a resolution can apply; engine change needs a design decision first. Steps 1–3, 5, 6 and the step-7 hardening (identity dismissals, concurrent refresh) on main. The review-queue UI (step 3) was built without a design pass: use it on a real partial acceptance and log findings before any redesign.
 5b. **Changes UX (Prompt 7i)**, **admin surfaces (Prompt 7j)** and **system attributes for regulated estates (Prompt 7k)** — all from use on 11 September; schedule after C2's engine half, before any pilot. 7k is the one that touches the engine; run it on the desktop.
 6. Hour of use → issues → **U4-3** (drag-to-reorder is queued there; expect the change flow, versions and the architect door's remaining §3.2 items to surface).
 7. Repeat until the definition of usable holds.
@@ -429,6 +429,31 @@ The ordering matters. Prompts 0–2 produce documents that every later prompt re
 > Sprint R1. A roadmap view with rows by capability or by system, time on the horizontal, lifecycle bars from `introduced` and `planned_end`, markers where changes add or retire elements, and replacement arrows from the planned-replacement rule (system added in an approved or in-delivery change, supporting the same capability, where the same change retires the old system). Filters: capability, owner, contracts ending within the window, changes by status. As-is / to-be selector applies. Export to PNG and to a table. No editing on the roadmap; dates change on the element or change page.
 
 ---
+
+---
+
+## Deferred register (read with SPEC §11; nothing here is closed)
+
+Every parked item, its target, and where it is tracked. A row leaves this list only when the work lands or the human explicitly drops it. Rule: anything deferred gets a row here, a SPEC §11 row, and a GitHub issue, in the same PR that defers it.
+
+| Item | Why parked | Target | Tracked |
+|---|---|---|---|
+| C2b — structural-conflict resolution actions (keep-retraction/keep-element cascade, duplicate-relationship survivor, cardinality primary pick) | Refresh folds the other side's deltas before resolution runs; retract-vs-modify throws. Needs an engine decision: resolution during fold, or two-phase refresh | After 7i–7k, before K1 | SPEC §11; issue (open on C2 PR) |
+| C2 review-queue design pass | Built without a handoff; needs evidence from use first | After first real partial acceptance | issue `design` |
+| Extra Playwright for review queue and BranchRebasePanel | With C2b | C2b | SPEC §11 |
+| Landscape context view as C4-style diagram (descriptions in tiles, verb labels, actors as people, boundary) | After M1b markers landed on tiles | U4-3 | decisions-from-use |
+| Drag-and-drop reorder on the capability map | Move buttons suffice for now | U4-3 | SPEC §11 row 13 |
+| Starter-map upgrade flow (model tree vs newer map version, additions proposed as a reviewable branch) | Needs the capture review queue | K1 | issue `missing` |
+| Value streams (value stream → stages, `enables`) | After usable | future ADR | decisions-from-use |
+| Security zone on containers; compliance view | Explicitly out of scope | not scheduled | 7k text |
+| Notification tray deep links for relationship/version/decision anchors | Pages don't exist yet | D1 / R1 | SPEC §11 |
+| Landscape position persistence with layout versioning | Auto-layout only until stable | not scheduled | UI-principles §6 |
+| Delta-apply in SQL (payload size) | Plumbing track | before K1 | SPEC §11 row 4 |
+| `merge_elements` + trigram identity matching | Q1 | Q1 | SPEC §11 row 5 |
+| Roadmap view | R1 | R1 | SPEC §11 row 8 |
+| Landscape p5 fps 30 → 45 | Profile worst frames first | R-perf | SPEC §11 row 12 |
+| Typed Supabase client | H2 | H2 | SPEC §11 row 10 |
+| Cloudflare deploy hook ordering (migrations before app) | Hook created; workflow rewrite is 7g A3 | 7g | issue |
 
 ---
 
