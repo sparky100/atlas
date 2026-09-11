@@ -5,6 +5,7 @@ import { getSourcesByIds } from '../../db/elements';
 import {
   approveMergeRequest,
   computeMergeReviewForBranch,
+  dismissIdentityPair as dismissIdentityPairRpc,
   getMergeRequestById,
   mergeApprovedRequest,
   pushRefresh,
@@ -71,7 +72,13 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
   const [actionStatus, setActionStatus] = useState<ActionStatus>('idle');
   const [actionError, setActionError] = useState<string | null>(null);
   const [fieldChoices, setFieldChoices] = useState<Map<string, FieldConflictChoice>>(new Map());
-  const [dismissedIdentityPairs, setDismissedIdentityPairs] = useState<Set<string>>(new Set());
+  // Optimistic-only additions not yet reflected in `state.request.dismissed_identity_pairs`
+  // (the RPC call below is in flight, or its result hasn't triggered a
+  // reload yet) — merged with the server-persisted list in
+  // `isIdentityPairDismissed` below, never the sole source of truth (SPEC
+  // §10.2 P-18: this must survive a reload, which local-only state never
+  // did before Sprint C2 step 7).
+  const [pendingDismissals, setPendingDismissals] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -110,11 +117,30 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
     });
   }, []);
 
-  const dismissIdentityPair = useCallback((oid: UUID, tid: UUID) => {
-    setDismissedIdentityPairs((prev) => new Set(prev).add([oid, tid].sort().join(' ')));
-  }, []);
+  const dismissIdentityPair = useCallback(
+    (oid: UUID, tid: UUID) => {
+      if (state.status !== 'ready') return;
+      const pairKey = [oid, tid].sort().join(' ');
+      setPendingDismissals((prev) => new Set(prev).add(pairKey));
+      void dismissIdentityPairRpc(supabase, state.request.id, pairKey)
+        .then(() => {
+          reload();
+        })
+        .catch((e: unknown) => {
+          setActionError(e instanceof Error ? e.message : 'Could not dismiss this identity warning.');
+        });
+    },
+    [state, reload],
+  );
 
-  const isIdentityPairDismissed = useCallback((oid: UUID, tid: UUID) => dismissedIdentityPairs.has([oid, tid].sort().join(' ')), [dismissedIdentityPairs]);
+  const isIdentityPairDismissed = useCallback(
+    (oid: UUID, tid: UUID) => {
+      const pairKey = [oid, tid].sort().join(' ');
+      if (state.status === 'ready' && state.request.dismissed_identity_pairs.includes(pairKey)) return true;
+      return pendingDismissals.has(pairKey);
+    },
+    [state, pendingDismissals],
+  );
 
   const reopenForEdits = useCallback(
     async (reviewNotes?: string) => {
