@@ -176,6 +176,8 @@ When multi-branch composition is built, **conflict** is defined as one of three 
 - *A merge commit that cherry-picks a subset of the branch's own deltas* — falsifies the branch's own append-only history (ADR-002) by making its merged form disagree with what it actually contained when reviewed.
 - *Two-phase commit that edits the original branch's deltas after acceptance* — deltas are never mutated post-hoc (ADR-002); a split branch is a new set of pointers over the same immutable delta rows, not a rewrite.
 
+**Amendment (Sprint C2b, ADR-021 — `docs/ADR-021-structural-conflict-resolution.md`): how structural conflicts are resolved, and how a merge commit folds.** Two things this ADR's refresh/merge wording assumed turned out not to hold once structural conflicts were built for (issue #76): a resolution recorded in a later commit can never protect an earlier conflicting delta from the replay in SPEC §6.2's `fold`, on either side — and the final merge on `main` is the fold that is hashed. ADR-021 decides (1) a merge commit whose first parent is an ancestor of its second parent folds to the second parent's state (invariant C19; the merge commit itself stays, exactly as this ADR requires — only its fold rule changes), landing on its own before Sprints 7i–7k; and (2) a refresh is "prepare, replay, decide": an optional `preparation`-kind commit (new `commit_kind`, C18) makes main's replay applicable, then the `merge` commit carries the reviewer's decision deltas and the `resolved_conflicts` rows, written atomically by `atlas.refresh_branch`. The four actions §7.4 names (keep-retraction / keep-element with cascade, duplicate survivor, cardinality primary) have their exact delta sequences in ADR-021 §4.
+
 ---
 
 ## ADR-007: Provenance is fact-level
@@ -451,5 +453,7 @@ A one-off backfill (`scripts/stripSeedCodes.ts`, model-scoped, same shape as `sc
 ## Deferred to follow-up ADRs
 
 Named explicitly so they aren't mistaken for settled: multi-branch to-be composition and its conflict-resolution UX (ADR-005); the decisions/evidence workflow layer on top of ADR-013's data shape; delta retention/compaction policy (ADR-002); the full `type_schemas` JSON-Schema generator and validator (ADR-001, ADR-015), deferred to Sprint K1; and, deferred to Q1 alongside the matching pipeline and `atlas.merge_elements` itself (ADR-019), the standing duplicates report ADR-019 names but doesn't build.
+
+**ADRs recorded in their own files** (this document holds ADR-001–020; later ones are separate files, indexed here): **ADR-021** — `docs/ADR-021-structural-conflict-resolution.md`, structural-conflict resolution on refresh ("prepare, replay, decide", the `preparation` commit kind, C18) and the fast-forward fold rule for the final merge (C19). Accepted 2026-09-11; amends ADR-006.
 
 ~~Whether Atlas shares the existing suite's identity/tenancy tables (ADR-014)~~ — **closed, Sprint H1: ADR-017 decides separate, permanently.** This was the only item in this list with a concrete follow-up ADR actually written; the rest remain open in the sense this section describes.
