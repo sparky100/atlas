@@ -7,6 +7,34 @@
   padding: var(--space-2);
 }
 
+/**
+ * Sprint U4-2b item 4: plain 1px border at rest, the full emphasis
+ * border back on hover/focus (`BlueprintFrame.tsx`'s own prop comment).
+ * `border-width` alone changes, not `border`, so the colour/style/radius
+ * stay identical between states — only the weight steps up, no flash of
+ * a different border colour. `padding`/`box-sizing: border-box` mean the
+ * content box doesn't shift by the 1px difference either.
+ */
+.interactive {
+  border-width: var(--border-width);
+  transition: border-width 100ms ease-out;
+}
+
+.interactive:hover,
+.interactive:focus-within {
+  border-width: var(--border-width-emphasis);
+}
+
+.interactive .corner {
+  opacity: 0;
+  transition: opacity 100ms ease-out;
+}
+
+.interactive:hover .corner,
+.interactive:focus-within .corner {
+  opacity: 1;
+}
+
 .corner {
   position: absolute;
   width: var(--blueprint-corner-size);

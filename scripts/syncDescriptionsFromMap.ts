@@ -17,6 +17,17 @@
  * no way to write real model data except as a real signed-in member, by
  * design. This signs in with the anon-key client exactly the way the app
  * itself does, runs the sync, then signs out.
+ *
+ * Sprint U4-2b item 5: the UI's own "Sync descriptions from starter map"
+ * action (`src/ui/capabilityMap/SyncDescriptionsAction.tsx`,
+ * `useSyncDescriptions.ts`) is deleted — a one-off repair belongs in a
+ * script run once per affected model, not a standing button on the
+ * capability map page. This CLI entrypoint is the repair's only surface
+ * now. Delete this script (and `src/db/syncDescriptionsFromMap.ts`, its
+ * own remaining caller) once every model seeded before commit 4e63ca5 has
+ * been repaired — the DNO starter-map model, named live as the one
+ * outstanding case at the time this note was written, is the one to
+ * confirm before removing it.
  */
 import { createSupabaseClient } from '../src/db/client';
 import { loadEnv } from '../src/db/env';
