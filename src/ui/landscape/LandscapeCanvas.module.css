@@ -66,3 +66,54 @@
   white-space: nowrap;
   transform: translate(-50%, calc(-100% - var(--space-2)));
 }
+
+/**
+ * Item 11: "Tap on a '+N' chip lists the other capabilities with links" —
+ * unlike `.tooltip` above (hover-only, `pointer-events: none`), this stays
+ * open until dismissed (Escape, the close button, or clicking elsewhere on
+ * the canvas — `LandscapeCanvas.tsx`'s own pointer-up handler), so it
+ * needs real pointer events and a higher stacking position than the
+ * toolbar it can overlap near the canvas's own right edge.
+ */
+.extraLanesPopover {
+  position: absolute;
+  z-index: 20;
+  min-width: 200px;
+  background: var(--surface-raised);
+  color: var(--text);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--surface-raised-shadow);
+  padding: var(--space-2);
+  transform: translate(-50%, var(--space-2));
+}
+
+.extraLanesPopoverHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.extraLanesPopoverClose {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0 var(--space-1);
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.extraLanesPopoverLink {
+  display: block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.extraLanesPopoverLink:hover {
+  background: var(--surface);
+}

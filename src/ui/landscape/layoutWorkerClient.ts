@@ -7,7 +7,7 @@
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
-import { computeLandscapeLayout, type LandscapeLayout } from './layout';
+import { computeLandscapeLayout, MIN_LAYOUT_WIDTH, type LandscapeLayout } from './layout';
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from './layout.worker';
 
 interface PendingRequest {
@@ -49,14 +49,16 @@ export function computeLandscapeLayoutInWorker(
   supportsEdges: readonly RelationshipsHeadRow[],
   capabilitiesById: Map<UUID, ElementsHeadRow>,
   actors: readonly ElementsHeadRow[] = [],
+  /** Item 7: the canvas's own on-screen width at layout time — see `layout.ts`'s own parameter doc. */
+  layoutWidthHint: number = MIN_LAYOUT_WIDTH,
 ): Promise<LandscapeLayout> {
   if (typeof Worker === 'undefined') {
-    return Promise.resolve(computeLandscapeLayout(systems, supportsEdges, capabilitiesById, actors));
+    return Promise.resolve(computeLandscapeLayout(systems, supportsEdges, capabilitiesById, actors, layoutWidthHint));
   }
   const requestId = nextRequestId++;
   return new Promise((resolve, reject) => {
     pending.set(requestId, { resolve, reject });
-    const request: LayoutWorkerRequest = { requestId, systems: [...systems], supportsEdges: [...supportsEdges], capabilities: [...capabilitiesById.entries()], actors: [...actors] };
+    const request: LayoutWorkerRequest = { requestId, systems: [...systems], supportsEdges: [...supportsEdges], capabilities: [...capabilitiesById.entries()], actors: [...actors], layoutWidthHint };
     getWorker().postMessage(request);
   });
 }

@@ -3,7 +3,6 @@ import { useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
-import { Button } from '../components/Button/Button';
 import { CommentsPanel } from '../components/CommentsPanel/CommentsPanel';
 import { DiffLegend } from '../components/DiffBadge/DiffLegend';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
@@ -23,6 +22,7 @@ import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
+import { useCanvasWidth } from '../landscape/useCanvasWidth';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { useLandscape } from '../landscape/useLandscape';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
@@ -51,16 +51,16 @@ import styles from './LandscapePage.module.css';
  * ModelNav.tsx/UserMenu.tsx/UI-principles.md §2 — 390px, the sprint's own
  * narrow-mobile floor from C2, is a Playwright viewport width to prove no
  * horizontal overflow at, not a second breakpoint) the header actions row
- * is unchanged: "+ Add system", "+ Add actor", "Reset layout" inline.
- * Below it, three same-row controls plus the ref/breadcrumb chrome above
- * them left no room, so the two "Add" controls collapse into one "+ Add"
- * disclosure and "Reset layout" moves into its own "⋯" overflow menu —
- * kept as two separate disclosures, not merged into one, so a primary
- * creation action doesn't hide behind the same trigger as a secondary
- * view action (the same split ElementHeader.tsx's `Edit` vs. its own "⋯"
- * keeps). `useIsNarrowViewport` decides which arrangement actually
- * *mounts* (not a CSS-only show/hide of both) so `ElementSearchAdd`'s own
- * search-pool fetch never runs twice for one page load.
+ * is "+ Add system", "+ Add actor" inline. Below it, those two collapse
+ * into one "+ Add" disclosure — `useIsNarrowViewport` decides which
+ * arrangement actually *mounts* (not a CSS-only show/hide of both) so
+ * `ElementSearchAdd`'s own search-pool fetch never runs twice for one page
+ * load.
+ *
+ * Sprint U4-2b item 6: "Reset layout" (and the "⋯" overflow menu it used
+ * to be the narrow viewport's only occupant of) is gone entirely — the
+ * landscape auto-lays-out on every open now, with no `view_layouts` row to
+ * reset (`useLandscape.ts`'s own comment, UI-principles §6.4).
  */
 export function LandscapePage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
@@ -91,19 +91,23 @@ export function LandscapePage() {
   const writeHeadCommitId = editingBranch?.head_commit_id ?? null;
   const canAdd = canEdit && searchCommitId !== null && writeHeadCommitId !== null;
 
+  // Item 7: `<main>`'s own measured width, fed to `useLandscape` as the
+  // layout's width hint — see `useCanvasWidth.ts`'s own comment for why
+  // `<main>` (rendered in every state) is what gets measured, not the
+  // canvas element itself.
+  const { ref: canvasWidthRef, width: canvasWidth } = useCanvasWidth();
+
   // Sprint U4-2a item 2: `searchCommitId` above is already `mainBranch`'s
   // head, from the one `useMainBranch` call this route makes — handing it
   // to `useLandscape` as its main-commit hint means `ref.kind === 'main'`
   // (no `?ref=` at all, the common case) never re-fetches the identical
   // `main` row a second time. See useLandscape.ts's own doc comment.
-  const { state, resetLayout } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId, searchCommitId);
+  const { state } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId, searchCommitId, canvasWidth ?? undefined);
 
   // Sprint U4-1 E1: see this component's own module comment.
   const narrow = useIsNarrowViewport(768);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const addMenuId = useId();
-  const moreMenuId = useId();
 
   // Sprint M1b (`docs/HANDOFF-M1b-comments.md`'s Canvas section, direction
   // 5a): the panel is scoped to one system at a time, opened by clicking a
@@ -137,6 +141,12 @@ export function LandscapePage() {
   // its own (the zoom chain is system-specific), so this goes straight to
   // the actor's own element page instead.
   const actorHref = (actorId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${actorId}?ref=${refParam}`;
+  // Item 11: a lane key that isn't `$external`/`$unassigned` is a level-1
+  // capability's own element id (`layout.ts`'s `placementFor`) — its
+  // element page, same shape as `actorHref` above, works regardless of
+  // where in the capability tree it sits (unlike a capability-map anchor,
+  // which would need to know the map's own scroll position).
+  const capabilityHref = (capabilityId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${capabilityId}?ref=${refParam}`;
 
   // Shared between the >=768px inline row and the <768px "+ Add" menu
   // (E1) — same two controls, a different wrapper around them.
@@ -185,7 +195,7 @@ export function LandscapePage() {
       <AppHeader />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
-        <main className={[styles.main, hasCanvas ? styles.mainWithCanvas : ''].filter(Boolean).join(' ')}>
+        <main ref={canvasWidthRef} className={[styles.main, hasCanvas ? styles.mainWithCanvas : ''].filter(Boolean).join(' ')}>
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
@@ -193,60 +203,26 @@ export function LandscapePage() {
           segments={segments}
         />
         <div className={styles.header}>
-          <Text as="h1" size="2xl">
+          <Text as="h1" size="2xl" className={styles.title}>
             Landscape{capability ? `: systems supporting ${capability.name}` : ''}
           </Text>
-          {state.status === 'ready' && !narrow && (
+          {state.status === 'ready' && !narrow && addControls && <div className={styles.actions}>{addControls}</div>}
+          {state.status === 'ready' && narrow && canAdd && (
             <div className={styles.actions}>
-              {addControls}
-              <Button variant="ghost" onClick={resetLayout}>
-                Reset layout
-              </Button>
-            </div>
-          )}
-          {state.status === 'ready' && narrow && (
-            <div className={styles.actions}>
-              {canAdd && (
-                <div className={styles.menuWrapper}>
-                  <button
-                    type="button"
-                    className={styles.menuToggle}
-                    aria-expanded={addMenuOpen}
-                    aria-controls={addMenuId}
-                    onClick={() => {
-                      setAddMenuOpen((o) => !o);
-                    }}
-                  >
-                    <Text as="span">+ Add</Text>
-                  </button>
-                  <div id={addMenuId} className={[styles.menu, addMenuOpen ? styles.open : ''].filter(Boolean).join(' ')}>
-                    {addControls}
-                  </div>
-                </div>
-              )}
               <div className={styles.menuWrapper}>
                 <button
                   type="button"
                   className={styles.menuToggle}
-                  aria-expanded={moreMenuOpen}
-                  aria-controls={moreMenuId}
-                  aria-label="Landscape actions"
+                  aria-expanded={addMenuOpen}
+                  aria-controls={addMenuId}
                   onClick={() => {
-                    setMoreMenuOpen((o) => !o);
+                    setAddMenuOpen((o) => !o);
                   }}
                 >
-                  <span aria-hidden="true">⋯</span>
+                  <Text as="span">+ Add</Text>
                 </button>
-                <div id={moreMenuId} className={[styles.menu, moreMenuOpen ? styles.open : ''].filter(Boolean).join(' ')}>
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setMoreMenuOpen(false);
-                      resetLayout();
-                    }}
-                  >
-                    Reset layout
-                  </Button>
+                <div id={addMenuId} className={[styles.menu, addMenuOpen ? styles.open : ''].filter(Boolean).join(' ')}>
+                  {addControls}
                 </div>
               </div>
             </div>
@@ -304,6 +280,7 @@ export function LandscapePage() {
               diff={state.data.diff}
               nodeHref={nodeHref}
               actorHref={actorHref}
+              capabilityHref={capabilityHref}
               unresolvedCommentCounts={unresolvedCounts}
               onCommentMarkerClick={(elementId) => {
                 setCommentsPanelElementId(elementId);

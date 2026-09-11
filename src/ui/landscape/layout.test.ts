@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeLandscapeLayout, EXTERNAL_LANE_KEY, LAYOUT_WIDTH, UNASSIGNED_LANE_KEY } from './layout';
+import { computeLandscapeLayout, EXTERNAL_LANE_KEY, MIN_LAYOUT_WIDTH, UNASSIGNED_LANE_KEY } from './layout';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 
 function system(id: string, name: string, isExternal = false): ElementsHeadRow {
@@ -143,7 +143,7 @@ describe('computeLandscapeLayout', () => {
     expect(layout.referenceMarkers).toEqual([{ elementId: 'sys-1', laneKey: 'network-ops', x: expect.any(Number), y: expect.any(Number) }]);
     const marker = layout.referenceMarkers[0];
     if (!marker) throw new Error('expected a reference marker');
-    expect(marker.x + 108).toBeLessThanOrEqual(LAYOUT_WIDTH - 32); // REFERENCE_CHIP_WIDTH, PADDING — anchored inside the band's own right edge
+    expect(marker.x + 108).toBeLessThanOrEqual(MIN_LAYOUT_WIDTH - 32); // REFERENCE_CHIP_WIDTH, PADDING — anchored inside the band's own right edge
     expect(marker.y).toBeGreaterThanOrEqual(networkOpsLane.y);
     expect(marker.y).toBeLessThan(networkOpsLane.y + 28); // still within the header line's own height, even for a collapsed lane
   });
@@ -191,16 +191,16 @@ describe('computeLandscapeLayout', () => {
 
   // --- Landscape canvas, structural: full-width wrapping bands, empty-lane collapse, boundary, actors ---
 
-  it('every lane spans the full LAYOUT_WIDTH regardless of member count (item 2)', () => {
+  it('every lane spans the full MIN_LAYOUT_WIDTH regardless of member count (item 2)', () => {
     const cap = capability('cap-1', 'Payments');
     const empty = computeLandscapeLayout([], [], new Map());
     const populated = computeLandscapeLayout([system('sys-1', 'Billing')], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]));
-    expect(empty.width).toBe(LAYOUT_WIDTH);
-    expect(populated.width).toBe(LAYOUT_WIDTH);
+    expect(empty.width).toBe(MIN_LAYOUT_WIDTH);
+    expect(populated.width).toBe(MIN_LAYOUT_WIDTH);
   });
 
   it('wraps a lane past its row capacity onto a second row, growing the band height to fit', () => {
-    // 160px node + 24px gutter, six per row inside LAYOUT_WIDTH's 1216px
+    // 160px node + 24px gutter, six per row inside MIN_LAYOUT_WIDTH's 1216px
     // available width — a seventh system in the same lane must wrap.
     const cap = capability('cap-1', 'Payments');
     const systems = Array.from({ length: 7 }, (_, i) => system(`sys-${String(i)}`, `System ${String(i).padStart(2, '0')}`));
@@ -268,5 +268,58 @@ describe('computeLandscapeLayout', () => {
     // never inside the range the boundary itself encloses.
     expect(externalLane.y).toBeGreaterThan(layout.boundary.bottom);
     expect(layout.boundary.bottom).toBeLessThanOrEqual(externalLane.y);
+  });
+
+  // --- Sprint U4-2b item 8: band height from content, nothing overlaps a label, empty bands still show their chips ---
+
+  it('item 8: every node in a lane sits below that lane\'s own label row, never overlapping it, at any row count', () => {
+    const cap = capability('cap-1', 'Payments');
+    const systems = Array.from({ length: 9 }, (_, i) => system(`sys-${String(i)}`, `System ${String(i).padStart(2, '0')}`));
+    const layout = computeLandscapeLayout(systems, systems.map((s) => supports(s.element_id, 'cap-1')), new Map([['cap-1', cap]]));
+    const lane = layout.lanes[0];
+    if (!lane) throw new Error('expected a lane');
+    for (const node of layout.nodes) expect(node.y).toBeGreaterThanOrEqual(lane.y + 28); // LANE_LABEL_HEIGHT
+  });
+
+  it('item 8: a lane\'s own height always accounts for exactly its own row count — three lanes of different sizes never bleed into each other\'s space', () => {
+    const capSmall = capability('cap-small', 'Small');
+    const capBig = capability('cap-big', 'Big');
+    const smallSystems = [system('sys-s1', 'S1')];
+    const bigSystems = Array.from({ length: 7 }, (_, i) => system(`sys-b${String(i)}`, `B${String(i)}`));
+    const systems = [...smallSystems, ...bigSystems];
+    const edges = [...smallSystems.map((s) => supports(s.element_id, 'cap-small')), ...bigSystems.map((s) => supports(s.element_id, 'cap-big'))];
+    const layout = computeLandscapeLayout(systems, edges, new Map([['cap-small', capSmall], ['cap-big', capBig]]));
+    const laneBig = layout.lanes.find((l) => l.key === 'cap-big');
+    const laneSmall = layout.lanes.find((l) => l.key === 'cap-small');
+    if (!laneBig || !laneSmall) throw new Error('expected both lanes');
+    // Alphabetical lane order puts "Big" before "Small" — its own row-2
+    // wrap must fit entirely inside its own height, never reaching into
+    // the next lane's own y-range.
+    expect(laneBig.y).toBeLessThan(laneSmall.y);
+    expect(laneBig.y + laneBig.height).toBeLessThanOrEqual(laneSmall.y);
+    for (const node of layout.nodes) {
+      const ownLane = node.elementId.startsWith('sys-b') ? laneBig : laneSmall;
+      expect(node.y).toBeGreaterThanOrEqual(ownLane.y);
+      expect(node.y + 48).toBeLessThanOrEqual(ownLane.y + ownLane.height); // NODE_HEIGHT
+    }
+    // laneBig's own (wrapped, two-row) content never reaches into laneSmall's
+    // own y-range, which starts exactly where laneBig's height says it does.
+    for (const node of layout.nodes.filter((n) => n.elementId.startsWith('sys-b'))) {
+      expect(node.y + 48).toBeLessThanOrEqual(laneSmall.y);
+    }
+  });
+
+  it('item 8: an empty (reference-only) lane still shows its chip even with zero members, at the same collapsed height regardless of how many systems reference it', () => {
+    const capA = capability('cap-a', 'Alpha');
+    const capB = capability('cap-b', 'Beta');
+    const sys1 = system('sys-1', 'One');
+    const sys2 = system('sys-2', 'Two');
+    const l1AncestorByCapabilityId = new Map([['cap-a', capA], ['cap-b', capB]]);
+    const edges = [supports('sys-1', 'cap-a', 'primary'), supports('sys-1', 'cap-b', 'secondary'), supports('sys-2', 'cap-a', 'primary'), supports('sys-2', 'cap-b', 'secondary')];
+    const layout = computeLandscapeLayout([sys1, sys2], edges, l1AncestorByCapabilityId);
+    const laneB = layout.lanes.find((l) => l.key === 'cap-b');
+    if (!laneB) throw new Error('expected a Beta lane');
+    expect(laneB.height).toBe(28 + 8); // LANE_LABEL_HEIGHT + EMPTY_LANE_GUTTER_Y — collapsed regardless of reference count
+    expect(layout.referenceMarkers.filter((m) => m.laneKey === 'cap-b')).toHaveLength(2); // both chips still present
   });
 });
