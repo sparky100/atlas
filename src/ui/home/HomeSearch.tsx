@@ -63,7 +63,13 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
   const [description, setDescription] = useState('');
   const [capability, setCapability] = useState<{ id: UUID; name: string } | null>(null);
   const [proposedBranch, setProposedBranch] = useState<BranchRow | null>(null);
-  const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?ref=main`;
+  // Bug fix: this used to hardcode `?ref=main` — an *existing* element
+  // found by search always lives on main (search itself never varies
+  // with the ref, this component's own doc comment), but opening it
+  // still needs to carry the session's own selected ref forward, or the
+  // very next edit made from that element page silently targets main
+  // instead of the change the reviewer had open a moment ago.
+  const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?ref=${refParamOf(activeRef)}`;
 
   // Decision 5: a contributor viewing main has no direct write to main
   // (roleGates.ts's canEditOnMain) — they get the propose-a-change picker

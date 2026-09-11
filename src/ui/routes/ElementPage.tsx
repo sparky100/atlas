@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { ATTRIBUTE_SCHEMA_BY_TYPE } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
@@ -26,13 +26,15 @@ import { StructureSection } from '../components/StructureSection/StructureSectio
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
+import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
+import { useSelectedRef } from '../branches/useSelectedRef';
 import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
-import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
+import { refLabelOf, refParamOf } from '../../db/ref';
 import { elementBreadcrumbSegments } from '../nav/elementBreadcrumbSegments';
 import { ALIAS_TYPE_LABELS, aliasAsFact } from '../elements/aliasLabels';
 import { useElementPage } from '../elements/useElementPage';
@@ -70,8 +72,13 @@ import styles from './ElementPage.module.css';
  */
 export function ElementPage() {
   const { orgSlug, modelSlug, elementId } = useParams<{ orgSlug: string; modelSlug: string; elementId: string }>();
-  const [searchParams] = useSearchParams();
-  const ref = parseRefParam(searchParams.get('ref'));
+  const { ref } = useSelectedRef();
+  // Bug fix: this page used to call `refLabelOf(ref)` with no second
+  // argument at all — every other ref-aware page resolves the branch's
+  // own title via `useBranchLabel` first, so this was the one page whose
+  // breadcrumb never showed "Change: {title}" for a selected change, only
+  // the short id fragment `refLabelOf`'s own fallback uses.
+  const { label: branchLabel } = useBranchLabel(ref);
   const { userId } = useAuth();
   const location = useLocation();
   // Handoff — Flow: Add a system, step 7: `HomeSearch`'s onCreated navigates
@@ -192,7 +199,7 @@ export function ElementPage() {
             <Breadcrumb
               org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
               model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
-              refLabel={refLabelOf(ref)}
+              refLabel={refLabelOf(ref, branchLabel)}
               segments={elementBreadcrumbSegments(state.data.element, state.data.parent, orgSlug ?? '', model.slug, refParamOf(ref))}
             />
             <ElementHeader

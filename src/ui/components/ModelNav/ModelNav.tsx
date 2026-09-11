@@ -1,8 +1,9 @@
-import { Link, useLocation, useSearchParams } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { Chip } from '../Chip/Chip';
 import { Text } from '../Text/Text';
 import { useBranchLabel } from '../../branches/useBranchLabel';
-import { parseRefParam, refLabelOf, refParamOf } from '../../../db/ref';
+import { useSelectedRef } from '../../branches/useSelectedRef';
+import { refLabelOf, refParamOf } from '../../../db/ref';
 import { modelNavSectionFor, type ModelNavSection } from '../../nav/modelNavSection';
 import styles from './ModelNav.module.css';
 
@@ -13,21 +14,16 @@ export interface ModelNavProps {
 
 type RealSection = Exclude<ModelNavSection, null>;
 
-interface NavItem {
-  section: RealSection;
-  label: string;
-  /** Whether this section's page reads `?ref=` — the current ref carries through when it does; `changes`/`review` are never anything but main-scoped (SPEC §7's merge/review flow), so they never get one. */
-  carriesRef: boolean;
-}
+const SECTIONS: RealSection[] = ['home', 'capability-map', 'landscape', 'changes', 'versions', 'review'];
 
-const NAV_ITEMS: NavItem[] = [
-  { section: 'home', label: 'Home', carriesRef: false },
-  { section: 'capability-map', label: 'Capability map', carriesRef: true },
-  { section: 'landscape', label: 'Landscape', carriesRef: true },
-  { section: 'changes', label: 'Changes', carriesRef: false },
-  { section: 'versions', label: 'Versions', carriesRef: true },
-  { section: 'review', label: 'Review queue', carriesRef: false },
-];
+const SECTION_LABELS: Record<RealSection, string> = {
+  home: 'Home',
+  'capability-map': 'Capability map',
+  landscape: 'Landscape',
+  changes: 'Changes',
+  versions: 'Versions',
+  review: 'Review queue',
+};
 
 /**
  * The persistent model-level navigation (Sprint U3b, recorded as the
@@ -42,11 +38,23 @@ const NAV_ITEMS: NavItem[] = [
  * change's title, a particular tag's name, a particular commit) stay —
  * this rail is for jumping between sections, not a duplicate of what's
  * already on the page.
+ *
+ * Bug fix: every link here now carries the selected ref (`useSelectedRef`),
+ * including Home/Changes/Review — a former `carriesRef` flag deliberately
+ * left those three main-scoped ("changes"/"review" have no per-ref
+ * content, and Home's own content is a search box, not a view of a
+ * specific ref) but that meant clicking any of them was how a selected
+ * change silently got lost: `SelectedRefProvider.tsx`'s own reconciliation
+ * would eventually restore it (rewriting the URL once the page landed
+ * without one), but only after a page had already rendered assuming
+ * `main` for one frame — a real, if brief, race the create-after-navigate
+ * bug this fixes could still lose to. Carrying it here outright, on every
+ * link, closes that race instead of relying on the correction after the
+ * fact.
  */
 export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
   const location = useLocation();
-  const [searchParams] = useSearchParams();
-  const ref = parseRefParam(searchParams.get('ref'));
+  const { ref } = useSelectedRef();
   const { label: branchLabel } = useBranchLabel(ref);
   const refParam = refParamOf(ref);
 
@@ -57,14 +65,15 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
   return (
     <nav className={styles.nav} aria-label="Model navigation">
       <ul className={styles.list}>
-        {NAV_ITEMS.map((item) => {
-          const href = item.section === 'home' ? base : `${base}/${sectionPath(item.section)}${item.carriesRef && refParam !== 'main' ? `?ref=${refParam}` : ''}`;
-          const isActive = item.section === activeSection;
+        {SECTIONS.map((section) => {
+          const path = sectionPath(section);
+          const href = `${base}${path ? `/${path}` : ''}${refParam !== 'main' ? `?ref=${refParam}` : ''}`;
+          const isActive = section === activeSection;
           return (
-            <li key={item.section}>
+            <li key={section}>
               <Link to={href} className={[styles.link, isActive ? styles.active : ''].filter(Boolean).join(' ')} aria-current={isActive ? 'page' : undefined}>
                 <Text as="span" size="sm">
-                  {item.label}
+                  {SECTION_LABELS[section]}
                 </Text>
               </Link>
             </li>
