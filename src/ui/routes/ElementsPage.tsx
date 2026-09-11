@@ -6,6 +6,7 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import { useThreadCounts } from '../comments/useThreadCounts';
 import { useMainBranch } from '../branches/useMainBranch';
 import { useModels } from '../models/useModels';
 import { canEditOnMain, useMembership } from '../orgs/useMembership';
@@ -55,6 +56,12 @@ export function ElementsPage() {
     reloadMainBranch();
     if (state.status === 'ready') state.reload();
   };
+  // M1 close-out item 4: "unresolved counts on the browse table rows" —
+  // one batched RPC over every row currently on screen (post-filter/search/
+  // sort, same as everywhere else `useThreadCounts` is used), not a query
+  // per row.
+  const threadCountsState = useThreadCounts(model?.id ?? null, state.status === 'ready' ? state.rows.map((r) => r.element.element_id) : []);
+  const threadCounts = threadCountsState.status === 'ready' ? threadCountsState.counts : undefined;
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -88,6 +95,7 @@ export function ElementsPage() {
             state={state}
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}
+            unresolvedCounts={threadCounts}
             linkSupportsInline={
               filter === 'unlinked-systems' && canEdit && mainBranch
                 ? {

@@ -17,7 +17,7 @@ import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { buildCommitLoader } from './commitLoader';
 import { commitToBranch } from './commits';
-import { createComment, editCommentBody, getUnresolvedCommentCounts, listCommentsForAnchor, reopenComment, resolveComment } from './comments';
+import { createComment, editCommentBody, getThreadCounts, listCommentsForAnchor, reopenComment, resolveComment } from './comments';
 import { loadEnv } from './env';
 import { createModel } from './models';
 import { createOrganisation } from './organisations';
@@ -697,10 +697,10 @@ describe('comments, mentions, notifications, and realtime against a real local S
   }, 30_000);
 
   // ---------------------------------------------------------------------
-  // unresolved_comment_counts
+  // thread_counts
   // ---------------------------------------------------------------------
 
-  it('unresolved_comment_counts returns one root-thread count per anchor, resolved threads and replies excluded', async () => {
+  it('thread_counts returns open and total root-thread counts per anchor, distinguishing "all resolved" from "no comments" (M1 close-out item 1)', async () => {
     const main = await getMainBranch(alice.client, modelId);
     if (!main?.head_commit_id) throw new Error('main branch not found');
     const elementWithOpen = randomUUID();
@@ -732,10 +732,17 @@ describe('comments, mentions, notifications, and realtime against a real local S
     const resolvedRoot = await createComment(alice.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementWithResolvedOnly, body: 'already handled', authorId: alice.id });
     await resolveComment(alice.client, { commentId: resolvedRoot.id, resolvedBy: alice.id });
 
-    const counts = await getUnresolvedCommentCounts(alice.client, modelId, [elementWithOpen, elementWithResolvedOnly, elementWithNone]);
-    const byAnchor = new Map(counts.map((c) => [c.anchor_id, c.unresolved_count]));
-    expect(byAnchor.get(elementWithOpen)).toBe(1);
-    expect(byAnchor.get(elementWithResolvedOnly)).toBeUndefined();
+    const counts = await getThreadCounts(alice.client, modelId, [elementWithOpen, elementWithResolvedOnly, elementWithNone]);
+    const byAnchor = new Map(counts.map((c) => [c.anchor_id, { open: c.open_count, total: c.total_count }]));
+
+    // The reply on elementWithOpen's own thread doesn't count as a second
+    // root thread — both open and total stay at 1.
+    expect(byAnchor.get(elementWithOpen)).toEqual({ open: 1, total: 1 });
+
+    // The whole point of this RPC over the one it replaced: an anchor with
+    // every thread resolved is now distinguishable from one with none at
+    // all — both used to be equally absent from the result.
+    expect(byAnchor.get(elementWithResolvedOnly)).toEqual({ open: 0, total: 1 });
     expect(byAnchor.get(elementWithNone)).toBeUndefined();
   }, 30_000);
 

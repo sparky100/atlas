@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import type { ElementType, UUID } from '../../../contracts/delta';
 import { ELEMENT_TYPE_FILTER_OPTIONS } from '../../../db/elementBrowse';
 import type { BranchRow } from '../../../db/types';
+import type { ThreadCount } from '../../comments/useThreadCounts';
 import { RelationshipAdd } from '../RelationshipGroup/RelationshipAdd';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
@@ -35,6 +36,8 @@ export interface ElementBrowseTableProps {
   // treats "optional" and "may be undefined" as different things (same
   // convention `Text.tsx`'s own `className` prop documents).
   linkSupportsInline?: ElementBrowseLinkSupportsConfig | undefined;
+  /** M1 close-out item 4: "unresolved counts on the browse table rows" — the caller's own `useThreadCounts` result, keyed by `element_id`. A row absent from the map (or `open === 0`) shows no badge at all; this is a count, not the hollow/ink marker distinction the landscape/capability map draw (a table row already reads as text, nothing there for a marker to compete with). */
+  unresolvedCounts?: ReadonlyMap<UUID, ThreadCount> | undefined;
 }
 
 const COLUMNS: { key: ElementBrowseSortKey; label: string }[] = [
@@ -75,7 +78,7 @@ function InlineSupportsPicker({ system, config, searchCommitId }: { system: { el
 }
 
 /** Sprint U3b: "filterable, sortable table of elements by type with owner and lifecycle." A real `<table>` — semantic tabular data, not a design-system gap (native `<table>`/`<th>`/`<td>` is the correct element here, the same way `<ul>`/`<li>` already is for plain lists elsewhere in this app). */
-export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInline }: ElementBrowseTableProps) {
+export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInline, unresolvedCounts }: ElementBrowseTableProps) {
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 
@@ -119,11 +122,14 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInli
                     </button>
                   </th>
                 ))}
+                <th>Comments</th>
                 {linkSupportsInline && <th>Link to a capability</th>}
               </tr>
             </thead>
             <tbody>
-              {state.rows.map((row) => (
+              {state.rows.map((row) => {
+                const unresolvedCount = unresolvedCounts?.get(row.element.element_id)?.open ?? 0;
+                return (
                 <tr key={row.element.element_id}>
                   <td>
                     <Link to={elementHref(row.element.element_id)} className={styles.nameCell}>
@@ -160,6 +166,17 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInli
                       </Text>
                     )}
                   </td>
+                  <td>
+                    {unresolvedCount > 0 ? (
+                      <Text as="span" size="sm" className={styles.unresolvedBadge}>
+                        💬 {unresolvedCount}
+                      </Text>
+                    ) : (
+                      <Text as="span" tone="faint" size="sm">
+                        —
+                      </Text>
+                    )}
+                  </td>
                   {linkSupportsInline && (
                     <td>
                       {row.element.element_type === 'system' && (
@@ -168,7 +185,8 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInli
                     </td>
                   )}
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

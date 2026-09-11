@@ -157,23 +157,32 @@ export async function editCommentBody(supabase: Client, commentId: UUID, body: s
   return data as CommentRow;
 }
 
-/** One `(anchor_id, unresolved_count)` pair per anchor that has at least one open root thread. An anchor with zero unresolved threads is simply absent from the result — callers default to 0. */
-export interface UnresolvedCommentCount {
+/**
+ * One `(anchor_id, open_count, total_count)` row per anchor that has at
+ * least one root thread at all. An anchor with zero comments ever raised
+ * is simply absent from the result, same convention as the RPC this
+ * replaced — but an anchor with `total_count > 0` and `open_count === 0`
+ * (every thread resolved) is now distinguishable from that absent case,
+ * which a plain "unresolved count" alone could never tell apart (M1
+ * close-out item 1 — the marker's own "hollow, all resolved" state).
+ */
+export interface ThreadCounts {
   anchor_id: UUID;
-  unresolved_count: number;
+  open_count: number;
+  total_count: number;
 }
 
 /**
- * `atlas.unresolved_comment_counts` via RPC (a POST, not a GET `.in()`) —
- * this is exactly the shape rule 8 asks for: `anchorIds` grows with however
- * many element cards a page renders, which scales with the model, so a GET
- * `.in()` here is the same URL-length hazard `assertInFilterSize` guards
- * everywhere else. A POST body has no such limit.
+ * `atlas.thread_counts` via RPC (a POST, not a GET `.in()`) — this is
+ * exactly the shape rule 8 asks for: `anchorIds` grows with however many
+ * element cards/tiles/rows a page renders, which scales with the model, so
+ * a GET `.in()` here is the same URL-length hazard `assertInFilterSize`
+ * guards everywhere else. A POST body has no such limit.
  */
-export async function getUnresolvedCommentCounts(supabase: Client, modelId: UUID, anchorIds: readonly UUID[]): Promise<UnresolvedCommentCount[]> {
+export async function getThreadCounts(supabase: Client, modelId: UUID, anchorIds: readonly UUID[]): Promise<ThreadCounts[]> {
   if (anchorIds.length === 0) return [];
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.schema('atlas').rpc('unresolved_comment_counts', { p_model_id: modelId, p_anchor_ids: anchorIds });
-  if (error) throw new Error(`getUnresolvedCommentCounts: ${error.message}`);
-  return (data as UnresolvedCommentCount[] | null) ?? [];
+  const { data, error } = await supabase.schema('atlas').rpc('thread_counts', { p_model_id: modelId, p_anchor_ids: anchorIds });
+  if (error) throw new Error(`getThreadCounts: ${error.message}`);
+  return (data as ThreadCounts[] | null) ?? [];
 }

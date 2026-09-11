@@ -1,12 +1,15 @@
 import { useId, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
+import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { CommentsPanel } from '../components/CommentsPanel/CommentsPanel';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useMainBranch } from '../branches/useMainBranch';
+import { useThreadCounts } from '../comments/useThreadCounts';
 import { useModels } from '../models/useModels';
 import { canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -15,6 +18,7 @@ import { CapabilityMapAddForm } from '../capabilityMap/CapabilityMapAddForm';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
 import { ExportCapabilityMapAction } from '../capabilityMap/ExportCapabilityMapAction';
+import { tileCapabilityIds } from '../capabilityMap/layout';
 import { useCapabilityMap } from '../capabilityMap/useCapabilityMap';
 import { useColourByPreference } from '../capabilityMap/useColourByPreference';
 import { useHomeMode } from '../home/useHomeMode';
@@ -101,6 +105,19 @@ export function CapabilityMapPage() {
   // viewport-conditional, so no `useIsNarrowViewport` here).
   const [maintenanceMenuOpen, setMaintenanceMenuOpen] = useState(false);
   const maintenanceMenuId = useId();
+
+  // M1 close-out item 2: "markers on tiles (bottom-right, same rule) and
+  // the panel" — same shape LandscapePage.tsx's own comments panel state
+  // already uses (a single open-panel id, hover has no equivalent here
+  // since tiles aren't a hover surface the way canvas nodes are).
+  const [commentsPanelCapabilityId, setCommentsPanelCapabilityId] = useState<UUID | null>(null);
+  const anchorIds = state.status === 'ready' ? tileCapabilityIds(state.data.tree) : [];
+  const threadCountsState = useThreadCounts(model?.id ?? null, anchorIds);
+  const threadCounts = threadCountsState.status === 'ready' ? threadCountsState.counts : undefined;
+  const commentsPanelCapabilityName =
+    state.status === 'ready' && commentsPanelCapabilityId
+      ? (state.data.tree.l1.flatMap((column) => column.l2.flatMap((card) => [card.capability, ...card.l3])).find((c) => c.element_id === commentsPanelCapabilityId)?.name ?? '')
+      : '';
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -202,6 +219,25 @@ export function CapabilityMapPage() {
             }
             reorderMode={reorderMode}
             onReorderModeChange={setReorderMode}
+            threadCounts={threadCounts}
+            onCommentMarkerClick={setCommentsPanelCapabilityId}
+          />
+        )}
+        {commentsPanelCapabilityId && (
+          <CommentsPanel
+            orgId={organisation?.id ?? ''}
+            modelId={model.id}
+            userId={userId}
+            role={role}
+            anchorType="element"
+            anchorId={commentsPanelCapabilityId}
+            subjectName={commentsPanelCapabilityName}
+            unresolvedCount={threadCounts?.get(commentsPanelCapabilityId)?.open ?? 0}
+            branchId={ref.kind === 'branch' ? ref.branchId : null}
+            viewKind="capability_map"
+            onClose={() => {
+              setCommentsPanelCapabilityId(null);
+            }}
           />
         )}
         </main>

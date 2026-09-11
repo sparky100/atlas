@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import type { BranchRow } from '../../db/types';
+import type { ThreadCount } from '../comments/useThreadCounts';
 import { CapabilityTile } from '../components/CapabilityTile/CapabilityTile';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
@@ -12,6 +13,13 @@ import { COLOUR_BY_OPTIONS, aggregateTileColourFor, supportingSystemIds, tileCol
 import type { CapabilityMapTree, L1Column, L2Card } from './layout';
 import { useCapabilityReorder } from './useCapabilityReorder';
 import styles from './CapabilityMapView.module.css';
+
+/** M1 close-out item 2's own marker shape, derived once per tile from the caller's raw `{ open, total }` — `undefined` (no marker at all) for a capability with no comment thread. */
+function commentMarkerFor(threadCounts: ReadonlyMap<UUID, ThreadCount> | undefined, capabilityId: UUID): { state: 'ink'; count: number } | { state: 'hollow' } | undefined {
+  const counts = threadCounts?.get(capabilityId);
+  if (!counts || counts.total === 0) return undefined;
+  return counts.open > 0 ? { state: 'ink', count: counts.open } : { state: 'hollow' };
+}
 
 /**
  * `reorderCapability`'s own "does the caller have edit rights, and what do
@@ -63,6 +71,10 @@ export interface CapabilityMapViewProps {
    */
   reorderMode: boolean;
   onReorderModeChange: (mode: boolean) => void;
+  /** M1 close-out item 2: "markers on tiles (bottom-right, same rule)" — the caller's own `useThreadCounts` result, keyed by capability id. `undefined` while still loading, same convention `unresolvedCount`/`unresolvedCommentCounts` already use elsewhere; a tile with no entry (or `total === 0`) shows no marker at all. Desktop `CapabilityTile`s only (L2 cards, L3 tiles) — narrow's own `MobileL2Row`/L3 rows carry none of this yet, same named gap `LandscapePage.tsx`'s own `LandscapeMobileList` comment already accepts for the identical reason (no room, no prior wiring to build on). */
+  threadCounts?: ReadonlyMap<UUID, ThreadCount> | undefined;
+  /** Opens the comments panel scoped to the clicked capability — omitted entirely (same convention as `reorderCapability`) wherever the caller hasn't wired a panel at all. */
+  onCommentMarkerClick?: ((capabilityId: UUID) => void) | undefined;
 }
 
 /**
@@ -137,7 +149,7 @@ export interface CapabilityMapViewProps {
  * already has. See `L1ColumnView`'s own comment for why this branches on
  * a JS `narrow` flag rather than a CSS media query.
  */
-export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, colourBy, onColourByChange, orgSlug, modelSlug, refParam, reorderCapability, reorderMode, onReorderModeChange }: CapabilityMapViewProps) {
+export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, colourBy, onColourByChange, orgSlug, modelSlug, refParam, reorderCapability, reorderMode, onReorderModeChange, threadCounts, onCommentMarkerClick }: CapabilityMapViewProps) {
   const [expanded, setExpanded] = useState<Set<UUID>>(new Set());
   const colourById = useId();
   const reorderModeId = useId();
@@ -243,6 +255,8 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
               narrow={narrow}
               l1Expanded={expandedL1 === column.capability.element_id}
               onToggleL1={toggleExpandedL1}
+              threadCounts={threadCounts}
+              onCommentMarkerClick={onCommentMarkerClick}
             />
           ))}
         </div>
@@ -350,6 +364,8 @@ function L1ColumnView({
   narrow,
   l1Expanded,
   onToggleL1,
+  threadCounts,
+  onCommentMarkerClick,
 }: {
   column: L1Column;
   colourBy: ColourByMode;
@@ -367,6 +383,8 @@ function L1ColumnView({
   narrow: boolean;
   l1Expanded: boolean;
   onToggleL1: (id: UUID) => void;
+  threadCounts: ReadonlyMap<UUID, ThreadCount> | undefined;
+  onCommentMarkerClick: ((capabilityId: UUID) => void) | undefined;
 }) {
   const panelId = useId();
   const count = supportingSystemIds(column.capability.element_id, supportsEdges).length;
@@ -415,6 +433,8 @@ function L1ColumnView({
         previousSibling={column.l2[index - 1]?.capability}
         nextSibling={column.l2[index + 1]?.capability}
         reorderCapability={reorderCapability}
+        threadCounts={threadCounts}
+        onCommentMarkerClick={onCommentMarkerClick}
       />
     ),
   );
@@ -622,6 +642,8 @@ function L2CardView({
   previousSibling,
   nextSibling,
   reorderCapability,
+  threadCounts,
+  onCommentMarkerClick,
 }: {
   card: L2Card;
   colourBy: ColourByMode;
@@ -635,12 +657,21 @@ function L2CardView({
   previousSibling: ElementsHeadRow | undefined;
   nextSibling: ElementsHeadRow | undefined;
   reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
+  threadCounts: ReadonlyMap<UUID, ThreadCount> | undefined;
+  onCommentMarkerClick: ((capabilityId: UUID) => void) | undefined;
 }) {
   const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById);
   const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
 
   return (
-    <CapabilityTile href={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`} name={card.capability.name} tone={colour.tone} toneLabel={colour.label}>
+    <CapabilityTile
+      href={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`}
+      name={card.capability.name}
+      tone={colour.tone}
+      toneLabel={colour.label}
+      commentMarker={commentMarkerFor(threadCounts, card.capability.element_id)}
+      onCommentMarkerClick={onCommentMarkerClick ? () => { onCommentMarkerClick(card.capability.element_id); } : undefined}
+    >
       <div className={styles.cardSecondaryRow}>
         {reorderCapability && (
           <ReorderButtons
@@ -674,6 +705,8 @@ function L2CardView({
                 tone={leafColour.tone}
                 toneLabel={leafColour.label}
                 size="compact"
+                commentMarker={commentMarkerFor(threadCounts, leaf.element_id)}
+                onCommentMarkerClick={onCommentMarkerClick ? () => { onCommentMarkerClick(leaf.element_id); } : undefined}
               >
                 <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
               </CapabilityTile>

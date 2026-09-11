@@ -6,7 +6,7 @@ import { EmptyState } from '../components/EmptyState/EmptyState';
 import { LinkButton } from '../components/Button/LinkButton';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
-import { useUnresolvedCommentCounts } from '../comments/useUnresolvedCommentCounts';
+import { useThreadCounts } from '../comments/useThreadCounts';
 import type { BranchRow } from '../../db/types';
 import { branchStatusTone } from './branchStatus';
 import { useChanges } from './useChanges';
@@ -42,11 +42,11 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   // unresolved count") — `anchor_type = 'change'` counts key on the same
   // `anchor_id` (a branch's own id) regardless of anchor type, so the
   // batched RPC works unchanged here.
-  const unresolvedState = useUnresolvedCommentCounts(
+  const threadCountsState = useThreadCounts(
     modelId,
     branches.map((b) => b.id),
   );
-  const unresolvedCounts = unresolvedState.status === 'ready' ? unresolvedState.counts : undefined;
+  const threadCounts = threadCountsState.status === 'ready' ? threadCountsState.counts : undefined;
 
   return (
     <div>
@@ -133,7 +133,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
       {branches.length > 0 && (
         <ul className={styles.list}>
           {branches.map((branch) => (
-            <ChangeRow key={branch.id} branch={branch} orgSlug={orgSlug} modelSlug={modelSlug} unresolvedCount={unresolvedCounts?.get(branch.id)} />
+            <ChangeRow key={branch.id} branch={branch} orgSlug={orgSlug} modelSlug={modelSlug} unresolvedCount={threadCounts?.get(branch.id)?.open} />
           ))}
         </ul>
       )}

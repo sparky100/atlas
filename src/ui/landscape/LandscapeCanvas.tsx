@@ -26,13 +26,23 @@ export interface LandscapeCanvasProps {
   actorHref: (elementId: UUID) => string;
   /** Item 11: where a link in the "+N other capabilities" popover goes — a lane's own `key` (a level-1 capability's element id, for every lane but `$external`/`$unassigned`, neither of which a node's `extraLaneCount`/`referenceMarkers` ever point at — see `layout.ts`'s own `placementFor`) is the id this takes. */
   capabilityHref: (capabilityId: UUID) => string;
-  /** Unresolved comment-thread count per system id (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s Canvas section) — `useUnresolvedCommentCounts`'s own batched RPC result. A system absent from the map has zero unresolved threads and paints no marker. Actors carry no comment markers this sprint. */
-  unresolvedCommentCounts?: ReadonlyMap<UUID, number> | undefined;
+  /**
+   * Thread counts per system id (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s
+   * Canvas section; M1 close-out item 1 extends it to `{ open, total }`) —
+   * `useThreadCounts`'s own batched RPC result. A system absent from the map
+   * entirely paints no marker at all; one present with `open > 0` paints the
+   * ink marker, and one with `total > 0 && open === 0` (every thread
+   * resolved) paints the hollow marker instead. Actors carry no comment
+   * markers this sprint.
+   */
+  threadCounts?: ReadonlyMap<UUID, { open: number; total: number }> | undefined;
   /** Clicking a node's own comment marker (not the rest of the node, which still navigates via `nodeHref`) — opens the comments panel scoped to that system. */
   onCommentMarkerClick?: (elementId: UUID) => void;
   /** `c`/`n` (UI-principles §8.8) act on whichever node is currently hovered — the canvas has no persistent "selected node" of its own yet (only hover and click-to-navigate), so the hovered node is the nearest existing stand-in for "the focused row". `c` with nothing hovered is a no-op the caller may still handle (e.g. closing an already-open panel). */
   onToggleCommentsPanel?: (elementId: UUID | null) => void;
   onNewCommentShortcut?: (elementId: UUID) => void;
+  /** M1 close-out item 1: "the per-session 'comments on this view' filter" — every node with no thread at all (`threadCounts` absent or `total === 0`) recedes to a low, diff-style alpha instead of being removed from the layout outright (removing nodes would change lane placement and edge routing for everything else on screen, which this is a read-only lens over, not a re-query). `false`/omitted draws every node at full opacity, same as before this item. */
+  commentsOnlyFilter?: boolean | undefined;
 }
 
 interface Transform {
@@ -258,10 +268,11 @@ export function LandscapeCanvas({
   nodeHref,
   actorHref,
   capabilityHref,
-  unresolvedCommentCounts,
+  threadCounts,
   onCommentMarkerClick,
   onToggleCommentsPanel,
   onNewCommentShortcut,
+  commentsOnlyFilter = false,
 }: LandscapeCanvasProps) {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -335,15 +346,15 @@ export function LandscapeCanvas({
     [layout, transform],
   );
 
-  /** The comment marker's own hit region — bottom-right, only for a system node with at least one unresolved thread (the only state this sprint draws — see the marker's own drawing comment below). Checked before `nodeAt` in the click handler so a marker click opens the panel instead of navigating. Actors never carry a marker (`unresolvedCommentCounts` is system-keyed). */
+  /** The comment marker's own hit region — bottom-right, for a system node carrying either marker state (ink, `open > 0`, or hollow, `total > 0 && open === 0` — see the marker's own drawing comment below; either one opens the same panel). Checked before `nodeAt` in the click handler so a marker click opens the panel instead of navigating. Actors never carry a marker (`threadCounts` is system-keyed). Not gated on `showLabels` the way the hollow marker's own drawing is — same fixed world-space region regardless of zoom, matching the ink marker's own "always drawn" hit region; a click where the hollow marker would be, at a zoom too far out to actually see it, is a rare enough miss not worth a second, zoom-aware hit-test path. */
   const commentMarkerAt = useCallback(
     (screenX: number, screenY: number): UUID | null => {
-      if (!unresolvedCommentCounts || unresolvedCommentCounts.size === 0) return null;
+      if (!threadCounts || threadCounts.size === 0) return null;
       const worldX = (screenX - transform.tx) / transform.scale;
       const worldY = (screenY - transform.ty) / transform.scale;
       for (const node of layout.nodes) {
-        const count = unresolvedCommentCounts.get(node.elementId);
-        if (!count) continue;
+        const counts = threadCounts.get(node.elementId);
+        if (!counts || counts.total === 0) continue;
         const markerLeft = node.x + NODE_WIDTH - COMMENT_MARKER_INSET - COMMENT_MARKER_WIDTH;
         const markerTop = node.y + NODE_HEIGHT - COMMENT_MARKER_INSET - COMMENT_MARKER_HEIGHT;
         if (worldX >= markerLeft && worldX <= markerLeft + COMMENT_MARKER_WIDTH && worldY >= markerTop && worldY <= markerTop + COMMENT_MARKER_HEIGHT) {
@@ -352,7 +363,7 @@ export function LandscapeCanvas({
       }
       return null;
     },
-    [layout, transform, unresolvedCommentCounts],
+    [layout, transform, threadCounts],
   );
 
   /** The "+N" marker's own hit region — top-right, only for a node whose lane placement fell back to "most recently added" with other lanes it also touches (`extraLaneCount`, `layout.ts`'s own `placementFor`). A generous fixed *world*-space radius, same reasoning as `COMMENT_MARKER_WIDTH`/`HEIGHT` above: the drawn circle's on-screen size is quantised by zoom step, not worth matching pixel-for-pixel in a hit test. Checked before `nodeAt` (item 11: tapping the chip opens the popover instead of navigating). */
@@ -509,16 +520,20 @@ export function LandscapeCanvas({
       const extraLaneMarkers: { text: string; worldX: number; worldY: number; colour: string }[] = [];
       // Sprint M1b, bottom-right (UI-principles §6.1's corner-assignment
       // rule — "+N" keeps top-right, this is the one corner nothing else
-      // claims). Always drawn, at every zoom, unlike `showLabels`-gated
-      // node labels: "a count nobody can see is a count that does not
-      // exist" (`docs/HANDOFF-M1b-comments.md`'s Canvas section). Only the
-      // unresolved (ink) state is drawn this sprint — the "all resolved,
-      // hollow" state needs a way to tell "zero unresolved" apart from "no
-      // comments at all", which `atlas.unresolved_comment_counts` doesn't
-      // return (an anchor with zero unresolved threads is simply absent
-      // either way); a follow-up backend addition, tracked in
-      // `docs/SPEC-data-model.md` §11, not faked here.
+      // claims). The ink (unresolved) marker is always drawn, at every
+      // zoom, unlike `showLabels`-gated node labels: "a count nobody can
+      // see is a count that does not exist" (`docs/HANDOFF-M1b-comments.md`'s
+      // Canvas section) — an open thread is worth surfacing even zoomed
+      // out past where names read.
       const commentMarkers: { elementId: UUID; count: number; worldX: number; worldY: number }[] = [];
+      // M1 close-out item 1's "hollow" marker — every thread on this
+      // anchor resolved (`total > 0 && open === 0`, `atlas.thread_counts`'s
+      // own distinction from "no comments at all", where the anchor is
+      // simply absent from `threadCounts`). Unlike the ink marker above,
+      // gated on `showLabels`: an all-clear signal is reassurance, not an
+      // alert, so it's fine for it to recede along with the names at the
+      // same zoom-out point rather than staying pinned at every scale.
+      const hollowCommentMarkers: { elementId: UUID; worldX: number; worldY: number }[] = [];
 
       // An arrow function assigned to a `const`, not a hoisted `function`
       // declaration — TS narrows `ctx` to non-null only up to this point in
@@ -535,8 +550,20 @@ export function LandscapeCanvas({
         const nodeState = nodeDiff?.state ?? 'unchanged';
         const diffColour = diff && elementType === 'system' ? diffBorderColour(nodeState, tokens) : null;
 
+        // M1 close-out item 1's own "comments on this view" filter — a node
+        // with no thread at all recedes rather than disappearing outright
+        // (`LandscapeCanvasProps.commentsOnlyFilter`'s own comment explains
+        // why this stays a lens over the existing layout, not a re-query).
+        // Combined multiplicatively with the diff view's own "unchanged"
+        // fade above, not replacing it, so a filtered, unchanged node reads
+        // fainter still rather than one fade silently overriding the other.
+        const threadCountsForNode = elementType === 'system' ? threadCounts?.get(elementId) : undefined;
+        const hasAnyThread = (threadCountsForNode?.total ?? 0) > 0;
+        const diffAlpha = diff && elementType === 'system' && nodeState === 'unchanged' ? 0.6 : 1;
+        const filterAlpha = commentsOnlyFilter && !hasAnyThread ? 0.25 : 1;
+
         ctx.save();
-        ctx.globalAlpha = diff && elementType === 'system' && nodeState === 'unchanged' ? 0.6 : 1;
+        ctx.globalAlpha = diffAlpha * filterAlpha;
         roundRectPath(ctx, x, y, NODE_WIDTH, NODE_HEIGHT, 8);
         if (diff && nodeState === 'removed') {
           const pattern = createHatchPattern(ctx, tokens.diffRemoved);
@@ -562,11 +589,12 @@ export function LandscapeCanvas({
         ctx.restore();
 
         // Comment markers (Sprint M1b) only ever apply to systems —
-        // `unresolvedCommentCounts` is keyed by system id.
-        const unresolvedCount = elementType === 'system' ? (unresolvedCommentCounts?.get(elementId) ?? 0) : 0;
+        // `threadCounts` is keyed by system id.
+        const openCount = threadCountsForNode?.open ?? 0;
+        const totalCount = threadCountsForNode?.total ?? 0;
         if (showLabels) {
           const glyph = elementType === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph('system');
-          nodeLabels.push({ glyph, name: element.name, worldX: x, worldY: y, truncateToNarrow: unresolvedCount > 0 });
+          nodeLabels.push({ glyph, name: element.name, worldX: x, worldY: y, truncateToNarrow: totalCount > 0 });
         }
         if (diff && elementType === 'system' && DIFF_MARKER[nodeState] !== '') {
           const label = nodeState === 'changed' ? `${DIFF_MARKER[nodeState]}${String(nodeDiff?.changedAttributes.length ?? 0)}` : DIFF_MARKER[nodeState];
@@ -575,8 +603,10 @@ export function LandscapeCanvas({
         if (extraLaneCount !== undefined) {
           extraLaneMarkers.push({ text: `+${String(extraLaneCount)}`, worldX: x + NODE_WIDTH - 4, worldY: y + 4, colour: tokens.textMuted });
         }
-        if (unresolvedCount > 0) {
-          commentMarkers.push({ elementId, count: unresolvedCount, worldX: x + NODE_WIDTH - COMMENT_MARKER_INSET, worldY: y + NODE_HEIGHT - COMMENT_MARKER_INSET });
+        if (openCount > 0) {
+          commentMarkers.push({ elementId, count: openCount, worldX: x + NODE_WIDTH - COMMENT_MARKER_INSET, worldY: y + NODE_HEIGHT - COMMENT_MARKER_INSET });
+        } else if (totalCount > 0 && showLabels) {
+          hollowCommentMarkers.push({ elementId, worldX: x + NODE_WIDTH - COMMENT_MARKER_INSET, worldY: y + NODE_HEIGHT - COMMENT_MARKER_INSET });
         }
       };
 
@@ -590,7 +620,7 @@ export function LandscapeCanvas({
       // fixed on-screen size within a zoom step, not scale continuously
       // with the gesture the way node geometry does, so it can't share the
       // world-transformed pass above.
-      if (laneLabels.length > 0 || nodeLabels.length > 0 || diffMarkers.length > 0 || edgeMarkers.length > 0 || extraLaneMarkers.length > 0 || referenceChips.length > 0 || commentMarkers.length > 0) {
+      if (laneLabels.length > 0 || nodeLabels.length > 0 || diffMarkers.length > 0 || edgeMarkers.length > 0 || extraLaneMarkers.length > 0 || referenceChips.length > 0 || commentMarkers.length > 0 || hollowCommentMarkers.length > 0) {
         const textScale = quantizeScale(transform.scale, MIN_SCALE, MAX_SCALE);
         const toScreen = (worldX: number, worldY: number): [number, number] => [worldX * transform.scale + transform.tx, worldY * transform.scale + transform.ty];
         ctx.textBaseline = 'middle';
@@ -667,6 +697,25 @@ export function LandscapeCanvas({
           ctx.fillStyle = tokens.surfaceRaised;
           ctx.fillText(String(marker.count), left + w / 2, top + h / 2 + 1);
         }
+
+        // M1 close-out item 1's hollow marker — same plate, but "background
+        // reverts to the surface, digit and border to ~82%/45% ink"
+        // (`docs/HANDOFF-M1b-comments.md`'s own wording for this exact
+        // state): outline only, no fill, no digit at all (an all-resolved
+        // thread has nothing left to count) — the empty plate itself is
+        // the whole signal. `tokens.textMuted` for the border reads as
+        // that ~45% ink against the node's own surface underneath.
+        for (const marker of hollowCommentMarkers) {
+          const [right, bottom] = toScreen(marker.worldX, marker.worldY);
+          const w = COMMENT_MARKER_WIDTH * textScale;
+          const h = COMMENT_MARKER_HEIGHT * textScale;
+          const left = right - w;
+          const top = bottom - h;
+          roundRectPath(ctx, left, top, w, h, 2 * textScale);
+          ctx.strokeStyle = tokens.textMuted;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
         ctx.textAlign = 'left';
       }
     }
@@ -677,7 +726,7 @@ export function LandscapeCanvas({
     return () => {
       observer.disconnect();
     };
-  }, [layout, routedEdges, systemsById, actorsById, diff, diffByElementId, diffByRelationshipId, transform, hover, unresolvedCommentCounts]);
+  }, [layout, routedEdges, systemsById, actorsById, diff, diffByElementId, diffByRelationshipId, transform, hover, threadCounts, commentsOnlyFilter]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
