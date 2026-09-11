@@ -22,6 +22,13 @@
  *    owning actor is a real node here (grouped separately, as `owners`),
  *    just with no line drawn to it — which is exactly what "shown on the
  *    element page" already implies for the fact of ownership itself.
+ *
+ * Sprint U4-2b item 12 adds a third bucket, `supports`, the same shape as
+ * `owners`: real information about the hub (its own `supports` edges to a
+ * capability), surfaced as the header's "Supports: ..." line, never a
+ * Context node and never a drawn edge — the first rule above still holds,
+ * `supports` just isn't silently dropped on the floor any more the way it
+ * was before this item.
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
@@ -33,6 +40,13 @@ export interface ContextNeighbour {
   edges: RelationshipsHeadRow[];
 }
 
+/** One capability the hub *system* supports (`supports: system -> capability`) — Sprint U4-2b item 12's own header line, never a Context node or a drawn edge (this module's own first rule still holds: `supports` is the landscape's lane structure). */
+export interface ContextSupport {
+  capability: ElementsHeadRow;
+  /** `SupportsAttributes.role === 'primary'` on this edge — item 12's "primary first" ordering (`supports` below). */
+  primary: boolean;
+}
+
 export interface ContextGroup {
   hub: ElementsHeadRow;
   /** Non-external neighbours, reached via a drawn `uses`/`flows_to` edge. */
@@ -41,6 +55,8 @@ export interface ContextGroup {
   external: ContextNeighbour[];
   /** Actors that `own` the hub (ADR-001: `owns: actor → system`) — real Context nodes with no drawn edge (see module comment). */
   owners: ElementsHeadRow[];
+  /** Sprint U4-2b item 12: the header's "Supports: <capabilities, primary first>" line — see `ContextSupport`'s own comment for why this is neither a node nor a drawn edge, same as `owners`. */
+  supports: ContextSupport[];
 }
 
 function isExternal(element: ElementsHeadRow): boolean {
@@ -59,6 +75,10 @@ function byNameThenId(a: ElementsHeadRow, b: ElementsHeadRow): number {
 export function computeContextGroup(hub: ElementsHeadRow, relationships: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): ContextGroup {
   const neighbourEdges = new Map<UUID, RelationshipsHeadRow[]>();
   const ownerIds = new Set<UUID>();
+  // Keyed by capability id, not a list: at most one supports edge is ever
+  // expected between one system and one capability, so the last one seen
+  // (there should only ever be one) simply wins.
+  const supportsEdgeByCapabilityId = new Map<UUID, RelationshipsHeadRow>();
 
   for (const rel of relationships) {
     const otherId = rel.from_element_id === hub.element_id ? rel.to_element_id : rel.from_element_id;
@@ -68,7 +88,11 @@ export function computeContextGroup(hub: ElementsHeadRow, relationships: readonl
       ownerIds.add(rel.from_element_id);
       continue;
     }
-    if (rel.relationship_type !== 'uses' && rel.relationship_type !== 'flows_to') continue; // supports/owns-the-other-way: not a Context node source.
+    if (rel.relationship_type === 'supports' && rel.from_element_id === hub.element_id) {
+      supportsEdgeByCapabilityId.set(rel.to_element_id, rel);
+      continue;
+    }
+    if (rel.relationship_type !== 'uses' && rel.relationship_type !== 'flows_to') continue; // owns-the-other-way, or a supports edge in the other direction: not a Context node source.
 
     const list = neighbourEdges.get(otherId) ?? [];
     list.push(rel);
@@ -90,5 +114,13 @@ export function computeContextGroup(hub: ElementsHeadRow, relationships: readonl
     .filter((e): e is ElementsHeadRow => e !== undefined)
     .sort(byNameThenId);
 
-  return { hub, internal, external, owners };
+  const supports: ContextSupport[] = [...supportsEdgeByCapabilityId.entries()]
+    .map(([capabilityId, edge]): ContextSupport | null => {
+      const capability = elementsById.get(capabilityId);
+      return capability ? { capability, primary: attributesRecord(edge.attributes).role === 'primary' } : null; // named by a relationship but not resolved: same "never render for data that isn't there" stance as internal/external above.
+    })
+    .filter((s): s is ContextSupport => s !== null)
+    .sort((a, b) => (a.primary === b.primary ? byNameThenId(a.capability, b.capability) : a.primary ? -1 : 1));
+
+  return { hub, internal, external, owners, supports };
 }

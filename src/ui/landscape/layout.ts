@@ -209,18 +209,25 @@ function layoutRow(members: readonly ElementsHeadRow[], top: number): { nodes: L
   return { nodes, height };
 }
 
+export interface LandscapeSystemGrouping {
+  /** Every level-1 capability lane key touched, in the exact order both the canvas and the mobile list (item 13) render lanes: capability lanes by name, then `UNASSIGNED_LANE_KEY` — never `EXTERNAL_LANE_KEY`, which both callers place last, on their own (this module's own top comment: external isn't part of this ordering). */
+  boundaryKeys: string[];
+  hasExternalLane: boolean;
+  /** Every lane's members, already sorted by name/id (`byNameThenId`) — includes `EXTERNAL_LANE_KEY` when `hasExternalLane`, and every lane a system merely *references* (via `referenceTargets`) even if nothing is ever primary-placed there. */
+  byLane: ReadonlyMap<string, ElementsHeadRow[]>;
+  l1CapabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>;
+  extraLaneCountByElementId: ReadonlyMap<UUID, number>;
+  referenceTargets: readonly { elementId: UUID; laneKey: string }[];
+}
+
 /**
- * @param systems Landscape nodes (src/db/landscape.ts's `listSystemsForLandscape`).
- * @param supportsEdges `supports` relationships from a system to a capability (`listSupportsEdgesForSystems`) — used only for lane assignment, never rendered as edges themselves (§6.1: landscape edges are `uses`/`flows_to` only).
- * @param l1AncestorByCapabilityId Every capability actually named by `supportsEdges`' targets, mapped to its own level-1 ancestor row (itself, if it already is one) — `src/ui/elements/capabilityDepth.ts`'s `l1AncestorOf`, resolved by the caller for each distinct target id. Lane labels come from these ancestor rows' own names, never a leaf sub-capability's.
- * @param actors Actors (`src/db/landscape.ts`'s `listActorsForLandscape`) — item 3's own top row, both external and internal together (visually distinguished, not separately grouped — `LandscapeCanvas.tsx`'s own concern).
+ * The lane-assignment half of `computeLandscapeLayout` (B4's whole
+ * placement rule — this module's own top comment), extracted so item 13's
+ * mobile list (`landscapeGroups.ts`) can classify systems into the exact
+ * same lanes the desktop canvas draws, without needing any of this
+ * function's pixel math.
  */
-export function computeLandscapeLayout(
-  systems: readonly ElementsHeadRow[],
-  supportsEdges: readonly RelationshipsHeadRow[],
-  l1AncestorByCapabilityId: ReadonlyMap<UUID, ElementsHeadRow>,
-  actors: readonly ElementsHeadRow[] = [],
-): LandscapeLayout {
+function groupSystemsByLane(systems: readonly ElementsHeadRow[], supportsEdges: readonly RelationshipsHeadRow[], l1AncestorByCapabilityId: ReadonlyMap<UUID, ElementsHeadRow>): LandscapeSystemGrouping {
   const supportsBySystem = new Map<UUID, RelationshipsHeadRow[]>();
   for (const edge of supportsEdges) {
     const list = supportsBySystem.get(edge.from_element_id) ?? [];
@@ -256,6 +263,28 @@ export function computeLandscapeLayout(
       return ra - rb || na.localeCompare(nb) || a.localeCompare(b);
     });
   const hasExternalLane = byLane.has(EXTERNAL_LANE_KEY);
+
+  const sortedByLane = new Map<string, ElementsHeadRow[]>();
+  for (const [key, members] of byLane) sortedByLane.set(key, [...members].sort(byNameThenId));
+
+  return { boundaryKeys, hasExternalLane, byLane: sortedByLane, l1CapabilitiesById, extraLaneCountByElementId, referenceTargets };
+}
+
+export { groupSystemsByLane };
+
+/**
+ * @param systems Landscape nodes (src/db/landscape.ts's `listSystemsForLandscape`).
+ * @param supportsEdges `supports` relationships from a system to a capability (`listSupportsEdgesForSystems`) — used only for lane assignment, never rendered as edges themselves (§6.1: landscape edges are `uses`/`flows_to` only).
+ * @param l1AncestorByCapabilityId Every capability actually named by `supportsEdges`' targets, mapped to its own level-1 ancestor row (itself, if it already is one) — `src/ui/elements/capabilityDepth.ts`'s `l1AncestorOf`, resolved by the caller for each distinct target id. Lane labels come from these ancestor rows' own names, never a leaf sub-capability's.
+ * @param actors Actors (`src/db/landscape.ts`'s `listActorsForLandscape`) — item 3's own top row, both external and internal together (visually distinguished, not separately grouped — `LandscapeCanvas.tsx`'s own concern).
+ */
+export function computeLandscapeLayout(
+  systems: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  l1AncestorByCapabilityId: ReadonlyMap<UUID, ElementsHeadRow>,
+  actors: readonly ElementsHeadRow[] = [],
+): LandscapeLayout {
+  const { boundaryKeys, hasExternalLane, byLane, l1CapabilitiesById, extraLaneCountByElementId, referenceTargets } = groupSystemsByLane(systems, supportsEdges, l1AncestorByCapabilityId);
 
   const lanes: LandscapeLane[] = [];
   const nodes: LandscapeNodePosition[] = [];

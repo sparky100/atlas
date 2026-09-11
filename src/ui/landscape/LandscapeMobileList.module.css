@@ -1,0 +1,160 @@
+/**
+ * Sprint U4-2b item 13: the mobile landscape list. Same accordion shape as
+ * `CapabilityMapView.module.css`'s own `.mobileGroupHeader`/`.mobileGroupBody`
+ * (check B6) — a single full-width toggle button per group, one open at a
+ * time, dense rows inside. `min-width: 0` throughout for the same reason
+ * that file's own comment gives: every element here is a flex item of a
+ * `flex-direction: column` ancestor, so without it an un-wrapped row of
+ * content sets an unshrinkable width floor wider than a narrow viewport,
+ * forcing the page open regardless of `width: 100%`.
+ */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.group {
+  min-width: 0;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.groupHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.groupName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.referencedChips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.chevron {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.groupBody {
+  min-width: 0;
+  padding: var(--space-2) var(--space-2) var(--space-2) calc(4px + var(--space-3));
+}
+
+.emptyGroup {
+  padding: var(--space-2) 0;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border);
+}
+
+.rowMain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.rowName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/**
+ * Item 13's own "lifecycle dot" — a small solid circle, `data-tone` keyed
+ * off the same `--status-*` tokens `Chip`/`CapabilityMapView.module.css`'s
+ * own `.mobileToneStrip` already use, so a status colour is never invented
+ * twice. `role="img"`/`aria-label` (not just `title`, which touch has no
+ * hover for) carry the status to anyone who can't see the colour — the
+ * same "never colour alone" rule §6.3/§8.4 apply everywhere else in this
+ * product.
+ */
+.lifecycleDot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-neutral);
+}
+
+.lifecycleDot[data-tone='ok'] {
+  background: var(--status-ok);
+}
+.lifecycleDot[data-tone='warn'] {
+  background: var(--status-warn);
+}
+.lifecycleDot[data-tone='danger'] {
+  background: var(--status-danger);
+}
+.lifecycleDot[data-tone='info'] {
+  background: var(--status-info);
+}
+.lifecycleDot[data-tone='neutral'] {
+  background: var(--status-neutral);
+}
+
+.rowSecondary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.contextLink {
+  white-space: nowrap;
+}
