@@ -22,7 +22,9 @@ Separate product, separate repo, separate Supabase project. Shares code with the
 2. Housekeeping (one short sprint): commit this pack to `docs/prompts/`; reduce Actions; `pnpm release` script; create issue labels; fix ADR-000 preface; SPEC §11 add the untracked C1 items (structural-conflict resolution actions → C2; capture-draft queue item kind → K1) and remove the stale `base_commit_id` note.
 3. **U4-2a** (Prompt 7f) — partly done 10 September; **close-out is Prompt 7g** (process, three bugs, the partial and unstarted items).
 4. **U4-2b** (Prompt 7h) — UI tweaks from use: capability map text and tiles, landscape auto-layout and width, context header.
-5. **M1b** — comments UI, built to `docs/HANDOFF-M1b-comments.md` (corrected against the codebase first).
+5. **M1b** — built 9 September; close-out done 11 September on the desktop (integration and Playwright run, thread-counts RPC, hollow markers and per-view filter, capability map markers, browse-table counts).
+5a. **C2 (Prompt 7b) — in progress from 11 September.** Engine and `split_branch` first; stop before the review-queue UI until it has a design handoff.
+5b. **Changes UX (Prompt 7i)**, **admin surfaces (Prompt 7j)** and **system attributes for regulated estates (Prompt 7k)** — all from use on 11 September; schedule after C2's engine half, before any pilot. 7k is the one that touches the engine; run it on the desktop.
 6. Hour of use → issues → **U4-3** (drag-to-reorder is queued there; expect the change flow, versions and the architect door's remaining §3.2 items to surface).
 7. Repeat until the definition of usable holds.
 8. Then C2 (split), K1 (capture), D1 (decisions), Q1 (duplicates), R1 (roadmap).
@@ -325,6 +327,46 @@ The ordering matters. Prompts 0–2 produce documents that every later prompt re
 > 13. Header shows "Supports: <capabilities, primary first>" and "Owned by: <team>" with links; empty state reads "No connections to other systems or actors yet" with the add link.
 >
 > Playwright overall: no text overflow on the map at 1280 and 1920 for the longest names in the eight maps; ten systems across five lanes with no tile/label intersection and no edge across a non-endpoint tile; context header for a system with supports but no uses.
+
+---
+
+## Prompt 7i — Claude Code: changes UX (from use, 11 September)
+
+> The change lifecycle has worked since C1 but the UI never explains it. Engine frozen. One summary; three suites; pnpm release.
+> 1. Change page status stepper: Draft → Proposed → In review → Approved → Merged (Rejected as a side exit); current step highlighted; one sentence under it on what happens next and who does it.
+> 2. While a change is selected, every page shows a persistent banner: "Editing in change: <name>" with To-be/Diff shortcuts and "Back to main"; save toasts say the edit went to the change.
+> 3. Changes list cards: status, target date, affected capabilities, unresolved comments, one-line "what this change does" from describeEnvelope.
+> 4. Entry points: "Propose a change" on every element page (creates a change scoped to that element and selects it) and on the director door's changes-in-flight panel.
+> 5. First-time explainer on the Changes page when a model has none (what a change is; contributors never edit main; merging updates the landscape).
+> 6. Playwright: create a change from an element page, banner shown, edit, submit, approve as owner, merge; stepper correct at each step.
+
+---
+
+## Prompt 7j — Claude Code: A1 admin surfaces (from use, 11 September)
+
+> Model and organisation management do not exist. Engine frozen except the archive flag. One summary; three suites; pnpm release. Record archive semantics as an ADR-009 amendment.
+> 1. Model settings (/o/:org/m/:model/settings, owner/architect): rename, slug, description; Archive (`models.archived_at`; hidden from lists and search, read-only when opened, Restore for owners); Delete (owner only, only when archived, typed-name confirmation, cascades through org-scoped tables). Entry from the model home overflow menu.
+> 2. Organisation settings (/o/:org/settings, owner): rename, slug; member directory (profiles, role, joined); change role; remove member (guard_last_owner stays); invite by email (pending invite row; member created with the invited role on first sign-in with that email); Delete organisation (owner, only when no models, typed confirmation). Entry from the org switcher.
+> 3. Org home: archived models under a collapsed "Archived" section.
+> 4. RLS for invites and archive; contracts and round-trip tests; migrations.
+> 5. Playwright: archive and restore; delete an archived model; invite and sign in; change a role; last owner cannot be removed.
+
+---
+
+## Prompt 7k — Claude Code: system attributes for regulated estates (from use, 11 September)
+
+> One sprint for four related model additions; they share the contract change and the colour-by machinery. Engine change allowed; each ends with contract update, attribute schema (labels, edit controls), round-trip tests, migration where a backfill or check is needed, and an ADR-001 amendment. One summary; three suites; `pnpm release`.
+>
+> 1. **Criticality and hosting.** System gains `criticality` (critical | high | medium | low), `hostingModel` (on_premises | private_cloud | public_cloud | saas | hybrid) and `hostingProvider` (text). Colour-by on landscape and capability map: criticality (worst-of for capabilities) and hosting model. Health findings: critical systems without a business owner; critical systems exposed with no planned replacement. Element page shows both with provenance.
+> 2. **Owner roles.** `owns` gains `role: business | technical | service` (default business; migration backfills existing links); at most one per (system, role). Element page and context header list owners by role ("Business owner: Housing · Technical owner: IT Operations"); the picker asks for the role on systems, defaults to business on capabilities. Health findings become role-aware: critical systems without a business owner; systems without a technical owner; capabilities without a business owner.
+> 3. **IT / OT domain.** System gains `domain: it | ot | hybrid` (default it); containers inherit. Landscape colour-by "IT/OT" with OT systems grouped in a labelled zone inside the enterprise boundary; a "Boundary crossings" list (flows_to/uses between IT and OT) reachable from the architect door; health finding: a crossing with no data classification or verb. Capability map colour-by "OT share".
+> 4. **Integration platforms.** System gains `kind: application | integration_platform | data_platform | infrastructure` (default application). `flows_to` and `uses` gain optional `via` (element ref to a system of kind integration_platform, validated at commit). Landscape: a platform band along the bottom spanning the capability lanes for non-application kinds; edge toggle "route via platforms" (direct edges by default). Platform element page: "Flows via this platform". Health finding: an integration platform with nothing flowing via it.
+>
+> Also, from the changes discussion: element header menu gains "Retire…" (sets lifecycle and planned end, optional "replaced by" picker creating the replacement's supports links) and "Remove from model…" (element.retract cascading its relationships in one commit; confirmation lists what goes); both respect the selected ref (branch or, for owner/architect, main).
+>
+> Playwright: add criticality and hosting to a system and see the colour-by; add a technical owner alongside a business owner; two systems, one OT, a flow between them listed as a crossing; A flows_to B via M, listed on M's page, toggle routes the edge; retire a system with a replacement and see exposure clear; remove a system with relationships in one commit.
+>
+> Capture (K1) note: hosting, technical owner and `via` are the fields an ITSM export or integration register populates with high confidence; add them to the capture spec's target fields.
 
 ---
 
