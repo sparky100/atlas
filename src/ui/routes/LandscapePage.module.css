@@ -71,6 +71,18 @@
   flex: 0 0 auto;
 }
 
+/* M1 close-out item 1: "the per-session 'comments on this view' filter" —
+   a plain checkbox + label, the same row height as the `+ Add` controls
+   next to it, not a bespoke switch control this design system has no
+   other use for. */
+.commentsOnlyToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--row-height);
+  cursor: pointer;
+}
+
 /**
  * Sprint U4-1 E1: the < 768px "+ Add" / "⋯" disclosures — which
  * arrangement mounts is decided in JS (LandscapePage.tsx's own

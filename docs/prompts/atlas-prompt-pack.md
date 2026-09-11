@@ -294,14 +294,23 @@ The ordering matters. Prompts 0–2 produce documents that every later prompt re
 ---
 
 ## Prompt 7h — Claude Code: U4-2b, UI tweaks from use (10 September)
+
 > Sprint U4-2b, after 7g. One PR per group; three suites on the final commit of each; `pnpm release`; issues first. Engine frozen.
-> **Bugs:** (1) Bug: the search-first create option disappears when any partial match exists. Rule: "Create '<typed>' as [type]" is always the last row unless there is an exact, case-insensitive match on a name or alias; near-matches are listed above it. Apply to HomeSearch, ElementSearchAdd and the relationship target picker (where create doesn't apply, no change). Playwright: typing "Enter" with "Enterprise Architecture & Standards" present shows the match and the create row; typing the exact name hides create.
+>
+> **Bugs**
+> B1. Search-first create option disappears when any partial match exists. Rule: "Create '<typed>' as [type]" is always the last row unless there is an exact, case-insensitive match on a name or alias; near-matches listed above it. Apply to HomeSearch and ElementSearchAdd (the relationship target picker has no create; unchanged). Playwright: typing "Enter" with "Enterprise Architecture & Standards" present shows the match and the create row; the exact name hides create.
+> B2. Element header "…" menu contains only "Copy element ID"; Rename is missing for systems. Add Rename to the menu for every element type; renaming writes `element.update` on name and records the old name as an alias; tapping the title also opens the inline rename. Playwright: rename from the menu, new name in breadcrumb, old name found by search.
+> B3. Provenance card: recorded/effective as precise relative time or date (the staleness bucket stays on the inline badge only); "Loading history…" replaced by real history or omitted.
+> B4. Comment header: display name once, handle only when it differs; first sign-in prompts for a display name.
+> B5. Search result rows: one link per row (the name); type and relationship count as muted plain text, not links.
+> B6. Empty states never use developer wording: "Decisions aren't built yet — see Sprint D1" becomes "No decisions recorded"; grep for "Sprint" and "not built" in user-facing strings.
+>
 > **Capability map**
 > 1. L1 names never truncate; the chip and "N systems →" wrap under the name or collapse to dot + count when the column is narrow.
 > 2. L2 names wrap to two lines inside the tile.
 > 3. Every tile reserves the chip row so tiles in a column are equal height.
 > 4. Try the blueprint frame on hover/focus/selected only with a plain 1px border otherwise; screenshot both for a decision before committing.
-> 5. Remove "Sync descriptions from starter map" from the UI (keep the script with a note that it repairs models seeded before commit 4e63ca5, delete once the DNO model is repaired). Overflow menu keeps Export as starter map and Backfill capability order (remove the latter once run everywhere).
+> 5. Remove "Sync descriptions from starter map" from the UI (keep the script with a note that it repairs models seeded before commit 4e63ca5; delete once the DNO model is repaired). Overflow menu keeps Export as starter map and Backfill capability order (remove the latter once run everywhere).
 >
 > **Landscape**
 > 6. Auto-layout on every open: no `view_layouts` reads or writes for the landscape kind; remove Reset layout; drags allowed within the session only. Record in UI-principles §6.
@@ -310,12 +319,12 @@ The ordering matters. Prompts 0–2 produce documents that every later prompt re
 > 9. Edges do not cross unrelated tiles: route around, or offset tiles to leave an edge lane.
 > 10. Page header on canvas routes follows the canvas's full-width rule; actions never clip.
 > 11. Tap on a "+N" chip lists the other capabilities with links.
+> 12. Mobile (<768px): render a list, not the canvas. Collapsible groups per level-1 capability (name, system count, shared-system chips), actors first, Unassigned last; systems as rows with icon, name, lifecycle dot, "+N" chip, "uses N · used by N" text, tap → element page, "Context →" link. Desktop canvas unchanged. Playwright at 390px: groups render, expand one, tap a system.
 >
 > **Context view**
-> 12. Header shows "Supports: <capabilities, primary first>" and "Owned by: <team>" with links; empty state reads "No connections to other systems or actors yet" with the add link.
-> 13. Landscape on mobile (<768px): render a list, not the canvas. Collapsible groups per level-1 capability (name, system count, shared-system chips), actors first, Unassigned last; systems as rows with icon, name, lifecycle dot, "+N" chip, "uses N · used by N" text, tap → element page, "Context →" link. Desktop canvas unchanged. Playwright at 390px: groups render, expand one, tap a system.
-
-> Playwright: no text overflow on the map at 1280 and 1920 for the longest names in the eight maps; ten systems across five lanes with no tile/label intersection and no edge across a non-endpoint tile; context header for a system with supports but no uses.
+> 13. Header shows "Supports: <capabilities, primary first>" and "Owned by: <team>" with links; empty state reads "No connections to other systems or actors yet" with the add link.
+>
+> Playwright overall: no text overflow on the map at 1280 and 1920 for the longest names in the eight maps; ten systems across five lanes with no tile/label intersection and no edge across a non-endpoint tile; context header for a system with supports but no uses.
 
 ---
 
@@ -385,7 +394,7 @@ Recorded here so they land in the right sprint rather than only in conversation.
 
 **Model (small engine change; one migration, one contract update, schedule before the landscape lanes get heavier use):**
 - `supports` gains an attribute `role: primary | secondary`; a system has at most one primary (check constraint). Placement on the landscape uses the primary lane; other lanes show a linked reference, never a duplicate box. No primary → the Unassigned lane.
-- `uses` and `flows_to` gain a required free-text `label` (the verb: "withdraws cash using"). Creation asks for it; the review checklist flags any relationship without one.
+- `uses` and `flows_to` carry the verb phrase ("withdraws cash using") in their existing `description` attribute; no separate `label` field (decided during the add-a-system flow build, 9 September). Creation asks for it; the review checklist flags any relationship without one.
 - Planned-replacement rule is per capability: replacing a system's finance function does not clear Housing's exposure.
 
 **Creation (U3a/U3b):**

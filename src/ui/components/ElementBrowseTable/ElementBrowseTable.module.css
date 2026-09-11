@@ -59,3 +59,10 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+/* M1 close-out item 4: "unresolved counts on the browse table rows" — plain
+   inline text, the same 💬 glyph the notification tray/comment affordances
+   elsewhere already use for "this has comments," not a new icon. */
+.unresolvedBadge {
+  white-space: nowrap;
+}
