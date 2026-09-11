@@ -9,6 +9,7 @@ import { Text } from '../components/Text/Text';
 import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfirm';
 import type { MemberRole, OrganisationRow } from '../../db/types';
 import { canManageOrgSettings } from './roleGates';
+import { useInvites } from './useInvites';
 import { useMembers } from './useMembers';
 import { useOrganisationSettings } from './useOrganisationSettings';
 import styles from './OrganisationSettingsView.module.css';
@@ -36,16 +37,22 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
   const canManage = canManageOrgSettings(role);
   const { status, error, update, remove } = useOrganisationSettings(organisation.id, onChanged);
   const { members, loading: membersLoading, error: membersError, changeRole, remove: removeMemberRow } = useMembers(organisation.id);
+  const { invites, loading: invitesLoading, error: invitesError, create: createInviteRow, revoke: revokeInviteRow } = useInvites(organisation.id, userId);
   const [name, setName] = useState(organisation.name);
   const [slug, setSlug] = useState(organisation.slug);
   const [deleteResult, setDeleteResult] = useState<'has_models' | 'not_found' | null>(null);
   const [deleteModelCount, setDeleteModelCount] = useState(0);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<MemberRole>('contributor');
+  const [inviteResult, setInviteResult] = useState<'already_pending' | null>(null);
   const navigate = useNavigate();
   // Real label/input association (`htmlFor`/`id`) — `ModelSettingsView.tsx`'s
   // own fix for the same issue (a sibling `Text as="label"` with no `for`
   // isn't programmatically associated with anything).
   const nameId = useId();
   const slugId = useId();
+  const inviteEmailId = useId();
+  const inviteRoleId = useId();
 
   return (
     <div>
@@ -160,6 +167,95 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
           </ul>
         )}
       </Panel>
+
+      {canManage && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Invite by email
+          </Text>
+          <Text as="p" tone="muted" size="sm">
+            No email is sent. The invited address joins with the chosen role the moment they sign up or next sign in.
+          </Text>
+          <form
+            className={styles.inviteForm}
+            onSubmit={(e) => {
+              e.preventDefault();
+              setInviteResult(null);
+              void createInviteRow(inviteEmail, inviteRole).then((result) => {
+                if (!result) return;
+                if (result.status === 'already_pending') {
+                  setInviteResult('already_pending');
+                } else {
+                  setInviteEmail('');
+                }
+              });
+            }}
+          >
+            <label htmlFor={inviteEmailId}>
+              <Text as="span" size="sm">
+                Email
+              </Text>
+            </label>
+            <input
+              id={inviteEmailId}
+              className={styles.input}
+              type="email"
+              required
+              value={inviteEmail}
+              onChange={(e) => {
+                setInviteEmail(e.target.value);
+              }}
+            />
+            <label htmlFor={inviteRoleId}>
+              <Text as="span" size="sm">
+                Role
+              </Text>
+            </label>
+            <select
+              id={inviteRoleId}
+              className={styles.roleSelect}
+              value={inviteRole}
+              onChange={(e) => {
+                setInviteRole(e.target.value as MemberRole);
+              }}
+            >
+              {ROLE_OPTIONS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+            <Button variant="primary" type="submit">
+              Send invite
+            </Button>
+          </form>
+          {inviteResult === 'already_pending' && <Text as="p">There's already a pending invite for that email at this organisation.</Text>}
+          {invitesError !== null && <Text as="p">{invitesError}</Text>}
+          {!invitesLoading && invites.length === 0 && <EmptyState>No invites yet.</EmptyState>}
+          {invites.length > 0 && (
+            <ul className={styles.memberList}>
+              {invites.map((invite) => (
+                <li key={invite.id} className={styles.memberRow}>
+                  <div className={styles.memberIdentity}>
+                    <Text as="span">{invite.email}</Text>
+                    <Chip tone={invite.consumed_at === null ? 'neutral' : 'ok'}>{invite.consumed_at === null ? 'Pending' : 'Joined'}</Chip>
+                    <Chip tone="neutral">{invite.role}</Chip>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    aria-label={`Revoke invite for ${invite.email}`}
+                    onClick={() => {
+                      void revokeInviteRow(invite.id);
+                    }}
+                  >
+                    Revoke
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      )}
 
       {canManage && (
         <Panel>
