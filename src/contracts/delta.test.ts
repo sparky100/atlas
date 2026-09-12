@@ -476,3 +476,77 @@ describe('Capability essentialFunction and system supportEndsAt (Prompt 7k item 
     expect(fromDeltaRow(toDeltaRow(setSupportEndsAt, ctx))).toEqual(setSupportEndsAt);
   });
 });
+
+describe('"Platforms and modules": SystemKind.platform and ContainerAttributes\' module-override fields', () => {
+  it('kind: "platform" is accepted at create and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-30',
+      elementId: 'el-11',
+      elementType: 'system',
+      name: 'SAP',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false, kind: 'platform' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('a module\'s own lifecycleStatus/criticality/hostingModel/hostingProvider/domain overrides are accepted at create and survive the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-31',
+      elementId: 'el-12',
+      elementType: 'container',
+      name: 'FI',
+      parentId: 'el-11',
+      attributes: { isExternal: false, lifecycleStatus: 'active', criticality: 'high', hostingModel: 'saas', hostingProvider: 'SAP Cloud', domain: 'it' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('a module\'s override can be set later via an update, with none recorded at create', () => {
+    const create: Delta = {
+      kind: 'element.create',
+      id: 'delta-32',
+      elementId: 'el-13',
+      elementType: 'container',
+      name: 'PM',
+      parentId: 'el-11',
+      attributes: { isExternal: false },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    const setCriticality: Delta = {
+      kind: 'element.update',
+      id: 'delta-33',
+      elementId: 'el-13',
+      elementType: 'container',
+      attribute: 'criticality',
+      value: 'critical',
+      previousDeltaId: 'delta-32',
+      sourceId: 'src-1',
+      confidence: 0.9,
+    };
+    expect(fromDeltaRow(toDeltaRow(create, ctx))).toEqual(create);
+    expect(fromDeltaRow(toDeltaRow(setCriticality, ctx))).toEqual(setCriticality);
+  });
+
+  it('a container supporting a capability directly (a platform module) is accepted at create and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'relationship.create',
+      id: 'delta-34',
+      relationshipId: 'rel-3',
+      relationshipType: 'supports',
+      fromElementId: 'el-12',
+      toElementId: 'cap-1',
+      attributes: { role: 'primary' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+});

@@ -173,13 +173,25 @@ export function LandscapePage() {
 
   const refParam = refParamOf(ref);
   const segments: BreadcrumbSegment[] = capability ? [{ label: capability.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/capability-map?ref=${refParam}` }] : [];
-  const nodeHref = (systemId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/context/${systemId}?${zoomQueryString({ ref, capabilityId })}`;
   // Landscape canvas, structural (item 3): an actor has no Context view of
   // its own (the zoom chain is system-specific), so this goes straight to
   // the actor's own element page instead — the same target item 13's
   // mobile list uses for both its system and actor rows' own tap target
   // ("tap → element page", `LandscapeMobileList.tsx`'s own prop comment).
   const elementHref = (elementId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${elementId}?ref=${refParam}`;
+  // "Platforms and modules": a module tile's own `elementId` is a
+  // Container, which has no Context view of its own (the zoom chain is
+  // system-specific) — its own element page instead, the same target
+  // `elementHref` already gives an actor. Every other node (an ordinary
+  // system, or a platform's own band tile) keeps the existing Context-view
+  // target. `systemsById` is only known once the hook is `ready`, but this
+  // function is only ever actually called then (the canvas/mobile list it's
+  // passed to both render under that same gate) — reading `state` from the
+  // closure here, rather than reordering this whole component around it.
+  const nodeHref = (systemId: string) => {
+    const element = state.status === 'ready' ? state.data.systemsById.get(systemId) : undefined;
+    return element?.element_type === 'container' ? elementHref(systemId) : `/o/${orgSlug ?? ''}/m/${model.slug}/context/${systemId}?${zoomQueryString({ ref, capabilityId })}`;
+  };
   // Item 11: a lane key that isn't `$external`/`$unassigned` is a level-1
   // capability's own element id (`layout.ts`'s `placementFor`) — its
   // element page, same shape as `elementHref` above, works regardless of

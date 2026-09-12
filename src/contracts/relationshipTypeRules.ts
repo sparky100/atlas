@@ -31,6 +31,18 @@ export interface RelationshipTypeRule {
 
 export const RELATIONSHIP_TYPE_RULES: readonly RelationshipTypeRule[] = [
   { relationshipType: 'supports', fromType: 'system', toType: 'capability', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: 1 },
+  /**
+   * "Platforms and modules": a platform's own `Container` children
+   * (modules) support a capability directly, not the platform itself —
+   * same cardinality shape as the system row above (`maxPrimaryPerFrom: 1`,
+   * one landscape lane per module). Legal for any container, not gated to
+   * "only when the container's parent has `kind: 'platform'`" —
+   * `RELATIONSHIP_TYPE_RULES` has never expressed anything finer than
+   * (relationshipType, fromType, toType), and adding a parent-kind
+   * invariant here would be materially more machinery than this feature
+   * needs.
+   */
+  { relationshipType: 'supports', fromType: 'container', toType: 'capability', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: 1 },
   { relationshipType: 'uses', fromType: 'system', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'uses', fromType: 'container', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'uses', fromType: 'component', toType: 'component', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },

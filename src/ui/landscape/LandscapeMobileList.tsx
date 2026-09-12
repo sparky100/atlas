@@ -161,10 +161,17 @@ function SystemRow({ member, elementHref, contextHref }: { member: LandscapeGrou
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
 
+  // "Platforms and modules": a module tile's own element is a Container
+  // (`system` here is really "the lane member," not always a System) —
+  // it has no Context view of its own, same reasoning `contextHref`'s own
+  // doc comment already gives for an actor, so this row omits that link
+  // the same way an actor row would if it ever reached this component.
+  const isModule = system.element_type === 'container';
+
   return (
     <li className={styles.row}>
       <Link to={elementHref(system.element_id)} className={styles.rowMain}>
-        <ElementTypeGlyph type="system" external={external} />
+        <ElementTypeGlyph type={system.element_type} external={external} />
         <Text as="span" className={styles.rowName}>
           {system.name}
         </Text>
@@ -175,9 +182,11 @@ function SystemRow({ member, elementHref, contextHref }: { member: LandscapeGrou
         <Text as="span" size="sm" tone="muted">
           uses {usesCount} · used by {usedByCount}
         </Text>
-        <Link to={contextHref(system.element_id)} className={styles.contextLink}>
-          Context →
-        </Link>
+        {!isModule && (
+          <Link to={contextHref(system.element_id)} className={styles.contextLink}>
+            Context →
+          </Link>
+        )}
       </div>
     </li>
   );

@@ -29,7 +29,9 @@ export interface RetireActionProps {
 /**
  * Prompt 7k item 5's "Retire…" — planned end date (required: that's the
  * whole point of retiring something), plus an optional "replaced by"
- * search picker (system-only, excluding this element itself) whose
+ * search picker (scoped to `element`'s own type — a system replaces with
+ * another system, a module/container with another container, "platforms
+ * and modules" own generalisation — excluding this element itself) whose
  * capability transfer is `useElementRetire`'s own job. See that hook's
  * doc comment for what the transfer does and doesn't attempt.
  */
@@ -52,7 +54,8 @@ export function RetireAction({
   const [replacement, setReplacement] = useState<RetireReplacement | null>(null);
   const [pickingReplacement, setPickingReplacement] = useState(false);
   const plannedEndId = useId();
-  const search = useRelationshipTargetSearch(searchCommitId, modelId, ['system'], element.element_id, pickingReplacement);
+  const search = useRelationshipTargetSearch(searchCommitId, modelId, [element.element_type], element.element_id, pickingReplacement);
+  const searchPlaceholder = element.element_type === 'container' ? 'Search modules…' : 'Search systems…';
   const { status, error, retire } = useElementRetire({
     modelId,
     orgId,
@@ -106,7 +109,7 @@ export function RetireAction({
             autoFocus
             type="text"
             className={styles.input}
-            placeholder="Search systems…"
+            placeholder={searchPlaceholder}
             value={search.query}
             onChange={(e) => {
               search.setQuery(e.target.value);

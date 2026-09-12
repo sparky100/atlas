@@ -88,8 +88,19 @@ export type SystemDomain = 'it' | 'ot' | 'hybrid';
  * application; only a system that genuinely mediates flows between
  * others (an ESB, an API gateway, a data platform, a piece of
  * infrastructure like a message bus) needs marking.
+ *
+ * "Platforms and modules": `'platform'` is a large, extensible platform
+ * (Salesforce, SAP, Dynamics) whose own `Container` children are its
+ * modules (FI, PM, Sales Cloud, …) — an existing structural relationship
+ * (`parentId`) carrying a new meaning, not a new relationship type. A
+ * module `supports` a capability directly
+ * (`relationshipTypeRules.ts`'s new `(supports, container, capability)`
+ * row), not the platform itself — the platform's own tile only ever
+ * lands in the landscape's platform band (`isNonApplicationKind`, below,
+ * already treats `'platform'` the same as every other non-`'application'`
+ * kind), never a capability lane.
  */
-export type SystemKind = 'application' | 'integration_platform' | 'data_platform' | 'infrastructure';
+export type SystemKind = 'application' | 'integration_platform' | 'data_platform' | 'infrastructure' | 'platform';
 export type ActorSubtype = 'person' | 'team';
 export type DataClassification = 'public' | 'official' | 'official_sensitive' | 'special_category';
 /** Sprint U4-1 B4: which of a system's `supports` edges anchors its one landscape lane (relationship_type_rules' new `maxPrimaryPerFrom: 1`, `supports`-only). Always set at creation, defaulting to `secondary` unless the picker's "primary?" prompt is answered yes — never left unset the way `SupportsAttributes.description` is, since lane placement has to read *something* off every edge. */
@@ -189,6 +200,31 @@ export interface ContainerAttributes {
   introduced?: ISODate;
   /** See `SystemAttributes.plannedEnd`. */
   plannedEnd?: ISODate;
+  /**
+   * "Platforms and modules": a module's own override of its platform's
+   * `lifecycleStatus`/`criticality`/`hostingModel`/`hostingProvider`/
+   * `domain` — every one of these five is optional and, when absent,
+   * resolves to the platform's own value instead
+   * (`src/ui/elements/moduleAttributes.ts`'s `effectiveModuleAttributes`).
+   * This is a genuinely different shape from `SystemDomain`'s own
+   * "container always defers to its parent system, never has a value of
+   * its own" precedent (`resolveElementDomain`) — a module *can* record
+   * its own fact, e.g. an FI module criticality-rated independently of
+   * SAP as a whole. Meaningless (never read) on an ordinary container
+   * that isn't a platform's module; kept as a plain optional field rather
+   * than a second, module-only attributes shape, since `ContainerAttributes`
+   * has no way to express "only when parent.kind === 'platform'" and a
+   * ordinary container simply never has a reason to set these.
+   */
+  lifecycleStatus?: LifecycleStatus;
+  /** See this interface's own `lifecycleStatus` doc comment. */
+  criticality?: Criticality;
+  /** See this interface's own `lifecycleStatus` doc comment. */
+  hostingModel?: HostingModel;
+  /** See this interface's own `lifecycleStatus` doc comment. */
+  hostingProvider?: string;
+  /** See this interface's own `lifecycleStatus` doc comment. Landscape zoning (OT-zone eligibility) deliberately never reads this inherited — only a module's own explicit override, same as `resolveElementDomain`'s existing per-element check now also does (see that function's own updated comment). */
+  domain?: SystemDomain;
 }
 
 export interface ComponentAttributes {

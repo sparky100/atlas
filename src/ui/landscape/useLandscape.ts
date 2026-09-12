@@ -1,16 +1,25 @@
 import { useEffect, useState } from 'react';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
-import { resolveBranchModeProjection, projectionActorsForLandscape, projectionElementsByIds, projectionLandscapeEdges, projectionSupportsEdgesForSystems, projectionSystemsForLandscape } from '../../db/branchProjection';
+import {
+  resolveBranchModeProjection,
+  projectionActorsForLandscape,
+  projectionContainersForLandscape,
+  projectionElementsByIds,
+  projectionLandscapeEdges,
+  projectionSupportsEdgesForSystems,
+  projectionSystemsForLandscape,
+} from '../../db/branchProjection';
 import { listSupportsEdgesForCapabilities } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
-import { listActorsForLandscape, listLandscapeEdges, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
+import { listActorsForLandscape, listContainersForLandscape, listLandscapeEdges, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import { getOrCreateModelView } from '../../db/views';
 import type { ViewMode } from '../../db/viewMode';
 import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
 import { l1AncestorOf, loadCapabilityAncestry } from '../elements/capabilityDepth';
+import { isPlatform } from '../elements/systemKind';
 import { computeLandscapeGroups, type LandscapeGroups } from './landscapeGroups';
 import type { LandscapeLayout } from './layout';
 import { computeLandscapeLayoutInWorker } from './layoutWorkerClient';
@@ -176,6 +185,7 @@ export function useLandscape(
       let commitId: UUID;
       let allSystems: ElementsHeadRow[];
       let allActors: ElementsHeadRow[];
+      let allContainers: ElementsHeadRow[];
       let branchId: UUID | null = null;
       let diff: VersionDiff | null = null;
       // Populated only for a branch ref, closed over below so every
@@ -201,6 +211,7 @@ export function useLandscape(
         diff = resolved.diff;
         allSystems = projectionSystemsForLandscape(resolved.projection);
         allActors = projectionActorsForLandscape(resolved.projection);
+        allContainers = projectionContainersForLandscape(resolved.projection);
         systemsSource = {
           edges: (systemIds) => projectionLandscapeEdges(resolved.projection, systemIds),
           supports: (systemIds) => projectionSupportsEdgesForSystems(resolved.projection, systemIds),
@@ -214,7 +225,11 @@ export function useLandscape(
         // itself (systems/actors) is unique to this hook, same as the
         // fallback branch below.
         commitId = mainCommitIdHint;
-        [allSystems, allActors] = await Promise.all([listSystemsForLandscape(supabase, commitId), listActorsForLandscape(supabase, commitId)]);
+        [allSystems, allActors, allContainers] = await Promise.all([
+          listSystemsForLandscape(supabase, commitId),
+          listActorsForLandscape(supabase, commitId),
+          listContainersForLandscape(supabase, commitId),
+        ]);
       } else {
         const resolvedCommitId = await resolveRef(supabase, currentModelId, ref);
         if (!resolvedCommitId) {
@@ -222,8 +237,29 @@ export function useLandscape(
           return;
         }
         commitId = resolvedCommitId;
-        [allSystems, allActors] = await Promise.all([listSystemsForLandscape(supabase, commitId), listActorsForLandscape(supabase, commitId)]);
+        [allSystems, allActors, allContainers] = await Promise.all([
+          listSystemsForLandscape(supabase, commitId),
+          listActorsForLandscape(supabase, commitId),
+          listContainersForLandscape(supabase, commitId),
+        ]);
       }
+
+      // "Platforms and modules": a platform's own module (Container)
+      // children get their own landscape tile, placed by their own
+      // `supports` edge — folded into `allSystems` right here so every
+      // downstream step (capability filter, edge/supports fetch, layout,
+      // groups) already treats a module exactly like a system, with no
+      // changes needed to any of them. Label composed as "Platform · Module"
+      // (a shallow copy — never mutates the loaded row) — the prompt's own
+      // tile text; the link target and lane placement both still key off
+      // the module's own `element_id`.
+      const platformsById = new Map(allSystems.filter((s) => isPlatform(s)).map((s) => [s.element_id, s]));
+      const moduleNodes: ElementsHeadRow[] = [];
+      for (const container of allContainers) {
+        const platform = container.parent_id !== null ? platformsById.get(container.parent_id) : undefined;
+        if (platform) moduleNodes.push({ ...container, name: `${platform.name} · ${container.name}` });
+      }
+      if (moduleNodes.length > 0) allSystems = [...allSystems, ...moduleNodes];
 
       const supportingIds = capabilityId ? (systemsSource ? systemsSource.supportingSystemIds(capabilityId) : await loadSupportingSystemIds(commitId, capabilityId)) : null;
       const systems = supportingIds ? allSystems.filter((s) => supportingIds.has(s.element_id)) : allSystems;

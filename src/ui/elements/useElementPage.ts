@@ -27,7 +27,7 @@ import type { HeadProjection } from '../../engine/projection';
 import type { AliasRow, BranchRow, SourceRow } from '../../db/types';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import { capabilityLevel } from './capabilityDepth';
-import { isIntegrationPlatform } from './systemKind';
+import { isIntegrationPlatform, isPlatform } from './systemKind';
 import { supabase } from '../supabaseClient';
 
 export interface ElementPageData {
@@ -51,6 +51,18 @@ export interface ElementPageData {
   flowsViaThisPlatform: RelationshipsHeadRow[];
   /** The endpoints (`from`/`to`) of every edge in `flowsViaThisPlatform` — never this element itself, which is only ever the `via`, not an endpoint, of these edges. */
   flowsViaThisPlatformEndpoints: Map<UUID, ElementsHeadRow>;
+  /**
+   * "Platforms and modules": every live `supports` edge from one of this
+   * element's own `children` (its modules) — only ever populated when
+   * `element` is a system with `kind: 'platform'` (`isPlatform`); `[]` for
+   * every other element, same honest-empty-state reasoning
+   * `flowsViaThisPlatform` above already gives. Not populated for a system
+   * that isn't itself a platform, even if it happens to have containers —
+   * an ordinary system's own containers are shown in "Structure", not here.
+   */
+  moduleSupportsEdges: RelationshipsHeadRow[];
+  /** Every capability named by a `moduleSupportsEdges` edge's own `toElementId` — what `ModulesSection.tsx` groups modules by. */
+  moduleSupportsCapabilities: Map<UUID, ElementsHeadRow>;
 }
 
 export type ElementPageState =
@@ -221,6 +233,20 @@ export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): UseEle
         flowsViaThisPlatformEndpoints = await source.elementsByIds(endpointIds);
       }
 
+      // "Platforms and modules": a platform's own children (already loaded
+      // above as `children`, no new round trip for that half) are its
+      // modules — reuse the same `ElementSource.relationships` primitive
+      // `PlatformFlowsSection`'s own data uses, once per module, to find
+      // which capabilities they support.
+      let moduleSupportsEdges: RelationshipsHeadRow[] = [];
+      let moduleSupportsCapabilities = new Map<UUID, ElementsHeadRow>();
+      if (element.element_type === 'system' && isPlatform(element) && children.length > 0) {
+        const perModuleRelationships = await Promise.all(children.map((module) => source.relationships(module.element_id)));
+        moduleSupportsEdges = perModuleRelationships.flat().filter((rel) => rel.relationship_type === 'supports');
+        const capabilityIds = [...new Set(moduleSupportsEdges.map((rel) => rel.to_element_id))];
+        moduleSupportsCapabilities = await source.elementsByIds(capabilityIds);
+      }
+
       if (!cancelled) {
         setState({
           status: 'ready',
@@ -241,6 +267,8 @@ export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): UseEle
             inFlightBranches,
             flowsViaThisPlatform,
             flowsViaThisPlatformEndpoints,
+            moduleSupportsEdges,
+            moduleSupportsCapabilities,
           },
         });
       }

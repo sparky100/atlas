@@ -205,6 +205,7 @@ Primary key `(relationship_type, from_type, to_type)`. No `org_id`; product cont
 | relationship_type | from | to | max_per_from | max_primary_per_to | max_primary_per_from |
 |---|---|---|---|---|---|
 | supports | system | capability | | | 1 |
+| supports | container | capability | | | 1 |
 | uses | system | system | | | |
 | uses | container | container | | | |
 | uses | component | component | | | |
@@ -214,6 +215,20 @@ Primary key `(relationship_type, from_type, to_type)`. No `org_id`; product cont
 | owns | actor | system | | 1 | |
 | flows_to | system | system | | | |
 | flows_to | container | container | | | |
+
+**Amended ("Platforms and modules").** The new `supports (container, capability)`
+row lets a `Container` support a capability directly — a platform system's own
+children (`kind: 'platform'`, `src/contracts/delta.ts`'s `SystemKind`) are its
+modules, and a module supports a capability, not the platform itself. Legal for
+any container, not restricted to "only a platform's own module" — this table has
+never expressed anything finer than `(relationship_type, from_type, to_type)`,
+and a parent-kind-aware invariant would be more machinery than this feature
+needs. Same `max_primary_per_from: 1` cardinality as the system row, enforced
+identically: `checkPrimaryCardinality` (C17) is already generic on the anchor
+element's id with no type check, and the existing partial unique index
+(`relationships_head_one_primary_supports_per_system`, keyed on
+`(commit_id, from_element_id)` with no type restriction) already covers a
+container anchor too — no new migration.
 
 ### 3.4 History
 
