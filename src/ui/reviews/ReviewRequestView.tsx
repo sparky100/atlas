@@ -6,6 +6,7 @@ import { CardComments } from '../components/CardComments/CardComments';
 import { Chip } from '../components/Chip/Chip';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { profileLabel } from '../comments/profileLabel';
 import { useThreadCounts } from '../comments/useThreadCounts';
 import { canApproveOrMergeRequest, canReviewMergeRequest, useMembership } from '../orgs/useMembership';
 import { useAuth } from '../auth/useAuth';
@@ -68,12 +69,19 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
   if (rr.state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (rr.state.status === 'error') return <Text as="p">{rr.state.message}</Text>;
 
-  const { request, branch, review, mainHeadCommitId } = rr.state;
+  const { request, branch, review, mainHeadCommitId, requesterProfile } = rr.state;
   const { classification, threeWay } = review;
   const blockingFindings = classification.findings.filter((f) => f.blocking);
   const identityFindings = classification.findings.filter((f) => !f.blocking);
   const structuralFindings = blockingFindings.filter((f) => f.class !== 'field-conflict');
   const fieldConflictFindings = blockingFindings.filter((f) => f.class === 'field-conflict');
+  // S1 item 3: "counts of things, not facts" — `classification.findings` is
+  // flat and per-attribute (two conflicting attributes on one element are
+  // two entries), so counting it directly counts conflicting *facts*, not
+  // conflicting *subjects*. Distinct `subjectId`s is the "thing" a reviewer
+  // actually cares about the count of.
+  const blockingSubjectCount = new Set(blockingFindings.map((f) => f.subjectId)).size;
+  const advisorySubjectCount = new Set(identityFindings.map((f) => f.subjectId)).size;
 
   const canApproveNow = !classification.hasBlockingConflict && threeWay.upToDateWithMain && canApproveOrMerge && request.status === 'pending';
 
@@ -103,14 +111,17 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
           <Chip tone={mergeRequestStatusTone(request.status)}>{request.status.replace('_', ' ')}</Chip>
           <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
           <Text as="span" tone="muted" size="sm">
-            Requested by {request.requested_by}
+            Requested by {profileLabel(requesterProfile)}
           </Text>
           <Text as="span" tone="faint" size="xs">
-            {blockingFindings.length} blocking · {identityFindings.length} advisory
+            {blockingSubjectCount} blocking · {advisorySubjectCount} advisory
           </Text>
-          <Text as="span" tone="faint" size="xs">
-            {totalUnresolved} unresolved comment{totalUnresolved === 1 ? '' : 's'} — never a disabled reason
-          </Text>
+          {/* S1 item 3: "comment count only when non-zero" — a "0 unresolved comments" line was never itself information a reviewer acts on. */}
+          {totalUnresolved > 0 && (
+            <Text as="span" tone="faint" size="xs">
+              {totalUnresolved} unresolved comment{totalUnresolved === 1 ? '' : 's'} — never a disabled reason
+            </Text>
+          )}
           {/* S1 item 2: "review request ... pages get 'View this change'" — Landscape at this branch's ref, read-only. Available regardless of role/status: a reviewer looking at any request, at any point, can see the change's own To-be state. */}
           <Link to={`/o/${orgSlug}/m/${modelSlug}/landscape?${refQueryParam({ kind: 'branch', branchId: branch.id }, true)}`}>
             <Button variant="secondary">View this change</Button>
@@ -126,65 +137,6 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
         )}
 
         {rr.actionError !== null && <Text as="p">{rr.actionError}</Text>}
-
-        <div className={styles.finalActions}>
-          {canReview && request.status !== 'changes_requested' && (request.status === 'pending' || request.status === 'approved') && (
-            <Button
-              variant="ghost"
-              disabled={rr.actionStatus === 'working'}
-              onClick={() => {
-                void rr.reopenForEdits();
-              }}
-            >
-              Reopen for edits
-            </Button>
-          )}
-          {canReview && branch.status === 'draft' && (
-            <Button
-              variant="secondary"
-              disabled={rr.actionStatus === 'working'}
-              onClick={() => {
-                void rr.pushRefreshAndResubmit();
-              }}
-            >
-              {rr.stagedChoiceCount > 0 ? `Push refresh (${String(rr.stagedChoiceCount)} resolved) & resubmit` : 'Pull in main & resubmit'}
-            </Button>
-          )}
-          {canApproveOrMerge && (request.status === 'pending' || request.status === 'changes_requested' || request.status === 'approved') && (
-            <Button
-              variant="ghost"
-              disabled={rr.actionStatus === 'working'}
-              onClick={() => {
-                void rr.reject();
-              }}
-            >
-              Reject
-            </Button>
-          )}
-          {canApproveOrMerge && (
-            <Button
-              variant="primary"
-              disabled={!canApproveNow || rr.actionStatus === 'working'}
-              title={!canApproveNow ? 'Needs no blocking conflicts, an up-to-date branch, and a pending request' : undefined}
-              onClick={() => {
-                void rr.approve();
-              }}
-            >
-              Approve
-            </Button>
-          )}
-          {canApproveOrMerge && request.status === 'approved' && (
-            <Button
-              variant="primary"
-              disabled={rr.actionStatus === 'working'}
-              onClick={() => {
-                void rr.merge();
-              }}
-            >
-              Merge
-            </Button>
-          )}
-        </div>
       </Panel>
 
       {request.status === 'pending' && threeWay.upToDateWithMain && (
@@ -263,6 +215,72 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
           </summary>
           <CleanChanges base={threeWay.base} ours={threeWay.ours} cleanIds={classification.clean} commentsSlotFor={renderCardComments} />
         </details>
+      </Panel>
+
+      {/* S1 item 3: "content before actions" — the actual decision buttons
+          (Approve/Reject/Merge/Reopen/Refresh) render last, once every
+          conflict, the split option, and the clean-changes list have all
+          had their chance to inform the reviewer, not first, above them all,
+          the way this Panel used to bundle them with the summary row. */}
+      <Panel>
+        <div className={styles.finalActions}>
+          {canReview && request.status !== 'changes_requested' && (request.status === 'pending' || request.status === 'approved') && (
+            <Button
+              variant="ghost"
+              disabled={rr.actionStatus === 'working'}
+              onClick={() => {
+                void rr.reopenForEdits();
+              }}
+            >
+              Reopen for edits
+            </Button>
+          )}
+          {canReview && branch.status === 'draft' && (
+            <Button
+              variant="secondary"
+              disabled={rr.actionStatus === 'working'}
+              onClick={() => {
+                void rr.pushRefreshAndResubmit();
+              }}
+            >
+              {rr.stagedChoiceCount > 0 ? `Push refresh (${String(rr.stagedChoiceCount)} resolved) & resubmit` : 'Pull in main & resubmit'}
+            </Button>
+          )}
+          {canApproveOrMerge && (request.status === 'pending' || request.status === 'changes_requested' || request.status === 'approved') && (
+            <Button
+              variant="ghost"
+              disabled={rr.actionStatus === 'working'}
+              onClick={() => {
+                void rr.reject();
+              }}
+            >
+              Reject
+            </Button>
+          )}
+          {canApproveOrMerge && (
+            <Button
+              variant="primary"
+              disabled={!canApproveNow || rr.actionStatus === 'working'}
+              title={!canApproveNow ? 'Needs no blocking conflicts, an up-to-date branch, and a pending request' : undefined}
+              onClick={() => {
+                void rr.approve();
+              }}
+            >
+              Approve
+            </Button>
+          )}
+          {canApproveOrMerge && request.status === 'approved' && (
+            <Button
+              variant="primary"
+              disabled={rr.actionStatus === 'working'}
+              onClick={() => {
+                void rr.merge();
+              }}
+            >
+              Merge
+            </Button>
+          )}
+        </div>
       </Panel>
     </div>
   );
