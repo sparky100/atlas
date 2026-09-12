@@ -15,14 +15,16 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { useThreadCounts } from '../comments/useThreadCounts';
 import { useModels } from '../models/useModels';
-import { canEditOnMain, useMembership } from '../orgs/useMembership';
+import { canBackfillCapabilityOrder, canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { refLabelOf, refQueryParam } from '../../db/ref';
+import { BackfillCapabilityOrderAction } from '../capabilityMap/BackfillCapabilityOrderAction';
 import { CapabilityMapAddForm } from '../capabilityMap/CapabilityMapAddForm';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
 import { ExportCapabilityMapAction } from '../capabilityMap/ExportCapabilityMapAction';
 import { tileCapabilityIds } from '../capabilityMap/layout';
+import { useBackfillCapabilityOrder } from '../capabilityMap/useBackfillCapabilityOrder';
 import { useCapabilityMap } from '../capabilityMap/useCapabilityMap';
 import { useColourByPreference } from '../capabilityMap/useColourByPreference';
 import { useHomeMode } from '../home/useHomeMode';
@@ -58,6 +60,14 @@ import styles from './CapabilityMapPage.module.css';
  * non-empty (same condition the old standalone row used) — nothing to
  * export from an empty map.
  *
+ * S1 item 13: "'Backfill capability order' owner action in the overflow
+ * menu" joins Export in the same menu, gated narrower still
+ * (`canBackfillCapabilityOrder` — owner only, not owner/architect) since
+ * the prompt's own wording calls it out as an owner action specifically.
+ * Idempotent (`useBackfillCapabilityOrder.ts`'s own comment) — safe to
+ * leave in the menu rather than needing to time its removal to the moment
+ * every model happens to be caught up.
+ *
  * Sprint U4-2b item 5: "Sync descriptions from starter map" is gone from
  * this menu (and from the UI entirely — `SyncDescriptionsAction.tsx`/
  * `useSyncDescriptions.ts` deleted). It was a one-off repair action for
@@ -87,6 +97,12 @@ export function CapabilityMapPage() {
   const { branch: mainBranch } = useMainBranch(model?.id ?? null);
 
   const { state, reload } = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref);
+  // S1 item 13: called unconditionally here (not inside `BackfillCapabilityOrderAction`
+  // itself) — see that component's own module comment for why owning this
+  // hook one level up, in a component that stays mounted across the
+  // `reload` it triggers, is what lets its own success message survive to
+  // be seen at all.
+  const backfillOrder = useBackfillCapabilityOrder({ modelId: model?.id ?? '', userId, onBackfilled: reload });
 
   // Sprint U4-1 C4: "exposure for director home mode, coverage for
   // architect" — the same home_mode this org's ModelHome.tsx switches
@@ -102,6 +118,21 @@ export function CapabilityMapPage() {
   // silently reset a toggle living inside it back to `false` after every
   // single move. See CapabilityMapView.tsx's own prop comment.
   const [reorderMode, setReorderMode] = useState(false);
+  // S1 item 13: which L2 cards have their L3 children expanded — lifted
+  // here for exactly the same reason `reorderMode` already is (its own
+  // comment above): an L3 reorder's own `onReordered` triggers this same
+  // `reload`-cycled remount of `CapabilityMapView`, which would otherwise
+  // silently collapse every expanded L2 back to closed right after a
+  // successful move.
+  const [expanded, setExpanded] = useState<Set<UUID>>(new Set());
+  const toggleExpanded = (id: UUID): void => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   // Sprint U4-2a check B5: "Sync descriptions"/"Export as starter map" move
   // from two always-visible buttons of their own into one "⋯" overflow
   // menu beside "+ Add capability" — same always-collapsed pattern
@@ -195,6 +226,10 @@ export function CapabilityMapPage() {
                       modelSlug={model.slug}
                       userId={userId}
                     />
+                    {/* S1 item 13: owner-only, narrower than the `canEdit` gate this whole menu is already behind — see `canBackfillCapabilityOrder`'s own comment. */}
+                    {canBackfillCapabilityOrder(role) && (
+                      <BackfillCapabilityOrderAction status={backfillOrder.status} message={backfillOrder.message} error={backfillOrder.error} onBackfill={() => { void backfillOrder.backfill(); }} />
+                    )}
                   </div>
                 </div>
               )}
@@ -225,6 +260,8 @@ export function CapabilityMapPage() {
             }
             reorderMode={reorderMode}
             onReorderModeChange={setReorderMode}
+            expanded={expanded}
+            onToggleExpand={toggleExpanded}
             threadCounts={threadCounts}
             onCommentMarkerClick={setCommentsPanelCapabilityId}
           />

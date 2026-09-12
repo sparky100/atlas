@@ -6,9 +6,12 @@
  * from a starter map before the map content itself carried `order`
  * (Sprint U4-1 C1's own content pass), has no `order` at all. Without one
  * it sorts to the end of its siblings (`layout.ts`'s `compareCapabilities`)
- * and can't be moved by `useCapabilityReorder.ts`'s swap (which needs a
- * real number on both sides) — this writes one for every such capability,
- * for a given model, in a single commit.
+ * — `useCapabilityReorder.ts`'s swap now assigns one on the fly the moment
+ * such a capability is actually moved (S1 item 13), but this function is
+ * the deliberate, model-wide alternative: one owner click
+ * (`BackfillCapabilityOrderAction.tsx`) writes a real order for every such
+ * capability in the model, in a single commit, rather than waiting for
+ * each one to be touched individually.
  *
  * Grouping and numbering: siblings share a raw `parent_id` (even an
  * unresolved one — an orphan still has *some* `parent_id` value, and

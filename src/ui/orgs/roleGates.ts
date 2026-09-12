@@ -110,3 +110,16 @@ export function canCancelChange(role: MemberRole | null, branch: BranchRow, user
 export function canManageOrgSettings(role: MemberRole | null): boolean {
   return role === 'owner';
 }
+
+/**
+ * S1 item 13: the prompt's own wording — "'Backfill capability order'
+ * owner action" — not enforced at the RLS layer (the commit it writes is a
+ * plain `commitToBranch` on main, which `atlas.commit_deltas` allows any
+ * owner *or* architect to make); restricted to owner only here in the UI,
+ * the same narrower-than-`canEditOnMain` floor `canRestoreModel`/
+ * `canDeleteModel` already use for a maintenance action nobody but the
+ * owner should routinely reach for.
+ */
+export function canBackfillCapabilityOrder(role: MemberRole | null): boolean {
+  return role === 'owner';
+}

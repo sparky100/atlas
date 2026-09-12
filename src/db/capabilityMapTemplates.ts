@@ -59,9 +59,23 @@ export interface CapabilityMapItemRow {
  * (`CapabilityMapImportPanel.tsx`, shown only where `canEdit` already
  * holds), the same convention `listPublishedCapabilityMaps` (this
  * function's predecessor) already followed.
+ *
+ * S1 item 13: "picker cards alphabetical by title" — `title` primary,
+ * nulls last (a row from before the title/summary migration, `title`'s own
+ * doc comment above) so an untitled map doesn't jump ahead of every real
+ * title by sorting first; `sector` next, purely to group any such
+ * untitled rows together rather than scattering them by id; `version`
+ * descending last, unchanged from before this item — the newest version
+ * of the same title/sector still comes first.
  */
 export async function listSeedableCapabilityMaps(supabase: Client): Promise<CapabilityMapRow[]> {
-  const { data, error } = await supabase.from('capability_maps').select('*').in('status', ['published', 'draft']).order('sector').order('version', { ascending: false });
+  const { data, error } = await supabase
+    .from('capability_maps')
+    .select('*')
+    .in('status', ['published', 'draft'])
+    .order('title', { ascending: true, nullsFirst: false })
+    .order('sector')
+    .order('version', { ascending: false });
   if (error) throw new Error(`listSeedableCapabilityMaps: ${error.message}`);
   return data as CapabilityMapRow[];
 }

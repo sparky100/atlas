@@ -84,6 +84,17 @@ export interface CapabilityMapViewProps {
    */
   reorderMode: boolean;
   onReorderModeChange: (mode: boolean) => void;
+  /**
+   * S1 item 13: which L2 cards have their L3 children expanded — lifted
+   * to the caller for the same reason `reorderMode` already is (this
+   * component's own prop comment above): `onReordered` triggers a
+   * `reload` that unmounts and remounts this component, and local state
+   * here would silently collapse back to empty the moment an L3 reorder
+   * succeeds — found live via this item's own e2e run, the same way the
+   * `reorderMode` bug was originally found.
+   */
+  expanded: ReadonlySet<UUID>;
+  onToggleExpand: (id: UUID) => void;
   /** M1 close-out item 2: "markers on tiles (bottom-right, same rule)" — the caller's own `useThreadCounts` result, keyed by capability id. `undefined` while still loading, same convention `unresolvedCount`/`unresolvedCommentCounts` already use elsewhere; a tile with no entry (or `total === 0`) shows no marker at all. Desktop `CapabilityTile`s only (L2 cards, L3 tiles) — narrow's own `MobileL2Row`/L3 rows carry none of this yet, same named gap `LandscapePage.tsx`'s own `LandscapeMobileList` comment already accepts for the identical reason (no room, no prior wiring to build on). */
   threadCounts?: ReadonlyMap<UUID, ThreadCount> | undefined;
   /** Opens the comments panel scoped to the clicked capability — omitted entirely (same convention as `reorderCapability`) wherever the caller hasn't wired a panel at all. */
@@ -162,8 +173,7 @@ export interface CapabilityMapViewProps {
  * already has. See `L1ColumnView`'s own comment for why this branches on
  * a JS `narrow` flag rather than a CSS media query.
  */
-export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, colourBy, onColourByChange, orgSlug, modelSlug, refParam, reorderCapability, reorderMode, onReorderModeChange, threadCounts, onCommentMarkerClick }: CapabilityMapViewProps) {
-  const [expanded, setExpanded] = useState<Set<UUID>>(new Set());
+export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, colourBy, onColourByChange, orgSlug, modelSlug, refParam, reorderCapability, reorderMode, onReorderModeChange, expanded, onToggleExpand, threadCounts, onCommentMarkerClick }: CapabilityMapViewProps) {
   const colourById = useId();
   const reorderModeId = useId();
   // Check B6: "Mobile (<768px): L1 groups as a collapsed list [...] one
@@ -195,15 +205,6 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
   // default — means reordering stays exactly as capable as before but
   // costs nothing when someone's just reading the map, editor or not.
   const activeReorderCapability = reorderMode ? reorderCapability : undefined;
-
-  function toggleExpanded(id: UUID): void {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
 
   // Sprint U4-1 C5: no "+ Add capability" fallback here any more —
   // CapabilityMapPage.tsx's own header action area is always visible
@@ -261,9 +262,10 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
               modelSlug={modelSlug}
               refParam={refParam}
               expanded={expanded}
-              onToggleExpand={toggleExpanded}
+              onToggleExpand={onToggleExpand}
               previousSibling={tree.l1[index - 1]?.capability}
               nextSibling={tree.l1[index + 1]?.capability}
+              siblings={tree.l1.map((c) => c.capability)}
               reorderCapability={activeReorderCapability}
               narrow={narrow}
               l1Expanded={expandedL1 === column.capability.element_id}
@@ -312,10 +314,13 @@ function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, refParam }
  * `next` are this capability's immediate siblings in display order
  * (`compareCapabilities`) — `undefined` at either end of the list, which
  * disables the matching button rather than wrapping around; that's the
- * only reason a button is ever disabled here — every capability gets an
- * `order` at creation now (`useCapabilityCreate.ts`) or via the one-off
- * `scripts/backfillCapabilityOrder.ts` for anything older, so there's no
- * "not orderable yet" state left to show. Mounted only when the caller has
+ * only reason a button is ever disabled here. Every capability gets an
+ * `order` at creation now (`useCapabilityCreate.ts`), and S1 item 13's
+ * `useCapabilityReorder`'s own `resolveOrders` assigns one on the fly for
+ * anything older the moment it's actually moved — so there's no "not
+ * orderable yet" state left to show either way; `siblings` is what makes
+ * that on-the-fly assignment collision-free (its own prop comment).
+ * Mounted only when the caller has
  * edit rights (`L1ColumnView`/`L2CardView` render this conditionally on
  * `reorderCapability`, never with `context` missing) — `useCapabilityReorder`
  * is a real hook, so it can't be called conditionally *inside* one
@@ -327,6 +332,7 @@ function ReorderButtons({
   capability,
   previous,
   next,
+  siblings,
   context,
   previousGlyph,
   previousLabel,
@@ -336,6 +342,8 @@ function ReorderButtons({
   capability: ElementsHeadRow;
   previous: ElementsHeadRow | undefined;
   next: ElementsHeadRow | undefined;
+  /** S1 item 13: the full sibling group in display order — `useCapabilityReorder`'s own `swap`/`resolveOrders` comment explains why this is what lets a swap succeed even when `capability` or its neighbor has no `order` yet, instead of refusing. */
+  siblings: readonly ElementsHeadRow[];
   context: CapabilityMapEditContext & { onReordered: () => void };
   previousGlyph: string;
   previousLabel: string;
@@ -346,10 +354,10 @@ function ReorderButtons({
 
   return (
     <span className={styles.reorderButtons}>
-      <button type="button" aria-label={previousLabel} disabled={previous === undefined || status === 'reordering'} onClick={() => { if (previous) void swap(capability, previous); }}>
+      <button type="button" aria-label={previousLabel} disabled={previous === undefined || status === 'reordering'} onClick={() => { if (previous) void swap(capability, previous, siblings); }}>
         {previousGlyph}
       </button>
-      <button type="button" aria-label={nextLabel} disabled={next === undefined || status === 'reordering'} onClick={() => { if (next) void swap(capability, next); }}>
+      <button type="button" aria-label={nextLabel} disabled={next === undefined || status === 'reordering'} onClick={() => { if (next) void swap(capability, next, siblings); }}>
         {nextGlyph}
       </button>
       {error !== null && (
@@ -373,6 +381,7 @@ function L1ColumnView({
   onToggleExpand,
   previousSibling,
   nextSibling,
+  siblings,
   reorderCapability,
   narrow,
   l1Expanded,
@@ -387,10 +396,12 @@ function L1ColumnView({
   orgSlug: string;
   modelSlug: string;
   refParam: string;
-  expanded: Set<UUID>;
+  expanded: ReadonlySet<UUID>;
   onToggleExpand: (id: UUID) => void;
   previousSibling: ElementsHeadRow | undefined;
   nextSibling: ElementsHeadRow | undefined;
+  /** S1 item 13: every L1 capability, in display order — `ReorderButtons`' own `siblings` prop comment. */
+  siblings: readonly ElementsHeadRow[];
   reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
   /** Check B6: <768px, this column collapses to an accordion group — see `CapabilityMapView`'s own comment for why this is a prop, not a CSS media query. */
   narrow: boolean;
@@ -429,6 +440,7 @@ function L1ColumnView({
         onToggleExpand={onToggleExpand}
         previousSibling={column.l2[index - 1]?.capability}
         nextSibling={column.l2[index + 1]?.capability}
+        siblings={column.l2.map((c) => c.capability)}
         reorderCapability={reorderCapability}
       />
     ) : (
@@ -445,6 +457,7 @@ function L1ColumnView({
         onToggleExpand={onToggleExpand}
         previousSibling={column.l2[index - 1]?.capability}
         nextSibling={column.l2[index + 1]?.capability}
+        siblings={column.l2.map((c) => c.capability)}
         reorderCapability={reorderCapability}
         threadCounts={threadCounts}
         onCommentMarkerClick={onCommentMarkerClick}
@@ -502,6 +515,7 @@ function L1ColumnView({
                   capability={column.capability}
                   previous={previousSibling}
                   next={nextSibling}
+                  siblings={siblings}
                   context={reorderCapability}
                   previousGlyph="↑"
                   previousLabel={`Move ${column.capability.name} up`}
@@ -532,6 +546,7 @@ function L1ColumnView({
             capability={column.capability}
             previous={previousSibling}
             next={nextSibling}
+            siblings={siblings}
             context={reorderCapability}
             previousGlyph="←"
             previousLabel={`Move ${column.capability.name} left`}
@@ -568,6 +583,7 @@ function MobileL2Row({
   onToggleExpand,
   previousSibling,
   nextSibling,
+  siblings,
   reorderCapability,
 }: {
   card: L2Card;
@@ -581,6 +597,8 @@ function MobileL2Row({
   onToggleExpand: (id: UUID) => void;
   previousSibling: ElementsHeadRow | undefined;
   nextSibling: ElementsHeadRow | undefined;
+  /** S1 item 13: every L2 sibling under this L1, in display order — `ReorderButtons`' own `siblings` prop comment. */
+  siblings: readonly ElementsHeadRow[];
   reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
 }) {
   const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById);
@@ -602,6 +620,7 @@ function MobileL2Row({
             capability={card.capability}
             previous={previousSibling}
             next={nextSibling}
+            siblings={siblings}
             context={reorderCapability}
             previousGlyph="↑"
             previousLabel={`Move ${card.capability.name} up`}
@@ -621,7 +640,7 @@ function MobileL2Row({
       </div>
       {expanded && card.l3.length > 0 && (
         <div className={styles.mobileL3List}>
-          {card.l3.map((leaf) => {
+          {card.l3.map((leaf, index) => {
             const leafColour = tileColourFor(colourBy, leaf.element_id, supportsEdges, systemsById);
             const leafCount = supportingSystemIds(leaf.element_id, supportsEdges).length;
             return (
@@ -632,6 +651,20 @@ function MobileL2Row({
                   </Text>
                 </Link>
                 {leafColour.tone !== undefined && leafColour.label !== undefined && <Chip tone={leafColour.tone}>{leafColour.label}</Chip>}
+                {/* S1 item 13: "L3 reorder controls" — the same move-up/down pattern L2 already has, one level deeper. */}
+                {reorderCapability && (
+                  <ReorderButtons
+                    capability={leaf}
+                    previous={card.l3[index - 1]}
+                    next={card.l3[index + 1]}
+                    siblings={card.l3}
+                    context={reorderCapability}
+                    previousGlyph="↑"
+                    previousLabel={`Move ${leaf.name} up`}
+                    nextGlyph="↓"
+                    nextLabel={`Move ${leaf.name} down`}
+                  />
+                )}
                 <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
               </div>
             );
@@ -654,6 +687,7 @@ function L2CardView({
   onToggleExpand,
   previousSibling,
   nextSibling,
+  siblings,
   reorderCapability,
   threadCounts,
   onCommentMarkerClick,
@@ -669,6 +703,8 @@ function L2CardView({
   onToggleExpand: (id: UUID) => void;
   previousSibling: ElementsHeadRow | undefined;
   nextSibling: ElementsHeadRow | undefined;
+  /** S1 item 13: every L2 sibling under this L1, in display order — `ReorderButtons`' own `siblings` prop comment. */
+  siblings: readonly ElementsHeadRow[];
   reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
   threadCounts: ReadonlyMap<UUID, ThreadCount> | undefined;
   onCommentMarkerClick: ((capabilityId: UUID) => void) | undefined;
@@ -691,6 +727,7 @@ function L2CardView({
             capability={card.capability}
             previous={previousSibling}
             next={nextSibling}
+            siblings={siblings}
             context={reorderCapability}
             previousGlyph="↑"
             previousLabel={`Move ${card.capability.name} up`}
@@ -707,7 +744,7 @@ function L2CardView({
       </div>
       {expanded && card.l3.length > 0 && (
         <div className={styles.l3Tiles}>
-          {card.l3.map((leaf) => {
+          {card.l3.map((leaf, index) => {
             const leafColour = tileColourFor(colourBy, leaf.element_id, supportsEdges, systemsById);
             const leafCount = supportingSystemIds(leaf.element_id, supportsEdges).length;
             return (
@@ -721,6 +758,20 @@ function L2CardView({
                 commentMarker={commentMarkerFor(threadCounts, leaf.element_id)}
                 onCommentMarkerClick={onCommentMarkerClick ? () => { onCommentMarkerClick(leaf.element_id); } : undefined}
               >
+                {/* S1 item 13: "L3 reorder controls" — the same move-up/down pattern L2 already has, one level deeper. */}
+                {reorderCapability && (
+                  <ReorderButtons
+                    capability={leaf}
+                    previous={card.l3[index - 1]}
+                    next={card.l3[index + 1]}
+                    siblings={card.l3}
+                    context={reorderCapability}
+                    previousGlyph="↑"
+                    previousLabel={`Move ${leaf.name} up`}
+                    nextGlyph="↓"
+                    nextLabel={`Move ${leaf.name} down`}
+                  />
+                )}
                 <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
               </CapabilityTile>
             );

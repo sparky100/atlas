@@ -18,7 +18,7 @@ import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
 
-async function seedFixture(orgPrefix: string) {
+function seedFixture(orgPrefix: string) {
   const env = loadEnv();
 
   const email = `${orgPrefix}-${randomUUID()}@example.test`;
@@ -29,7 +29,7 @@ async function seedFixture(orgPrefix: string) {
 }
 
 test('landscape mobile list: an ink marker for an open thread, a hollow marker for an all-resolved one, both open the comments panel', async ({ page }) => {
-  const { email, password, signedIn } = await seedFixture('landscape-mobile-markers');
+  const { email, password, signedIn } = seedFixture('landscape-mobile-markers');
 
   await page.goto('/sign-in');
   await page.getByText("Don't have an account? Create one").click();
@@ -106,7 +106,7 @@ test('landscape mobile list: an ink marker for an open thread, a hollow marker f
 });
 
 test('capability-scoped landscape list: an ink marker for an open thread, a hollow marker for an all-resolved one, both open the comments panel', async ({ page }) => {
-  const { email, password, signedIn } = await seedFixture('capability-list-markers');
+  const { email, password, signedIn } = seedFixture('capability-list-markers');
 
   await page.goto('/sign-in');
   await page.getByText("Don't have an account? Create one").click();
