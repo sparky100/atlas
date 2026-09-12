@@ -17,6 +17,18 @@
  * `defaultCreateAttributes`'s own branch-vs-main default) with the
  * breadcrumb naming the change throughout.
  *
+ * Second bug, found the same way — no existing test ever actually clicked
+ * "Back to main" (`e2e/changes-ux-lifecycle.spec.ts` only asserted the
+ * button was *visible*): `EditingBranchBanner.tsx`'s own `backToMain` used
+ * to strip `?ref=`/`?mode=` from the URL directly via its own
+ * `setSearchParams`, never touching the *stored* selection —
+ * `SelectedRefProvider`'s reconciliation then read the still-stored branch
+ * back out of `sessionStorage` the moment the URL fell silent and wrote it
+ * right back in, so the click appeared to do nothing. Continues straight on
+ * from the first bug's own scenario: click "Back to main", confirm the
+ * banner is gone and the URL reverted, then create a second system and
+ * confirm *that* one lands on main, not the branch.
+ *
  * Same "needs a real Supabase" limitation as every other spec here.
  */
 import { randomUUID } from 'node:crypto';
@@ -109,4 +121,53 @@ test('a selected change persists through Home, search and create — the new ele
   const branchHead = foldFromGenesis(branch.head_commit_id, loader);
   expect(branchHead.elements.has(elementId)).toBe(true);
   expect(branchHead.elements.get(elementId)?.attributes.lifecycleStatus).toBe('planned');
+
+  // 7. "Back to main" — the second bug this file now covers. Must be a
+  // real, immediate exit: the banner gone, the URL reverted, and nothing
+  // hands the branch ref back on the very next render (the regression
+  // this test exists to catch — see the module comment above).
+  await page.getByRole('button', { name: 'Back to main' }).click();
+  await expect(page.getByText(`Editing in change: ${changeTitle}`)).not.toBeVisible();
+  await expect(page).not.toHaveURL(refUrlPattern(branchId));
+
+  // 8. Navigate Home again through the nav rail — if `backToMain` had only
+  // patched the URL without clearing the stored selection, this hop alone
+  // would silently restore `?ref=branch:…` (`SelectedRefProvider`'s own
+  // "URL is silent → substitute the stored choice" rule) and reproduce the
+  // bug on arrival.
+  await page.getByRole('navigation', { name: 'Model navigation' }).getByRole('link', { name: 'Home', exact: true }).click();
+  await expect(page).not.toHaveURL(refUrlPattern(branchId));
+  await expect(page.getByText(`Editing in change: ${changeTitle}`)).not.toBeVisible();
+
+  // 9. A second create now lands on main, not the branch — the owner
+  // fixture user writes to main directly (no propose-a-change picker), so
+  // the sheet's own copy names main, not the change, and the lifecycle
+  // default is `active`.
+  const secondSystemName = `Back To Main System ${randomUUID().slice(0, 8)}`;
+  const searchBoxAgain = page.getByPlaceholder('Search or create a capability, system, or actor…');
+  await searchBoxAgain.fill(secondSystemName);
+  await page.getByRole('button', { name: `Create system "${secondSystemName}"` }).click();
+  await expect(page.getByText('Adding to change:', { exact: false })).not.toBeVisible();
+  await page.getByPlaceholder('One line — what this system is').fill('Proves Back to main actually cleared the selection.');
+  await expect(page.getByText('active on main', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Skip capability' }).click();
+
+  await expect(page.getByRole('heading', { name: secondSystemName })).toBeVisible({ timeout: 15_000 });
+  await expect(page).not.toHaveURL(/ref=branch:/);
+  await expect(page.locator('header').getByText('active', { exact: true })).toBeVisible();
+
+  const secondElementIdMatch = /\/e\/([^/?]+)/.exec(page.url());
+  if (!secondElementIdMatch?.[1]) throw new Error(`could not read the second element id out of ${page.url()}`);
+  const secondElementId = secondElementIdMatch[1];
+
+  const refreshedMain = await getMainBranch(signedIn, modelId);
+  if (!refreshedMain?.head_commit_id) throw new Error('main branch not found after the second create');
+  const refreshedLoader = await buildCommitLoader(signedIn, modelId);
+  const refreshedMainHead = foldFromGenesis(refreshedMain.head_commit_id, refreshedLoader);
+  expect(refreshedMainHead.elements.has(secondElementId)).toBe(true);
+
+  // The branch's own head is exactly where the first create left it — the
+  // second create never touched it.
+  const branchAfter = await getBranch(signedIn, branchId);
+  expect(branchAfter?.head_commit_id).toBe(branch.head_commit_id);
 });

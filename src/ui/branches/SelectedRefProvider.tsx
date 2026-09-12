@@ -120,8 +120,22 @@ export function SelectedRefProvider({ children }: { children: ReactNode }) {
       if (storageKey) writeStored(storageKey, next);
       setSearchParams((prev) => {
         const updated = new URLSearchParams(prev);
-        if (next.kind === 'main') updated.delete('ref');
-        else updated.set('ref', refParamOf(next));
+        if (next.kind === 'main') {
+          updated.delete('ref');
+          // Meaningless once back at main — the As-is/To-be/Diff control
+          // itself is hidden there (UI-principles §6.2), so a stale
+          // `?mode=diff` left behind would be inert clutter, not a real
+          // state. Cleared in the same update as `ref` (not a second,
+          // separate `setSearchParams` call from a caller like
+          // `EditingBranchBanner`) — `setSearchParams`'s updater closes
+          // over a snapshot from its own last render, so two independent
+          // calls in the same handler can each overwrite the other's
+          // change instead of composing; one atomic update here is what
+          // "Back to main" actually needs to land correctly.
+          updated.delete('mode');
+        } else {
+          updated.set('ref', refParamOf(next));
+        }
         return updated;
       });
     },
