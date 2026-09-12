@@ -1,5 +1,5 @@
 import type { DeltaHistoryRow } from '../../../db/elements';
-import { monthsSince } from '../../../contracts/thresholds';
+import { formatAge } from '../../time';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { Text } from '../Text/Text';
 import styles from './HistoryTimeline.module.css';
@@ -22,13 +22,6 @@ function summarise(delta: DeltaHistoryRow): string {
   }
 }
 
-function formatAge(dateStr: string, now: Date): string {
-  const months = monthsSince(new Date(dateStr), now);
-  if (months < 1) return '< 1mo ago';
-  if (months < 24) return `${String(months)}mo ago`;
-  return `${String(Math.floor(months / 12))}y ago`;
-}
-
 export interface HistoryTimelineProps {
   history: DeltaHistoryRow[];
   now?: Date;
@@ -45,7 +38,7 @@ export function HistoryTimeline({ history, now = new Date() }: HistoryTimelinePr
       {history.map((delta) => (
         <li key={delta.id} className={styles.entry}>
           <Text tone="muted" size="xs" as="span" mono>
-            {formatAge(delta.created_at, now)}
+            {formatAge(new Date(delta.created_at), now)} ago
           </Text>
           <Text as="span" size="sm">
             {summarise(delta)}

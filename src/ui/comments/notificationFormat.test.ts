@@ -34,13 +34,13 @@ describe('notificationKindWording', () => {
 });
 
 describe('notificationAnchorWords', () => {
-  // `formatCommitActivityTime`'s own buckets (`commitActivityTime.ts`): a
-  // same-calendar-day gap reads "Nh ago" — deterministic across locales,
-  // unlike its older-than-yesterday branch (`toLocaleDateString()`), which
-  // this suite deliberately avoids for that reason. No `Z` suffix, exactly
-  // `commitActivityTime.test.ts`'s own convention — both timestamps parse
-  // in the same local timezone, so "same calendar day" holds regardless of
-  // where this runs.
+  // `formatRelativeTime`'s own buckets (`src/ui/time.ts`): a same-calendar-
+  // day gap reads "Nh ago" — deterministic across locales, unlike its
+  // older-than-yesterday branch (`toLocaleDateString()`), which this suite
+  // deliberately avoids for that reason. No `Z` suffix, exactly
+  // `time.test.ts`'s own convention — both timestamps parse in the same
+  // local timezone, so "same calendar day" holds regardless of where this
+  // runs.
   const now = new Date('2026-09-09T12:00:00.000');
   const createdAt = '2026-09-09T10:00:00.000';
 

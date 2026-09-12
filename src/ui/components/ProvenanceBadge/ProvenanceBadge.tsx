@@ -1,5 +1,6 @@
 import type { SourceKind } from '../../../contracts/sources';
-import { isStale, monthsSince } from '../../../contracts/thresholds';
+import { isStale } from '../../../contracts/thresholds';
+import { formatAge } from '../../time';
 import { ConfidenceDots } from '../ConfidenceDots/ConfidenceDots';
 import styles from './ProvenanceBadge.module.css';
 
@@ -20,13 +21,6 @@ export interface ProvenanceBadgeProps {
   /** 0–1. Human assertion is 1.0. */
   confidence: number;
   now?: Date;
-}
-
-function formatAge(date: Date, now: Date): string {
-  const months = monthsSince(date, now);
-  if (months < 1) return '< 1mo';
-  if (months < 24) return `${String(months)}mo`;
-  return `${String(Math.floor(months / 12))}y`;
 }
 
 /**
