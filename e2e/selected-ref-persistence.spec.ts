@@ -9,13 +9,14 @@
  * silently reattached to its URL on landing.
  *
  * This test follows the bug report's own acceptance scenario exactly:
- * open a change ("Edit in this change" on ChangePage.tsx — itself part of
- * this fix; nothing on that page used to select a ref at all), navigate
- * Home through the nav rail (not `page.goto` — the whole point is that an
- * in-app navigation must not lose the selection), search, create a
- * system, and confirm it landed on the branch (lifecycle `planned`,
- * `defaultCreateAttributes`'s own branch-vs-main default) with the
- * breadcrumb naming the change throughout.
+ * create a change (which now lands inside it, selected, per the "sticky
+ * ref" close-out below — `ChangePage.tsx`'s own "Edit in this change" is
+ * the same mechanism for an *existing* change), navigate Home through the
+ * nav rail (not `page.goto` — the whole point is that an in-app navigation
+ * must not lose the selection), search, create a system, and confirm it
+ * landed on the branch (lifecycle `planned`, `defaultCreateAttributes`'s
+ * own branch-vs-main default) with the breadcrumb naming the change
+ * throughout.
  *
  * Second bug, found the same way — no existing test ever actually clicked
  * "Back to main" (`e2e/changes-ux-lifecycle.spec.ts` only asserted the
@@ -55,19 +56,20 @@ test('a selected change persists through Home, search and create — the new ele
   await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(`persist-ref-${randomUUID().slice(0, 8)}`);
   await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
-  const changeRow = page.locator('li', { hasText: changeTitle });
-  await expect(changeRow).toBeVisible();
-  await changeRow.getByRole('link', { name: 'Open →' }).click();
+
+  // 2. Sticky ref: "the create-change flow lands you inside" — creating
+  // now selects the new branch as the session's editing ref and navigates
+  // straight to its own page, so there is no separate "open it, then click
+  // Edit in this change" step left to do; both are already true on
+  // landing. (Viewing a change page never selects it on its own —
+  // `changes-ux-lifecycle.spec.ts` covers that half, and this scenario's
+  // own point — persistence through navigation — starts from here either
+  // way.)
   await expect(page.getByRole('heading', { name: changeTitle })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
   const branchIdMatch = /\/changes\/([^/?]+)/.exec(page.url());
   if (!branchIdMatch?.[1]) throw new Error(`could not read the branch id out of ${page.url()}`);
   const branchId = branchIdMatch[1];
-
-  // 2. "Open a change": select it as the session's editing ref. Nothing
-  // did this before this fix — viewing a change's own page never itself
-  // selected it.
-  await page.getByRole('button', { name: 'Edit in this change' }).click();
-  await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
   await expect(page).toHaveURL(refUrlPattern(branchId));
 
   // 3. Navigate Home through the nav rail itself, not page.goto — this is

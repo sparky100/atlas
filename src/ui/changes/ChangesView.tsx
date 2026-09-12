@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import type { ChangeListSummary } from '../../db/changeSummary';
 import { Button } from '../components/Button/Button';
@@ -9,6 +9,7 @@ import { EmptyState } from '../components/EmptyState/EmptyState';
 import { LinkButton } from '../components/Button/LinkButton';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { useSelectedRef } from '../branches/useSelectedRef';
 import { useThreadCounts } from '../comments/useThreadCounts';
 import type { BranchRow } from '../../db/types';
 import { branchStatusTone } from './branchStatus';
@@ -36,6 +37,8 @@ export interface ChangesViewProps {
  * create + list + a status chip only.
  */
 export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate }: ChangesViewProps) {
+  const navigate = useNavigate();
+  const { setRef } = useSelectedRef();
   const { status, branches, error, mainHeadCommitId, createChange } = useChanges(modelId, orgId, userId);
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
@@ -73,6 +76,14 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
                   setTitle('');
                   setDescription('');
                   setTargetDate('');
+                  // "The create-change flow lands you inside" — a freshly
+                  // created change is always `draft`, so unlike
+                  // `ChangePage.tsx`'s own "Edit in this change" there is no
+                  // `canWorkInThisChange`-style gate to repeat here; select
+                  // it as the active ref and go straight to its own page,
+                  // same as clicking "Edit in this change" would.
+                  setRef({ kind: 'branch', branchId: branch.id });
+                  void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`);
                 }
               });
             }}

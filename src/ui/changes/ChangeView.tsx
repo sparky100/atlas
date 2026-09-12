@@ -12,6 +12,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import type { MemberRole } from '../../db/types';
+import { useSelectedRef } from '../branches/useSelectedRef';
 import { BranchRebasePanel } from '../reviews/BranchRebasePanel';
 import { branchStatusTone } from './branchStatus';
 import { deriveChangeStep } from './changeStepper';
@@ -62,6 +63,14 @@ export interface ChangeViewProps {
  * open merge request: once one exists, refreshing goes through the review
  * request's own page instead (it also has to resubmit the request's
  * cached classification, which this panel has no request to update).
+ *
+ * Leaving vs finishing (`EditingBranchBanner.tsx`'s own "Back to main" is
+ * the other half): "Submit for review" is *finishing*, not leaving — the
+ * branch itself goes read-only for the proposer (`draft -> proposed`), so
+ * unlike "Back to main" there is no state left to preserve by staying
+ * selected. Submitting therefore clears the session's active ref too, but
+ * only when this branch was actually the one selected — never a bystander
+ * reviewer's own selection just because they happened to look at this page.
  */
 export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role, canEdit }: ChangeViewProps) {
   const { userId } = useAuth();
@@ -74,6 +83,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   const navigate = useNavigate();
   const { request: openRequest } = useOpenMergeRequest(branchId);
   const submission = useSubmitForReview(modelId, branch);
+  const { ref, clearRef } = useSelectedRef();
 
   if (status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (status === 'not_found' || !branch) return <Text as="p">No change found for this id.</Text>;
@@ -139,7 +149,17 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
                   disabled={submission.status === 'submitting'}
                   onClick={() => {
                     void submission.submit().then((mergeRequestId) => {
-                      if (mergeRequestId) void navigate(`/o/${orgSlug}/m/${modelSlug}/review/${mergeRequestId}`);
+                      if (!mergeRequestId) return;
+                      // Leaving vs finishing: "Back to main" leaves a still-
+                      // editable Draft; "Submit for review" finishes it — the
+                      // branch becomes read-only for the proposer the moment
+                      // it's Proposed (canEditBranch's own `status === 'draft'`
+                      // gate), so there is nothing left to be "in." Only clear
+                      // the session's active ref if this branch was actually
+                      // it — a reviewer or bystander submitting from a change
+                      // page they weren't editing in has nothing to reset.
+                      if (ref.kind === 'branch' && ref.branchId === branchId) clearRef();
+                      void navigate(`/o/${orgSlug}/m/${modelSlug}/review/${mergeRequestId}`);
                     });
                   }}
                 >

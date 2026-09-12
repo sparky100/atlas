@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 import { parseRefParam, refParamOf, type Ref } from '../../db/ref';
 import { SelectedRefContext } from './selectedRefContext';
+import { useBranchStatusReset } from './useBranchStatusReset';
 
 const MODEL_PATH_RE = /^\/o\/([^/]+)\/m\/([^/]+)/;
 
@@ -18,7 +19,13 @@ function storageKeyFor(pathname: string): string | null {
 function readStored(storageKey: string): Ref {
   try {
     const stored = sessionStorage.getItem(storageKey);
-    return stored ? parseRefParam(stored) : { kind: 'main' };
+    if (!stored) return { kind: 'main' };
+    const parsed = parseRefParam(stored);
+    // Defence in depth alongside the write-side guard below: nothing
+    // should ever store a `tag:`/`commit:` value here, but a stale entry
+    // written before that guard existed (or any other unexpected path)
+    // must not resurrect one as if it were a real selection.
+    return parsed.kind === 'branch' ? parsed : { kind: 'main' };
   } catch {
     // Private browsing, quota, or a disabled storage API — the ref still
     // works for this one page load via the URL/render-derived value
@@ -99,7 +106,20 @@ export function SelectedRefProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!storageKey) return;
     if (urlRefParam !== null) {
-      writeStored(storageKey, parseRefParam(urlRefParam));
+      const parsed = parseRefParam(urlRefParam);
+      // Found while wiring `EditingBranchBanner` onto every model-scoped
+      // route (Sprint 7i close-out): only `main`/`branch` are ever the
+      // *persisted* selection — a `tag:`/`commit:` ref (VersionDiffPage's
+      // own `?ref=`/`?diff=` pair, an activity row's "link to the commit
+      // diff") is always a transient, explicit view, never something a
+      // user is "in." Writing it here regardless of kind meant simply
+      // opening a tag or a commit diff silently overwrote (or cleared)
+      // whatever change branch was actually selected — the exact
+      // "viewing ... never changes the active ref" rule this feature
+      // already enforces for ChangeView, just missed for these two ref
+      // kinds. `ref` (the `useMemo` above) is untouched by this: that page
+      // still renders at the explicit tag/commit it asked for either way.
+      if (parsed.kind === 'main' || parsed.kind === 'branch') writeStored(storageKey, parsed);
       return;
     }
     const stored = readStored(storageKey);
@@ -145,6 +165,14 @@ export function SelectedRefProvider({ children }: { children: ReactNode }) {
   const clearRef = useCallback(() => {
     setRef({ kind: 'main' });
   }, [setRef]);
+
+  // "Any transition that makes the branch non-editable for the current
+  // user resets the active ref to main on every open tab (realtime)" —
+  // this tab's own reaction; every other open tab with the same branch
+  // selected runs the identical subscription in its own
+  // `SelectedRefProvider` instance (see useBranchStatusReset.ts's own
+  // comment for why one row-scoped channel per tab, not a shared one).
+  useBranchStatusReset(ref, clearRef);
 
   const value = useMemo(() => ({ ref, setRef, clearRef }), [ref, setRef, clearRef]);
 

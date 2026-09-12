@@ -40,10 +40,9 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   await page.getByPlaceholder('Description (optional)').fill('Swap Billing Service onto Acme Corp.');
   await page.getByRole('button', { name: 'Create change' }).click();
 
-  const changeRow = page.locator('li', { hasText: changeTitle });
-  await expect(changeRow).toBeVisible();
-  await changeRow.getByRole('link', { name: 'Open →' }).click();
-
+  // Sticky ref: a successful create lands inside the new change's own page
+  // directly (`ChangesView.tsx`'s own comment) — no separate "find the row,
+  // click Open →" step needed any more.
   // 2. The change's own page: draft, up to date, nothing to review yet.
   await expect(page.getByRole('heading', { name: changeTitle })).toBeVisible();
   await expect(page.getByText('draft', { exact: true })).toBeVisible();
