@@ -550,6 +550,10 @@ export const COMMIT_INVARIANTS = [
     id: 'C18',
     text: "relationship.create/relationship.update setting uses.via or flows_to.via to a non-null value: the referenced element exists in the head as it stands at the point this delta is applied and is a system with kind === 'integration_platform' (Prompt 7k item 4). Not re-checked at relationship.restore, matching C9's own endpoint check, which restore also does not re-run — a restored edge is trusted to reconstruct exactly the state it last held, not re-validated against the current head.",
   },
+  {
+    id: 'C19',
+    text: "fold: a merge commit whose first parent is in the ancestry of its second parent folds to the second parent's state plus its own deltas (ADR-021 §2.1/§5 item 1) — the final merge onto main, whose precondition mergeBase(B) == main.head (SPEC §7.1) guarantees this, rather than replaying the second parent's exclusive commits in commit order. A refresh commit (parent = the branch's own head) essentially never satisfies this, and keeps folding by replay as before.",
+  },
 ] as const;
 
 export type CommitInvariantId = (typeof COMMIT_INVARIANTS)[number]['id'];
