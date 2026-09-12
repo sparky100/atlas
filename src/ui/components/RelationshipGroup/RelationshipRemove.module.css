@@ -1,0 +1,87 @@
+/**
+ * Two class families, each copied by value (not imported) from an existing
+ * precedent, matching the convention already recorded for `ModelHome.tsx`'s
+ * own settings menu (Sprint 7j): a scoped, per-row overflow menu isn't a
+ * shared component anywhere in this codebase, so the *shape* is reused, not
+ * the file.
+ *
+ *  - `.menuWrapper`/`.menuToggle`/`.menu`/`.menuItem` — `ElementHeader.module.css`'s
+ *    own header overflow menu, unchanged apart from `.menuToggle`'s smaller
+ *    footprint (a row-level control, not the page header's own "⋯").
+ *  - `.panel`/`.actions` — `RelationshipAdd.module.css`'s own confirmation-panel
+ *    shape, so "Remove" and "+ Add" read as the same family of inline control.
+ */
+.menuWrapper {
+  position: relative;
+  margin-left: auto;
+}
+
+.menuToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.75rem;
+  width: 1.75rem;
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1em;
+  cursor: pointer;
+}
+
+/* Unlike `ElementHeader.module.css`'s own `.menu`/`.menu.open` pair (which
+   always renders the menu and toggles visibility via a class), this one is
+   only ever mounted in the DOM while genuinely open (`RelationshipRemove.tsx`
+   renders it conditionally) — no separate `.open` modifier needed. */
+.menu {
+  display: flex;
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--surface-raised-shadow);
+  min-width: 140px;
+  z-index: 10;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  cursor: pointer;
+  text-align: left;
+}
+
+.menuItem:hover {
+  background: var(--bg-subtle);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  min-width: 280px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  z-index: 10;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

@@ -11,6 +11,7 @@ import {
   listFactsForSubject,
   listFlowsViaElement,
   listInFlightBranchesTouchingSubject,
+  listRelationshipHistoryForElement,
   listRelationshipsForElement,
   type DeltaHistoryRow,
 } from '../../db/elements';
@@ -45,6 +46,15 @@ export interface ElementPageData {
   aliases: AliasRow[];
   aliasSources: Map<UUID, SourceRow>;
   sources: Map<UUID, SourceRow>;
+  /**
+   * "Relationship removal": this element's own deltas
+   * (`listDeltaHistoryForSubject(elementId)`) merged with every delta ever
+   * asserted about a relationship that has touched this element on either
+   * side, live or since retracted (`listRelationshipHistoryForElement`) —
+   * one combined, re-sorted timeline. Closes the gap `HistoryTimeline.tsx`'s
+   * own already-ready `relationship_create`/`update`/`retract`/`restore`
+   * rendering cases had nothing feeding them before this.
+   */
   history: DeltaHistoryRow[];
   inFlightBranches: BranchRow[];
   /** Prompt 7k item 4's "Flows via this platform" — every `uses`/`flows_to` edge naming this element as `via`, only ever populated when `element` is a system with `kind: 'integration_platform'` (`isIntegrationPlatform`); `[]` for every other element, not `undefined`, so the section can render an honest empty state rather than needing a second "is this even a platform" check downstream. */
@@ -187,13 +197,18 @@ export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): UseEle
         return;
       }
 
-      const [facts, relationships, aliases, history, inFlightBranches] = await Promise.all([
+      const [facts, relationships, aliases, ownHistory, relationshipHistory, inFlightBranches] = await Promise.all([
         source.facts(elementId),
         source.relationships(elementId),
         listAliasesForElement(supabase, modelId, elementId),
         listDeltaHistoryForSubject(supabase, modelId, elementId),
+        listRelationshipHistoryForElement(supabase, modelId, elementId),
         listInFlightBranchesTouchingSubject(supabase, modelId, elementId),
       ]);
+      // Merge, then re-sort — `listDeltaHistoryForSubject`'s own newest-first,
+      // `id`-tiebreak order (see that function's doc comment) applied across
+      // both sources together, not just within each.
+      const history = [...ownHistory, ...relationshipHistory].sort((a, b) => (a.created_at === b.created_at ? a.id.localeCompare(b.id) : b.created_at.localeCompare(a.created_at)));
 
       const parent = element.parent_id ? await source.element(element.parent_id) : null;
       const children = await source.children(elementId);
