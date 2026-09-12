@@ -97,6 +97,24 @@ export interface ResumePoint {
  * the other side, topologically sorted, before applying the merge commit's
  * own (resolution) deltas.
  *
+ * ADR-021 §2.1/§5 item 1 (C19): a merge commit whose first parent is
+ * already an ancestor of its second parent — the final merge onto main,
+ * whose precondition `mergeBase(B) == main.head` (SPEC §7.1) guarantees
+ * this — instead folds straight to the second parent's own state, then
+ * applies this commit's own deltas (zero, for a final merge on main). This
+ * is not just an optimisation skipping a replay that would land on the
+ * same answer: replaying `exclusive(mergedBranchHead, parent)` in commit
+ * order can throw when a resolution recorded in a later commit was needed
+ * to make an earlier one applicable (ADR-021 §1.2's own failing case) —
+ * `foldFromGenesis(mergedBranchHeadCommitId)` instead re-folds that side's
+ * *own* history through its *own* parent/merge structure, where any such
+ * resolution already sits in the right place. A refresh commit (parent =
+ * the branch's own head, mergedBranchHead = main's head) essentially never
+ * satisfies this condition — the branch's own commits since forking are
+ * not, in general, reachable from main — so it keeps taking the replay
+ * path below unchanged; the one exception (a branch with no own commits
+ * since forking) still gives the same answer either way.
+ *
  * `resumePoint`, if given, short-circuits the recursion the moment it
  * reaches `resumePoint.commitId`, returning a clone of `resumePoint.head`
  * instead of continuing to genesis. Omitting it computes the full fold from
@@ -104,13 +122,24 @@ export interface ResumePoint {
  * what's changed" optimisation (SPEC §6.5's `materialise`) — one function
  * for both, so proving `head == fold(deltas)` (§6.6, P-2) is just "call
  * this twice, with and without a resume point that lies on the same
- * ancestry, and compare hashes."
+ * ancestry, and compare hashes." The fast-forward branch below still
+ * composes correctly with this: `mergedBranchHeadCommitId`'s own ancestry
+ * is a superset of `parentCommitId`'s (that's what "parent is an ancestor
+ * of it" means), so a resume point anywhere on the original path is still
+ * reached by recursing into the fast-forward side.
  */
 export function foldFromGenesis(commitId: UUID | null, loader: CommitLoader, resumePoint?: ResumePoint): Head {
   if (resumePoint?.commitId === commitId) return cloneHead(resumePoint.head);
   if (commitId === null) return emptyHead();
 
   const node = load(commitId, loader);
+
+  if (node.merged_branch_head_commit_id !== null && node.parent_commit_id !== null && ancestry(node.merged_branch_head_commit_id, loader).has(node.parent_commit_id)) {
+    const head = foldFromGenesis(node.merged_branch_head_commit_id, loader, resumePoint);
+    fold(head, node.deltas, { authorId: node.author_id, createdAt: node.created_at });
+    return head;
+  }
+
   const head = foldFromGenesis(node.parent_commit_id, loader, resumePoint);
 
   if (node.merged_branch_head_commit_id) {
