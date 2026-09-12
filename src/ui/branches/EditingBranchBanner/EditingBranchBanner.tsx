@@ -3,6 +3,7 @@ import type { Ref } from '../../../db/ref';
 import type { ViewMode } from '../../../db/viewMode';
 import { Text } from '../../components/Text/Text';
 import { useBranchLabel } from '../useBranchLabel';
+import { useSelectedRef } from '../useSelectedRef';
 import styles from './EditingBranchBanner.module.css';
 
 export interface EditingBranchBannerProps {
@@ -44,6 +45,7 @@ export interface EditingBranchBannerProps {
  */
 export function EditingBranchBanner({ activeRef, showModeShortcuts = true }: EditingBranchBannerProps) {
   const [, setSearchParams] = useSearchParams();
+  const { clearRef } = useSelectedRef();
   const { label } = useBranchLabel(activeRef);
 
   if (activeRef.kind !== 'branch') return null;
@@ -56,16 +58,22 @@ export function EditingBranchBanner({ activeRef, showModeShortcuts = true }: Edi
     });
   };
 
+  // Bug fix: this used to only strip `?ref=`/`?mode=` from the URL directly
+  // via this component's own `setSearchParams` — but `SelectedRefProvider`'s
+  // own reconciliation (its module comment's "URL is silent" branch) treats
+  // an absent `?ref=` as "nothing said otherwise, restore this session's
+  // remembered choice for this model," and that choice was never touched,
+  // so it immediately read the still-stored branch back out of
+  // `sessionStorage` and wrote `?ref=branch:…` right back into the URL —
+  // "Back to main" appeared to do nothing (or flash and revert). `clearRef()`
+  // (`useSelectedRef`) is the one function that clears the *stored*
+  // selection and the URL together (and, since it clears `mode` too —
+  // `SelectedRefProvider.setRef`'s own comment — there is nothing left for
+  // this component to strip itself); going through it, not `setSearchParams`
+  // directly, is what makes this a real exit rather than a value the
+  // provider's own effect immediately restores.
   const backToMain = () => {
-    setSearchParams((prev) => {
-      const updated = new URLSearchParams(prev);
-      updated.delete('ref');
-      // Meaningless once back at main — the As-is/To-be/Diff control itself
-      // is hidden there (UI-principles §6.2), so a stale `?mode=diff` left
-      // in the URL would be inert clutter, not a real state.
-      updated.delete('mode');
-      return updated;
-    });
+    clearRef();
   };
 
   return (
