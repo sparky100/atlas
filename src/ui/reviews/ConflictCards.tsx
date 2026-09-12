@@ -243,7 +243,10 @@ export function CleanChanges({ base, ours, cleanIds, commentsSlotFor }: { base: 
       {relationships.map((r) => (
         <li key={r.relationshipId}>
           <DiffBadge state={r.state} changedCount={r.changedAttributes.length} />{' '}
-          <Text as="span">{(r.toBe ?? r.asIs)?.relationshipType ?? r.relationshipId}</Text>
+          {/* S1 item 3: "both ends named" — was just the relationship type
+              (or a raw id fallback), same "A uses B" shape `subjectName`
+              already gives every conflict card below. */}
+          <Text as="span">{subjectName([base, ours], r.relationshipId)}</Text>
           {commentsSlotFor?.(r.relationshipId)}
         </li>
       ))}

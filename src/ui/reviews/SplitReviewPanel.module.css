@@ -21,9 +21,21 @@
 }
 
 .blockedList {
+  padding-left: var(--space-4);
+  margin: var(--space-2) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/** S1 item 3: the split panel's own Included/Blocked/Available groups — each a labelled section rather than one flat checkbox list, so the closure preview reads as three named partitions of "what will happen," not annotations bolted onto a single list. */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
   margin-top: var(--space-3);
 }
 
-.blockedList ul {
-  padding-left: var(--space-4);
+.group:first-of-type {
+  margin-top: var(--space-2);
 }

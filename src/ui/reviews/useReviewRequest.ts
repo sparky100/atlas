@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getBranch } from '../../db/branches';
 import { getSourcesByIds } from '../../db/elements';
+import { getProfile } from '../../db/profiles';
 import {
   approveMergeRequest,
   computeMergeReviewForBranch,
@@ -14,7 +15,7 @@ import {
   resubmitMergeRequest,
   type MergeApprovedResult,
 } from '../../db/mergeRequests';
-import type { BranchRow, MergeRequestRow, SourceRow } from '../../db/types';
+import type { BranchRow, MergeRequestRow, ProfileRow, SourceRow } from '../../db/types';
 import type { MergeReview } from '../../engine/merge';
 import type { FieldConflictChoice } from '../../engine/mergeResolution';
 import { supabase } from '../supabaseClient';
@@ -25,6 +26,8 @@ export interface ReviewRequestData {
   mainHeadCommitId: UUID;
   review: MergeReview;
   sourcesById: Map<UUID, SourceRow>;
+  /** S1 item 3: "requester by display name" — `null` only if the profile row itself is somehow missing (never in practice past first membership, `getProfile`'s own comment); the view falls back to a short id fragment in that case rather than erroring. */
+  requesterProfile: ProfileRow | null;
 }
 
 export type ReviewRequestState = { status: 'loading' } | { status: 'error'; message: string } | ({ status: 'ready' } & ReviewRequestData);
@@ -52,8 +55,9 @@ async function loadReviewRequestData(modelId: UUID, mergeRequestId: UUID): Promi
     if (f.theirs) sourceIds.add(f.theirs.sourceId);
   }
   const sourcesById = await getSourcesByIds(supabase, [...sourceIds]);
+  const requesterProfile = await getProfile(supabase, request.requested_by);
 
-  return { status: 'ready', request, branch, mainHeadCommitId: computed.mainHeadCommitId, review: computed.review, sourcesById };
+  return { status: 'ready', request, branch, mainHeadCommitId: computed.mainHeadCommitId, review: computed.review, sourcesById, requesterProfile };
 }
 
 /**

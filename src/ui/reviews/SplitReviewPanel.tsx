@@ -128,6 +128,18 @@ export function SplitReviewPanel({ modelId, branch, mainHeadCommitId, review, ca
     }
   }
 
+  // S1 item 3: "split as the reviewer's own partial-accept mode, showing
+  // the real closure preview (pulled in / blocked), not four flat
+  // checkboxes." The closure was already computed (`refreshPreview` above,
+  // unchanged) — what changes here is the render: three named groups
+  // (Included, Blocked, Available) a reviewer reads as the actual closure
+  // partition, instead of one flat checkbox list with small inline
+  // annotations bolted on. Before anything is selected (`closure === null`)
+  // there's only one group — every subject is simply "available."
+  const blockedIds = new Set(closure?.blocked.map((b) => b.subjectId) ?? []);
+  const includedSubjects = closure ? subjects.filter((s) => closure.accepted.has(s.id)) : [];
+  const availableSubjects = subjects.filter((s) => !includedSubjects.some((i) => i.id === s.id) && !blockedIds.has(s.id));
+
   return (
     <Panel>
       <Text as="h2" size="lg">
@@ -136,30 +148,46 @@ export function SplitReviewPanel({ modelId, branch, mainHeadCommitId, review, ca
       <Text as="p" tone="muted" size="sm">
         Accept a subset of this branch's own changes into a new, immediately-merged branch. The rest stays here, untouched, for a later review.
       </Text>
-      <ul className={styles.list}>
-        {subjects.map((s) => (
-          <li key={s.id} className={styles.row}>
-            <label className={styles.checkboxRow}>
-              <input type="checkbox" checked={requested.has(s.id)} onChange={() => { toggle(s.id); }} disabled={status === 'working'} />
-              <Text as="span" size="sm">
-                {s.action} — {s.label}
-              </Text>
-            </label>
-            {closure?.pulledIn.has(s.id) && (
-              <Text as="span" size="xs" tone="muted">
-                (pulled in)
-              </Text>
-            )}
-          </li>
-        ))}
-      </ul>
+
+      {includedSubjects.length > 0 && (
+        <div className={styles.group}>
+          <Text as="h3" size="sm" tone="muted">
+            Included — will split off now ({includedSubjects.length})
+          </Text>
+          <ul className={styles.list}>
+            {includedSubjects.map((s) => {
+              const pulledIn = closure?.pulledIn.has(s.id) ?? false;
+              return (
+                <li key={s.id} className={styles.row}>
+                  {pulledIn ? (
+                    <Text as="span" size="sm">
+                      {s.action} — {s.label}
+                      <Text as="span" size="xs" tone="muted">
+                        {' '}
+                        (pulled in — needed by something else you selected)
+                      </Text>
+                    </Text>
+                  ) : (
+                    <label className={styles.checkboxRow}>
+                      <input type="checkbox" checked={requested.has(s.id)} onChange={() => { toggle(s.id); }} disabled={status === 'working'} />
+                      <Text as="span" size="sm">
+                        {s.action} — {s.label}
+                      </Text>
+                    </label>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       {closure && closure.blocked.length > 0 && (
-        <div className={styles.blockedList}>
-          <Text as="p" size="sm">
-            Blocked:
+        <div className={styles.group}>
+          <Text as="h3" size="sm" tone="muted">
+            Blocked — can't split off alone ({closure.blocked.length})
           </Text>
-          <ul>
+          <ul className={styles.blockedList}>
             {closure.blocked.map((b) => (
               <li key={b.subjectId}>
                 <Text as="span" size="sm" tone="muted">
@@ -171,6 +199,26 @@ export function SplitReviewPanel({ modelId, branch, mainHeadCommitId, review, ca
           </ul>
         </div>
       )}
+
+      <div className={styles.group}>
+        {(includedSubjects.length > 0 || (closure && closure.blocked.length > 0)) && (
+          <Text as="h3" size="sm" tone="muted">
+            Available ({availableSubjects.length})
+          </Text>
+        )}
+        <ul className={styles.list}>
+          {availableSubjects.map((s) => (
+            <li key={s.id} className={styles.row}>
+              <label className={styles.checkboxRow}>
+                <input type="checkbox" checked={requested.has(s.id)} onChange={() => { toggle(s.id); }} disabled={status === 'working'} />
+                <Text as="span" size="sm">
+                  {s.action} — {s.label}
+                </Text>
+              </label>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {error !== null && <Text as="p">{error}</Text>}
 

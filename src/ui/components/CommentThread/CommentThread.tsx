@@ -3,6 +3,7 @@ import type { UUID } from '../../../contracts/delta';
 import type { BranchRow, CommentRow, MemberRole, ProfileRow } from '../../../db/types';
 import type { CommentThread as CommentThreadData } from '../../../db/comments';
 import { canResolveComment } from '../../comments/commentPermissions';
+import { profileLabel as authorLabel } from '../../comments/profileLabel';
 import { formatCommitActivityTime } from '../../home/commitActivityTime';
 import { Avatar } from '../Avatar/Avatar';
 import { Button } from '../Button/Button';
@@ -24,10 +25,6 @@ export interface CommentThreadProps {
   onReply: (parentCommentId: UUID, body: string) => Promise<void>;
   onResolve: (commentId: UUID) => Promise<void>;
   onReopen: (commentId: UUID) => Promise<void>;
-}
-
-function authorLabel(profile: ProfileRow | undefined): string {
-  return profile?.display_name ?? (profile ? `@${profile.handle}` : 'Someone');
 }
 
 /** One comment row (root or reply) — author identity, body, timestamp. Both `CommentThread`'s own root and its replies use this; only the root additionally carries the resolve/reopen row and a reply composer, added around it by the caller below. */
