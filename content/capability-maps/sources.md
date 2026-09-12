@@ -96,3 +96,39 @@ verbatim) — no new reference model added. `status: draft`,
 every map's own first draft: it stays draft, seedable for review
 alongside the published v1, until a named reviewer edits that field and
 runs `pnpm content:publish-capability-map electricity_network 2`.
+
+## electricity_network v3 and utility v2 (2026-09-12)
+
+S1 item 14: both maps gain a new level-1 capability, **Network Delivery &
+Maintenance** (code `13`, placed first by `order: 5` — below every other
+sector-specific level-1's own `10`-`40` range), covering the delivery/
+field side of running the network rather than the planning/knowing side
+`Asset Management` already covers: Capital Projects & Construction,
+Planned Maintenance & Inspection, Field Workforce Scheduling &
+Dispatch, Streetworks & Permits, Land, Wayleaves & Consents, Vegetation
+Management, Contractor Management. Level-1 name and definition are
+worded identically in both maps, following the existing
+`utility`/`electricity_network` level-1-wording convention above; the
+level-2 descriptions are electricity-specific in one and sector-neutral
+in the other, the same split every other shared level-1 in these two
+maps already uses.
+
+Judgement call made while drafting `electricity_network/3.json`: v2's
+own `9.6 Vegetation Management` is removed and replaced by the new
+`13.6 Vegetation Management` — the same capability, relocated to the
+grouping this item names it under, rather than left duplicated under
+both `Asset Management` and `Network Delivery & Maintenance` (v2 was
+never published, so nothing seeded from it depends on code `9.6`).
+`utility/1.json` has no equivalent name to relocate, so `utility/2.json`
+only adds; nothing existing is touched.
+
+Both new versions add a level-1 capability beyond the 8-12 editorial
+range and a level-2 group of 7 (above the 3-6 range) — expected,
+flagged in `docs/review/capability-maps.md`, and named here for the
+reviewer rather than left as a surprise in the flag table. No new
+reference model consulted; drafted from the same sources already named
+above for each sector. `status: draft`,
+`reviewedBy: "Pending human review — drafted by Claude Code"` on both —
+seedable for review, not published, until a named reviewer edits that
+field and runs `pnpm content:publish-capability-map electricity_network 3`
+/ `pnpm content:publish-capability-map utility 2`.
