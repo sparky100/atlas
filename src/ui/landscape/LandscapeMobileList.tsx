@@ -5,6 +5,8 @@ import type { ActorSubtype } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import { Chip } from '../components/Chip/Chip';
+import { CommentMarkerButton, type CommentMarkerState } from '../components/CommentMarkerButton/CommentMarkerButton';
+import { commentMarkerFor } from '../components/CommentMarkerButton/commentMarkerFor';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../components/Text/Text';
 import { attributesRecord } from '../elements/attributesRecord';
@@ -18,7 +20,19 @@ export interface LandscapeMobileListProps {
   elementHref: (elementId: UUID) => string;
   /** The row's own separate "Context →" link — systems only (an actor has no Context view of its own, same reasoning `LandscapeCanvas.tsx`'s `actorHref` doc comment already gives). */
   contextHref: (systemId: UUID) => string;
+  /**
+   * S1 item 12: "markers ... on the mobile landscape list" — the same
+   * map `LandscapePage.tsx` already fetches once for the desktop canvas
+   * (`useThreadCounts`, keyed by `systemsById`'s ids) threaded through
+   * here too; no second fetch. System-only, same as the canvas: an actor
+   * row never carries a marker, `threadCounts` simply has no entry for
+   * one either way.
+   */
+  threadCounts?: ReadonlyMap<UUID, { open: number; total: number }> | undefined;
+  /** Required together with `threadCounts` — opens the comments panel scoped to the clicked row's own element. */
+  onCommentMarkerClick?: ((elementId: UUID) => void) | undefined;
 }
+
 
 const ACTORS_GROUP_KEY = '$actors';
 
@@ -34,7 +48,7 @@ const ACTORS_GROUP_KEY = '$actors';
  * for the identical UI problem (a long list of named collections, each
  * with its own members, on a narrow screen).
  */
-export function LandscapeMobileList({ groups, elementHref, contextHref }: LandscapeMobileListProps) {
+export function LandscapeMobileList({ groups, elementHref, contextHref, threadCounts, onCommentMarkerClick }: LandscapeMobileListProps) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   function toggle(key: string): void {
@@ -79,7 +93,14 @@ export function LandscapeMobileList({ groups, elementHref, contextHref }: Landsc
           ) : (
             <ul className={styles.rows}>
               {group.members.map((member) => (
-                <SystemRow key={member.system.element_id} member={member} elementHref={elementHref} contextHref={contextHref} />
+                <SystemRow
+                  key={member.system.element_id}
+                  member={member}
+                  elementHref={elementHref}
+                  contextHref={contextHref}
+                  marker={commentMarkerFor(member.system.element_id, threadCounts)}
+                  onCommentMarkerClick={onCommentMarkerClick}
+                />
               ))}
             </ul>
           )}
@@ -158,7 +179,19 @@ function ActorRow({ actor, elementHref }: { actor: ElementsHeadRow; elementHref:
   );
 }
 
-function SystemRow({ member, elementHref, contextHref }: { member: LandscapeGroupMember; elementHref: (id: UUID) => string; contextHref: (id: UUID) => string }) {
+function SystemRow({
+  member,
+  elementHref,
+  contextHref,
+  marker,
+  onCommentMarkerClick,
+}: {
+  member: LandscapeGroupMember;
+  elementHref: (id: UUID) => string;
+  contextHref: (id: UUID) => string;
+  marker: CommentMarkerState | undefined;
+  onCommentMarkerClick: ((elementId: UUID) => void) | undefined;
+}) {
   const { system, extraLaneCount, usesCount, usedByCount, role } = member;
   const attrs = attributesRecord(system.attributes);
   const external = attrs.isExternal === true;
@@ -200,6 +233,14 @@ function SystemRow({ member, elementHref, contextHref }: { member: LandscapeGrou
           <Link to={contextHref(system.element_id)} className={styles.contextLink}>
             Context →
           </Link>
+        )}
+        {marker && (
+          <CommentMarkerButton
+            marker={marker}
+            onClick={() => {
+              onCommentMarkerClick?.(system.element_id);
+            }}
+          />
         )}
       </div>
     </li>

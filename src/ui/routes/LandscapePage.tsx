@@ -80,12 +80,24 @@ import styles from './LandscapePage.module.css';
  * collapsible list, `landscapeGroups.ts`'s own module comment has the full
  * grouping rules) instead of `LandscapeCanvas`, never both. The desktop
  * canvas itself, and everything about it (the `.mainWithCanvas` full-width
- * treatment — keyed on viewport width alone, see `canvasWidthClass` below
- * — `useThreadCounts`, the comments panel), stays exactly as it was — the
- * list is a second renderer for the same `state.data`, not a replacement,
- * and doesn't need any of that (no pixels, no viewport culling, no
- * worker), so it renders inside the page's ordinary centred column
- * instead.
+ * treatment — keyed on viewport width alone, see `canvasWidthClass` below),
+ * stays exactly as it was — the list is a second renderer for the same
+ * `state.data`, not a replacement, and doesn't need any of the canvas's
+ * own pixel/viewport-culling/worker machinery, so it renders inside the
+ * page's ordinary centred column instead. It does share `useThreadCounts`
+ * and the comments panel with the canvas as of S1 item 12 (below) — that
+ * part was the one real gap between the two renderers, not something
+ * canvas-specific by nature.
+ *
+ * S1 item 12: "markers and panel on the mobile landscape list and the
+ * capability-scoped list" — `LandscapeMobileList`/`CapabilityLandscapeList`
+ * both now take the same `threadCounts` map (`useThreadCounts`, already
+ * fetched once per view — `CapabilityLandscapeList`'s own is a second call
+ * scoped to its own system-id set, since `useLandscape` never runs while a
+ * capability filter is active) and an `onCommentMarkerClick` callback
+ * reusing this page's existing `commentsPanelElementId`/`autoFocusComposer`
+ * state — the same shape the canvas's own `onCommentMarkerClick` already
+ * used, just reaching two more renderers instead of one.
  */
 export function LandscapePage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
@@ -153,6 +165,14 @@ export function LandscapePage() {
   const anchorIds = state.status === 'ready' ? [...state.data.systemsById.keys()] : [];
   const threadCountsState = useThreadCounts(model?.id ?? null, anchorIds);
   const threadCounts = threadCountsState.status === 'ready' ? threadCountsState.counts : undefined;
+  // S1 item 12: "markers ... on the capability-scoped list" — `useLandscape`
+  // itself never runs while `capabilityId` is set (its own `enabled` doc
+  // comment above), so its own `anchorIds`/`threadCounts` above are always
+  // empty in that mode; this is `CapabilityLandscapeList`'s own separate
+  // system-id set, fetched the same way, not a second mechanism.
+  const capabilitySystemIds = capabilityLandscapeState.status === 'ready' ? [...capabilityLandscapeState.data.primary, ...capabilityLandscapeState.data.secondary].map((row) => row.system.element_id) : [];
+  const capabilityThreadCountsState = useThreadCounts(model?.id ?? null, capabilitySystemIds);
+  const capabilityThreadCounts = capabilityThreadCountsState.status === 'ready' ? capabilityThreadCountsState.counts : undefined;
   // M1 close-out item 1's own "per-session 'comments on this view' filter"
   // — plain component state, not `user_preferences` or anything else
   // persisted server-side: it resets on every fresh visit to this page
@@ -161,8 +181,10 @@ export function LandscapePage() {
   // worth carrying across visits.
   const [commentsOnlyFilter, setCommentsOnlyFilter] = useState(false);
   // Prompt 7k item 1: the landscape's own colour-by mode — desktop canvas
-  // only, same "no comment wiring on mobile's list yet" scoping as the
-  // comments-only filter above.
+  // only; unlike the comments-only filter above, this one genuinely has no
+  // equivalent on the mobile list (a fill colour has nothing to mean on a
+  // plain list row) — see the comments-only filter's own comment for why
+  // the comparison doesn't hold for it any more (S1 item 12).
   const { colourBy, setColourBy } = useLandscapeColourByPreference(userId);
   const colourById = useId();
   // Prompt 7k item 4: "route via platforms" — direct edges by default,
@@ -323,7 +345,7 @@ export function LandscapePage() {
               </div>
             </div>
           )}
-          {/* M1 close-out item 1: "the per-session 'comments on this view' filter" — desktop canvas only (mobile's own list carries no comment wiring yet, item 13's own comment above); toggled independently of `+ Add`, so it's its own `.actions` group rather than folded into `addControls`. */}
+          {/* M1 close-out item 1: "the per-session 'comments on this view' filter" — desktop canvas only. Unlike the marker/panel wiring itself (which the mobile list now shares, S1 item 12), this specific *filter* (dimming every tile with no thread at all) has no equivalent on a plain list row — there's nothing to visually dim a row's own text down from. Toggled independently of `+ Add`, so it's its own `.actions` group rather than folded into `addControls`. */}
           {state.status === 'ready' && showCanvas && (
             <div className={styles.actions}>
               <label className={styles.commentsOnlyToggle}>
@@ -400,7 +422,38 @@ export function LandscapePage() {
             {capabilityLandscapeState.status === 'loading' && <Text tone="muted">Loading…</Text>}
             {capabilityLandscapeState.status === 'error' && <Text as="p">{capabilityLandscapeState.message}</Text>}
             {capabilityLandscapeState.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
-            {capabilityLandscapeState.status === 'ready' && <CapabilityLandscapeList rows={capabilityLandscapeState.data} elementHref={elementHref} contextHref={nodeHref} />}
+            {capabilityLandscapeState.status === 'ready' && (
+              <>
+                <CapabilityLandscapeList
+                  rows={capabilityLandscapeState.data}
+                  elementHref={elementHref}
+                  contextHref={nodeHref}
+                  threadCounts={capabilityThreadCounts}
+                  onCommentMarkerClick={(elementId) => {
+                    setCommentsPanelElementId(elementId);
+                    setAutoFocusComposer(false);
+                  }}
+                />
+                {commentsPanelElementId && (
+                  <CommentsPanel
+                    orgId={organisation?.id ?? ''}
+                    modelId={model.id}
+                    userId={userId}
+                    role={role}
+                    anchorType="element"
+                    anchorId={commentsPanelElementId}
+                    subjectName={[...capabilityLandscapeState.data.primary, ...capabilityLandscapeState.data.secondary].find((row) => row.system.element_id === commentsPanelElementId)?.system.name ?? ''}
+                    unresolvedCount={capabilityThreadCounts?.get(commentsPanelElementId)?.open ?? 0}
+                    branchId={ref.kind === 'branch' ? (editingBranch?.id ?? null) : null}
+                    viewKind="landscape"
+                    autoFocusComposer={autoFocusComposer}
+                    onClose={() => {
+                      setCommentsPanelElementId(null);
+                    }}
+                  />
+                )}
+              </>
+            )}
           </>
         ) : (
           <>
@@ -431,8 +484,39 @@ export function LandscapePage() {
                 )}
               </div>
             )}
-            {/* Item 13: <768px renders the list, never the canvas — same `state.data`, no comments panel/unresolved-count wiring (this list carries none of that yet), no viewport-fit math. */}
-            {state.status === 'ready' && hasContent && narrow && <LandscapeMobileList groups={state.data.groups} elementHref={elementHref} contextHref={nodeHref} />}
+            {/* Item 13: <768px renders the list, never the canvas — same `state.data`. S1 item 12 adds comment markers/panel here too, the same `threadCounts` map the canvas already computes — no viewport-fit math needed, this list has no pixels to lay out. */}
+            {state.status === 'ready' && hasContent && narrow && (
+              <>
+                <LandscapeMobileList
+                  groups={state.data.groups}
+                  elementHref={elementHref}
+                  contextHref={nodeHref}
+                  threadCounts={threadCounts}
+                  onCommentMarkerClick={(elementId) => {
+                    setCommentsPanelElementId(elementId);
+                    setAutoFocusComposer(false);
+                  }}
+                />
+                {commentsPanelElementId && (
+                  <CommentsPanel
+                    orgId={organisation?.id ?? ''}
+                    modelId={model.id}
+                    userId={userId}
+                    role={role}
+                    anchorType="element"
+                    anchorId={commentsPanelElementId}
+                    subjectName={state.data.systemsById.get(commentsPanelElementId)?.name ?? ''}
+                    unresolvedCount={threadCounts?.get(commentsPanelElementId)?.open ?? 0}
+                    branchId={ref.kind === 'branch' ? (editingBranch?.id ?? null) : null}
+                    viewKind="landscape"
+                    autoFocusComposer={autoFocusComposer}
+                    onClose={() => {
+                      setCommentsPanelElementId(null);
+                    }}
+                  />
+                )}
+              </>
+            )}
             {state.status === 'ready' && showCanvas && (
               <div className={styles.canvasRow}>
                 <LandscapeCanvas

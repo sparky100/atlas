@@ -1,0 +1,28 @@
+.marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 2px;
+  border: none;
+  font-size: var(--text-xs-size);
+  line-height: 16px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.marker[data-state='ink'] {
+  background: var(--text);
+  color: var(--surface-raised);
+}
+
+/* All threads resolved: background reverts to the surface, outline only —
+   same convention CapabilityTile.module.css's own hollow state and the
+   landscape canvas's own hollow plate already use. */
+.marker[data-state='hollow'] {
+  background: transparent;
+  border: 1px solid var(--text-muted);
+}
