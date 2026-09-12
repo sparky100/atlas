@@ -124,7 +124,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
 
       {activeRef.kind === 'branch' && (
         <Text as="p" tone="faint" size="xs">
-          Searched against main&rsquo;s head, not this branch.
+          Searched against main&rsquo;s head, not this change.
         </Text>
       )}
 
@@ -239,7 +239,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
           />
           <Text as="p" tone="faint" size="xs">
             Written as manual · {userId ? 'you' : 'signed-in user'} · confidence 1.00. Lifecycle and External default —
-            {writeBranch?.kind === 'main' ? ' defaulted on create · active on main.' : ' defaulted on create · planned on a change branch.'}
+            {writeBranch?.kind === 'main' ? ' defaulted on create · active on main.' : ' defaulted on create · planned on a change.'}
           </Text>
           <div className={styles.actions}>
             <Button variant="primary" disabled={createStatus === 'creating' || description.trim().length === 0} onClick={submitCreate}>

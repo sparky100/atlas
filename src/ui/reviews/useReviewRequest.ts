@@ -43,10 +43,10 @@ async function loadReviewRequestData(modelId: UUID, mergeRequestId: UUID): Promi
   if (!request) return { status: 'error', message: 'This review request no longer exists.' };
 
   const branch = await getBranch(supabase, request.branch_id);
-  if (!branch) return { status: 'error', message: 'The branch this request is for no longer exists.' };
+  if (!branch) return { status: 'error', message: 'The change this request is for no longer exists.' };
 
   const computed = await computeMergeReviewForBranch(supabase, modelId, branch);
-  if (!computed) return { status: 'error', message: 'This branch has no commits of its own — there is nothing to review.' };
+  if (!computed) return { status: 'error', message: 'This change has no commits of its own — there is nothing to review.' };
 
   const sourceIds = new Set<UUID>();
   for (const f of computed.review.threeWay.fields) {
@@ -192,7 +192,7 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
       }
       const refreshedBranch = await getBranch(supabase, branch.id);
       if (!refreshedBranch) {
-        setActionError('The branch disappeared while refreshing.');
+        setActionError('The change disappeared while refreshing.');
         return;
       }
       const recomputed = await computeMergeReviewForBranch(supabase, modelId, refreshedBranch);

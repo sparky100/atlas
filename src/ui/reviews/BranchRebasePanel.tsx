@@ -96,7 +96,7 @@ export function BranchRebasePanel({ modelId, branch, userId, canEdit, onRebased 
             Structural conflicts
           </Text>
           <Text as="p" tone="muted" size="sm">
-            Fix these with the ordinary branch editor (un-retract, remove the dangling relationship, drop the duplicate), then rebase.
+            Fix these with the ordinary change editor (un-retract, remove the dangling relationship, drop the duplicate), then rebase.
           </Text>
           <ul className={styles.cardList}>
             {structuralFindings.map((finding, i) => (

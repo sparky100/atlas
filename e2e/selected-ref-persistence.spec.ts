@@ -93,7 +93,7 @@ test('a selected change persists through Home, search and create — the new ele
   // (HomeSearch.tsx's own description/capability sheet).
   await expect(page.getByText(`Adding to change: ${changeTitle}`)).toBeVisible();
   await page.getByPlaceholder('One line — what this system is').fill('Proves the selected ref survived Home and search.');
-  await expect(page.getByText('planned on a change branch', { exact: false })).toBeVisible();
+  await expect(page.getByText('planned on a change', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Skip capability' }).click();
 
   // 5. Landed on the new element's own page, still at the same branch ref

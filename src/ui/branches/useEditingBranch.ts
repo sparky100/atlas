@@ -54,7 +54,7 @@ export function useEditingBranch(modelId: UUID | null, ref: Ref): UseEditingBran
         // — `branch: null` here means "nothing is editable," which every
         // caller's own `canEdit`/`canAdd` computation just quietly treats
         // as "no write controls," with no indication anything failed.
-        reportError(e instanceof Error ? `Couldn't load the branch to edit: ${e.message}` : "Couldn't load the branch to edit.");
+        reportError(e instanceof Error ? `Couldn't load the change to edit: ${e.message}` : "Couldn't load the change to edit.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

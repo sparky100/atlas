@@ -168,10 +168,10 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
 
         <Panel>
           <Text as="h2" size="lg">
-            My branches
+            My changes
           </Text>
           {data.myOpenBranches.length === 0 ? (
-            <EmptyState>No open branches of your own right now.</EmptyState>
+            <EmptyState>No open changes of your own right now.</EmptyState>
           ) : (
             <ul className={styles.branchList}>
               {data.myOpenBranches.map((branch) => (
