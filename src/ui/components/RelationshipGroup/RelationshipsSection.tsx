@@ -9,6 +9,7 @@ import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { FactBadge } from '../FactBadge/FactBadge';
 import { RelationshipAdd } from './RelationshipAdd';
+import { RelationshipRemove, type RelationshipsSectionRemoveConfig } from './RelationshipRemove';
 import { Text } from '../Text/Text';
 import styles from './RelationshipsSection.module.css';
 
@@ -42,11 +43,15 @@ export interface RelationshipsSectionProps {
   modelSlug: string;
   elementId: UUID;
   elementType: ElementType;
+  /** This element's own current name — "Relationship removal"'s confirmation sentence subject (`elementName` on `addRelationship` already carries this for the create side; the remove side needs it unconditionally, even when `removeRelationship` is the only config given). */
+  elementName: string;
   relationships: RelationshipsHeadRow[];
   endpoints: Map<UUID, ElementsHeadRow>;
   relationshipFacts: Map<UUID, Map<string, FactsRow>>;
   sources: Map<UUID, SourceRow>;
   addRelationship?: RelationshipsSectionAddConfig | undefined;
+  /** "Relationship removal": each row's own "⋯ Remove" — omitted entirely (not shown disabled) when the caller hasn't established edit rights, same convention as `addRelationship`. */
+  removeRelationship?: RelationshipsSectionRemoveConfig | undefined;
   /** The other element id of a relationship just added in this session (Handoff — Flow: Add a system, step 7's `just added` chip) — cleared by the caller once acknowledged, not by this component. */
   justAddedElementId?: UUID | null;
 }
@@ -62,7 +67,7 @@ export interface RelationshipsSectionProps {
  * with neither existing rows nor (when `addRelationship` is given) the
  * right to add is skipped entirely, same as before this generalisation.
  */
-export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementType, relationships, endpoints, relationshipFacts, sources, addRelationship, justAddedElementId = null }: RelationshipsSectionProps) {
+export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementType, elementName, relationships, endpoints, relationshipFacts, sources, addRelationship, removeRelationship, justAddedElementId = null }: RelationshipsSectionProps) {
   const outboundSlots = new Map(outboundRelationshipGroups(elementType).map((slot) => [slot.relationshipType, slot]));
   const inboundSlots = new Map(inboundRelationshipGroups(elementType).map((slot) => [slot.relationshipType, slot]));
 
@@ -92,12 +97,14 @@ export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementTyp
               slot={outboundSlot}
               elementId={elementId}
               elementType={elementType}
+              elementName={elementName}
               orgSlug={orgSlug}
               modelSlug={modelSlug}
               endpoints={endpoints}
               relationshipFacts={relationshipFacts}
               sources={sources}
               addRelationship={addRelationship}
+              removeRelationship={removeRelationship}
               justAddedElementId={justAddedElementId}
             />
           )}
@@ -109,12 +116,14 @@ export function RelationshipsSection({ orgSlug, modelSlug, elementId, elementTyp
               slot={inboundSlot}
               elementId={elementId}
               elementType={elementType}
+              elementName={elementName}
               orgSlug={orgSlug}
               modelSlug={modelSlug}
               endpoints={endpoints}
               relationshipFacts={relationshipFacts}
               sources={sources}
               addRelationship={addRelationship}
+              removeRelationship={removeRelationship}
               justAddedElementId={justAddedElementId}
             />
           )}
@@ -131,12 +140,14 @@ function RelationshipDirectionGroup({
   slot,
   elementId,
   elementType,
+  elementName,
   orgSlug,
   modelSlug,
   endpoints,
   relationshipFacts,
   sources,
   addRelationship,
+  removeRelationship,
   justAddedElementId,
 }: {
   label: string;
@@ -145,12 +156,14 @@ function RelationshipDirectionGroup({
   slot: RelationshipGroupSlot | undefined;
   elementId: UUID;
   elementType: ElementType;
+  elementName: string;
   orgSlug: string;
   modelSlug: string;
   endpoints: Map<UUID, ElementsHeadRow>;
   relationshipFacts: Map<UUID, Map<string, FactsRow>>;
   sources: Map<UUID, SourceRow>;
   addRelationship?: RelationshipsSectionAddConfig | undefined;
+  removeRelationship?: RelationshipsSectionRemoveConfig | undefined;
   justAddedElementId?: UUID | null;
 }) {
   return (
@@ -204,6 +217,18 @@ function RelationshipDirectionGroup({
             {typeof dataClassification === 'string' && dataClassification.length > 0 && <Chip tone="info">{dataClassification}</Chip>}
             {justAdded && <Chip tone="info">just added</Chip>}
             {existsFact && <FactBadge fact={existsFact} source={sources.get(existsFact.source_id)} />}
+            {removeRelationship && (
+              <RelationshipRemove
+                relationship={rel}
+                direction={direction}
+                elementName={elementName}
+                otherName={other?.name}
+                siblingRows={rows}
+                endpoints={endpoints}
+                relationshipFacts={relationshipFacts}
+                config={removeRelationship}
+              />
+            )}
           </div>
         );
       })}

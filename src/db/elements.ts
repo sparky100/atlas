@@ -168,6 +168,42 @@ export async function listDeltaHistoryForSubject(supabase: Client, modelId: UUID
   return selectAll<DeltaHistoryRow>(query);
 }
 
+/**
+ * "Relationship removal"'s history gap: `listDeltaHistoryForSubject` above
+ * is subject-generic (it works for a relationship's own id exactly as well
+ * as an element's), but nothing calls it with a relationship id anywhere —
+ * a relationship's `subject_id` (`subjectOf()`/`factKeyOf()`,
+ * `src/contracts/delta.ts`) is its own `relationshipId`, distinct from
+ * either endpoint's element id, so an element's own history query never
+ * surfaces it. This closes that gap: find every `relationship.create`
+ * delta naming `elementId` on either side (the `.or()` both-directions
+ * shape `listRelationshipsForElement` above already establishes for this
+ * exact case), then pull each discovered relationship's own full history.
+ *
+ * Bounded by how many relationships have ever touched this one element —
+ * the same order as `relationships.length` on the element page today, not
+ * by model size — so this is a plain small-N fan-out, not a
+ * caller-scoped `.in()` (CLAUDE.md rule 8 doesn't apply here).
+ * Model-scoped, not commit-scoped, same as `listDeltaHistoryForSubject`
+ * itself: a retracted relationship's own `relationship_create` row still
+ * exists in `deltas` regardless of the current commit, which is exactly
+ * the point — "history keeps the relationship and its provenance" even
+ * after it's gone from `relationships_head`.
+ */
+export async function listRelationshipHistoryForElement(supabase: Client, modelId: UUID, elementId: UUID): Promise<DeltaHistoryRow[]> {
+  const query = supabase
+    .from('deltas')
+    .select('subject_id', { count: 'exact' })
+    .eq('model_id', modelId)
+    .eq('kind', 'relationship_create')
+    .or(`from_element_id.eq.${elementId},to_element_id.eq.${elementId}`)
+    .order('id');
+  const creates = await selectAll<{ subject_id: UUID }>(query);
+  const relationshipIds = [...new Set(creates.map((row) => row.subject_id))];
+  const perRelationship = await Promise.all(relationshipIds.map((id) => listDeltaHistoryForSubject(supabase, modelId, id)));
+  return perRelationship.flat();
+}
+
 /** A single fact's supersession chain (§4.3's provenance card): follow `previous_delta_id` back from `deltaId` to genesis. Bounded by the chain's real length, not by history depth — a fact is superseded at most a handful of times in practice. */
 export async function getSupersessionChain(supabase: Client, deltaId: UUID): Promise<DeltaRow[]> {
   const chain: DeltaRow[] = [];

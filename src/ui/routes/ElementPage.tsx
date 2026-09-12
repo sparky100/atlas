@@ -307,6 +307,7 @@ export function ElementPage() {
                     modelSlug={model.slug}
                     elementId={state.data.element.element_id}
                     elementType={state.data.element.element_type}
+                    elementName={state.data.element.name}
                     relationships={state.data.relationships}
                     endpoints={state.data.relationshipEndpoints}
                     relationshipFacts={state.data.relationshipFacts}
@@ -326,6 +327,18 @@ export function ElementPage() {
                               setJustAddedElementId(otherElementId);
                               reloadAfterCommit();
                             },
+                          }
+                        : undefined
+                    }
+                    removeRelationship={
+                      canAddRelationship
+                        ? {
+                            modelId: model.id,
+                            orgId: organisation?.id ?? '',
+                            userId,
+                            branch: editingBranch,
+                            expectedHeadCommitId: state.data.commitId,
+                            onRemoved: reloadAfterCommit,
                           }
                         : undefined
                     }
