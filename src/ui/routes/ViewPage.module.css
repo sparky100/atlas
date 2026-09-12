@@ -31,3 +31,13 @@
 .header {
   margin-bottom: var(--space-4);
 }
+
+/** ChangePage.tsx's own header: the title plus "Edit in this change" — every other consumer of `.header` above is a bare `<h1>` alone, so this is additive, not a change to their own layout. */
+.headerRow {
+  margin-bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}

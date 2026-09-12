@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router';
+import { useParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
@@ -10,11 +10,12 @@ import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { useMainBranch } from '../branches/useMainBranch';
+import { useSelectedRef } from '../branches/useSelectedRef';
 import { useThreadCounts } from '../comments/useThreadCounts';
 import { useModels } from '../models/useModels';
 import { canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
-import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
+import { refLabelOf, refParamOf } from '../../db/ref';
 import { CapabilityMapAddForm } from '../capabilityMap/CapabilityMapAddForm';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
@@ -71,8 +72,7 @@ import styles from './CapabilityMapPage.module.css';
  */
 export function CapabilityMapPage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
-  const [searchParams] = useSearchParams();
-  const ref = parseRefParam(searchParams.get('ref'));
+  const { ref } = useSelectedRef();
   const { userId } = useAuth();
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');

@@ -58,7 +58,7 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   await expect(page.getByRole('heading', { name: 'Billing Service' })).toBeVisible();
   await expect(page.getByText('Acme Corp')).toHaveCount(0);
   await page.getByRole('button', { name: '✎ Edit' }).click();
-  await page.getByLabel('Vendor').fill('Acme Corp');
+  await page.getByLabel('Vendor', { exact: true }).fill('Acme Corp');
   await page.getByRole('button', { name: 'Save' }).click();
   // A real commit round trip (write the delta, re-fetch the element) — the
   // default 5s expect timeout is tight for a freshly-started local
@@ -156,7 +156,7 @@ test('a failed save surfaces its error in the UI instead of leaving the editor o
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=branch:${branchId}`);
   await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible();
   await page.getByRole('button', { name: '✎ Edit' }).click();
-  await page.getByLabel('Vendor').fill('Page Value');
+  await page.getByLabel('Vendor', { exact: true }).fill('Page Value');
 
   // Commit directly to the same branch out from under the open editor —
   // it still holds `expectedHeadCommitId: seedCommitId` (the branch's head

@@ -7,7 +7,11 @@ import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useThreadCounts } from '../comments/useThreadCounts';
+import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
+import { useBranchLabel } from '../branches/useBranchLabel';
 import { useMainBranch } from '../branches/useMainBranch';
+import { useSelectedRef } from '../branches/useSelectedRef';
+import { refLabelOf } from '../../db/ref';
 import { useModels } from '../models/useModels';
 import { canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -51,6 +55,8 @@ export function ElementsPage() {
   const [searchParams] = useSearchParams();
   const filter = parseFilterParam(searchParams.get('filter'));
   const { userId } = useAuth();
+  const { ref } = useSelectedRef();
+  const { label: branchLabel } = useBranchLabel(ref);
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
@@ -91,10 +97,11 @@ export function ElementsPage() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
+          <EditingBranchBanner activeRef={ref} showModeShortcuts={false} />
           <Breadcrumb
             org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
             model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
-            refLabel="main"
+            refLabel={refLabelOf(ref, branchLabel)}
           />
           <Text as="h1" size="2xl">
             Elements

@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import type { MemberRole } from '../../db/types';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -12,7 +12,7 @@ import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
-import { parseRefParam } from '../../db/ref';
+import { useSelectedRef } from '../branches/useSelectedRef';
 import { ArchitectHome } from '../home/ArchitectHome';
 import { DirectorHome } from '../home/DirectorHome';
 import { HomeModeSwitch } from '../home/HomeModeSwitch';
@@ -69,13 +69,16 @@ export function ModelHome() {
   const settingsMenuId = useId();
 
   // Handoff — Flow: Add a system, decision 5: the search box's create
-  // action now follows the current `?ref=` (main, unless the door is
-  // opened at `?ref=branch:…`) rather than always writing to main — a
-  // contributor viewing main gets `HomeSearch`'s own propose-a-change
-  // picker instead of a direct write, same role split every other write
-  // path in this product already makes (ADR-015/ADR-009).
-  const [searchParams] = useSearchParams();
-  const ref = parseRefParam(searchParams.get('ref'));
+  // action now follows the current selected ref (main, unless a change
+  // is selected) rather than always writing to main — a contributor
+  // viewing main gets `HomeSearch`'s own propose-a-change picker instead
+  // of a direct write, same role split every other write path in this
+  // product already makes (ADR-015/ADR-009). Bug fix: this used to
+  // re-parse `?ref=` from this page's own URL, which a link to Home
+  // (`ModelNav.tsx`'s own former `carriesRef: false`) never carried —
+  // `useSelectedRef` reads the session-persisted selection instead, so
+  // landing on Home doesn't silently reset the write target to main.
+  const { ref } = useSelectedRef();
   const { branch: mainBranch } = useMainBranch(model?.id ?? null);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
   const canShowSearch = canCreateChangeBranch(role);
