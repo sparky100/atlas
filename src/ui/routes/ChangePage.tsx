@@ -71,7 +71,8 @@ export function ChangePage() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
-          <EditingBranchBanner activeRef={ref} showModeShortcuts={false} />
+          {/* Own page already has its own "Submit for review" (below, via ChangeView) — the banner's copy of that action exists for every *other* page; showing both here would be the literal duplicate this item's own comment warns against. */}
+          <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} showSubmitForReview={false} />
           <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabel} />
           <div className={styles.headerRow}>
             <Text as="h1" size="2xl">

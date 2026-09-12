@@ -106,7 +106,7 @@ export function ModelHome() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
-        <EditingBranchBanner activeRef={ref} showModeShortcuts={false} />
+        <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />
         <div className={styles.header}>
           <Text as="h1" size="2xl">
             {model.name}
