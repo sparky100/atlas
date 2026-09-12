@@ -43,6 +43,8 @@ export interface DerivedChangeSteps {
   steps: { key: ChangeStepKey; label: string; state: ChangeStepState }[];
   /** Rejected is a side exit (the prompt's own wording), not a position on the five-step line. */
   rejected: boolean;
+  /** S1 item 4: cancelled is the other side exit — a proposer's or owner/architect's own deliberate stop, distinct from a reviewer's rejection. */
+  cancelled: boolean;
   /** "one sentence under it on what happens next and who does it." */
   sentence: string;
 }
@@ -69,6 +71,7 @@ export function deriveChangeStep(branch: Pick<BranchRow, 'status'>, mergeRequest
       return {
         steps: stepsWithStatesUpTo(0),
         rejected: false,
+        cancelled: false,
         sentence: sentBack ? 'Sent back for changes by a reviewer. Edit and resubmit when ready.' : 'Not yet submitted. The change owner submits it for review when ready.',
       };
     }
@@ -80,18 +83,21 @@ export function deriveChangeStep(branch: Pick<BranchRow, 'status'>, mergeRequest
       return {
         steps: stepsWithStatesUpTo(2),
         rejected: false,
+        cancelled: false,
         sentence: 'Awaiting review. An owner or architect approves or requests changes.',
       };
     case 'approved':
       return {
         steps: stepsWithStatesUpTo(3),
         rejected: false,
+        cancelled: false,
         sentence: 'Approved, not yet merged. An owner or architect merges it into main.',
       };
     case 'merged':
       return {
         steps: stepsWithStatesUpTo(4),
         rejected: false,
+        cancelled: false,
         sentence: 'Merged into main.',
       };
     case 'rejected':
@@ -102,12 +108,28 @@ export function deriveChangeStep(branch: Pick<BranchRow, 'status'>, mergeRequest
       return {
         steps: stepsWithStatesUpTo(2).map((step) => (step.key === 'in_review' ? { ...step, state: 'upcoming' as const } : step)),
         rejected: true,
+        cancelled: false,
         sentence: "Rejected. This change wasn't merged — start a new change, or discuss with the reviewer and open a new one.",
       };
     case 'archived':
       // Change branches never reach this status (it's the capture-draft
       // lifecycle's, per `BranchStatus`'s own doc comment) — handled only
       // so this switch is exhaustive over the shared enum.
-      return { steps: stepsWithStatesUpTo(null), rejected: false, sentence: 'Archived.' };
+      return { steps: stepsWithStatesUpTo(null), rejected: false, cancelled: false, sentence: 'Archived.' };
+    case 'cancelled': {
+      // S1 item 4: the other side exit, alongside rejected — whatever
+      // steps had actually passed (Draft always; Proposed too if this was
+      // cancelled after submission) stay passed; the step it was cancelled
+      // out of is downgraded from "current" to "upcoming" (same trick
+      // `rejected` already uses for `in_review`) so nothing on the line
+      // reads as current for a closed state.
+      const exitKey: ChangeStepKey = mergeRequest ? 'in_review' : 'proposed';
+      return {
+        steps: stepsWithStatesUpTo(mergeRequest ? 2 : 1).map((step) => (step.key === exitKey ? { ...step, state: 'upcoming' as const } : step)),
+        rejected: false,
+        cancelled: true,
+        sentence: 'Cancelled.',
+      };
+    }
   }
 }

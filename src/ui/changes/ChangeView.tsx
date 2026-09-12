@@ -11,13 +11,17 @@ import { LinkButton } from '../components/Button/LinkButton';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import { createChangeBranch, getMainBranch } from '../../db/branches';
 import type { MemberRole } from '../../db/types';
 import { useSelectedRef } from '../branches/useSelectedRef';
+import { canCancelChange } from '../orgs/useMembership';
 import { BranchRebasePanel } from '../reviews/BranchRebasePanel';
+import { supabase } from '../supabaseClient';
 import { branchStatusTone } from './branchStatus';
 import { deriveChangeStep } from './changeStepper';
 import { describeDelta } from './changeSummaryFormat';
 import { Stepper } from './Stepper/Stepper';
+import { useCancelChange } from './useCancelChange';
 import { useChange } from './useChange';
 import { useChangeSummary } from './useChangeSummary';
 import { useOpenMergeRequest } from './useOpenMergeRequest';
@@ -83,10 +87,47 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   const navigate = useNavigate();
   const { request: openRequest } = useOpenMergeRequest(branchId);
   const submission = useSubmitForReview(modelId, branch);
-  const { ref, clearRef } = useSelectedRef();
+  const cancellation = useCancelChange(branch);
+  const { ref, setRef, clearRef } = useSelectedRef();
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
   if (status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (status === 'not_found' || !branch) return <Text as="p">No change found for this id.</Text>;
+
+  const duplicateIntoNewDraft = async () => {
+    setDuplicateError(null);
+    setDuplicating(true);
+    try {
+      const main = await getMainBranch(supabase, modelId);
+      if (!main) {
+        setDuplicateError('This model has no main branch to fork from.');
+        return;
+      }
+      const newBranch = await createChangeBranch(supabase, {
+        id: crypto.randomUUID(),
+        orgId,
+        modelId,
+        name: `${branch.name}-copy-${crypto.randomUUID().slice(0, 8)}`,
+        ...(branch.title ? { title: branch.title } : {}),
+        ...(branch.description ? { description: branch.description } : {}),
+        ...(branch.target_date ? { targetDate: branch.target_date } : {}),
+        createdBy: userId ?? '',
+        mainHeadCommitId: main.head_commit_id,
+      });
+      // Same "lands you inside, editing" convention `ChangesView.tsx`'s own
+      // create form already establishes — a duplicate is a fresh draft the
+      // proposer presumably wants to pick straight back up, not just view.
+      setRef({ kind: 'branch', branchId: newBranch.id });
+      void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${newBranch.id}`);
+    } catch (e) {
+      setDuplicateError(e instanceof Error ? e.message : 'Could not duplicate this change.');
+    } finally {
+      setDuplicating(false);
+    }
+  };
 
   const startEditing = () => {
     setTitle(branch.title ?? '');
@@ -108,6 +149,26 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           Updated {new Date(branch.updated_at).toLocaleString()}
         </Text>
       </div>
+
+      {/* S1 item 4: "listed ... with a reason" — the cancelled branch's own
+          page is where that reason actually lives; the collapsed list on
+          ChangesPage only names the change, not why. */}
+      {branch.status === 'cancelled' && (
+        <Panel>
+          <Text as="p" size="sm">
+            Cancelled{branch.cancelled_at ? ` ${new Date(branch.cancelled_at).toLocaleString()}` : ''}.
+          </Text>
+          {branch.cancel_reason && (
+            <Text as="p" tone="muted" size="sm">
+              {branch.cancel_reason}
+            </Text>
+          )}
+          <Button variant="secondary" disabled={duplicating} onClick={() => void duplicateIntoNewDraft()}>
+            {duplicating ? 'Duplicating…' : 'Duplicate into a new draft'}
+          </Button>
+          {duplicateError !== null && <Text as="p">{duplicateError}</Text>}
+        </Panel>
+      )}
 
       {/* Item 1: the stepper needs to know whether an open merge request
           exists (for the Draft/"sent back" sentence and the In
@@ -175,6 +236,69 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
               <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/${openRequest.id}`} variant="secondary">
                 Open review →
               </LinkButton>
+            </div>
+          )}
+        </Panel>
+      )}
+
+      {/* S1 item 4: "Cancel a change: proposer or owner/architect, Draft or
+          Proposed." Closing this also closes any open merge request
+          (atlas.cancel_change's own comment) — the queue and My changes
+          both drop it without either of them needing a change of their
+          own (a closed request is no longer "open"; a cancelled branch was
+          never in `MY_OPEN_STATUSES` to begin with). */}
+      {canCancelChange(role, branch, userId) && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Cancel this change
+          </Text>
+          {!cancelling ? (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setCancelReason('');
+                setCancelling(true);
+              }}
+            >
+              Cancel this change…
+            </Button>
+          ) : (
+            <div className={styles.editForm}>
+              <textarea
+                className={styles.textarea}
+                placeholder="Reason (required)"
+                value={cancelReason}
+                onChange={(e) => {
+                  setCancelReason(e.target.value);
+                }}
+              />
+              <div className={styles.actions}>
+                <Button
+                  variant="primary"
+                  disabled={cancellation.status === 'cancelling'}
+                  onClick={() => {
+                    void cancellation.cancel(cancelReason).then((cancelled) => {
+                      if (!cancelled) return;
+                      setCancelling(false);
+                      // Same "only clear it if it was actually this branch"
+                      // care every other exit path here already takes.
+                      if (ref.kind === 'branch' && ref.branchId === branchId) clearRef();
+                      reload();
+                    });
+                  }}
+                >
+                  {cancellation.status === 'cancelling' ? 'Cancelling…' : 'Confirm cancel'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setCancelling(false);
+                  }}
+                >
+                  Back
+                </Button>
+              </div>
+              {cancellation.error !== null && <Text as="p">{cancellation.error}</Text>}
             </div>
           )}
         </Panel>

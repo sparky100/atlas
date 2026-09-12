@@ -16,5 +16,11 @@ export function branchStatusTone(status: BranchStatus): ChipTone {
       return 'danger';
     case 'archived':
       return 'neutral';
+    // S1 item 4: a proposer's or owner/architect's own deliberate call to
+    // stop, not a failure the way `rejected` is — `neutral`, the same tone
+    // `draft`/`archived` already use for "closed, not colour-coded as an
+    // error."
+    case 'cancelled':
+      return 'neutral';
   }
 }

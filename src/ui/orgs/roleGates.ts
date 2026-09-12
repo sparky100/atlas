@@ -7,6 +7,7 @@
  * Re-exported from useMembership.ts, so every existing import site is
  * unaffected — this is a location split, not a public API change.
  */
+import type { UUID } from '../../contracts/delta';
 import type { BranchRow, MemberRole } from '../../db/types';
 
 /** Mirrors `models_insert`'s RLS check (`atlas.has_role(org_id, 'owner', 'architect')`, supabase/migrations/20260906071300_models.sql) — for showing/hiding the affordance; the database enforces the real rule regardless of what this returns. */
@@ -89,6 +90,20 @@ export function canRestoreModel(role: MemberRole | null): boolean {
 /** Mirrors `models_delete`'s RLS and `atlas.delete_model`'s own role check — owner only, same floor as restore. */
 export function canDeleteModel(role: MemberRole | null): boolean {
   return role === 'owner';
+}
+
+/**
+ * S1 item 4: mirrors `atlas.cancel_change`'s own check — "proposer or
+ * owner/architect, Draft or Proposed." Unlike every other gate in this
+ * file, this one also needs `userId` (no existing gate combines role with
+ * `branch.created_by` ownership) — a contributor who proposed this exact
+ * change can cancel it themselves even without `canCreateChangeBranch`'s
+ * own role floor mattering here, since the RPC's own check is "the
+ * proposer, *or* an owner/architect," not both.
+ */
+export function canCancelChange(role: MemberRole | null, branch: BranchRow, userId: UUID | null): boolean {
+  const isProposer = userId !== null && branch.created_by === userId;
+  return (isProposer || role === 'owner' || role === 'architect') && (branch.status === 'draft' || branch.status === 'proposed');
 }
 
 /** Sprint 7j item 2: mirrors `organisations_update`/`organisations_delete` and `members_insert`/`members_update`'s RLS — organisation rename/slug, member directory management (role change, remove, invite) and Delete organisation are all owner-only. */

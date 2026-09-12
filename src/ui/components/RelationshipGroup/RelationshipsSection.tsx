@@ -479,4 +479,7 @@ const PLACEHOLDER_BRANCH: BranchRow = {
   split_from: null,
   created_by: '',
   updated_at: '',
+  cancel_reason: null,
+  cancelled_at: null,
+  cancelled_by: null,
 };
