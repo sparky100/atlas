@@ -72,11 +72,12 @@ const systemAttributes: fc.Arbitrary<SystemAttributes> = fc.record(
     hostingProvider: fc.string(),
     domain: fc.constantFrom(...systemDomain),
     kind: fc.constantFrom(...systemKind),
+    version: fc.string(),
   },
   { requiredKeys: ['lifecycleStatus', 'isExternal'] },
 );
 const containerAttributes: fc.Arbitrary<ContainerAttributes> = fc.record(
-  { description: fc.string(), technology: fc.string(), isExternal: fc.boolean(), introduced: isoDate, plannedEnd: isoDate },
+  { description: fc.string(), technology: fc.string(), isExternal: fc.boolean(), introduced: isoDate, plannedEnd: isoDate, version: fc.string() },
   { requiredKeys: ['isExternal'] },
 );
 const componentAttributes: fc.Arbitrary<ComponentAttributes> = fc.record({ description: fc.string(), technology: fc.string() }, { requiredKeys: [] });
@@ -156,6 +157,10 @@ const elementUpdateArb: fc.Arbitrary<Delta> = fc.oneof(
   fc.tuple(provenanceBase, uuid, uuid, fc.constantFrom(...systemKind, null)).map(
     ([base, elementId, previousDeltaId, value]) =>
       ({ ...base, kind: 'element.update', elementId, elementType: 'system', attribute: 'kind', value, previousDeltaId }) satisfies Delta,
+  ),
+  fc.tuple(provenanceBase, uuid, uuid, fc.constantFrom<'system' | 'container'>('system', 'container'), fc.option(fc.string(), { nil: null })).map(
+    ([base, elementId, previousDeltaId, elementType, value]) =>
+      ({ ...base, kind: 'element.update', elementId, elementType, attribute: 'version', value, previousDeltaId }) satisfies Delta,
   ),
 );
 

@@ -127,6 +127,12 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onPro
   const attrs = attributesRecord(element.attributes);
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
+  // S1 item 11: "shown by lifecycle in the header" — system and container
+  // are the only two element types `version` exists on (attributeSchema.ts),
+  // so this is simply absent from `attrs` for every other type, the same
+  // way `lifecycleStatus` above only ever renders for the types that carry
+  // it despite no explicit `element_type` check here either.
+  const version = typeof attrs.version === 'string' ? attrs.version : null;
   const isExternal = attrs.isExternal === true;
   const externalOrganisation = typeof attrs.externalOrganisation === 'string' ? attrs.externalOrganisation : null;
 
@@ -196,6 +202,17 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onPro
           </Text>
         )}
         {lifecycleStatus !== null && lifecycleTone !== undefined && <Chip tone={lifecycleTone}>{lifecycleStatus}</Chip>}
+        {/* Plain text, not a Chip: version is free text in whatever scheme
+            the estate actually uses ("3.4.1", "2026-Q1") — a Chip implies
+            a fixed vocabulary the way lifecycle/external status actually
+            are, which this isn't. No "v" prefix either, for the same
+            reason: it would misrepresent a value that isn't a bare
+            semver number to begin with. */}
+        {version !== null && (
+          <Text as="span" tone="muted" size="sm">
+            {version}
+          </Text>
+        )}
         {isExternal && <Chip tone="neutral">{externalOrganisation ? `external (${externalOrganisation})` : 'external'}</Chip>}
       </div>
       <div className={styles.metaRow}>

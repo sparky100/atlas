@@ -104,6 +104,9 @@ const KIND_OPTIONS = ['application', 'integration_platform', 'data_platform', 'i
 
 const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   lifecycleStatus: { label: 'Lifecycle', required: true, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
+  // S1 item 11: "shown by lifecycle in the header" — ElementHeader.tsx
+  // renders this right next to the lifecycle Chip; kept adjacent here too.
+  version: { label: 'Version', required: false, kind: 'text' },
   vendor: { label: 'Vendor', required: false, kind: 'text' },
   description: { label: 'Description', required: false, kind: 'text', multiline: true },
   isExternal: { label: 'External', required: true, kind: 'boolean' },
@@ -121,6 +124,7 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
 };
 const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
   'lifecycleStatus',
+  'version',
   'vendor',
   'description',
   'isExternal',
@@ -151,6 +155,10 @@ const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   hostingModel: { label: 'Hosting model (module override)', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
   hostingProvider: { label: 'Hosting provider (module override)', required: false, kind: 'text' },
   domain: { label: 'Domain (module override)', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
+  // S1 item 11: a container's own version — never part of the platform-
+  // module inheritance set above (see ContainerAttributes.version's own
+  // doc comment, delta.ts).
+  version: { label: 'Version', required: false, kind: 'text' },
 };
 const CONTAINER_ORDER: (keyof ContainerAttributes)[] = [
   'technology',
@@ -159,6 +167,7 @@ const CONTAINER_ORDER: (keyof ContainerAttributes)[] = [
   'introduced',
   'plannedEnd',
   'lifecycleStatus',
+  'version',
   'criticality',
   'hostingModel',
   'hostingProvider',
