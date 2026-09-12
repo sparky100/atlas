@@ -1,13 +1,20 @@
-import { useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
+import type { UUID } from '../../../contracts/delta';
 import type { Ref } from '../../../db/ref';
 import type { ViewMode } from '../../../db/viewMode';
+import { Button } from '../../components/Button/Button';
 import { Text } from '../../components/Text/Text';
-import { useBranchLabel } from '../useBranchLabel';
+import { useSubmitForReview } from '../../changes/useSubmitForReview';
+import { useEditingBranch } from '../useEditingBranch';
 import { useSelectedRef } from '../useSelectedRef';
 import styles from './EditingBranchBanner.module.css';
 
 export interface EditingBranchBannerProps {
   activeRef: Ref;
+  /** For "Submit for review"'s own commit-review computation and its post-submit navigation to the new request's page — every caller already has these three in scope for its own routing/data needs. */
+  modelId: UUID;
+  orgSlug: string;
+  modelSlug: string;
   /**
    * Whether this page's own `?mode=` (As-is/To-be/Diff, `BranchViewModeControl`)
    * is actually consumed — Landscape/Context/Container/Component all are;
@@ -18,24 +25,48 @@ export interface EditingBranchBannerProps {
    * Defaults `true` since most callers do support it.
    */
   showModeShortcuts?: boolean;
+  /**
+   * `ChangePage.tsx` is the one caller that must opt out: it renders this
+   * banner *and* `ChangeView.tsx`'s own, pre-existing "Submit for review"
+   * button on the very same page — without this, a change's own page would
+   * show the identical action twice (a real strict-mode duplicate this
+   * item's own e2e regression sweep caught: `getByRole('button', { name:
+   * 'Submit for review' })` resolving to two elements at once). Every other
+   * caller has no button of its own to collide with, so this defaults
+   * `true`, same convention as `showModeShortcuts` above.
+   */
+  showSubmitForReview?: boolean;
 }
 
 /**
- * Sprint 7i item 2: "While a change is selected, every page shows a
- * persistent banner: 'Editing in change: <name>' with To-be/Diff shortcuts
- * and 'Back to main'; save toasts say the edit went to the change" (the
- * toast half is `toastStore.ts`/`ToastHost.tsx`).
+ * Sprint 7i item 2 / S1 item 1 (docs/prompts/atlas-prompt-pack.md): "While
+ * a change is selected, every page shows a persistent banner: 'Editing in
+ * change: <name>' with To-be/Diff shortcuts and 'Back to main'" — S1 item
+ * 1 adds the other half of leaving a change: "'Submit for review' (finish;
+ * Proposed; ref -> main). Never one button for both." Until now, submitting
+ * only existed on the change's own page (`ChangeView.tsx`); a reviewer or
+ * proposer working from anywhere else (an element page, the landscape) had
+ * no way to finish a change without first navigating back to it.
  *
- * Self-contained — one line per route (`<EditingBranchBanner activeRef={ref} />`,
+ * "Leave" vs "finish," same distinction `ChangeView.tsx`'s own module
+ * comment already draws for its copy of this action: "Back to main" leaves
+ * a still-editable Draft in place (nothing changes about the branch
+ * itself); "Submit for review" finishes it — the branch goes read-only for
+ * the proposer the instant it's Proposed (`canEditBranch`'s own
+ * `status === 'draft'` gate) — so, like `ChangeView.tsx`'s own submit
+ * handler, this clears the session's active ref only when *this* branch
+ * was the one actually selected, and always navigates to the new request's
+ * review page on success. Only rendered while the branch is still `draft`
+ * (`useEditingBranch`'s own resolution) — once it's Proposed or further,
+ * either an open request already exists (nothing left to submit) or this
+ * page's own reviewer never had a "submit" action to begin with.
+ *
+ * Self-contained — one line per route (`<EditingBranchBanner activeRef={ref} modelId={...} orgSlug={...} modelSlug={...} />`,
  * right inside `<main>`, before the breadcrumb) rather than a shared
  * `AppShell` wrapper: no such wrapper exists anywhere in this codebase yet
  * (every route independently renders `AppHeader`/`ModelNav` itself), and
  * introducing one is a structural refactor this feature doesn't need to
- * bundle with. Resolves its own branch label via `useBranchLabel` (the
- * same hook `ContextPage.tsx`/`ContainerPage.tsx`/`ComponentPage.tsx`
- * already call) rather than requiring every caller to have a `BranchRow`
- * in hand — `LandscapePage.tsx`/`CapabilityMapPage.tsx`/`ModelHome.tsx`
- * don't otherwise need one.
+ * bundle with.
  *
  * Renders nothing outside a `branch:` ref — "a change is selected" per the
  * prompt's own wording, not "this page happens to support editing it"
@@ -43,10 +74,16 @@ export interface EditingBranchBannerProps {
  * being able to edit into it at all; the banner's job is orientation, not
  * a promise that this exact page is writable).
  */
-export function EditingBranchBanner({ activeRef, showModeShortcuts = true }: EditingBranchBannerProps) {
+export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, showModeShortcuts = true, showSubmitForReview = true }: EditingBranchBannerProps) {
   const [, setSearchParams] = useSearchParams();
-  const { clearRef } = useSelectedRef();
-  const { label } = useBranchLabel(activeRef);
+  const navigate = useNavigate();
+  const { ref, clearRef } = useSelectedRef();
+  // `useEditingBranch` gives the full row (title, status), not just a
+  // label — this banner needs `status` too, to know whether "Submit for
+  // review" applies at all, and folds `useBranchLabel`'s own job into the
+  // same fetch rather than a second one.
+  const { branch } = useEditingBranch(activeRef.kind === 'branch' ? modelId : null, activeRef);
+  const submission = useSubmitForReview(modelId, branch);
 
   if (activeRef.kind !== 'branch') return null;
 
@@ -76,10 +113,21 @@ export function EditingBranchBanner({ activeRef, showModeShortcuts = true }: Edi
     clearRef();
   };
 
+  const submitForReview = () => {
+    void submission.submit().then((mergeRequestId) => {
+      if (!mergeRequestId) return;
+      // Only clear the session's own selection if this branch was actually
+      // it — a reviewer or bystander submitting from a change page they
+      // weren't editing in has nothing of their own to reset.
+      if (ref.kind === 'branch' && ref.branchId === activeRef.branchId) clearRef();
+      void navigate(`/o/${orgSlug}/m/${modelSlug}/review/${mergeRequestId}`);
+    });
+  };
+
   return (
     <div className={styles.banner} role="status">
       <Text as="span" size="sm">
-        Editing in change: {label ?? activeRef.branchId.slice(0, 8)}
+        Editing in change: {branch?.title ?? branch?.name ?? activeRef.branchId.slice(0, 8)}
       </Text>
       {showModeShortcuts && (
         <div className={styles.shortcuts}>
@@ -91,9 +139,19 @@ export function EditingBranchBanner({ activeRef, showModeShortcuts = true }: Edi
           </button>
         </div>
       )}
+      {showSubmitForReview && branch?.status === 'draft' && (
+        <Button variant="primary" onClick={submitForReview} disabled={submission.status === 'submitting'}>
+          {submission.status === 'submitting' ? 'Submitting…' : 'Submit for review'}
+        </Button>
+      )}
       <button type="button" className={[styles.link, styles.backToMain].join(' ')} onClick={backToMain}>
         Back to main
       </button>
+      {showSubmitForReview && submission.error !== null && (
+        <Text as="p" size="sm">
+          {submission.error}
+        </Text>
+      )}
     </div>
   );
 }

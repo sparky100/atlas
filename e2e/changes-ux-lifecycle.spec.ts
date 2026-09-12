@@ -69,7 +69,7 @@ test('propose a change from an element page as a contributor, edit, submit; appr
   // draft/contributor-editable), and the save toast (item 2's other half)
   // says where it went.
   await contributorPage.getByRole('button', { name: '✎ Edit' }).click();
-  await contributorPage.getByLabel('Vendor').fill('Ridgeline Systems');
+  await contributorPage.getByLabel('Vendor', { exact: true }).fill('Ridgeline Systems');
   await contributorPage.getByRole('button', { name: 'Save' }).click();
   await expect(contributorPage.getByRole('button', { name: '✎ Edit' })).toBeVisible({ timeout: 15_000 });
   await expect(contributorPage.getByText(`Saved to change: ${changeName}`)).toBeVisible();
