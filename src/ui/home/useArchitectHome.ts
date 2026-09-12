@@ -14,6 +14,8 @@ import {
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
+  findExternalInterfacesMissingClassification,
+  findExternalOrganisationAccess,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
@@ -24,10 +26,12 @@ import {
   listFactsForCommit,
   listUsesAndFlowsToEndpointElements,
   type BoundaryCrossing,
+  type ExternalInterfaceCrossing,
+  type ExternalOrganisationAccess,
   type StaleAttributesFinding,
   type UnlabeledVerbRelationship,
 } from '../../db/healthFindings';
-import { listSystemsForLandscape } from '../../db/landscape';
+import { listActorsForLandscape, listSystemsForLandscape } from '../../db/landscape';
 import { listOpenMergeRequestsForModel } from '../../db/mergeRequests';
 import { listAllSupportsEdges, listDeltasForCommits, listRecentCommits } from '../../db/modelHome';
 import { listProfilesByIds } from '../../db/profiles';
@@ -77,6 +81,10 @@ export interface ArchitectHomeData {
   boundaryCrossingsMissingClassification: BoundaryCrossing[];
   /** Prompt 7k item 5's third Assurance finding: critical systems past or within `STALE_AFTER_MONTHS` of vendor support end. */
   criticalSystemsPastOrNearSupportEnd: ElementsHeadRow[];
+  /** S1 item 11a's own first Assurance finding: a `uses`/`flows_to` edge crossing the enterprise/external boundary (`isExternal`/`externalOrganisation`, not IT/OT domain) with no data classification. */
+  externalInterfacesMissingClassification: ExternalInterfaceCrossing[];
+  /** S1 item 11a's own second Assurance row: purely informational — every external actor `uses` edge, naming the organisation and which system it reaches. No classification requirement (see that finding's own doc comment for why). */
+  externalOrganisationAccess: ExternalOrganisationAccess[];
 }
 
 export type ArchitectHomeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeData };
@@ -111,7 +119,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
         return;
       }
 
-      const [commits, reviewQueue, changeBranches, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints] = await Promise.all([
+      const [commits, reviewQueue, changeBranches, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors] = await Promise.all([
         // S1 item 6: "recent activity" now groups consecutive same-subject
         // commits into one line and prefers others' activity when trimming
         // to five displayed items (groupRecentActivity.ts) — both can
@@ -128,10 +136,18 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
         listFactsForCommit(supabase, main.head_commit_id),
         listAllUsesAndFlowsToEdges(supabase, main.head_commit_id),
         listUsesAndFlowsToEndpointElements(supabase, main.head_commit_id),
+        // S1 item 11a: an actor can now be a `uses` edge's own endpoint too
+        // (`relationshipTypeRules.ts`'s new actor→system/container rows) —
+        // `listUsesAndFlowsToEndpointElements` above deliberately excludes
+        // actors (its own doc comment: system/container/component only,
+        // every type `uses`/`flows_to` could touch *before* this item), so
+        // resolving an actor endpoint needs this separate fetch merged in
+        // below, not a widened filter on that one.
+        listActorsForLandscape(supabase, main.head_commit_id),
       ]);
 
       const myOpenBranches = changeBranches.filter((b) => b.created_by === userId && MY_OPEN_STATUSES.includes(b.status));
-      const usesAndFlowsToEndpointsById = new Map(usesAndFlowsToEndpoints.map((el) => [el.element_id, el]));
+      const usesAndFlowsToEndpointsById = new Map([...usesAndFlowsToEndpoints, ...actors].map((el) => [el.element_id, el]));
 
       // Sprint U4-1 B2: author display name and named-subject links for
       // each shown commit, both batched once across every row rather than
@@ -189,6 +205,8 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             systemsSupportingEssentialFunctionWithoutTechnicalOwner: findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supportsEdges, ownsEdges),
             boundaryCrossingsMissingClassification: findBoundaryCrossingsMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             criticalSystemsPastOrNearSupportEnd: findCriticalSystemsPastOrNearSupportEnd(systems),
+            externalInterfacesMissingClassification: findExternalInterfacesMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
+            externalOrganisationAccess: findExternalOrganisationAccess(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
           },
         });
       }

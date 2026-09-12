@@ -181,7 +181,7 @@ export function useLandscape(
       // Populated only for a branch ref, closed over below so every
       // downstream query (edges, supports, capability lookups) reads the
       // same folded state instead of re-resolving it per call.
-      let systemsSource: { edges: (systemIds: UUID[]) => RelationshipsHeadRow[]; supports: (systemIds: UUID[]) => RelationshipsHeadRow[]; byIds: (ids: UUID[]) => Map<UUID, ElementsHeadRow> } | undefined;
+      let systemsSource: { edges: (systemIds: UUID[], actorIds: UUID[]) => RelationshipsHeadRow[]; supports: (systemIds: UUID[]) => RelationshipsHeadRow[]; byIds: (ids: UUID[]) => Map<UUID, ElementsHeadRow> } | undefined;
 
       if (ref.kind === 'branch') {
         const branch = await resolveBranchRef(supabase, ref);
@@ -201,7 +201,7 @@ export function useLandscape(
         allActors = projectionActorsForLandscape(resolved.projection);
         allContainers = projectionContainersForLandscape(resolved.projection);
         systemsSource = {
-          edges: (systemIds) => projectionLandscapeEdges(resolved.projection, systemIds),
+          edges: (systemIds, actorIds) => projectionLandscapeEdges(resolved.projection, systemIds, actorIds),
           supports: (systemIds) => projectionSupportsEdgesForSystems(resolved.projection, systemIds),
           byIds: (ids) => projectionElementsByIds(resolved.projection, ids),
         };
@@ -249,9 +249,13 @@ export function useLandscape(
       if (moduleNodes.length > 0) allSystems = [...allSystems, ...moduleNodes];
 
       const systemIds = allSystems.map((s) => s.element_id);
+      // S1 item 11a: an actor's own `uses` edge to a system needs the
+      // actor's id in this fetch's own endpoint set too, or it's silently
+      // dropped the way a systems-only fetch always used to.
+      const actorIds = allActors.map((a) => a.element_id);
       const [edges, supportsEdges] = systemsSource
-        ? [systemsSource.edges(systemIds), systemsSource.supports(systemIds)]
-        : await Promise.all([listLandscapeEdges(supabase, commitId, systemIds), listSupportsEdgesForSystems(supabase, commitId, systemIds)]);
+        ? [systemsSource.edges(systemIds, actorIds), systemsSource.supports(systemIds)]
+        : await Promise.all([listLandscapeEdges(supabase, commitId, systemIds, actorIds), listSupportsEdgesForSystems(supabase, commitId, systemIds)]);
       const byIds: (ids: readonly UUID[]) => Promise<Map<UUID, ElementsHeadRow>> = systemsSource ? (ids) => Promise.resolve(systemsSource.byIds([...ids])) : (ids) => getElementsByIds(supabase, commitId, ids);
       const l1AncestorByCapabilityId = await loadL1AncestorByCapabilityId(byIds, supportsEdges);
 

@@ -11,6 +11,11 @@ const GLYPH: Record<ElementType, string> = {
 const ACTOR_GLYPH: Record<ActorSubtype, string> = {
   person: '◉',
   team: '◎',
+  // S1 item 11a: a third-party organisation (a regulator, a supplier) —
+  // a diamond, distinct from person/team's circle family, since it's a
+  // different *kind* of actor (an entity, not people), not merely a
+  // bigger/smaller version of the same shape.
+  organisation: '◈',
 };
 
 /**

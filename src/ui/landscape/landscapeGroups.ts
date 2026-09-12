@@ -76,8 +76,8 @@ function byNameThenId(a: ElementsHeadRow, b: ElementsHeadRow): number {
  * @param systems Landscape nodes (src/db/landscape.ts's `listSystemsForLandscape`).
  * @param supportsEdges `supports` relationships from a system to a capability — the exact same input `computeLandscapeLayout` takes, for the exact same lane assignment.
  * @param l1AncestorByCapabilityId Every capability actually named by `supportsEdges`' targets, mapped to its own level-1 ancestor row — same shape `computeLandscapeLayout` takes.
- * @param actors Actors — item 13's own leading group.
- * @param edges `uses`/`flows_to` relationships between systems (`listLandscapeEdges`) — the same edges the desktop canvas draws, read here only to count each system's own "uses N · used by N", never rendered as a line (this is a list, not a diagram).
+ * @param actors Actors — item 13's own leading group, internal ones only as of S1 item 11a: an external actor instead joins the External group's own members, alongside external systems (`buildGroup`'s own `extraMembers`, below) — the same "one outside region, actors included" placement `layout.ts`'s `computeLandscapeLayout` now gives the desktop canvas.
+ * @param edges `uses`/`flows_to` relationships, system or actor sourced (`listLandscapeEdges`) — the same edges the desktop canvas draws, read here only to count each member's own "uses N · used by N", never rendered as a line (this is a list, not a diagram).
  */
 export function computeLandscapeGroups(
   systems: readonly ElementsHeadRow[],
@@ -86,7 +86,12 @@ export function computeLandscapeGroups(
   actors: readonly ElementsHeadRow[],
   edges: readonly RelationshipsHeadRow[],
 ): LandscapeGroups {
-  const { boundaryKeys, hasExternalLane, byLane, l1CapabilitiesById, extraLaneCountByElementId, referenceTargets } = groupSystemsByLane(systems, supportsEdges, l1AncestorByCapabilityId);
+  const { boundaryKeys, hasExternalLane: hasExternalSystemLane, byLane, l1CapabilitiesById, extraLaneCountByElementId, referenceTargets } = groupSystemsByLane(systems, supportsEdges, l1AncestorByCapabilityId);
+
+  // S1 item 11a — see this function's own `actors` param doc comment.
+  const internalActors = actors.filter((a) => attributesRecord(a.attributes).isExternal !== true);
+  const externalActors = actors.filter((a) => attributesRecord(a.attributes).isExternal === true);
+  const hasExternalLane = hasExternalSystemLane || externalActors.length > 0;
 
   // Secondary-supporter wording: this file's own copy of `layout.ts`'s
   // identical grouping (that module's `supportsBySystem` is private to its
@@ -116,7 +121,7 @@ export function computeLandscapeGroups(
     referencedByLaneKey.set(ref.laneKey, list);
   }
 
-  function buildGroup(key: string, region: LandscapeLaneRegion): LandscapeGroup {
+  function buildGroup(key: string, region: LandscapeLaneRegion, extraMembers: readonly ElementsHeadRow[] = []): LandscapeGroup {
     const label = key === EXTERNAL_LANE_KEY ? 'External' : key === OT_ZONE_LANE_KEY ? 'OT' : key === PLATFORM_BAND_KEY ? 'Platforms' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
     // A genuine capability lane's own key is that capability's element id
     // (`l1CapabilitiesById.has(key)`) — the four special lanes never have a
@@ -139,7 +144,10 @@ export function computeLandscapeGroups(
       const ownEdges = (supportsBySystem.get(systemId) ?? []).filter((e) => l1AncestorByCapabilityId.get(e.to_element_id)?.element_id === key);
       return ownEdges.some((e) => attributesRecord(e.attributes).role === 'primary') ? 'primary' : 'secondary';
     }
-    const anchoredMembers: LandscapeGroupMember[] = (byLane.get(key) ?? []).map((system) => {
+    // `extraMembers` (external actors, only ever passed for the External
+    // group) merge in and re-sort alongside the lane's own systems — one
+    // alphabetised member list, not actors trailing behind every system.
+    const anchoredMembers: LandscapeGroupMember[] = [...(byLane.get(key) ?? []), ...extraMembers].sort(byNameThenId).map((system) => {
       const extraLaneCount = extraLaneCountByElementId.get(system.element_id);
       const usesCount = usesCountByElementId.get(system.element_id) ?? 0;
       const usedByCount = usedByCountByElementId.get(system.element_id) ?? 0;
@@ -162,7 +170,7 @@ export function computeLandscapeGroups(
   }
 
   const groups: LandscapeGroup[] = boundaryKeys.map((key) => buildGroup(key, key === UNASSIGNED_LANE_KEY ? 'unassigned' : key === OT_ZONE_LANE_KEY ? 'ot' : key === PLATFORM_BAND_KEY ? 'platform' : 'capability'));
-  if (hasExternalLane) groups.push(buildGroup(EXTERNAL_LANE_KEY, 'external'));
+  if (hasExternalLane) groups.push(buildGroup(EXTERNAL_LANE_KEY, 'external', externalActors));
 
-  return { actors: [...actors].sort(byNameThenId), groups };
+  return { actors: [...internalActors].sort(byNameThenId), groups };
 }

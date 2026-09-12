@@ -908,3 +908,66 @@ describe('C18 (Prompt 7k item 4): uses.via/flows_to.via must reference a live in
     expect(() => fold(head, [clearVia], ctx)).not.toThrow();
   });
 });
+
+describe('C20 (S1 item 11a): owns.role from an external actor must be "service"', () => {
+  function elementCreate(id: UUID, elementId: UUID, elementType: ElementType, name: string, attributes: Record<string, Json> = {}): Delta {
+    const base = elementType === 'system' ? { lifecycleStatus: 'active', isExternal: false } : elementType === 'actor' ? { subtype: 'organisation', isExternal: false } : {};
+    return { kind: 'element.create', id, elementId, elementType, name, parentId: null, attributes: { ...base, ...attributes } as never, sourceId: 'src', confidence: 1 };
+  }
+
+  function systemAndActor(actorIsExternal: boolean): Head {
+    return fold(
+      emptyHead(),
+      [
+        elementCreate('d-sys', 'sys-1', 'system', 'Reporting System'),
+        elementCreate('d-actor', 'act-1', 'actor', 'Ofgem', actorIsExternal ? { isExternal: true, externalOrganisation: 'Ofgem' } : { isExternal: false }),
+      ],
+      ctx,
+    );
+  }
+
+  function ownsCreate(relationshipId: UUID, role: OwnsRole): Delta {
+    return { kind: 'relationship.create', id: `d-${relationshipId}`, relationshipId, relationshipType: 'owns', fromElementId: 'act-1', toElementId: 'sys-1', attributes: { role }, sourceId: 'src', confidence: 1 };
+  }
+
+  it('accepts role "service" from an external actor', () => {
+    const head = systemAndActor(true);
+    expect(() => fold(head, [ownsCreate('rel-1', 'service')], ctx)).not.toThrow();
+  });
+
+  it('rejects role "business" from an external actor, naming C20', () => {
+    const head = systemAndActor(true);
+    const attempt = () => fold(head, [ownsCreate('rel-1', 'business')], ctx);
+    expect(attempt).toThrow(EngineError);
+    expect(attempt).toThrow(/C20/);
+  });
+
+  it('rejects role "technical" from an external actor', () => {
+    const head = systemAndActor(true);
+    expect(() => fold(head, [ownsCreate('rel-1', 'technical')], ctx)).toThrow(/C20/);
+  });
+
+  it('accepts any role from an internal actor — the restriction only applies to an external owner', () => {
+    const head = systemAndActor(false);
+    expect(() => fold(head, [ownsCreate('rel-1', 'business')], ctx)).not.toThrow();
+    const head2 = systemAndActor(false);
+    expect(() => fold(head2, [ownsCreate('rel-2', 'technical')], ctx)).not.toThrow();
+  });
+
+  it('relationship.update: promoting an external actor\'s own owns edge away from "service" is rejected the same way as at create', () => {
+    const head = systemAndActor(true);
+    fold(head, [ownsCreate('rel-1', 'service')], ctx);
+    const promote: Delta = { kind: 'relationship.update', id: 'd-promote', relationshipId: 'rel-1', relationshipType: 'owns', attribute: 'role', value: 'business', previousDeltaId: 'd-rel-1', sourceId: 'src', confidence: 1 };
+    expect(() => fold(head, [promote], ctx)).toThrow(/C20/);
+  });
+
+  it('relationship.restore: reviving a stale external-owner edge is not re-checked, matching C18\'s own convention', () => {
+    // Retracting then restoring an edge that was already legally
+    // "service" reconstructs exactly that state — nothing to reject
+    // regardless of whether restore re-runs C20.
+    const created = fold(systemAndActor(true), [ownsCreate('rel-1', 'service')], ctx);
+    const retracted = fold(created, [{ kind: 'relationship.retract', id: 'd-retract', relationshipId: 'rel-1', relationshipType: 'owns', previousDeltaId: 'd-rel-1', sourceId: 'src', confidence: 1 }], ctx);
+    const restore: Delta = { kind: 'relationship.restore', id: 'd-restore', relationshipId: 'rel-1', relationshipType: 'owns', previousDeltaId: 'd-retract', sourceId: 'src', confidence: 1 };
+    expect(() => fold(retracted, [restore], ctx)).not.toThrow();
+  });
+});

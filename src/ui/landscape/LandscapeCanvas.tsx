@@ -352,7 +352,12 @@ export function LandscapeCanvas({
   // here exactly like viewport culling and LOD already do below.
   const routedEdges = useMemo(() => {
     const allPositions: LandscapeNodePosition[] = [...layout.nodes, ...layout.actorNodes];
-    const positionById = new Map(layout.nodes.map((n) => [n.elementId, n]));
+    // S1 item 11a: an actor can now be a `uses` edge's own `from` endpoint
+    // — this map used to be systems-only (every edge source was a system
+    // or container), so an actor-sourced edge silently found no position
+    // and was dropped. `allPositions` already combines both for obstacle
+    // purposes; edge endpoint lookup needs the same combination.
+    const positionById = new Map(allPositions.map((n) => [n.elementId, n]));
     const channels = computeLandscapeChannels(layout);
     const result: { edge: RelationshipsHeadRow; points: { x: number; y: number }[] }[] = [];
     for (const edge of edges) {
@@ -580,6 +585,15 @@ export function LandscapeCanvas({
       }
 
       const edgeMarkers: { text: string; worldX: number; worldY: number; colour: string }[] = [];
+      // S1 item 11a: an actor's own `uses` edge shows its verb phrase
+      // ("submits RIIO returns to") right on the canvas — unlike a
+      // system-to-system edge, which has never had an on-canvas label
+      // (its own description only ever showed on the element page's
+      // RelationshipsSection row and the Context view). Scoped to actor-
+      // involved edges only, not every edge: this is new drawing surface
+      // this item specifically asked for, not a general "label every
+      // edge" redesign of the existing, already-dense system web.
+      const edgeLabels: { text: string; worldX: number; worldY: number }[] = [];
       if (edgeScreenWidth >= 0.25) {
         const simplified = edgeScreenWidth < 0.5;
         for (const { edge, points } of routedEdges) {
@@ -611,6 +625,14 @@ export function LandscapeCanvas({
           if (diff && (edgeState === 'added' || edgeState === 'changed') && !simplified) {
             const mid = polylineMidpoint(points);
             edgeMarkers.push({ text: edgeState === 'added' ? '+' : '~', worldX: mid.x, worldY: mid.y, colour: diffColour ?? tokens.text });
+          }
+
+          if (showLabels && !simplified && (actorsById.has(edge.from_element_id) || actorsById.has(edge.to_element_id))) {
+            const description = attributesRecord(edge.attributes).description;
+            if (typeof description === 'string' && description.trim().length > 0) {
+              const mid = polylineMidpoint(points);
+              edgeLabels.push({ text: description, worldX: mid.x, worldY: mid.y });
+            }
           }
 
           // "Aggregated": below the 0.5px tier, a plain hairline with no
@@ -760,7 +782,7 @@ export function LandscapeCanvas({
       // fixed on-screen size within a zoom step, not scale continuously
       // with the gesture the way node geometry does, so it can't share the
       // world-transformed pass above.
-      if (laneLabels.length > 0 || nodeLabels.length > 0 || diffMarkers.length > 0 || edgeMarkers.length > 0 || extraLaneMarkers.length > 0 || referenceChips.length > 0 || commentMarkers.length > 0 || hollowCommentMarkers.length > 0) {
+      if (laneLabels.length > 0 || nodeLabels.length > 0 || diffMarkers.length > 0 || edgeMarkers.length > 0 || edgeLabels.length > 0 || extraLaneMarkers.length > 0 || referenceChips.length > 0 || commentMarkers.length > 0 || hollowCommentMarkers.length > 0) {
         const textScale = quantizeScale(transform.scale, MIN_SCALE, MAX_SCALE);
         const toScreen = (worldX: number, worldY: number): [number, number] => [worldX * transform.scale + transform.tx, worldY * transform.scale + transform.ty];
         ctx.textBaseline = 'middle';
@@ -805,6 +827,20 @@ export function LandscapeCanvas({
           const truncated = truncate(ctx, label.name, maxWidth);
           ctx.fillText(truncated, x + 30 * textScale, y + screenNodeHeight / 2);
         }
+
+        // S1 item 11a: an actor's own `uses` edge verb phrase, centred on
+        // the edge's own midpoint — plain muted text, same treatment as a
+        // lane label, not a filled pill (`referenceChips`' own shape):
+        // this labels a line, not a small fixed-size marker.
+        ctx.font = `${(11 * textScale).toFixed(2)}px sans-serif`;
+        ctx.fillStyle = tokens.textMuted;
+        ctx.textAlign = 'center';
+        for (const label of edgeLabels) {
+          const [x, y] = toScreen(label.worldX, label.worldY);
+          const truncated = truncate(ctx, label.text, NODE_WIDTH * 1.5 * textScale);
+          ctx.fillText(truncated, x, y - 6 * textScale);
+        }
+        ctx.textAlign = 'left';
 
         // §6.3's "+"/"−"/"~N"/"⤴" badges — a small filled circle behind the
         // glyph so it reads against any node/edge colour underneath, node

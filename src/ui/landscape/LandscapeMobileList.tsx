@@ -164,18 +164,22 @@ function SystemRow({ member, elementHref, contextHref }: { member: LandscapeGrou
   const external = attrs.isExternal === true;
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
+  // S1 item 11a: an external actor is now a real member of the External
+  // group (`landscapeGroups.ts`'s own `buildGroup` doc comment) — its own
+  // subtype glyph (person/team/organisation), not the bare actor glyph.
+  const actorSubtype = system.element_type === 'actor' && typeof attrs.subtype === 'string' ? (attrs.subtype as ActorSubtype) : undefined;
 
   // "Platforms and modules": a module tile's own element is a Container
   // (`system` here is really "the lane member," not always a System) —
   // it has no Context view of its own, same reasoning `contextHref`'s own
-  // doc comment already gives for an actor, so this row omits that link
-  // the same way an actor row would if it ever reached this component.
-  const isModule = system.element_type === 'container';
+  // doc comment already gives for an actor — extended here (S1 item 11a)
+  // since an actor can now genuinely reach this row, not just a module.
+  const hasNoContextView = system.element_type === 'container' || system.element_type === 'actor';
 
   return (
     <li className={styles.row}>
       <Link to={elementHref(system.element_id)} className={styles.rowMain}>
-        <ElementTypeGlyph type={system.element_type} external={external} />
+        <ElementTypeGlyph type={system.element_type} external={external} {...(actorSubtype !== undefined ? { actorSubtype } : {})} />
         <Text as="span" className={styles.rowName}>
           {system.name}
         </Text>
@@ -192,7 +196,7 @@ function SystemRow({ member, elementHref, contextHref }: { member: LandscapeGrou
         <Text as="span" size="sm" tone="muted">
           uses {usesCount} · used by {usedByCount}
         </Text>
-        {!isModule && (
+        {!hasNoContextView && (
           <Link to={contextHref(system.element_id)} className={styles.contextLink}>
             Context →
           </Link>

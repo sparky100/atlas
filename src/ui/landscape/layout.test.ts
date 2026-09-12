@@ -302,19 +302,50 @@ describe('computeLandscapeLayout', () => {
     expect(laneA.height).toBeGreaterThan(laneB.height); // the populated lane keeps its full content height
   });
 
-  it('actors get their own wrapped row above the boundary, both external and internal together (item 3)', () => {
+  it('an internal actor gets its own wrapped row above the boundary (item 3)', () => {
     const cap = capability('cap-1', 'Payments');
     const sys = system('sys-1', 'Billing Service');
     const internalActor = actor('act-1', 'Ops Team', false);
-    const externalActor = actor('act-2', 'Vendor Contact', true);
-    const layout = computeLandscapeLayout([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]), [internalActor, externalActor]);
-    expect(layout.actorNodes.map((n) => n.elementId).sort()).toEqual(['act-1', 'act-2']);
-    // Both actors sit on the row's own first line (name-sorted, both fit in
-    // one row well within the six-per-row capacity).
-    expect(new Set(layout.actorNodes.map((n) => n.y)).size).toBe(1);
+    const layout = computeLandscapeLayout([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]), [internalActor]);
+    expect(layout.actorNodes.map((n) => n.elementId)).toEqual(['act-1']);
     expect(layout.actorNodes[0]?.y).toBe(32); // PADDING — the very top of the canvas
     // Every lane starts below the actor row, not above it.
     for (const lane of layout.lanes) expect(lane.y).toBeGreaterThan(layout.actorNodes[0]?.y ?? 0);
+  });
+
+  it("an external actor joins the external band below the boundary, not the top actor row (S1 item 11a) — one 'outside' region for everything external, actors included", () => {
+    const cap = capability('cap-1', 'Payments');
+    const sys = system('sys-1', 'Billing Service');
+    const internalActor = actor('act-1', 'Ops Team', false);
+    const externalActor = actor('act-2', 'Ofgem', true);
+    const layout = computeLandscapeLayout([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]), [internalActor, externalActor]);
+
+    const internalNode = layout.actorNodes.find((n) => n.elementId === 'act-1');
+    const externalNode = layout.actorNodes.find((n) => n.elementId === 'act-2');
+    if (!internalNode || !externalNode) throw new Error('expected both actors to have a position');
+
+    // Internal actor: unchanged, top row.
+    expect(internalNode.y).toBe(32); // PADDING
+    // External actor: below the boundary, in the external band — never the
+    // top row, and never in `layout.nodes` (that array draws as a system,
+    // `LandscapeCanvas.tsx`'s own hardcoded `drawNode(..., 'system', ...)`
+    // loop — an actor must stay in `actorNodes` regardless of region).
+    expect(externalNode.y).toBeGreaterThan(layout.boundary.bottom);
+    expect(layout.nodes.some((n) => n.elementId === 'act-2')).toBe(false);
+
+    // The external band exists and is labelled "External" even though
+    // there is no external *system* here at all — only the actor.
+    const externalLane = layout.lanes.find((l) => l.region === 'external');
+    expect(externalLane?.label).toBe('External');
+  });
+
+  it("an external actor still gets the external band even when there is nothing else external at all", () => {
+    const cap = capability('cap-1', 'Payments');
+    const sys = system('sys-1', 'Billing Service');
+    const layout = computeLandscapeLayout([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]), [actor('act-1', 'Ofgem', true)]);
+    expect(layout.lanes.some((l) => l.region === 'external')).toBe(true);
+    expect(layout.actorNodes).toHaveLength(1);
+    expect(layout.actorNodes[0]?.y).toBeGreaterThan(layout.boundary.bottom);
   });
 
   it('with no actors at all, nothing reserves the actor row\'s own space — lanes start at PADDING', () => {

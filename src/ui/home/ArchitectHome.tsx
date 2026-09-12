@@ -8,7 +8,7 @@ import { HealthFinding, type HealthFindingItem } from '../components/HealthFindi
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import type { BoundaryCrossing, UnlabeledVerbRelationship } from '../../db/healthFindings';
+import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, UnlabeledVerbRelationship } from '../../db/healthFindings';
 import { formatRelativeTime } from '../time';
 import { branchStatusTone } from '../changes/branchStatus';
 import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
@@ -39,6 +39,16 @@ function unlabeledRelationshipItems(edges: readonly UnlabeledVerbRelationship[])
 /** Prompt 7k item 3: boundary crossings are relationship pairs too, same shape as `unlabeledRelationshipItems` above. */
 function boundaryCrossingItems(crossings: readonly BoundaryCrossing[]): HealthFindingItem[] {
   return crossings.map((crossing) => ({ id: crossing.relationshipId, label: `${crossing.fromName} → ${crossing.toName}` }));
+}
+
+/** S1 item 11a: the enterprise/external boundary's own crossings — same shape again, a different boundary. */
+function externalInterfaceItems(crossings: readonly ExternalInterfaceCrossing[]): HealthFindingItem[] {
+  return crossings.map((crossing) => ({ id: crossing.relationshipId, label: `${crossing.fromName} → ${crossing.toName}` }));
+}
+
+/** S1 item 11a's own second Assurance row — one row per external actor's own `uses` edge, naming the organisation and what it reaches. */
+function externalOrganisationAccessItems(access: readonly ExternalOrganisationAccess[]): HealthFindingItem[] {
+  return access.map((a) => ({ id: a.relationshipId, label: `${a.organisation} uses ${a.systemName}` }));
 }
 
 /**
@@ -107,6 +117,9 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
   // the relationship-shaped finding (unlabeledVerbRelationships) has no
   // browse-table home at all, so it gets no href.
   const browseHref = (filter: string) => `/o/${orgSlug}/m/${modelSlug}/elements?filter=${filter}`;
+  // S1 item 11a: both new Assurance rows share the one "View all" page —
+  // see `useExternalInterfaces.ts`'s own doc comment for why.
+  const externalInterfacesHref = `/o/${orgSlug}/m/${modelSlug}/external-interfaces`;
 
   // `duplicatesCount` is typed as the literal `0` (still wired to 0 until
   // Q1, ADR-019) — a placeholder notice, not a real check yet, so it's
@@ -181,7 +194,8 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
   ];
   const { active: activeHealthChecks, clear: clearHealthChecks } = partitionHealthChecks(healthChecks);
 
-  // Prompt 7k item 5's own three regulatory-alignment checks — grouped
+  // Prompt 7k item 5's own three regulatory-alignment checks, plus S1
+  // item 11a's own two external-boundary checks — five in all, grouped
   // under "Assurance" (S1 item 6), partitioned the same way as the group
   // above but kept independent of it (a clean Health findings group says
   // nothing about whether Assurance is also clean, and vice versa).
@@ -205,6 +219,27 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
       summary: `${String(data.criticalSystemsPastOrNearSupportEnd.length)} critical ${plural(data.criticalSystemsPastOrNearSupportEnd.length, 'system', 'systems')} past or near vendor support end`,
       items: elementItems(data.criticalSystemsPastOrNearSupportEnd),
       browseHref: browseHref('critical-support-end'),
+    },
+    {
+      key: 'external-interfaces-missing-classification',
+      count: data.externalInterfacesMissingClassification.length,
+      summary: `${String(data.externalInterfacesMissingClassification.length)} external interface${data.externalInterfacesMissingClassification.length === 1 ? '' : 's'} with no data classification`,
+      items: externalInterfaceItems(data.externalInterfacesMissingClassification),
+      browseHref: externalInterfacesHref,
+      browseLabel: 'View all →',
+    },
+    {
+      // S1 item 11a: purely informational (see this finding's own doc
+      // comment, healthFindings.ts) — still one of the nine/twelve checks
+      // for "N checks clear" purposes when nothing external has access at
+      // all, the same as every other check here; nothing about it being
+      // informational rather than a problem changes how it collapses.
+      key: 'external-organisation-access',
+      count: data.externalOrganisationAccess.length,
+      summary: `${String(data.externalOrganisationAccess.length)} external ${plural(data.externalOrganisationAccess.length, 'organisation', 'organisations')} with access`,
+      items: externalOrganisationAccessItems(data.externalOrganisationAccess),
+      browseHref: externalInterfacesHref,
+      browseLabel: 'View all →',
     },
   ];
   const { active: activeAssuranceChecks, clear: clearAssuranceChecks } = partitionHealthChecks(assuranceChecks);

@@ -180,7 +180,9 @@ const COMPONENT_META: Record<keyof ComponentAttributes, AttributeFieldMeta> = {
 };
 const COMPONENT_ORDER: (keyof ComponentAttributes)[] = ['technology', 'description'];
 
-const ACTOR_SUBTYPE_OPTIONS = ['person', 'team'] as const;
+// S1 item 11a: 'organisation' — a third-party entity (a regulator, a
+// supplier), see `ActorSubtype`'s own doc comment (delta.ts).
+const ACTOR_SUBTYPE_OPTIONS = ['person', 'team', 'organisation'] as const;
 
 const ACTOR_META: Record<keyof ActorAttributes, AttributeFieldMeta> = {
   subtype: { label: 'Type', required: true, kind: 'enum', options: ACTOR_SUBTYPE_OPTIONS },

@@ -101,7 +101,8 @@ export type SystemDomain = 'it' | 'ot' | 'hybrid';
  * kind), never a capability lane.
  */
 export type SystemKind = 'application' | 'integration_platform' | 'data_platform' | 'infrastructure' | 'platform';
-export type ActorSubtype = 'person' | 'team';
+/** S1 item 11a: adds `'organisation'` — a third-party entity (a regulator, a supplier) rather than an internal person or team; almost always paired with `isExternal: true`, though not enforced (an organisation subtype merely names the *kind* of actor, `isExternal` is the separate fact about whether it's outside the enterprise). */
+export type ActorSubtype = 'person' | 'team' | 'organisation';
 export type DataClassification = 'public' | 'official' | 'official_sensitive' | 'special_category';
 /** Sprint U4-1 B4: which of a system's `supports` edges anchors its one landscape lane (relationship_type_rules' new `maxPrimaryPerFrom: 1`, `supports`-only). Always set at creation, defaulting to `secondary` unless the picker's "primary?" prompt is answered yes — never left unset the way `SupportsAttributes.description` is, since lane placement has to read *something* off every edge. */
 export type SupportsRole = 'primary' | 'secondary';
@@ -557,6 +558,10 @@ export const COMMIT_INVARIANTS = [
   {
     id: 'C19',
     text: "fold: a merge commit whose first parent is in the ancestry of its second parent folds to the second parent's state plus its own deltas (ADR-021 §2.1/§5 item 1) — the final merge onto main, whose precondition mergeBase(B) == main.head (SPEC §7.1) guarantees this, rather than replaying the second parent's exclusive commits in commit order. A refresh commit (parent = the branch's own head) essentially never satisfies this, and keeps folding by replay as before.",
+  },
+  {
+    id: 'C20',
+    text: "relationship.create/relationship.update setting owns.role on an edge whose fromElementId is an actor with attributes.isExternal === true (in the resulting head): role must be 'service' (S1 item 11a) — an external actor (a regulator, a supplier) never holds business or technical ownership of something inside the enterprise, only a service relationship to it. Not re-checked at relationship.restore, matching C9's/C18's own convention (`src/engine/deltas.ts`'s doc comment on C18): a restored edge reconstructs exactly the state it last held, not re-validated against the current head.",
   },
 ] as const;
 

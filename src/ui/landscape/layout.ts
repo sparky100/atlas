@@ -58,10 +58,17 @@
  * `isExternal` system instead lands in its own band, placed *after* a gap
  * below the enterprise boundary (`boundary`, the y-range the boundary-
  * enclosed lanes span) rather than being one more lane inside it, matching
- * the C4 landscape convention item 3 asked for. Actors (both external and
- * internal) get their own wrapped row above everything, including the
- * boundary — `actorNodes`, laid out the same way a lane's members are, just
- * with no lane of their own to belong to.
+ * the C4 landscape convention item 3 asked for.
+ *
+ * S1 item 11a: actors split the same way systems do. An internal actor
+ * gets its own wrapped row above everything, including the boundary —
+ * `actorNodes`, laid out the same way a lane's members are, just with no
+ * lane of their own to belong to (unchanged from before this item). An
+ * external actor instead joins the `EXTERNAL_LANE_KEY` band alongside
+ * external systems — one "outside" region for everything external, not a
+ * second one just for actors — consistent with the same boundary the
+ * Context view and `owns` restriction (C20, `src/engine/deltas.ts`) both
+ * key off the same `isExternal` attribute for.
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
@@ -330,7 +337,7 @@ export { groupSystemsByLane };
  * @param systems Landscape nodes (src/db/landscape.ts's `listSystemsForLandscape`).
  * @param supportsEdges `supports` relationships from a system to a capability (`listSupportsEdgesForSystems`) — used only for lane assignment, never rendered as edges themselves (§6.1: landscape edges are `uses`/`flows_to` only).
  * @param l1AncestorByCapabilityId Every capability actually named by `supportsEdges`' targets, mapped to its own level-1 ancestor row (itself, if it already is one) — `src/ui/elements/capabilityDepth.ts`'s `l1AncestorOf`, resolved by the caller for each distinct target id. Lane labels come from these ancestor rows' own names, never a leaf sub-capability's.
- * @param actors Actors (`src/db/landscape.ts`'s `listActorsForLandscape`) — item 3's own top row, both external and internal together (visually distinguished, not separately grouped — `LandscapeCanvas.tsx`'s own concern).
+ * @param actors Actors (`src/db/landscape.ts`'s `listActorsForLandscape`) — item 3's own top row for internal ones; an external actor instead joins the external band below the boundary (S1 item 11a), same as an external system.
  * @param layoutWidthHint Item 7: the canvas's own on-screen width at layout time, when the caller has one — clamped to `MIN_LAYOUT_WIDTH` below. Omitted (this module's own tests, mostly) means "just use the floor."
  */
 export function computeLandscapeLayout(
@@ -344,29 +351,63 @@ export function computeLandscapeLayout(
   const availableRowWidth = layoutWidth - 2 * PADDING;
   const itemsPerRow = Math.max(1, Math.floor((availableRowWidth + NODE_GUTTER_X) / (NODE_WIDTH + NODE_GUTTER_X)));
 
-  const { boundaryKeys, hasExternalLane, byLane, l1CapabilitiesById, extraLaneCountByElementId, referenceTargets } = groupSystemsByLane(systems, supportsEdges, l1AncestorByCapabilityId);
+  const { boundaryKeys, hasExternalLane: hasExternalSystemLane, byLane, l1CapabilitiesById, extraLaneCountByElementId, referenceTargets } = groupSystemsByLane(
+    systems,
+    supportsEdges,
+    l1AncestorByCapabilityId,
+  );
+
+  // S1 item 11a: an external actor joins the external band below the
+  // boundary, alongside external systems, rather than the top actor row —
+  // laid out by `placeLane` below as a second wrapped row within the same
+  // "External" lane (never merged into `byLane`/`nodes` itself: a node
+  // pushed there draws as a *system* — `LandscapeCanvas.tsx`'s own
+  // `drawNode` calls, hardcoded per array — so an actor needs its own
+  // `actorNodes` entry regardless of which region it's placed in). An
+  // internal actor keeps the pre-item-11a top-row placement (`actorRow`,
+  // below).
+  const internalActors = actors.filter((a) => !isExternal(a));
+  const externalActors = actors.filter(isExternal);
+  const hasExternalLane = hasExternalSystemLane || externalActors.length > 0;
 
   const lanes: LandscapeLane[] = [];
   const nodes: LandscapeNodePosition[] = [];
+  const actorNodesInLanes: LandscapeNodePosition[] = [];
   const referenceMarkers: LandscapeReferenceMarker[] = [];
   let y = PADDING;
 
-  const actorRow = layoutRow([...actors].sort(byNameThenId), y, itemsPerRow);
+  const actorRow = layoutRow([...internalActors].sort(byNameThenId), y, itemsPerRow);
   if (actorRow.nodes.length > 0) y += actorRow.height + ACTOR_GUTTER_Y;
 
   const boundaryTop = y;
 
-  function placeLane(key: string, region: LandscapeLaneRegion): void {
+  /**
+   * `actorMembers` (S1 item 11a, external actors only — every other lane
+   * always passes none) get their own wrapped row *within* this lane,
+   * placed after the system row, but land in `actorNodesInLanes`, never
+   * `nodes` — a node in `nodes` draws as a system regardless of what
+   * element it actually is (`LandscapeCanvas.tsx`'s own hardcoded
+   * `drawNode(node.elementId, 'system', ...)` loop), so an actor placed
+   * here still needs the same `actorNodes`-array treatment the top actor
+   * row (`actorRow`, above) already gets.
+   */
+  function placeLane(key: string, region: LandscapeLaneRegion, actorMembers: readonly ElementsHeadRow[] = []): void {
     const members = [...(byLane.get(key) ?? [])].sort(byNameThenId);
     const label = key === EXTERNAL_LANE_KEY ? 'External' : key === OT_ZONE_LANE_KEY ? 'OT' : key === PLATFORM_BAND_KEY ? 'Platforms' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
     const row = layoutRow(members, y + LANE_LABEL_HEIGHT, itemsPerRow);
-    const laneHeight = members.length === 0 ? LANE_LABEL_HEIGHT + EMPTY_LANE_GUTTER_Y : LANE_LABEL_HEIGHT + row.height + LANE_GUTTER_Y;
+    const sortedActorMembers = [...actorMembers].sort(byNameThenId);
+    const actorRowTop = y + LANE_LABEL_HEIGHT + (members.length > 0 ? row.height + NODE_GUTTER_Y : 0);
+    const laneActorRow = layoutRow(sortedActorMembers, actorRowTop, itemsPerRow);
+    const hasAnyMembers = members.length > 0 || sortedActorMembers.length > 0;
+    const contentHeight = row.height + (sortedActorMembers.length > 0 ? (members.length > 0 ? NODE_GUTTER_Y : 0) + laneActorRow.height : 0);
+    const laneHeight = hasAnyMembers ? LANE_LABEL_HEIGHT + contentHeight + LANE_GUTTER_Y : LANE_LABEL_HEIGHT + EMPTY_LANE_GUTTER_Y;
     lanes.push({ key, label, region, y, height: laneHeight });
 
     for (const node of row.nodes) {
       const extraLaneCount = extraLaneCountByElementId.get(node.elementId);
       nodes.push(extraLaneCount === undefined ? node : { ...node, extraLaneCount });
     }
+    actorNodesInLanes.push(...laneActorRow.nodes);
 
     // The band's own right-edge reference chips (item 2 — never folded
     // into the label text) — stacked leftward from the right edge, one per
@@ -386,12 +427,12 @@ export function computeLandscapeLayout(
 
   if (hasExternalLane) {
     y += EXTERNAL_GUTTER_Y;
-    placeLane(EXTERNAL_LANE_KEY, 'external');
+    placeLane(EXTERNAL_LANE_KEY, 'external', externalActors);
   }
 
   return {
     nodes,
-    actorNodes: actorRow.nodes,
+    actorNodes: [...actorRow.nodes, ...actorNodesInLanes],
     lanes,
     referenceMarkers,
     boundary: { top: boundaryTop, bottom: boundaryBottom },

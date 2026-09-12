@@ -14,8 +14,15 @@ function flowsToEdge(from: string, to: string, description?: string): Relationsh
   return { relationship_id: 'r1', relationship_type: 'flows_to', from_element_id: from, to_element_id: to, attributes: description !== undefined ? { description } : {}, exists_delta_id: 'd-r1' };
 }
 
-function actor(id: string, name: string): ElementsHeadRow {
-  return { element_id: id, element_type: 'actor', name, parent_id: null, attributes: { subtype: 'team', isExternal: false }, exists_delta_id: `d-${id}` };
+function actor(id: string, name: string, external = false, externalOrganisation?: string): ElementsHeadRow {
+  return {
+    element_id: id,
+    element_type: 'actor',
+    name,
+    parent_id: null,
+    attributes: { subtype: external ? 'organisation' : 'team', isExternal: external, ...(externalOrganisation !== undefined ? { externalOrganisation } : {}) },
+    exists_delta_id: `d-${id}`,
+  };
 }
 
 function rel(id: string, type: RelationshipsHeadRow['relationship_type'], from: string, to: string): RelationshipsHeadRow {
@@ -145,6 +152,25 @@ describe('computeContextGroup', () => {
     const hub = system('hub', 'Hub');
     const group = computeContextGroup(hub, [rel('r1', 'uses', 'hub', 'missing')], new Map());
     expect(group.internal).toEqual([]);
+  });
+
+  it('S1 item 11a: an actor can now reach the hub via a real uses edge too, grouped internal/external exactly like a system neighbour', () => {
+    const hub = system('hub', 'Hub');
+    const internalActor = actor('act-1', 'Ops Team');
+    const externalActor = actor('act-2', 'Ofgem', true, 'Ofgem');
+    const group = computeContextGroup(hub, [rel('r1', 'uses', 'act-1', 'hub'), rel('r2', 'uses', 'act-2', 'hub')], new Map([['act-1', internalActor], ['act-2', externalActor]]));
+    expect(group.internal.map((n) => n.element.element_id)).toEqual(['act-1']);
+    expect(group.external.map((n) => n.element.element_id)).toEqual(['act-2']);
+  });
+
+  it('S1 item 11a: an owner carries its own isExternal/externalOrganisation, for ContextView.tsx\'s own internal/external split', () => {
+    const hub = system('hub', 'Hub');
+    const internalOwner = actor('owner1', 'Platform Team');
+    const externalOwner = actor('owner2', 'Ofgem', true, 'Ofgem');
+    const group = computeContextGroup(hub, [ownsRel('r1', 'owner1', 'hub', 'technical'), ownsRel('r2', 'owner2', 'hub', 'service')], new Map([['owner1', internalOwner], ['owner2', externalOwner]]));
+    const byId = new Map(group.owners.map((o) => [o.actor.element_id, o]));
+    expect(byId.get('owner1')).toMatchObject({ isExternal: false, externalOrganisation: null });
+    expect(byId.get('owner2')).toMatchObject({ isExternal: true, externalOrganisation: 'Ofgem' });
   });
 });
 

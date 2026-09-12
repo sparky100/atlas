@@ -175,6 +175,94 @@ export function findBoundaryCrossingsMissingClassification(edges: readonly Relat
   return findBoundaryCrossings(edges, elementsById).filter((crossing) => crossing.missingDataClassification);
 }
 
+export interface ExternalInterfaceCrossing {
+  relationshipId: UUID;
+  relationshipType: 'uses' | 'flows_to';
+  fromName: string;
+  toName: string;
+}
+
+/** A system/container counts as "external" for this finding either way ADR-001 lets it record the fact: `isExternal: true` outright, or an `externalOrganisation` actually named (S1 item 11a) — never an actor, which gets its own separate finding below. */
+function isExternalInterfaceElement(element: ElementsHeadRow): boolean {
+  if (element.element_type === 'actor') return false;
+  const attrs = attributesRecord(element.attributes);
+  if (attrs.isExternal === true) return true;
+  return typeof attrs.externalOrganisation === 'string' && attrs.externalOrganisation.trim() !== '';
+}
+
+/**
+ * S1 item 11a's own Assurance finding: a `flows_to` edge crossing the
+ * external boundary — exactly one endpoint external,
+ * `isExternalInterfaceElement` above, never both or neither (an edge
+ * between two external systems, or two internal ones, isn't a boundary
+ * crossing at all) — with no data classification recorded. `uses` is
+ * excluded outright, same reasoning `findBoundaryCrossings`'s own
+ * `missingDataClassification` already gives: `UsesAttributes` (delta.ts)
+ * has no `dataClassification` attribute to be missing, so flagging a
+ * `uses` edge here would be flagging a fact it never had anywhere to
+ * carry. A sibling to Prompt 7k item 3's own IT/OT
+ * `findBoundaryCrossings`, keyed on `isExternal`/`externalOrganisation`
+ * instead of `domain` — deliberately its own pass, not a filter over that
+ * one: the two boundaries (IT/OT vs. enterprise/external) are independent
+ * facts about an edge and can cross one, both, or neither.
+ */
+export function findExternalInterfacesMissingClassification(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): ExternalInterfaceCrossing[] {
+  const result: ExternalInterfaceCrossing[] = [];
+  for (const edge of edges) {
+    if (edge.relationship_type !== 'uses' && edge.relationship_type !== 'flows_to') continue;
+    const from = elementsById.get(edge.from_element_id);
+    const to = elementsById.get(edge.to_element_id);
+    if (!from || !to) continue;
+    const fromExternal = isExternalInterfaceElement(from);
+    const toExternal = isExternalInterfaceElement(to);
+    if (fromExternal === toExternal) continue; // both or neither — not a crossing.
+    // `uses` has no `dataClassification` attribute today at all
+    // (`UsesAttributes`, delta.ts) — same "only flows_to can be missing a
+    // fact it never had a place to carry" reasoning `findBoundaryCrossings`'s
+    // own `missingDataClassification` already applies. Written as a
+    // relationship-type check rather than "does this edge's own attributes
+    // happen to have the key" so it stays correct (and a genuine no-op)
+    // rather than silently starting to flag every `uses` edge if `uses`
+    // ever does gain the field later.
+    if (edge.relationship_type !== 'flows_to') continue;
+    const dataClassification = attributesRecord(edge.attributes).dataClassification;
+    if (typeof dataClassification === 'string' && dataClassification.trim() !== '') continue;
+    result.push({ relationshipId: edge.relationship_id, relationshipType: edge.relationship_type, fromName: from.name, toName: to.name });
+  }
+  return result;
+}
+
+export interface ExternalOrganisationAccess {
+  relationshipId: UUID;
+  organisation: string;
+  systemName: string;
+}
+
+/**
+ * S1 item 11a's own second Assurance row: not a "problem" the way the
+ * finding above is (there is no missing-metadata condition to flag — an
+ * external actor `uses` edge is only ever legal at all with a verb phrase,
+ * same as any other `uses` edge, Sprint U4-1 B5) — purely informational
+ * visibility into which outside organisations can reach in at all, and
+ * what they reach. One row per edge, not deduplicated by organisation: two
+ * separate `uses` edges from the same external actor into two different
+ * systems are two separate facts worth listing, not one.
+ */
+export function findExternalOrganisationAccess(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): ExternalOrganisationAccess[] {
+  const result: ExternalOrganisationAccess[] = [];
+  for (const edge of edges) {
+    if (edge.relationship_type !== 'uses') continue;
+    const actor = elementsById.get(edge.from_element_id);
+    const target = elementsById.get(edge.to_element_id);
+    if (!actor || !target || actor.element_type !== 'actor') continue;
+    const attrs = attributesRecord(actor.attributes);
+    if (attrs.isExternal !== true) continue;
+    const organisation = typeof attrs.externalOrganisation === 'string' && attrs.externalOrganisation.trim() !== '' ? attrs.externalOrganisation : actor.name;
+    result.push({ relationshipId: edge.relationship_id, organisation, systemName: target.name });
+  }
+  return result;
+}
+
 /**
  * Prompt 7k item 4's own health finding: every system with
  * `kind: 'integration_platform'` that no live `uses`/`flows_to` edge

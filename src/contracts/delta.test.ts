@@ -609,3 +609,50 @@ describe('System and container version (S1 item 11)', () => {
     expect(fromDeltaRow(toDeltaRow(setVersion, ctx))).toEqual(setVersion);
   });
 });
+
+describe('Actor subtype "organisation" and its own uses edge (S1 item 11a)', () => {
+  it('subtype "organisation" is accepted at create, with isExternal and externalOrganisation, and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-39',
+      elementId: 'act-1',
+      elementType: 'actor',
+      name: 'Ofgem',
+      parentId: null,
+      attributes: { subtype: 'organisation', isExternal: true, externalOrganisation: 'Ofgem' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('an actor→system uses edge is accepted at create and survives the row round trip ("Ofgem uses the reporting system")', () => {
+    const d: Delta = {
+      kind: 'relationship.create',
+      id: 'delta-40',
+      relationshipId: 'rel-4',
+      relationshipType: 'uses',
+      fromElementId: 'act-1',
+      toElementId: 'sys-1',
+      attributes: { description: 'submits RIIO returns to' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('an actor→container uses edge is accepted at create and survives the row round trip too', () => {
+    const d: Delta = {
+      kind: 'relationship.create',
+      id: 'delta-41',
+      relationshipId: 'rel-5',
+      relationshipType: 'uses',
+      fromElementId: 'act-1',
+      toElementId: 'container-1',
+      attributes: { description: 'submits data to' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+});

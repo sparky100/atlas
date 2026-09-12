@@ -58,6 +58,7 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
 
   // v1: one System.
   const systemAId = randomUUID();
+  const systemACreateDeltaId = randomUUID();
   const v1Envelope: CommitEnvelope = {
     id: randomUUID(),
     branchId: main.id,
@@ -67,7 +68,7 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
     title: 'add System A',
     body: null,
     deltas: [
-      { kind: 'element.create', id: randomUUID(), elementId: systemAId, elementType: 'system', name: 'System A', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: systemACreateDeltaId, elementId: systemAId, elementType: 'system', name: 'System A', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
     ],
   };
   const v1Result = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope: v1Envelope });
@@ -90,7 +91,7 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
   const systemBId = randomUUID();
   const v2Deltas: Delta[] = [
     { kind: 'element.create', id: randomUUID(), elementId: systemBId, elementType: 'system', name: 'System B', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
-    { kind: 'element.update', id: randomUUID(), elementId: systemAId, elementType: 'system', attribute: 'vendor', value: 'Acme Corp', previousDeltaId: v1Envelope.deltas[0]!.id, sourceId: seedSourceId, confidence: 1 },
+    { kind: 'element.update', id: randomUUID(), elementId: systemAId, elementType: 'system', attribute: 'vendor', value: 'Acme Corp', previousDeltaId: systemACreateDeltaId, sourceId: seedSourceId, confidence: 1 },
   ];
   const v2Envelope: CommitEnvelope = {
     id: randomUUID(),

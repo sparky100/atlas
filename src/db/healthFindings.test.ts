@@ -10,6 +10,8 @@ import {
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
+  findExternalInterfacesMissingClassification,
+  findExternalOrganisationAccess,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
@@ -24,6 +26,10 @@ function system(id: string, attributes: Record<string, Json> = {}): ElementsHead
 
 function container(id: string, parentId: string): ElementsHeadRow {
   return { element_id: id, element_type: 'container', name: `Container ${id}`, parent_id: parentId, attributes: {}, exists_delta_id: `delta-${id}` };
+}
+
+function actor(id: string, attributes: Record<string, Json> = {}): ElementsHeadRow {
+  return { element_id: id, element_type: 'actor', name: `Actor ${id}`, parent_id: null, attributes, exists_delta_id: `delta-${id}` };
 }
 
 function capability(id: string, parentId: string | null = null): ElementsHeadRow {
@@ -551,5 +557,130 @@ describe('findCriticalSystemsPastOrNearSupportEnd (Prompt 7k item 5)', () => {
   it('does not flag a critical system with no supportEndsAt at all, even with a near plannedEnd', () => {
     const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2027-01-01' })];
     expect(findCriticalSystemsPastOrNearSupportEnd(systems, now)).toEqual([]);
+  });
+});
+
+describe('findExternalInterfacesMissingClassification (S1 item 11a)', () => {
+  it('flags a flows_to edge between an internal and an external system with no data classification', () => {
+    const elementsById = new Map([
+      ['sys-int', system('sys-int')],
+      ['sys-ext', system('sys-ext', { isExternal: true })],
+    ]);
+    const edges = [relationship('r1', 'flows_to', 'sys-int', 'sys-ext')];
+    expect(findExternalInterfacesMissingClassification(edges, elementsById)).toEqual([{ relationshipId: 'r1', relationshipType: 'flows_to', fromName: 'System sys-int', toName: 'System sys-ext' }]);
+  });
+
+  it('a system with only externalOrganisation set (not isExternal) still counts as the external side', () => {
+    const elementsById = new Map([
+      ['sys-int', system('sys-int')],
+      ['sys-ext', system('sys-ext', { externalOrganisation: 'Acme Supplier' })],
+    ]);
+    const edges = [relationship('r1', 'flows_to', 'sys-int', 'sys-ext')];
+    expect(findExternalInterfacesMissingClassification(edges, elementsById)).toHaveLength(1);
+  });
+
+  it('is not flagged once a data classification is recorded', () => {
+    const elementsById = new Map([
+      ['sys-int', system('sys-int')],
+      ['sys-ext', system('sys-ext', { isExternal: true })],
+    ]);
+    const edges = [relationship('r1', 'flows_to', 'sys-int', 'sys-ext', { dataClassification: 'official' })];
+    expect(findExternalInterfacesMissingClassification(edges, elementsById)).toEqual([]);
+  });
+
+  it('never flagged when both endpoints are internal', () => {
+    const elementsById = new Map([
+      ['sys-a', system('sys-a')],
+      ['sys-b', system('sys-b')],
+    ]);
+    const edges = [relationship('r1', 'flows_to', 'sys-a', 'sys-b')];
+    expect(findExternalInterfacesMissingClassification(edges, elementsById)).toEqual([]);
+  });
+
+  it('never flagged when both endpoints are external — a crossing needs exactly one side external', () => {
+    const elementsById = new Map([
+      ['sys-a', system('sys-a', { isExternal: true })],
+      ['sys-b', system('sys-b', { isExternal: true })],
+    ]);
+    const edges = [relationship('r1', 'flows_to', 'sys-a', 'sys-b')];
+    expect(findExternalInterfacesMissingClassification(edges, elementsById)).toEqual([]);
+  });
+
+  it('an actor endpoint is never counted as the external side of this finding — it has its own separate finding', () => {
+    const elementsById = new Map([
+      ['sys-int', system('sys-int')],
+      ['act-1', actor('act-1', { isExternal: true, subtype: 'organisation' })],
+    ]);
+    const edges = [relationship('r1', 'uses', 'act-1', 'sys-int', { description: 'submits returns to' })];
+    expect(findExternalInterfacesMissingClassification(edges, elementsById)).toEqual([]);
+  });
+
+  it('a uses edge is never flagged — UsesAttributes carries no dataClassification field to be missing', () => {
+    const elementsById = new Map([
+      ['sys-int', system('sys-int')],
+      ['sys-ext', system('sys-ext', { isExternal: true })],
+    ]);
+    const edges = [relationship('r1', 'uses', 'sys-int', 'sys-ext', { description: 'polls' })];
+    expect(findExternalInterfacesMissingClassification(edges, elementsById)).toEqual([]);
+  });
+});
+
+describe('findExternalOrganisationAccess (S1 item 11a)', () => {
+  it('lists an external actor\'s own uses edge, naming its organisation and the system it reaches', () => {
+    const elementsById = new Map([
+      ['act-1', actor('act-1', { isExternal: true, subtype: 'organisation', externalOrganisation: 'Ofgem' })],
+      ['sys-1', system('sys-1')],
+    ]);
+    const edges = [relationship('r1', 'uses', 'act-1', 'sys-1', { description: 'submits RIIO returns to' })];
+    expect(findExternalOrganisationAccess(edges, elementsById)).toEqual([{ relationshipId: 'r1', organisation: 'Ofgem', systemName: 'System sys-1' }]);
+  });
+
+  it('falls back to the actor\'s own name when externalOrganisation is unset', () => {
+    const elementsById = new Map([
+      ['act-1', actor('act-1', { isExternal: true })],
+      ['sys-1', system('sys-1')],
+    ]);
+    const edges = [relationship('r1', 'uses', 'act-1', 'sys-1')];
+    expect(findExternalOrganisationAccess(edges, elementsById)).toEqual([{ relationshipId: 'r1', organisation: 'Actor act-1', systemName: 'System sys-1' }]);
+  });
+
+  it('never lists an internal actor\'s own uses edge', () => {
+    const elementsById = new Map([
+      ['act-1', actor('act-1', { isExternal: false })],
+      ['sys-1', system('sys-1')],
+    ]);
+    const edges = [relationship('r1', 'uses', 'act-1', 'sys-1')];
+    expect(findExternalOrganisationAccess(edges, elementsById)).toEqual([]);
+  });
+
+  it('never lists a system-to-system uses edge — only an actor\'s own', () => {
+    const elementsById = new Map([
+      ['sys-a', system('sys-a')],
+      ['sys-b', system('sys-b')],
+    ]);
+    const edges = [relationship('r1', 'uses', 'sys-a', 'sys-b')];
+    expect(findExternalOrganisationAccess(edges, elementsById)).toEqual([]);
+  });
+
+  it('never lists a flows_to edge, even from an external actor\'s own id — flows_to has no actor-endpoint rule at all', () => {
+    const elementsById = new Map([
+      ['act-1', actor('act-1', { isExternal: true })],
+      ['sys-1', system('sys-1')],
+    ]);
+    const edges = [relationship('r1', 'flows_to', 'act-1', 'sys-1')];
+    expect(findExternalOrganisationAccess(edges, elementsById)).toEqual([]);
+  });
+
+  it('lists two edges from the same external actor separately, not deduplicated', () => {
+    const elementsById = new Map([
+      ['act-1', actor('act-1', { isExternal: true, externalOrganisation: 'Ofgem' })],
+      ['sys-1', system('sys-1')],
+      ['sys-2', system('sys-2')],
+    ]);
+    const edges = [relationship('r1', 'uses', 'act-1', 'sys-1'), relationship('r2', 'uses', 'act-1', 'sys-2')];
+    expect(findExternalOrganisationAccess(edges, elementsById)).toEqual([
+      { relationshipId: 'r1', organisation: 'Ofgem', systemName: 'System sys-1' },
+      { relationshipId: 'r2', organisation: 'Ofgem', systemName: 'System sys-2' },
+    ]);
   });
 });

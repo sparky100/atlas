@@ -9,6 +9,7 @@ import { ContainerPage } from './routes/ContainerPage';
 import { ContextPage } from './routes/ContextPage';
 import { ElementPage } from './routes/ElementPage';
 import { ElementsPage } from './routes/ElementsPage';
+import { ExternalInterfacesPage } from './routes/ExternalInterfacesPage';
 import { Home } from './routes/Home';
 import { LandscapePage } from './routes/LandscapePage';
 import { ModelHome } from './routes/ModelHome';
@@ -60,6 +61,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/review" element={<ReviewQueuePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/review/:mergeRequestId" element={<ReviewRequestPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/boundary-crossings" element={<BoundaryCrossingsPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/external-interfaces" element={<ExternalInterfacesPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
