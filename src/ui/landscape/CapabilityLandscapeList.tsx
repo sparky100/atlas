@@ -1,6 +1,8 @@
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { Chip } from '../components/Chip/Chip';
+import { CommentMarkerButton } from '../components/CommentMarkerButton/CommentMarkerButton';
+import { commentMarkerFor } from '../components/CommentMarkerButton/commentMarkerFor';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
@@ -15,7 +17,11 @@ export interface CapabilityLandscapeListProps {
   elementHref: (elementId: UUID) => string;
   /** The row's own separate "Context →" link — a module has no Context view of its own (`LandscapeMobileList.tsx`'s identical `isModule` reasoning), so it's the one row kind that omits this. */
   contextHref: (systemId: UUID) => string;
+  /** S1 item 12: "markers ... on the capability-scoped list" — see `LandscapeMobileList.tsx`'s identical prop for the shared marker convention this reuses. */
+  threadCounts?: ReadonlyMap<UUID, { open: number; total: number }> | undefined;
+  onCommentMarkerClick?: ((elementId: UUID) => void) | undefined;
 }
+
 
 /**
  * Sprint U4-2c item 2: "/landscape?capability=X ... a flat list of the
@@ -25,14 +31,14 @@ export interface CapabilityLandscapeListProps {
  * (`LandscapeCanvas.tsx`/`LandscapeMobileList.tsx`), this list has no
  * pixels to lay out and nothing that behaves differently on a small screen.
  */
-export function CapabilityLandscapeList({ rows, elementHref, contextHref }: CapabilityLandscapeListProps) {
+export function CapabilityLandscapeList({ rows, elementHref, contextHref, threadCounts, onCommentMarkerClick }: CapabilityLandscapeListProps) {
   if (rows.count === 0) {
     return <EmptyState>No systems support this capability yet.</EmptyState>;
   }
   return (
     <div className={styles.list}>
-      <Section title="Primary" rows={rows.primary} elementHref={elementHref} contextHref={contextHref} />
-      <Section title="Also supports" rows={rows.secondary} elementHref={elementHref} contextHref={contextHref} />
+      <Section title="Primary" rows={rows.primary} elementHref={elementHref} contextHref={contextHref} threadCounts={threadCounts} onCommentMarkerClick={onCommentMarkerClick} />
+      <Section title="Also supports" rows={rows.secondary} elementHref={elementHref} contextHref={contextHref} threadCounts={threadCounts} onCommentMarkerClick={onCommentMarkerClick} />
     </div>
   );
 }
@@ -42,9 +48,11 @@ interface SectionProps {
   rows: readonly CapabilityLandscapeRow[];
   elementHref: (elementId: UUID) => string;
   contextHref: (systemId: UUID) => string;
+  threadCounts: ReadonlyMap<UUID, { open: number; total: number }> | undefined;
+  onCommentMarkerClick: ((elementId: UUID) => void) | undefined;
 }
 
-function Section({ title, rows, elementHref, contextHref }: SectionProps) {
+function Section({ title, rows, elementHref, contextHref, threadCounts, onCommentMarkerClick }: SectionProps) {
   // An empty section (every supporter is primary, or every one is
   // secondary) is a real, expected shape — omitted rather than shown with
   // a "(0)" count and no rows under it.
@@ -56,14 +64,33 @@ function Section({ title, rows, elementHref, contextHref }: SectionProps) {
       </Text>
       <ul className={styles.rows}>
         {rows.map((row) => (
-          <Row key={row.system.element_id} row={row} elementHref={elementHref} contextHref={contextHref} />
+          <Row
+            key={row.system.element_id}
+            row={row}
+            elementHref={elementHref}
+            contextHref={contextHref}
+            marker={commentMarkerFor(row.system.element_id, threadCounts)}
+            onCommentMarkerClick={onCommentMarkerClick}
+          />
         ))}
       </ul>
     </section>
   );
 }
 
-function Row({ row, elementHref, contextHref }: { row: CapabilityLandscapeRow; elementHref: (elementId: UUID) => string; contextHref: (systemId: UUID) => string }) {
+function Row({
+  row,
+  elementHref,
+  contextHref,
+  marker,
+  onCommentMarkerClick,
+}: {
+  row: CapabilityLandscapeRow;
+  elementHref: (elementId: UUID) => string;
+  contextHref: (systemId: UUID) => string;
+  marker: ReturnType<typeof commentMarkerFor>;
+  onCommentMarkerClick: ((elementId: UUID) => void) | undefined;
+}) {
   const { system, role, viaCapability, owner, usesCount, usedByCount } = row;
   const attrs = attributesRecord(system.attributes);
   const external = attrs.isExternal === true;
@@ -108,6 +135,14 @@ function Row({ row, elementHref, contextHref }: { row: CapabilityLandscapeRow; e
           <Link to={contextHref(system.element_id)} className={styles.contextLink}>
             Context →
           </Link>
+        )}
+        {marker && (
+          <CommentMarkerButton
+            marker={marker}
+            onClick={() => {
+              onCommentMarkerClick?.(system.element_id);
+            }}
+          />
         )}
       </div>
     </li>
