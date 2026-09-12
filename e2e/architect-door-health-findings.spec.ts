@@ -305,7 +305,7 @@ test('Sprint U4-1 B3: capability ownership inherits from an owned ancestor; an u
   await expect(page.getByText('Owned Root Child', { exact: true })).toHaveCount(0);
 });
 
-test('Sprint U4-1 B3: a model with nothing to flag collapses the whole panel to one "No findings" line', async ({ page }) => {
+test('S1 item 7: a model with nothing to flag collapses each group to one "N checks clear" line, expanding to each check\'s own line', async ({ page }) => {
   const env = loadEnv();
 
   const email = `healthfindings-clean-${randomUUID()}@example.test`;
@@ -335,14 +335,35 @@ test('Sprint U4-1 B3: a model with nothing to flag collapses the whole panel to 
 
   // Genesis-only main — a brand-new model has nothing to flag at all
   // (ADR-018: main already has a real head, no bootstrap needed). Prompt
-  // 7k item 5's own "Assurance" panel gates independently (its own doc
-  // comment, ArchitectHome.tsx) — a genuinely clean model shows "No
-  // findings." twice, once per panel, not once combined.
+  // 7k item 5's own "Assurance" group gates independently (its own doc
+  // comment, ArchitectHome.tsx) — a genuinely clean model collapses each
+  // group to its own "N checks clear" line (S1 item 7), not one combined
+  // line, mirroring the old "No findings." x2 behaviour it replaces.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await expect(page.getByRole('heading', { name: 'Health findings' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
-  await expect(page.getByText('No findings.')).toHaveCount(2);
+  const healthClear = page.getByRole('button', { name: '9 checks clear' });
+  const assuranceClear = page.getByRole('button', { name: '3 checks clear' });
+  await expect(healthClear).toBeVisible();
+  await expect(assuranceClear).toBeVisible();
+  // Collapsed by default — no individual check's own line rendered yet,
+  // and the always-separate "duplicates" notice hidden alongside them
+  // (unchanged from the old all-zero behaviour: it only shows next to at
+  // least one real, non-zero check).
   await expect(page.getByText(/not linked to a capability/)).toHaveCount(0);
   await expect(page.getByText(/with no owner/)).toHaveCount(0);
   await expect(page.getByText(/duplicates flagged/)).toHaveCount(0);
+
+  // Expanding the Health findings group's own line reveals each of its
+  // nine checks' own "0 X" summary — including ones the panel above never
+  // showed a live example of.
+  await healthClear.click();
+  await expect(page.getByText('0 systems not linked to a capability', { exact: true })).toBeVisible();
+  await expect(page.getByText('0 capabilities with no owner', { exact: true })).toBeVisible();
+  // Assurance's own line is still collapsed — expanding one group doesn't
+  // expand the other.
+  await expect(page.getByText(/supporting an essential function/)).toHaveCount(0);
+
+  await assuranceClear.click();
+  await expect(page.getByText(/supporting an essential function with no technical owner/)).toBeVisible();
 });

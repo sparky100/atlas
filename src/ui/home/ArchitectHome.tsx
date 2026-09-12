@@ -13,6 +13,7 @@ import type { BoundaryCrossing, UnlabeledVerbRelationship } from '../../db/healt
 import { branchStatusTone } from '../changes/branchStatus';
 import { formatCommitActivityTime } from './commitActivityTime';
 import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
+import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
 import type { ArchitectHomeData, RecentCommitRow } from './useArchitectHome';
 import styles from './DoorHome.module.css';
 
@@ -77,13 +78,17 @@ function boundaryCrossingItems(crossings: readonly BoundaryCrossing[]): HealthFi
  * own sequence exactly — the actual reason this swap was worth making,
  * not just a cosmetic desktop rearrangement.
  *
- * Every finding is still rendered through `HealthFinding` (Sprint U4-1
- * B3: collapsed row → expand, paginated at 20, a link into the browse
- * table pre-filtered to the finding where one applies) — see item 7
- * (issue not yet filed at the time of writing) for "zero-count findings
- * collapse to one line," not built here; each of the two zero-gates below
- * still renders its own plain "No findings" paragraph per finding group,
- * unchanged from before this item.
+ * Every real finding is still rendered through `HealthFinding` (Sprint
+ * U4-1 B3: collapsed row → expand, paginated at 20, a link into the browse
+ * table pre-filtered to the finding where one applies). S1 item 7: "zero-
+ * count findings collapse to one line ('N checks clear') with expand" —
+ * `healthChecks.ts`'s `partitionHealthChecks` splits each group's checks
+ * into `active` (its own plate, as before) and `clear` (rolled into one
+ * `checksClearLabel` line via `CollapsibleSection`, expanding to each
+ * cleared check's own one-line summary). This also replaces the old
+ * "No findings" line: when every check in a group is zero, `active` is
+ * empty and only the "N checks clear" line renders — the same shape,
+ * naturally, rather than a separate special case.
  */
 export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) {
   const now = new Date();
@@ -99,32 +104,136 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
   // browse-table home at all, so it gets no href.
   const browseHref = (filter: string) => `/o/${orgSlug}/m/${modelSlug}/elements?filter=${filter}`;
 
-  // Sprint U4-1 B3: "zero-count findings collapse to one 'No findings'
-  // line" — checked across every real finding. `duplicatesCount` is typed
-  // as the literal `0` (still wired to 0 until Q1, ADR-019), so it's
-  // trivially always satisfied and left out of this check rather than
-  // written as a tautological `=== 0`.
-  const allFindingsZero =
-    data.systemsWithoutCapability.length === 0 &&
-    data.capabilitiesWithoutOwner.length === 0 &&
-    data.staleAttributes.staleFactCount === 0 &&
-    data.unlabeledVerbRelationships.length === 0 &&
-    data.systemsWithoutTechnicalOwner.length === 0 &&
-    data.criticalSystemsWithoutBusinessOwner.length === 0 &&
-    data.criticalExposedSystems.length === 0 &&
-    data.boundaryCrossingsMissingClassificationOrVerb.length === 0 &&
-    data.unusedIntegrationPlatforms.length === 0;
+  // `duplicatesCount` is typed as the literal `0` (still wired to 0 until
+  // Q1, ADR-019) — a placeholder notice, not a real check yet, so it's
+  // left out of this list and rendered as its own permanent line below
+  // rather than something item 7's "N checks clear" could ever roll it into.
+  const healthChecks: HealthCheck[] = [
+    {
+      key: 'unlinked-systems',
+      count: data.systemsWithoutCapability.length,
+      summary: `${String(data.systemsWithoutCapability.length)} ${plural(data.systemsWithoutCapability.length, 'system', 'systems')} not linked to a capability`,
+      items: elementItems(data.systemsWithoutCapability),
+      browseHref: browseHref('unlinked-systems'),
+      browseLabel: 'Review and link →',
+    },
+    {
+      key: 'unowned-capabilities',
+      count: data.capabilitiesWithoutOwner.length,
+      summary: `${String(data.capabilitiesWithoutOwner.length)} ${plural(data.capabilitiesWithoutOwner.length, 'capability', 'capabilities')} with no owner`,
+      items: elementItems(data.capabilitiesWithoutOwner),
+      browseHref: browseHref('unowned-capabilities'),
+    },
+    {
+      key: 'stale-attributes',
+      count: data.staleAttributes.staleFactCount,
+      summary:
+        data.staleAttributes.staleFactCount > 0
+          ? `${String(data.staleAttributes.staleFactCount)} ${plural(data.staleAttributes.staleFactCount, 'attribute', 'attributes')} stale over 12 months — across ${String(data.staleAttributes.staleSystems.length)} ${plural(data.staleAttributes.staleSystems.length, 'system', 'systems')} · oldest ${String(data.staleAttributes.oldestAgeYears)}y`
+          : '0 attributes stale over 12 months',
+      items: elementItems(data.staleAttributes.staleSystems),
+      browseHref: browseHref('stale-attributes'),
+    },
+    {
+      key: 'unlabeled-relationships',
+      count: data.unlabeledVerbRelationships.length,
+      summary: `${String(data.unlabeledVerbRelationships.length)} ${plural(data.unlabeledVerbRelationships.length, 'relationship', 'relationships')} missing a label`,
+      items: unlabeledRelationshipItems(data.unlabeledVerbRelationships),
+    },
+    {
+      key: 'no-technical-owner',
+      count: data.systemsWithoutTechnicalOwner.length,
+      summary: `${String(data.systemsWithoutTechnicalOwner.length)} ${plural(data.systemsWithoutTechnicalOwner.length, 'system', 'systems')} with no technical owner`,
+      items: elementItems(data.systemsWithoutTechnicalOwner),
+      browseHref: browseHref('no-technical-owner'),
+    },
+    {
+      key: 'critical-no-business-owner',
+      count: data.criticalSystemsWithoutBusinessOwner.length,
+      summary: `${String(data.criticalSystemsWithoutBusinessOwner.length)} critical ${plural(data.criticalSystemsWithoutBusinessOwner.length, 'system', 'systems')} with no business owner`,
+      items: elementItems(data.criticalSystemsWithoutBusinessOwner),
+      browseHref: browseHref('critical-no-business-owner'),
+    },
+    {
+      key: 'critical-exposed',
+      count: data.criticalExposedSystems.length,
+      summary: `${String(data.criticalExposedSystems.length)} critical ${plural(data.criticalExposedSystems.length, 'system', 'systems')} exposed with no planned replacement`,
+      items: elementItems(data.criticalExposedSystems),
+      browseHref: browseHref('critical-exposed'),
+    },
+    {
+      key: 'boundary-crossings-missing-metadata',
+      count: data.boundaryCrossingsMissingClassificationOrVerb.length,
+      summary: `${String(data.boundaryCrossingsMissingClassificationOrVerb.length)} boundary crossing${data.boundaryCrossingsMissingClassificationOrVerb.length === 1 ? '' : 's'} with no data classification or verb`,
+      items: boundaryCrossingItems(data.boundaryCrossingsMissingClassificationOrVerb),
+    },
+    {
+      key: 'unused-integration-platform',
+      count: data.unusedIntegrationPlatforms.length,
+      summary: `${String(data.unusedIntegrationPlatforms.length)} unused integration ${plural(data.unusedIntegrationPlatforms.length, 'platform', 'platforms')} (nothing flows via it)`,
+      items: elementItems(data.unusedIntegrationPlatforms),
+      browseHref: browseHref('unused-integration-platform'),
+    },
+  ];
+  const { active: activeHealthChecks, clear: clearHealthChecks } = partitionHealthChecks(healthChecks);
 
-  // Prompt 7k item 5: its own zero-gate, independent of `allFindingsZero`
-  // above — "the architect door groups these three under 'Assurance'"
-  // (the prompt's own wording) still means its own "No findings" line,
-  // now inside the same Health findings Panel rather than a separate one
-  // (S1 item 6: "health findings (boundary crossings and Assurance
-  // inside)").
-  const allAssuranceFindingsZero =
-    data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length === 0 &&
-    data.boundaryCrossingsMissingClassification.length === 0 &&
-    data.criticalSystemsPastOrNearSupportEnd.length === 0;
+  // Prompt 7k item 5's own three regulatory-alignment checks — grouped
+  // under "Assurance" (S1 item 6), partitioned the same way as the group
+  // above but kept independent of it (a clean Health findings group says
+  // nothing about whether Assurance is also clean, and vice versa).
+  const assuranceChecks: HealthCheck[] = [
+    {
+      key: 'essential-no-technical-owner',
+      count: data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length,
+      summary: `${String(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length)} ${plural(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length, 'system', 'systems')} supporting an essential function with no technical owner`,
+      items: elementItems(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner),
+      browseHref: browseHref('essential-no-technical-owner'),
+    },
+    {
+      key: 'boundary-crossings-missing-classification',
+      count: data.boundaryCrossingsMissingClassification.length,
+      summary: `${String(data.boundaryCrossingsMissingClassification.length)} boundary crossing${data.boundaryCrossingsMissingClassification.length === 1 ? '' : 's'} with no data classification`,
+      items: boundaryCrossingItems(data.boundaryCrossingsMissingClassification),
+    },
+    {
+      key: 'critical-support-end',
+      count: data.criticalSystemsPastOrNearSupportEnd.length,
+      summary: `${String(data.criticalSystemsPastOrNearSupportEnd.length)} critical ${plural(data.criticalSystemsPastOrNearSupportEnd.length, 'system', 'systems')} past or near vendor support end`,
+      items: elementItems(data.criticalSystemsPastOrNearSupportEnd),
+      browseHref: browseHref('critical-support-end'),
+    },
+  ];
+  const { active: activeAssuranceChecks, clear: clearAssuranceChecks } = partitionHealthChecks(assuranceChecks);
+
+  function checkPlate(check: HealthCheck, index: number) {
+    const browseProps = check.browseHref !== undefined ? { browseHref: check.browseHref, ...(check.browseLabel !== undefined && { browseLabel: check.browseLabel }) } : {};
+    const finding = <HealthFinding summary={check.summary} items={check.items} {...browseProps} />;
+    // Item 6's convention: the first *real* (non-zero) finding in a group
+    // is blueprint-framed — preserved here now that zero-count checks no
+    // longer take a plate of their own to be "first".
+    return index === 0 ? (
+      <BlueprintFrame key={check.key}>{finding}</BlueprintFrame>
+    ) : (
+      <div key={check.key} className={styles.findingPlate}>
+        {finding}
+      </div>
+    );
+  }
+
+  function clearChecksSection(checks: readonly HealthCheck[]) {
+    if (checks.length === 0) return null;
+    return (
+      <CollapsibleSection title={checksClearLabel(checks.length)} defaultOpen={false}>
+        <div className={styles.findingPlates}>
+          {checks.map((check) => (
+            <Text key={check.key} as="p" tone="muted">
+              {check.summary}
+            </Text>
+          ))}
+        </div>
+      </CollapsibleSection>
+    );
+  }
 
   const { shown: shownActivity, rest: restActivity } = selectRecentActivity(data.recentCommits, 5);
 
@@ -228,87 +337,14 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
             </Text>
           </Link>
 
-          {allFindingsZero ? (
-            <Text as="p" tone="muted">
-              No findings.
-            </Text>
-          ) : (
+          {activeHealthChecks.length > 0 && (
             <div className={styles.findingPlates}>
-              <BlueprintFrame>
-                <HealthFinding
-                  summary={`${String(data.systemsWithoutCapability.length)} ${plural(data.systemsWithoutCapability.length, 'system', 'systems')} not linked to a capability`}
-                  items={elementItems(data.systemsWithoutCapability)}
-                  browseHref={browseHref('unlinked-systems')}
-                  browseLabel="Review and link →"
-                />
-              </BlueprintFrame>
-
-              <div className={styles.findingPlate}>
-                <HealthFinding
-                  summary={`${String(data.capabilitiesWithoutOwner.length)} ${plural(data.capabilitiesWithoutOwner.length, 'capability', 'capabilities')} with no owner`}
-                  items={elementItems(data.capabilitiesWithoutOwner)}
-                  browseHref={browseHref('unowned-capabilities')}
-                />
-              </div>
-
-              <div className={styles.findingPlate}>
-                <HealthFinding
-                  summary={
-                    data.staleAttributes.staleFactCount > 0
-                      ? `${String(data.staleAttributes.staleFactCount)} ${plural(data.staleAttributes.staleFactCount, 'attribute', 'attributes')} stale over 12 months — across ${String(data.staleAttributes.staleSystems.length)} ${plural(data.staleAttributes.staleSystems.length, 'system', 'systems')} · oldest ${String(data.staleAttributes.oldestAgeYears)}y`
-                      : '0 attributes stale over 12 months'
-                  }
-                  items={elementItems(data.staleAttributes.staleSystems)}
-                  browseHref={browseHref('stale-attributes')}
-                />
-              </div>
-
-              <div className={styles.findingPlate}>
-                <HealthFinding
-                  summary={`${String(data.unlabeledVerbRelationships.length)} ${plural(data.unlabeledVerbRelationships.length, 'relationship', 'relationships')} missing a label`}
-                  items={unlabeledRelationshipItems(data.unlabeledVerbRelationships)}
-                />
-              </div>
-
-              <div className={styles.findingPlate}>
-                <HealthFinding
-                  summary={`${String(data.systemsWithoutTechnicalOwner.length)} ${plural(data.systemsWithoutTechnicalOwner.length, 'system', 'systems')} with no technical owner`}
-                  items={elementItems(data.systemsWithoutTechnicalOwner)}
-                  browseHref={browseHref('no-technical-owner')}
-                />
-              </div>
-
-              <div className={styles.findingPlate}>
-                <HealthFinding
-                  summary={`${String(data.criticalSystemsWithoutBusinessOwner.length)} critical ${plural(data.criticalSystemsWithoutBusinessOwner.length, 'system', 'systems')} with no business owner`}
-                  items={elementItems(data.criticalSystemsWithoutBusinessOwner)}
-                  browseHref={browseHref('critical-no-business-owner')}
-                />
-              </div>
-
-              <div className={styles.findingPlate}>
-                <HealthFinding
-                  summary={`${String(data.criticalExposedSystems.length)} critical ${plural(data.criticalExposedSystems.length, 'system', 'systems')} exposed with no planned replacement`}
-                  items={elementItems(data.criticalExposedSystems)}
-                  browseHref={browseHref('critical-exposed')}
-                />
-              </div>
-
-              <div className={styles.findingPlate}>
-                <HealthFinding
-                  summary={`${String(data.boundaryCrossingsMissingClassificationOrVerb.length)} boundary crossing${data.boundaryCrossingsMissingClassificationOrVerb.length === 1 ? '' : 's'} with no data classification or verb`}
-                  items={boundaryCrossingItems(data.boundaryCrossingsMissingClassificationOrVerb)}
-                />
-              </div>
-
-              <div className={styles.findingPlate}>
-                <HealthFinding
-                  summary={`${String(data.unusedIntegrationPlatforms.length)} unused integration ${plural(data.unusedIntegrationPlatforms.length, 'platform', 'platforms')} (nothing flows via it)`}
-                  items={elementItems(data.unusedIntegrationPlatforms)}
-                  browseHref={browseHref('unused-integration-platform')}
-                />
-              </div>
-
+              {activeHealthChecks.map(checkPlate)}
+              {/* Not a real check (always 0 until Q1, ADR-019) — never part
+                  of `healthChecks` or its "N checks clear" collapse, but
+                  kept alongside the other plates rather than shown when
+                  every real check is already clean (Sprint U4-1 B3's own
+                  "No findings" behaviour, unchanged by S1 item 7). */}
               <div className={styles.findingPlate}>
                 <Text as="p">{data.duplicatesCount} duplicates flagged</Text>
                 <Text as="p" tone="faint" size="sm">
@@ -317,6 +353,7 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
               </div>
             </div>
           )}
+          {clearChecksSection(clearHealthChecks)}
 
           {/* S1 item 6: "Assurance inside" — Prompt 7k item 5's own three
               regulatory-alignment findings, still gated by their own
@@ -327,36 +364,8 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
           <Text as="h3" size="md">
             Assurance
           </Text>
-          {allAssuranceFindingsZero ? (
-            <Text as="p" tone="muted">
-              No findings.
-            </Text>
-          ) : (
-            <div className={styles.findingPlates}>
-              <div className={styles.findingPlate}>
-                <HealthFinding
-                  summary={`${String(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length)} ${plural(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length, 'system', 'systems')} supporting an essential function with no technical owner`}
-                  items={elementItems(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner)}
-                  browseHref={browseHref('essential-no-technical-owner')}
-                />
-              </div>
-
-              <div className={styles.findingPlate}>
-                <HealthFinding
-                  summary={`${String(data.boundaryCrossingsMissingClassification.length)} boundary crossing${data.boundaryCrossingsMissingClassification.length === 1 ? '' : 's'} with no data classification`}
-                  items={boundaryCrossingItems(data.boundaryCrossingsMissingClassification)}
-                />
-              </div>
-
-              <div className={styles.findingPlate}>
-                <HealthFinding
-                  summary={`${String(data.criticalSystemsPastOrNearSupportEnd.length)} critical ${plural(data.criticalSystemsPastOrNearSupportEnd.length, 'system', 'systems')} past or near vendor support end`}
-                  items={elementItems(data.criticalSystemsPastOrNearSupportEnd)}
-                  browseHref={browseHref('critical-support-end')}
-                />
-              </div>
-            </div>
-          )}
+          {activeAssuranceChecks.length > 0 && <div className={styles.findingPlates}>{activeAssuranceChecks.map(checkPlate)}</div>}
+          {clearChecksSection(clearAssuranceChecks)}
         </Panel>
       </div>
 
