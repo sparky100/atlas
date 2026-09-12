@@ -78,4 +78,32 @@ describe('capability_maps.title/summary round-trip', () => {
     expect(readBack?.title).toBeNull();
     expect(readBack?.summary).toBeNull();
   });
+
+  it('S1 item 13: "picker cards alphabetical by title" — a null title sorts after every real one', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const zTitle = `Zzz Alphabetical Test ${suffix}`;
+    const aTitle = `Aaa Alphabetical Test ${suffix}`;
+
+    const zId = randomUUID();
+    const aId = randomUUID();
+    const untitledId = randomUUID();
+    insertedMapIds.push(zId, aId, untitledId);
+
+    // Inserted Z-then-A-then-untitled — a passthrough of insertion order
+    // (or a sort by sector/version alone, the pre-item-13 behaviour) would
+    // not put them back in title order on its own. Distinct sectors avoid
+    // `capability_maps_sector_version_key` (sector, version) colliding.
+    const { error: insertError } = await service.from('capability_maps').insert([
+      { id: zId, sector: `test_sector_z_${suffix}`, version: 1, status: 'draft', title: zTitle, source_description: 'Alphabetical-order test row (Z).' },
+      { id: aId, sector: `test_sector_a_${suffix}`, version: 1, status: 'draft', title: aTitle, source_description: 'Alphabetical-order test row (A).' },
+      { id: untitledId, sector: `test_sector_u_${suffix}`, version: 1, status: 'draft', source_description: 'Alphabetical-order test row (no title).' },
+    ]);
+    if (insertError) throw new Error(`insert: ${insertError.message}`);
+
+    const listed = await listSeedableCapabilityMaps(service);
+    const indexOf = (id: string) => listed.findIndex((m) => m.id === id);
+    expect(indexOf(aId)).toBeGreaterThanOrEqual(0);
+    expect(indexOf(zId)).toBeGreaterThan(indexOf(aId));
+    expect(indexOf(untitledId)).toBeGreaterThan(indexOf(zId));
+  });
 });

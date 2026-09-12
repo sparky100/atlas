@@ -137,3 +137,109 @@ test('reordering: move-right swaps two L1 capabilities, move-down swaps two L2 c
     expect(l1Order).toEqual(['Root Beta', 'Hand Added Root', 'Root Alpha']);
   }).toPass();
 });
+
+/**
+ * S1 item 13: "L3 reorder controls" and "order assigned on the fly when
+ * missing" — a separate fixture/test from the one above, since both of
+ * these are genuinely new behaviour (the review-tightened C1 above only
+ * ever covered L1/L2, and every seeded capability there already had an
+ * `order`).
+ */
+test('reordering: L3 tiles have their own move controls, and a capability with no order swaps in without refusing', async ({ page }) => {
+  const env = loadEnv();
+
+  const email = `capmap-reorder-l3-${randomUUID()}@example.test`;
+  const password = `${randomUUID()}Aa1!`;
+
+  await page.goto('/sign-in');
+  await page.getByText("Don't have an account? Create one").click();
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('heading', { name: 'Your organisations' })).toBeVisible();
+
+  const signedIn = createSupabaseClient(env);
+  const { error: signInError } = await signedIn.auth.signInWithPassword({ email, password });
+  if (signInError) throw new Error(`capability-map-reorder-l3 fixture sign-in: ${signInError.message}`);
+  const { data: userData, error: getUserError } = await signedIn.auth.getUser();
+  if (getUserError) throw new Error(`capability-map-reorder-l3 fixture: could not read the signed-in user: ${getUserError.message}`);
+  const userId = userData.user.id;
+
+  const orgId = randomUUID();
+  const orgSlug = `capmap-reorder-l3-${orgId.slice(0, 8)}`;
+  await createOrganisation(signedIn, { id: orgId, name: 'Capability Map Reorder L3 Test Org', slug: orgSlug, createdBy: userId });
+
+  const modelId = randomUUID();
+  const modelSlug = `capmap-reorder-l3-model-${modelId.slice(0, 8)}`;
+  await createModel(signedIn, { id: modelId, orgId, name: 'Capability Map Reorder L3 Test Model', slug: modelSlug, createdBy: userId });
+
+  const main = await getMainBranch(signedIn, modelId);
+  if (!main) throw new Error('main branch was not auto-created');
+  const genesisCommitId = main.head_commit_id;
+
+  const { error: sourceError } = await signedIn.from('sources').insert({ id: randomUUID(), org_id: orgId, model_id: modelId, kind: 'manual', name: 'Seed', user_id: userId, created_by: userId });
+  if (sourceError) throw new Error(`seed source: ${sourceError.message}`);
+  const { data: sourceRow } = await signedIn.from('sources').select('id').eq('model_id', modelId).eq('user_id', userId).single();
+  const seedSourceId = (sourceRow as { id: string }).id;
+
+  const rootId = randomUUID();
+  const midId = randomUUID();
+  const leafXId = randomUUID();
+  const leafYId = randomUUID();
+  // A second L1 whose two children have NO `order` at all — the "order
+  // assigned on the fly when missing" case. `noOrderParentId` itself has
+  // an order so it doesn't also compete with `rootId` for L1 position.
+  const noOrderParentId = randomUUID();
+  const noOrderChildAId = randomUUID();
+  const noOrderChildBId = randomUUID();
+
+  const seedEnvelope: CommitEnvelope = {
+    id: randomUUID(),
+    branchId: main.id,
+    parentCommitId: genesisCommitId,
+    mergedBranchHeadCommitId: null,
+    kind: 'manual',
+    title: 'seed an L1/L2/L3 chain, plus two order-less L2 siblings under a second L1',
+    body: null,
+    deltas: [
+      { kind: 'element.create', id: randomUUID(), elementId: rootId, elementType: 'capability', name: 'L3 Reorder Root', parentId: null, attributes: { order: 10 }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: midId, elementType: 'capability', name: 'L3 Reorder Mid', parentId: rootId, attributes: { order: 10 }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: leafXId, elementType: 'capability', name: 'Leaf X', parentId: midId, attributes: { order: 10 }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: leafYId, elementType: 'capability', name: 'Leaf Y', parentId: midId, attributes: { order: 20 }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: noOrderParentId, elementType: 'capability', name: 'No Order Root', parentId: null, attributes: { order: 20 }, sourceId: seedSourceId, confidence: 1 },
+      // Deliberately no `order` attribute on either child — simulates a
+      // capability that predates create-time order assignment.
+      { kind: 'element.create', id: randomUUID(), elementId: noOrderChildAId, elementType: 'capability', name: 'No Order Child A', parentId: noOrderParentId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: noOrderChildBId, elementType: 'capability', name: 'No Order Child B', parentId: noOrderParentId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
+    ],
+  };
+  const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope: seedEnvelope });
+  if (!seedResult.ok) throw new Error(`seeding capability-map-reorder-l3 fixture: ${seedResult.message}`);
+
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
+  await expect(page.getByText('L3 Reorder Root')).toBeVisible();
+  await page.getByLabel('Reorder mode').check();
+
+  // --- L3: expand L3 Reorder Mid, move Leaf X down, swapping with Leaf Y ---
+  await page.getByRole('button', { name: /▸ 2/ }).click();
+  await expect(page.getByRole('link', { name: 'Leaf X' })).toBeVisible();
+  await page.getByRole('button', { name: 'Move Leaf X down' }).click();
+
+  await expect(async () => {
+    const l3Order = await page.getByRole('link', { name: /^(Leaf X|Leaf Y)$/ }).allTextContents();
+    expect(l3Order).toEqual(['Leaf Y', 'Leaf X']);
+  }).toPass();
+
+  // --- Order assigned on the fly: neither No Order Child has an `order`
+  // at all, yet the move button still works, without the old "Both
+  // capabilities need an existing order before they can swap places"
+  // refusal message ever appearing. ---
+  await expect(page.getByText('No Order Child A')).toBeVisible();
+  await page.getByRole('button', { name: 'Move No Order Child A down' }).click();
+
+  await expect(async () => {
+    const noOrderOrder = await page.getByRole('link', { name: /^(No Order Child A|No Order Child B)$/ }).allTextContents();
+    expect(noOrderOrder).toEqual(['No Order Child B', 'No Order Child A']);
+  }).toPass();
+  await expect(page.getByText('Both capabilities need an existing order')).toHaveCount(0);
+});

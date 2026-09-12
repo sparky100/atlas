@@ -96,12 +96,23 @@
  * fit alongside the chip/zoom-link/reorder-toggle, and wraps them onto
  * their own line below it, at their natural width, the moment it can't —
  * never cutting the name itself short to make room.
+ *
+ * S1 item 13's "explicit shared L1 header height": `min-height`, not
+ * `height` — a fixed `height` would clip a name long enough to need the
+ * wrap above, reintroducing the truncation item 1 deliberately removed.
+ * `min-height` gives every column the same floor (two `--row-height` rows'
+ * worth, matching `ChangeView.module.css`/`ModelSettingsView.module.css`'s
+ * own "room for a short row plus a wrapped one" convention) so a short L1
+ * name's header lines up with a sibling's wrapped one instead of looking
+ * shorter, while a name needing more than two lines still grows past it
+ * rather than being cut off.
  */
 .columnHeader {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2);
+  min-height: calc(var(--row-height) * 2);
   padding-bottom: var(--space-1);
   border-bottom: var(--border-width-emphasis) solid var(--border-strong);
 }

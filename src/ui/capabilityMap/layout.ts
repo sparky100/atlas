@@ -82,11 +82,12 @@ function orderOf(capability: ElementsHeadRow): number | null {
  * back to `code` (numeric-aware) when either tile lacks an order, then
  * name, then id as the final tiebreak. Every capability normally has an
  * order — `useCapabilityCreate.ts` sets one at creation time (this
- * file's own `nextSiblingOrder`), and `scripts/backfillCapabilityOrder.ts`
- * is the one-off fix for anything created before that — so the no-order
- * branch is a defensive fallback for data that predates or has somehow
- * escaped both, not an expected steady-state case; it sorts after every
- * ordered sibling, never before, so a gap like that can't jump a
+ * file's own `nextSiblingOrder`); anything created before that (or
+ * seeded from a starter map before it carried `order`) sorts after every
+ * ordered sibling here until it's actually touched — either by the
+ * owner-only "Backfill capability order" action (`BackfillCapabilityOrderAction.tsx`)
+ * or, S1 item 13, the first time someone moves it via `useCapabilityReorder`'s
+ * own on-the-fly `resolveOrders` — so a gap like that can't jump a
  * capability ahead of ones someone deliberately placed.
  */
 export function compareCapabilities(a: ElementsHeadRow, b: ElementsHeadRow): number {

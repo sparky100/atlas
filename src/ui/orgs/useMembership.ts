@@ -9,6 +9,7 @@ import { supabase } from '../supabaseClient';
 export {
   canApproveOrMergeRequest,
   canArchiveModel,
+  canBackfillCapabilityOrder,
   canCancelChange,
   canCreateChangeBranch,
   canCreateModel,

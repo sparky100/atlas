@@ -6,8 +6,12 @@ import { listFactsForSubject } from '../../db/elements';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { describeEnvelope } from '../../engine/describeEnvelope';
-import { attributesRecord } from '../elements/attributesRecord';
 import { supabase } from '../supabaseClient';
+import { resolveOrders } from './resolveCapabilityOrders';
+
+// Re-exported for every existing import site — see resolveCapabilityOrders.ts's
+// own comment for why the logic itself lives there now.
+export { resolveOrders } from './resolveCapabilityOrders';
 
 export type CapabilityReorderStatus = 'idle' | 'reordering';
 
@@ -18,15 +22,18 @@ export interface UseCapabilityReorderResult {
    * Swaps `capability` and `neighbor`'s `attributes.order` — moving
    * `capability` one place among its siblings, Sprint U4-1 C1's "drag-to-
    * reorder" (a swap, not a drag gesture — see this hook's own module
-   * comment). Both are expected to already carry a real `order`: every
-   * capability gets one at creation now (`useCapabilityCreate.ts`), and
-   * `scripts/backfillCapabilityOrder.ts` is the one-off fix for anything
-   * created before that change existed — the `typeof !== 'number'` check
-   * below is a defensive guard against that invariant somehow not
-   * holding (an unbackfilled model, a write path this hook doesn't know
-   * about), not a normal path the UI routes around.
+   * comment). `siblings` is the full sibling group in current display
+   * order (`compareCapabilities`) — S1 item 13's "order assigned on the
+   * fly when missing": every capability gets a real `order` at creation
+   * now (`useCapabilityCreate.ts`), but anything older can still lack one
+   * (the "Backfill capability order" owner action,
+   * `BackfillCapabilityOrderAction.tsx`, is the deliberate model-wide fix
+   * for that; `resolveOrders` below is the lightweight per-swap
+   * counterpart, so a reorder click still works without waiting for an
+   * owner to run it) — `siblings` is what lets a fresh value be assigned
+   * without colliding with any other sibling's existing order.
    */
-  swap: (capability: ElementsHeadRow, neighbor: ElementsHeadRow) => Promise<void>;
+  swap: (capability: ElementsHeadRow, neighbor: ElementsHeadRow, siblings: readonly ElementsHeadRow[]) => Promise<void>;
 }
 
 export interface UseCapabilityReorderInput {
@@ -68,17 +75,12 @@ export function useCapabilityReorder(input: UseCapabilityReorderInput): UseCapab
   const [error, setError] = useState<string | null>(null);
 
   const swap = useCallback(
-    async (capability: ElementsHeadRow, neighbor: ElementsHeadRow) => {
+    async (capability: ElementsHeadRow, neighbor: ElementsHeadRow, siblings: readonly ElementsHeadRow[]) => {
       if (!userId) {
         setError('You must be signed in to reorder capabilities.');
         return;
       }
-      const capabilityOrder = attributesRecord(capability.attributes).order;
-      const neighborOrder = attributesRecord(neighbor.attributes).order;
-      if (typeof capabilityOrder !== 'number' || typeof neighborOrder !== 'number') {
-        setError('Both capabilities need an existing order before they can swap places.');
-        return;
-      }
+      const { capabilityOrder, neighborOrder } = resolveOrders(siblings, capability, neighbor);
       setError(null);
       setStatus('reordering');
 
