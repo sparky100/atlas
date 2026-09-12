@@ -1,5 +1,4 @@
 import { Link } from 'react-router';
-import type { RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import type { ElementVersionDiff, VersionDiff } from '../../engine/versionDiff';
 import { Chip } from '../components/Chip/Chip';
@@ -9,7 +8,7 @@ import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyp
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { attributesRecord } from '../elements/attributesRecord';
-import type { ContextGroup, ContextNeighbour } from './contextGrouping';
+import { edgeLabel, type ContextGroup, type ContextNeighbour } from './contextGrouping';
 import styles from './ContextView.module.css';
 
 // Prompt 7k item 2: "Business owner: Housing · Technical owner: IT
@@ -162,12 +161,6 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }
       </div>
     </div>
   );
-}
-
-function edgeLabel(edge: RelationshipsHeadRow, hubId: UUID): string {
-  const outbound = edge.from_element_id === hubId;
-  if (edge.relationship_type === 'flows_to') return outbound ? 'flows to ⇢' : '⇢ flows from';
-  return outbound ? 'uses →' : '← used by';
 }
 
 function NeighbourList({ neighbours, hubId, elementHref, diffById }: { neighbours: ContextNeighbour[]; hubId: UUID; elementHref: (id: UUID) => string; diffById: Map<UUID, ElementVersionDiff> | null }) {

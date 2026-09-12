@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import { computeContextGroup } from './contextGrouping';
+import { computeContextGroup, edgeLabel } from './contextGrouping';
 
 function system(id: string, name: string, external = false): ElementsHeadRow {
   return { element_id: id, element_type: 'system', name, parent_id: null, attributes: { lifecycleStatus: 'active', isExternal: external }, exists_delta_id: `d-${id}` };
+}
+
+function usesEdge(from: string, to: string, description?: string): RelationshipsHeadRow {
+  return { relationship_id: 'r1', relationship_type: 'uses', from_element_id: from, to_element_id: to, attributes: description !== undefined ? { description } : {}, exists_delta_id: 'd-r1' };
+}
+
+function flowsToEdge(from: string, to: string, description?: string): RelationshipsHeadRow {
+  return { relationship_id: 'r1', relationship_type: 'flows_to', from_element_id: from, to_element_id: to, attributes: description !== undefined ? { description } : {}, exists_delta_id: 'd-r1' };
 }
 
 function actor(id: string, name: string): ElementsHeadRow {
@@ -137,5 +145,28 @@ describe('computeContextGroup', () => {
     const hub = system('hub', 'Hub');
     const group = computeContextGroup(hub, [rel('r1', 'uses', 'hub', 'missing')], new Map());
     expect(group.internal).toEqual([]);
+  });
+});
+
+describe('edgeLabel (Sprint U4-2c item 1: "edit a verb ... and see it on the context view")', () => {
+  it('shows the edge\'s own description as the label, direction arrow after it, when the hub is the from-side', () => {
+    expect(edgeLabel(usesEdge('hub', 'n1', 'reads customer records from'), 'hub')).toBe('reads customer records from →');
+  });
+
+  it('shows the edge\'s own description with the arrow before it, when the hub is the to-side', () => {
+    expect(edgeLabel(usesEdge('n1', 'hub', 'sends interval reads to'), 'hub')).toBe('← sends interval reads to');
+  });
+
+  it('does the same for flows_to, with its own arrow glyph', () => {
+    expect(edgeLabel(flowsToEdge('hub', 'n1', 'streams sensor telemetry to'), 'hub')).toBe('streams sensor telemetry to ⇢');
+    expect(edgeLabel(flowsToEdge('n1', 'hub', 'streams sensor telemetry to'), 'hub')).toBe('⇢ streams sensor telemetry to');
+  });
+
+  it('falls back to the original fixed wording when description is missing or blank — pre-this-feature or malformed data, never a blank label', () => {
+    expect(edgeLabel(usesEdge('hub', 'n1'), 'hub')).toBe('uses →');
+    expect(edgeLabel(usesEdge('n1', 'hub'), 'hub')).toBe('← used by');
+    expect(edgeLabel(usesEdge('hub', 'n1', '   '), 'hub')).toBe('uses →');
+    expect(edgeLabel(flowsToEdge('hub', 'n1'), 'hub')).toBe('flows to ⇢');
+    expect(edgeLabel(flowsToEdge('n1', 'hub'), 'hub')).toBe('⇢ flows from');
   });
 });

@@ -65,6 +65,29 @@ export interface ContextGroup {
   supports: ContextSupport[];
 }
 
+/**
+ * Sprint U4-2c item 1: "edit a verb on an existing flow and see it on the
+ * context view" — a `uses`/`flows_to` edge's own `description` (its verb
+ * phrase, required at creation for both types,
+ * `relationshipAttributeSchema.ts`'s own schema) is the real label now,
+ * not a fixed "uses"/"flows to" placeholder; only the direction arrow is
+ * still invented here. Falls back to the original fixed wording only when
+ * `description` is missing or blank (pre-this-feature data, or malformed
+ * data this function never assumes can't exist) — the exact same fallback
+ * text `ContextView.tsx` always showed before this item, per direction.
+ */
+export function edgeLabel(edge: RelationshipsHeadRow, hubId: UUID): string {
+  const outbound = edge.from_element_id === hubId;
+  const description = attributesRecord(edge.attributes).description;
+  const verb = typeof description === 'string' && description.trim().length > 0 ? description : null;
+  if (edge.relationship_type === 'flows_to') {
+    const fallback = outbound ? 'flows to' : 'flows from';
+    return outbound ? `${verb ?? fallback} ⇢` : `⇢ ${verb ?? fallback}`;
+  }
+  const fallback = outbound ? 'uses' : 'used by';
+  return outbound ? `${verb ?? fallback} →` : `← ${verb ?? fallback}`;
+}
+
 function isExternal(element: ElementsHeadRow): boolean {
   return attributesRecord(element.attributes).isExternal === true;
 }

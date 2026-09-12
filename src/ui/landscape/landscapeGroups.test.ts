@@ -67,7 +67,7 @@ describe('computeLandscapeGroups (item 13)', () => {
     expect(hubMember.usedByCount).toBe(1); // other2 -> hub
   });
 
-  it('an empty (reference-only) lane still shows the referencing systems ("shared-system chips")', () => {
+  it('an empty (reference-only) lane still shows the referencing systems ("shared-system chips") — and, secondary-supporter wording, lists them as real secondary members too', () => {
     const capA = capability('cap-a', 'Alpha');
     const capB = capability('cap-b', 'Beta');
     const sys = system('sys-1', 'Multi-homed');
@@ -76,7 +76,7 @@ describe('computeLandscapeGroups (item 13)', () => {
     const groups = computeLandscapeGroups([sys], edges, l1AncestorByCapabilityId, [], []);
     const laneB = groups.groups.find((g) => g.key === 'cap-b');
     if (!laneB) throw new Error('expected a Beta lane');
-    expect(laneB.members).toEqual([]);
+    expect(laneB.members).toEqual([{ system: sys, usesCount: 0, usedByCount: 0, role: 'secondary' }]);
     expect(laneB.referencedBy.map((s) => s.element_id)).toEqual(['sys-1']);
   });
 
@@ -87,8 +87,33 @@ describe('computeLandscapeGroups (item 13)', () => {
     const l1AncestorByCapabilityId = new Map([['cap-a', capA], ['cap-z', capZ]]);
     const edges = [supports('sys-1', 'cap-a'), supports('sys-1', 'cap-z')];
     const groups = computeLandscapeGroups([sys], edges, l1AncestorByCapabilityId, [], []);
-    const member = groups.groups.flatMap((g) => g.members).find((m) => m.system.element_id === 'sys-1');
+    // Secondary-supporter wording: `sys-1` now appears twice — once as its
+    // anchored (primary) lane's own member, carrying `extraLaneCount`, and
+    // once more as the *other* lane's `secondary` member (never carrying
+    // it, this member field's own doc comment) — disambiguated the same
+    // way a caller actually would, by which one has the `+N` marker at all.
+    const member = groups.groups.flatMap((g) => g.members).find((m) => m.system.element_id === 'sys-1' && m.extraLaneCount !== undefined);
     expect(member?.extraLaneCount).toBe(1);
+  });
+
+  it('secondary-supporter wording: an anchored member carries role "primary", a merged secondary-lane member carries "secondary"', () => {
+    const capA = capability('cap-a', 'Alpha');
+    const capB = capability('cap-b', 'Beta');
+    const sys = system('sys-1', 'Multi-homed');
+    const l1AncestorByCapabilityId = new Map([['cap-a', capA], ['cap-b', capB]]);
+    const edges = [supports('sys-1', 'cap-a', 'primary'), supports('sys-1', 'cap-b', 'secondary')];
+    const groups = computeLandscapeGroups([sys], edges, l1AncestorByCapabilityId, [], []);
+    const laneA = groups.groups.find((g) => g.key === 'cap-a');
+    const laneB = groups.groups.find((g) => g.key === 'cap-b');
+    expect(laneA?.members[0]?.role).toBe('primary');
+    expect(laneB?.members[0]?.role).toBe('secondary');
+  });
+
+  it('the four non-capability lanes (Unassigned/External/OT/Platforms) never carry a role — there is no single `supports` edge to name one from', () => {
+    const sys = system('sys-1', 'No Capability', false);
+    const groups = computeLandscapeGroups([sys], [], new Map(), [], []);
+    const unassigned = groups.groups.find((g) => g.key === UNASSIGNED_LANE_KEY);
+    expect(unassigned?.members[0]?.role).toBeUndefined();
   });
 
   it('is deterministic: the same inputs, in a different array order, produce the same groups', () => {

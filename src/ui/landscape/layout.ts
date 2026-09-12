@@ -126,8 +126,11 @@ const BOUNDARY_MARGIN = 8;
  */
 export const MIN_LAYOUT_WIDTH = 1280;
 
-const REFERENCE_CHIP_WIDTH = 108;
-const REFERENCE_CHIP_HEIGHT = 18;
+// Exported: `LandscapeCanvas.tsx`'s own drawing pass and (secondary-
+// supporter wording) its reference-chip hit test both need this exact box
+// size — one source for the literal rather than two copies to keep in sync.
+export const REFERENCE_CHIP_WIDTH = 108;
+export const REFERENCE_CHIP_HEIGHT = 18;
 const REFERENCE_CHIP_GUTTER = 6;
 
 export interface LandscapeNodePosition {

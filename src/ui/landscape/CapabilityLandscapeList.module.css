@@ -1,0 +1,99 @@
+/**
+ * Sprint U4-2c item 2: the capability-scoped landscape's flat list — "no
+ * lanes, no cross-lane chips," desktop and mobile alike (no breakpoint
+ * split in this file at all, unlike `LandscapeMobileList.module.css`).
+ * Row/chip shapes copied from that module's own `.row`/`.rowMain`/
+ * `.rowName`/`.lifecycleDot`/`.rowSecondary`/`.contextLink` rather than
+ * imported, since the two lists are siblings, not one reusing the other.
+ */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.section {
+  min-width: 0;
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-2) 0;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border);
+  background: var(--surface);
+}
+
+.rowMain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.rowName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/** Same tone-keyed dot as `LandscapeMobileList.module.css`'s own `.lifecycleDot` — see that file's comment for why colour is never the only signal. */
+.lifecycleDot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-neutral);
+}
+
+.lifecycleDot[data-tone='ok'] {
+  background: var(--status-ok);
+}
+.lifecycleDot[data-tone='warn'] {
+  background: var(--status-warn);
+}
+.lifecycleDot[data-tone='danger'] {
+  background: var(--status-danger);
+}
+.lifecycleDot[data-tone='info'] {
+  background: var(--status-info);
+}
+.lifecycleDot[data-tone='neutral'] {
+  background: var(--status-neutral);
+}
+
+.rowSecondary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.contextLink {
+  white-space: nowrap;
+  margin-left: auto;
+}

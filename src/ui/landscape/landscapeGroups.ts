@@ -24,16 +24,33 @@
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
+import { attributesRecord } from '../elements/attributesRecord';
 import { EXTERNAL_LANE_KEY, groupSystemsByLane, OT_ZONE_LANE_KEY, PLATFORM_BAND_KEY, UNASSIGNED_LANE_KEY, type LandscapeLaneRegion } from './layout';
 
 export interface LandscapeGroupMember {
   system: ElementsHeadRow;
-  /** Same "+N" fallback-placement marker `layout.ts`'s own nodes carry — item 13's own "'+N' chip" on a system row. */
+  /** Same "+N" fallback-placement marker `layout.ts`'s own nodes carry — item 13's own "'+N' chip" on a system row. Never set on a secondary-supporter member (below) — "+N" marks a *primary* placement that fell back to "most recently added," which doesn't apply to a system merely also-supporting this lane. */
   extraLaneCount?: number;
   /** Outbound `uses`/`flows_to` edge count — item 13's "uses N". */
   usesCount: number;
   /** Inbound `uses`/`flows_to` edge count — item 13's "used by N". */
   usedByCount: number;
+  /**
+   * Secondary-supporter wording: "expanded groups list every supporting
+   * system with a role tag." `undefined` only for the four non-capability
+   * lanes (Unassigned/External/OT/Platforms) — a system lands there by
+   * placement fallback, not because of a specific `supports` edge into
+   * *that* lane, so "primary"/"secondary" has no real edge to name. Every
+   * genuine capability lane's members always get one: `'primary'` for the
+   * anchored member (matching whichever edge actually holds
+   * `role: 'primary'` for it, or — the "most recently added" fallback
+   * `layout.ts`'s own module comment describes — the one edge assigning it
+   * here at all when none is), `'secondary'` for every system merged in
+   * from `referencedBy` below (an edge into a lane that isn't a system's
+   * own anchor is never the anchor `role: 'primary'` edge, so this is
+   * always correct without a second lookup).
+   */
+  role?: 'primary' | 'secondary';
 }
 
 export interface LandscapeGroup {
@@ -71,6 +88,17 @@ export function computeLandscapeGroups(
 ): LandscapeGroups {
   const { boundaryKeys, hasExternalLane, byLane, l1CapabilitiesById, extraLaneCountByElementId, referenceTargets } = groupSystemsByLane(systems, supportsEdges, l1AncestorByCapabilityId);
 
+  // Secondary-supporter wording: this file's own copy of `layout.ts`'s
+  // identical grouping (that module's `supportsBySystem` is private to its
+  // own `groupSystemsByLane`) — `role` below is the only thing that needs
+  // it here.
+  const supportsBySystem = new Map<UUID, RelationshipsHeadRow[]>();
+  for (const edge of supportsEdges) {
+    const list = supportsBySystem.get(edge.from_element_id) ?? [];
+    list.push(edge);
+    supportsBySystem.set(edge.from_element_id, list);
+  }
+
   const usesCountByElementId = new Map<UUID, number>();
   const usedByCountByElementId = new Map<UUID, number>();
   for (const edge of edges) {
@@ -90,13 +118,35 @@ export function computeLandscapeGroups(
 
   function buildGroup(key: string, region: LandscapeLaneRegion): LandscapeGroup {
     const label = key === EXTERNAL_LANE_KEY ? 'External' : key === OT_ZONE_LANE_KEY ? 'OT' : key === PLATFORM_BAND_KEY ? 'Platforms' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
-    const members: LandscapeGroupMember[] = (byLane.get(key) ?? []).map((system) => {
+    // A genuine capability lane's own key is that capability's element id
+    // (`l1CapabilitiesById.has(key)`) — the four special lanes never have a
+    // real `supports` edge naming them, so `role` stays `undefined` there
+    // (this member interface's own doc comment explains why).
+    const isCapabilityLane = l1CapabilitiesById.has(key);
+    function roleFor(systemId: UUID): 'primary' | 'secondary' | undefined {
+      if (!isCapabilityLane) return undefined;
+      const ownEdges = (supportsBySystem.get(systemId) ?? []).filter((e) => e.to_element_id === key);
+      return ownEdges.some((e) => attributesRecord(e.attributes).role === 'primary') ? 'primary' : 'secondary';
+    }
+    const anchoredMembers: LandscapeGroupMember[] = (byLane.get(key) ?? []).map((system) => {
       const extraLaneCount = extraLaneCountByElementId.get(system.element_id);
       const usesCount = usesCountByElementId.get(system.element_id) ?? 0;
       const usedByCount = usedByCountByElementId.get(system.element_id) ?? 0;
-      return extraLaneCount === undefined ? { system, usesCount, usedByCount } : { system, extraLaneCount, usesCount, usedByCount };
+      const role = roleFor(system.element_id);
+      return { system, usesCount, usedByCount, ...(extraLaneCount === undefined ? {} : { extraLaneCount }), ...(role === undefined ? {} : { role }) };
     });
     const referencedBy = [...(referencedByLaneKey.get(key) ?? [])].sort(byNameThenId);
+    // Secondary-supporter wording: merged into `members` too — every
+    // referencing system is, by construction, a `secondary` supporter of
+    // this lane (see this member field's own doc comment for why no
+    // lookup is needed to know that).
+    const referencedMembers: LandscapeGroupMember[] = referencedBy.map((system) => ({
+      system,
+      usesCount: usesCountByElementId.get(system.element_id) ?? 0,
+      usedByCount: usedByCountByElementId.get(system.element_id) ?? 0,
+      role: 'secondary',
+    }));
+    const members = [...anchoredMembers, ...referencedMembers];
     return { key, label, region, members, referencedBy };
   }
 
