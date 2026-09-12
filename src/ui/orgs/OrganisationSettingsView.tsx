@@ -8,6 +8,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfirm';
 import type { MemberRole, OrganisationRow } from '../../db/types';
+import { formatDate } from '../time';
 import { canManageOrgSettings } from './roleGates';
 import { useInvites } from './useInvites';
 import { useMembers } from './useMembers';
@@ -129,7 +130,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
                       </Text>
                     )}
                     <Text as="span" tone="muted" size="sm">
-                      Joined {new Date(member.joined_at).toLocaleDateString()}
+                      Joined {formatDate(member.joined_at)}
                     </Text>
                   </div>
                   {canManage ? (

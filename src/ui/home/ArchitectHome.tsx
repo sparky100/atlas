@@ -8,10 +8,9 @@ import { HealthFinding, type HealthFindingItem } from '../components/HealthFindi
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import { monthsSince } from '../../contracts/thresholds';
 import type { BoundaryCrossing, UnlabeledVerbRelationship } from '../../db/healthFindings';
+import { formatRelativeTime } from '../time';
 import { branchStatusTone } from '../changes/branchStatus';
-import { formatCommitActivityTime } from './commitActivityTime';
 import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
 import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
 import type { ArchitectHomeData, RecentCommitRow } from './useArchitectHome';
@@ -21,14 +20,6 @@ export interface ArchitectHomeProps {
   data: ArchitectHomeData;
   orgSlug: string;
   modelSlug: string;
-}
-
-/** Same age vocabulary as `HistoryTimeline`'s own local `formatAge` — `< 1mo ago` / `Nmo ago` / `Ny ago`. */
-function formatAge(dateStr: string, now: Date): string {
-  const months = monthsSince(new Date(dateStr), now);
-  if (months < 1) return '< 1mo ago';
-  if (months < 24) return `${String(months)}mo ago`;
-  return `${String(Math.floor(months / 12))}y ago`;
 }
 
 function plural(count: number, singular: string, pluralForm: string): string {
@@ -89,6 +80,19 @@ function boundaryCrossingItems(crossings: readonly BoundaryCrossing[]): HealthFi
  * "No findings" line: when every check in a group is zero, `active` is
  * empty and only the "N checks clear" line renders — the same shape,
  * naturally, rather than a separate special case.
+ *
+ * S1 item 8: "Review queue and every other user-facing time use the one
+ * time helper" — the Review queue's own "Oldest: opened…" line and every
+ * commit row in Recent activity now go through `formatRelativeTime`
+ * (`src/ui/time.ts`, moved and renamed from this file's old local import
+ * of `commitActivityTime.ts`'s `formatCommitActivityTime`), not a local
+ * reimplementation. This also swaps Review queue's own vocabulary: it
+ * used the coarse provenance staleness bucket before ("< 1mo ago" for
+ * anything under a month, which is most review items) —
+ * `formatRelativeTime`'s precise minutes/hours answer is what "how old is
+ * the oldest item" actually wants. See `src/ui/time.ts`'s own doc comment
+ * for why its three vocabularies stay distinct rather than collapsing
+ * into one literal format string.
  */
 export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) {
   const now = new Date();
@@ -282,7 +286,7 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
             {latest.authorDisplay}
           </Text>
           <Text as="span" tone="faint" size="sm">
-            {formatCommitActivityTime(latest.commit.created_at, now)}
+            {formatRelativeTime(latest.commit.created_at, now)}
           </Text>
         </div>
       </li>
@@ -307,7 +311,7 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
           {data.oldestReviewItem && (
             <Link to={`/o/${orgSlug}/m/${modelSlug}/review/${data.oldestReviewItem.id}`}>
               <Text as="span" size="sm">
-                Oldest: opened {formatAge(data.oldestReviewItem.created_at, now)} →
+                Oldest: opened {formatRelativeTime(data.oldestReviewItem.created_at, now)} →
               </Text>
             </Link>
           )}

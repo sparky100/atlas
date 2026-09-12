@@ -4,7 +4,7 @@ import type { BranchRow, CommentRow, MemberRole, ProfileRow } from '../../../db/
 import type { CommentThread as CommentThreadData } from '../../../db/comments';
 import { canResolveComment } from '../../comments/commentPermissions';
 import { profileLabel as authorLabel } from '../../comments/profileLabel';
-import { formatCommitActivityTime } from '../../home/commitActivityTime';
+import { formatRelativeTime } from '../../time';
 import { Avatar } from '../Avatar/Avatar';
 import { Button } from '../Button/Button';
 import { Chip } from '../Chip/Chip';
@@ -49,7 +49,7 @@ function CommentRowView({ comment, profile, now }: { comment: CommentRow; profil
             </Text>
           )}
           <Text as="span" size="xs" tone="faint">
-            {formatCommitActivityTime(comment.created_at, now)}
+            {formatRelativeTime(comment.created_at, now)}
           </Text>
           {comment.edited_at && (
             <Text as="span" size="xs" tone="faint">
@@ -109,7 +109,7 @@ export function CommentThread({ thread, profiles, branches, members, role, userI
         {resolved && (
           <>
             <Text as="span" size="xs" tone="muted">
-              resolved by {resolvedByProfile ? `@${resolvedByProfile.handle}` : 'someone'} · {root.resolved_at ? formatCommitActivityTime(root.resolved_at, now) : ''}
+              resolved by {resolvedByProfile ? `@${resolvedByProfile.handle}` : 'someone'} · {root.resolved_at ? formatRelativeTime(root.resolved_at, now) : ''}
             </Text>
             {canResolve && (
               <Button variant="ghost" onClick={() => void onReopen(root.id)}>

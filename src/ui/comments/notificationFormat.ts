@@ -1,4 +1,4 @@
-import { formatCommitActivityTime } from '../home/commitActivityTime';
+import { formatRelativeTime } from '../time';
 import type { AnchorType, NotificationKind, ViewKind } from '../../db/types';
 
 const BODY_TRUNCATE_LENGTH = 80;
@@ -25,6 +25,6 @@ export function notificationKindWording(kind: NotificationKind, authorName: stri
 export function notificationAnchorWords(subjectName: string | undefined, anchorType: AnchorType, viewKind: ViewKind | null, now: Date, createdAt: string): string {
   const parts = [subjectName ?? `a ${anchorType}`, anchorType];
   if (viewKind) parts.push(viewKind);
-  parts.push(formatCommitActivityTime(createdAt, now));
+  parts.push(formatRelativeTime(createdAt, now));
   return parts.join(' · ');
 }

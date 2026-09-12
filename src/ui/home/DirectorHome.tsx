@@ -8,6 +8,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { UUID } from '../../contracts/delta';
 import type { MemberRole } from '../../db/types';
+import { formatDate } from '../time';
 import { branchStatusTone } from '../changes/branchStatus';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { attributesRecord } from '../elements/attributesRecord';
@@ -273,8 +274,4 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised }: CapabilityTile
       {emphasised ? <BlueprintFrame>{content}</BlueprintFrame> : content}
     </Link>
   );
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString();
 }

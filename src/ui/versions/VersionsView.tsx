@@ -6,6 +6,7 @@ import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { TagRow } from '../../db/types';
+import { formatDateTime } from '../time';
 import { useVersions } from './useVersions';
 import styles from './VersionsView.module.css';
 
@@ -143,7 +144,7 @@ function VersionRow({ tag, orgSlug, modelSlug }: { tag: TagRow; orgSlug: string;
           </Text>
         )}
         <Text as="p" tone="faint" size="xs">
-          {new Date(tag.created_at).toLocaleString()}
+          {formatDateTime(tag.created_at)}
         </Text>
       </div>
       <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/capability-map?ref=tag:${tag.name}`} variant="secondary">

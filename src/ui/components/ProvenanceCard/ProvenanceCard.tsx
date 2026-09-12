@@ -1,7 +1,7 @@
 import type { DeltaRow, FactsRow } from '../../../contracts/rows';
 import type { CapabilityMapRow } from '../../../db/capabilityMapTemplates';
 import type { SourceRow } from '../../../db/types';
-import { formatCommitActivityTime } from '../../home/commitActivityTime';
+import { formatRelativeTime } from '../../time';
 import { ConfidenceDots } from '../ConfidenceDots/ConfidenceDots';
 import { Text } from '../Text/Text';
 import styles from './ProvenanceCard.module.css';
@@ -32,7 +32,7 @@ export interface ProvenanceCardProps {
  * canvas tooltips (step 4) reuse it too.
  *
  * Prompt 7h bug fix: "recorded/effective as precise relative time or
- * date" — the Effective/Recorded rows use `formatCommitActivityTime`
+ * date" — the Effective/Recorded rows use `formatRelativeTime`
  * (minutes/hours/yesterday/date), not the coarse monthly staleness
  * bucket `ProvenanceBadge`'s own compact badge still uses for its
  * stale-colour threshold; a card the viewer is already hovering to read
@@ -81,7 +81,7 @@ export function ProvenanceCard({ fact, source, supersessionChain, supersessionSo
           Effective
         </Text>
         <Text size="sm" as="span">
-          {formatCommitActivityTime(effectiveDateStr, now)}
+          {formatRelativeTime(effectiveDateStr, now)}
         </Text>
       </div>
       <div className={styles.row}>
@@ -89,7 +89,7 @@ export function ProvenanceCard({ fact, source, supersessionChain, supersessionSo
           Recorded
         </Text>
         <Text size="sm" as="span">
-          {formatCommitActivityTime(recordedDateStr, now)}
+          {formatRelativeTime(recordedDateStr, now)}
         </Text>
       </div>
       <div className={styles.row}>

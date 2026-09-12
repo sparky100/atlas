@@ -14,6 +14,7 @@ import { useAuth } from '../auth/useAuth';
 import { createChangeBranch, getMainBranch } from '../../db/branches';
 import type { MemberRole } from '../../db/types';
 import { useSelectedRef } from '../branches/useSelectedRef';
+import { formatDateTime } from '../time';
 import { canCancelChange } from '../orgs/useMembership';
 import { BranchRebasePanel } from '../reviews/BranchRebasePanel';
 import { supabase } from '../supabaseClient';
@@ -146,7 +147,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           </Text>
         )}
         <Text as="span" tone="faint" size="xs">
-          Updated {new Date(branch.updated_at).toLocaleString()}
+          Updated {formatDateTime(branch.updated_at)}
         </Text>
       </div>
 
@@ -156,7 +157,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
       {branch.status === 'cancelled' && (
         <Panel>
           <Text as="p" size="sm">
-            Cancelled{branch.cancelled_at ? ` ${new Date(branch.cancelled_at).toLocaleString()}` : ''}.
+            Cancelled{branch.cancelled_at ? ` ${formatDateTime(branch.cancelled_at)}` : ''}.
           </Text>
           {branch.cancel_reason && (
             <Text as="p" tone="muted" size="sm">
