@@ -47,6 +47,24 @@ export function refParamOf(ref: Ref): string {
 }
 
 /**
+ * S1 item 2 ("View this change"): the query string for a link that must
+ * carry both the ref *and* whether it's a read-only viewing ref, not the
+ * editing one — `?ref=branch:x&viewing=1` vs plain `?ref=branch:x`. One
+ * helper rather than every call site hand-appending `viewing` next to its
+ * own `refParamOf(ref)` (`ModelNav.tsx`, `LandscapePage.tsx`,
+ * `ElementPage.tsx`'s own href builders, `zoomQueryString`) — the same
+ * "one place, not one per caller" reasoning `refParamOf` itself already
+ * gives the ref string. Never emits `viewing=1` for `main` — nothing to
+ * view read-only there (`SelectedRefProvider`'s own write-effect only
+ * ever *checks* for `viewing` on a `branch:` ref for the identical
+ * reason).
+ */
+export function refQueryParam(ref: Ref, viewing: boolean): string {
+  const base = `ref=${refParamOf(ref)}`;
+  return viewing && ref.kind === 'branch' ? `${base}&viewing=1` : base;
+}
+
+/**
  * The `[ref]` chip's text (UI-principles §2.2) — `main`, a tag's own name,
  * or `Change: {title}` for a branch (§2.2's own example). `branchLabel`,
  * when given, is normally a branch's `title ?? name` — callers rendering a

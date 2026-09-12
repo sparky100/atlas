@@ -21,11 +21,14 @@ export interface ZoomParams {
   ref: Ref;
   /** The capability this navigation descended from, if any — carried forward so a deep-linked Context/Container/Component page can still render the Capability breadcrumb segment. */
   capabilityId: UUID | null;
+  /** S1 item 2: whether `ref` is a read-only viewing ref, not the editing one — carried the same way `capabilityId` is, so "View this change" stays in effect all the way down the zoom chain (Landscape → Context → Container → Component), not just its first hop. Omitted (falsy) for every existing caller that predates viewing mode. */
+  viewing?: boolean;
 }
 
 export function zoomQueryString(params: ZoomParams): string {
   const search = new URLSearchParams({ ref: refParamOf(params.ref) });
   if (params.capabilityId) search.set('capability', params.capabilityId);
+  if (params.viewing && params.ref.kind === 'branch') search.set('viewing', '1');
   return search.toString();
 }
 

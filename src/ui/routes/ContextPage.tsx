@@ -8,12 +8,14 @@ import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useModels } from '../models/useModels';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
-import { refLabelOf, refParamOf } from '../../db/ref';
+import { refLabelOf, refQueryParam } from '../../db/ref';
 import { parseViewMode } from '../../db/viewMode';
 import { BranchViewModeControl } from '../branches/BranchViewModeControl';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
+import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
 import { useSelectedRef } from '../branches/useSelectedRef';
+import { isViewingMode } from '../branches/viewingMode';
 import { ContextView } from '../context/ContextView';
 import { useSystemContext } from '../context/useSystemContext';
 import { parseCapabilityParam } from '../nav/zoomParams';
@@ -33,6 +35,7 @@ export function ContextPage() {
   const { orgSlug, modelSlug, systemId } = useParams<{ orgSlug: string; modelSlug: string; systemId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { ref } = useSelectedRef();
+  const viewing = isViewingMode(searchParams);
   const mode = parseViewMode(searchParams.get('mode'));
   const capabilityId = parseCapabilityParam(searchParams.get('capability'));
   const { userId } = useAuth();
@@ -59,10 +62,10 @@ export function ContextPage() {
     );
   }
 
-  const refParam = refParamOf(ref);
+  const refParam = refQueryParam(ref, viewing);
   const segments: BreadcrumbSegment[] = [];
-  if (capability) segments.push({ label: capability.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/capability-map?ref=${refParam}` });
-  if (state.status === 'ready') segments.push({ label: state.data.group.hub.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/context/${systemId ?? ''}?ref=${refParam}` });
+  if (capability) segments.push({ label: capability.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/capability-map?${refParam}` });
+  if (state.status === 'ready') segments.push({ label: state.data.group.hub.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/context/${systemId ?? ''}?${refParam}` });
 
   return (
     <div>
@@ -70,7 +73,7 @@ export function ContextPage() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={[styles.main, state.status === 'ready' ? styles.mainWithView : ''].filter(Boolean).join(' ')}>
-        <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
+        {viewing ? <ViewingBranchBanner activeRef={ref} /> : <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />}
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}

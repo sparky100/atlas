@@ -17,6 +17,7 @@ export interface StructureViewProps {
   group: StructureGroup;
   orgSlug: string;
   modelSlug: string;
+  /** The full `ref=...` query fragment (`refQueryParam`), not a bare token — see `CapabilityMapView.tsx`'s identical `refParam` doc comment for why. */
   refParam: string;
   /** UI-principles §6.2/§6.3 — present only when a branch's Diff mode is active. Reuses `DiffBadge`, same call as ContextView.tsx's own comment explains for this family of DOM views. */
   diff?: VersionDiff | null;
@@ -43,8 +44,8 @@ function diffBadge(diffById: Map<UUID, ElementVersionDiff> | null, elementId: UU
  * element page, nothing more.
  */
 export function StructureView({ kind, group, orgSlug, modelSlug, refParam, diff = null, addChild }: StructureViewProps) {
-  const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?ref=${refParam}`;
-  const componentsHref = (containerId: UUID) => `/o/${orgSlug}/m/${modelSlug}/component/${containerId}?ref=${refParam}`;
+  const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?${refParam}`;
+  const componentsHref = (containerId: UUID) => `/o/${orgSlug}/m/${modelSlug}/component/${containerId}?${refParam}`;
   const parentExternal = attributesRecord(group.parent.attributes).isExternal === true;
   const diffById = diff ? new Map<UUID, ElementVersionDiff>(diff.elements.map((e) => [e.elementId, e])) : null;
 

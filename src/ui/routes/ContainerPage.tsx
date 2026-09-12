@@ -10,14 +10,16 @@ import { useAuth } from '../auth/useAuth';
 import { useModels } from '../models/useModels';
 import { canEditBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
-import { refLabelOf, refParamOf } from '../../db/ref';
+import { refLabelOf, refParamOf, refQueryParam } from '../../db/ref';
 import { parseViewMode } from '../../db/viewMode';
 import { BranchViewModeControl } from '../branches/BranchViewModeControl';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
+import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
+import { isViewingMode } from '../branches/viewingMode';
 import { StructureView } from '../structureView/StructureView';
 import { useStructureView } from '../structureView/useStructureView';
 import { parseCapabilityParam } from '../nav/zoomParams';
@@ -43,6 +45,7 @@ export function ContainerPage() {
   const { orgSlug, modelSlug, systemId } = useParams<{ orgSlug: string; modelSlug: string; systemId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { ref } = useSelectedRef();
+  const viewing = isViewingMode(searchParams);
   const mode = parseViewMode(searchParams.get('mode'));
   const capabilityId = parseCapabilityParam(searchParams.get('capability'));
   const { userId } = useAuth();
@@ -55,7 +58,7 @@ export function ContainerPage() {
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
-  const canEdit = editingBranch !== null && canEditBranch(role, editingBranch);
+  const canEdit = !viewing && editingBranch !== null && canEditBranch(role, editingBranch);
   // See LandscapePage.tsx's identical comment: ADR-018 guarantees both are
   // never null in practice; BranchRow's own type hasn't been narrowed yet.
   const searchCommitId = mainBranch?.head_commit_id ?? null;
@@ -78,10 +81,15 @@ export function ContainerPage() {
     );
   }
 
+  // Bare token for `ElementSearchAdd`'s own `refParam` prop (only ever
+  // rendered while `canAdd`, which already folds in `!viewing`); the full
+  // query fragment (`refQuery`, carries `viewing=1`) for every link this
+  // page builds itself.
   const refParam = refParamOf(ref);
-  const contextHref = `/o/${orgSlug ?? ''}/m/${model.slug}/context/${systemId ?? ''}?${new URLSearchParams({ ref: refParam, ...(capabilityId ? { capability: capabilityId } : {}) }).toString()}`;
+  const refQuery = refQueryParam(ref, viewing);
+  const contextHref = `/o/${orgSlug ?? ''}/m/${model.slug}/context/${systemId ?? ''}?${refQuery}${capabilityId ? `&capability=${capabilityId}` : ''}`;
   const segments: BreadcrumbSegment[] = [];
-  if (capability) segments.push({ label: capability.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/capability-map?ref=${refParam}` });
+  if (capability) segments.push({ label: capability.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/capability-map?${refQuery}` });
   segments.push({ label: state.status === 'ready' ? state.data.group.parent.name : '…', href: contextHref });
 
   return (
@@ -90,7 +98,7 @@ export function ContainerPage() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={[styles.main, state.status === 'ready' ? styles.mainWithView : ''].filter(Boolean).join(' ')}>
-        <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
+        {viewing ? <ViewingBranchBanner activeRef={ref} /> : <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />}
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
@@ -132,7 +140,7 @@ export function ContainerPage() {
             group={state.data.group}
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}
-            refParam={refParam}
+            refParam={refQuery}
             diff={state.data.diff}
             addChild={
               canAdd ? (

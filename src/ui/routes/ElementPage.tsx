@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ATTRIBUTE_SCHEMA_BY_TYPE } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
@@ -28,15 +28,17 @@ import { StructureSection } from '../components/StructureSection/StructureSectio
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
+import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
+import { isViewingMode } from '../branches/viewingMode';
 import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
-import { refLabelOf, refParamOf } from '../../db/ref';
+import { refLabelOf, refParamOf, refQueryParam } from '../../db/ref';
 import { elementBreadcrumbSegments } from '../nav/elementBreadcrumbSegments';
 import { ALIAS_TYPE_LABELS, aliasAsFact } from '../elements/aliasLabels';
 import { useElementPage } from '../elements/useElementPage';
@@ -74,7 +76,9 @@ import styles from './ElementPage.module.css';
  */
 export function ElementPage() {
   const { orgSlug, modelSlug, elementId } = useParams<{ orgSlug: string; modelSlug: string; elementId: string }>();
+  const [searchParams] = useSearchParams();
   const { ref } = useSelectedRef();
+  const viewing = isViewingMode(searchParams);
   // Bug fix: this page used to call `refLabelOf(ref)` with no second
   // argument at all — every other ref-aware page resolves the branch's
   // own title via `useBranchLabel` first, so this was the one page whose
@@ -111,7 +115,7 @@ export function ElementPage() {
   const { state, reload } = useElementPage(model?.id ?? '', elementId ?? '', ref);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
-  const canEdit = editingBranch !== null && canEditBranch(role, editingBranch);
+  const canEdit = !viewing && editingBranch !== null && canEditBranch(role, editingBranch);
   // The complement of `canEdit` at `main`: a contributor who can create a
   // change branch but has no direct main-write path gets this instead of
   // `Edit` — never both (ElementHeader.tsx passes exactly one).
@@ -125,7 +129,7 @@ export function ElementPage() {
   // anyway). Gated on `canCreateChangeBranch` the same as `canPropose`
   // above: a viewer already sees everything read-only by design and needs
   // no explanation for it.
-  const underReview = ref.kind === 'branch' && editingBranch !== null && ['proposed', 'in_review', 'approved'].includes(editingBranch.status) && canCreateChangeBranch(role);
+  const underReview = !viewing && ref.kind === 'branch' && editingBranch !== null && ['proposed', 'in_review', 'approved'].includes(editingBranch.status) && canCreateChangeBranch(role);
   // See LandscapePage.tsx's identical comment: ADR-018 guarantees main's
   // head is never null in practice; `BranchRow`'s own type hasn't been
   // narrowed yet. `expectedHeadCommitId` for the relationship-add write
@@ -195,7 +199,7 @@ export function ElementPage() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
-        <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />
+        {viewing ? <ViewingBranchBanner activeRef={ref} /> : <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />}
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
@@ -212,7 +216,7 @@ export function ElementPage() {
               org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
               model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
               refLabel={refLabelOf(ref, branchLabel)}
-              segments={elementBreadcrumbSegments(state.data.element, state.data.parent, orgSlug ?? '', model.slug, refParamOf(ref))}
+              segments={elementBreadcrumbSegments(state.data.element, state.data.parent, orgSlug ?? '', model.slug, refQueryParam(ref, viewing))}
             />
             <ElementHeader
               element={state.data.element}
