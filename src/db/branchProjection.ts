@@ -139,6 +139,11 @@ export function projectionActorsForLandscape(projection: HeadProjection): Elemen
   return projection.elementsHead.filter((e) => e.element_type === 'actor').sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Mirrors src/db/landscape.ts's `listContainersForLandscape` ("platforms and modules": a platform's own module rows), name-sorted to match. */
+export function projectionContainersForLandscape(projection: HeadProjection): ElementsHeadRow[] {
+  return projection.elementsHead.filter((e) => e.element_type === 'container').sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Mirrors src/db/landscape.ts's `listLandscapeEdges` — both endpoints in `systemIds`. */
 export function projectionLandscapeEdges(projection: HeadProjection, systemIds: readonly UUID[]): RelationshipsHeadRow[] {
   const ids = new Set(systemIds);

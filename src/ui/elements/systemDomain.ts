@@ -40,15 +40,21 @@ export function domainOf(system: ElementsHeadRow): SystemDomain {
 
 /**
  * The domain a `uses`/`flows_to` endpoint resolves to for boundary-crossing
- * purposes — a System reads its own `domain` (`domainOf`); a Container or
- * Component has none of its own and inherits by walking `parent_id` up
- * until a System is reached (a Container's parent is always a System, a
- * Component's parent is always a Container, per `relationshipTypeRules.ts`'s
- * own hierarchy — so at most two hops). An element missing from
- * `elementsById` (shouldn't happen for a live edge's own endpoints, but
- * `listUsesAndFlowsToEndpointElements`'s own caller-supplied scope could in
- * principle miss one) or a chain that never reaches a System defaults to
- * `'it'`, the same "absent reads as it" stance `domainOf` takes.
+ * purposes — a System reads its own `domain` (`domainOf`). A Container or
+ * Component checks its *own* `domain` first ("platforms and modules": a
+ * platform's module can now carry its own override,
+ * `ContainerAttributes.domain`'s own doc comment) before inheriting by
+ * walking `parent_id` up until a System is reached (a Container's parent is
+ * always a System, a Component's parent is always a Container, per
+ * `relationshipTypeRules.ts`'s own hierarchy — so at most two hops). An
+ * element missing from `elementsById` (shouldn't happen for a live edge's
+ * own endpoints, but `listUsesAndFlowsToEndpointElements`'s own
+ * caller-supplied scope could in principle miss one) or a chain that never
+ * reaches a System defaults to `'it'`, the same "absent reads as it" stance
+ * `domainOf` takes. Fully backward-compatible: an ordinary Container/
+ * Component that never sets `domain` (every one before this feature, and
+ * most after it) falls straight through to the parent walk exactly as
+ * before.
  */
 export function resolveElementDomain(element: ElementsHeadRow, elementsById: ReadonlyMap<string, ElementsHeadRow>): SystemDomain {
   let current: ElementsHeadRow | undefined = element;
@@ -56,6 +62,8 @@ export function resolveElementDomain(element: ElementsHeadRow, elementsById: Rea
   // component, ADR-000) — never an unbounded walk of caller-supplied data.
   for (let hop = 0; hop < 4 && current; hop++) {
     if (current.element_type === 'system') return domainOf(current);
+    const ownValue = attributesRecord(current.attributes).domain;
+    if (ownValue === 'ot' || ownValue === 'hybrid') return ownValue;
     current = current.parent_id !== null ? elementsById.get(current.parent_id) : undefined;
   }
   return 'it';

@@ -27,10 +27,15 @@ export interface UseElementRetireInput {
   modelId: UUID;
   orgId: UUID;
   userId: UUID | null;
-  /** The retiring system. Retire is system-only — `lifecycleStatus` (what this action actually sets) is not a field `CapabilityAttributes`/`ContainerAttributes`/`ComponentAttributes`/`ActorAttributes` carry. */
+  /**
+   * The retiring element — a system, or (post-"platforms and modules") a
+   * container/module. Not capability/component/actor: `lifecycleStatus`
+   * (what this action actually sets) is only a field `SystemAttributes`/
+   * `ContainerAttributes` carry.
+   */
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
-  /** The retiring system's own live relationships (`ElementPageData.relationships`) — used to find its own `supports` edges when a replacement is given; no new round trip. */
+  /** The retiring element's own live relationships (`ElementPageData.relationships`) — used to find its own `supports` edges when a replacement is given; no new round trip. */
   relationships: readonly RelationshipsHeadRow[];
   relationshipFacts: ReadonlyMap<UUID, Map<string, FactsRow>>;
   /** Which branch this commits to — see `useElementEditor.ts`'s identical `branch` doc comment. */
@@ -40,16 +45,19 @@ export interface UseElementRetireInput {
 }
 
 /**
- * Prompt 7k item 5's "Retire…": sets `lifecycleStatus: 'retiring'` and
- * `plannedEnd` via the same `element.update` shape `useElementEditor.ts`
- * already uses (no new engine primitive), plus an optional "replaced by"
- * picker that transfers the retiring system's own `supports` edges to the
- * replacement, one capability at a time, in the *same* commit — old edge
- * retracted, new edge created `role: 'secondary'`. This is what actually
- * clears a capability's "lifecycle exposure" colour-by
+ * Prompt 7k item 5's "Retire…" (generalised beyond system-only by
+ * "platforms and modules" — a platform's module is a Container, and
+ * `ContainerAttributes` now carries `lifecycleStatus`/`plannedEnd` too):
+ * sets `lifecycleStatus: 'retiring'` and `plannedEnd` via the same
+ * `element.update` shape `useElementEditor.ts` already uses (no new engine
+ * primitive), plus an optional "replaced by" picker that transfers the
+ * retiring element's own `supports` edges to the replacement, one
+ * capability at a time, in the *same* commit — old edge retracted, new
+ * edge created `role: 'secondary'`. This is what actually clears a
+ * capability's "lifecycle exposure" colour-by
  * (`src/ui/capabilityMap/metrics.ts`'s `lifecycleExposure`): that check
  * reads every *live* `supports` edge into a capability, so leaving the
- * retiring system's own edge in place would keep the capability reading
+ * retiring element's own edge in place would keep the capability reading
  * exposed regardless of what the replacement also supports.
  *
  * New edges always get `role: 'secondary'`, never a copy of the original
@@ -78,19 +86,20 @@ export function useElementRetire(input: UseElementRetireInput): UseElementRetire
   const retire = useCallback(
     async (plannedEnd: string, replacement: RetireReplacement | null) => {
       if (!userId) {
-        setError('You must be signed in to retire this system.');
+        setError('You must be signed in to retire this.');
         return;
       }
-      // `plannedEnd` is optional on `SystemAttributes` in general (an
-      // ordinary edit may set it without touching lifecycle at all), but
-      // this action's whole point is recording one — enforced here, at the
-      // product level, rather than by widening the schema's own
-      // `required` flag for every other caller of `validateAttributeValue`.
+      // `plannedEnd` is optional on `SystemAttributes`/`ContainerAttributes`
+      // in general (an ordinary edit may set it without touching lifecycle
+      // at all), but this action's whole point is recording one — enforced
+      // here, at the product level, rather than by widening the schema's
+      // own `required` flag for every other caller of
+      // `validateAttributeValue`.
       if (plannedEnd.trim() === '') {
-        setError('Planned end is required to retire a system.');
+        setError('Planned end is required to retire this.');
         return;
       }
-      const validated = validateAttributeValue('system', 'plannedEnd', plannedEnd);
+      const validated = validateAttributeValue(element.element_type, 'plannedEnd', plannedEnd);
       if (!validated.ok) {
         setError(validated.error);
         return;
@@ -108,13 +117,13 @@ export function useElementRetire(input: UseElementRetireInput): UseElementRetire
             kind: 'element.update',
             id: crypto.randomUUID(),
             elementId: element.element_id,
-            elementType: 'system',
+            elementType: element.element_type,
             attribute: 'lifecycleStatus',
             value: 'retiring',
             previousDeltaId: facts.get('lifecycleStatus')?.delta_id ?? element.exists_delta_id,
             sourceId: source.id,
             confidence: 1,
-          });
+          } as Delta);
         }
 
         const currentPlannedEnd = attributesRecord(element.attributes).plannedEnd;
@@ -123,7 +132,7 @@ export function useElementRetire(input: UseElementRetireInput): UseElementRetire
             kind: 'element.update',
             id: crypto.randomUUID(),
             elementId: element.element_id,
-            elementType: 'system',
+            elementType: element.element_type,
             attribute: 'plannedEnd',
             value: validated.value,
             previousDeltaId: facts.get('plannedEnd')?.delta_id ?? element.exists_delta_id,

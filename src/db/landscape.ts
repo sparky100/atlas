@@ -44,6 +44,27 @@ export async function listSystemsForLandscape(supabase: Client, commitId: UUID):
  * max_rows treatment as `listSystemsForLandscape` above, for the same
  * reason (SPEC §6.7).
  */
+/**
+ * Every Container at this commit — "platforms and modules": a platform
+ * system's own children are its modules, each of which may `supports` a
+ * capability directly and needs its own landscape tile. Same
+ * `selectAll`/max_rows treatment as `listSystemsForLandscape` above.
+ * `useLandscape.ts` filters this client-side to the containers whose
+ * `parent_id` is one of the already-loaded systems with `kind: 'platform'`
+ * — cheap (bounded by however many platforms exist, never a growing
+ * caller-supplied id list), not a second query scoped by parent.
+ */
+export async function listContainersForLandscape(supabase: Client, commitId: UUID): Promise<ElementsHeadRow[]> {
+  const query = supabase
+    .from('elements_head')
+    .select(ELEMENTS_HEAD_COLUMNS, { count: 'exact' })
+    .eq('commit_id', commitId)
+    .eq('element_type', 'container')
+    .order('name')
+    .order('element_id');
+  return selectAll<ElementsHeadRow>(query);
+}
+
 export async function listActorsForLandscape(supabase: Client, commitId: UUID): Promise<ElementsHeadRow[]> {
   const query = supabase
     .from('elements_head')

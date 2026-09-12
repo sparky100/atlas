@@ -65,4 +65,24 @@ describe('resolveElementDomain (Prompt 7k item 3)', () => {
     const container = element('cont-1', 'container', 'missing-parent');
     expect(resolveElementDomain(container, new Map([['cont-1', container]]))).toBe('it');
   });
+
+  it('"platforms and modules": a container with its own domain override reads that, not its parent system\'s', () => {
+    const system = element('sys-1', 'system', null, { domain: 'it' });
+    const module = element('cont-1', 'container', 'sys-1', { domain: 'ot' });
+    const byId = new Map([
+      ['sys-1', system],
+      ['cont-1', module],
+    ]);
+    expect(resolveElementDomain(module, byId)).toBe('ot');
+  });
+
+  it('an ordinary container that never sets its own domain still falls through to the parent walk, unchanged', () => {
+    const system = element('sys-1', 'system', null, { domain: 'ot' });
+    const container = element('cont-1', 'container', 'sys-1');
+    const byId = new Map([
+      ['sys-1', system],
+      ['cont-1', container],
+    ]);
+    expect(resolveElementDomain(container, byId)).toBe('ot');
+  });
 });

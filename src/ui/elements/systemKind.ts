@@ -15,17 +15,23 @@ export const SYSTEM_KIND_LABEL: Record<SystemKind, string> = {
   integration_platform: 'Integration platform',
   data_platform: 'Data platform',
   infrastructure: 'Infrastructure',
+  platform: 'Platform',
 };
 
 /** A system's own `kind`, defaulting to `'application'` when absent or not a recognised value — never written back, just how every reader treats the gap (`SystemKind`'s own doc comment, `delta.ts`). */
 export function kindOf(system: ElementsHeadRow): SystemKind {
   const value = attributesRecord(system.attributes).kind;
-  return value === 'integration_platform' || value === 'data_platform' || value === 'infrastructure' ? value : 'application';
+  return value === 'integration_platform' || value === 'data_platform' || value === 'infrastructure' || value === 'platform' ? value : 'application';
 }
 
 /** Whether `system` is a live candidate for `via` — the same check C18 (`src/engine/deltas.ts`'s `checkVia`) enforces at commit time, mirrored here for UI-side filtering (the `via` picker only searches these) before a commit is ever attempted. */
 export function isIntegrationPlatform(system: ElementsHeadRow): boolean {
   return kindOf(system) === 'integration_platform';
+}
+
+/** Whether `system` is a "platforms and modules" platform — its own `Container` children are its modules, each of which may `supports` a capability directly (`relationshipTypeRules.ts`'s `(supports, container, capability)` row). */
+export function isPlatform(system: ElementsHeadRow): boolean {
+  return kindOf(system) === 'platform';
 }
 
 /** Every kind other than the default — the landscape's platform band groups a system here the moment it's marked as anything but an ordinary application. */

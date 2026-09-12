@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isIntegrationPlatform, isNonApplicationKind, kindOf } from './systemKind';
+import { isIntegrationPlatform, isNonApplicationKind, isPlatform, kindOf } from './systemKind';
 import type { ElementsHeadRow, Json } from '../../contracts/rows';
 
 function system(kind?: string): ElementsHeadRow {
@@ -13,6 +13,7 @@ describe('kindOf (Prompt 7k item 4)', () => {
     expect(kindOf(system('integration_platform'))).toBe('integration_platform');
     expect(kindOf(system('data_platform'))).toBe('data_platform');
     expect(kindOf(system('infrastructure'))).toBe('infrastructure');
+    expect(kindOf(system('platform'))).toBe('platform');
   });
 
   it('defaults to application when absent', () => {
@@ -39,5 +40,14 @@ describe('isNonApplicationKind', () => {
     expect(isNonApplicationKind(system('integration_platform'))).toBe(true);
     expect(isNonApplicationKind(system('data_platform'))).toBe(true);
     expect(isNonApplicationKind(system('infrastructure'))).toBe(true);
+    expect(isNonApplicationKind(system('platform'))).toBe(true);
+  });
+});
+
+describe('isPlatform ("platforms and modules")', () => {
+  it('is true only for kind: platform', () => {
+    expect(isPlatform(system('platform'))).toBe(true);
+    expect(isPlatform(system('integration_platform'))).toBe(false);
+    expect(isPlatform(system())).toBe(false);
   });
 });

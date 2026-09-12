@@ -13,10 +13,12 @@ import { ChangesTouchingSection } from '../components/ChangesTouchingSection/Cha
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { CommentsSection } from '../components/CommentsSection/CommentsSection';
 import { ElementHeader } from '../components/ElementHeader/ElementHeader';
+import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { HistoryTimeline } from '../components/HistoryTimeline/HistoryTimeline';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { ModulesSection } from '../components/ModulesSection/ModulesSection';
 import { Panel } from '../components/Panel/Panel';
 import { PlatformFlowsSection } from '../components/PlatformFlowsSection/PlatformFlowsSection';
 import { RelationshipsSection } from '../components/RelationshipGroup/RelationshipsSection';
@@ -40,7 +42,7 @@ import { ALIAS_TYPE_LABELS, aliasAsFact } from '../elements/aliasLabels';
 import { useElementPage } from '../elements/useElementPage';
 import { useElementEditor, type DraftValue } from '../elements/useElementEditor';
 import { useElementRename } from '../elements/useElementRename';
-import { isIntegrationPlatform } from '../elements/systemKind';
+import { isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import styles from './ElementPage.module.css';
 
 /**
@@ -209,10 +211,10 @@ export function ElementPage() {
               onEdit={canEdit && editor.status === 'idle' ? editor.startEditing : undefined}
               onProposeChange={canPropose ? () => { setProposingChange(true); } : undefined}
               rename={canEdit ? rename : undefined}
-              onRetire={canEdit && state.data.element.element_type === 'system' ? () => { setRetiring(true); } : undefined}
+              onRetire={canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') ? () => { setRetiring(true); } : undefined}
               onRemoveFromModel={canEdit && state.data.children.length === 0 ? () => { setRemovingFromModel(true); } : undefined}
             />
-            {retiring && state.data.element.element_type === 'system' && (
+            {retiring && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') && (
               <RetireAction
                 modelId={model.id}
                 orgId={organisation?.id ?? ''}
@@ -335,6 +337,34 @@ export function ElementPage() {
                 {state.data.element.element_type === 'system' && isIntegrationPlatform(state.data.element) && (
                   <CollapsibleSection title="Flows via this platform" meta={`(${String(state.data.flowsViaThisPlatform.length)})`}>
                     <PlatformFlowsSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} flows={state.data.flowsViaThisPlatform} endpoints={state.data.flowsViaThisPlatformEndpoints} />
+                  </CollapsibleSection>
+                )}
+                {state.data.element.element_type === 'system' && isPlatform(state.data.element) && (
+                  <CollapsibleSection title="Modules" meta={`(${String(state.data.children.length)})`}>
+                    <ModulesSection
+                      orgSlug={organisation?.slug ?? ''}
+                      modelSlug={model.slug}
+                      modules={state.data.children}
+                      moduleSupportsEdges={state.data.moduleSupportsEdges}
+                      moduleSupportsCapabilities={state.data.moduleSupportsCapabilities}
+                    />
+                    {canAddRelationship && (
+                      <ElementSearchAdd
+                        elementType="container"
+                        buttonLabel="+ Add module"
+                        parentId={state.data.element.element_id}
+                        modelId={model.id}
+                        orgId={organisation?.id ?? ''}
+                        userId={userId}
+                        searchCommitId={searchCommitId}
+                        branch={editingBranch}
+                        expectedHeadCommitId={state.data.commitId}
+                        orgSlug={organisation?.slug ?? ''}
+                        modelSlug={model.slug}
+                        refParam={refParamOf(ref)}
+                        onCreated={reloadAfterCommit}
+                      />
+                    )}
                   </CollapsibleSection>
                 )}
               </div>

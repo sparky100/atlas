@@ -99,8 +99,8 @@ const CRITICALITY_OPTIONS = ['critical', 'high', 'medium', 'low'] as const;
 const HOSTING_MODEL_OPTIONS = ['on_premises', 'private_cloud', 'public_cloud', 'saas', 'hybrid'] as const;
 /** Prompt 7k item 3 — see `SystemDomain`'s own doc comment (`delta.ts`) for why absent reads as `'it'`. */
 const DOMAIN_OPTIONS = ['it', 'ot', 'hybrid'] as const;
-/** Prompt 7k item 4 — see `SystemKind`'s own doc comment (`delta.ts`) for why absent reads as `'application'`. */
-const KIND_OPTIONS = ['application', 'integration_platform', 'data_platform', 'infrastructure'] as const;
+/** Prompt 7k item 4 (plus "platforms and modules"'s own `'platform'` addition) — see `SystemKind`'s own doc comment (`delta.ts`) for why absent reads as `'application'`. */
+const KIND_OPTIONS = ['application', 'integration_platform', 'data_platform', 'infrastructure', 'platform'] as const;
 
 const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   lifecycleStatus: { label: 'Lifecycle', required: true, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
@@ -141,8 +141,29 @@ const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   isExternal: { label: 'External', required: true, kind: 'boolean' },
   introduced: { label: 'Introduced', required: false, kind: 'date' },
   plannedEnd: { label: 'Planned end', required: false, kind: 'date' },
+  // "Platforms and modules": a module's own override of its platform's
+  // attribute — see ContainerAttributes.lifecycleStatus's own doc comment
+  // (delta.ts). Meaningless (never shown as inherited here — this is the
+  // raw own-value edit form/display, not the resolved effective value) on
+  // an ordinary container that isn't a platform's module.
+  lifecycleStatus: { label: 'Lifecycle (module override)', required: false, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
+  criticality: { label: 'Criticality (module override)', required: false, kind: 'enum', options: CRITICALITY_OPTIONS },
+  hostingModel: { label: 'Hosting model (module override)', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
+  hostingProvider: { label: 'Hosting provider (module override)', required: false, kind: 'text' },
+  domain: { label: 'Domain (module override)', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
 };
-const CONTAINER_ORDER: (keyof ContainerAttributes)[] = ['technology', 'description', 'isExternal', 'introduced', 'plannedEnd'];
+const CONTAINER_ORDER: (keyof ContainerAttributes)[] = [
+  'technology',
+  'description',
+  'isExternal',
+  'introduced',
+  'plannedEnd',
+  'lifecycleStatus',
+  'criticality',
+  'hostingModel',
+  'hostingProvider',
+  'domain',
+];
 
 const COMPONENT_META: Record<keyof ComponentAttributes, AttributeFieldMeta> = {
   technology: { label: 'Technology', required: false, kind: 'text' },

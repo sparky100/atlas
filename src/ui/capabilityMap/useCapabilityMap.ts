@@ -6,6 +6,7 @@ import { getElementsByIds } from '../../db/elements';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
 import { getOrCreateModelView } from '../../db/views';
 import type { ViewRow } from '../../db/types';
+import { effectiveModuleAttributes } from '../elements/moduleAttributes';
 import { computeCapabilityMapTree, type CapabilityMapTree } from './layout';
 import { supabase } from '../supabaseClient';
 
@@ -60,6 +61,33 @@ export function useCapabilityMap(modelId: UUID, orgId: UUID, userId: UUID | null
       const supportsEdges = await listSupportsEdgesForCapabilities(supabase, commitId, capabilityIds);
       const systemIds = [...new Set(supportsEdges.map((edge) => edge.from_element_id))];
       const systemsById = await getElementsByIds(supabase, commitId, systemIds);
+
+      // "Platforms and modules": a module (Container) supporting a
+      // capability may inherit its own unset lifecycle/criticality/hosting/
+      // domain from its platform (`effectiveModuleAttributes`'s own doc
+      // comment) — but the platform itself typically has no *direct*
+      // supports edge of its own, so it's usually missing from
+      // `systemsById` above. A second, small lookup for just those missing
+      // parent ids, then every module's own entry is replaced with its
+      // resolved-effective row; `metrics.ts` never needs to know any of
+      // this happened, since it only ever reads `.attributes` off whatever
+      // row `systemsById` hands it.
+      const missingPlatformIds = [
+        ...new Set(
+          [...systemsById.values()]
+            .filter((e): e is ElementsHeadRow & { parent_id: UUID } => e.element_type === 'container' && e.parent_id !== null && !systemsById.has(e.parent_id))
+            .map((e) => e.parent_id),
+        ),
+      ];
+      if (missingPlatformIds.length > 0) {
+        const platformsById = await getElementsByIds(supabase, commitId, missingPlatformIds);
+        for (const [id, row] of platformsById) systemsById.set(id, row);
+      }
+      for (const [id, row] of systemsById) {
+        if (row.element_type !== 'container' || row.parent_id === null) continue;
+        const platform = systemsById.get(row.parent_id);
+        if (platform) systemsById.set(id, effectiveModuleAttributes(row, platform));
+      }
 
       const view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'capability_map', name: 'Capability map', createdBy: currentUserId });
       const tree = computeCapabilityMapTree(capabilities);
