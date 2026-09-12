@@ -23,10 +23,12 @@ import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
+import { CapabilityLandscapeList } from '../landscape/CapabilityLandscapeList';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
 import { LANDSCAPE_COLOUR_BY_OPTIONS } from '../landscape/landscapeColour';
 import { LandscapeMobileList } from '../landscape/LandscapeMobileList';
 import { useCanvasWidth } from '../landscape/useCanvasWidth';
+import { useCapabilityLandscape } from '../landscape/useCapabilityLandscape';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { useLandscape } from '../landscape/useLandscape';
 import { useLandscapeColourByPreference } from '../landscape/useLandscapeColourByPreference';
@@ -123,7 +125,15 @@ export function LandscapePage() {
   // to `useLandscape` as its main-commit hint means `ref.kind === 'main'`
   // (no `?ref=` at all, the common case) never re-fetches the identical
   // `main` row a second time. See useLandscape.ts's own doc comment.
-  const { state } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId, searchCommitId, canvasWidth ?? undefined);
+  //
+  // Sprint U4-2c item 2: `useLandscape` itself only ever runs while
+  // `capabilityId` is absent (its own `enabled` doc comment) — whenever
+  // it's set, `useCapabilityLandscape` below is the one hook actually
+  // loading anything, and this page renders `CapabilityLandscapeList`
+  // instead of the canvas/mobile list either one of the other two hooks
+  // feeds.
+  const { state } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId === null, searchCommitId, canvasWidth ?? undefined);
+  const { state: capabilityLandscapeState } = useCapabilityLandscape(model?.id ?? null, ref, mode, capabilityId, searchCommitId);
 
   // Sprint U4-1 E1: see this component's own module comment.
   const narrow = useIsNarrowViewport(768);
@@ -254,7 +264,11 @@ export function LandscapePage() {
   // live — the page never finished loading). Keying the class on `!narrow`
   // alone keeps `<main>`'s width stable across loading/ready/error/empty,
   // since the canvas is never shown on mobile regardless of content.
-  const canvasWidthClass = !narrow;
+  //
+  // Item 2: never full-bleed while a capability filter is active either —
+  // `CapabilityLandscapeList` is an ordinary-column flat list on every
+  // viewport width, the same reasoning `!narrow` already gives mobile.
+  const canvasWidthClass = !narrow && capabilityId === null;
 
   return (
     <div>
@@ -270,8 +284,9 @@ export function LandscapePage() {
           segments={segments}
         />
         <div className={styles.header}>
+          {/* Sprint U4-2c item 2: "Title 'Systems supporting X (N)'" — replaces the ordinary "Landscape" title outright while a capability filter is active, rather than appending to it, the same way this whole header's controls below (colour-by, comments-only, route-via-platforms) don't apply to the flat list either. `(N)` only once the count is actually known. */}
           <Text as="h1" size="2xl" className={styles.title}>
-            Landscape{capability ? `: systems supporting ${capability.name}` : ''}
+            {capability ? `Systems supporting ${capability.name}${capabilityLandscapeState.status === 'ready' ? ` (${String(capabilityLandscapeState.data.count)})` : ''}` : 'Landscape'}
           </Text>
           {/* Prompt 7k item 1: the landscape's own colour-by mode — desktop canvas only, same scoping as the comments-only filter beside it. */}
           {state.status === 'ready' && showCanvas && (
@@ -371,86 +386,98 @@ export function LandscapePage() {
         )}
         {ref.kind === 'branch' && mode === 'diff' && <DiffLegend />}
 
-        {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
-        {state.status === 'error' && <Text as="p">{state.message}</Text>}
-        {state.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
-        {state.status === 'ready' && state.data.layout.nodes.length === 0 && state.data.layout.actorNodes.length === 0 && (
-          <div>
-            <EmptyState>{capability ? 'No systems support this capability yet.' : 'No systems yet.'}</EmptyState>
-            {!capability && canAdd && (
-              <div className={styles.actions}>
-                <ElementSearchAdd
-                  elementType="system"
-                  buttonLabel="Add a system"
-                  parentId={null}
-                  modelId={model.id}
-                  orgId={organisation?.id ?? ''}
-                  userId={userId}
-                  searchCommitId={searchCommitId}
-                  branch={editingBranch}
-                  expectedHeadCommitId={writeHeadCommitId}
-                  orgSlug={organisation?.slug ?? ''}
-                  modelSlug={model.slug}
-                  refParam={refParam}
-                  onCreated={reloadMainBranch}
-                />
+        {/* Sprint U4-2c item 2: while a capability filter is active, `CapabilityLandscapeList` (desktop and mobile alike — no lanes, no cross-lane chips, so no viewport split either) replaces every bit of the lane-based rendering below it, which `useLandscape` itself no longer even loads (its own `enabled` doc comment). Branches on `capabilityId` (the URL param `useCapabilityLandscape` actually reads), not `capability` (the breadcrumb element, which can still be loading) — see the title above for the one place that distinction matters. */}
+        {capabilityId !== null ? (
+          <>
+            {capabilityLandscapeState.status === 'loading' && <Text tone="muted">Loading…</Text>}
+            {capabilityLandscapeState.status === 'error' && <Text as="p">{capabilityLandscapeState.message}</Text>}
+            {capabilityLandscapeState.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
+            {capabilityLandscapeState.status === 'ready' && <CapabilityLandscapeList rows={capabilityLandscapeState.data} elementHref={elementHref} contextHref={nodeHref} />}
+          </>
+        ) : (
+          <>
+            {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+            {state.status === 'error' && <Text as="p">{state.message}</Text>}
+            {state.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
+            {state.status === 'ready' && state.data.layout.nodes.length === 0 && state.data.layout.actorNodes.length === 0 && (
+              <div>
+                <EmptyState>No systems yet.</EmptyState>
+                {canAdd && (
+                  <div className={styles.actions}>
+                    <ElementSearchAdd
+                      elementType="system"
+                      buttonLabel="Add a system"
+                      parentId={null}
+                      modelId={model.id}
+                      orgId={organisation?.id ?? ''}
+                      userId={userId}
+                      searchCommitId={searchCommitId}
+                      branch={editingBranch}
+                      expectedHeadCommitId={writeHeadCommitId}
+                      orgSlug={organisation?.slug ?? ''}
+                      modelSlug={model.slug}
+                      refParam={refParam}
+                      onCreated={reloadMainBranch}
+                    />
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
-        {/* Item 13: <768px renders the list, never the canvas — same `state.data`, no comments panel/unresolved-count wiring (this list carries none of that yet), no viewport-fit math. */}
-        {state.status === 'ready' && hasContent && narrow && <LandscapeMobileList groups={state.data.groups} elementHref={elementHref} contextHref={nodeHref} />}
-        {state.status === 'ready' && showCanvas && (
-          <div className={styles.canvasRow}>
-            <LandscapeCanvas
-              layout={state.data.layout}
-              systemsById={state.data.systemsById}
-              actorsById={state.data.actorsById}
-              edges={state.data.edges}
-              diff={state.data.diff}
-              nodeHref={nodeHref}
-              actorHref={elementHref}
-              capabilityHref={capabilityHref}
-              threadCounts={threadCounts}
-              commentsOnlyFilter={commentsOnlyFilter}
-              colourBy={colourBy}
-              routeViaPlatforms={routeViaPlatforms}
-              onCommentMarkerClick={(elementId) => {
-                setCommentsPanelElementId(elementId);
-                setAutoFocusComposer(false);
-              }}
-              onToggleCommentsPanel={(elementId) => {
-                if (commentsPanelElementId !== null) {
-                  setCommentsPanelElementId(null);
-                } else if (elementId) {
-                  setCommentsPanelElementId(elementId);
-                  setAutoFocusComposer(false);
-                }
-              }}
-              onNewCommentShortcut={(elementId) => {
-                setCommentsPanelElementId(elementId);
-                setAutoFocusComposer(true);
-              }}
-            />
-            {commentsPanelElementId && (
-              <CommentsPanel
-                orgId={organisation?.id ?? ''}
-                modelId={model.id}
-                userId={userId}
-                role={role}
-                anchorType="element"
-                anchorId={commentsPanelElementId}
-                subjectName={state.data.systemsById.get(commentsPanelElementId)?.name ?? ''}
-                unresolvedCount={threadCounts?.get(commentsPanelElementId)?.open ?? 0}
-                branchId={ref.kind === 'branch' ? (editingBranch?.id ?? null) : null}
-                viewKind="landscape"
-                autoFocusComposer={autoFocusComposer}
-                onClose={() => {
-                  setCommentsPanelElementId(null);
-                }}
-              />
+            {/* Item 13: <768px renders the list, never the canvas — same `state.data`, no comments panel/unresolved-count wiring (this list carries none of that yet), no viewport-fit math. */}
+            {state.status === 'ready' && hasContent && narrow && <LandscapeMobileList groups={state.data.groups} elementHref={elementHref} contextHref={nodeHref} />}
+            {state.status === 'ready' && showCanvas && (
+              <div className={styles.canvasRow}>
+                <LandscapeCanvas
+                  layout={state.data.layout}
+                  systemsById={state.data.systemsById}
+                  actorsById={state.data.actorsById}
+                  edges={state.data.edges}
+                  diff={state.data.diff}
+                  nodeHref={nodeHref}
+                  actorHref={elementHref}
+                  capabilityHref={capabilityHref}
+                  threadCounts={threadCounts}
+                  commentsOnlyFilter={commentsOnlyFilter}
+                  colourBy={colourBy}
+                  routeViaPlatforms={routeViaPlatforms}
+                  onCommentMarkerClick={(elementId) => {
+                    setCommentsPanelElementId(elementId);
+                    setAutoFocusComposer(false);
+                  }}
+                  onToggleCommentsPanel={(elementId) => {
+                    if (commentsPanelElementId !== null) {
+                      setCommentsPanelElementId(null);
+                    } else if (elementId) {
+                      setCommentsPanelElementId(elementId);
+                      setAutoFocusComposer(false);
+                    }
+                  }}
+                  onNewCommentShortcut={(elementId) => {
+                    setCommentsPanelElementId(elementId);
+                    setAutoFocusComposer(true);
+                  }}
+                />
+                {commentsPanelElementId && (
+                  <CommentsPanel
+                    orgId={organisation?.id ?? ''}
+                    modelId={model.id}
+                    userId={userId}
+                    role={role}
+                    anchorType="element"
+                    anchorId={commentsPanelElementId}
+                    subjectName={state.data.systemsById.get(commentsPanelElementId)?.name ?? ''}
+                    unresolvedCount={threadCounts?.get(commentsPanelElementId)?.open ?? 0}
+                    branchId={ref.kind === 'branch' ? (editingBranch?.id ?? null) : null}
+                    viewKind="landscape"
+                    autoFocusComposer={autoFocusComposer}
+                    onClose={() => {
+                      setCommentsPanelElementId(null);
+                    }}
+                  />
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
         </main>
       </div>

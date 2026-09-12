@@ -114,11 +114,15 @@ function AccordionGroup({ label, count, countUnit, referencedBy = [], expanded, 
               {count} {countUnit}
               {count === 1 ? '' : 's'}
             </Text>
+            {/* Secondary-supporter wording: "also: SAP", not "→ SAP" —
+                these are still-collapsed hints that the full list (every
+                supporting system, primary and secondary, each with its own
+                role tag) is one tap away, not a diagram-style pointer. */}
             {referencedBy.length > 0 && (
               <span className={styles.referencedChips}>
                 {referencedBy.map((system) => (
                   <Chip key={system.element_id} tone="neutral">
-                    ⇢ {system.name}
+                    also: {system.name}
                   </Chip>
                 ))}
               </span>
@@ -155,7 +159,7 @@ function ActorRow({ actor, elementHref }: { actor: ElementsHeadRow; elementHref:
 }
 
 function SystemRow({ member, elementHref, contextHref }: { member: LandscapeGroupMember; elementHref: (id: UUID) => string; contextHref: (id: UUID) => string }) {
-  const { system, extraLaneCount, usesCount, usedByCount } = member;
+  const { system, extraLaneCount, usesCount, usedByCount, role } = member;
   const attrs = attributesRecord(system.attributes);
   const external = attrs.isExternal === true;
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
@@ -176,6 +180,12 @@ function SystemRow({ member, elementHref, contextHref }: { member: LandscapeGrou
           {system.name}
         </Text>
         {lifecycleTone !== undefined && lifecycleStatus !== null && <span className={styles.lifecycleDot} data-tone={lifecycleTone} role="img" aria-label={lifecycleStatus} title={lifecycleStatus} />}
+        {/* Secondary-supporter wording: "expanded groups list every
+            supporting system with a role tag" — `role` is only ever
+            `undefined` for the four non-capability lanes (Unassigned/
+            External/OT/Platforms, `landscapeGroups.ts`'s own doc comment),
+            which have no single `supports` edge to name a role from. */}
+        {role !== undefined && <Chip tone={role === 'primary' ? 'info' : 'neutral'}>{role}</Chip>}
         {extraLaneCount !== undefined && <Chip tone="neutral">+{extraLaneCount}</Chip>}
       </Link>
       <div className={styles.rowSecondary}>

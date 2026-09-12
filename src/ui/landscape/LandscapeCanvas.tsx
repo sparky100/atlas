@@ -8,7 +8,7 @@ import type { ChipTone } from '../components/Chip/Chip';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff, VersionDiffState } from '../../engine/versionDiff';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
-import { BOUNDARY_MARGIN, computeLandscapeChannels, NODE_HEIGHT, NODE_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
+import { BOUNDARY_MARGIN, computeLandscapeChannels, NODE_HEIGHT, NODE_WIDTH, REFERENCE_CHIP_HEIGHT, REFERENCE_CHIP_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
 import { landscapeTileColourFor } from './landscapeColour';
 import { quantizeScale } from './zoom';
 import styles from './LandscapeCanvas.module.css';
@@ -332,6 +332,12 @@ export function LandscapeCanvas({
   // hover changes (unlike `.tooltip`) until dismissed; see this state's own
   // render-site comment for the dismiss paths.
   const [extraLanesPopover, setExtraLanesPopover] = useState<{ elementId: UUID; screenX: number; screenY: number } | null>(null);
+  // Secondary-supporter wording: the reference chip's own tooltip/tap state
+  // — a plain hover on desktop (cleared the moment the pointer leaves it,
+  // same as `hover`'s own node tooltip), or a tap-to-toggle on touch, which
+  // has no hover at all (same dual mouse/touch handling `extraLanesPopover`
+  // above already needs, for the identical reason).
+  const [hoverReference, setHoverReference] = useState<{ elementId: UUID; screenX: number; screenY: number } | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; startTransform: Transform; moved: boolean } | null>(null);
 
   const diffByElementId = useMemo(() => new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []), [diff]);
@@ -445,6 +451,27 @@ export function LandscapeCanvas({
         const cx = node.x + NODE_WIDTH - 4;
         const cy = node.y + 4;
         if (Math.hypot(worldX - cx, worldY - cy) <= EXTRA_LANE_MARKER_HIT_RADIUS) return node.elementId;
+      }
+      return null;
+    },
+    [layout, transform],
+  );
+
+  /**
+   * Secondary-supporter wording: the reference chip's own hit region —
+   * same fixed `108×18` world-space box the drawing pass below lays it out
+   * with (`marker.x`/`marker.y` is that box's own top-left corner), not a
+   * generous radius the way `extraLaneMarkerAt`'s small circle needs —
+   * the chip is already a real rectangle wide enough to hit reliably.
+   */
+  const referenceMarkerAt = useCallback(
+    (screenX: number, screenY: number): UUID | null => {
+      const worldX = (screenX - transform.tx) / transform.scale;
+      const worldY = (screenY - transform.ty) / transform.scale;
+      for (const marker of layout.referenceMarkers) {
+        if (worldX >= marker.x && worldX <= marker.x + REFERENCE_CHIP_WIDTH && worldY >= marker.y && worldY <= marker.y + REFERENCE_CHIP_HEIGHT) {
+          return marker.elementId;
+        }
       }
       return null;
     },
@@ -750,8 +777,8 @@ export function LandscapeCanvas({
         ctx.font = `${(10 * textScale).toFixed(2)}px sans-serif`;
         for (const chip of referenceChips) {
           const [x, y] = toScreen(chip.x, chip.y);
-          const w = 108 * transform.scale;
-          const h = 18 * transform.scale;
+          const w = REFERENCE_CHIP_WIDTH * transform.scale;
+          const h = REFERENCE_CHIP_HEIGHT * transform.scale;
           roundRectPath(ctx, x, y, w, h, h / 2);
           ctx.fillStyle = tokens.surfaceRaised;
           ctx.fill();
@@ -859,9 +886,23 @@ export function LandscapeCanvas({
       if (drag.moved) {
         setTransform({ scale: drag.startTransform.scale, tx: drag.startTransform.tx + dx, ty: drag.startTransform.ty + dy });
         setHover(null);
+        setHoverReference(null);
         return;
       }
     }
+
+    // Secondary-supporter wording: checked before `nodeAt` — a reference
+    // chip sits in a lane's own margin, never overlapping a real node's
+    // hit region, but checking it first keeps this the same precedence
+    // every other marker (`extraLaneMarkerAt`/`commentMarkerAt`) already
+    // gets over a plain node.
+    const referenceElementId = referenceMarkerAt(screenX, screenY);
+    if (referenceElementId) {
+      setHover(null);
+      setHoverReference({ elementId: referenceElementId, screenX, screenY });
+      return;
+    }
+    setHoverReference(null);
 
     const hit = nodeAt(screenX, screenY);
     setHover(hit ? { elementId: hit.elementId, elementType: hit.elementType, screenX, screenY } : null);
@@ -886,6 +927,15 @@ export function LandscapeCanvas({
       return;
     }
     setExtraLanesPopover(null);
+    // Secondary-supporter wording: same tap-to-toggle a touch device needs
+    // for `extraLanesPopover` above — a tap has no preceding hover to have
+    // already shown this via `handlePointerMove`.
+    const referenceElementId = referenceMarkerAt(screenX, screenY);
+    if (referenceElementId) {
+      setHoverReference((prev) => (prev?.elementId === referenceElementId ? null : { elementId: referenceElementId, screenX, screenY }));
+      return;
+    }
+    setHoverReference(null);
     const markerElementId = commentMarkerAt(screenX, screenY);
     if (markerElementId) {
       onCommentMarkerClick?.(markerElementId);
@@ -921,7 +971,12 @@ export function LandscapeCanvas({
     else if (e.key === 'c') onToggleCommentsPanel?.(hover?.elementId ?? null);
     else if (e.key === 'n' && hover) onNewCommentShortcut?.(hover.elementId);
     else if (e.key === 'Escape' && extraLanesPopover) setExtraLanesPopover(null);
+    else if (e.key === 'Escape' && hoverReference) setHoverReference(null);
   }
+
+  // Secondary-supporter wording: the reference chip's own resolved system
+  // name, for the tooltip text below.
+  const hoveredReferenceSystem = hoverReference ? systemsById.get(hoverReference.elementId) : undefined;
 
   const hoveredElement = hover ? (hover.elementType === 'system' ? systemsById.get(hover.elementId) : actorsById.get(hover.elementId)) : undefined;
   // §6.3: "Hover on any marker shows the changed attributes" — base -> new isn't shown here (the canvas has no per-field value, only the diff's element-grain summary); the element page's own history is where that detail lives. Actors carry no diff state (diff is system/relationship-grained).
@@ -965,6 +1020,7 @@ export function LandscapeCanvas({
         onPointerUp={handlePointerUp}
         onPointerLeave={() => {
           setHover(null);
+          setHoverReference(null);
         }}
         onWheel={handleWheel}
         onKeyDown={handleKeyDown}
@@ -986,6 +1042,14 @@ export function LandscapeCanvas({
           {attributesRecord(hoveredElement.attributes).isExternal === true ? ' (external)' : ''}
           {hoveredDiff && hoveredDiff.state !== 'unchanged' && hoveredDiff.changedAttributes.length > 0 && ` — changed: ${hoveredDiff.changedAttributes.join(', ')}`}
           {hoveredColourByLabel !== undefined && ` — ${hoveredColourByLabel}`}
+        </div>
+      )}
+      {/* Secondary-supporter wording: the reference chip's own tooltip/tap
+          text — a different, purpose-written sentence, not the chip's own
+          "⇢ {name}" label re-shown. */}
+      {hoveredReferenceSystem && hoverReference && (
+        <div className={styles.tooltip} style={{ left: hoverReference.screenX, top: hoverReference.screenY }}>
+          {hoveredReferenceSystem.name} also supports this capability (secondary)
         </div>
       )}
       {extraLanesPopover && (

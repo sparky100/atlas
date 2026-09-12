@@ -10,7 +10,6 @@ import {
   projectionSupportsEdgesForSystems,
   projectionSystemsForLandscape,
 } from '../../db/branchProjection';
-import { listSupportsEdgesForCapabilities } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
 import { listActorsForLandscape, listContainersForLandscape, listLandscapeEdges, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
@@ -37,22 +36,6 @@ export interface LandscapeData {
   groups: LandscapeGroups;
   /** Populated only when `ref` is a branch and `mode === 'diff'` (UI-principles §6.2/§6.3) — `null` for `main`/`tag`, and for `asIs`/`toBe`, where there's nothing to highlight against. */
   diff: VersionDiff | null;
-}
-
-/**
- * The systems supporting exactly `capabilityId` — the same exact-match
- * relationship a capability tile's own supporting-system count already
- * uses (src/ui/capabilityMap/metrics.ts's `supportingSystemIds`), so
- * "zoom into this tile's landscape" always shows exactly the systems the
- * tile's own count named, never a parent/child-aggregated superset. Only
- * meaningful against `main`/a tag — the capability filter is a director's-
- * door zoom affordance (§3.1), not part of the As-is/To-be/Diff selector,
- * so a branch ref never calls this (`capabilityId` is only ever passed by
- * LandscapePage when `ref.kind !== 'branch'`).
- */
-async function loadSupportingSystemIds(commitId: UUID, capabilityId: UUID): Promise<Set<UUID>> {
-  const edges = await listSupportsEdgesForCapabilities(supabase, commitId, [capabilityId]);
-  return new Set(edges.map((edge) => edge.from_element_id));
 }
 
 export type LandscapeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: LandscapeData };
@@ -101,11 +84,17 @@ export interface UseLandscapeResult {
  * implements) would be session-only state in that component if one is
  * ever added, never written back here.
  *
- * `capabilityId`, when given, is the "optional capability filter"
- * UI-principles §6.1's Landscape row itself names — *not* a separate view:
- * `scope_element_id` must be null for `landscape` (SPEC §3.9's own check
- * constraint), so a filtered landscape is still the model's one landscape
- * `views` row, just rendering a subset of its systems.
+ * `enabled` (Sprint U4-2c item 2): `false` skips this effect entirely,
+ * leaving `state` at `{ status: 'loading' }` forever — `LandscapePage.tsx`
+ * passes `capabilityId === null` here, since the capability-scoped flat
+ * list (`useCapabilityLandscape.ts`) replaces this hook's own lane-based
+ * canvas/mobile-list rendering outright whenever `?capability=` is set
+ * (never both at once), and there'd be nothing to gain from this hook's own
+ * network round trips and worker layout running for a view that will never
+ * render. `useLandscape` itself has no capability filter of its own any
+ * more for the identical reason — the old exact-match filter this
+ * parameter used to gate is `useCapabilityLandscape.ts`'s job now, rolled
+ * up through descendant capabilities rather than an exact match.
  *
  * Sprint C1: when `ref.kind === 'branch'`, this folds the branch's own
  * as-is/to-be state via the engine instead of querying `elements_head`/
@@ -121,7 +110,8 @@ export function useLandscape(
   userId: UUID | null,
   ref: Ref,
   mode: ViewMode,
-  capabilityId: UUID | null = null,
+  /** See this function's own doc comment above. */
+  enabled: boolean,
   /**
    * Sprint U4-2a item 2 ("main-branch lookup once per route, shared"): the
    * caller's own already-fetched `main` head. `LandscapePage` already calls
@@ -164,7 +154,7 @@ export function useLandscape(
     // own model resolved. Gating here means the effect (and every child
     // hook downstream of `state`) simply doesn't run yet, rather than
     // running once with a hollow id and once for real.
-    if (!userId || !modelId || !orgId) return undefined;
+    if (!userId || !modelId || !orgId || !enabled) return undefined;
     // Wait for the caller's own main-branch fetch rather than racing it:
     // if this fired its own `resolveRef` in parallel with the caller's
     // `useMainBranch` (as it used to, unconditionally) and only used the
@@ -191,9 +181,7 @@ export function useLandscape(
       // Populated only for a branch ref, closed over below so every
       // downstream query (edges, supports, capability lookups) reads the
       // same folded state instead of re-resolving it per call.
-      let systemsSource:
-        | { edges: (systemIds: UUID[]) => RelationshipsHeadRow[]; supports: (systemIds: UUID[]) => RelationshipsHeadRow[]; byIds: (ids: UUID[]) => Map<UUID, ElementsHeadRow>; supportingSystemIds: (capId: UUID) => Set<UUID> }
-        | undefined;
+      let systemsSource: { edges: (systemIds: UUID[]) => RelationshipsHeadRow[]; supports: (systemIds: UUID[]) => RelationshipsHeadRow[]; byIds: (ids: UUID[]) => Map<UUID, ElementsHeadRow> } | undefined;
 
       if (ref.kind === 'branch') {
         const branch = await resolveBranchRef(supabase, ref);
@@ -216,7 +204,6 @@ export function useLandscape(
           edges: (systemIds) => projectionLandscapeEdges(resolved.projection, systemIds),
           supports: (systemIds) => projectionSupportsEdgesForSystems(resolved.projection, systemIds),
           byIds: (ids) => projectionElementsByIds(resolved.projection, ids),
-          supportingSystemIds: (capId) => new Set(resolved.projection.relationshipsHead.filter((r) => r.relationship_type === 'supports' && r.to_element_id === capId).map((r) => r.from_element_id)),
         };
       } else if (ref.kind === 'main' && mainCommitIdHint) {
         // Shared lookup: the caller already resolved `main`, so skip this
@@ -247,12 +234,12 @@ export function useLandscape(
       // "Platforms and modules": a platform's own module (Container)
       // children get their own landscape tile, placed by their own
       // `supports` edge — folded into `allSystems` right here so every
-      // downstream step (capability filter, edge/supports fetch, layout,
-      // groups) already treats a module exactly like a system, with no
-      // changes needed to any of them. Label composed as "Platform · Module"
-      // (a shallow copy — never mutates the loaded row) — the prompt's own
-      // tile text; the link target and lane placement both still key off
-      // the module's own `element_id`.
+      // downstream step (edge/supports fetch, layout, groups) already
+      // treats a module exactly like a system, with no changes needed to
+      // any of them. Label composed as "Platform · Module" (a shallow
+      // copy — never mutates the loaded row) — the prompt's own tile text;
+      // the link target and lane placement both still key off the module's
+      // own `element_id`.
       const platformsById = new Map(allSystems.filter((s) => isPlatform(s)).map((s) => [s.element_id, s]));
       const moduleNodes: ElementsHeadRow[] = [];
       for (const container of allContainers) {
@@ -261,9 +248,7 @@ export function useLandscape(
       }
       if (moduleNodes.length > 0) allSystems = [...allSystems, ...moduleNodes];
 
-      const supportingIds = capabilityId ? (systemsSource ? systemsSource.supportingSystemIds(capabilityId) : await loadSupportingSystemIds(commitId, capabilityId)) : null;
-      const systems = supportingIds ? allSystems.filter((s) => supportingIds.has(s.element_id)) : allSystems;
-      const systemIds = systems.map((s) => s.element_id);
+      const systemIds = allSystems.map((s) => s.element_id);
       const [edges, supportsEdges] = systemsSource
         ? [systemsSource.edges(systemIds), systemsSource.supports(systemIds)]
         : await Promise.all([listLandscapeEdges(supabase, commitId, systemIds), listSupportsEdgesForSystems(supabase, commitId, systemIds)]);
@@ -278,15 +263,15 @@ export function useLandscape(
       // UI-principles §8.6: layout runs off the main thread. Fresh every
       // load (item 6) — no saved position to merge in, for systems or
       // actors alike.
-      const layout: LandscapeLayout = await computeLandscapeLayoutInWorker(systems, supportsEdges, l1AncestorByCapabilityId, allActors, layoutWidthHint);
+      const layout: LandscapeLayout = await computeLandscapeLayoutInWorker(allSystems, supportsEdges, l1AncestorByCapabilityId, allActors, layoutWidthHint);
 
-      const systemsById = new Map(systems.map((s) => [s.element_id, s]));
+      const systemsById = new Map(allSystems.map((s) => [s.element_id, s]));
       const actorsById = new Map(allActors.map((a) => [a.element_id, a]));
       // Item 13: the same classification `computeLandscapeLayoutInWorker`
       // used for pixel placement, without any of the pixel math — cheap
       // enough (a handful of Map operations) to run on the main thread,
       // unlike `layout` itself.
-      const groups = computeLandscapeGroups(systems, supportsEdges, l1AncestorByCapabilityId, allActors, edges);
+      const groups = computeLandscapeGroups(allSystems, supportsEdges, l1AncestorByCapabilityId, allActors, edges);
       if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, actorsById, edges, layout, groups, diff } });
     }
 
@@ -300,7 +285,7 @@ export function useLandscape(
     // `ref`'s string form (`refParam`) is the real dependency, same pitfall
     // and same fix as useElementPage.ts — `ref` itself is read from the
     // closure, always the latest one.
-  }, [modelId, orgId, userId, refParam, mode, capabilityId, mainCommitIdHint, layoutWidthHint]);
+  }, [modelId, orgId, userId, refParam, mode, enabled, mainCommitIdHint, layoutWidthHint]);
 
   return { state };
 }

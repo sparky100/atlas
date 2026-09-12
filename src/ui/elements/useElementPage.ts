@@ -27,6 +27,7 @@ import {
 import type { HeadProjection } from '../../engine/projection';
 import type { AliasRow, BranchRow, SourceRow } from '../../db/types';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
+import { attributesRecord } from './attributesRecord';
 import { capabilityLevel } from './capabilityDepth';
 import { isIntegrationPlatform, isPlatform } from './systemKind';
 import { supabase } from '../supabaseClient';
@@ -223,7 +224,19 @@ export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): UseEle
         elementCapabilityLevel = capabilityLevel(parent, grandparent);
       }
 
-      const otherEndpointIds = relationships.map((rel) => (rel.from_element_id === elementId ? rel.to_element_id : rel.from_element_id));
+      // Relationship attribute editing, general: the expanded attributes
+      // panel shows `uses`/`flows_to`'s own `via` (an integration-platform
+      // element reference, Prompt 7k item 4) resolved to a name and linked,
+      // the same as any other endpoint — so `via` ids are folded into the
+      // same batch lookup as the ordinary from/to endpoints, not a second
+      // round trip. Harmless when a relationship has no `via` (nothing
+      // added) or when it's already one of this element's own endpoints
+      // elsewhere (`elementsByIds`/the `Map` it returns dedupe on id).
+      const otherEndpointIds = relationships.flatMap((rel) => {
+        const attrs = attributesRecord(rel.attributes);
+        const viaId = typeof attrs.via === 'string' ? [attrs.via] : [];
+        return [rel.from_element_id === elementId ? rel.to_element_id : rel.from_element_id, ...viaId];
+      });
       const [relationshipEndpoints, relationshipFactsList] = await Promise.all([
         source.elementsByIds(otherEndpointIds),
         Promise.all(relationships.map((rel) => source.facts(rel.relationship_id))),

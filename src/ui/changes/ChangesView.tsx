@@ -163,6 +163,13 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
           <Text as="p" size="sm">
             Merging a change updates the landscape, capability map and every view that reads main&rsquo;s current state.
           </Text>
+          {/* Sprint 7i item 5: versions, in the same explainer — a version
+              (Versions page) is an optional named snapshot of main for
+              later comparison, never a step a change has to pass through
+              on its way to being merged. */}
+          <Text as="p" size="sm">
+            Versions (tagging main for later comparison) are optional snapshots — a change never needs one to be reviewed or merged.
+          </Text>
         </Panel>
       )}
       {branches.length === 0 && status !== 'loading' && <EmptyState>No changes yet. {canCreate ? 'Create one above.' : 'Nobody has proposed one.'}</EmptyState>}

@@ -353,6 +353,18 @@ export function ElementPage() {
                           }
                         : undefined
                     }
+                    editRelationship={
+                      canAddRelationship
+                        ? {
+                            modelId: model.id,
+                            orgId: organisation?.id ?? '',
+                            userId,
+                            branch: editingBranch,
+                            expectedHeadCommitId: state.data.commitId,
+                            onSaved: reloadAfterCommit,
+                          }
+                        : undefined
+                    }
                   />
                 </CollapsibleSection>
                 <CollapsibleSection title="Structure">
