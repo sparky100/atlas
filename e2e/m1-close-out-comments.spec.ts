@@ -66,9 +66,8 @@ test('comment on a branch-only element, merge the change, see the comment on mai
   await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(changeName);
   await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
-  const changeRow = page.locator('li', { hasText: changeTitle });
-  await expect(changeRow).toBeVisible();
-  await changeRow.getByRole('link', { name: 'Open →' }).click();
+  // Sticky ref: a successful create lands inside the new change's own page
+  // directly — no separate "find the row, click Open →" step needed.
   await expect(page.getByRole('heading', { name: changeTitle })).toBeVisible();
   const branchIdMatch = /\/changes\/([^/?]+)/.exec(page.url());
   if (!branchIdMatch?.[1]) throw new Error(`could not read the branch id out of ${page.url()}`);

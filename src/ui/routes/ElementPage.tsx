@@ -116,6 +116,16 @@ export function ElementPage() {
   // change branch but has no direct main-write path gets this instead of
   // `Edit` — never both (ElementHeader.tsx passes exactly one).
   const canPropose = ref.kind === 'main' && !canEdit && canCreateChangeBranch(role);
+  // Sticky ref close-out: "read-only: under review" — the complement of
+  // `canEdit` on a *branch* ref, the other reason (beyond role) `onEdit`
+  // can be missing: the branch itself stopped taking commits the moment it
+  // left `draft` (`canEditBranch`'s own status gate). `merged`/`rejected`/
+  // `archived` are excluded — those are closed, not "under review," and
+  // read differently (a merged element is ordinarily viewed via `main`
+  // anyway). Gated on `canCreateChangeBranch` the same as `canPropose`
+  // above: a viewer already sees everything read-only by design and needs
+  // no explanation for it.
+  const underReview = ref.kind === 'branch' && editingBranch !== null && ['proposed', 'in_review', 'approved'].includes(editingBranch.status) && canCreateChangeBranch(role);
   // See LandscapePage.tsx's identical comment: ADR-018 guarantees main's
   // head is never null in practice; `BranchRow`'s own type hasn't been
   // narrowed yet. `expectedHeadCommitId` for the relationship-add write
@@ -210,6 +220,7 @@ export function ElementPage() {
               existsSource={state.data.sources.get(state.data.facts.get('$exists')?.source_id ?? '')}
               onEdit={canEdit && editor.status === 'idle' ? editor.startEditing : undefined}
               onProposeChange={canPropose ? () => { setProposingChange(true); } : undefined}
+              readOnlyReason={underReview ? 'Read-only: under review' : undefined}
               rename={canEdit ? rename : undefined}
               onRetire={canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') ? () => { setRetiring(true); } : undefined}
               onRemoveFromModel={canEdit && state.data.children.length === 0 ? () => { setRemovingFromModel(true); } : undefined}

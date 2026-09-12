@@ -1,9 +1,11 @@
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
+import { useSelectedRef } from '../branches/useSelectedRef';
 import { useModels } from '../models/useModels';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { parseRefParam, refLabelOf, refParamOf } from '../../db/ref';
@@ -22,6 +24,7 @@ export function VersionDiffPage() {
   const [searchParams] = useSearchParams();
   const toBe = parseRefParam(searchParams.get('ref'));
   const asIs = parseRefParam(searchParams.get('diff'));
+  const { ref } = useSelectedRef();
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
@@ -49,6 +52,7 @@ export function VersionDiffPage() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
+          <EditingBranchBanner activeRef={ref} showModeShortcuts={false} />
           <Breadcrumb
             org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
             model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}

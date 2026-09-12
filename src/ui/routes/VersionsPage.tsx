@@ -1,10 +1,12 @@
 import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import { useSelectedRef } from '../branches/useSelectedRef';
 import { useModels } from '../models/useModels';
 import { canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -22,6 +24,7 @@ import styles from './ViewPage.module.css';
 export function VersionsPage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
   const { userId } = useAuth();
+  const { ref } = useSelectedRef();
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
@@ -49,6 +52,7 @@ export function VersionsPage() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
+          <EditingBranchBanner activeRef={ref} showModeShortcuts={false} />
           <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel="main" />
           <div className={styles.header}>
             <Text as="h1" size="2xl">

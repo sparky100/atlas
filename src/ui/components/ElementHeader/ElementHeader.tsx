@@ -71,6 +71,20 @@ export interface ElementHeaderProps {
    * C8's re-parenting half — see that hook's doc comment.
    */
   onRemoveFromModel?: (() => void) | undefined;
+  /**
+   * Sticky ref close-out: "Contributors see 'read-only: under review' on
+   * elements of a Proposed change." — the explanation `onEdit`'s own
+   * omitted-not-disabled convention never gave: neither `onEdit` nor
+   * `onProposeChange` is missing here because the viewer lacks a role
+   * (that case already reads as no affordance at all, same as a viewer),
+   * but because the *branch itself* stopped taking commits the moment it
+   * left `draft` (`canEditBranch`'s own `status === 'draft'` gate,
+   * roleGates.ts) — a state worth naming, not silently indistinguishable
+   * from "you can't edit this." Rendered only when the caller passes it
+   * (`ElementPage.tsx`'s own `underReview`); omitted otherwise, same
+   * convention as every prop above.
+   */
+  readOnlyReason?: string | undefined;
 }
 
 /**
@@ -106,7 +120,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel, readOnlyReason }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
@@ -196,6 +210,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onPro
             Propose a change
           </Button>
         )}
+        {readOnlyReason && <Chip tone="neutral">{readOnlyReason}</Chip>}
         <div className={styles.menuWrapper}>
           <button type="button" className={styles.menuToggle} aria-expanded={menuOpen} aria-controls={menuId} aria-label="Element actions" onClick={() => { setMenuOpen((o) => !o); }}>
             <span aria-hidden="true">⋯</span>
