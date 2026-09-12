@@ -105,7 +105,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
     async function load(): Promise<void> {
       const main = await getMainBranch(supabase, modelId);
       if (!main) {
-        if (!cancelled) setState({ status: 'error', message: 'This model has no main branch.' });
+        if (!cancelled) setState({ status: 'error', message: 'This model has no main yet.' });
         return;
       }
 

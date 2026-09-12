@@ -146,7 +146,7 @@ export function SplitReviewPanel({ modelId, branch, mainHeadCommitId, review, ca
         Split — deliver part of this change now
       </Text>
       <Text as="p" tone="muted" size="sm">
-        Accept a subset of this branch's own changes into a new, immediately-merged branch. The rest stays here, untouched, for a later review.
+        Accept a subset of this change's own edits into a new, immediately-merged change. The rest stays here, untouched, for a later review.
       </Text>
 
       {includedSubjects.length > 0 && (

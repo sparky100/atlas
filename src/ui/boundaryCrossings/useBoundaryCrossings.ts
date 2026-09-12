@@ -26,7 +26,7 @@ export function useBoundaryCrossings(modelId: UUID): BoundaryCrossingsState {
     async function load(): Promise<void> {
       const main = await getMainBranch(supabase, modelId);
       if (!main) {
-        if (!cancelled) setState({ status: 'error', message: 'This model has no main branch.' });
+        if (!cancelled) setState({ status: 'error', message: 'This model has no main yet.' });
         return;
       }
       const [edges, elements] = await Promise.all([listAllUsesAndFlowsToEdges(supabase, main.head_commit_id), listUsesAndFlowsToEndpointElements(supabase, main.head_commit_id)]);

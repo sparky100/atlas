@@ -165,7 +165,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
       {branches.length === 0 && status !== 'loading' && (
         <Panel>
           <Text as="p" size="sm">
-            A change is a branch: a proposed edit to the model that doesn&rsquo;t touch main until it&rsquo;s reviewed and merged.
+            A change is a proposed edit to the model that doesn&rsquo;t touch main until it&rsquo;s reviewed and merged.
           </Text>
           <Text as="p" size="sm">
             Contributors never edit main directly — every edit from a contributor goes through a change like this one.

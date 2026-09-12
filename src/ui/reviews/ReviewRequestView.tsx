@@ -131,7 +131,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
         {!threeWay.upToDateWithMain && (
           <div className={styles.banner}>
             <Text as="p" size="sm">
-              Main has moved since this branch forked — a refresh is required before this can be approved.
+              Main has moved since this change forked — a refresh is required before this can be approved.
             </Text>
           </div>
         )}
@@ -149,7 +149,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
             Structural conflicts
           </Text>
           <Text as="p" tone="muted" size="sm">
-            No one-click resolution yet for these — reopen this branch for edits, fix them with the ordinary branch editor (un-retract, remove the dangling relationship, drop the duplicate), then push a refresh.
+            No one-click resolution yet for these — reopen this change for edits, fix them with the ordinary change editor (un-retract, remove the dangling relationship, drop the duplicate), then push a refresh.
           </Text>
           <ul className={styles.cardList}>
             {structuralFindings.map((finding, i) => (
@@ -261,7 +261,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
             <Button
               variant="primary"
               disabled={!canApproveNow || rr.actionStatus === 'working'}
-              title={!canApproveNow ? 'Needs no blocking conflicts, an up-to-date branch, and a pending request' : undefined}
+              title={!canApproveNow ? 'Needs no blocking conflicts, an up-to-date change, and a pending request' : undefined}
               onClick={() => {
                 void rr.approve();
               }}

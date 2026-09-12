@@ -101,7 +101,7 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
       }
       const refreshed = await getBranch(supabase, branch.id);
       if (!refreshed) {
-        setActionError('The branch disappeared while rebasing.');
+        setActionError('The change disappeared while rebasing.');
         return;
       }
       onRebased();

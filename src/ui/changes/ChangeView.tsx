@@ -103,7 +103,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
     try {
       const main = await getMainBranch(supabase, modelId);
       if (!main) {
-        setDuplicateError('This model has no main branch to fork from.');
+        setDuplicateError('This model has no main to fork from.');
         return;
       }
       const newBranch = await createChangeBranch(supabase, {
@@ -478,7 +478,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         </Text>
         {summaryState.status === 'ready' && summaryState.lineage.splits.length === 0 && (
           <Text as="p" tone="muted">
-            {branch.split_from ? 'This change was split from another one.' : 'Not split yet — everything is still on this branch.'}
+            {branch.split_from ? 'This change was split from another one.' : 'Not split yet — everything is still on this change.'}
           </Text>
         )}
         {summaryState.status === 'ready' && summaryState.lineage.splits.length > 0 && (
