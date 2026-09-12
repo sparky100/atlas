@@ -35,7 +35,7 @@ export function useChangeSummaries(modelId: UUID, branches: readonly BranchRow[]
       .catch((e: unknown) => {
         if (!cancelled) {
           setState({ status: 'ready', summaries: new Map() });
-          reportError(e instanceof Error ? `Couldn't load change summaries: ${e.message}` : "Couldn't load change summaries.");
+          reportError("Couldn't load change summaries.", e);
         }
       });
     return () => {

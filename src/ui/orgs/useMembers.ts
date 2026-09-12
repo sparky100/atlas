@@ -62,7 +62,7 @@ export function useMembers(orgId: UUID | null): UseMembersResult {
     } catch (e) {
       const message = e instanceof Error ? e.message : "Could not change this member's role.";
       setError(message);
-      reportError(`Could not change this member's role: ${message}`);
+      reportError("Could not change this member's role.", e);
     }
   };
 
@@ -75,7 +75,7 @@ export function useMembers(orgId: UUID | null): UseMembersResult {
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Could not remove this member.';
       setError(message);
-      reportError(`Could not remove this member: ${message}`);
+      reportError('Could not remove this member.', e);
     }
   };
 

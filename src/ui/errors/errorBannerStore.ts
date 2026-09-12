@@ -37,8 +37,19 @@ function notify(): void {
  * failed fetch (React StrictMode's dev-only double-invoke among them,
  * this sprint's own recurring finding) shows one banner, not a stack of
  * the same sentence.
+ *
+ * S1 item 9: "Error banners show one plain sentence; detail to console."
+ * `text` is the only thing that ever reaches the banner — every call site
+ * writes its own plain lead-in sentence rather than interpolating a raw
+ * caught error's `.message` into it (a PostgREST error or this sprint's
+ * own `assertRealId` guard can both throw long, technical, multi-clause
+ * strings that have no business in a user-facing banner). `detail`, when
+ * given, goes to `console.error` and nowhere else — one place enforces
+ * this rather than relying on every caller to remember its own
+ * `console.error` before reporting.
  */
-export function reportError(text: string): string {
+export function reportError(text: string, detail?: unknown): string {
+  if (detail !== undefined) console.error(text, detail);
   const existing = messages.find((m) => m.text === text);
   if (existing) return existing.id;
   const id = crypto.randomUUID();

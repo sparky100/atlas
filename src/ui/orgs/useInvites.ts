@@ -61,7 +61,7 @@ export function useInvites(orgId: UUID | null, invitedBy: UUID | null): UseInvit
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Could not send this invite.';
       setError(message);
-      reportError(`Could not send this invite: ${message}`);
+      reportError('Could not send this invite.', e);
       return null;
     }
   };
@@ -74,7 +74,7 @@ export function useInvites(orgId: UUID | null, invitedBy: UUID | null): UseInvit
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Could not revoke this invite.';
       setError(message);
-      reportError(`Could not revoke this invite: ${message}`);
+      reportError('Could not revoke this invite.', e);
     }
   };
 

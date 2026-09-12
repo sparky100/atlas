@@ -59,7 +59,7 @@ export function useMainBranch(modelId: UUID | null): UseMainBranchResult {
         // `main.head_commit_id` for something real (search, canAdd,
         // canEdit) — silently disabling all of that with no visible cause
         // is worse than a banner naming what failed.
-        reportError(e instanceof Error ? `Couldn't load this model's main: ${e.message}` : "Couldn't load this model's main.");
+        reportError("Couldn't load this model's main.", e);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
