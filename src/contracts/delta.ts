@@ -190,6 +190,8 @@ export interface SystemAttributes {
    * `plannedEnd`.
    */
   supportEndsAt?: ISODate;
+  /** S1 item 11: the deployed release/build a system is currently on (e.g. "3.4.1", "2026-Q1") — free text, since the estate's own version schemes vary too widely for an enum; optional, unrecorded until someone sets it. */
+  version?: string;
 }
 
 export interface ContainerAttributes {
@@ -225,6 +227,8 @@ export interface ContainerAttributes {
   hostingProvider?: string;
   /** See this interface's own `lifecycleStatus` doc comment. Landscape zoning (OT-zone eligibility) deliberately never reads this inherited — only a module's own explicit override, same as `resolveElementDomain`'s existing per-element check now also does (see that function's own updated comment). */
   domain?: SystemDomain;
+  /** S1 item 11: see `SystemAttributes.version`. Not part of the platform-module inheritance set above (`effectiveModuleAttributes`) — a container's own version is a fact about that container, never inherited from its parent system. */
+  version?: string;
 }
 
 export interface ComponentAttributes {

@@ -65,6 +65,16 @@ describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
   });
 });
 
+describe('System/container version (S1 item 11)', () => {
+  it('is a plain, optional text field on both system and container, not on capability/actor/component', () => {
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.system.find((f) => f.key === 'version')).toMatchObject({ label: 'Version', required: false, kind: 'text' });
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.container.find((f) => f.key === 'version')).toMatchObject({ label: 'Version', required: false, kind: 'text' });
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.capability.some((f) => f.key === 'version')).toBe(false);
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.actor.some((f) => f.key === 'version')).toBe(false);
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.component.some((f) => f.key === 'version')).toBe(false);
+  });
+});
+
 describe('validateAttributeValue', () => {
   it('rejects clearing a required field', () => {
     expect(validateAttributeValue('system', 'lifecycleStatus', '')).toEqual({ ok: false, error: 'Lifecycle is required' });

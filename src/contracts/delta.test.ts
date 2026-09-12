@@ -550,3 +550,62 @@ describe('"Platforms and modules": SystemKind.platform and ContainerAttributes\'
     expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
   });
 });
+
+describe('System and container version (S1 item 11)', () => {
+  it('is accepted at create on a system, optional, and survives the row round trip', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-35',
+      elementId: 'el-14',
+      elementType: 'system',
+      name: 'Payments Gateway',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false, version: '3.4.1' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('is accepted at create on a container too — it is its own fact, not inherited from a parent system the way the module-override fields above are', () => {
+    const d: Delta = {
+      kind: 'element.create',
+      id: 'delta-36',
+      elementId: 'el-15',
+      elementType: 'container',
+      name: 'FI',
+      parentId: 'el-14',
+      attributes: { isExternal: false, version: '2026-Q1' },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    expect(fromDeltaRow(toDeltaRow(d, ctx))).toEqual(d);
+  });
+
+  it('can be set later via an update, with none recorded at create', () => {
+    const create: Delta = {
+      kind: 'element.create',
+      id: 'delta-37',
+      elementId: 'el-16',
+      elementType: 'system',
+      name: 'Legacy Billing',
+      parentId: null,
+      attributes: { lifecycleStatus: 'active', isExternal: false },
+      sourceId: 'src-1',
+      confidence: 1,
+    };
+    const setVersion: Delta = {
+      kind: 'element.update',
+      id: 'delta-38',
+      elementId: 'el-16',
+      elementType: 'system',
+      attribute: 'version',
+      value: '1.0.0',
+      previousDeltaId: 'delta-37',
+      sourceId: 'src-1',
+      confidence: 0.8,
+    };
+    expect(fromDeltaRow(toDeltaRow(create, ctx))).toEqual(create);
+    expect(fromDeltaRow(toDeltaRow(setVersion, ctx))).toEqual(setVersion);
+  });
+});
