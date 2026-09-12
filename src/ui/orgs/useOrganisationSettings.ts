@@ -39,7 +39,7 @@ export function useOrganisationSettings(orgId: UUID, onChanged: (org: Organisati
         setStatus('idle');
         const message = e instanceof Error ? e.message : `Could not ${label}.`;
         setError(message);
-        reportError(`Could not ${label}: ${message}`);
+        reportError(`Could not ${label}.`, e);
         return null;
       }
     },

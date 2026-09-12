@@ -29,6 +29,28 @@ describe('reportError / getErrorSnapshot', () => {
   });
 });
 
+describe('reportError detail (S1 item 9: "one plain sentence; detail to console")', () => {
+  it('never puts detail into the banner text, even when given', () => {
+    const id = reportError('Could not load this model.', new Error('relation "elements_head" does not exist'));
+    expect(getErrorSnapshot()).toEqual([{ id, text: 'Could not load this model.' }]);
+  });
+
+  it('logs detail to the console when given', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const detail = new Error('boom');
+    reportError('Could not load this model.', detail);
+    expect(spy).toHaveBeenCalledWith('Could not load this model.', detail);
+    spy.mockRestore();
+  });
+
+  it('never logs to the console when no detail is given', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    reportError('Could not load this model.');
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+});
+
 describe('dismissError', () => {
   it('removes exactly the dismissed message', () => {
     const keepId = reportError('Could not load this model.');

@@ -15,8 +15,14 @@ export interface UseEditingBranchResult {
  * The branch a page should actually write to for the current `?ref=`
  * (Sprint C1 step 9): `main`'s own row for `ref.kind === 'main'`, or the
  * referenced change branch's row for `ref.kind === 'branch'` — `null` for
- * `tag` (a tag is never editable; a page reading one already renders
- * read-only per `resolveRef`'s own doc comment).
+ * `tag` or `commit` (neither is ever editable; a page reading one already
+ * renders read-only per `resolveRef`'s own doc comment). S1 item 9:
+ * "editing hooks (useEditingBranch etc.) never run for commit or tag
+ * refs" — this used to guard only `tag`, so a `commit:` ref fell through
+ * to `getBranch(supabase, branchIdIfAny ?? '')` with `branchIdIfAny` null
+ * (a commit ref has no `branchId`), which `assertRealId` throws on
+ * immediately — a doomed query and a spurious error banner on every page
+ * render with a commit ref selected, never a real load.
  *
  * This closes a gap `useMainBranch.ts`'s own module comment named but
  * didn't finish: "every editing hook now takes an explicit `branch:
@@ -36,7 +42,7 @@ export function useEditingBranch(modelId: UUID | null, ref: Ref): UseEditingBran
   const branchIdIfAny = ref.kind === 'branch' ? ref.branchId : null;
 
   useEffect(() => {
-    if (!modelId || ref.kind === 'tag') {
+    if (!modelId || ref.kind === 'tag' || ref.kind === 'commit') {
       setBranch(null);
       setLoading(false);
       return;
@@ -54,7 +60,7 @@ export function useEditingBranch(modelId: UUID | null, ref: Ref): UseEditingBran
         // — `branch: null` here means "nothing is editable," which every
         // caller's own `canEdit`/`canAdd` computation just quietly treats
         // as "no write controls," with no indication anything failed.
-        reportError(e instanceof Error ? `Couldn't load the change to edit: ${e.message}` : "Couldn't load the change to edit.");
+        reportError("Couldn't load the change to edit.", e);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

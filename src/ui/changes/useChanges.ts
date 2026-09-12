@@ -62,7 +62,7 @@ export function useChanges(modelId: UUID, orgId: UUID, userId: UUID | null): Use
           // Sprint U4-2a item 2 already fixed on useMainBranch/
           // useEditingBranch. The global banner is a floor under the
           // local text, not a replacement for it.
-          reportError(`Couldn't load this model's changes: ${message}`);
+          reportError("Couldn't load this model's changes.", e);
         }
       });
     return () => {
@@ -119,7 +119,7 @@ export function useChanges(modelId: UUID, orgId: UUID, userId: UUID | null): Use
         // rendering `error` (ProposeChangePicker.tsx already does — this
         // makes that safe by construction rather than by each caller
         // remembering to check).
-        reportError(`Couldn't create this change: ${message}`);
+        reportError("Couldn't create this change.", e);
         return null;
       }
     },
