@@ -125,7 +125,18 @@ export function computeLandscapeGroups(
     const isCapabilityLane = l1CapabilitiesById.has(key);
     function roleFor(systemId: UUID): 'primary' | 'secondary' | undefined {
       if (!isCapabilityLane) return undefined;
-      const ownEdges = (supportsBySystem.get(systemId) ?? []).filter((e) => e.to_element_id === key);
+      // Bug fix: `key` is the *lane's* id — for a capability lane, its
+      // level-1 ancestor's element id, per `groupSystemsByLane`/`layout.ts`'s
+      // own `placementFor` (edges roll up through `l1AncestorByCapabilityId`
+      // before comparing lanes; a `supports` edge's own `to_element_id` is
+      // whatever capability was actually picked, leaf or not). This used to
+      // compare `e.to_element_id === key` directly, which only ever matched
+      // an edge aimed at the level-1 capability itself — any edge to a
+      // *child* capability (the common case) never matched, so `.some(...)`
+      // was vacuously false and every such member showed 'secondary'
+      // regardless of its real `role`. Resolving each edge's own lane the
+      // same way `placementFor` does closes that gap.
+      const ownEdges = (supportsBySystem.get(systemId) ?? []).filter((e) => l1AncestorByCapabilityId.get(e.to_element_id)?.element_id === key);
       return ownEdges.some((e) => attributesRecord(e.attributes).role === 'primary') ? 'primary' : 'secondary';
     }
     const anchoredMembers: LandscapeGroupMember[] = (byLane.get(key) ?? []).map((system) => {

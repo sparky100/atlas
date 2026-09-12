@@ -109,6 +109,19 @@ describe('computeLandscapeGroups (item 13)', () => {
     expect(laneB?.members[0]?.role).toBe('secondary');
   });
 
+  it('bug fix: a primary edge to a *child* capability still reports the anchored member as "primary" (the lane key is the level-1 ancestor, not the edge\'s own target)', () => {
+    const capA = capability('cap-a', 'Information Management'); // the level-1 lane
+    const sys = system('sys-1', 'Informatica');
+    // The edge targets the *child*; `l1AncestorByCapabilityId` maps that
+    // child to `cap-a`, the same shape `layout.ts`'s own caller builds —
+    // `cap-child` never appears as a map key pointing to itself.
+    const l1AncestorByCapabilityId = new Map([['cap-child', capA]]);
+    const groups = computeLandscapeGroups([sys], [supports('sys-1', 'cap-child', 'primary')], l1AncestorByCapabilityId, [], []);
+    const laneA = groups.groups.find((g) => g.key === 'cap-a');
+    if (!laneA) throw new Error('expected an Information Management lane');
+    expect(laneA.members[0]?.role).toBe('primary');
+  });
+
   it('the four non-capability lanes (Unassigned/External/OT/Platforms) never carry a role — there is no single `supports` edge to name one from', () => {
     const sys = system('sys-1', 'No Capability', false);
     const groups = computeLandscapeGroups([sys], [], new Map(), [], []);
