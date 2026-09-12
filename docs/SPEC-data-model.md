@@ -785,7 +785,9 @@ The two-round-trip design's orphaned-commit tradeoff (a lost race leaving a perm
 ```
 fold(c: Commit | null) -> Head
   if c is null: return emptyHead()
-  if c.kind == 'merge':
+  if c.kind == 'merge' and c.parent in ancestry(c.mergedBranchHead):
+    H = fold(c.mergedBranchHead)                           // C19: fast-forward — see amendment below
+  else if c.kind == 'merge':
     H = fold(c.parent)                                     // first parent: the branch this commit is on
     for c2 in topo(exclusive(c.mergedBranchHead, c.parent)):
       for d in deltasOf(c2) ordered by seq: apply(H, d)    // the other side, in order
@@ -823,6 +825,8 @@ apply(H, d):
       for (k, f) in reconstructedFacts: H.facts[(d.elementId, k)] = f   // original provenance, not the restore's
     relationship.*: symmetric, with from/to on the row and inside the $exists fact value
 ```
+
+**Amended (C19, ADR-021 §2.1/§5 item 1):** `fold`'s first branch above — a merge commit whose first parent is already in the ancestry of its second parent folds to the second parent's own state, plus this commit's own deltas — is the final merge onto main, whose precondition `mergeBase(B) == main.head` (§7.1) guarantees the condition. This is not only an optimisation that happens to land on the same answer: replaying `exclusive(mergedBranchHead, parent)` in commit order (the second, ordinary-replay branch) can throw when a resolution recorded in a later commit was needed to make an earlier one applicable (ADR-021 §1.2's own failing case, left for C2b's structural-resolution work to actually produce); re-folding the second parent's own history through its own parent/merge structure sidesteps that ordering problem entirely, and matches what `mergeApprovedRequest` already materialises as main's new projection. A refresh commit (`parent` = the branch's own head, `mergedBranchHead` = main's head) essentially never satisfies the fast-forward condition — the branch's own commits since forking are not, in general, reachable from main — so it keeps folding by the ordinary replay branch; the one exception (a branch with no own commits since forking) gives the same answer either way.
 
 `fact(d, value)` copies `d.id, d.sourceId, d.sourceRef, d.effectiveDate, d.confidence, commit.authorId, commit.createdAt`.
 
@@ -882,7 +886,7 @@ Bound: replay cost is O(deltas since the nearest tag or branch head), never O(al
 
 The materialiser is trusted only because these three equalities are checked:
 
-1. **Property test P-2** (every CI run): for random commit DAGs, `head_hash(materialise(c)) == head_hash(fold(c))` where `fold` is the §6.2 reference implementation with no caching.
+1. **Property test P-2** (every CI run): for random commit DAGs, `head_hash(materialise(c)) == head_hash(fold(c))` where `fold` is the §6.2 reference implementation with no caching. **Amended (C19, ADR-021 §2.1/§5 item 1):** covers both of `fold`'s merge shapes — the fast-forward branch (a main-merge commit, `mergeBase(B) == main.head`) and the ordinary replay branch (a refresh commit) — not just whichever one a graph generator happened to produce before.
 2. **Integrity job** (nightly, per model): for every retained commit `c`, recompute `fold(c)` from genesis and compare to `commits.head_hash` and to the persisted rows (row-by-row, not just hash). Any mismatch: raise an incident, mark `validation_results` for `c` as `fail` with rule `HASH`, and refuse merges on that model until repaired.
 3. **On tag creation**: `fold(commit)` is recomputed from genesis before the tag row is inserted. A tag is the one moment the cost is always paid, so that anything a version is cited for was verified from first principles.
 
