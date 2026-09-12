@@ -53,11 +53,28 @@ function isEmpty(value: Json | undefined): value is null | undefined {
   return value === null || value === undefined;
 }
 
+/**
+ * S1 item 10: "describeEnvelope truncates values at ~40 chars" — a
+ * one-line commit title has no business quoting a whole `description`
+ * (a multiline, free-text attribute, `attributeSchema.ts`) or a long URL
+ * in full. Same trim/slice/ellipsis shape as `notificationFormat.ts`'s
+ * `truncateNotificationBody`, but that one lives in `src/ui` (a longer
+ * 80-char budget for a comment-notification's own body) and this module
+ * cannot import from `src/ui` (this file's own top comment) — a small
+ * local copy at this module's own, shorter budget, rather than reaching
+ * across the layer boundary for it.
+ */
+const VALUE_TRUNCATE_LENGTH = 40;
+
+function truncateValue(text: string): string {
+  return text.length <= VALUE_TRUNCATE_LENGTH ? text : `${text.slice(0, VALUE_TRUNCATE_LENGTH)}…`;
+}
+
 function formatValue(value: Json): string {
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'string') return value;
+  if (typeof value === 'string') return truncateValue(value);
   if (typeof value === 'number') return String(value);
-  return JSON.stringify(value);
+  return truncateValue(JSON.stringify(value));
 }
 
 function describeElementUpdate(elementType: ElementType, elementId: UUID, attribute: string, value: Json | undefined, nameLookup: NameLookup): string {

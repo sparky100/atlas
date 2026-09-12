@@ -1,4 +1,6 @@
 import { Link } from 'react-router';
+import { attributeFieldSchema } from '../../contracts/attributeSchema';
+import type { ElementType } from '../../contracts/delta';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff } from '../../engine/versionDiff';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { DiffBadge } from '../components/DiffBadge/DiffBadge';
@@ -87,6 +89,21 @@ export function VersionDiffView({ diff, orgSlug, modelSlug, toBeRefParam, asIsRe
   );
 }
 
+/**
+ * S1 item 10: "attribute labels not keys" — `changedAttributes` is a list
+ * of raw storage keys (`versionDiff.ts`'s own doc comment: "Attribute keys
+ * (plus 'name')"), the same keys `ElementPage.tsx`'s attribute list
+ * already turns into a human label via `attributeFieldSchema`. `'name'`
+ * isn't a schema field (it's the element's own name column, not an
+ * `attributes` entry) so it gets its own literal label rather than
+ * falling through to the raw key, which would coincidentally read fine
+ * ("name") but shouldn't rely on that coincidence.
+ */
+function attributeLabel(elementType: ElementType, key: string): string {
+  if (key === 'name') return 'Name';
+  return attributeFieldSchema(elementType, key)?.label ?? key;
+}
+
 function ElementDiffRow({ diff, href }: { diff: ElementVersionDiff; href: string }) {
   const row = diff.toBe ?? diff.asIs;
   if (!row) return null;
@@ -102,7 +119,7 @@ function ElementDiffRow({ diff, href }: { diff: ElementVersionDiff; href: string
         <DiffBadge state={diff.state} changedCount={diff.state === 'changed' ? diff.changedAttributes.length : undefined} />
         {diff.changedAttributes.length > 0 && (
           <Text as="span" size="sm" tone="muted">
-            {diff.changedAttributes.join(', ')}
+            {diff.changedAttributes.map((key) => attributeLabel(row.elementType, key)).join(', ')}
           </Text>
         )}
       </div>
