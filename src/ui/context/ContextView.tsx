@@ -28,6 +28,7 @@ export interface ContextViewProps {
   group: ContextGroup;
   orgSlug: string;
   modelSlug: string;
+  /** The full `ref=...` query fragment (`refQueryParam`), not a bare token — see `CapabilityMapView.tsx`'s identical `refParam` doc comment for why. */
   refParam: string;
   /** UI-principles §6.2/§6.3 — present only when a branch's Diff mode is active. This DOM view reuses `DiffBadge` (the same pill src/ui/versions/VersionDiffView.tsx already renders) rather than §6.3's canvas-specific border/fill/ghost treatment, which is written for shapes on a canvas, not list rows. */
   diff?: VersionDiff | null;
@@ -63,8 +64,8 @@ export interface ContextViewProps {
  * though its own "Supports:" line renders above that message.
  */
 export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }: ContextViewProps) {
-  const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?ref=${refParam}`;
-  const containersHref = `/o/${orgSlug}/m/${modelSlug}/container/${group.hub.element_id}?ref=${refParam}`;
+  const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?${refParam}`;
+  const containersHref = `/o/${orgSlug}/m/${modelSlug}/container/${group.hub.element_id}?${refParam}`;
   const hubExternal = attributesRecord(group.hub.attributes).isExternal === true;
   const diffById = new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []);
   const hubDiff = diffById.get(group.hub.element_id);

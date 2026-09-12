@@ -1,4 +1,4 @@
-import { useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { Button } from '../components/Button/Button';
@@ -9,10 +9,13 @@ import { ChangeView } from '../changes/ChangeView';
 import { useChange } from '../changes/useChange';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
+import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { useSelectedRef } from '../branches/useSelectedRef';
+import { isViewingMode } from '../branches/viewingMode';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
+import { refQueryParam } from '../../db/ref';
 import styles from './ViewPage.module.css';
 
 /**
@@ -35,11 +38,28 @@ import styles from './ViewPage.module.css';
  * Only offered for a `draft` branch (`useMembership.ts`'s own
  * `canEditBranch`: the only status a change branch is actually
  * committable to).
+ *
+ * S1 item 2: "View this change" sits beside it — the other, read-only
+ * half of the same choice ("distinct from 'Work in this change'"). Unlike
+ * "Edit in this change" it never calls `setRef` (nothing about the
+ * session's own selection changes), is available at *every* branch
+ * status (a reviewer views an approved or merged change too, not just a
+ * draft one) and needs no role check (a viewer sees everything read-only
+ * by design — same reasoning `ElementPage.tsx`'s own `underReview` gate
+ * comment gives `canCreateChangeBranch`, just with no gate here at all).
+ * A plain link to Landscape at this branch's ref with `viewing=1`
+ * (`refQueryParam`) — Landscape is this change's own natural "To-be"
+ * view, the same first stop `"Edit in this change"` implicitly assumes
+ * too (nothing on *this* page itself needs a read-only mode; it already
+ * has none of Landscape/CapabilityMap/ElementPage's own edit affordances
+ * to hide).
  */
 export function ChangePage() {
   const { orgSlug, modelSlug, branchId } = useParams<{ orgSlug: string; modelSlug: string; branchId: string }>();
+  const [searchParams] = useSearchParams();
   const { userId } = useAuth();
   const { ref, setRef } = useSelectedRef();
+  const viewing = isViewingMode(searchParams);
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
@@ -72,22 +92,33 @@ export function ChangePage() {
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
           {/* Own page already has its own "Submit for review" (below, via ChangeView) — the banner's copy of that action exists for every *other* page; showing both here would be the literal duplicate this item's own comment warns against. */}
-          <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} showSubmitForReview={false} />
+          {viewing ? (
+            <ViewingBranchBanner activeRef={ref} />
+          ) : (
+            <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} showSubmitForReview={false} />
+          )}
           <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabel} />
           <div className={styles.headerRow}>
             <Text as="h1" size="2xl">
               {branch?.title ?? branch?.name ?? 'Change'}
             </Text>
-            {canEdit && branch?.status === 'draft' && branchId && (
-              <Button
-                variant={isSelected ? 'ghost' : 'primary'}
-                disabled={isSelected}
-                onClick={() => {
-                  setRef({ kind: 'branch', branchId });
-                }}
-              >
-                {isSelected ? 'Editing in this change' : 'Edit in this change'}
-              </Button>
+            {branchId && (
+              <div className={styles.headerActions}>
+                {canEdit && branch?.status === 'draft' && (
+                  <Button
+                    variant={isSelected ? 'ghost' : 'primary'}
+                    disabled={isSelected}
+                    onClick={() => {
+                      setRef({ kind: 'branch', branchId });
+                    }}
+                  >
+                    {isSelected ? 'Editing in this change' : 'Edit in this change'}
+                  </Button>
+                )}
+                <Link to={`/o/${orgSlug ?? ''}/m/${model.slug}/landscape?${refQueryParam({ kind: 'branch', branchId }, true)}`}>
+                  <Button variant="secondary">View this change</Button>
+                </Link>
+              </div>
             )}
           </div>
           <ChangeView orgId={organisation?.id ?? ''} modelId={model.id} branchId={branchId ?? ''} orgSlug={orgSlug ?? ''} modelSlug={model.slug} role={role} canEdit={canEdit} />

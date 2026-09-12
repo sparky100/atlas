@@ -1,9 +1,10 @@
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import { Chip } from '../Chip/Chip';
 import { Text } from '../Text/Text';
 import { useBranchLabel } from '../../branches/useBranchLabel';
 import { useSelectedRef } from '../../branches/useSelectedRef';
-import { refLabelOf, refParamOf } from '../../../db/ref';
+import { isViewingMode } from '../../branches/viewingMode';
+import { refLabelOf, refQueryParam } from '../../../db/ref';
 import { modelNavSectionFor, type ModelNavSection } from '../../nav/modelNavSection';
 import styles from './ModelNav.module.css';
 
@@ -54,9 +55,21 @@ const SECTION_LABELS: Record<RealSection, string> = {
  */
 export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { ref } = useSelectedRef();
   const { label: branchLabel } = useBranchLabel(ref);
-  const refParam = refParamOf(ref);
+  // S1 item 2: while viewing (`?viewing=1`), carry that forward only on the
+  // two sections "View this change" actually promises read-only access
+  // to — Landscape and Capability map. Home/Changes/Review deliberately
+  // drop it: a viewing ref is never something a user is "in" the way the
+  // editing ref is (`SelectedRefProvider.tsx`'s own write-effect comment),
+  // so clicking away to one of those three is a perfectly good, low-risk
+  // way to leave viewing mode — nothing is lost by dropping a read-only
+  // flag, unlike the editing-ref bug this rail's own carriesRef fix
+  // (module comment above) exists to prevent.
+  const viewing = isViewingMode(searchParams);
+  const refParam = refQueryParam(ref, false);
+  const refParamViewing = refQueryParam(ref, viewing);
 
   const base = `/o/${orgSlug}/m/${modelSlug}`;
   const modelRelativePath = location.pathname.startsWith(base) ? location.pathname.slice(base.length) : location.pathname;
@@ -67,7 +80,9 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
       <ul className={styles.list}>
         {SECTIONS.map((section) => {
           const path = sectionPath(section);
-          const href = `${base}${path ? `/${path}` : ''}${refParam !== 'main' ? `?ref=${refParam}` : ''}`;
+          const carriesViewing = section === 'landscape' || section === 'capability-map';
+          const query = carriesViewing ? refParamViewing : refParam;
+          const href = `${base}${path ? `/${path}` : ''}${ref.kind !== 'main' ? `?${query}` : ''}`;
           const isActive = section === activeSection;
           return (
             <li key={section}>

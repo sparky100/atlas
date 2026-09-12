@@ -97,6 +97,7 @@ export function SelectedRefProvider({ children }: { children: ReactNode }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const storageKey = storageKeyFor(location.pathname);
   const urlRefParam = searchParams.get('ref');
+  const urlViewingParam = searchParams.get('viewing');
 
   const ref = useMemo<Ref>(() => {
     if (urlRefParam !== null) return parseRefParam(urlRefParam);
@@ -119,7 +120,15 @@ export function SelectedRefProvider({ children }: { children: ReactNode }) {
       // already enforces for ChangeView, just missed for these two ref
       // kinds. `ref` (the `useMemo` above) is untouched by this: that page
       // still renders at the explicit tag/commit it asked for either way.
-      if (parsed.kind === 'main' || parsed.kind === 'branch') writeStored(storageKey, parsed);
+      // S1 item 2: `?viewing=1` marks this `branch:` ref as a read-only
+      // *viewing* ref, not the session's editing selection — the exact
+      // "transient, explicit view, never something a user is 'in'" carve-
+      // out this comment already draws for `tag:`/`commit:`, extended to
+      // cover a `branch:` ref that happens to be a "View this change"
+      // link rather than "Edit in this change"/the sticky-ref create
+      // flow. `ref` itself (the `useMemo` above) is untouched: the page
+      // still renders read-only at exactly the branch it asked for.
+      if ((parsed.kind === 'main' || parsed.kind === 'branch') && urlViewingParam !== '1') writeStored(storageKey, parsed);
       return;
     }
     const stored = readStored(storageKey);
@@ -133,7 +142,7 @@ export function SelectedRefProvider({ children }: { children: ReactNode }) {
         { replace: true },
       );
     }
-  }, [storageKey, urlRefParam, setSearchParams]);
+  }, [storageKey, urlRefParam, urlViewingParam, setSearchParams]);
 
   const setRef = useCallback(
     (next: Ref) => {

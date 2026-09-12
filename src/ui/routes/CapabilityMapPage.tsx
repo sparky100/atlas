@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { useParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
@@ -9,13 +9,15 @@ import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
+import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
+import { isViewingMode } from '../branches/viewingMode';
 import { useThreadCounts } from '../comments/useThreadCounts';
 import { useModels } from '../models/useModels';
 import { canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
-import { refLabelOf, refParamOf } from '../../db/ref';
+import { refLabelOf, refQueryParam } from '../../db/ref';
 import { CapabilityMapAddForm } from '../capabilityMap/CapabilityMapAddForm';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
@@ -72,7 +74,9 @@ import styles from './CapabilityMapPage.module.css';
  */
 export function CapabilityMapPage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
+  const [searchParams] = useSearchParams();
   const { ref } = useSelectedRef();
+  const viewing = isViewingMode(searchParams);
   const { userId } = useAuth();
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
@@ -134,7 +138,7 @@ export function CapabilityMapPage() {
     );
   }
 
-  const refParam = refParamOf(ref);
+  const refParam = refQueryParam(ref, viewing);
   // Check D1: same "only once there's real content" condition
   // LandscapePage.tsx's own `hasCanvas` uses — the empty-map/import-panel
   // state keeps the ordinary centred column, since there's no map yet to
@@ -147,7 +151,7 @@ export function CapabilityMapPage() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={[styles.main, hasContent ? styles.mainWithMap : ''].filter(Boolean).join(' ')}>
-        <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />
+        {viewing ? <ViewingBranchBanner activeRef={ref} /> : <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />}
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}

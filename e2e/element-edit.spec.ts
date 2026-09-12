@@ -114,7 +114,7 @@ test('an owner edits a System attribute on main and sees the new value with its 
   await expect(page.getByText('Acme Corp')).toHaveCount(0);
 
   await page.getByRole('button', { name: '✎ Edit' }).click();
-  await page.getByLabel('Vendor').fill('Acme Corp');
+  await page.getByLabel('Vendor', { exact: true }).fill('Acme Corp');
   await page.getByRole('button', { name: 'Save' }).click();
 
   // Save exits edit mode and reloads via useElementPage's real reload —

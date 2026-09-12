@@ -52,7 +52,7 @@ export function ReviewRequestPage() {
               Review request
             </Text>
           </div>
-          <ReviewRequestView modelId={model.id} mergeRequestId={mergeRequestId ?? ''} orgId={organisation.id} />
+          <ReviewRequestView modelId={model.id} mergeRequestId={mergeRequestId ?? ''} orgId={organisation.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
         </main>
       </div>
     </div>

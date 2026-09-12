@@ -13,9 +13,10 @@
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
 
-export function elementBreadcrumbSegments(element: ElementsHeadRow, parent: ElementsHeadRow | null, orgSlug: string, modelSlug: string, refParam: string): BreadcrumbSegment[] {
+/** `refQuery` is the full `ref=...` query fragment (`refQueryParam`), not a bare token — see `CapabilityMapView.tsx`'s identical `refParam` doc comment for why (S1 item 2: carries `&viewing=1` while this element page is itself a read-only viewing ref, so zooming out from it stays read-only too). */
+export function elementBreadcrumbSegments(element: ElementsHeadRow, parent: ElementsHeadRow | null, orgSlug: string, modelSlug: string, refQuery: string): BreadcrumbSegment[] {
   const base = `/o/${orgSlug}/m/${modelSlug}`;
-  const query = `?ref=${refParam}`;
+  const query = `?${refQuery}`;
 
   switch (element.element_type) {
     case 'capability':

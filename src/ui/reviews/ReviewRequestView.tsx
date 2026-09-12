@@ -1,4 +1,6 @@
+import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
+import { refQueryParam } from '../../db/ref';
 import { Button } from '../components/Button/Button';
 import { CardComments } from '../components/CardComments/CardComments';
 import { Chip } from '../components/Chip/Chip';
@@ -19,6 +21,9 @@ export interface ReviewRequestViewProps {
   modelId: UUID;
   mergeRequestId: UUID;
   orgId: UUID;
+  /** S1 item 2: "View this change" — both only needed to build that one link (Landscape at this request's branch ref, read-only). `ReviewRequestPage.tsx` already has both in scope for its own routing. */
+  orgSlug: string;
+  modelSlug: string;
 }
 
 /**
@@ -39,7 +44,7 @@ export interface ReviewRequestViewProps {
  * structural card names the real path that exists today: reopen the
  * branch and fix it with the ordinary editor, then refresh.
  */
-export function ReviewRequestView({ modelId, mergeRequestId, orgId }: ReviewRequestViewProps) {
+export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, modelSlug }: ReviewRequestViewProps) {
   const { userId } = useAuth();
   const { role } = useMembership(orgId, userId);
   const canReview = canReviewMergeRequest(role);
@@ -106,6 +111,10 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId }: ReviewRequ
           <Text as="span" tone="faint" size="xs">
             {totalUnresolved} unresolved comment{totalUnresolved === 1 ? '' : 's'} — never a disabled reason
           </Text>
+          {/* S1 item 2: "review request ... pages get 'View this change'" — Landscape at this branch's ref, read-only. Available regardless of role/status: a reviewer looking at any request, at any point, can see the change's own To-be state. */}
+          <Link to={`/o/${orgSlug}/m/${modelSlug}/landscape?${refQueryParam({ kind: 'branch', branchId: branch.id }, true)}`}>
+            <Button variant="secondary">View this change</Button>
+          </Link>
         </div>
 
         {!threeWay.upToDateWithMain && (

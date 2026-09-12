@@ -15,14 +15,16 @@ import { useThreadCounts } from '../comments/useThreadCounts';
 import { useModels } from '../models/useModels';
 import { canEditBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
-import { refLabelOf, refParamOf } from '../../db/ref';
+import { refLabelOf, refParamOf, refQueryParam } from '../../db/ref';
 import { parseViewMode } from '../../db/viewMode';
 import { BranchViewModeControl } from '../branches/BranchViewModeControl';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
+import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
+import { isViewingMode } from '../branches/viewingMode';
 import { CapabilityLandscapeList } from '../landscape/CapabilityLandscapeList';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
 import { LANDSCAPE_COLOUR_BY_OPTIONS } from '../landscape/landscapeColour';
@@ -89,6 +91,7 @@ export function LandscapePage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { ref } = useSelectedRef();
+  const viewing = isViewingMode(searchParams);
   const mode = parseViewMode(searchParams.get('mode'));
   const capabilityId = parseCapabilityParam(searchParams.get('capability'));
   const { userId } = useAuth();
@@ -104,7 +107,7 @@ export function LandscapePage() {
   // being viewed (src/db/elementSearch.ts's own module comment) — only the
   // write target (`editingBranch`) varies with the ref.
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
-  const canEdit = editingBranch !== null && canEditBranch(role, editingBranch);
+  const canEdit = !viewing && editingBranch !== null && canEditBranch(role, editingBranch);
   // ADR-018 guarantees both are never null in practice (every branch always
   // has a real head, from genesis onward) — `BranchRow`'s own type hasn't
   // been narrowed to match yet (a separate, wider cleanup touching every
@@ -182,14 +185,19 @@ export function LandscapePage() {
     );
   }
 
+  const refQuery = refQueryParam(ref, viewing);
+  // Bare ref string (no `viewing`) for `ElementSearchAdd`'s own `refParam`
+  // prop — every one of its three call sites below only ever renders while
+  // `canAdd` is true, which already folds in `!viewing` (`canEdit` above),
+  // so it never needs to carry `viewing` forward itself.
   const refParam = refParamOf(ref);
-  const segments: BreadcrumbSegment[] = capability ? [{ label: capability.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/capability-map?ref=${refParam}` }] : [];
+  const segments: BreadcrumbSegment[] = capability ? [{ label: capability.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/capability-map?${refQuery}` }] : [];
   // Landscape canvas, structural (item 3): an actor has no Context view of
   // its own (the zoom chain is system-specific), so this goes straight to
   // the actor's own element page instead — the same target item 13's
   // mobile list uses for both its system and actor rows' own tap target
   // ("tap → element page", `LandscapeMobileList.tsx`'s own prop comment).
-  const elementHref = (elementId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${elementId}?ref=${refParam}`;
+  const elementHref = (elementId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${elementId}?${refQuery}`;
   // "Platforms and modules": a module tile's own `elementId` is a
   // Container, which has no Context view of its own (the zoom chain is
   // system-specific) — its own element page instead, the same target
@@ -201,14 +209,14 @@ export function LandscapePage() {
   // closure here, rather than reordering this whole component around it.
   const nodeHref = (systemId: string) => {
     const element = state.status === 'ready' ? state.data.systemsById.get(systemId) : undefined;
-    return element?.element_type === 'container' ? elementHref(systemId) : `/o/${orgSlug ?? ''}/m/${model.slug}/context/${systemId}?${zoomQueryString({ ref, capabilityId })}`;
+    return element?.element_type === 'container' ? elementHref(systemId) : `/o/${orgSlug ?? ''}/m/${model.slug}/context/${systemId}?${zoomQueryString({ ref, capabilityId, viewing })}`;
   };
   // Item 11: a lane key that isn't `$external`/`$unassigned` is a level-1
   // capability's own element id (`layout.ts`'s `placementFor`) — its
   // element page, same shape as `elementHref` above, works regardless of
   // where in the capability tree it sits (unlike a capability-map anchor,
   // which would need to know the map's own scroll position).
-  const capabilityHref = (capabilityId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${capabilityId}?ref=${refParam}`;
+  const capabilityHref = (capabilityId: string) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${capabilityId}?${refQuery}`;
 
   // Shared between the >=768px inline row and the <768px "+ Add" menu
   // (E1) — same two controls, a different wrapper around them.
@@ -276,7 +284,7 @@ export function LandscapePage() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main ref={canvasWidthRef} className={[styles.main, canvasWidthClass ? styles.mainWithCanvas : ''].filter(Boolean).join(' ')}>
-        <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
+        {viewing ? <ViewingBranchBanner activeRef={ref} /> : <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />}
         <Breadcrumb
           org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
           model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}

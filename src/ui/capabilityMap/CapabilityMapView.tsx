@@ -48,7 +48,20 @@ export interface CapabilityMapViewProps {
   onColourByChange: (mode: ColourByMode) => void;
   orgSlug: string;
   modelSlug: string;
-  /** `?ref=...` — carried into every "→ Landscape" zoom link so it lands on the same ref the map itself is showing (§2.4's deep-link rule). */
+  /**
+   * The full `ref=...` query fragment (S1 item 2: `refQueryParam`, so it
+   * also carries `&viewing=1` while this page itself is a read-only
+   * viewing ref — a change viewed via "View this change" must stay
+   * read-only through this link too, not silently become the session's
+   * editing ref the moment `LandscapePage` sees a bare `?ref=branch:x`
+   * with no `viewing` flag) — carried into every "→ Landscape" zoom link
+   * so it lands on the same ref the map itself is showing (§2.4's
+   * deep-link rule). Despite the name, this is the whole fragment, not a
+   * bare token — the one place it's actually consumed, `LandscapeZoomLink`
+   * below, appends `&capability=` directly rather than rebuilding it via
+   * `URLSearchParams` (which would double-encode the `&` if a viewing
+   * flag were smuggled into a single param value instead).
+   */
   refParam: string;
   /**
    * Sprint U4-1 C1's "drag-to-reorder among siblings" (§4.2-style gate:
@@ -283,7 +296,7 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
 /** The "→ Landscape" zoom link every tile shows next to its supporting-system count — `null` (rendered as nothing) when there are none to zoom into. */
 function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, refParam }: { capabilityId: UUID; count: number; orgSlug: string; modelSlug: string; refParam: string }) {
   if (count === 0) return null;
-  const href = `/o/${orgSlug}/m/${modelSlug}/landscape?${new URLSearchParams({ ref: refParam, capability: capabilityId }).toString()}`;
+  const href = `/o/${orgSlug}/m/${modelSlug}/landscape?${refParam}&capability=${capabilityId}`;
   return (
     <Link to={href} className={styles.zoomLink}>
       <Text as="span" tone="faint" size="sm">
