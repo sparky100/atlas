@@ -52,6 +52,27 @@ describe('describeEnvelope', () => {
     expect(describeEnvelope([delta], nameLookup)).toBe('Set PowerON external to Yes');
   });
 
+  it('element.update (a long free-text value): truncates at ~40 chars with an ellipsis, S1 item 10', () => {
+    const longDescription = 'This is a much longer description than the forty character budget allows for a one-line commit title';
+    const delta = base({ kind: 'element.update', elementId: 'powerOn', elementType: 'system', attribute: 'description', value: longDescription, previousDeltaId: 'p1' });
+    const result = describeEnvelope([delta], nameLookup);
+    expect(result).toBe(`Set PowerON description to ${longDescription.slice(0, 40)}…`);
+    expect(result.length).toBeLessThan(longDescription.length + 'Set PowerON description to '.length);
+  });
+
+  it('element.update (a value at or under the ~40 char budget): never truncated, no ellipsis', () => {
+    const shortEnough = 'exactly forty characters long, no more!!';
+    expect(shortEnough).toHaveLength(40);
+    const delta = base({ kind: 'element.update', elementId: 'powerOn', elementType: 'system', attribute: 'description', value: shortEnough, previousDeltaId: 'p1' });
+    expect(describeEnvelope([delta], nameLookup)).toBe(`Set PowerON description to ${shortEnough}`);
+  });
+
+  it('element.update (name, a long new name): the rename target is truncated too, not just plain attribute values', () => {
+    const longName = 'A Very Long System Name That Exceeds The Forty Character Budget By Quite A Lot';
+    const delta = base({ kind: 'element.update', elementId: 'northgate', elementType: 'system', attribute: 'name', value: longName, previousDeltaId: 'p1' });
+    expect(describeEnvelope([delta], nameLookup)).toBe(`Rename Northgate to ${longName.slice(0, 40)}…`);
+  });
+
   it('element.retract: "Retract {name}"', () => {
     const delta = base({ kind: 'element.retract', elementId: 'northgate', elementType: 'system', previousDeltaId: 'p1' });
     expect(describeEnvelope([delta], nameLookup)).toBe('Retract Northgate');
@@ -85,6 +106,12 @@ describe('describeEnvelope', () => {
   it('relationship.update: no endpoint ids are on the delta, so this names the relationship type, not its endpoints', () => {
     const delta = base({ kind: 'relationship.update', relationshipId: 'r1', relationshipType: 'owns', attribute: 'role', value: 'technical', previousDeltaId: 'p1' });
     expect(describeEnvelope([delta], nameLookup)).toBe('Set owns role to technical');
+  });
+
+  it('relationship.update (a long value): truncated the same as an element attribute value, S1 item 10', () => {
+    const longValue = 'a free-text description value much longer than forty characters allows';
+    const delta = base({ kind: 'relationship.update', relationshipId: 'r1', relationshipType: 'flows_to', attribute: 'description', value: longValue, previousDeltaId: 'p1' });
+    expect(describeEnvelope([delta], nameLookup)).toBe(`Set flows_to description to ${longValue.slice(0, 40)}…`);
   });
 
   it('relationship.update (cleared): "Clear {type} {label}"', () => {

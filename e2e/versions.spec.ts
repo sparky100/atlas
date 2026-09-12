@@ -85,10 +85,12 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
   await expect(versionList.getByText('v1', { exact: true })).toBeVisible();
   await expect(versionList.getByText('First cut')).toBeVisible();
 
-  // v2: add System B on top of v1 — a real change to diff against.
+  // v2: add System B, and change System A's vendor — a "changed" row
+  // (S1 item 10: "attribute labels not keys") alongside the "added" one.
   const systemBId = randomUUID();
   const v2Deltas: Delta[] = [
     { kind: 'element.create', id: randomUUID(), elementId: systemBId, elementType: 'system', name: 'System B', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
+    { kind: 'element.update', id: randomUUID(), elementId: systemAId, elementType: 'system', attribute: 'vendor', value: 'Acme Corp', previousDeltaId: v1Envelope.deltas[0]!.id, sourceId: seedSourceId, confidence: 1 },
   ];
   const v2Envelope: CommitEnvelope = {
     id: randomUUID(),
@@ -116,9 +118,9 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
   await expect(page).toHaveURL(/ref=tag%3Av1|ref=tag:v1/);
   await expect(page.getByText('no commits yet at this ref')).toHaveCount(0);
 
-  // Diff v1 → v2: System B should show as Added, System A as Unchanged
-  // (implicitly — it's not listed, since Unchanged rows are counted, not
-  // shown; see VersionDiffView.tsx's own comment on why).
+  // Diff v1 → v2: System B shows as Added; System A shows as Changed,
+  // naming its changed attribute by human label ("Vendor"), never the raw
+  // storage key ("vendor") — S1 item 10.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/versions`);
   await page.getByRole('combobox').first().selectOption('tag:v2');
   await page.getByRole('combobox').last().selectOption('tag:v1');
@@ -129,5 +131,7 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
   // .first(): the badge's accessible text duplicates across an icon +
   // label pair in the same row — this checks the badge renders at all.
   await expect(page.getByText('Added').first()).toBeVisible();
-  await expect(page.getByText('System A')).toHaveCount(0);
+  await expect(page.getByText('System A')).toBeVisible();
+  await expect(page.getByText('Vendor', { exact: true })).toBeVisible();
+  await expect(page.getByText('vendor', { exact: true })).toHaveCount(0);
 });
