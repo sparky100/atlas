@@ -55,6 +55,19 @@ export async function createChangeBranch(supabase: Client, input: CreateChangeBr
   return data as BranchRow;
 }
 
+/**
+ * S1 item 4: "Cancel a change" — `atlas.cancel_change` (proposer or
+ * owner/architect, Draft or Proposed; requires a reason; closes any open
+ * merge request too — see that migration's own comment).
+ */
+export async function cancelChange(supabase: Client, branchId: UUID, reason: string): Promise<BranchRow> {
+  assertRealId('cancelChange', 'id', branchId);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.schema('atlas').rpc('cancel_change', { p_branch_id: branchId, p_reason: reason });
+  if (error) throw new Error(`cancelChange: ${error.message}`);
+  return data as BranchRow;
+}
+
 export async function getBranch(supabase: Client, branchId: UUID): Promise<BranchRow | null> {
   assertRealId('getBranch', 'id', branchId);
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.

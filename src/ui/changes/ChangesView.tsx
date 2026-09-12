@@ -4,6 +4,7 @@ import type { UUID } from '../../contracts/delta';
 import type { ChangeListSummary } from '../../db/changeSummary';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { LinkButton } from '../components/Button/LinkButton';
@@ -58,6 +59,11 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   // every card at once — see useChangeSummaries.ts's own comment.
   const summariesState = useChangeSummaries(modelId, branches);
   const summaries = summariesState.status === 'ready' ? summariesState.summaries : undefined;
+  // S1 item 4: "listed under a collapsed 'Cancelled' section" — same
+  // active/collapsed split `OrgHome.tsx` already uses for archived models
+  // (`activeModels`/`archivedModels`, its own `CollapsibleSection`).
+  const activeBranches = branches.filter((b) => b.status !== 'cancelled');
+  const cancelledBranches = branches.filter((b) => b.status === 'cancelled');
 
   return (
     <div>
@@ -151,7 +157,11 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
       {/* Item 5: first-time explainer — the model has never had a change,
           not just "this page hasn't loaded any yet" (status !== 'loading'
           already distinguishes that from the ordinary empty-list case
-          below). */}
+          below). Keyed on every branch, not just the active ones — a model
+          whose only changes are all cancelled has still "had a change"
+          before, so the explainer would be a strange thing to show again;
+          the empty state just below it is the one that's keyed on active
+          only, since that's the one actually saying "nothing to see here." */}
       {branches.length === 0 && status !== 'loading' && (
         <Panel>
           <Text as="p" size="sm">
@@ -172,10 +182,10 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
           </Text>
         </Panel>
       )}
-      {branches.length === 0 && status !== 'loading' && <EmptyState>No changes yet. {canCreate ? 'Create one above.' : 'Nobody has proposed one.'}</EmptyState>}
-      {branches.length > 0 && (
+      {activeBranches.length === 0 && status !== 'loading' && <EmptyState>No changes yet. {canCreate ? 'Create one above.' : 'Nobody has proposed one.'}</EmptyState>}
+      {activeBranches.length > 0 && (
         <ul className={styles.list}>
-          {branches.map((branch) => (
+          {activeBranches.map((branch) => (
             <ChangeRow
               key={branch.id}
               branch={branch}
@@ -186,6 +196,23 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
             />
           ))}
         </ul>
+      )}
+
+      {cancelledBranches.length > 0 && (
+        <CollapsibleSection title="Cancelled" meta={`(${String(cancelledBranches.length)})`} defaultOpen={false}>
+          <ul className={styles.list}>
+            {cancelledBranches.map((branch) => (
+              <ChangeRow
+                key={branch.id}
+                branch={branch}
+                orgSlug={orgSlug}
+                modelSlug={modelSlug}
+                unresolvedCount={threadCounts?.get(branch.id)?.open}
+                summary={summaries?.get(branch.id)}
+              />
+            ))}
+          </ul>
+        </CollapsibleSection>
       )}
     </div>
   );
@@ -214,6 +241,14 @@ function ChangeRow({
         {branch.description !== null && (
           <Text as="p" tone="muted" size="sm">
             {branch.description}
+          </Text>
+        )}
+        {/* S1 item 4: "listed under a collapsed 'Cancelled' section with a
+            reason" — the reason belongs right here in the list, not only
+            on the change's own page. */}
+        {branch.status === 'cancelled' && branch.cancel_reason && (
+          <Text as="p" tone="muted" size="sm">
+            Cancelled: {branch.cancel_reason}
           </Text>
         )}
         {/* Item 3's own one-liner — distinct from the free-text description

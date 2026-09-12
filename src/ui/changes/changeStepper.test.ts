@@ -78,6 +78,23 @@ describe('deriveChangeStep', () => {
     expect(result.rejected).toBe(true);
   });
 
+  it('cancelled from draft (never submitted): only Draft passed, cancelled flag set, nothing current', () => {
+    const result = deriveChangeStep({ status: 'cancelled' }, null);
+    expect(stateOf(result.steps, 'draft')).toBe('passed');
+    expect(stateOf(result.steps, 'proposed')).toBe('upcoming');
+    expect(result.steps.some((s) => s.state === 'current')).toBe(false);
+    expect(result.rejected).toBe(false);
+    expect(result.cancelled).toBe(true);
+  });
+
+  it('cancelled after submission: Draft/Proposed passed too', () => {
+    const result = deriveChangeStep({ status: 'cancelled' }, mergeRequest('pending'));
+    expect(stateOf(result.steps, 'draft')).toBe('passed');
+    expect(stateOf(result.steps, 'proposed')).toBe('passed');
+    expect(stateOf(result.steps, 'in_review')).toBe('upcoming');
+    expect(result.cancelled).toBe(true);
+  });
+
   it('in_review (defensive — never actually written) maps the same as proposed', () => {
     const result = deriveChangeStep({ status: 'in_review' }, mergeRequest('pending'));
     expect(stateOf(result.steps, 'in_review')).toBe('current');

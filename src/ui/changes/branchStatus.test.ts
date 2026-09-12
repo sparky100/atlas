@@ -12,6 +12,7 @@ describe('branchStatusTone', () => {
       merged: 'ok',
       rejected: 'danger',
       archived: 'neutral',
+      cancelled: 'neutral',
     };
     for (const [status, tone] of Object.entries(expected)) {
       expect(branchStatusTone(status as BranchStatus)).toBe(tone);

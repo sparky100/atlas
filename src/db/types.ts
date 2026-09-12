@@ -57,7 +57,8 @@ export interface ModelRow {
 }
 
 export type BranchKind = 'main' | 'change' | 'capture_draft';
-export type BranchStatus = 'draft' | 'proposed' | 'in_review' | 'approved' | 'merged' | 'rejected' | 'archived';
+/** S1 item 4: `cancelled` — a proposer or owner/architect calling it off from `draft`/`proposed`, via `atlas.cancel_change`; terminal, like `merged`/`rejected`. */
+export type BranchStatus = 'draft' | 'proposed' | 'in_review' | 'approved' | 'merged' | 'rejected' | 'archived' | 'cancelled';
 
 /**
  * The literal shape of a row in `branches`
@@ -94,6 +95,10 @@ export interface BranchRow {
   split_from: UUID | null;
   created_by: UUID;
   updated_at: string;
+  /** S1 item 4, set together by `atlas.cancel_change`: the proposer or owner/architect's own stated reason, `null` unless `status === 'cancelled'`. */
+  cancel_reason: string | null;
+  cancelled_at: string | null;
+  cancelled_by: UUID | null;
 }
 
 export type MergeRequestStatus = 'pending' | 'changes_requested' | 'approved' | 'merged' | 'rejected';

@@ -19,6 +19,9 @@ function branch(overrides: Partial<BranchRow>): BranchRow {
     split_from: null,
     created_by: 'user-1',
     updated_at: '2026-01-01T00:00:00.000Z',
+    cancel_reason: null,
+    cancelled_at: null,
+    cancelled_by: null,
     ...overrides,
   };
 }
