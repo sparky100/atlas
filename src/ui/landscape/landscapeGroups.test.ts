@@ -7,8 +7,8 @@ function system(id: string, name: string, isExternal = false): ElementsHeadRow {
   return { element_id: id, element_type: 'system', name, parent_id: null, attributes: { isExternal }, exists_delta_id: `d-${id}` };
 }
 
-function actor(id: string, name: string): ElementsHeadRow {
-  return { element_id: id, element_type: 'actor', name, parent_id: null, attributes: { subtype: 'team', isExternal: false }, exists_delta_id: `d-${id}` };
+function actor(id: string, name: string, isExternal = false): ElementsHeadRow {
+  return { element_id: id, element_type: 'actor', name, parent_id: null, attributes: { subtype: isExternal ? 'organisation' : 'team', isExternal }, exists_delta_id: `d-${id}` };
 }
 
 function capability(id: string, name: string): ElementsHeadRow {
@@ -44,13 +44,32 @@ describe('computeLandscapeGroups (item 13)', () => {
     expect(groups.groups.map((g) => g.key)).toEqual(['cap-a', 'cap-z', UNASSIGNED_LANE_KEY, EXTERNAL_LANE_KEY]);
   });
 
-  it('actors are their own leading group, sorted by name then id, separate from every capability lane', () => {
+  it('internal actors are their own leading group, sorted by name then id, separate from every capability lane', () => {
     const cap = capability('cap-1', 'Payments');
     const sys = system('sys-1', 'Billing Service');
     const actors = [actor('act-b', 'Bravo Team'), actor('act-a', 'Alpha Team')];
     const groups = computeLandscapeGroups([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]), actors, []);
     expect(groups.actors.map((a) => a.element_id)).toEqual(['act-a', 'act-b']);
-    expect(groups.groups.every((g) => (g.members as { system: ElementsHeadRow }[]).every((m) => m.system.element_type !== 'actor'))).toBe(true);
+    expect(groups.groups.every((g) => g.members.every((m) => m.system.element_type !== 'actor'))).toBe(true);
+  });
+
+  it("S1 item 11a: an external actor joins the External group's own members, not the leading Actors group", () => {
+    const cap = capability('cap-1', 'Payments');
+    const sys = system('sys-1', 'Billing Service');
+    const actors = [actor('act-int', 'Ops Team'), actor('act-ext', 'Ofgem', true)];
+    const groups = computeLandscapeGroups([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]), actors, []);
+    expect(groups.actors.map((a) => a.element_id)).toEqual(['act-int']);
+    const externalGroup = groups.groups.find((g) => g.region === 'external');
+    expect(externalGroup?.members.map((m) => m.system.element_id)).toEqual(['act-ext']);
+  });
+
+  it('S1 item 11a: the External group exists purely for an external actor, even with zero external systems', () => {
+    const cap = capability('cap-1', 'Payments');
+    const sys = system('sys-1', 'Billing Service');
+    const groups = computeLandscapeGroups([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]), [actor('act-ext', 'Ofgem', true)], []);
+    const externalGroup = groups.groups.find((g) => g.region === 'external');
+    expect(externalGroup?.label).toBe('External');
+    expect(externalGroup?.members).toHaveLength(1);
   });
 
   it('counts each system\'s own uses/used-by edges, both directions, uses and flows_to together', () => {

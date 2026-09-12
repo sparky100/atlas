@@ -339,11 +339,14 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // comment, ArchitectHome.tsx) — a genuinely clean model collapses each
   // group to its own "N checks clear" line (S1 item 7), not one combined
   // line, mirroring the old "No findings." x2 behaviour it replaces.
+  // Assurance is 5, not 3, as of S1 item 11a's own two new checks
+  // (external interfaces missing classification, external organisation
+  // access) — both zero on an element-less model.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await expect(page.getByRole('heading', { name: 'Health findings' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
   const healthClear = page.getByRole('button', { name: '9 checks clear' });
-  const assuranceClear = page.getByRole('button', { name: '3 checks clear' });
+  const assuranceClear = page.getByRole('button', { name: '5 checks clear' });
   await expect(healthClear).toBeVisible();
   await expect(assuranceClear).toBeVisible();
   // Collapsed by default — no individual check's own line rendered yet,

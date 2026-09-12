@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import type { UUID } from '../../contracts/delta';
+import type { ActorSubtype, UUID } from '../../contracts/delta';
 import type { ElementVersionDiff, VersionDiff } from '../../engine/versionDiff';
 import { Chip } from '../components/Chip/Chip';
 import { LinkButton } from '../components/Button/LinkButton';
@@ -69,6 +69,9 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }
   const hubExternal = attributesRecord(group.hub.attributes).isExternal === true;
   const diffById = new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []);
   const hubDiff = diffById.get(group.hub.element_id);
+  // S1 item 11a — see the "Owned by" line's own comment below.
+  const internalOwners = group.owners.filter((o) => !o.isExternal);
+  const externalOwners = group.owners.filter((o) => o.isExternal);
 
   return (
     <div>
@@ -113,12 +116,18 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }
                   · Technical owner: IT Operations"), not a single flat
                   "Owned by:" list — computeContextGroup already sorted
                   `owners` by role, so within each role group the actors are
-                  already in the right order too. */}
-              {OWNS_ROLE_ORDER.filter((role) => group.owners.some((o) => o.role === role)).map((role, groupIndex) => (
+                  already in the right order too. S1 item 11a: only ever
+                  *internal* owners here — an external owner can only ever
+                  hold role "service" (C20, src/engine/deltas.ts), and is
+                  split into its own trailing "External:" clause below
+                  instead, naming the organisation rather than folding it
+                  in as one more "Service owner" name indistinguishable
+                  from an internal one. */}
+              {OWNS_ROLE_ORDER.filter((role) => internalOwners.some((o) => o.role === role)).map((role, groupIndex) => (
                 <span key={role}>
                   {groupIndex > 0 && ' · '}
                   {ownsRoleLabel(role)} owner:{' '}
-                  {group.owners
+                  {internalOwners
                     .filter((o) => o.role === role)
                     .map((owner, i) => (
                       <span key={owner.actor.element_id}>
@@ -128,6 +137,18 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }
                     ))}
                 </span>
               ))}
+              {externalOwners.length > 0 && (
+                <span>
+                  {internalOwners.length > 0 && ' · '}
+                  External:{' '}
+                  {externalOwners.map((owner, i) => (
+                    <span key={owner.actor.element_id}>
+                      {i > 0 && ', '}
+                      <Link to={elementHref(owner.actor.element_id)}>{owner.externalOrganisation ?? owner.actor.name}</Link>
+                    </span>
+                  ))}
+                </span>
+              )}
             </Text>
           )}
         </div>
@@ -168,12 +189,18 @@ function NeighbourList({ neighbours, hubId, elementHref, diffById }: { neighbour
   return (
     <ul className={styles.neighbours}>
       {neighbours.map((neighbour) => {
-        const external = attributesRecord(neighbour.element.attributes).isExternal === true;
+        const neighbourAttrs = attributesRecord(neighbour.element.attributes);
+        const external = neighbourAttrs.isExternal === true;
+        // S1 item 11a: an actor can now reach here (a `uses` edge, not
+        // just `owns`) — its own subtype glyph (person/team/organisation),
+        // not the bare fallback `LandscapeCanvas.tsx`/`LandscapeMobileList.tsx`
+        // both already avoid the same way.
+        const actorSubtype = neighbour.element.element_type === 'actor' && typeof neighbourAttrs.subtype === 'string' ? (neighbourAttrs.subtype as ActorSubtype) : undefined;
         const neighbourDiff = diffById?.get(neighbour.element.element_id);
         return (
           <li key={neighbour.element.element_id} className={styles.neighbour}>
             <div className={styles.neighbourTitle}>
-              <ElementTypeGlyph type={neighbour.element.element_type} external={external} />
+              <ElementTypeGlyph type={neighbour.element.element_type} external={external} {...(actorSubtype !== undefined ? { actorSubtype } : {})} />
               <Link to={elementHref(neighbour.element.element_id)}>
                 <Text as="span">{neighbour.element.name}</Text>
               </Link>

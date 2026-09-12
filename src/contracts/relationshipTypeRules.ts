@@ -48,6 +48,15 @@ export const RELATIONSHIP_TYPE_RULES: readonly RelationshipTypeRule[] = [
   { relationshipType: 'uses', fromType: 'component', toType: 'component', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'uses', fromType: 'container', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'uses', fromType: 'component', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  // S1 item 11a: an actor (a person, team, or external organisation) can
+  // use a system or container directly — "Ofgem uses the reporting
+  // system" is a `uses` edge, not an `owns` one; `owns` stays reserved for
+  // actual ownership. Engine validation for the new "external actor" rule
+  // this item also adds (C20, delta.ts) lives on `owns` only — a `uses`
+  // edge from an external actor needs no extra check beyond this triple
+  // being legal at all.
+  { relationshipType: 'uses', fromType: 'actor', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  { relationshipType: 'uses', fromType: 'actor', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'owns', fromType: 'actor', toType: 'capability', maxPerFrom: null, maxPrimaryPerTo: 1, maxPrimaryPerFrom: null },
   { relationshipType: 'owns', fromType: 'actor', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: 1, maxPrimaryPerFrom: null },
   { relationshipType: 'flows_to', fromType: 'system', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },

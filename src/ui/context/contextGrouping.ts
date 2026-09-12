@@ -51,6 +51,9 @@ export interface ContextSupport {
 export interface ContextOwner {
   actor: ElementsHeadRow;
   role: string;
+  /** S1 item 11a: "external actors outside the enterprise boundary" — owners have no drawn edge to sit `internal`/`external` of a ring the way a `uses`/`flows_to` neighbour does, so this is `ContextView.tsx`'s own hook for splitting "Owned by" into two sub-groups instead. `externalOrganisation`, when set, names which one. */
+  isExternal: boolean;
+  externalOrganisation: string | null;
 }
 
 export interface ContextGroup {
@@ -146,7 +149,10 @@ export function computeContextGroup(hub: ElementsHeadRow, relationships: readonl
   const owners: ContextOwner[] = ownerEntries
     .map(({ actorId, role }): ContextOwner | null => {
       const actor = elementsById.get(actorId);
-      return actor ? { actor, role } : null; // named by a relationship but not resolved: same "never render for data that isn't there" stance as internal/external above.
+      if (!actor) return null; // named by a relationship but not resolved: same "never render for data that isn't there" stance as internal/external above.
+      const actorAttrs = attributesRecord(actor.attributes);
+      const externalOrganisation = typeof actorAttrs.externalOrganisation === 'string' ? actorAttrs.externalOrganisation : null;
+      return { actor, role, isExternal: isExternal(actor), externalOrganisation };
     })
     .filter((o): o is ContextOwner => o !== null)
     .sort((a, b) => a.role.localeCompare(b.role) || byNameThenId(a.actor, b.actor));

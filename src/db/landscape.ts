@@ -97,9 +97,15 @@ export async function listActorsForLandscape(supabase: Client, commitId: UUID): 
  * `(commit_id, relationship_id)` (this table's primary key) makes that a
  * unique, stable pagination order.
  */
-export async function listLandscapeEdges(supabase: Client, commitId: UUID, systemIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
+export async function listLandscapeEdges(supabase: Client, commitId: UUID, systemIds: readonly UUID[], actorIds: readonly UUID[] = []): Promise<RelationshipsHeadRow[]> {
   if (systemIds.length === 0) return [];
-  const ids = new Set(systemIds);
+  // S1 item 11a: an actor can now be a `uses` edge's own `from` endpoint
+  // ("Ofgem uses the reporting system") — `actorIds` widens the endpoint
+  // set this filters against so that edge isn't silently dropped the way
+  // a systems-only set would drop it. Still gated on `systemIds` being
+  // non-empty above: with no systems on this landscape at all, there is
+  // nothing an actor's edge could connect to that this view would ever draw.
+  const ids = new Set([...systemIds, ...actorIds]);
   const query = supabase
     .from('relationships_head')
     .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })

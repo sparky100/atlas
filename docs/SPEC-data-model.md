@@ -211,6 +211,8 @@ Primary key `(relationship_type, from_type, to_type)`. No `org_id`; product cont
 | uses | component | component | | | |
 | uses | container | system | | | |
 | uses | component | container | | | |
+| uses | actor | system | | | |
+| uses | actor | container | | | |
 | owns | actor | capability | | 1 | |
 | owns | actor | system | | 1 | |
 | flows_to | system | system | | | |
@@ -229,6 +231,17 @@ element's id with no type check, and the existing partial unique index
 (`relationships_head_one_primary_supports_per_system`, keyed on
 `(commit_id, from_element_id)` with no type restriction) already covers a
 container anchor too — no new migration.
+
+**Amended (S1 item 11a, external actors).** Two new rows, `(uses, actor,
+system)` and `(uses, actor, container)` — an actor (a person, team, or
+external organisation) can now `uses` a system or container directly
+("Ofgem uses the reporting system"), not only `owns` one. No cardinality
+cap, same as every other `uses` row; no `flows_to` row for an actor
+endpoint — that relationship stays System/Container-to-System/Container
+only. See ADR-001's own amendment for the full picture (the new `owns`
+constraint this item also adds, C20, is unrelated to this table — it
+constrains an existing `(owns, actor, *)` row's own attribute value, not
+which triples are legal at all).
 
 ### 3.4 History
 
@@ -742,7 +755,7 @@ Kinds:
 
 ### 5.2 Invariants
 
-`COMMIT_INVARIANTS` in `delta.ts` is the list (C1–C17). They are checked in this order, and the first failure rejects the whole commit:
+`COMMIT_INVARIANTS` in `delta.ts` is the list (C1–C20 as of S1 item 11a's own C20 — this list was already stale at C1–C17 before that, having missed C18/C19; corrected here rather than left to drift further). They are checked in this order, and the first failure rejects the whole commit:
 
 1. Shape: C1, C2, C3, C14.
 2. Intra-commit: C4.

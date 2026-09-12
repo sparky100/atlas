@@ -144,9 +144,9 @@ export function projectionContainersForLandscape(projection: HeadProjection): El
   return projection.elementsHead.filter((e) => e.element_type === 'container').sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Mirrors src/db/landscape.ts's `listLandscapeEdges` — both endpoints in `systemIds`. */
-export function projectionLandscapeEdges(projection: HeadProjection, systemIds: readonly UUID[]): RelationshipsHeadRow[] {
-  const ids = new Set(systemIds);
+/** Mirrors src/db/landscape.ts's `listLandscapeEdges` — both endpoints in `systemIds` ∪ `actorIds` (S1 item 11a: an actor can be a `uses` edge's own `from` endpoint). */
+export function projectionLandscapeEdges(projection: HeadProjection, systemIds: readonly UUID[], actorIds: readonly UUID[] = []): RelationshipsHeadRow[] {
+  const ids = new Set([...systemIds, ...actorIds]);
   return projection.relationshipsHead.filter((r) => (r.relationship_type === 'uses' || r.relationship_type === 'flows_to') && ids.has(r.from_element_id) && ids.has(r.to_element_id));
 }
 
