@@ -53,7 +53,7 @@ test('architect door: recent commits show a real author, a precise time, a diff 
   // The org's creator is its owner, so the default door is already
   // architect (architect-door-health-findings.spec.ts's own comment).
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
-  await expect(page.getByRole('heading', { name: 'Recent commits' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recent activity' })).toBeVisible();
 
   const commitRow = page.locator('li', { hasText: 'Add system Grid Sensor Array' });
   await expect(commitRow).toBeVisible();

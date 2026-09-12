@@ -46,13 +46,15 @@ test('a flow between an IT and an OT system is listed as a boundary crossing, an
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByRole('link', { name: /PLC Controller/ })).toBeVisible();
 
-  // 2. "Boundary crossings" — reachable from the architect door, lists
-  // this exact edge. The home page's own count-and-link block is checked
-  // by presence/navigation only (its count is two adjacent `<Text>` spans
-  // concatenated with no separator, not a single stable string to assert
-  // on) — the list page below is the real content check.
+  // 2. "Boundary crossings" — reachable from the architect door (S1 item 6:
+  // its own count-and-link block now lives inside the "Health findings"
+  // panel, not a standalone panel/heading of its own), lists this exact
+  // edge. The home page's own count-and-link block is checked by presence/
+  // navigation only (its count is two adjacent `<Text>` spans concatenated
+  // with no separator, not a single stable string to assert on) — the list
+  // page below is the real content check.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
-  await expect(page.getByRole('heading', { name: 'Boundary crossings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Health findings' })).toBeVisible();
   await page.getByRole('link', { name: 'View all →' }).click();
   await expect(page.getByRole('heading', { name: 'Boundary crossings' })).toBeVisible();
   await expect(page.getByText('Billing Platform → PLC Controller')).toBeVisible();

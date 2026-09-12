@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import { Link } from 'react-router';
 import { BlueprintFrame } from '../components/BlueprintFrame/BlueprintFrame';
 import { Chip } from '../components/Chip/Chip';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { HealthFinding, type HealthFindingItem } from '../components/HealthFinding/HealthFinding';
 import { Panel } from '../components/Panel/Panel';
@@ -11,6 +12,7 @@ import { monthsSince } from '../../contracts/thresholds';
 import type { BoundaryCrossing, UnlabeledVerbRelationship } from '../../db/healthFindings';
 import { branchStatusTone } from '../changes/branchStatus';
 import { formatCommitActivityTime } from './commitActivityTime';
+import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
 import type { ArchitectHomeData, RecentCommitRow } from './useArchitectHome';
 import styles from './DoorHome.module.css';
 
@@ -52,28 +54,36 @@ function boundaryCrossingItems(crossings: readonly BoundaryCrossing[]): HealthFi
  * architect-door amendment for Health findings —
  * `docs/HANDOFF-7d-architect-door.md`; still scoped down from §3.2's full
  * three-column dashboard otherwise, see `useArchitectHome.ts`'s own
- * comment for exactly what's deferred). Recent commits on main; the
- * review queue's count and oldest item; the signed-in user's own open
- * branches; a "Boundary crossings" count-and-link block (Prompt 7k item 3,
- * same shape as the Review queue block — the full list lives at
- * `BoundaryCrossingsPage.tsx`); a growing set of Health findings (systems
- * with no capability, capabilities with no owner, stale attributes,
- * `uses`/`flows_to` relationships with no verb-phrase label (Sprint U4-1
- * B5), systems without a technical/business owner and critical-system
- * findings (Prompt 7k items 1-2), boundary crossings missing a
- * classification or verb (Prompt 7k item 3), duplicates — the last still
- * wired to 0 until Q1, ADR-019); a separate "Assurance" panel groups
- * Prompt 7k item 5's own three regulatory-alignment findings (essential-
- * function systems with no technical owner, boundary crossings missing a
- * data classification, critical systems near vendor support end), each
- * rendered through `HealthFinding`
- * (Sprint U4-1 B3: collapsed row → expand, paginated at 20, a link into
- * the browse table pre-filtered to the finding where one applies) — each
- * panel collapsing to its own "No findings" line when every finding it
- * groups is zero at once (the two panels gate independently, not as one
- * combined zero-check). Jumping to Changes or the review queue generically is the
- * persistent model nav's job now (ModelNav.tsx) — this used to also carry
- * its own "Start a change"/"Open the queue" links before that existed.
+ * comment for exactly what's deferred).
+ *
+ * S1 item 6: "Architect door order: review queue, health findings
+ * (boundary crossings and Assurance inside), my changes, recent
+ * activity." Boundary crossings' own count-and-link block (Prompt 7k
+ * item 3, the full list still lives at `BoundaryCrossingsPage.tsx`) and
+ * the Assurance sub-group (Prompt 7k item 5's three regulatory-alignment
+ * findings) now render *inside* the one "Health findings" panel, in that
+ * order, rather than as three separate side-by-side panels each gating
+ * "No findings" independently. "Recent commits" is renamed "Recent
+ * activity" and moved after "My changes" — see `groupRecentActivity.ts`
+ * for the "five items, others' activity preferred, runs on one subject
+ * collapsed" behaviour that panel now has.
+ *
+ * The two-column layout itself (`.main`/`.side`, `DoorHome.module.css`)
+ * is unchanged, but which content each div holds has swapped: the first
+ * div (2fr, wider) now holds Review queue + Health findings; the second
+ * (1fr) holds My changes + Recent activity. Below the 768px breakpoint
+ * the grid collapses to one column with no `order` overrides anywhere, so
+ * this is also what makes the *mobile* stacking order match the prompt's
+ * own sequence exactly — the actual reason this swap was worth making,
+ * not just a cosmetic desktop rearrangement.
+ *
+ * Every finding is still rendered through `HealthFinding` (Sprint U4-1
+ * B3: collapsed row → expand, paginated at 20, a link into the browse
+ * table pre-filtered to the finding where one applies) — see item 7
+ * (issue not yet filed at the time of writing) for "zero-count findings
+ * collapse to one line," not built here; each of the two zero-gates below
+ * still renders its own plain "No findings" paragraph per finding group,
+ * unchanged from before this item.
  */
 export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) {
   const now = new Date();
@@ -105,91 +115,74 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
     data.boundaryCrossingsMissingClassificationOrVerb.length === 0 &&
     data.unusedIntegrationPlatforms.length === 0;
 
-  // Prompt 7k item 5: a separate Panel, own zero-gate — "the architect
-  // door groups these three under 'Assurance'" (the prompt's own wording),
-  // not folded into the Health findings panel's own all-zero gate above.
+  // Prompt 7k item 5: its own zero-gate, independent of `allFindingsZero`
+  // above — "the architect door groups these three under 'Assurance'"
+  // (the prompt's own wording) still means its own "No findings" line,
+  // now inside the same Health findings Panel rather than a separate one
+  // (S1 item 6: "health findings (boundary crossings and Assurance
+  // inside)").
   const allAssuranceFindingsZero =
     data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length === 0 &&
     data.boundaryCrossingsMissingClassification.length === 0 &&
     data.criticalSystemsPastOrNearSupportEnd.length === 0;
 
+  const { shown: shownActivity, rest: restActivity } = selectRecentActivity(data.recentCommits, 5);
+
+  function activityRow(group: GroupedActivityItem) {
+    const { latest, count, subject } = group;
+    const diffHref = commitDiffHref(latest.commit);
+    // A real, ungrouped commit keeps its own title; a collapsed run gets
+    // the synthetic "N edits to X" summary the prompt's own example names
+    // ("3 edits to Dynamics") — never both, and never a "1 edit to X" for
+    // a group of one (`count > 1` is the only condition that matters here,
+    // `subject` is already guaranteed non-null whenever `count > 1` —
+    // `groupRecentActivity.ts`'s own collapsing rule).
+    const title = count > 1 && subject ? `${String(count)} edits to ${subject.name}` : latest.commit.title;
+    return (
+      <li key={group.key} className={styles.commitRow}>
+        <div className={styles.commitMain}>
+          {diffHref && count === 1 ? (
+            <Link to={diffHref}>
+              <Text as="span" size="sm">
+                {title}
+              </Text>
+            </Link>
+          ) : (
+            <Text as="span" size="sm">
+              {title}
+            </Text>
+          )}
+          {count === 1 && latest.subjects.length > 0 && (
+            <Text as="p" tone="faint" size="xs">
+              {latest.subjects.map((s, index) => (
+                <Fragment key={s.elementId}>
+                  {index > 0 && ', '}
+                  <Link to={elementHref(s.elementId)}>{s.name}</Link>
+                </Fragment>
+              ))}
+            </Text>
+          )}
+          {count > 1 && subject && (
+            <Text as="p" tone="faint" size="xs">
+              <Link to={elementHref(subject.elementId)}>{subject.name}</Link>
+            </Text>
+          )}
+        </div>
+        <div className={styles.commitMeta}>
+          <Text as="span" tone="muted" size="sm">
+            {latest.authorDisplay}
+          </Text>
+          <Text as="span" tone="faint" size="sm">
+            {formatCommitActivityTime(latest.commit.created_at, now)}
+          </Text>
+        </div>
+      </li>
+    );
+  }
+
   return (
     <div className={styles.columns}>
       <div className={styles.main}>
-        <Panel>
-          <Text as="h2" size="lg">
-            Recent commits
-          </Text>
-          {data.recentCommits.length === 0 ? (
-            <EmptyState>No commits on main yet.</EmptyState>
-          ) : (
-            <ul className={styles.commitList}>
-              {data.recentCommits.map(({ commit, authorDisplay, subjects }) => {
-                const diffHref = commitDiffHref(commit);
-                return (
-                  <li key={commit.id} className={styles.commitRow}>
-                    <div className={styles.commitMain}>
-                      {diffHref ? (
-                        <Link to={diffHref}>
-                          <Text as="span" size="sm">
-                            {commit.title}
-                          </Text>
-                        </Link>
-                      ) : (
-                        <Text as="span" size="sm">
-                          {commit.title}
-                        </Text>
-                      )}
-                      {subjects.length > 0 && (
-                        <Text as="p" tone="faint" size="xs">
-                          {subjects.map((subject, index) => (
-                            <Fragment key={subject.elementId}>
-                              {index > 0 && ', '}
-                              <Link to={elementHref(subject.elementId)}>{subject.name}</Link>
-                            </Fragment>
-                          ))}
-                        </Text>
-                      )}
-                    </div>
-                    <div className={styles.commitMeta}>
-                      <Text as="span" tone="muted" size="sm">
-                        {authorDisplay}
-                      </Text>
-                      <Text as="span" tone="faint" size="sm">
-                        {formatCommitActivityTime(commit.created_at, now)}
-                      </Text>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Panel>
-
-        <Panel>
-          <Text as="h2" size="lg">
-            My changes
-          </Text>
-          {data.myOpenBranches.length === 0 ? (
-            <EmptyState>No open changes of your own right now.</EmptyState>
-          ) : (
-            <ul className={styles.branchList}>
-              {data.myOpenBranches.map((branch) => (
-                <li key={branch.id} className={styles.branchRow}>
-                  <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`}>
-                    <Text as="span" size="sm">
-                      {branch.title ?? branch.name}
-                    </Text>
-                  </Link>
-                  <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-      </div>
-
-      <div className={styles.side}>
         <Panel>
           <Text as="h2" size="lg">
             Review queue
@@ -213,8 +206,14 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
 
         <Panel>
           <Text as="h2" size="lg">
-            Boundary crossings
+            Health findings
           </Text>
+
+          {/* Prompt 7k item 3's own count-and-link block — every IT/OT
+              crossing, not just the ones a finding below flags as missing
+              metadata; the full list still lives at BoundaryCrossingsPage.tsx.
+              S1 item 6 moves this from its own standalone panel to inside
+              Health findings, first. */}
           <div className={styles.count}>
             <Text as="span" size="2xl">
               {data.boundaryCrossingsCount}
@@ -228,12 +227,7 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
               View all →
             </Text>
           </Link>
-        </Panel>
 
-        <Panel>
-          <Text as="h2" size="lg">
-            Health findings
-          </Text>
           {allFindingsZero ? (
             <Text as="p" tone="muted">
               No findings.
@@ -323,10 +317,14 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
               </div>
             </div>
           )}
-        </Panel>
 
-        <Panel>
-          <Text as="h2" size="lg">
+          {/* S1 item 6: "Assurance inside" — Prompt 7k item 5's own three
+              regulatory-alignment findings, still gated by their own
+              independent zero-check (a clean Health findings panel above
+              says nothing about whether Assurance also has nothing to
+              show, and vice versa), now a subsection of this one panel
+              rather than a standalone Panel of its own. */}
+          <Text as="h3" size="md">
             Assurance
           </Text>
           {allAssuranceFindingsZero ? (
@@ -358,6 +356,48 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
                 />
               </div>
             </div>
+          )}
+        </Panel>
+      </div>
+
+      <div className={styles.side}>
+        <Panel>
+          <Text as="h2" size="lg">
+            My changes
+          </Text>
+          {data.myOpenBranches.length === 0 ? (
+            <EmptyState>No open changes of your own right now.</EmptyState>
+          ) : (
+            <ul className={styles.branchList}>
+              {data.myOpenBranches.map((branch) => (
+                <li key={branch.id} className={styles.branchRow}>
+                  <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`}>
+                    <Text as="span" size="sm">
+                      {branch.title ?? branch.name}
+                    </Text>
+                  </Link>
+                  <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel>
+          <Text as="h2" size="lg">
+            Recent activity
+          </Text>
+          {data.recentCommits.length === 0 ? (
+            <EmptyState>No commits on main yet.</EmptyState>
+          ) : (
+            <>
+              <ul className={styles.commitList}>{shownActivity.map(activityRow)}</ul>
+              {restActivity.length > 0 && (
+                <CollapsibleSection title="View all" meta={`(${String(restActivity.length)} more)`} defaultOpen={false}>
+                  <ul className={styles.commitList}>{restActivity.map(activityRow)}</ul>
+                </CollapsibleSection>
+              )}
+            </>
           )}
         </Panel>
       </div>

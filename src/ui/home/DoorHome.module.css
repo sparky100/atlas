@@ -59,6 +59,11 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  /* S1 item 6 moved this list into the narrower `.side` column (it used to
+     live in the wide `.main` one) — an unshrinkable `.commitMeta` (a long
+     author display plus a timestamp) could otherwise squeeze `.commitMain`
+     down to zero width instead of just wrapping to its own line. */
+  flex-wrap: wrap;
 }
 
 .commitMain {
@@ -66,6 +71,9 @@
   flex-direction: column;
   gap: var(--space-1);
   min-width: 0;
+  /* A real minimum so a long, unshrinkable `.commitMeta` wraps to its own
+     line (via the `flex-wrap` above) rather than collapsing this to 0. */
+  flex: 1 1 180px;
 }
 
 .commitMeta {

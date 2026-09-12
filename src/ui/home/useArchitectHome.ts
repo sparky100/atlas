@@ -35,13 +35,15 @@ import type { BranchRow, MergeRequestRow, ProfileRow } from '../../db/types';
 import { envelopeSubjects } from '../../engine/describeEnvelope';
 import { supabase } from '../supabaseClient';
 
-/** One "Recent commits" row's own extras beyond the bare `CommitRow` — author display and named subjects, both resolved in a batch across every shown commit rather than per-row (Sprint U4-1 B2). */
+/** One "Recent activity" row's own extras beyond the bare `CommitRow` — author display and named subjects, both resolved in a batch across every shown commit rather than per-row (Sprint U4-1 B2). */
 export interface RecentCommitRow {
   commit: CommitRow;
   /** `atlas.profiles.display_name`, falling back to `handle`, then the bare author id — same fallback chain `useDirectorHome.ts`'s `VersionStamp.authorDisplay` already uses for a tag's author. */
   authorDisplay: string;
   /** This commit's own named subjects (`envelopeSubjects`), resolved to their current name — empty for a relationship.update/retract/restore-only commit (no endpoint ids to resolve, `describeEnvelope.ts`'s own module comment) or one whose subjects no longer exist at main's current head. */
   subjects: { elementId: UUID; name: string }[];
+  /** S1 item 6: "others' activity preferred" — whether the signed-in viewer is this commit's own author, computed here (where `userId` is already in scope) rather than threading `userId` into the presentation component just to re-derive it. */
+  isOwn: boolean;
 }
 
 export interface ArchitectHomeData {
@@ -110,7 +112,13 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
       }
 
       const [commits, reviewQueue, changeBranches, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints] = await Promise.all([
-        listRecentCommits(supabase, main.id, 10),
+        // S1 item 6: "recent activity" now groups consecutive same-subject
+        // commits into one line and prefers others' activity when trimming
+        // to five displayed items (groupRecentActivity.ts) — both can
+        // shrink an already-small raw list well below five, so this fetches
+        // more raw commits than are ever shown at once, the same way it
+        // always fetched more than "Oldest" alone needed.
+        listRecentCommits(supabase, main.id, 30),
         listOpenMergeRequestsForModel(supabase, modelId),
         listChangeBranches(supabase, modelId),
         listCapabilitiesForMap(supabase, main.head_commit_id),
@@ -156,7 +164,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             return element ? { elementId, name: element.name } : null;
           })
           .filter((s): s is { elementId: UUID; name: string } => s !== null);
-        return { commit, authorDisplay, subjects };
+        return { commit, authorDisplay, subjects, isOwn: commit.author_id === userId };
       });
 
       if (!cancelled) {
