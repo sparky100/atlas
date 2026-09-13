@@ -201,15 +201,47 @@ function packRow(units: readonly DiagramUnitInput[], top: number, availableWidth
 }
 
 /**
+ * Bug fix: a module's own pitch (`MODULE_WIDTH` + `MODULE_GUTTER_X` = 80px)
+ * is much narrower than a neighbour tile's own width (`NODE_WIDTH` = 160px)
+ * — two adjacent modules, each with its own attached neighbour, centred
+ * naively under their own module would overlap by up to half a tile's
+ * width, exactly the reported bug ("two neighbours render in the same box
+ * and their labels concatenate"). This resolves every column's *desired*
+ * centre (its own module's centre) against every other column's own
+ * `NODE_WIDTH`-wide footprint, left to right: sorted by desired centre, each
+ * column is pushed only as far right as it needs to clear the previous
+ * column's own tile plus a normal gutter, never further — a column with
+ * room to spare still sits exactly under its own module, and relative
+ * left-to-right order is always preserved (this only ever pushes right,
+ * never re-orders or pushes left), keeping the result deterministic
+ * (CLAUDE.md rule 6).
+ */
+function resolveColumnCentres(desired: readonly { moduleId: UUID; centreX: number }[]): Map<UUID, number> {
+  const sorted = [...desired].sort((a, b) => a.centreX - b.centreX);
+  const resolved = new Map<UUID, number>();
+  let previousRightEdge = -Infinity;
+  for (const { moduleId, centreX } of sorted) {
+    const actualCentreX = previousRightEdge === -Infinity ? centreX : Math.max(centreX, previousRightEdge + TILE_GUTTER_X + NODE_WIDTH / 2);
+    resolved.set(moduleId, actualCentreX);
+    previousRightEdge = actualCentreX + NODE_WIDTH / 2;
+  }
+  return resolved;
+}
+
+/**
  * V1 polish, "neighbour columns spaced beneath the module they connect to,
  * edges never crossing tiles": when the hub is a platform with modules, a
  * neighbour that names one of those modules on every one of its edges
  * (`unit.attachedToModuleId`) is placed in its own column, centred directly
- * under that module — stacked vertically with any other neighbour sharing
- * the same module, in module x-order — rather than packed into a generic
- * wrapped row. Since the module sits directly above, the edge between them
- * (`curveBetween`, `ContextDiagramCanvas.tsx`) is a straight vertical run
- * through open space, never crossing another tile.
+ * under that module (`resolveColumnCentres` above resolves any two columns
+ * that would otherwise collide) — stacked vertically with any other
+ * neighbour sharing the same module, in module x-order — rather than packed
+ * into a generic wrapped row. Since the module sits directly above (usually
+ * at the same x — `resolveColumnCentres` only ever shifts a column when two
+ * modules truly sit too close together to give each its own untouched
+ * tile-width), the edge between them (`curveBetween`, `ContextDiagramCanvas.tsx`)
+ * is a straight (or, when shifted, gently curved) vertical run through open
+ * space, never crossing another tile.
  *
  * A neighbour with no such single module (an ordinary, non-platform hub —
  * every neighbour is unattached then — or a genuine edge straight to the
@@ -236,12 +268,14 @@ function layoutNeighbourBand(units: readonly DiagramUnitInput[], hubModules: rea
     }
   }
 
+  const columnModules = hubModules.filter((m) => (byModule.get(m.elementId)?.length ?? 0) > 0);
+  const resolvedCentres = resolveColumnCentres(columnModules.map((m) => ({ moduleId: m.elementId, centreX: m.x + m.w / 2 })));
+
   const tiles: DiagramTile[] = [];
   let columnsHeight = 0;
-  for (const module of hubModules) {
+  for (const module of columnModules) {
     const columnUnits = [...(byModule.get(module.elementId) ?? [])].sort(byElementId);
-    if (columnUnits.length === 0) continue;
-    const centreX = module.x + module.w / 2;
+    const centreX = resolvedCentres.get(module.elementId) ?? module.x + module.w / 2;
     columnUnits.forEach((unit, i) => {
       tiles.push({ elementId: unit.elementId, x: centreX - NODE_WIDTH / 2, y: top + i * (NODE_HEIGHT + TILE_GUTTER_Y), w: NODE_WIDTH, h: NODE_HEIGHT });
     });
@@ -295,12 +329,23 @@ export function computeContextDiagramLayout(
     y += externalRow.height;
   }
 
+  // Bug fix, `resolveColumnCentres`'s own comment: a column only ever gets
+  // pushed *right* of its module's own centre, never left — so `width`
+  // (fixed above, before either neighbour band was laid out) can, in a
+  // dense case (several adjacent modules each with their own attached
+  // neighbour), no longer be wide enough to keep every resolved column
+  // inside the boundary. Widened here, after the fact, rather than
+  // threaded back through the whole layout — nothing already placed
+  // (the hub, its modules, every tile computed above) needs to move.
+  const rightmostTileEdge = Math.max(hubTile.x + hubTile.w, ...internalRow.tiles.map((t) => t.x + t.w), ...externalRow.tiles.map((t) => t.x + t.w));
+  const finalWidth = Math.max(width, rightmostTileEdge + PADDING);
+
   return {
     hub: hubTile,
     internalNeighbours: internalRow.tiles,
     externalNeighbours: externalRow.tiles,
     boundary: { top: boundaryTop, bottom: boundaryBottom },
-    width,
+    width: finalWidth,
     height: y + PADDING,
   };
 }
