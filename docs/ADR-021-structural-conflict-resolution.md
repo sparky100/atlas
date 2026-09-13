@@ -243,7 +243,22 @@ resolved_conflicts:
     keep ours:   {winning: R_o's promoting delta, discarded: main's promoting delta, resolution: M's promote(R_o), 'primary'}
     keep theirs: {winning: main's promoting delta, discarded: R_o's promoting delta, resolution: P's reassign(R_o), 'primary'}
 ```
-For `supports` the reassigned value is always `'secondary'` — the one other state the type has. For `owns` there is no equivalent natural "next" role: `'business'`/`'technical'`/`'service'` aren't ordered, so "demote" doesn't name a single target value the way it does for `supports`. **Open sub-question, not resolved by this amendment** (Prompt 7k item 2 only changed the contract/cardinality `classifyMerge` and the engine check against; it did not build C2b): when C2b's builder is actually implemented, the loser's own reassignment target for an `owns` collision needs an explicit answer — retract the loser's edge outright (simplest, but loses the fact that someone *is* an owner of that target in some capacity, just not this one) versus prompting the reviewer for which role the loser becomes (more information-preserving, more UI surface). Decide this when `buildStructuralResolutions` (§5 item 2) is actually written, not silently here.
+For `supports` the reassigned value is always `'secondary'` — the one other state the type has. For `owns` there is no equivalent natural "next" role: `'business'`/`'technical'`/`'service'` aren't ordered, so "demote" doesn't name a single target value the way it does for `supports`.
+
+**Resolved when `buildStructuralResolutions` was actually written (13 September):** the loser's `owns` edge is retracted outright, not reassigned to one of the other two roles — simpler, needs no role-picker UI surface at this stage (card actions are §5 item 6, a separate, later step), and matches how a duplicate-relationship's loser is already handled (§4.2). Since `owns` has no neutral, always-legal "demoted" value the way `supports` has `'secondary'`, `P` retracts `R_o` outright rather than reassigning it — for *both* choices, since `R_o` staying live would block `X`'s replay of `R_t`'s promotion (C17) regardless of which side eventually wins:
+
+```
+P:  rretract(R_o)                         prev = R_o's own existsDeltaId          [C17 for the replay]
+M:  replay X   → R_t's promotion applies
+M own, if the reviewer keeps ours:
+    rretract(R_t)                         prev = R_t's own existsDeltaId (from the just-applied replay)
+    rrestore(R_o)                         prev = P's rretract(R_o)
+M own, if the reviewer keeps theirs: nothing — R_o stays retracted, R_t stands
+resolved_conflicts:
+    keep ours:   {winning: R_o's promoting delta, discarded: R_t's promoting delta, resolution: M's rrestore(R_o), 'primary'}
+    keep theirs: {winning: R_t's promoting delta, discarded: R_o's promoting delta, resolution: P's rretract(R_o), 'primary'}
+```
+`resolved_conflicts`' `rationale` stays `'primary'` for both types, for one shared card-action vocabulary — extending `owns` to a reassignment prompt later, if ever wanted, is additive (a new choice shape), not a breaking change to this one.
 
 When the pair is also a duplicate (§4.2), the survivor pick subsumes the primary/role pick: the loser is retracted, and `P` reassigns `R_o` only if the loser is `R_t` and `R_t`'s replay would otherwise throw — i.e. always, since `R_o` holds the colliding value on `O` at replay time.
 

@@ -243,7 +243,7 @@ export function classifyMerge(input: MergeClassifyInput, options: MergeClassifyO
   // or retracted the old one within its own commit history, so replaying
   // that side's exclusive commits in order demotes it before promoting the
   // new one, with no collision ever reaching `apply`.
-  const cardinalityCandidates = new Map<string, { side: 'ours' | 'theirs'; relationshipId: UUID }[]>();
+  const cardinalityCandidates = new Map<string, { side: 'ours' | 'theirs'; relationshipId: UUID; value: string }[]>();
   for (const f of fields) {
     if (f.attribute !== 'role' || (f.classification !== 'OURS' && f.classification !== 'THEIRS')) continue;
     const side: 'ours' | 'theirs' = f.classification === 'OURS' ? 'ours' : 'theirs';
@@ -252,31 +252,35 @@ export function classifyMerge(input: MergeClassifyInput, options: MergeClassifyO
     if (!rel) continue;
     const value = (side === 'ours' ? f.ours : f.theirs)?.value;
     let anchorElementId: UUID | undefined;
+    let candidateValue: string | undefined;
     if (rel.relationshipType === 'supports' && value === 'primary') {
       anchorElementId = rel.fromElementId;
+      candidateValue = value;
     } else if (rel.relationshipType === 'owns' && typeof value === 'string') {
       anchorElementId = rel.toElementId;
+      candidateValue = value;
     }
-    if (!anchorElementId) continue;
-    const key = `${rel.relationshipType}:${anchorElementId}:${String(value)}`;
+    if (!anchorElementId || candidateValue === undefined) continue;
+    const key = `${rel.relationshipType}:${anchorElementId}:${candidateValue}`;
+    const entry = { side, relationshipId: f.subjectId, value: candidateValue };
     const list = cardinalityCandidates.get(key);
-    if (list) list.push({ side, relationshipId: f.subjectId });
-    else cardinalityCandidates.set(key, [{ side, relationshipId: f.subjectId }]);
+    if (list) list.push(entry);
+    else cardinalityCandidates.set(key, [entry]);
   }
   for (const candidates of cardinalityCandidates.values()) {
-    const oursIds = candidates.filter((c) => c.side === 'ours').map((c) => c.relationshipId);
-    const theirsIds = candidates.filter((c) => c.side === 'theirs').map((c) => c.relationshipId);
-    for (const oid of oursIds) {
-      const orow = ours.relationships.get(oid);
+    const oursEntries = candidates.filter((c) => c.side === 'ours');
+    const theirsEntries = candidates.filter((c) => c.side === 'theirs');
+    for (const o of oursEntries) {
+      const orow = ours.relationships.get(o.relationshipId);
       if (!orow) continue;
-      for (const tid of theirsIds) {
-        if (oid === tid) continue;
-        const noun = orow.relationshipType === 'supports' ? 'a primary supports' : `an owns (${String(orow.attributes.role)})`;
+      for (const t of theirsEntries) {
+        if (o.relationshipId === t.relationshipId) continue;
+        const noun = orow.relationshipType === 'supports' ? 'a primary supports' : `an owns (${o.value})`;
         findings.push(
-          finding('structural:cardinality', true, oid, `both sides asserted ${noun} relationship on the same anchor`, { relatedSubjectId: tid }),
+          finding('structural:cardinality', true, o.relationshipId, `both sides asserted ${noun} relationship on the same anchor`, { relatedSubjectId: t.relationshipId }),
         );
-        blockingSubjects.add(oid);
-        blockingSubjects.add(tid);
+        blockingSubjects.add(o.relationshipId);
+        blockingSubjects.add(t.relationshipId);
       }
     }
   }
