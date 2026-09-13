@@ -473,7 +473,8 @@ export function factKeyOf(d: Delta): { subjectId: UUID; attribute: string } {
 // Commit envelope
 // ---------------------------------------------------------------------------
 
-export type CommitKind = 'genesis' | 'manual' | 'capture' | 'merge' | 'template_seed';
+/** `preparation` (ADR-021 §2a amendment 1, C2b): the first of up to two commits `atlas.refresh_branch` writes atomically on a change branch, immediately before the `merge` commit that follows it — never written directly by a client, same as `genesis`. See SPEC §5.1. */
+export type CommitKind = 'genesis' | 'manual' | 'capture' | 'merge' | 'template_seed' | 'preparation';
 
 /**
  * No `authorId` field (Sprint H1, docs/AUDIT-2026-09-U2.md §2.E.3 item 15):
@@ -539,7 +540,10 @@ export const COMMIT_INVARIANTS = [
   { id: 'C12', text: 'sourceId refers to a source in the same model. effectiveDate, if present, is not in the future.' },
   { id: 'C13', text: 'parentCommitId equals the branch head at the moment of insert (single-writer per branch).' },
   { id: 'C14', text: 'kind === "merge" iff mergedBranchHeadCommitId is non-null. A merge commit on main is created only by the merge procedure, never by a direct insert.' },
-  { id: 'C15', text: 'Merge commit: every fact key changed to different values on both sides since the merge base has exactly one delta in this commit (a resolution); no delta addresses a fact key that is not a field conflict.' },
+  {
+    id: 'C15',
+    text: "Merge commit: every fact key changed to different values on both sides since the merge base has exactly one delta in this commit (a resolution), plus — for a refresh resolving a blocking structural finding (ADR-021 §4, C2b) — the decision deltas the reviewer's choice derives (keep-retraction/keep-element cascade, duplicate-relationship survivor, cardinality primary/role pick); no delta addresses anything else. Every blocking structural finding needs a choice before a refresh can be pushed; a converged retraction is resolved automatically and never needs one.",
+  },
   { id: 'C16', text: 'The resulting head passes the validation level required for the branch kind: capture_draft → structural only; change → structural, schema advisory; main → structural and schema (SPEC §6.3).' },
   {
     id: 'C17',
@@ -556,6 +560,10 @@ export const COMMIT_INVARIANTS = [
   {
     id: 'C20',
     text: "relationship.create/relationship.update setting owns.role on an edge whose fromElementId is an actor with attributes.isExternal === true (in the resulting head): role must be 'service' (S1 item 11a) — an external actor (a regulator, a supplier) never holds business or technical ownership of something inside the enterprise, only a service relationship to it. Not re-checked at relationship.restore, matching C9's/C18's own convention (`src/engine/deltas.ts`'s doc comment on C18): a restored edge reconstructs exactly the state it last held, not re-validated against the current head.",
+  },
+  {
+    id: 'C21',
+    text: "a preparation-kind commit (ADR-021 §2a amendment 1/§6, C2b — numbered C21 rather than the ADR's original draft \"C18,\" which collided with the unrelated C18 above once this was actually built, ADR-021 §2a amendment 3) contains only the deltas ADR-021 §3.3's preparation table derives from the findings — restores of elements the branch retracted and main touched, retracts of the branch's own relationships to elements main retracted, demotions/retractions of the branch's primaries that main's primaries collide with — and no other commit kind may carry them. Written only by atlas.refresh_branch, immediately before the merge commit that follows it, sharing its merge_resolution source; never by a client directly, same restriction as genesis.",
   },
 ] as const;
 

@@ -353,7 +353,7 @@ describe('CommitEnvelope <-> commits+deltas rows round trip (RT-2, contract leve
   // `kind === 'merge'` iff `mergedBranchHeadCommitId` is non-null, and a
   // real 'merge' envelope needs a real second-parent id, not null.
   const kindAndMerge: fc.Arbitrary<{ kind: CommitKind; mergedBranchHeadCommitId: UUID | null }> = fc.oneof(
-    fc.constantFrom('manual' as const, 'capture' as const, 'template_seed' as const).map((kind) => ({ kind, mergedBranchHeadCommitId: null })),
+    fc.constantFrom('manual' as const, 'capture' as const, 'template_seed' as const, 'preparation' as const).map((kind) => ({ kind, mergedBranchHeadCommitId: null })),
     fc.uuid().map((mergedBranchHeadCommitId) => ({ kind: 'merge' as const, mergedBranchHeadCommitId })),
   );
 

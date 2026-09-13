@@ -1,0 +1,22 @@
+-- ADR-021 §2a amendment 1, §6 (C21), C2b: a refresh is "prepare, replay,
+-- decide" — up to two commits, the first (kind = 'preparation') carrying
+-- only the mechanical deltas that make main's replay applicable, written
+-- atomically with the following `merge` commit by a new RPC,
+-- atlas.refresh_branch (ADR-021 §5 item 5, not yet built). See
+-- src/contracts/delta.ts's CommitKind/C21 and SPEC-data-model.md §5.1.
+--
+-- This migration only adds the enum value. Postgres does not allow a new
+-- enum label to be referenced by name in the same transaction that adds it
+-- (ALTER TYPE ... ADD VALUE commits are visible only after the transaction
+-- commits) — hence this trivial migration, split from the one that uses
+-- 'preparation' as a real commit kind, same as
+-- 20260906210000_commit_kind_genesis.sql did for 'genesis'.
+--
+-- atlas.commit_deltas's own kind-restriction check (20260906140000) still
+-- rejects 'preparation' on a change branch at this point — deliberately:
+-- nothing should be able to write one until atlas.refresh_branch exists to
+-- gate it (kind, adjacency to the following merge commit, shared
+-- merge_resolution source, C21). That restriction is extended in the same
+-- migration that introduces refresh_branch, not here.
+
+alter type commit_kind add value 'preparation';
