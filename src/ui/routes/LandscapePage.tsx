@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -220,6 +220,17 @@ export function LandscapePage() {
     focusedElementId && state.status === 'ready'
       ? new Set(state.data.edges.flatMap((e) => (e.from_element_id === focusedElementId ? [e.to_element_id] : e.to_element_id === focusedElementId ? [e.from_element_id] : []))).size
       : 0;
+  // §8.8's canvas `f` shortcut — its first real binding (V2): open every
+  // facet's `<details>` in the filter bar and move focus to the first one.
+  const filterBarRef = useRef<HTMLDivElement>(null);
+  const openFilterBar = () => {
+    const container = filterBarRef.current;
+    if (!container) return;
+    container.querySelectorAll('details').forEach((details) => {
+      details.open = true;
+    });
+    container.querySelector('summary')?.focus();
+  };
 
   // Sprint U4-1 E1: see this component's own module comment.
   const narrow = useIsNarrowViewport(768);
@@ -456,15 +467,17 @@ export function LandscapePage() {
           )}
         </div>
 
-        {/* V2 "landscape focus and filters": desktop canvas only, same gate as colour-by/comments-only/route-via-platforms above (this plan's own PR3 grouping note: "gated on `showCanvas` like every other canvas-only control"). */}
+        {/* V2 "landscape focus and filters": desktop canvas only, same gate as colour-by/comments-only/route-via-platforms above (this plan's own PR3 grouping note: "gated on `showCanvas` like every other canvas-only control"). Wrapped in a plain ref'd div so the canvas's own `f` shortcut (§8.8) can open every facet's `<details>` and move focus there — the filter bar has no imperative API of its own, and doesn't need one just for this. */}
         {state.status === 'ready' && showCanvas && (
-          <LandscapeFilterBar
-            filters={filters}
-            capabilityOptions={capabilityOptions}
-            onChange={(next) => {
-              setSearchParams((prev) => landscapeFiltersToSearchParams(next, prev));
-            }}
-          />
+          <div ref={filterBarRef}>
+            <LandscapeFilterBar
+              filters={filters}
+              capabilityOptions={capabilityOptions}
+              onChange={(next) => {
+                setSearchParams((prev) => landscapeFiltersToSearchParams(next, prev));
+              }}
+            />
+          </div>
         )}
 
         {ref.kind === 'branch' && (
@@ -606,6 +619,7 @@ export function LandscapePage() {
                     setFocusedElementId(null);
                   }}
                   showConnections={showConnections}
+                  onOpenFilterBar={openFilterBar}
                   onCommentMarkerClick={(elementId) => {
                     setCommentsPanelElementId(elementId);
                     setAutoFocusComposer(false);

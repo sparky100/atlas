@@ -44,6 +44,8 @@ export interface LandscapeCanvasProps {
   /** `c`/`n` (UI-principles §8.8) act on whichever node is currently hovered — the canvas has no persistent "selected node" of its own yet (only hover and click-to-navigate), so the hovered node is the nearest existing stand-in for "the focused row". `c` with nothing hovered is a no-op the caller may still handle (e.g. closing an already-open panel). */
   onToggleCommentsPanel?: (elementId: UUID | null) => void;
   onNewCommentShortcut?: (elementId: UUID) => void;
+  /** §8.8's canvas key table: `f` — "Filter chips" is a real binding as of V2 (it was aspirational before). The canvas has no filter UI of its own (`LandscapeFilterBar.tsx` is a DOM sibling on `LandscapePage.tsx`), so this just asks the caller to open it. */
+  onOpenFilterBar?: () => void;
   /** M1 close-out item 1: "the per-session 'comments on this view' filter" — every node with no thread at all (`threadCounts` absent or `total === 0`) recedes to a low, diff-style alpha instead of being removed from the layout outright (removing nodes would change lane placement and edge routing for everything else on screen, which this is a read-only lens over, not a re-query). `false`/omitted draws every node at full opacity, same as before this item. */
   commentsOnlyFilter?: boolean | undefined;
   /**
@@ -340,6 +342,7 @@ export function LandscapeCanvas({
   onCommentMarkerClick,
   onToggleCommentsPanel,
   onNewCommentShortcut,
+  onOpenFilterBar,
   commentsOnlyFilter = false,
   colourBy = 'none',
   routeViaPlatforms = false,
@@ -1127,6 +1130,8 @@ export function LandscapeCanvas({
     // §8.8's global `c`/`n` — see this component's own `onToggleCommentsPanel`/`onNewCommentShortcut` prop comments for why the hovered node stands in for "the focused row" here.
     else if (e.key === 'c') onToggleCommentsPanel?.(hover?.elementId ?? null);
     else if (e.key === 'n' && hover) onNewCommentShortcut?.(hover.elementId);
+    // §8.8's own "Filter chips" row — its first real binding, V2.
+    else if (e.key === 'f') onOpenFilterBar?.();
     else if (e.key === 'Escape' && extraLanesPopover) setExtraLanesPopover(null);
     else if (e.key === 'Escape' && hoverReference) setHoverReference(null);
     // V2 decision 2: "Escape clears" focus — appended after the two

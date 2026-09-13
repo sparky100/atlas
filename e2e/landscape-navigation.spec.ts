@@ -117,6 +117,11 @@ test('selecting a system on the landscape zooms to its Context view and updates 
   const ty = Number(await wrapper.getAttribute('data-ty'));
   const screenX = (node.x + NODE_WIDTH / 2) * scale + tx;
   const screenY = (node.y + NODE_HEIGHT / 2) * scale + ty;
+  // V2 "landscape focus and filters", decision 2: the first click on an
+  // unfocused tile now focuses it rather than navigating — a second click
+  // on the *same*, already-focused tile is what navigates (today's exact
+  // pre-V2 behaviour, unchanged in that one case).
+  await canvas.click({ position: { x: screenX, y: screenY } });
   await canvas.click({ position: { x: screenX, y: screenY } });
 
   await expect(page).toHaveURL(new RegExp(`/context/${systemId}\\?ref=main`));

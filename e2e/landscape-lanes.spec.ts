@@ -139,7 +139,13 @@ test('a system supporting a level-2 capability and a level-1 capability appears 
   const scale = Number(await wrapper.getAttribute('data-scale'));
   const tx = Number(await wrapper.getAttribute('data-tx'));
   const ty = Number(await wrapper.getAttribute('data-ty'));
-  await canvas.click({ position: { x: (node.x + NODE_WIDTH / 2) * scale + tx, y: (node.y + NODE_HEIGHT / 2) * scale + ty } });
+  const position = { x: (node.x + NODE_WIDTH / 2) * scale + tx, y: (node.y + NODE_HEIGHT / 2) * scale + ty };
+  // V2 "landscape focus and filters", decision 2: the first click on an
+  // unfocused tile now focuses it rather than navigating — a second click
+  // on the *same*, already-focused tile is what navigates (today's exact
+  // pre-V2 behaviour, unchanged in that one case).
+  await canvas.click({ position });
+  await canvas.click({ position });
   await expect(page).toHaveURL(new RegExp(`/context/${systemId}\\?ref=main`));
   await expect(page.getByRole('heading', { name: 'Context' })).toBeVisible();
 });

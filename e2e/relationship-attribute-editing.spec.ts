@@ -190,7 +190,12 @@ test('promoting a secondary supports edge demotes the current primary in the sam
   const scaleBefore = Number(await wrapperBefore.getAttribute('data-scale'));
   const txBefore = Number(await wrapperBefore.getAttribute('data-tx'));
   const tyBefore = Number(await wrapperBefore.getAttribute('data-ty'));
-  await canvas.click({ position: { x: (beforeNode.x + NODE_WIDTH / 2) * scaleBefore + txBefore, y: (beforeNode.y + NODE_HEIGHT / 2) * scaleBefore + tyBefore } });
+  const beforePosition = { x: (beforeNode.x + NODE_WIDTH / 2) * scaleBefore + txBefore, y: (beforeNode.y + NODE_HEIGHT / 2) * scaleBefore + tyBefore };
+  // V2 "landscape focus and filters", decision 2: the first click on an
+  // unfocused tile now focuses it rather than navigating — a second click
+  // on the *same*, already-focused tile is what navigates.
+  await canvas.click({ position: beforePosition });
+  await canvas.click({ position: beforePosition });
   await expect(page).toHaveURL(new RegExp(`/context/${systemId}\\?ref=main`));
 
   // --- Promote Capability One to primary from the system's own element page. ---
@@ -225,6 +230,9 @@ test('promoting a secondary supports edge demotes the current primary in the sam
   const scaleAfter = Number(await wrapperAfter.getAttribute('data-scale'));
   const txAfter = Number(await wrapperAfter.getAttribute('data-tx'));
   const tyAfter = Number(await wrapperAfter.getAttribute('data-ty'));
-  await canvas.click({ position: { x: (afterNode.x + NODE_WIDTH / 2) * scaleAfter + txAfter, y: (afterNode.y + NODE_HEIGHT / 2) * scaleAfter + tyAfter } });
+  const afterPosition = { x: (afterNode.x + NODE_WIDTH / 2) * scaleAfter + txAfter, y: (afterNode.y + NODE_HEIGHT / 2) * scaleAfter + tyAfter };
+  // V2 decision 2: focus first, navigate on the second click of the same tile.
+  await canvas.click({ position: afterPosition });
+  await canvas.click({ position: afterPosition });
   await expect(page).toHaveURL(new RegExp(`/context/${systemId}\\?ref=main`));
 });
