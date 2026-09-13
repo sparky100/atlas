@@ -15,14 +15,15 @@ import { createChangeBranch, getMainBranch } from '../../db/branches';
 import type { MemberRole } from '../../db/types';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { formatDateTime } from '../time';
-import { canCancelChange } from '../orgs/useMembership';
+import { canApproveOrMergeRequest, canCancelChange } from '../orgs/useMembership';
 import { BranchRebasePanel } from '../reviews/BranchRebasePanel';
 import { supabase } from '../supabaseClient';
-import { dateFieldLabelForIntent, isDateRequiredForIntent } from './branchIntent';
+import { dateFieldLabelForIntent, intentReviewWeight, isDateRequiredForIntent } from './branchIntent';
 import { branchStatusTone } from './branchStatus';
 import { deriveChangeStep } from './changeStepper';
 import { describeDelta } from './changeSummaryFormat';
 import { Stepper } from './Stepper/Stepper';
+import { useApproveAndMerge } from './useApproveAndMerge';
 import { useCancelChange } from './useCancelChange';
 import { useChange } from './useChange';
 import { useChangeSummary } from './useChangeSummary';
@@ -87,8 +88,9 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   const [description, setDescription] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const navigate = useNavigate();
-  const { request: openRequest } = useOpenMergeRequest(branchId);
+  const { request: openRequest, reload: reloadOpenRequest } = useOpenMergeRequest(branchId);
   const submission = useSubmitForReview(modelId, branch);
+  const approveAndMergeState = useApproveAndMerge(modelId);
   const cancellation = useCancelChange(branch);
   const { ref, setRef, clearRef } = useSelectedRef();
   const [cancelling, setCancelling] = useState(false);
@@ -252,6 +254,32 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
                 Open review →
               </LinkButton>
             </div>
+          )}
+          {/* F0's resolved review-weight decision: record/correct get this
+              one-click shortcut alongside "Open review →" above — the same
+              atlas.approve_merge_request/atlas.merge_branch RPCs a reviewer
+              would otherwise click through on the review request's own
+              page, called in sequence from here instead. propose/explore
+              keep that page as their only path (ReviewQueueView.tsx's own
+              intent filter is what actually keeps them off the shared
+              queue list; this button simply never renders for them). */}
+          {openRequest && intentReviewWeight(intent) === 'single' && canApproveOrMergeRequest(role) && (openRequest.status === 'pending' || openRequest.status === 'approved') && (
+            <>
+              <Button
+                variant="primary"
+                disabled={approveAndMergeState.status === 'working'}
+                onClick={() => {
+                  void approveAndMergeState.approveAndMerge(openRequest, branch).then((merged) => {
+                    if (!merged) return;
+                    reload();
+                    reloadOpenRequest();
+                  });
+                }}
+              >
+                {approveAndMergeState.status === 'working' ? 'Merging…' : 'Approve & merge'}
+              </Button>
+              {approveAndMergeState.error !== null && <Text as="p">{approveAndMergeState.error}</Text>}
+            </>
           )}
         </Panel>
       )}
