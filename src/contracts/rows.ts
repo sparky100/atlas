@@ -424,3 +424,107 @@ export interface FactsRow {
   asserted_by: UUID;
   asserted_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// atlas.refresh_branch (ADR-021 §5 item 5, C2b) — "prepare, replay, decide"
+// (SPEC §7.5). Not a commit envelope of its own (an RPC call, not a stored
+// row) — but its jsonb params/return still cross the same wire boundary
+// this file's other mappings do, so it lives here rather than in the engine.
+// ---------------------------------------------------------------------------
+
+/** A delta shaped for an RPC's own jsonb array parameter: `DeltaRow` minus the columns the RPC itself derives — `commit_id`/`org_id`/`model_id` from its own other params, `seq` from array position, `created_by` from `auth.uid()`. Mirrors the reduction `src/db/commits.ts`'s `commitToBranch` already does inline for `atlas.commit_deltas`'s own `p_deltas`. */
+export type DeltaWireRow = Omit<DeltaRow, 'commit_id' | 'org_id' | 'model_id' | 'seq' | 'created_by'>;
+
+export function toDeltaWireRow(delta: Delta): DeltaWireRow {
+  const row = toDeltaRow(delta, { orgId: '', modelId: '', commitId: '', seq: 0, createdBy: '' });
+  return {
+    id: row.id,
+    kind: row.kind,
+    subject_type: row.subject_type,
+    subject_id: row.subject_id,
+    attribute: row.attribute,
+    element_type: row.element_type,
+    relationship_type: row.relationship_type,
+    name: row.name,
+    parent_id: row.parent_id,
+    from_element_id: row.from_element_id,
+    to_element_id: row.to_element_id,
+    value: row.value,
+    previous_delta_id: row.previous_delta_id,
+    source_id: row.source_id,
+    source_ref: row.source_ref,
+    effective_date: row.effective_date,
+    confidence: row.confidence,
+  };
+}
+
+/** One of the two commits `atlas.refresh_branch` writes — `{id, title, deltas}`, no `parentCommitId` (the RPC computes both commits' adjacency itself, C21 — see that migration's own comment on why there's nothing here for a client to get wrong). */
+export interface RefreshBranchCommitInput {
+  id: UUID;
+  title: string;
+  deltas: readonly Delta[];
+}
+
+/** One `resolved_conflicts` row, already snake_case (`atlas.commit_deltas`'s own `p_resolved_conflicts` shape — `src/db/commits.ts`'s `ResolvedConflictInput`, camelCased there, mapped the same way at its own call site). */
+export interface ResolvedConflictWireRow {
+  id: UUID;
+  winning_delta_id: UUID;
+  discarded_delta_id: UUID;
+  resolution_delta_id: UUID | null;
+  rationale: string | null;
+}
+
+export interface RefreshBranchInput {
+  branchId: UUID;
+  /** C13: the branch's own head at the moment this was staged. */
+  expectedHeadCommitId: UUID;
+  mainHeadCommitId: UUID;
+  /** Null when no structural finding needed one — the common case (ADR-021 §3.3: "`P` is empty for the large majority of refreshes and is then not written at all"). */
+  prepCommit: RefreshBranchCommitInput | null;
+  mergeCommit: RefreshBranchCommitInput;
+  resolvedConflicts: readonly ResolvedConflictWireRow[];
+}
+
+export interface RefreshBranchParams {
+  p_branch_id: UUID;
+  p_expected_head_commit_id: UUID;
+  p_main_head_commit_id: UUID;
+  p_prep_commit: { id: UUID; title: string; deltas: DeltaWireRow[] } | null;
+  p_merge_commit: { id: UUID; title: string; deltas: DeltaWireRow[] };
+  p_resolved_conflicts: ResolvedConflictWireRow[];
+}
+
+/** `RefreshBranchInput` → `atlas.refresh_branch`'s own RPC params. */
+export function toRefreshBranchParams(input: RefreshBranchInput): RefreshBranchParams {
+  return {
+    p_branch_id: input.branchId,
+    p_expected_head_commit_id: input.expectedHeadCommitId,
+    p_main_head_commit_id: input.mainHeadCommitId,
+    p_prep_commit: input.prepCommit
+      ? { id: input.prepCommit.id, title: input.prepCommit.title, deltas: input.prepCommit.deltas.map(toDeltaWireRow) }
+      : null,
+    p_merge_commit: { id: input.mergeCommit.id, title: input.mergeCommit.title, deltas: input.mergeCommit.deltas.map(toDeltaWireRow) },
+    p_resolved_conflicts: [...input.resolvedConflicts],
+  };
+}
+
+/** `atlas.refresh_branch`'s own jsonb return (ADR-021 §5 item 5) — a status, never a thrown error, for the one outcome every caller must handle without a try/catch: main advanced (or a concurrent refresh won) since `expectedHeadCommitId` was read. */
+export type RefreshBranchResult = { status: 'ok'; prepCommitId: UUID | null; mergeCommitId: UUID } | { status: 'stale_head' } | { status: 'invalid'; reason: string };
+
+interface RefreshBranchResultRow {
+  status: 'ok' | 'stale_head' | 'invalid';
+  prepCommitId?: UUID | null;
+  mergeCommitId?: UUID;
+  reason?: string;
+}
+
+/** The RPC's own jsonb row → `RefreshBranchResult`. Throws for a status-specific field the type requires but the row lacks — a malformed row is a bug in the RPC's own `jsonb_build_object` call, not something to silently paper over here. */
+export function fromRefreshBranchResult(row: RefreshBranchResultRow): RefreshBranchResult {
+  if (row.status === 'ok') {
+    if (row.mergeCommitId === undefined) throw new Error('fromRefreshBranchResult: status "ok" with no mergeCommitId');
+    return { status: 'ok', prepCommitId: row.prepCommitId ?? null, mergeCommitId: row.mergeCommitId };
+  }
+  if (row.status === 'stale_head') return { status: 'stale_head' };
+  if (row.reason === undefined) throw new Error('fromRefreshBranchResult: status "invalid" with no reason');
+  return { status: 'invalid', reason: row.reason };
+}
