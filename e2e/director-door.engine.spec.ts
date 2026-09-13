@@ -103,7 +103,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
   // The planned-replacement branch: creates a new system supporting
   // capInfo and retracts the old one, then goes all the way to approved
   // (in delivery, ADR-006) — exactly UI-principles §3.1's rule.
-  const replacementBranch = await createChangeBranch(signedIn, { id: randomUUID(), orgId, modelId, name: 'replace-legacy-case-system', createdBy: userId, mainHeadCommitId: mainAfterSeed.head_commit_id });
+  const replacementBranch = await createChangeBranch(signedIn, { id: randomUUID(), orgId, modelId, name: 'replace-legacy-case-system', createdBy: userId, intent: 'propose', mainHeadCommitId: mainAfterSeed.head_commit_id });
   const sysInfoNewId = randomUUID();
   const replacementResult = await commitToBranch(signedIn, {
     modelId,
@@ -159,7 +159,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
 
   // An open change with a target date, for "What's changing".
   const targetDate = '2026-12-01';
-  await createChangeBranch(signedIn, { id: randomUUID(), orgId, modelId, name: 'upcoming-change', title: 'Upcoming change', createdBy: userId, mainHeadCommitId: mainAfterAdvance.head_commit_id, targetDate });
+  await createChangeBranch(signedIn, { id: randomUUID(), orgId, modelId, name: 'upcoming-change', title: 'Upcoming change', createdBy: userId, intent: 'propose', mainHeadCommitId: mainAfterAdvance.head_commit_id, targetDate });
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // The org's creator is its owner, so the default door is architect —

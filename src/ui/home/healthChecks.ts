@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { HealthFindingItem } from '../components/HealthFinding/HealthFinding';
 
 /**
@@ -16,6 +17,8 @@ export interface HealthCheck {
   items: readonly HealthFindingItem[];
   browseHref?: string;
   browseLabel?: string;
+  /** Prompt pack F3 PR6: `HealthFinding`'s own new per-row action slot, passed straight through — see that component's own doc comment. */
+  itemAction?: (item: HealthFindingItem) => ReactNode;
 }
 
 export interface PartitionedHealthChecks {

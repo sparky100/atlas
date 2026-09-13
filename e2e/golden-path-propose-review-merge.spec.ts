@@ -58,6 +58,16 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   await expect(proposerPage.getByRole('heading', { name: 'Ledger Service' })).toBeVisible();
   await expect(proposerPage.getByRole('button', { name: '✎ Edit' })).toHaveCount(0);
   await proposerPage.getByRole('button', { name: 'Propose a change' }).click();
+  // Prompt pack F0: an element page's own toggle defaults to `correct`
+  // (`branchIntent.ts`'s `defaultIntentForEntryPoint('elementPage')`) — this
+  // golden path's own scenario (a separate reviewer, "requests changes"
+  // reopening the branch, an ordinary approve-then-merge on the shared
+  // queue) is a `propose` story, so it switches the toggle explicitly
+  // rather than accepting the default. A `record`/`correct` change never
+  // reaches the shared `/review` queue this test walks through below
+  // (`useReviewQueue.ts`'s own intent filter, PR3) — it merges in one click
+  // from its own page instead, a different scenario this file doesn't test.
+  await proposerPage.getByRole('button', { name: 'Propose a plan' }).click();
 
   const changeName = 'retire-ledger-vendor';
   await proposerPage.getByPlaceholder('Name (e.g. retire-northgate)').fill(changeName);

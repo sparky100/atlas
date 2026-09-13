@@ -10,10 +10,14 @@ import type { UUID } from '../../contracts/delta';
 import type { MemberRole } from '../../db/types';
 import { formatDate } from '../time';
 import { branchStatusTone } from '../changes/branchStatus';
+import { defaultIntentForEntryPoint } from '../changes/branchIntent';
+import type { BranchIntent } from '../../db/types';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { attributesRecord } from '../elements/attributesRecord';
+import { decisionPrefillToSearchParams, prefillFromWeakCapability } from '../decisions/decisionPrefill';
+import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { ProposeChangePicker } from './ProposeChangePicker';
-import { canCreateChangeBranch } from '../orgs/useMembership';
+import { canCreateChangeBranch, canStartDecision } from '../orgs/useMembership';
 import type { CapabilityTileData } from '../../db/modelHome';
 import type { DirectorHomeData } from './useDirectorHome';
 import styles from './DirectorHome.module.css';
@@ -43,7 +47,12 @@ export interface DirectorHomeProps {
  */
 export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSlug, modelSlug }: DirectorHomeProps) {
   const capabilityMapHref = `/o/${orgSlug}/m/${modelSlug}/capability-map`;
-  const [proposingChange, setProposingChange] = useState(false);
+  // Prompt pack F0: which entry point (if either) is currently open, and
+  // therefore which intent the picker it opens should default to —
+  // `null` means neither is open. A single piece of state rather than two
+  // booleans, since only one of "Propose a change"/"What happened" can be
+  // open at a time.
+  const [changeEntryIntent, setChangeEntryIntent] = useState<BranchIntent | null>(null);
   const navigate = useNavigate();
   const canPropose = canCreateChangeBranch(role);
 
@@ -92,10 +101,10 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
 
         <div className={styles.tileGrid}>
           {weakTiles.map((tile) => (
-            <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised />
+            <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised role={role} />
           ))}
           {healthyTiles.map((tile) => (
-            <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised={false} />
+            <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised={false} role={role} />
           ))}
         </div>
       </section>
@@ -110,29 +119,41 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
               {data.openChanges.length} open{data.nextTargetDate ? ` · next target ${formatDate(data.nextTargetDate)}` : ''}
             </Text>
             {canPropose && (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setProposingChange(true);
-                }}
-              >
-                Propose a change
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setChangeEntryIntent(defaultIntentForEntryPoint('directorDoor'));
+                  }}
+                >
+                  Propose a change
+                </Button>
+                {/* Prompt pack F0's own "'what happened' → record" entry point — genuinely new, no prior surface for it anywhere in this app. Same gate as "Propose a change" (a lightweight, contributor-level act like opening any other change). */}
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setChangeEntryIntent(defaultIntentForEntryPoint('whatHappened'));
+                  }}
+                >
+                  What happened
+                </Button>
+              </>
             )}
           </div>
-          {proposingChange && (
+          {changeEntryIntent && (
             <Panel>
               <ProposeChangePicker
                 modelId={modelId}
                 orgId={orgId}
                 userId={userId}
+                defaultIntent={changeEntryIntent}
                 onChosen={(branch) => {
-                  setProposingChange(false);
+                  setChangeEntryIntent(null);
                   // ChangePage.tsx routes on the branch id in the path itself, not `?ref=` — there's nothing to select once you're already on that change's own page.
                   void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`);
                 }}
                 onCancel={() => {
-                  setProposingChange(false);
+                  setChangeEntryIntent(null);
                 }}
               />
             </Panel>
@@ -220,6 +241,8 @@ interface CapabilityTileProps {
   orgSlug: string;
   modelSlug: string;
   emphasised: boolean;
+  /** Prompt pack F3 PR6: gates the "Start a decision →" action below an emphasised (weak) tile — omitted entirely, not shown disabled, for a viewer; never rendered at all on a healthy tile. */
+  role: MemberRole | null;
 }
 
 const TONE_LABEL: Record<CapabilityTileData['tone'], string> = {
@@ -231,8 +254,17 @@ const TONE_LABEL: Record<CapabilityTileData['tone'], string> = {
 
 const TONE_CHIP: Record<CapabilityTileData['tone'], ChipTone> = { ok: 'ok', warn: 'warn', info: 'info', neutral: 'neutral' };
 
-function CapabilityTile({ tile, orgSlug, modelSlug, emphasised }: CapabilityTileProps) {
+function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: CapabilityTileProps) {
   const href = `/o/${orgSlug}/m/${modelSlug}/e/${tile.capability.element_id}`;
+  // Prompt pack F3 PR6: F3's own second named golden path, "from the
+  // director door's weak-capability tile, start a decision" — only ever
+  // offered on an emphasised (weak, `tone !== 'ok'`) tile, never a healthy
+  // one, and rendered as a sibling *after* the tile's own primary link, not
+  // nested inside it (an `<a>` cannot legally contain another `<a>`).
+  const startDecisionHref =
+    emphasised && canStartDecision(role)
+      ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefillFromWeakCapability({ id: tile.capability.element_id, name: tile.capability.name }, TONE_LABEL[tile.tone])).toString()}`
+      : null;
   const content = (
     <>
       <span className={styles.statusBar} data-tone={tile.tone} aria-hidden="true" />
@@ -270,8 +302,15 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised }: CapabilityTile
   );
 
   return (
-    <Link to={href} className={emphasised ? styles.tileEmphasised : styles.tile}>
-      {emphasised ? <BlueprintFrame>{content}</BlueprintFrame> : content}
-    </Link>
+    <div className={styles.tileWrapper}>
+      <Link to={href} className={emphasised ? styles.tileEmphasised : styles.tile}>
+        {emphasised ? <BlueprintFrame>{content}</BlueprintFrame> : content}
+      </Link>
+      {startDecisionHref !== null && (
+        <div className={styles.tileAction}>
+          <StartDecisionLink href={startDecisionHref} />
+        </div>
+      )}
+    </div>
   );
 }

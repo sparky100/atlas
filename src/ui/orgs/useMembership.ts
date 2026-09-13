@@ -12,6 +12,7 @@ export {
   canArchiveModel,
   canBackfillCapabilityOrder,
   canCancelChange,
+  canChooseDecisionOption,
   canCreateChangeBranch,
   canCreateModel,
   canDeleteModel,
@@ -20,6 +21,7 @@ export {
   canManageOrgSettings,
   canRestoreModel,
   canReviewMergeRequest,
+  canStartDecision,
 } from './roleGates';
 
 export interface UseMembershipResult {

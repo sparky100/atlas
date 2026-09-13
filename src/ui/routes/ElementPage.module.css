@@ -46,6 +46,14 @@
   gap: var(--space-3);
 }
 
+/* Prompt pack F0: the "Propose a change" panel's own correct/propose toggle — same row-of-buttons shape as .toastActions above, its own class only because it sits in a different panel. */
+.intentToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
 @media (max-width: 480px) {
   .toast {
     position: fixed;

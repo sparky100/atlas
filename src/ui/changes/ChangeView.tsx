@@ -15,13 +15,15 @@ import { createChangeBranch, getMainBranch } from '../../db/branches';
 import type { MemberRole } from '../../db/types';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { formatDateTime } from '../time';
-import { canCancelChange } from '../orgs/useMembership';
+import { canApproveOrMergeRequest, canCancelChange } from '../orgs/useMembership';
 import { BranchRebasePanel } from '../reviews/BranchRebasePanel';
 import { supabase } from '../supabaseClient';
+import { dateFieldLabelForIntent, intentReviewWeight, isDateRequiredForIntent } from './branchIntent';
 import { branchStatusTone } from './branchStatus';
 import { deriveChangeStep } from './changeStepper';
 import { describeDelta } from './changeSummaryFormat';
 import { Stepper } from './Stepper/Stepper';
+import { useApproveAndMerge } from './useApproveAndMerge';
 import { useCancelChange } from './useCancelChange';
 import { useChange } from './useChange';
 import { useChangeSummary } from './useChangeSummary';
@@ -86,8 +88,9 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   const [description, setDescription] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const navigate = useNavigate();
-  const { request: openRequest } = useOpenMergeRequest(branchId);
+  const { request: openRequest, reload: reloadOpenRequest } = useOpenMergeRequest(branchId);
   const submission = useSubmitForReview(modelId, branch);
+  const approveAndMergeState = useApproveAndMerge(modelId);
   const cancellation = useCancelChange(branch);
   const { ref, setRef, clearRef } = useSelectedRef();
   const [cancelling, setCancelling] = useState(false);
@@ -97,6 +100,14 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
 
   if (status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (status === 'not_found' || !branch) return <Text as="p">No change found for this id.</Text>;
+
+  // Prompt pack F0: `branch.intent` is only ever `null` for a change branch
+  // that predates the migration backfilling everything else to `propose` —
+  // real data always has one, but this view falls back the same way
+  // `duplicateIntoNewDraft` already does, rather than making every read
+  // below handle a `null` it should never actually see.
+  const intent = branch.intent ?? 'propose';
+  const dateFieldLabel = dateFieldLabelForIntent(intent);
 
   const duplicateIntoNewDraft = async () => {
     setDuplicateError(null);
@@ -117,6 +128,11 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         ...(branch.target_date ? { targetDate: branch.target_date } : {}),
         createdBy: userId ?? '',
         mainHeadCommitId: main.head_commit_id,
+        // Prompt pack F0: a duplicate keeps its source branch's own intent
+        // — `branch.intent` is only ever `null` for a non-`change` kind,
+        // which this action never duplicates from, but the fallback keeps
+        // this call exhaustive over `BranchIntent` regardless.
+        intent: branch.intent ?? 'propose',
       });
       // Same "lands you inside, editing" convention `ChangesView.tsx`'s own
       // create form already establishes — a duplicate is a fresh draft the
@@ -141,9 +157,9 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
     <div>
       <div className={styles.meta}>
         <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
-        {branch.target_date !== null && (
+        {dateFieldLabel !== null && branch.target_date !== null && (
           <Text as="span" tone="muted" size="sm">
-            Target: {branch.target_date}
+            {dateFieldLabel}: {branch.target_date}
           </Text>
         )}
         <Text as="span" tone="faint" size="xs">
@@ -239,6 +255,32 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
               </LinkButton>
             </div>
           )}
+          {/* F0's resolved review-weight decision: record/correct get this
+              one-click shortcut alongside "Open review →" above — the same
+              atlas.approve_merge_request/atlas.merge_branch RPCs a reviewer
+              would otherwise click through on the review request's own
+              page, called in sequence from here instead. propose/explore
+              keep that page as their only path (ReviewQueueView.tsx's own
+              intent filter is what actually keeps them off the shared
+              queue list; this button simply never renders for them). */}
+          {openRequest && intentReviewWeight(intent) === 'single' && canApproveOrMergeRequest(role) && (openRequest.status === 'pending' || openRequest.status === 'approved') && (
+            <>
+              <Button
+                variant="primary"
+                disabled={approveAndMergeState.status === 'working'}
+                onClick={() => {
+                  void approveAndMergeState.approveAndMerge(openRequest, branch).then((merged) => {
+                    if (!merged) return;
+                    reload();
+                    reloadOpenRequest();
+                  });
+                }}
+              >
+                {approveAndMergeState.status === 'working' ? 'Merging…' : 'Approve & merge'}
+              </Button>
+              {approveAndMergeState.error !== null && <Text as="p">{approveAndMergeState.error}</Text>}
+            </>
+          )}
         </Panel>
       )}
 
@@ -330,7 +372,13 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
               void updateMetadata({
                 title: title.trim().length > 0 ? title.trim() : null,
                 description: description.trim().length > 0 ? description.trim() : null,
-                targetDate: targetDate.trim().length > 0 ? targetDate.trim() : null,
+                // F0: `correct`/`explore` have no date field at all (see
+                // `dateFieldLabelForIntent`'s own doc comment) — omitted
+                // from the patch entirely, not sent as `null`, so an
+                // unrelated edit never silently clears a date a `record`/
+                // `propose` change already had before an intent change
+                // (intent editing isn't UI yet, but the column itself is).
+                ...(dateFieldLabel !== null ? { targetDate: targetDate.trim().length > 0 ? targetDate.trim() : null } : {}),
               }).then(() => {
                 setEditing(false);
               });
@@ -353,14 +401,28 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
                 setDescription(e.target.value);
               }}
             />
-            <input
-              className={styles.input}
-              type="date"
-              value={targetDate}
-              onChange={(e) => {
-                setTargetDate(e.target.value);
-              }}
-            />
+            {/* F0: "delivered date" for record, "target date" for propose
+                — the same `branches.target_date` column either way (a
+                deliberate reuse, `branchIntent.ts`'s own doc comment);
+                `correct`/`explore` need no date at all, so the field is
+                omitted entirely rather than shown disabled. */}
+            {dateFieldLabel !== null && (
+              <div className={styles.dateField}>
+                <Text as="label" size="sm" tone="muted">
+                  {dateFieldLabel}
+                  {isDateRequiredForIntent(intent) ? ' (required)' : ''}
+                </Text>
+                <input
+                  className={styles.input}
+                  type="date"
+                  required={isDateRequiredForIntent(intent)}
+                  value={targetDate}
+                  onChange={(e) => {
+                    setTargetDate(e.target.value);
+                  }}
+                />
+              </div>
+            )}
             <div className={styles.actions}>
               <Button variant="primary" type="submit" disabled={status === 'saving'}>
                 Save

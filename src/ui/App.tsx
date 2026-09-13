@@ -6,6 +6,8 @@ import { ChangePage } from './routes/ChangePage';
 import { ChangesPage } from './routes/ChangesPage';
 import { ContainerPage } from './routes/ContainerPage';
 import { ContextPage } from './routes/ContextPage';
+import { DecisionPage } from './routes/DecisionPage';
+import { DecisionsPage } from './routes/DecisionsPage';
 import { ElementPage } from './routes/ElementPage';
 import { ElementsPage } from './routes/ElementsPage';
 import { ExternalInterfacesPage } from './routes/ExternalInterfacesPage';
@@ -55,6 +57,8 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/versions" element={<VersionsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/changes" element={<ChangesPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/changes/:branchId" element={<ChangePage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/decisions" element={<DecisionsPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/decisions/:decisionId" element={<DecisionPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/diff" element={<VersionDiffPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/review" element={<ReviewQueuePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/review/:mergeRequestId" element={<ReviewRequestPage />} />

@@ -129,7 +129,7 @@ describe('model archive/restore/delete against a real local Supabase', () => {
     await createTag(owner.client, { id: randomUUID(), orgId, modelId, name: `v-${randomUUID().slice(0, 8)}`, commitId: updateCommitId, createdBy: owner.id });
 
     const changeBranchId = randomUUID();
-    await createChangeBranch(owner.client, { id: changeBranchId, orgId, modelId, name: `doomed-change-${randomUUID().slice(0, 8)}`, createdBy: owner.id, mainHeadCommitId: updateCommitId });
+    await createChangeBranch(owner.client, { id: changeBranchId, orgId, modelId, name: `doomed-change-${randomUUID().slice(0, 8)}`, createdBy: owner.id, intent: 'propose', mainHeadCommitId: updateCommitId });
 
     const { error: commentError } = await owner.client.from('comments').insert({ id: randomUUID(), org_id: orgId, model_id: modelId, anchor_type: 'element', anchor_id: elementId, body: 'A comment on the doomed element.', author_id: owner.id });
     if (commentError) throw new Error(`seed comment: ${commentError.message}`);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
 import { listCommentsByIds } from '../../db/comments';
+import { getDecision } from '../../db/decisions';
 import { getElementsByIds } from '../../db/elements';
 import { getModelById } from '../../db/models';
 import { getUnreadNotificationCount, listMyNotifications, markAllNotificationsRead, markNotificationRead } from '../../db/notifications';
@@ -21,9 +22,9 @@ export interface NotificationTrayRow {
   notification: NotificationRow;
   comment: CommentRow | undefined;
   authorProfile: ProfileRow | undefined;
-  /** The subject's own name, resolved for `element` anchors only this sprint (see module comment) — `undefined` otherwise, never a guess. */
+  /** The subject's own name, resolved for `element` and `decision` anchors only this sprint (see module comment) — `undefined` otherwise, never a guess. */
   subjectName: string | undefined;
-  /** Set only for anchor kinds with a real page to link to (`element`, `change` — App.tsx's own route table has neither a relationship, version, nor decision page yet). `undefined` renders as a plain, non-clickable row rather than a link that would 404. */
+  /** Set only for anchor kinds with a real page to link to (`element`, `change`, `decision` — prompt pack F3 PR4 added the last one; App.tsx's own route table still has no relationship or version page). `undefined` renders as a plain, non-clickable row rather than a link that would 404. */
   href: string | undefined;
 }
 
@@ -38,18 +39,14 @@ export type NotificationTrayState = { status: 'loading' } | { status: 'error'; m
  * never has to make.
  *
  * Deep-linking scope: `App.tsx`'s route table has a real page for `element`
- * (`/e/{elementId}`) and `change` (`/changes/{branchId}`) anchors only —
- * there is no relationship, version, or decision page to link to yet
- * (UI-principles §2.4's own deep-link table names `element`/`change`/
- * `merge request`/`capture draft`/`decision`, but only the first two, plus
- * versions/reviews already covered by other pages, are actually routed in
- * `App.tsx` today). A `relationship`/`version`/`decision`-anchored
- * notification still renders — body, author, "N ago" — just without a
- * subject name or a link, rather than one guessed at a route that doesn't
- * exist. Not a shortcut: `element`/`change` cover the overwhelming majority
- * of comments in practice, since `CommentsSection` is wired to element
- * anchors everywhere except the change page's own "Comments on this
- * change" panel.
+ * (`/e/{elementId}`), `change` (`/changes/{branchId}`), and (prompt pack F3
+ * PR4) `decision` (`/decisions/{decisionId}`) anchors — there is still no
+ * relationship or version page to link to (UI-principles §2.4's own deep-
+ * link table names `element`/`change`/`merge request`/`capture draft`/
+ * `decision`; the first three now have a real page, the last two still
+ * don't). A `relationship`/`version`-anchored notification still renders —
+ * body, author, "N ago" — just without a subject name or a link, rather
+ * than one guessed at a route that doesn't exist.
  */
 export function useNotificationTray(userId: UUID | null) {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -86,6 +83,7 @@ export function useNotificationTray(userId: UUID | null) {
         // recent notifications actually touch, typically one or two.
         const linkInfoByModel = new Map<UUID, { orgSlug: string; modelSlug: string }>();
         const elementNamesByModel = new Map<UUID, Map<UUID, string>>();
+        const decisionTitlesByModel = new Map<UUID, Map<UUID, string>>();
         for (const modelId of modelIds) {
           const model = await getModelById(supabase, modelId);
           if (!model) continue;
@@ -104,17 +102,34 @@ export function useNotificationTray(userId: UUID | null) {
               );
             }
           }
+
+          // Bounded by how many distinct decisions this user's recent
+          // notifications actually touch (typically none or a handful) —
+          // `getDecision` per id, same as `listBranchesByIds`'s own
+          // reasoning for staying plain (never model-scale, CLAUDE.md
+          // rule 8 doesn't apply).
+          const decisionAnchorIds = [...new Set(comments.filter((c) => c.model_id === modelId && c.anchor_type === 'decision').map((c) => c.anchor_id))];
+          if (decisionAnchorIds.length > 0) {
+            const decisions = await Promise.all(decisionAnchorIds.map((id) => getDecision(supabase, id)));
+            decisionTitlesByModel.set(modelId, new Map(decisions.filter((d) => d !== null).map((d) => [d.id, d.title])));
+          }
         }
 
         const rows: NotificationTrayRow[] = notifications.map((notification) => {
           const comment = notification.comment_id ? commentsById.get(notification.comment_id) : undefined;
           const authorProfile = comment ? profilesById.get(comment.author_id) : undefined;
           const link = comment ? linkInfoByModel.get(comment.model_id) : undefined;
-          const subjectName = comment?.anchor_type === 'element' ? elementNamesByModel.get(comment.model_id)?.get(comment.anchor_id) : undefined;
+          const subjectName =
+            comment?.anchor_type === 'element'
+              ? elementNamesByModel.get(comment.model_id)?.get(comment.anchor_id)
+              : comment?.anchor_type === 'decision'
+                ? decisionTitlesByModel.get(comment.model_id)?.get(comment.anchor_id)
+                : undefined;
           let href: string | undefined;
           if (comment && link) {
             if (comment.anchor_type === 'element') href = `/o/${link.orgSlug}/m/${link.modelSlug}/e/${comment.anchor_id}#c=${comment.id}`;
             else if (comment.anchor_type === 'change') href = `/o/${link.orgSlug}/m/${link.modelSlug}/changes/${comment.anchor_id}#c=${comment.id}`;
+            else if (comment.anchor_type === 'decision') href = `/o/${link.orgSlug}/m/${link.modelSlug}/decisions/${comment.anchor_id}#c=${comment.id}`;
           }
           return { notification, comment, authorProfile, subjectName, href };
         });

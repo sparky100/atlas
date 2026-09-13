@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { createChangeBranch, getMainBranch, listChangeBranches } from '../../db/branches';
-import type { BranchRow } from '../../db/types';
+import type { BranchIntent, BranchRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -13,6 +13,8 @@ export interface CreateChangeInput {
   description: string;
   /** ISO `date` string (`YYYY-MM-DD`), or `''` for no target date. */
   targetDate: string;
+  /** Prompt pack F0: required for every change branch. */
+  intent: BranchIntent;
 }
 
 export interface UseChangesResult {
@@ -103,6 +105,7 @@ export function useChanges(modelId: UUID, orgId: UUID, userId: UUID | null): Use
           ...(input.targetDate.trim().length > 0 ? { targetDate: input.targetDate.trim() } : {}),
           createdBy: userId,
           mainHeadCommitId,
+          intent: input.intent,
         });
         setStatus('idle');
         reload();

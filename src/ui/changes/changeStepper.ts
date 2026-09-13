@@ -1,4 +1,4 @@
-import type { BranchRow, MergeRequestRow } from '../../db/types';
+import type { BranchIntent, BranchRow, MergeRequestRow } from '../../db/types';
 
 /**
  * Sprint 7i item 1: "Change page status stepper: Draft → Proposed → In
@@ -57,14 +57,27 @@ function stepsWithStatesUpTo(currentIndex: number | null): { key: ChangeStepKey;
 }
 
 /**
- * `branch` only needs `status`; `mergeRequest` is the branch's own open
- * request (`useOpenMergeRequest`'s result — `pending`/`changes_requested`/
- * `approved`, per that hook's `OPEN_STATUSES`) or `null` once none is open.
- * Pass `null`, not `undefined`, while a request is still loading — the
- * caller should hold off rendering the stepper until it has resolved, the
- * same convention `ChangeView.tsx` already applies to `openRequest`.
+ * `branch` only needs `status`; `intent` is optional (omitted or `null`
+ * reads the same as `propose`/`explore` — the full-queue default) so this
+ * stays source-compatible with every pre-F0 caller. Prompt pack F0's own
+ * review-weight distinction (`branchIntent.ts`'s `intentReviewWeight`):
+ * `record`/`correct` never route through the shared review queue
+ * (`ReviewQueuePage`) — a single owner or architect approves and merges
+ * directly. PR3 makes the actual one-click "Approve & merge" action real;
+ * this only makes the stepper's own sentence honest about it one PR early,
+ * since the underlying `merge_requests` mechanism is unchanged either way
+ * (the resolved decision behind this: reuse the existing single-approver
+ * mechanism for every intent, no new privilege model).
+ *
+ * `mergeRequest` is the branch's own open request (`useOpenMergeRequest`'s
+ * result — `pending`/`changes_requested`/`approved`, per that hook's
+ * `OPEN_STATUSES`) or `null` once none is open. Pass `null`, not
+ * `undefined`, while a request is still loading — the caller should hold
+ * off rendering the stepper until it has resolved, the same convention
+ * `ChangeView.tsx` already applies to `openRequest`.
  */
-export function deriveChangeStep(branch: Pick<BranchRow, 'status'>, mergeRequest: MergeRequestRow | null): DerivedChangeSteps {
+export function deriveChangeStep(branch: Pick<BranchRow, 'status'> & { intent?: BranchIntent | null | undefined }, mergeRequest: MergeRequestRow | null): DerivedChangeSteps {
+  const singleApprover = branch.intent === 'record' || branch.intent === 'correct';
   switch (branch.status) {
     case 'draft': {
       const sentBack = mergeRequest?.status === 'changes_requested';
@@ -72,7 +85,11 @@ export function deriveChangeStep(branch: Pick<BranchRow, 'status'>, mergeRequest
         steps: stepsWithStatesUpTo(0),
         rejected: false,
         cancelled: false,
-        sentence: sentBack ? 'Sent back for changes by a reviewer. Edit and resubmit when ready.' : 'Not yet submitted. The change owner submits it for review when ready.',
+        sentence: sentBack
+          ? 'Sent back for changes by a reviewer. Edit and resubmit when ready.'
+          : singleApprover
+            ? 'Not yet submitted. Once submitted, a single owner or architect approves and merges it directly — no shared review queue.'
+            : 'Not yet submitted. The change owner submits it for review when ready.',
       };
     }
     // 'in_review' is never actually written to `branches.status` (see this
@@ -84,7 +101,7 @@ export function deriveChangeStep(branch: Pick<BranchRow, 'status'>, mergeRequest
         steps: stepsWithStatesUpTo(2),
         rejected: false,
         cancelled: false,
-        sentence: 'Awaiting review. An owner or architect approves or requests changes.',
+        sentence: singleApprover ? 'Awaiting a single approver — an owner or architect merges it directly, no shared review queue.' : 'Awaiting review. An owner or architect approves or requests changes.',
       };
     case 'approved':
       return {

@@ -33,11 +33,28 @@
   gap: var(--space-3);
 }
 
+/* Prompt pack F3 PR6: the grid item is now this wrapper, not the tile's
+   own `<Link>` directly — "Start a decision" renders as a sibling after
+   the link (never nested inside it), only on a weak tile. */
+.tileWrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.tileAction {
+  margin-top: var(--space-1);
+}
+
 .tile,
 .tileEmphasised {
   display: block;
   color: inherit;
   text-decoration: none;
+  /* `flex` is a no-op outside `.tileWrapper`'s flex context — harmless
+     everywhere this was already used before this file's own PR6 wrapper;
+     inside it, it's what keeps the tile itself filling the grid row's
+     stretched height instead of leaving a gap above "Start a decision". */
+  flex: 1 1 auto;
 }
 
 .tile {

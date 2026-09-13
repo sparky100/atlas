@@ -12,6 +12,7 @@ import { Chip } from '../components/Chip/Chip';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../components/Text/Text';
 import { canCreateChangeBranch, canEditOnMain } from '../orgs/useMembership';
+import { defaultIntentForEntryPoint } from '../changes/branchIntent';
 import { CapabilitySupportsPicker } from './CapabilitySupportsPicker';
 import { ProposeChangePicker } from './ProposeChangePicker';
 import { HOME_SEARCH_CREATABLE_TYPES, useHomeSearch } from './useHomeSearch';
@@ -197,6 +198,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
           modelId={modelId}
           orgId={orgId}
           userId={userId}
+          defaultIntent={defaultIntentForEntryPoint('homeSearch')}
           onChosen={(branch) => {
             setProposedBranch(branch);
             // A type with no description sheet of its own (capability,
@@ -292,4 +294,5 @@ const PLACEHOLDER_BRANCH: BranchRow = {
   cancelled_at: null,
   cancelled_by: null,
   dismissed_identity_pairs: [],
+  intent: null,
 };

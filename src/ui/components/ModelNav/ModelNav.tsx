@@ -15,13 +15,14 @@ export interface ModelNavProps {
 
 type RealSection = Exclude<ModelNavSection, null>;
 
-const SECTIONS: RealSection[] = ['home', 'capability-map', 'landscape', 'changes', 'versions', 'review'];
+const SECTIONS: RealSection[] = ['home', 'capability-map', 'landscape', 'changes', 'decisions', 'versions', 'review'];
 
 const SECTION_LABELS: Record<RealSection, string> = {
   home: 'Home',
   'capability-map': 'Capability map',
   landscape: 'Landscape',
   changes: 'Changes',
+  decisions: 'Decisions',
   versions: 'Versions',
   review: 'Review queue',
 };
@@ -31,7 +32,7 @@ const SECTION_LABELS: Record<RealSection, string> = {
  * navigation model in UI-principles §2): every model route renders this —
  * a left rail on desktop, a bottom bar on mobile (`.module.css`'s own
  * breakpoint switch, same 768px the rest of this sprint's mobile work
- * uses) — six sections, the active one highlighted, the current ref shown
+ * uses) — seven sections (prompt pack F3 PR4 added Decisions), the active one highlighted, the current ref shown
  * as a chip alongside. Replaces the ad hoc per-page "→" links
  * (`DirectorHome`'s "Open the capability map"/"All versions",
  * `ArchitectHome`'s "Open the queue") that stood in for this before it
@@ -112,6 +113,8 @@ function sectionPath(section: RealSection): string {
       return 'landscape';
     case 'changes':
       return 'changes';
+    case 'decisions':
+      return 'decisions';
     case 'versions':
       return 'versions';
     case 'review':

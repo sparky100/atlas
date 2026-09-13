@@ -123,3 +123,13 @@ export function canManageOrgSettings(role: MemberRole | null): boolean {
 export function canBackfillCapabilityOrder(role: MemberRole | null): boolean {
   return role === 'owner';
 }
+
+/** Prompt pack F3, ADR-022: mirrors `decisions_insert`'s own RLS floor (`supabase/migrations/20260913110000_decisions.sql`) — same as `canCreateChangeBranch`, starting a decision is a lightweight, contributor-level act. */
+export function canStartDecision(role: MemberRole | null): boolean {
+  return canCreateChangeBranch(role);
+}
+
+/** Prompt pack F3 PR5: mirrors `atlas.choose_decision_option`'s own role check (`supabase/migrations/20260913120000_choose_decision_option.sql`) — owner/architect only, the same floor `canApproveOrMergeRequest` uses, since choosing an option converts a branch to `propose` intent and closes out every other option in one action. */
+export function canChooseDecisionOption(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'architect';
+}

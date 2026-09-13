@@ -34,6 +34,7 @@ import { loadEnv } from './env';
 import { createOrganisation, getMyMembership, getOrganisationBySlug, listOrganisationsForUser } from './organisations';
 import { rebuildHead } from './rebuildHead';
 import { seedModelFromCapabilityMap } from './seedFromMap';
+import { splitAndMergeSubset } from './split';
 import { getOrCreateManualSource } from './sources';
 import { createTag, listTagsForModel } from './tags';
 import { getUserPreferences, upsertUserPreferences } from './userPreferences';
@@ -345,6 +346,7 @@ describe('repository layer against a real local Supabase', () => {
       modelId,
       name: 'add-a-system',
       createdBy: alice.id,
+      intent: 'propose',
       mainHeadCommitId: mainGenesisCommitId,
     });
     expect(branch.status).toBe('draft');
@@ -379,6 +381,7 @@ describe('repository layer against a real local Supabase', () => {
       modelId,
       name: 'concurrency-check',
       createdBy: alice.id,
+      intent: 'propose',
       mainHeadCommitId: mainGenesisCommitId,
     });
 
@@ -554,6 +557,7 @@ describe('repository layer against a real local Supabase', () => {
         modelId,
         name: 'kind-restriction-check',
         createdBy: alice.id,
+        intent: 'propose',
         mainHeadCommitId: mainGenesisCommitId,
       });
       for (const kind of ['capture', 'template_seed']) {
@@ -577,6 +581,7 @@ describe('repository layer against a real local Supabase', () => {
         modelId,
         name: 'refresh-kind-check',
         createdBy: alice.id,
+        intent: 'propose',
         mainHeadCommitId: mainGenesisCommitId,
       });
       const { data, error } = await alice.client.schema('atlas').rpc('commit_deltas', {
@@ -697,6 +702,7 @@ describe('repository layer against a real local Supabase', () => {
         modelId,
         name: 'submit-check',
         createdBy: alice.id,
+        intent: 'propose',
         mainHeadCommitId: main.head_commit_id,
       });
 
@@ -723,6 +729,7 @@ describe('repository layer against a real local Supabase', () => {
         modelId,
         name: 'approve-check',
         createdBy: alice.id,
+        intent: 'propose',
         mainHeadCommitId: main.head_commit_id,
       });
       const requestId = randomUUID();
@@ -748,6 +755,7 @@ describe('repository layer against a real local Supabase', () => {
         modelId,
         name: 'full-merge-path',
         createdBy: alice.id,
+        intent: 'propose',
         mainHeadCommitId: main.head_commit_id,
       });
       if (!branch.head_commit_id) throw new Error('branch has no head at creation');
@@ -835,6 +843,7 @@ describe('repository layer against a real local Supabase', () => {
         modelId,
         name: 'resolved-conflicts-check',
         createdBy: alice.id,
+        intent: 'propose',
         mainHeadCommitId: main.head_commit_id,
       });
       if (!branch.head_commit_id) throw new Error('branch has no head at creation');
@@ -914,6 +923,7 @@ describe('repository layer against a real local Supabase', () => {
         modelId,
         name: 'base-commit-id-refresh-check',
         createdBy: alice.id,
+        intent: 'propose',
         mainHeadCommitId: mainBeforeFork.head_commit_id,
       });
       if (!branch.base_commit_id || !branch.head_commit_id) throw new Error('branch has no base/head at creation');
@@ -986,6 +996,7 @@ describe('repository layer against a real local Supabase', () => {
         modelId,
         name: 'stale-approval-check',
         createdBy: alice.id,
+        intent: 'propose',
         mainHeadCommitId: main.head_commit_id,
       });
       const requestId = randomUUID();
@@ -1040,6 +1051,7 @@ describe('repository layer against a real local Supabase', () => {
         modelId,
         name: 'request-changes-check',
         createdBy: alice.id,
+        intent: 'propose',
         mainHeadCommitId: main.head_commit_id,
       });
       const requestA = randomUUID();
@@ -1057,6 +1069,7 @@ describe('repository layer against a real local Supabase', () => {
         modelId,
         name: 'reject-check',
         createdBy: alice.id,
+        intent: 'propose',
         mainHeadCommitId: main.head_commit_id,
       });
       const requestB = randomUUID();
@@ -1084,6 +1097,7 @@ describe('repository layer against a real local Supabase', () => {
         description: 'Decommission System X and move its data flows to the new CRM.',
         targetDate: '2026-12-01',
         createdBy: alice.id,
+        intent: 'propose',
         mainHeadCommitId: main.head_commit_id,
       });
       expect(original).toMatchObject({ description: 'Decommission System X and move its data flows to the new CRM.', target_date: '2026-12-01', split_from: null });
@@ -1106,6 +1120,7 @@ describe('repository layer against a real local Supabase', () => {
           name: 'metadata-check-split',
           kind: 'change',
           status: 'draft',
+          intent: 'propose',
           base_commit_id: main.head_commit_id,
           head_commit_id: main.head_commit_id,
           split_from: original.id,
@@ -1124,10 +1139,113 @@ describe('repository layer against a real local Supabase', () => {
         modelId,
         name: 'split-from-target',
         createdBy: alice.id,
+        intent: 'propose',
         mainHeadCommitId: main.head_commit_id,
       });
       const { error } = await service.from('branches').update({ split_from: other.id }).eq('id', main.id);
       expect(error).not.toBeNull();
+    });
+  });
+
+  describe('branches.intent (prompt pack F0: change intent — the why)', () => {
+    it('createChangeBranch persists the given intent; updateBranchMetadata may change it while draft; the guard trigger rejects a change once the branch leaves draft', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+
+      const branch = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: 'intent-check',
+        createdBy: alice.id,
+        intent: 'correct',
+        mainHeadCommitId: main.head_commit_id,
+      });
+      expect(branch.intent).toBe('correct');
+
+      await updateBranchMetadata(alice.client, branch.id, { intent: 'record' });
+      expect((await getBranch(alice.client, branch.id))?.intent).toBe('record');
+
+      const requestId = randomUUID();
+      const { error: submitError } = await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: requestId, p_branch_id: branch.id, p_classification: {} });
+      if (submitError) throw new Error(`submitting merge request: ${submitError.message}`);
+      expect((await getBranch(alice.client, branch.id))?.status).toBe('proposed');
+
+      const { error: guardError } = await alice.client.from('branches').update({ intent: 'propose' }).eq('id', branch.id);
+      expect(guardError).not.toBeNull();
+      expect((await getBranch(alice.client, branch.id))?.intent).toBe('record');
+    });
+
+    it('main and capture_draft branches never carry an intent; a change branch always must (branches_intent_only_for_change)', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      expect(main.intent).toBeNull();
+
+      const { error: missingIntentError } = await service.from('branches').insert({
+        id: randomUUID(),
+        org_id: orgId,
+        model_id: modelId,
+        name: 'missing-intent-check',
+        kind: 'change',
+        status: 'draft',
+        base_commit_id: main.head_commit_id,
+        head_commit_id: main.head_commit_id,
+        created_by: alice.id,
+      });
+      expect(missingIntentError).not.toBeNull();
+
+      const { error: mainWithIntentError } = await service
+        .from('branches')
+        .update({ intent: 'propose' })
+        .eq('id', main.id);
+      expect(mainWithIntentError).not.toBeNull();
+    });
+
+    it("atlas.split_branch inherits the split branch's own intent (a split is a subset of the same change, never a change of purpose)", async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const source = await createChangeBranch(alice.client, {
+        id: randomUUID(),
+        orgId,
+        modelId,
+        name: `split-intent-source-${randomUUID().slice(0, 8)}`,
+        createdBy: alice.id,
+        intent: 'explore',
+        mainHeadCommitId: main.head_commit_id,
+      });
+      if (!source.head_commit_id) throw new Error('branch has no head at creation');
+
+      const acceptedId = randomUUID();
+      const commitResult = await commitToBranch(alice.client, {
+        modelId,
+        branchId: source.id,
+        expectedHeadCommitId: source.head_commit_id,
+        envelope: {
+          id: randomUUID(),
+          branchId: source.id,
+          parentCommitId: source.head_commit_id,
+          mergedBranchHeadCommitId: null,
+          kind: 'manual',
+          title: 'split-intent seed',
+          body: null,
+          deltas: [makeCreateDelta(randomUUID(), acceptedId, 'Split Intent Seed', aliceManualSourceId)],
+        },
+      });
+      expect(commitResult).toMatchObject({ ok: true });
+      const sourceAfterCommit = await getBranch(alice.client, source.id);
+      if (!sourceAfterCommit) throw new Error('branch not found after commit');
+
+      const splitResult = await splitAndMergeSubset(alice.client, {
+        modelId,
+        branch: sourceAfterCommit,
+        mainHeadCommitId: main.head_commit_id,
+        requestedSubjectIds: new Set([acceptedId]),
+        splitBranchName: `split-intent-result-${randomUUID().slice(0, 8)}`,
+        splitBranchTitle: 'Split: Split Intent Seed',
+      });
+      expect(splitResult.ok).toBe(true);
+      if (!splitResult.ok) return;
+      expect(splitResult.splitBranch.intent).toBe('explore');
     });
   });
 

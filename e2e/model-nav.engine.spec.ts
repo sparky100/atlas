@@ -95,8 +95,8 @@ test('model nav: every model route reachable from every other within two taps on
   await expect(nav.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
 
   // One tap each reaches every other section, in a chain that visits all
-  // six — never more than one tap away from the bar since it's rendered
-  // on every page.
+  // seven (prompt pack F3 PR4 added Decisions) — never more than one tap
+  // away from the bar since it's rendered on every page.
   await nav.getByRole('link', { name: 'Capability map' }).click();
   await expect(page.getByRole('heading', { name: 'Capability map' })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Capability map' })).toHaveAttribute('aria-current', 'page');
@@ -108,6 +108,10 @@ test('model nav: every model route reachable from every other within two taps on
   await nav.getByRole('link', { name: 'Changes' }).click();
   await expect(page.getByRole('heading', { name: 'Changes', level: 1 })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Changes' })).toHaveAttribute('aria-current', 'page');
+
+  await nav.getByRole('link', { name: 'Decisions' }).click();
+  await expect(page.getByRole('heading', { name: 'Decisions', level: 1 })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Decisions' })).toHaveAttribute('aria-current', 'page');
 
   await nav.getByRole('link', { name: 'Versions' }).click();
   await expect(page.getByRole('heading', { name: 'Versions', level: 1 })).toBeVisible();

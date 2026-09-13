@@ -15,7 +15,7 @@
 import { assertRealId } from './assertRealId';
 import type { Client } from './client';
 import { assertInFilterSize } from './inFilterLimit';
-import type { BranchRow } from './types';
+import type { BranchIntent, BranchRow } from './types';
 import type { UUID } from '../contracts/delta';
 
 export interface CreateChangeBranchInput {
@@ -32,6 +32,8 @@ export interface CreateChangeBranchInput {
   createdBy: UUID;
   /** The main branch's current head — becomes both `base_commit_id` and `head_commit_id` (SPEC §3.4: a fresh branch starts with head equal to base). */
   mainHeadCommitId: UUID;
+  /** Prompt pack F0: required for every change branch — see `BranchIntent`'s own doc comment. */
+  intent: BranchIntent;
 }
 
 export async function createChangeBranch(supabase: Client, input: CreateChangeBranchInput): Promise<BranchRow> {
@@ -48,6 +50,7 @@ export async function createChangeBranch(supabase: Client, input: CreateChangeBr
     description: input.description ?? null,
     target_date: input.targetDate ?? null,
     created_by: input.createdBy,
+    intent: input.intent,
   };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('branches').insert(row).select('*').single();
@@ -119,9 +122,10 @@ export async function listChangeBranches(supabase: Client, modelId: UUID): Promi
 /**
  * The columns an authenticated user can update directly on their own
  * (title/shared_for_review from supabase/migrations/20260906071400_history.sql,
- * description/target_date from 20260906160000_branches_change_metadata.sql)
- * — everything else (`head_commit_id`, `status`, `base_commit_id`) goes
- * through a security-definer function (`atlas.commit_deltas` or one of the
+ * description/target_date from 20260906160000_branches_change_metadata.sql,
+ * intent from 20260913100000_change_intent.sql) — everything else
+ * (`head_commit_id`, `status`, `base_commit_id`) goes through a
+ * security-definer function (`atlas.commit_deltas` or one of the
  * review-queue functions in 20260906161000_merge_review_queue.sql), never a
  * plain update.
  */
@@ -130,6 +134,8 @@ export interface UpdateBranchMetadataInput {
   sharedForReview?: boolean;
   description?: string | null;
   targetDate?: string | null;
+  /** Prompt pack F0: "editable while Draft" — enforced server-side by `atlas.guard_branch_intent_update`, not just by this function omitting the call once a caller knows better; a write attempted once `status !== 'draft'` is rejected by the trigger, not silently ignored. */
+  intent?: BranchIntent;
 }
 
 export async function updateBranchMetadata(supabase: Client, branchId: UUID, input: UpdateBranchMetadataInput): Promise<void> {
@@ -139,6 +145,7 @@ export async function updateBranchMetadata(supabase: Client, branchId: UUID, inp
   if (input.sharedForReview !== undefined) patch.shared_for_review = input.sharedForReview;
   if (input.description !== undefined) patch.description = input.description;
   if (input.targetDate !== undefined) patch.target_date = input.targetDate;
+  if (input.intent !== undefined) patch.intent = input.intent;
   if (Object.keys(patch).length === 0) return;
   const { error } = await supabase.from('branches').update(patch).eq('id', branchId);
   if (error) throw new Error(`updateBranchMetadata: ${error.message}`);

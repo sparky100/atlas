@@ -25,7 +25,20 @@ export function useReviewQueue(modelId: UUID): ReviewQueueState & { reload: () =
       .then(async (requests) => {
         const branches = await Promise.all(requests.map((r) => getBranch(supabase, r.branch_id)));
         if (cancelled) return;
-        setState({ status: 'ready', rows: requests.map((request, i) => ({ request, branch: branches[i] ?? null })) });
+        // F0's resolved review-weight decision: record/correct changes
+        // never clutter this shared queue — they merge in one click from
+        // the change page itself (`useApproveAndMerge.ts`), and still show
+        // up in the Changes list per F0's own "groups by intent." The
+        // underlying `merge_requests` row still exists either way (same
+        // mechanism for every intent); this is a display filter only. A
+        // branch that failed to resolve (`null`) is kept, not hidden —
+        // failing to fetch it is not the same fact as "this is record/
+        // correct," and hiding it here would silently drop a real open
+        // request from the one place a reviewer can act on it.
+        const rows = requests
+          .map((request, i) => ({ request, branch: branches[i] ?? null }))
+          .filter(({ branch }) => branch?.intent !== 'record' && branch?.intent !== 'correct');
+        setState({ status: 'ready', rows });
       })
       .catch((e: unknown) => {
         reportError("Couldn't load the review queue.", e);

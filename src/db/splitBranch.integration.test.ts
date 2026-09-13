@@ -77,7 +77,7 @@ describe('atlas.split_branch against a real local Supabase (Sprint C2, Prompt 7b
   it('accepting a subset moves it to a new, merged branch; the remainder stays on the original, which still folds cleanly', async () => {
     const main = await getMainBranch(alice.client, modelId);
     if (!main?.head_commit_id) throw new Error('main branch not found');
-    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `split-basic-${randomUUID().slice(0, 8)}`, createdBy: alice.id, mainHeadCommitId: main.head_commit_id });
+    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `split-basic-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'propose', mainHeadCommitId: main.head_commit_id });
     if (!branch.head_commit_id) throw new Error('branch has no head at creation');
 
     const acceptedId = randomUUID();
@@ -153,7 +153,7 @@ describe('atlas.split_branch against a real local Supabase (Sprint C2, Prompt 7b
   it('pull-in: accepting only a relationship pulls its own new endpoint in too, and both land on main', async () => {
     const main = await getMainBranch(alice.client, modelId);
     if (!main?.head_commit_id) throw new Error('main branch not found');
-    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `split-pullin-${randomUUID().slice(0, 8)}`, createdBy: alice.id, mainHeadCommitId: main.head_commit_id });
+    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `split-pullin-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'propose', mainHeadCommitId: main.head_commit_id });
     if (!branch.head_commit_id) throw new Error('branch has no head at creation');
 
     const systemId = randomUUID();
@@ -244,7 +244,7 @@ describe('atlas.split_branch against a real local Supabase (Sprint C2, Prompt 7b
 
     const mainAfterSeed = await getMainBranch(alice.client, modelId);
     if (!mainAfterSeed?.head_commit_id) throw new Error('main branch not found after seed');
-    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `split-blocked-${randomUUID().slice(0, 8)}`, createdBy: alice.id, mainHeadCommitId: mainAfterSeed.head_commit_id });
+    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `split-blocked-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'propose', mainHeadCommitId: mainAfterSeed.head_commit_id });
     if (!branch.head_commit_id) throw new Error('branch has no head at creation');
 
     const loaderForRetract = await buildCommitLoader(alice.client, modelId);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { UUID } from '../../contracts/delta';
-import type { BranchRow } from '../../db/types';
+import type { BranchIntent, BranchRow } from '../../db/types';
 import { Button } from '../components/Button/Button';
 import { Text } from '../components/Text/Text';
 import { useChanges } from '../changes/useChanges';
@@ -21,6 +21,8 @@ export interface ProposeChangePickerProps {
    * this picker, which isn't about any one already-existing element.
    */
   defaultDescription?: string;
+  /** Prompt pack F0: required for every new change this picker creates — `branchIntent.ts`'s `defaultIntentForEntryPoint` names each call site's own default; a caller that lets the person choose (e.g. a toggle between `correct`/`propose` on the element page) just passes whichever value that choice currently holds. */
+  defaultIntent: BranchIntent;
 }
 
 /**
@@ -33,7 +35,7 @@ export interface ProposeChangePickerProps {
  * does the real work either way (same hook `ChangesView.tsx` uses); this is
  * a narrower, inline-first surface for it, not a second implementation.
  */
-export function ProposeChangePicker({ modelId, orgId, userId, onChosen, onCancel, defaultDescription = '' }: ProposeChangePickerProps) {
+export function ProposeChangePicker({ modelId, orgId, userId, onChosen, onCancel, defaultDescription = '', defaultIntent }: ProposeChangePickerProps) {
   const { status, branches, error, createChange } = useChanges(modelId, orgId, userId);
   const [selectedId, setSelectedId] = useState('');
   const [newName, setNewName] = useState('');
@@ -94,7 +96,7 @@ export function ProposeChangePicker({ modelId, orgId, userId, onChosen, onCancel
           variant="primary"
           disabled={status === 'creating' || newName.trim().length === 0}
           onClick={() => {
-            void createChange({ name: newName, title: '', description: defaultDescription, targetDate: '' }).then((branch) => {
+            void createChange({ name: newName, title: '', description: defaultDescription, targetDate: '', intent: defaultIntent }).then((branch) => {
               if (branch) onChosen(branch);
             });
           }}

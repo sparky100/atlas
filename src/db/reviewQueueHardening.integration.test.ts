@@ -67,7 +67,7 @@ describe('review queue hardening against a real local Supabase (Sprint C2 step 7
   it('P-18: an identity-pair dismissal persists across a fresh fetch, and dismissing the same pair twice is a no-op', async () => {
     const main = await getMainBranch(alice.client, modelId);
     if (!main?.head_commit_id) throw new Error('main branch not found');
-    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `identity-dismiss-${randomUUID().slice(0, 8)}`, createdBy: alice.id, mainHeadCommitId: main.head_commit_id });
+    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `identity-dismiss-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'propose', mainHeadCommitId: main.head_commit_id });
     if (!branch.head_commit_id) throw new Error('branch has no head at creation');
 
     const oursId = randomUUID();
@@ -117,7 +117,7 @@ describe('review queue hardening against a real local Supabase (Sprint C2 step 7
   it('adversarial case 1 (docs/AUDIT-2026-09-C1.md §4): two genuinely concurrent refreshes (Promise.all, not sequential) against the same starting head — exactly one wins', async () => {
     const main = await getMainBranch(alice.client, modelId);
     if (!main?.head_commit_id) throw new Error('main branch not found');
-    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `concurrent-refresh-${randomUUID().slice(0, 8)}`, createdBy: alice.id, mainHeadCommitId: main.head_commit_id });
+    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `concurrent-refresh-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'propose', mainHeadCommitId: main.head_commit_id });
     if (!branch.head_commit_id) throw new Error('branch has no head at creation');
 
     // Main advances after the branch forks — a real refresh is needed,

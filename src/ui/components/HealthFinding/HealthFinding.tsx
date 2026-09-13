@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Button } from '../Button/Button';
 import { Text } from '../Text/Text';
@@ -14,6 +14,21 @@ export interface HealthFindingProps {
   /** Where "Review →" (or `browseLabel`) sends someone — the browse table, pre-filtered to this finding. Omitted entirely (not a disabled link) when there's nowhere useful to send someone — Sprint U4-1 B5's own relationship finding has no element to browse to. */
   browseHref?: string;
   browseLabel?: string;
+  /**
+   * Prompt pack F3 PR6's own per-row action slot — the first thing a
+   * finding has ever offered *per item* rather than per group (`browseHref`
+   * above sends someone to the browse table as a whole; this renders
+   * something after one specific item's own label, in the expanded list
+   * only). Deliberately generic (a `ReactNode`, not a fixed "Start a
+   * decision" button baked into this component) so this stays a shared
+   * primitive every finding could eventually use a row action from, not a
+   * decisions-specific component — `ArchitectHome.tsx` is the one caller
+   * that actually passes one today, for its own `critical-support-end`
+   * check. Omitted entirely (no wrapper, no empty slot) for any item the
+   * caller returns `undefined` for, the same "omitted, never disabled"
+   * convention every other optional action in this product follows.
+   */
+  itemAction?: (item: HealthFindingItem) => ReactNode;
 }
 
 const PAGE_SIZE = 20;
@@ -29,7 +44,7 @@ const PAGE_SIZE = 20;
  * single line (all findings zero at once) is that component's own job,
  * not this one's.
  */
-export function HealthFinding({ summary, items, browseHref, browseLabel }: HealthFindingProps) {
+export function HealthFinding({ summary, items, browseHref, browseLabel, itemAction }: HealthFindingProps) {
   const [expanded, setExpanded] = useState(false);
   const [page, setPage] = useState(0);
 
@@ -71,10 +86,11 @@ export function HealthFinding({ summary, items, browseHref, browseLabel }: Healt
         <>
           <ul className={styles.itemList}>
             {pageItems.map((item) => (
-              <li key={item.id}>
+              <li key={item.id} className={itemAction ? styles.itemRow : undefined}>
                 <Text as="span" size="sm">
                   {item.label}
                 </Text>
+                {itemAction?.(item)}
               </li>
             ))}
           </ul>
