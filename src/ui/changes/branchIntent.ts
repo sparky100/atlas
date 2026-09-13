@@ -43,6 +43,14 @@ export const INTENT_OPTIONS: readonly { value: BranchIntent; label: string }[] =
   { value: 'explore', label: 'Explore — a candidate future' },
 ];
 
+/** A short, one-word label per intent — the chip on a `ChangeRow`/the "Changes" list's own per-intent `CollapsibleSection` title, where `INTENT_OPTIONS`' full descriptive labels would be too verbose. */
+export const INTENT_LABEL: Readonly<Record<BranchIntent, string>> = {
+  record: 'Record',
+  propose: 'Propose',
+  correct: 'Correct',
+  explore: 'Explore',
+};
+
 /**
  * F0's own four header sentences, verbatim shape from the prompt pack:
  * "Recording: Dynamics went live 3 Sept" / "Proposing: replace ADQM by

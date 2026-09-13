@@ -6,6 +6,7 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { ChangeView } from '../changes/ChangeView';
+import { intentHeaderLine } from '../changes/branchIntent';
 import { useChange } from '../changes/useChange';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
@@ -100,7 +101,15 @@ export function ChangePage() {
           <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabel} />
           <div className={styles.headerRow}>
             <Text as="h1" size="2xl">
-              {branch?.title ?? branch?.name ?? 'Change'}
+              {/* Prompt pack F0: the header line names the change's own
+                  "why" (Recording:/Proposing:/Correction/Exploring:) — see
+                  `branchIntent.ts`'s own doc comment for the exact four
+                  sentences and why `correct` gets no title suffix. Falls
+                  back to the plain title/name this page always showed
+                  before F0 (a `null` branch — still loading — or an
+                  `intent` of `null`, which is real only for a change
+                  branch created before this migration existed). */}
+              {branch ? intentHeaderLine(branch) : 'Change'}
             </Text>
             {branchId && (
               <div className={styles.headerActions}>

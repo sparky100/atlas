@@ -77,7 +77,15 @@ test('propose a change from an element page as a contributor, edit, submit; appr
   // 4. The change's own page: stepper reads Draft, current, not yet submitted.
   await contributorPage.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
   await expect(contributorPage.getByTestId('stepper-draft')).toHaveAttribute('data-step-state', 'current');
-  await expect(contributorPage.getByText('Not yet submitted. The change owner submits it for review when ready.')).toBeVisible();
+  // Prompt pack F0: an element page's own "Propose a change" defaults to
+  // `correct` (`branchIntent.ts`'s `defaultIntentForEntryPoint('elementPage')`
+  // — this flow never touches the toggle to `propose`), so the stepper's
+  // sentence names the single-approver path (`changeStepper.ts`'s own
+  // `singleApprover` branch) rather than the shared review queue's wording.
+  // The mechanism underneath (submit → review page → approve → merge) is
+  // still today's ordinary `merge_requests` flow, unchanged — only the
+  // copy differs; PR3 is what actually skips the shared queue's UI.
+  await expect(contributorPage.getByText('Not yet submitted. Once submitted, a single owner or architect approves and merges it directly — no shared review queue.')).toBeVisible();
 
   await contributorPage.getByRole('button', { name: 'Submit for review' }).click();
   await expect(contributorPage).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
@@ -87,7 +95,7 @@ test('propose a change from an element page as a contributor, edit, submit; appr
   await contributorPage.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
   await expect(contributorPage.getByTestId('stepper-proposed')).toHaveAttribute('data-step-state', 'passed');
   await expect(contributorPage.getByTestId('stepper-in_review')).toHaveAttribute('data-step-state', 'current');
-  await expect(contributorPage.getByText('Awaiting review. An owner or architect approves or requests changes.')).toBeVisible();
+  await expect(contributorPage.getByText('Awaiting a single approver — an owner or architect merges it directly, no shared review queue.')).toBeVisible();
 
   // 6. Approve as the owner — atlas.approve_merge_request is owner/architect
   // only, unlike submit (owner/architect/contributor); a contributor's own

@@ -18,6 +18,7 @@ import { formatDateTime } from '../time';
 import { canCancelChange } from '../orgs/useMembership';
 import { BranchRebasePanel } from '../reviews/BranchRebasePanel';
 import { supabase } from '../supabaseClient';
+import { dateFieldLabelForIntent, isDateRequiredForIntent } from './branchIntent';
 import { branchStatusTone } from './branchStatus';
 import { deriveChangeStep } from './changeStepper';
 import { describeDelta } from './changeSummaryFormat';
@@ -98,6 +99,14 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   if (status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (status === 'not_found' || !branch) return <Text as="p">No change found for this id.</Text>;
 
+  // Prompt pack F0: `branch.intent` is only ever `null` for a change branch
+  // that predates the migration backfilling everything else to `propose` —
+  // real data always has one, but this view falls back the same way
+  // `duplicateIntoNewDraft` already does, rather than making every read
+  // below handle a `null` it should never actually see.
+  const intent = branch.intent ?? 'propose';
+  const dateFieldLabel = dateFieldLabelForIntent(intent);
+
   const duplicateIntoNewDraft = async () => {
     setDuplicateError(null);
     setDuplicating(true);
@@ -146,9 +155,9 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
     <div>
       <div className={styles.meta}>
         <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
-        {branch.target_date !== null && (
+        {dateFieldLabel !== null && branch.target_date !== null && (
           <Text as="span" tone="muted" size="sm">
-            Target: {branch.target_date}
+            {dateFieldLabel}: {branch.target_date}
           </Text>
         )}
         <Text as="span" tone="faint" size="xs">
@@ -335,7 +344,13 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
               void updateMetadata({
                 title: title.trim().length > 0 ? title.trim() : null,
                 description: description.trim().length > 0 ? description.trim() : null,
-                targetDate: targetDate.trim().length > 0 ? targetDate.trim() : null,
+                // F0: `correct`/`explore` have no date field at all (see
+                // `dateFieldLabelForIntent`'s own doc comment) — omitted
+                // from the patch entirely, not sent as `null`, so an
+                // unrelated edit never silently clears a date a `record`/
+                // `propose` change already had before an intent change
+                // (intent editing isn't UI yet, but the column itself is).
+                ...(dateFieldLabel !== null ? { targetDate: targetDate.trim().length > 0 ? targetDate.trim() : null } : {}),
               }).then(() => {
                 setEditing(false);
               });
@@ -358,14 +373,28 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
                 setDescription(e.target.value);
               }}
             />
-            <input
-              className={styles.input}
-              type="date"
-              value={targetDate}
-              onChange={(e) => {
-                setTargetDate(e.target.value);
-              }}
-            />
+            {/* F0: "delivered date" for record, "target date" for propose
+                — the same `branches.target_date` column either way (a
+                deliberate reuse, `branchIntent.ts`'s own doc comment);
+                `correct`/`explore` need no date at all, so the field is
+                omitted entirely rather than shown disabled. */}
+            {dateFieldLabel !== null && (
+              <div className={styles.dateField}>
+                <Text as="label" size="sm" tone="muted">
+                  {dateFieldLabel}
+                  {isDateRequiredForIntent(intent) ? ' (required)' : ''}
+                </Text>
+                <input
+                  className={styles.input}
+                  type="date"
+                  required={isDateRequiredForIntent(intent)}
+                  value={targetDate}
+                  onChange={(e) => {
+                    setTargetDate(e.target.value);
+                  }}
+                />
+              </div>
+            )}
             <div className={styles.actions}>
               <Button variant="primary" type="submit" disabled={status === 'saving'}>
                 Save

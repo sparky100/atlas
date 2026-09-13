@@ -14,7 +14,7 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import { useThreadCounts } from '../comments/useThreadCounts';
 import type { BranchIntent, BranchRow } from '../../db/types';
 import { branchStatusTone } from './branchStatus';
-import { INTENT_OPTIONS } from './branchIntent';
+import { dateFieldLabelForIntent, INTENT_LABEL, INTENT_OPTIONS } from './branchIntent';
 import { useChangeSummaries } from './useChangeSummaries';
 import { useChanges } from './useChanges';
 import styles from './ChangesView.module.css';
@@ -69,6 +69,17 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   // (`activeModels`/`archivedModels`, its own `CollapsibleSection`).
   const activeBranches = branches.filter((b) => b.status !== 'cancelled');
   const cancelledBranches = branches.filter((b) => b.status === 'cancelled');
+  // Prompt pack F0: "Changes list groups by intent" — one CollapsibleSection
+  // per intent, in `INTENT_OPTIONS`' own order (record, propose, correct,
+  // explore), shown only when it actually has an active branch — same
+  // "skip when empty" convention the Cancelled section below already uses,
+  // rather than four sections where most read "nothing here" on a small
+  // model. `?? 'propose'` covers only a pre-F0 change branch (real `intent`
+  // is never null post-migration) — same fallback `ChangeView.tsx` uses.
+  const branchesByIntent = INTENT_OPTIONS.map((option) => ({
+    intent: option.value,
+    branches: activeBranches.filter((b) => (b.intent ?? 'propose') === option.value),
+  }));
 
   return (
     <div>
@@ -209,19 +220,24 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
         </Panel>
       )}
       {activeBranches.length === 0 && status !== 'loading' && <EmptyState>No changes yet. {canCreate ? 'Create one above.' : 'Nobody has proposed one.'}</EmptyState>}
-      {activeBranches.length > 0 && (
-        <ul className={styles.list}>
-          {activeBranches.map((branch) => (
-            <ChangeRow
-              key={branch.id}
-              branch={branch}
-              orgSlug={orgSlug}
-              modelSlug={modelSlug}
-              unresolvedCount={threadCounts?.get(branch.id)?.open}
-              summary={summaries?.get(branch.id)}
-            />
-          ))}
-        </ul>
+      {branchesByIntent.map(
+        ({ intent, branches: group }) =>
+          group.length > 0 && (
+            <CollapsibleSection key={intent} title={INTENT_LABEL[intent]} meta={`(${String(group.length)})`}>
+              <ul className={styles.list}>
+                {group.map((branch) => (
+                  <ChangeRow
+                    key={branch.id}
+                    branch={branch}
+                    orgSlug={orgSlug}
+                    modelSlug={modelSlug}
+                    unresolvedCount={threadCounts?.get(branch.id)?.open}
+                    summary={summaries?.get(branch.id)}
+                  />
+                ))}
+              </ul>
+            </CollapsibleSection>
+          ),
       )}
 
       {cancelledBranches.length > 0 && (
@@ -258,6 +274,8 @@ function ChangeRow({
   /** `undefined` while `useChangeSummaries` is still loading, or if it failed — the card renders without this row rather than a loading placeholder for a nice-to-have. */
   summary: ChangeListSummary | undefined;
 }) {
+  const intent = branch.intent ?? 'propose';
+  const dateFieldLabel = dateFieldLabelForIntent(intent);
   return (
     <li className={styles.row}>
       <div>
@@ -286,10 +304,15 @@ function ChangeRow({
           </Text>
         )}
         <div className={styles.rowMeta}>
+          {/* Redundant with the section this row lives under while active
+              (grouped by intent above), but the one place this chip earns
+              its keep is the flat "Cancelled" section below, which mixes
+              every intent together with no grouping of its own. */}
+          <Chip tone="neutral">{INTENT_LABEL[intent]}</Chip>
           <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
-          {branch.target_date !== null && (
+          {dateFieldLabel !== null && branch.target_date !== null && (
             <Text as="span" tone="faint" size="xs">
-              Target: {branch.target_date}
+              {dateFieldLabel}: {branch.target_date}
             </Text>
           )}
           {/* Only the "has unresolved" state is real data — see

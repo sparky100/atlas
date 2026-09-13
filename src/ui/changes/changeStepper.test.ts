@@ -99,4 +99,31 @@ describe('deriveChangeStep', () => {
     const result = deriveChangeStep({ status: 'in_review' }, mergeRequest('pending'));
     expect(stateOf(result.steps, 'in_review')).toBe('current');
   });
+
+  it('record/correct: draft and proposed sentences name the single approver, no queue', () => {
+    for (const intent of ['record', 'correct'] as const) {
+      const draft = deriveChangeStep({ status: 'draft', intent }, null);
+      expect(draft.sentence).toMatch(/single owner or architect/i);
+      expect(draft.sentence).not.toMatch(/review queue$/i);
+
+      const proposed = deriveChangeStep({ status: 'proposed', intent }, mergeRequest('pending'));
+      expect(proposed.sentence).toMatch(/single approver/i);
+    }
+  });
+
+  it('propose/explore/omitted intent: unchanged, full-queue wording', () => {
+    for (const intent of ['propose', 'explore', undefined, null] as const) {
+      const draft = deriveChangeStep({ status: 'draft', intent }, null);
+      expect(draft.sentence).toMatch(/not yet submitted/i);
+      expect(draft.sentence).not.toMatch(/single owner or architect/i);
+
+      const proposed = deriveChangeStep({ status: 'proposed', intent }, mergeRequest('pending'));
+      expect(proposed.sentence).toMatch(/awaiting review/i);
+    }
+  });
+
+  it('a sent-back draft keeps its sentence regardless of intent (the "sent back" fact outranks review weight)', () => {
+    const result = deriveChangeStep({ status: 'draft', intent: 'record' }, mergeRequest('changes_requested'));
+    expect(result.sentence).toMatch(/sent back for changes/i);
+  });
 });
