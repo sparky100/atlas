@@ -111,7 +111,6 @@ export function LandscapePage() {
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
-  const capability = useBreadcrumbElement(model?.id ?? null, ref, capabilityId);
   const { label: branchLabel } = useBranchLabel(ref);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
@@ -119,6 +118,11 @@ export function LandscapePage() {
   // being viewed (src/db/elementSearch.ts's own module comment) — only the
   // write target (`editingBranch`) varies with the ref.
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
+  // S1 item 15 (A2 remainder): `mainBranch` is already resolved above —
+  // hand its head commit id through as `useBreadcrumbElement`'s own dedup
+  // hint (that hook's own parameter comment) rather than letting it run a
+  // second, redundant `resolveRef` for the common `ref.kind === 'main'` case.
+  const capability = useBreadcrumbElement(model?.id ?? null, ref, capabilityId, mainBranch?.head_commit_id ?? null);
   const canEdit = !viewing && editingBranch !== null && canEditBranch(role, editingBranch);
   // ADR-018 guarantees both are never null in practice (every branch always
   // has a real head, from genesis onward) — `BranchRow`'s own type hasn't

@@ -37,6 +37,7 @@ import { listAllSupportsEdges, listDeltasForCommits, listRecentCommits } from '.
 import { listProfilesByIds } from '../../db/profiles';
 import type { BranchRow, MergeRequestRow, ProfileRow } from '../../db/types';
 import { envelopeSubjects } from '../../engine/describeEnvelope';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 /** One "Recent activity" row's own extras beyond the bare `CommitRow` — author display and named subjects, both resolved in a batch across every shown commit rather than per-row (Sprint U4-1 B2). */
@@ -213,6 +214,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
     }
 
     load().catch((e: unknown) => {
+      reportError("Couldn't load the architect view.", e);
       if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load the architect view' });
     });
 

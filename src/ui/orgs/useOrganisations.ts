@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createOrganisation, listOrganisationsForUser } from '../../db/organisations';
 import type { OrganisationRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface UseOrganisationsResult {
@@ -27,6 +28,7 @@ export function useOrganisations(): UseOrganisationsResult {
         if (!cancelled) setOrganisations(rows);
       })
       .catch((e: unknown) => {
+        reportError("Couldn't load your organisations.", e);
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load organisations');
       })
       .finally(() => {

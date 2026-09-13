@@ -22,6 +22,7 @@ import { isPlatform } from '../elements/systemKind';
 import { computeLandscapeGroups, type LandscapeGroups } from './landscapeGroups';
 import type { LandscapeLayout } from './layout';
 import { computeLandscapeLayoutInWorker } from './layoutWorkerClient';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface LandscapeData {
@@ -280,6 +281,7 @@ export function useLandscape(
     }
 
     load().catch((e: unknown) => {
+      reportError("Couldn't load the landscape.", e);
       if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load the landscape' });
     });
 

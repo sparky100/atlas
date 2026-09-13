@@ -65,7 +65,7 @@ export function ElementsPage() {
   const canEdit = canEditOnMain(role);
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
 
-  const state = useElementBrowse(model?.id ?? '', filter);
+  const state = useElementBrowse(model?.id ?? '', filter, mainBranch?.head_commit_id ?? null);
   const onLinked = () => {
     reloadMainBranch();
     if (state.status === 'ready') state.reload();

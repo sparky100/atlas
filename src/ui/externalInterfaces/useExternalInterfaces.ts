@@ -3,6 +3,7 @@ import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
 import { findExternalInterfacesMissingClassification, findExternalOrganisationAccess, listAllUsesAndFlowsToEdges, listUsesAndFlowsToEndpointElements, type ExternalInterfaceCrossing, type ExternalOrganisationAccess } from '../../db/healthFindings';
 import { listActorsForLandscape } from '../../db/landscape';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export type ExternalInterfacesState =
@@ -52,6 +53,7 @@ export function useExternalInterfaces(modelId: UUID): ExternalInterfacesState {
     }
 
     load().catch((e: unknown) => {
+      reportError("Couldn't load external interfaces.", e);
       if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load external interfaces.' });
     });
     return () => {

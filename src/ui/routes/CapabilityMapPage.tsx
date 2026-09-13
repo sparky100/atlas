@@ -96,7 +96,7 @@ export function CapabilityMapPage() {
   const canEdit = ref.kind === 'main' && canEditOnMain(role);
   const { branch: mainBranch } = useMainBranch(model?.id ?? null);
 
-  const { state, reload } = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref);
+  const { state, reload } = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref, mainBranch?.head_commit_id ?? null);
   // S1 item 13: called unconditionally here (not inside `BackfillCapabilityOrderAction`
   // itself) — see that component's own module comment for why owning this
   // hook one level up, in a component that stays mounted across the

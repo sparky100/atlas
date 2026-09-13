@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { createModel, listModelsForOrg } from '../../db/models';
 import type { ModelRow } from '../../db/types';
 import type { UUID } from '../../contracts/delta';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface UseModelsResult {
@@ -29,6 +30,7 @@ export function useModels(orgId: UUID | null): UseModelsResult {
         if (!cancelled) setModels(rows);
       })
       .catch((e: unknown) => {
+        reportError("Couldn't load models.", e);
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load models');
       })
       .finally(() => {

@@ -8,6 +8,7 @@ import { getUnreadNotificationCount, listMyNotifications, markAllNotificationsRe
 import { getOrganisationById } from '../../db/organisations';
 import { listProfilesByIds } from '../../db/profiles';
 import type { CommentRow, NotificationRow, ProfileRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 /**
@@ -120,6 +121,7 @@ export function useNotificationTray(userId: UUID | null) {
 
         setState({ status: 'ready', rows });
       } catch (e) {
+        reportError("Couldn't load notifications.", e);
         setState({ status: 'error', message: e instanceof Error ? e.message : 'Could not load notifications.' });
       }
     })();

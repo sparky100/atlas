@@ -5,6 +5,7 @@ import { computeMergeReviewForBranch, pushRefresh } from '../../db/mergeRequests
 import type { BranchRow } from '../../db/types';
 import type { MergeReview } from '../../engine/merge';
 import type { FieldConflictChoice } from '../../engine/mergeResolution';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface BranchRebaseData {
@@ -50,6 +51,7 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
         setFieldChoices(new Map());
       })
       .catch((e: unknown) => {
+        reportError("Couldn't compute this rebase.", e);
         if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to compute this rebase.' });
       });
     return () => {

@@ -37,8 +37,25 @@ import styles from './ModelHome.module.css';
  * never run" unless their data is actually needed, the same principle
  * this item's own resolved-model gate applies to an unresolved id.
  */
-function DirectorDoor({ modelId, orgId, userId, role, orgSlug, modelSlug }: { modelId: UUID; orgId: UUID; userId: UUID | null; role: MemberRole | null; orgSlug: string; modelSlug: string }) {
-  const directorState = useDirectorHome(modelId, orgId);
+function DirectorDoor({
+  modelId,
+  orgId,
+  userId,
+  role,
+  orgSlug,
+  modelSlug,
+  mainCommitIdHint,
+}: {
+  modelId: UUID;
+  orgId: UUID;
+  userId: UUID | null;
+  role: MemberRole | null;
+  orgSlug: string;
+  modelSlug: string;
+  /** S1 item 15 (A2 remainder): `ModelHome`'s own already-resolved main head commit id — `useDirectorHome`'s own parameter comment. */
+  mainCommitIdHint: UUID | null;
+}) {
+  const directorState = useDirectorHome(modelId, orgId, mainCommitIdHint);
   if (directorState.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (directorState.status === 'error') return <Text as="p">{directorState.message}</Text>;
   return <DirectorHome data={directorState.data} reload={directorState.reload} modelId={modelId} orgId={orgId} userId={userId} role={role} orgSlug={orgSlug} modelSlug={modelSlug} />;
@@ -170,7 +187,17 @@ export function ModelHome() {
           </Link>
         </div>
 
-        {homeMode === 'director' && <DirectorDoor modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} role={role} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
+        {homeMode === 'director' && (
+          <DirectorDoor
+            modelId={model.id}
+            orgId={organisation?.id ?? ''}
+            userId={userId}
+            role={role}
+            orgSlug={organisation?.slug ?? ''}
+            modelSlug={model.slug}
+            mainCommitIdHint={mainBranch?.head_commit_id ?? null}
+          />
+        )}
         {homeMode === 'architect' && <ArchitectDoor modelId={model.id} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
         </main>
       </div>

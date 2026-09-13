@@ -9,6 +9,7 @@ import type { ViewKind, ViewRow } from '../../db/types';
 import type { ViewMode } from '../../db/viewMode';
 import type { VersionDiff } from '../../engine/versionDiff';
 import { computeStructureGroup, type StructureGroup } from './structureGrouping';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface StructureViewData {
@@ -53,13 +54,37 @@ const CONFIG: StructureViewKindConfig = { viewKind: 'container', parentType: 'sy
  * querying `elements_head`/`relationships_head` — same reasoning as
  * useLandscape.ts's own Sprint C1 note.
  */
-export function useStructureView(modelId: UUID, orgId: UUID, userId: UUID | null, parentId: UUID, ref: Ref, mode: ViewMode): StructureViewState {
+export function useStructureView(
+  modelId: UUID,
+  orgId: UUID,
+  userId: UUID | null,
+  parentId: UUID,
+  ref: Ref,
+  mode: ViewMode,
+  /**
+   * S1 item 15 (A2 remainder): the caller's own already-resolved main
+   * head commit id (`useMainBranch`), same dedup shape `useLandscape.ts`/
+   * `useCapabilityLandscape.ts` already use — skips this hook's own
+   * `resolveRef` round trip for a `main` ref when the caller has one in
+   * hand. Race-tolerant, not blocking (unlike `useLandscape.ts`'s own
+   * "wait for it" choice): a `main` ref still loads via `resolveRef`
+   * exactly as before whenever the hint is momentarily absent, so a
+   * caller that doesn't pass one yet never stalls.
+   */
+  mainCommitIdHint: UUID | null = null,
+): StructureViewState {
   const [state, setState] = useState<StructureViewState>({ status: 'loading' });
   const refParam = refParamOf(ref);
   const config = CONFIG;
 
   useEffect(() => {
-    if (!userId) return undefined;
+    // S1 item 15: guard on `modelId`/`parentId` too, not just `userId` —
+    // same fix as `useBreadcrumbElement.ts`'s own precedent for this exact
+    // shape (a caller's `model?.id ?? ''` fires this effect once before its
+    // own model resolves; left unguarded, `reportError`'s new catch-all
+    // here would otherwise post a banner that outlives the load that
+    // follows it).
+    if (!userId || !modelId || !parentId) return undefined;
     const currentUserId = userId;
     let cancelled = false;
     setState({ status: 'loading' });
@@ -98,7 +123,7 @@ export function useStructureView(modelId: UUID, orgId: UUID, userId: UUID | null
         const externalIds = [...new Set(relationships.flatMap((r) => [r.from_element_id, r.to_element_id]).filter((id) => !childIds.includes(id)))];
         elementsById = projectionElementsByIds(resolved.projection, externalIds);
       } else {
-        const resolvedCommitId = await resolveRef(supabase, modelId, ref);
+        const resolvedCommitId = ref.kind === 'main' && mainCommitIdHint ? mainCommitIdHint : await resolveRef(supabase, modelId, ref);
         if (!resolvedCommitId) {
           if (!cancelled) setState({ status: 'refNotFound' });
           return;
@@ -132,13 +157,14 @@ export function useStructureView(modelId: UUID, orgId: UUID, userId: UUID | null
     }
 
     load().catch((e: unknown) => {
+      reportError("Couldn't load this container.", e);
       if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load this container' });
     });
 
     return () => {
       cancelled = true;
     };
-  }, [modelId, orgId, userId, parentId, refParam, mode]);
+  }, [modelId, orgId, userId, parentId, refParam, mode, mainCommitIdHint]);
 
   return state;
 }

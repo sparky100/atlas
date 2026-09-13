@@ -112,9 +112,10 @@ export function ElementPage() {
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
 
-  const { state, reload } = useElementPage(model?.id ?? '', elementId ?? '', ref);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
+  // S1 item 15 (A2 remainder): same dedup hint as every other page here.
+  const { state, reload } = useElementPage(model?.id ?? '', elementId ?? '', ref, mainBranch?.head_commit_id ?? null);
   const canEdit = !viewing && editingBranch !== null && canEditBranch(role, editingBranch);
   // The complement of `canEdit` at `main`: a contributor who can create a
   // change branch but has no direct main-write path gets this instead of
