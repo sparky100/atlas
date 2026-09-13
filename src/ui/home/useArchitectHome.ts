@@ -16,6 +16,7 @@ import {
   findCriticalSystemsWithoutBusinessOwner,
   findExternalInterfacesMissingClassification,
   findExternalOrganisationAccess,
+  findFlowsToPlatformInsteadOfModule,
   findPlatformSupportsThatShouldMoveToModule,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
@@ -29,6 +30,7 @@ import {
   type BoundaryCrossing,
   type ExternalInterfaceCrossing,
   type ExternalOrganisationAccess,
+  type PlatformFlowEndpoint,
   type StaleAttributesFinding,
   type UnlabeledVerbRelationship,
 } from '../../db/healthFindings';
@@ -63,6 +65,8 @@ export interface ArchitectHomeData {
   systemsWithoutCapability: ElementsHeadRow[];
   /** S1 item 19's own informational nudge: a platform with modules that itself carries a direct `supports` edge, probably meant for the module. */
   platformSupportsThatShouldMoveToModule: ElementsHeadRow[];
+  /** S1 item 20's own informational nudge: a `uses`/`flows_to` edge naming a platform with modules directly, on either end, rather than the specific module. */
+  flowsToPlatformInsteadOfModule: PlatformFlowEndpoint[];
   capabilitiesWithoutOwner: ElementsHeadRow[];
   staleAttributes: StaleAttributesFinding;
   /** Sprint U4-1 B5's fifth finding: `uses`/`flows_to` relationships with no verb-phrase label. */
@@ -203,6 +207,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             duplicatesCount: 0,
             systemsWithoutCapability: findSystemsWithoutCapability(systems, supportsEdges, containers),
             platformSupportsThatShouldMoveToModule: findPlatformSupportsThatShouldMoveToModule(systems, supportsEdges, containers),
+            flowsToPlatformInsteadOfModule: findFlowsToPlatformInsteadOfModule(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges),
             staleAttributes: computeStaleAttributesFinding(facts, systems),
             unlabeledVerbRelationships: findUnlabeledVerbRelationships(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),

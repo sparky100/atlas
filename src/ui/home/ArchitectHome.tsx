@@ -8,7 +8,7 @@ import { HealthFinding, type HealthFindingItem } from '../components/HealthFindi
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, UnlabeledVerbRelationship } from '../../db/healthFindings';
+import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, PlatformFlowEndpoint, UnlabeledVerbRelationship } from '../../db/healthFindings';
 import { formatRelativeTime } from '../time';
 import { branchStatusTone } from '../changes/branchStatus';
 import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
@@ -49,6 +49,11 @@ function externalInterfaceItems(crossings: readonly ExternalInterfaceCrossing[])
 /** S1 item 11a's own second Assurance row — one row per external actor's own `uses` edge, naming the organisation and what it reaches. */
 function externalOrganisationAccessItems(access: readonly ExternalOrganisationAccess[]): HealthFindingItem[] {
   return access.map((a) => ({ id: a.relationshipId, label: `${a.organisation} uses ${a.systemName}` }));
+}
+
+/** S1 item 20's own nudge — relationship pairs again, same shape as `boundaryCrossingItems`. */
+function platformFlowEndpointItems(endpoints: readonly PlatformFlowEndpoint[]): HealthFindingItem[] {
+  return endpoints.map((endpoint) => ({ id: endpoint.relationshipId, label: `${endpoint.fromName} → ${endpoint.toName}` }));
 }
 
 /**
@@ -146,6 +151,16 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
       items: elementItems(data.platformSupportsThatShouldMoveToModule),
       browseHref: browseHref('platform-supports-move-to-module'),
       browseLabel: 'Review and move →',
+    },
+    {
+      // S1 item 20: the uses/flows_to sibling of the nudge above — same
+      // "informational, not a problem" shape; no browse-table home
+      // (relationship-shaped, like unlabeledVerbRelationships below), so no
+      // browseHref, same as that finding.
+      key: 'flows-to-platform-instead-of-module',
+      count: data.flowsToPlatformInsteadOfModule.length,
+      summary: `${String(data.flowsToPlatformInsteadOfModule.length)} flow${data.flowsToPlatformInsteadOfModule.length === 1 ? '' : 's'} that could point at a module instead of the platform`,
+      items: platformFlowEndpointItems(data.flowsToPlatformInsteadOfModule),
     },
     {
       key: 'unowned-capabilities',

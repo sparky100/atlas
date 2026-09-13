@@ -12,6 +12,7 @@ import {
   findCriticalSystemsWithoutBusinessOwner,
   findExternalInterfacesMissingClassification,
   findExternalOrganisationAccess,
+  findFlowsToPlatformInsteadOfModule,
   findPlatformSupportsThatShouldMoveToModule,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
@@ -115,6 +116,71 @@ describe('findPlatformSupportsThatShouldMoveToModule', () => {
     const systems = [system('sys-1')];
     const edges = [relationship('r1', 'supports', 'sys-1', 'finance')];
     expect(findPlatformSupportsThatShouldMoveToModule(systems, edges, [])).toEqual([]);
+  });
+});
+
+function elementsMap(...elements: ElementsHeadRow[]): Map<string, ElementsHeadRow> {
+  return new Map(elements.map((e) => [e.element_id, e]));
+}
+
+describe('findFlowsToPlatformInsteadOfModule', () => {
+  it('flags a flows_to edge naming a platform-with-modules directly, on the "to" side', () => {
+    const sap = system('sap', { kind: 'platform' });
+    const fi = container('fi', 'sap');
+    const salesforce = system('salesforce');
+    const elementsById = elementsMap(sap, fi, salesforce);
+    const edges = [relationship('r1', 'flows_to', 'salesforce', 'sap')];
+    expect(findFlowsToPlatformInsteadOfModule(edges, elementsById)).toEqual([
+      { relationshipId: 'r1', relationshipType: 'flows_to', fromName: 'System salesforce', toName: 'System sap', platformSide: 'to' },
+    ]);
+  });
+
+  it('flags a uses edge naming a platform-with-modules directly, on the "from" side', () => {
+    const sap = system('sap', { kind: 'platform' });
+    const fi = container('fi', 'sap');
+    const other = system('other');
+    const elementsById = elementsMap(sap, fi, other);
+    const edges = [relationship('r1', 'uses', 'sap', 'other')];
+    expect(findFlowsToPlatformInsteadOfModule(edges, elementsById)).toEqual([
+      { relationshipId: 'r1', relationshipType: 'uses', fromName: 'System sap', toName: 'System other', platformSide: 'from' },
+    ]);
+  });
+
+  it('flags both sides as "both" when two platforms-with-modules flow to each other directly', () => {
+    const sap = system('sap', { kind: 'platform' });
+    const fi = container('fi', 'sap');
+    const crm = system('crm', { kind: 'platform' });
+    const crmModule = container('crm-module', 'crm');
+    const elementsById = elementsMap(sap, fi, crm, crmModule);
+    const edges = [relationship('r1', 'flows_to', 'sap', 'crm')];
+    expect(findFlowsToPlatformInsteadOfModule(edges, elementsById)).toEqual([
+      { relationshipId: 'r1', relationshipType: 'flows_to', fromName: 'System sap', toName: 'System crm', platformSide: 'both' },
+    ]);
+  });
+
+  it('does not flag a flow that names the module, not the platform', () => {
+    const sap = system('sap', { kind: 'platform' });
+    const fi = container('fi', 'sap');
+    const salesforce = system('salesforce');
+    const elementsById = elementsMap(sap, fi, salesforce);
+    const edges = [relationship('r1', 'flows_to', 'salesforce', 'fi')];
+    expect(findFlowsToPlatformInsteadOfModule(edges, elementsById)).toEqual([]);
+  });
+
+  it('does not flag a platform with no modules — there is nowhere lower to point the edge', () => {
+    const sap = system('sap', { kind: 'platform' });
+    const salesforce = system('salesforce');
+    const elementsById = elementsMap(sap, salesforce);
+    const edges = [relationship('r1', 'flows_to', 'salesforce', 'sap')];
+    expect(findFlowsToPlatformInsteadOfModule(edges, elementsById)).toEqual([]);
+  });
+
+  it('does not flag an ordinary (non-platform) system endpoint', () => {
+    const a = system('a');
+    const b = system('b');
+    const elementsById = elementsMap(a, b);
+    const edges = [relationship('r1', 'flows_to', 'a', 'b')];
+    expect(findFlowsToPlatformInsteadOfModule(edges, elementsById)).toEqual([]);
   });
 });
 
