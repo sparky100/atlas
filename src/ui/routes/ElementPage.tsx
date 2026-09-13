@@ -12,9 +12,9 @@ import { Button } from '../components/Button/Button';
 import { ChangesTouchingSection } from '../components/ChangesTouchingSection/ChangesTouchingSection';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { CommentsSection } from '../components/CommentsSection/CommentsSection';
+import { ElementDecisionsSection } from '../components/ElementDecisionsSection/ElementDecisionsSection';
 import { ElementHeader } from '../components/ElementHeader/ElementHeader';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
-import { EmptyState } from '../components/EmptyState/EmptyState';
 import { HistoryTimeline } from '../components/HistoryTimeline/HistoryTimeline';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
@@ -431,13 +431,11 @@ export function ElementPage() {
                 <CollapsibleSection title="History">
                   <HistoryTimeline history={state.data.history} />
                 </CollapsibleSection>
-                <CollapsibleSection title="Decisions">
-                  {/* Prompt 7h bug B6: no developer wording ("Sprint D1") in a
-                      user-facing string — decisions themselves are still a
-                      genuinely absent feature (CLAUDE.md rule 7: absent, not
-                      faked), just said plainly rather than naming the
-                      internal roadmap item that will eventually build it. */}
-                  <EmptyState>No decisions recorded</EmptyState>
+                <CollapsibleSection title="Decisions" meta={`(${String(state.data.elementDecisions.length)})`}>
+                  {/* "Why is this here" (prompt pack F3 PR6) — replaces the
+                      hardcoded EmptyState Prompt 7h bug B6 left here before
+                      the decisions schema existed at all. */}
+                  <ElementDecisionsSection entries={state.data.elementDecisions} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
                 </CollapsibleSection>
                 <CollapsibleSection title="Comments">
                   <CommentsSection

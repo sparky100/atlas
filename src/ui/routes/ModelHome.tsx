@@ -61,11 +61,24 @@ function DirectorDoor({
   return <DirectorHome data={directorState.data} reload={directorState.reload} modelId={modelId} orgId={orgId} userId={userId} role={role} orgSlug={orgSlug} modelSlug={modelSlug} />;
 }
 
-function ArchitectDoor({ modelId, userId, orgSlug, modelSlug }: { modelId: UUID; userId: UUID | null; orgSlug: string; modelSlug: string }) {
+function ArchitectDoor({
+  modelId,
+  userId,
+  role,
+  orgSlug,
+  modelSlug,
+}: {
+  modelId: UUID;
+  userId: UUID | null;
+  /** Prompt pack F3 PR6: "Start a decision" on a health finding row is gated the same as any other decision-starting entry point (`canStartDecision`) — this door had no role prop at all before this. */
+  role: MemberRole | null;
+  orgSlug: string;
+  modelSlug: string;
+}) {
   const architectState = useArchitectHome(modelId, userId);
   if (architectState.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (architectState.status === 'error') return <Text as="p">{architectState.message}</Text>;
-  return <ArchitectHome data={architectState.data} orgSlug={orgSlug} modelSlug={modelSlug} />;
+  return <ArchitectHome data={architectState.data} role={role} orgSlug={orgSlug} modelSlug={modelSlug} />;
 }
 
 /**
@@ -198,7 +211,7 @@ export function ModelHome() {
             mainCommitIdHint={mainBranch?.head_commit_id ?? null}
           />
         )}
-        {homeMode === 'architect' && <ArchitectDoor modelId={model.id} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
+        {homeMode === 'architect' && <ArchitectDoor modelId={model.id} userId={userId} role={role} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
         </main>
       </div>
     </div>

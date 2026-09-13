@@ -11,11 +11,12 @@
  * Covers: the `decisions` round-trip, its draft-only (`status='proposed'`)
  * update guard, `decision_links`'s own status-gated insert, a minimal
  * `assumptions`/`evidence` round-trip, the `'decision'` anchor wiring on
- * `comments` (`atlas.check_anchor`/`atlas.anchor_visible_to_viewer`), and
+ * `comments` (`atlas.check_anchor`/`atlas.anchor_visible_to_viewer`),
  * (PR5) `atlas.choose_decision_option` end to end — three `explore`-intent
  * options, choosing one, asserting the chosen branch's flipped `propose`
  * intent, the other two's `cancel_reason`, the one `decision_arguments`
- * row, and `decisions.status`/`branch_id`/`decided_by`/`decided_at`.
+ * row, and `decisions.status`/`branch_id`/`decided_by`/`decided_at` — and
+ * (PR6) `listDecisionsLinkingElements`, "why is this here"'s own query.
  */
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -25,7 +26,16 @@ import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { commitToBranch } from './commits';
 import { createComment, listCommentsForAnchor } from './comments';
-import { chooseDecisionOption, createDecision, createDecisionLink, getDecision, listDecisionArgumentsForDecision, listDecisionLinksForDecision, listDecisionsForModel } from './decisions';
+import {
+  chooseDecisionOption,
+  createDecision,
+  createDecisionLink,
+  getDecision,
+  listDecisionArgumentsForDecision,
+  listDecisionLinksForDecision,
+  listDecisionsForModel,
+  listDecisionsLinkingElements,
+} from './decisions';
 import { loadEnv } from './env';
 import { createModel } from './models';
 import { createOrganisation } from './organisations';
@@ -288,6 +298,35 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       // Submit the option for review — it leaves 'draft', so it's no longer a legal choice even though it's still linked.
       await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: randomUUID(), p_branch_id: option.id, p_classification: {} });
       await expect(chooseDecisionOption(alice.client, decision.id, option.id, 'no longer a draft')).rejects.toThrow();
+    });
+  });
+
+  describe('listDecisionsLinkingElements (prompt pack F3 PR6, "why is this here")', () => {
+    it('finds a decision linking the given element, ignores one linking an unrelated element, and dedupes a decision linked to two of the given ids at once', async () => {
+      const linked = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Concerns the seeded system', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      await createDecisionLink(alice.client, { decisionId: linked.id, linkedType: 'element', linkedId: elementId, createdBy: alice.id });
+
+      const unrelatedElementId = randomUUID();
+      const unrelated = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Concerns something else entirely', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      await createDecisionLink(alice.client, { decisionId: unrelated.id, linkedType: 'element', linkedId: unrelatedElementId, createdBy: alice.id });
+
+      // Linked to *both* ids in the query list at once — must appear exactly once, not twice.
+      const dualLinked = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Concerns both the system and another id', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const secondQueriedId = randomUUID();
+      await createDecisionLink(alice.client, { decisionId: dualLinked.id, linkedType: 'element', linkedId: elementId, createdBy: alice.id });
+      await createDecisionLink(alice.client, { decisionId: dualLinked.id, linkedType: 'element', linkedId: secondQueriedId, createdBy: alice.id });
+
+      const found = await listDecisionsLinkingElements(alice.client, [elementId, secondQueriedId]);
+      const foundIds = found.map((f) => f.decision.id);
+      expect(foundIds).toContain(linked.id);
+      expect(foundIds).toContain(dualLinked.id);
+      expect(foundIds).not.toContain(unrelated.id);
+      expect(foundIds.filter((id) => id === dualLinked.id)).toHaveLength(1);
+    });
+
+    it('returns an empty list for an element with no decisions at all, and for an empty input list', async () => {
+      expect(await listDecisionsLinkingElements(alice.client, [randomUUID()])).toEqual([]);
+      expect(await listDecisionsLinkingElements(alice.client, [])).toEqual([]);
     });
   });
 });

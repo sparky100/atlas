@@ -1,9 +1,10 @@
-import { useParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
+import { parseDecisionPrefillFromSearchParams } from '../decisions/decisionPrefill';
 import { DecisionsView } from '../decisions/DecisionsView';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
@@ -28,6 +29,12 @@ export function DecisionsPage() {
   const { userId } = useAuth();
   const { ref } = useSelectedRef();
   const { label: branchLabel } = useBranchLabel(ref);
+  const [searchParams] = useSearchParams();
+  // Prompt pack F3 PR6: "Start a decision" from a health finding or a
+  // weak-capability tile lands here with its own context pre-filled —
+  // `null` (the ordinary case, a bare `/decisions` link) opens the form
+  // blank, same as before this PR.
+  const prefill = parseDecisionPrefillFromSearchParams(searchParams);
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
@@ -62,7 +69,7 @@ export function DecisionsPage() {
               Decisions
             </Text>
           </div>
-          <DecisionsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} />
+          <DecisionsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} prefill={prefill} />
         </main>
       </div>
     </div>

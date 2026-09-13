@@ -8,9 +8,13 @@ import { HealthFinding, type HealthFindingItem } from '../components/HealthFindi
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { ElementsHeadRow } from '../../contracts/rows';
+import type { MemberRole } from '../../db/types';
 import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, PlatformFlowEndpoint, UnlabeledVerbRelationship } from '../../db/healthFindings';
 import { formatRelativeTime } from '../time';
 import { branchStatusTone } from '../changes/branchStatus';
+import { decisionPrefillToSearchParams, prefillFromCriticalSupportEndFinding } from '../decisions/decisionPrefill';
+import { StartDecisionLink } from '../decisions/StartDecisionLink';
+import { canStartDecision } from '../orgs/useMembership';
 import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
 import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
 import type { ArchitectHomeData, RecentCommitRow } from './useArchitectHome';
@@ -18,6 +22,8 @@ import styles from './DoorHome.module.css';
 
 export interface ArchitectHomeProps {
   data: ArchitectHomeData;
+  /** Prompt pack F3 PR6: gates the "Start a decision →" row action on the `critical-support-end` finding below (`canStartDecision`) — omitted entirely, not shown disabled, for a viewer. */
+  role: MemberRole | null;
   orgSlug: string;
   modelSlug: string;
 }
@@ -109,9 +115,13 @@ function platformFlowEndpointItems(endpoints: readonly PlatformFlowEndpoint[]): 
  * for why its three vocabularies stay distinct rather than collapsing
  * into one literal format string.
  */
-export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) {
+export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeProps) {
   const now = new Date();
   const elementHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}`;
+  // Prompt pack F3 PR6: "Start a decision" — the finding's own click hands
+  // the Decisions list a pre-filled form (`decisionPrefill.ts`), carried as
+  // ordinary URL search params on the `/decisions` link itself.
+  const startDecisionHref = (prefill: ReturnType<typeof prefillFromCriticalSupportEndFinding>) => `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefill).toString()}`;
   // A commit's diff against its own parent (Sprint U4-1 B2) — main's genesis
   // commit has no parent to diff against, so it stays plain text below
   // rather than linking anywhere.
@@ -247,6 +257,17 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
       summary: `${String(data.criticalSystemsPastOrNearSupportEnd.length)} critical ${plural(data.criticalSystemsPastOrNearSupportEnd.length, 'system', 'systems')} past or near vendor support end`,
       items: elementItems(data.criticalSystemsPastOrNearSupportEnd),
       browseHref: browseHref('critical-support-end'),
+      // Prompt pack F3 PR6: "Start a decision" from a health finding —
+      // F3's own named "SAP PM" golden path. `item.label` is exactly the
+      // system's own name for this finding (`elementItems`, above), so no
+      // second lookup is needed to build the prefill. Conditionally spread,
+      // not `undefined` — `exactOptionalPropertyTypes` (tsconfig.json)
+      // treats an explicit `itemAction: undefined` differently from the
+      // key being absent, the same reason `browseProps` below already
+      // spreads rather than sets its own optional fields to `undefined`.
+      ...(canStartDecision(role)
+        ? { itemAction: (item: HealthFindingItem) => <StartDecisionLink href={startDecisionHref(prefillFromCriticalSupportEndFinding({ id: item.id, name: item.label }))} /> }
+        : {}),
     },
     {
       key: 'external-interfaces-missing-classification',
@@ -274,7 +295,8 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
 
   function checkPlate(check: HealthCheck, index: number) {
     const browseProps = check.browseHref !== undefined ? { browseHref: check.browseHref, ...(check.browseLabel !== undefined && { browseLabel: check.browseLabel }) } : {};
-    const finding = <HealthFinding summary={check.summary} items={check.items} {...browseProps} />;
+    const itemActionProps = check.itemAction !== undefined ? { itemAction: check.itemAction } : {};
+    const finding = <HealthFinding summary={check.summary} items={check.items} {...browseProps} {...itemActionProps} />;
     // Item 6's convention: the first *real* (non-zero) finding in a group
     // is blueprint-framed — preserved here now that zero-count checks no
     // longer take a plate of their own to be "first".

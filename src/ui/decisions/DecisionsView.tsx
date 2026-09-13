@@ -11,6 +11,7 @@ import { useMainBranch } from '../branches/useMainBranch';
 import { useMembers } from '../orgs/useMembers';
 import { profileLabel } from '../comments/profileLabel';
 import type { DecisionRow } from '../../db/types';
+import type { DecisionPrefill } from './decisionPrefill';
 import { DecisionLinkPicker } from './DecisionLinkPicker';
 import { decisionStatusTone } from './decisionStatus';
 import { useDecisions } from './useDecisions';
@@ -24,24 +25,34 @@ export interface DecisionsViewProps {
   modelSlug: string;
   /** Same floor as `canCreateChangeBranch` (F3's own resolved decision — see `docs/ADR-022-decisions-schema.md`) — omitted entirely, not shown disabled, when false. */
   canCreate: boolean;
+  /** Prompt pack F3 PR6: "Start a decision" from a health finding or a weak-capability tile — `null` for the ordinary bare `/decisions` visit, which opens the form blank exactly as before this PR. */
+  prefill: DecisionPrefill | null;
 }
 
 /**
- * Prompt pack F3 PR4's "Decisions" list — create + list only (no options/
- * compare/choose yet, PR5; no "Start a decision" pre-fill or "why is this
- * here" yet, PR6). Mirrors `ChangesView.tsx`'s own shape: a create form
- * gated by role, loading/empty states, a list of rows linking onward.
+ * Prompt pack F3's "Decisions" list — create + list (PR4), reads a
+ * `prefill` (PR6's "Start a decision" from a health finding or a weak-
+ * capability tile) to open the form already filled in rather than blank.
+ * Mirrors `ChangesView.tsx`'s own shape: a create form gated by role,
+ * loading/empty states, a list of rows linking onward.
  */
-export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate }: DecisionsViewProps) {
+export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate, prefill }: DecisionsViewProps) {
   const navigate = useNavigate();
   const { status, decisions, error, createDecisionWithLinks } = useDecisions(modelId, orgId, userId);
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
-  const [title, setTitle] = useState('');
-  const [statement, setStatement] = useState('');
+  // Lazy initializers, not an effect: `prefill` is read once, from the URL
+  // this page landed on — a person is free to edit any of these fields
+  // afterwards without them snapping back, and a later re-render (e.g. the
+  // owner `<select>` populating once `members` loads) never overwrites a
+  // title/statement/link the person already touched.
+  const [title, setTitle] = useState(() => prefill?.title ?? '');
+  const [statement, setStatement] = useState(() => prefill?.statement ?? '');
   const [ownerId, setOwnerId] = useState(userId ?? '');
   const [neededBy, setNeededBy] = useState('');
-  const [links, setLinks] = useState<{ elementId: UUID; name: string }[]>([]);
+  const [links, setLinks] = useState<{ elementId: UUID; name: string }[]>(() =>
+    prefill ? [{ elementId: prefill.linkedElementId, name: prefill.linkedElementName }] : [],
+  );
 
   const resetForm = () => {
     setTitle('');
@@ -68,6 +79,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
                 statement,
                 ownerId,
                 neededBy,
+                ...(prefill ? { sourceFindingKey: prefill.sourceFindingKey } : {}),
                 links: links.map((l) => ({ linkedType: 'element' as const, linkedId: l.elementId })),
               }).then((decision) => {
                 if (decision) {

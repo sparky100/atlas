@@ -14,6 +14,14 @@
   gap: var(--space-1);
 }
 
+/* Prompt pack F3 PR6: only applied to a row that actually has an `itemAction` — an ordinary finding's rows stay a bare `<li>`, no layout change. */
+.itemRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
 .pagination {
   display: flex;
   align-items: center;

@@ -98,6 +98,45 @@ export async function listDecisionArgumentsForDecision(supabase: Client, decisio
 }
 
 /**
+ * F3 PR6's "why is this here": every decision that names one of the given
+ * elements as something it concerns (`linked_type='element'`). `elementIds`
+ * is the element itself plus, for a capability, its own capability
+ * ancestors (`useElementDecisions.ts`'s own caller builds that list) — a
+ * chain capped at three levels (SPEC's own L1/L2/L3 ceiling), never a list
+ * that grows with model size, so this doesn't need `assertInFilterSize`
+ * (SPEC §6.7's own guard is for a caller-supplied id list that scales with
+ * the model, not a small fixed structural chain like this one).
+ */
+export interface ElementDecisionLink {
+  decision: DecisionRow;
+  /** Which of `elementIds` this decision actually names — the element itself, or one of its capability ancestors. */
+  linkedElementId: UUID;
+}
+
+export async function listDecisionsLinkingElements(supabase: Client, elementIds: readonly UUID[]): Promise<ElementDecisionLink[]> {
+  if (elementIds.length === 0) return [];
+  // Two plain queries rather than a postgrest embed: `decision_links` is a
+  // polymorphic link (SPEC §3.8) — `linked_id` has no FK to embed through
+  // at all, and even `decision_id`'s own real FK to `decisions(id)` isn't
+  // worth an embed here given this untyped client (see branches.ts's own
+  // module comment) infers an embedded one-to-one as an array without a
+  // schema to disambiguate it against. `decisionIds` is bounded by however
+  // many links matched `elementIds` itself (already capped at 3) — never a
+  // list that scales with model size.
+  const { data: links, error: linksError } = await supabase.from('decision_links').select('decision_id, linked_id').eq('linked_type', 'element').in('linked_id', elementIds);
+  if (linksError) throw new Error(`listDecisionsLinkingElements: ${linksError.message}`);
+  const linkRows = links as { decision_id: UUID; linked_id: UUID }[];
+  if (linkRows.length === 0) return [];
+  const decisionIds = [...new Set(linkRows.map((l) => l.decision_id))];
+  const decisions = await Promise.all(decisionIds.map((id) => getDecision(supabase, id)));
+  const decisionsById = new Map(decisions.filter((d): d is DecisionRow => d !== null).map((d) => [d.id, d]));
+  return linkRows.flatMap((link) => {
+    const decision = decisionsById.get(link.decision_id);
+    return decision ? [{ decision, linkedElementId: link.linked_id }] : [];
+  });
+}
+
+/**
  * F3 PR5's "Choose": `atlas.choose_decision_option`
  * (`20260913120000_choose_decision_option.sql`) — the only writer
  * `decision_arguments` has. Atomically accepts the decision, records

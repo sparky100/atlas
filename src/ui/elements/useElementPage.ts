@@ -15,6 +15,8 @@ import {
   listRelationshipsForElement,
   type DeltaHistoryRow,
 } from '../../db/elements';
+import { listBranchesByIds } from '../../db/branches';
+import { listDecisionLinksForDecision, listDecisionsLinkingElements } from '../../db/decisions';
 import {
   loadProjectionAtCommit,
   projectionChildrenOf,
@@ -25,7 +27,7 @@ import {
   projectionRelationshipsForElement,
 } from '../../db/branchProjection';
 import type { HeadProjection } from '../../engine/projection';
-import type { AliasRow, BranchRow, SourceRow } from '../../db/types';
+import type { AliasRow, BranchRow, DecisionRow, SourceRow } from '../../db/types';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import { attributesRecord } from './attributesRecord';
 import { capabilityLevel } from './capabilityDepth';
@@ -75,6 +77,22 @@ export interface ElementPageData {
   moduleSupportsEdges: RelationshipsHeadRow[];
   /** Every capability named by a `moduleSupportsEdges` edge's own `toElementId` — what `ModulesSection.tsx` groups modules by. */
   moduleSupportsCapabilities: Map<UUID, ElementsHeadRow>;
+  /**
+   * "Why is this here" (prompt pack F3 PR6): every decision that names
+   * this element — or, for a capability, one of its own capability
+   * ancestors — as something it concerns, newest first, each with every
+   * branch-linked option it has (the chosen one and any cancelled
+   * "losing" ones alike, for a decision that's already `accepted`; every
+   * option is still `draft` for one that isn't). Decisions are model-wide,
+   * never branch/ref-scoped (same reasoning `useDecision.ts` already
+   * gives), so this is read the same regardless of the page's own `ref`.
+   */
+  elementDecisions: ElementPageDecisionEntry[];
+}
+
+export interface ElementPageDecisionEntry {
+  decision: DecisionRow;
+  options: BranchRow[];
 }
 
 export type ElementPageState =
@@ -238,12 +256,37 @@ export function useElementPage(
       // Capability only, and only as deep as the level computation needs
       // (at most a grandparent — nesting is capped at 3 levels): a plain
       // structural value, not a fact, so it gets no badge and lives
-      // outside `facts` entirely.
+      // outside `facts` entirely. `grandparent` is also "why is this
+      // here"'s own capability-ancestor chain below, not refetched there.
       let elementCapabilityLevel: number | null | undefined;
+      let grandparent: ElementsHeadRow | null = null;
       if (element.element_type === 'capability') {
-        const grandparent = parent?.parent_id ? await source.element(parent.parent_id) : null;
+        grandparent = parent?.parent_id ? await source.element(parent.parent_id) : null;
         elementCapabilityLevel = capabilityLevel(parent, grandparent);
       }
+
+      // "Why is this here" (prompt pack F3 PR6): this element itself, plus
+      // — only for a capability — its own capability ancestors (`parent`/
+      // `grandparent` above), a chain capped at 2 extra ids by SPEC's own
+      // L1/L2/L3 nesting ceiling, never a list that grows with model size.
+      const decisionElementIds: UUID[] = [elementId];
+      if (element.element_type === 'capability') {
+        if (parent) decisionElementIds.push(parent.element_id);
+        if (grandparent) decisionElementIds.push(grandparent.element_id);
+      }
+      const decisionLinks = await listDecisionsLinkingElements(supabase, decisionElementIds);
+      const decisionsById = new Map<UUID, DecisionRow>();
+      for (const link of decisionLinks) decisionsById.set(link.decision.id, link.decision);
+      const elementDecisions: ElementPageDecisionEntry[] = await Promise.all(
+        [...decisionsById.values()]
+          .sort((a, b) => (a.created_at === b.created_at ? 0 : a.created_at < b.created_at ? 1 : -1))
+          .map(async (decision) => {
+            const allLinks = await listDecisionLinksForDecision(supabase, decision.id);
+            const branchIds = allLinks.filter((l) => l.linked_type === 'branch').map((l) => l.linked_id);
+            const options = branchIds.length > 0 ? await listBranchesByIds(supabase, branchIds) : [];
+            return { decision, options };
+          }),
+      );
 
       // Relationship attribute editing, general: the expanded attributes
       // panel shows `uses`/`flows_to`'s own `via` (an integration-platform
@@ -318,6 +361,7 @@ export function useElementPage(
             flowsViaThisPlatformEndpoints,
             moduleSupportsEdges,
             moduleSupportsCapabilities,
+            elementDecisions,
           },
         });
       }

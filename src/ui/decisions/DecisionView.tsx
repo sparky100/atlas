@@ -13,8 +13,11 @@ import { useMainBranch } from '../branches/useMainBranch';
 import type { MemberRole } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { branchStatusTone } from '../changes/branchStatus';
+import { profileLabel } from '../comments/profileLabel';
 import { canChooseDecisionOption, canCreateChangeBranch } from '../orgs/useMembership';
+import { useMembers } from '../orgs/useMembers';
 import { decisionStatusTone } from './decisionStatus';
+import { exportDecisionAsAdrMarkdown } from './exportDecisionAsAdr';
 import { useDecision } from './useDecision';
 import { useDecisionComparison, type DecisionComparisonOption } from './useDecisionComparison';
 import { useDecisionOptions } from './useDecisionOptions';
@@ -31,18 +34,24 @@ export interface DecisionViewProps {
 
 /**
  * A single decision's own page (prompt pack F3). PR4 built context/owner/
- * needed-by, its links, and comments; PR5 adds "Add an option" (a fresh
+ * needed-by, its links, and comments; PR5 added "Add an option" (a fresh
  * `explore`-intent branch, linked), the comparison table
  * (`compareOptions.ts` — each option's own folded state re-run through
  * the existing capability-map metrics and boundary-crossing finding,
  * diffed against main), and "Choose" (`atlas.choose_decision_option` in
- * one call). "Start a decision" from a health finding and "why is this
- * here" are PR6.
+ * one call). PR6 adds "Copy as ADR markdown" (`exportDecisionAsAdr.ts` —
+ * a pure string-template builder, copied to the clipboard the same way
+ * `ElementHeader.tsx`'s own "Copy element ID" already does, since nothing
+ * in this app has ever offered a file download to invent a second
+ * mechanism for). "Start a decision" from a health finding and "why is
+ * this here" (an element's own linked decisions) are also PR6, but live on
+ * `DecisionsView.tsx`/`ElementDecisionsSection.tsx` respectively, not here.
  */
 export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role }: DecisionViewProps) {
   const { userId } = useAuth();
   const { state, reload } = useDecision(modelId, decisionId);
   const { branch: main } = useMainBranch(modelId);
+  const { members } = useMembers(orgId);
   const optionsState = useDecisionOptions(reload);
 
   const [addingOption, setAddingOption] = useState(false);
@@ -50,6 +59,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const [optionTitle, setOptionTitle] = useState('');
   const [choosingBranchId, setChoosingBranchId] = useState<UUID | null>(null);
   const [reasons, setReasons] = useState('');
+  const [adrCopied, setAdrCopied] = useState(false);
 
   // Every hook above must run unconditionally (rules of hooks) — the
   // comparison hook too, even before `state` has resolved to `ready`;
@@ -74,6 +84,40 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const canAddOption = canCreateChangeBranch(role) && decision.status === 'proposed';
   const canChoose = canChooseDecisionOption(role) && decision.status === 'proposed';
 
+  // Prompt pack F3 PR6's "Export as ADR markdown" — assembled from data
+  // this page has already loaded (no second round trip). `decisionArgLinks`
+  // filters to the `stance: 'for'` row `atlas.choose_decision_option`
+  // itself writes (PR5); `null` until the decision is `accepted`, the same
+  // "not yet decided" honesty `exportDecisionAsAdrMarkdown` itself renders.
+  const ownerName = profileLabel(members.find((m) => m.member.user_id === decision.owner_id)?.profile);
+  // Distinct from the `reasons`/`setReasons` state above, which is the
+  // in-progress "Choose" confirm form's own textarea — this is the
+  // decision's own already-recorded `decision_arguments` row, once it has one.
+  const decidedReasons = args.find((a) => a.stance === 'for')?.body ?? null;
+
+  async function copyAdrMarkdown() {
+    const markdown = exportDecisionAsAdrMarkdown({
+      decision,
+      ownerName,
+      options: branchLinks
+        .map((l) => linkedBranchesById.get(l.linked_id))
+        .filter((b): b is NonNullable<typeof b> => b !== undefined)
+        .map((b) => ({ branch: b, isChosen: b.id === decision.branch_id })),
+      reasons: decidedReasons,
+    });
+    try {
+      await navigator.clipboard.writeText(markdown);
+      setAdrCopied(true);
+      setTimeout(() => {
+        setAdrCopied(false);
+      }, 1500);
+    } catch {
+      // Clipboard access can be denied (permissions, insecure context) —
+      // not worth surfacing as an error for a copy-to-clipboard nicety,
+      // same call `ElementHeader.tsx`'s own "Copy element ID" makes.
+    }
+  }
+
   return (
     <div>
       <div className={styles.meta}>
@@ -90,6 +134,9 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             </Text>
           </a>
         )}
+        <Button variant="ghost" onClick={() => void copyAdrMarkdown()}>
+          {adrCopied ? 'Copied' : 'Copy as ADR markdown'}
+        </Button>
       </div>
 
       <Panel>
