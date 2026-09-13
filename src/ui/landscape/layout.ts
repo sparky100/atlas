@@ -165,6 +165,8 @@ export interface LandscapeLane {
   region: LandscapeLaneRegion;
   y: number;
   height: number;
+  /** V2 "landscape focus and filters": this lane's own resolved collapse state (`isLaneCollapsed`'s own result, computed once here rather than re-derived by every consumer) — `LandscapeFocusPanel.tsx`'s per-lane list reads this directly instead of re-implementing the override/emptiness tie-break itself. */
+  collapsed: boolean;
 }
 
 /** The enterprise boundary's own y-range (item 3) — spans every `'capability'`/`'unassigned'` lane, never an `'external'` one or the actor row above it. `LandscapeCanvas.tsx` draws the rectangle `BOUNDARY_MARGIN` outside this range; `top === bottom` for a model with no internal lanes at all (nothing to draw). */
@@ -470,7 +472,7 @@ export function computeLandscapeLayout(
     const hasAnyMembers = members.length > 0 || sortedActorMembers.length > 0;
     const contentHeight = row.height + (sortedActorMembers.length > 0 ? (members.length > 0 ? NODE_GUTTER_Y : 0) + laneActorRow.height : 0);
     const laneHeight = hasAnyMembers ? LANE_LABEL_HEIGHT + contentHeight + LANE_GUTTER_Y : LANE_LABEL_HEIGHT + EMPTY_LANE_GUTTER_Y;
-    lanes.push({ key, label, region, y, height: laneHeight });
+    lanes.push({ key, label, region, y, height: laneHeight, collapsed });
 
     for (const node of row.nodes) {
       const extraLaneCount = extraLaneCountByElementId.get(node.elementId);
