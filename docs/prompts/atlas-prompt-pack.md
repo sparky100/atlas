@@ -42,11 +42,14 @@ Applied by every session, cloud or desktop. Put into CLAUDE.md by prompt P1.
 1. **P1** — process: CLAUDE.md rules, deploy pipeline fixed, screen record, walkthrough intake, pack committed. Half a day.
 2. **E1** — C19. Desktop. Before any other engine or UI change.
 3. **S1** — stabilisation from the 11–12 September walkthrough and the audit's gaps. UI only.
-4. **S2** — golden paths: write the eight click-only specs, fix what they expose, ship nothing else.
+3a. **V1** — the context diagram (platform modules inside the tile, actors as people, verb edges, boundary). Desktop and mobile.
+4. **S2** — golden paths: write the eight click-only specs (flow 2 covers V1), fix what they expose, ship nothing else.
 5. **Human walkthrough**, findings filed via the intake → **S3**.
 6. Repeat 4–5 until the definition of usable holds by golden path.
+**Gate before any feature sprint:** S2's eight golden paths green at 1280 and 390; the context view built as a diagram (platform modules inside the tile); E1 merged; the deploy workflow has one green run or has been removed with `pnpm release` documented as the only path; one post-S2 walkthrough filed through the intake with its S3 (if any) closed.
+
 7. Then features, in order: **F0 + F3 as one sprint — decisions and options** (intent, decisions, explore changes as high-level options, the comparison view; the product's centre: which capabilities are changing or weak → options → a documented decision → a change) → **F3a** multiple reviewers and sign-up shape → **F1** custom attributes → **F2** capture (K1) → **E2** C2b → **F4** duplicates → **F5** roadmap → **F6** value streams.
-8. Plumbing alongside, desktop only, never the same files as the active S/F sprint: delta-apply in SQL (before F2); LLM proxy edge function (before F2); typed client; p5 fps profile.
+8. Plumbing alongside, desktop only, never the same files as the active S/F sprint, each with its own prompt below: **E3** delta-apply in SQL and **E4** LLM proxy edge function (both before F2); **E5** typed Supabase client (any time after S2); **E6** landscape p5 fps profile (after S2).
 
 ---
 
@@ -105,11 +108,21 @@ Capability map remainders (from the audit)
 14. Content: electricity_network v3 adds level-1 "Network Delivery & Maintenance" at the front (capital projects & construction; planned maintenance & inspection; field workforce scheduling & dispatch; streetworks & permits; land, wayleaves & consents; vegetation management; contractor management); utility v2 gets the equivalent; review doc regenerated; publish after human review.
 Taxonomy
 18. Remove the component level: ADR-001 amendment; remove the component route, view, create path, breadcrumb step, nav references, ELEMENT_TYPES and RELATIONSHIP_TYPE_RULES entries; migration refuses if component elements exist on dev (retract test ones first via a commit); delete component specs and screen-record states; UI-principles zoom chain becomes capability → system → container.
+19. Health finding "systems not linked to a capability": a platform counts as linked if any of its modules supports a capability; a platform with no modules is judged on its own supports. Informational nudge: supports on a platform that has modules — move to the module. Test on SAP with FI/PM.
+20. RELATIONSHIP_TYPE_RULES: uses and flows_to allowed container↔container, container↔system, system↔system; actor uses system/container. Health finding: a flow whose endpoint is a platform rather than one of its modules.
 Housekeeping from the audit
 15. A2 remainder: mainCommitIdHint dedup on all resolveRef call sites; reportError in every model-scoped hook; docs/CHECK-console.md written from a route-by-route console pass.
 16. BranchRebasePanel uses the persisted identity-dismiss RPC. Viewer-visibility integration test (before/after shared_for_review) written.
 17. Design-system rule reconciled: either Home.tsx/OrgHome.tsx raw lists are replaced, or UI-principles §35 is amended to allow them; not both.
 Summary lists each item done / not done with evidence and the human's sentence.
+```
+
+### V1 — the context diagram
+
+Prerequisites: S1 merged (component level removed; external actors; container↔system relationship rules). Desktop and 390px. Engine frozen.
+
+```
+V1. Replace the context list with a diagram in the C4 system-context style, rendered by the landscape's canvas renderer (reuse layout.ts primitives; no new canvas). Centre: the system as a tile (name, type, one sentence). For a platform, the tile contains its module tiles, each with its capability chip; flows attach to the module when the relationship's endpoint is a container, else to the platform edge with a "which module?" marker (health finding). Around it: actors as person icons with their `uses` verb, neighbouring systems/modules with directional verb-labelled lines from the relationship's description, incoming and outgoing distinguished; the dotted enterprise boundary with external systems and external actors outside. Header keeps Supports (grouped by module for platforms) and Owned by (internal / external). Tone: lifecycle or exposure only. Zoom/fit controls as on the landscape; tap a neighbour to re-centre. Mobile: the same content as a list grouped by direction (uses / used by / flows in / flows out / people), modules as sub-rows, no canvas. Screen record before/after. Playwright (engine-path here; the golden path lands in S2 flow 2): SAP with FI and PM modules and a Salesforce flow to FI renders the flow to the FI tile; an external organisation actor renders outside the boundary.
 ```
 
 ### S2 — golden paths
@@ -181,6 +194,24 @@ New ADR: value stream → stages, `enables` from capability to stage; one view; 
 
 ---
 
+### E3 — delta-apply in SQL
+
+Prerequisites: E1. Before F2. Replace the client-computed head on main commits with server-side application of the commit's deltas to elements_head/relationships_head/facts inside commit_deltas (the TypeScript fold stays the reference; rebuildHead and the head==fold comparison prove equivalence). Payload per commit becomes the deltas only. P-2 and the perf payload test updated (budget drops to < 200 KB for a single edit at 2,000 elements). ADR-015 amendment. Three suites; rebuildHead on every dev model after deploy.
+
+### E4 — LLM proxy edge function
+
+Prerequisites: none. Before F2. Extract the existing suite's llm-proxy into the shared package, deploy it to the Architecture project under supabase/functions/, with per-org rate limits, request logging without payload retention, and a contract test. README documents deployment as part of pnpm release.
+
+### E5 — typed Supabase client
+
+Prerequisites: S2. Generate the Database type from the schema, adopt it across src/db, remove hand-written row types where duplicated, no behaviour change. Round-trip tests unchanged.
+
+### E6 — landscape p5 fps
+
+Prerequisites: S2. Profile the worst 5% of frames on the 2,000-system fixture before changing anything; report; then the smallest change that raises p5 to ≥ 45; gate updated to the measured value.
+
+---
+
 ## 5. Plumbing track (desktop only; never the same files as the active sprint)
 
 | Item | Why | Before |
@@ -189,7 +220,6 @@ New ADR: value stream → stages, `enables` from capability to stage; one view; 
 | LLM proxy edge function extracted to the shared package, deployed to Architecture | F2 needs it | F2 |
 | Typed Supabase client | H2 | any time |
 | Landscape p5 fps 30 → 45: profile worst frames first | R-perf | after S2 |
-| Context view as C4-style diagram (descriptions in tiles, verb edges, actors as people, boundary; mobile decision when it exists) | decided, never built | S3 or later, with a screen record before/after |
 
 ---
 
@@ -216,7 +246,7 @@ Every row has (or gets, in P1) a SPEC §11 row and an issue. A row leaves only w
 | A2 remainder (resolveRef dedup, reportError everywhere, console check) | S1 | create |
 | BranchRebasePanel persisted dismissals; viewer-visibility test | S1 | create |
 | Golden-path specs (zero exist) | S2 | create |
-| Context view as C4-style diagram | plumbing / S3 | create |
+| Context view as C4-style diagram | V1 | create |
 | C2 review-queue design pass (after first real partial acceptance) | after S2 | create |
 | Custom attributes | F1 | create |
 | Starter-map upgrade flow | F2 | create |
