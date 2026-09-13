@@ -1,7 +1,7 @@
 /**
  * Blocking: element creation — the search-first "Add" control (Landscape
- * for systems/actors, Container/Component pages for their own children,
- * and per relationship-type group on the element page). This test covers
+ * for systems/actors, the Container page for its own children, and per
+ * relationship-type group on the element page). This test covers
  * the acceptance criterion named explicitly: "from an empty model, add two
  * systems and a `uses` relationship between them without any seeding" —
  * no starter map, no service-role bootstrap, nothing but ADR-018's own

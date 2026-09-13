@@ -3,7 +3,6 @@ import { Link } from 'react-router';
 import type { RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import type { ElementVersionDiff, VersionDiff } from '../../engine/versionDiff';
-import { LinkButton } from '../components/Button/LinkButton';
 import { DiffBadge } from '../components/DiffBadge/DiffBadge';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../components/EmptyState/EmptyState';
@@ -13,7 +12,6 @@ import type { StructureGroup } from './structureGrouping';
 import styles from './StructureView.module.css';
 
 export interface StructureViewProps {
-  kind: 'container' | 'component';
   group: StructureGroup;
   orgSlug: string;
   modelSlug: string;
@@ -32,20 +30,20 @@ function diffBadge(diffById: Map<UUID, ElementVersionDiff> | null, elementId: UU
 }
 
 /**
- * The Container/Component views' shared renderer (UI-principles §6.1:
- * "layered inside the [parent] frame; externals outside"). DOM/CSS, not
- * Canvas — same reasoning as ContextView.tsx's module comment: no §8.6
- * performance budget applies to one system's containers or one
- * container's components, which are never landscape-scale.
+ * The Container view's renderer (UI-principles §6.1: "layered inside the
+ * [parent] frame; externals outside"). DOM/CSS, not Canvas — same
+ * reasoning as ContextView.tsx's module comment: no §8.6 performance
+ * budget applies to one system's containers, which are never
+ * landscape-scale.
  *
- * Only Container's children (containers) get a "Components →" descend
- * link — Component is the zoom chain's last stop (UI-principles §2.1's
- * five levels end there), so a component card is a plain link to its
- * element page, nothing more.
+ * S1 item 18: this used to be shared with a Component view one level
+ * deeper (a `kind: 'container' | 'component'` prop, a "Components →"
+ * descend link on each container child) — the component level is gone
+ * from the taxonomy entirely now, so a container card is a plain link to
+ * its element page, nothing more, same as every other child here.
  */
-export function StructureView({ kind, group, orgSlug, modelSlug, refParam, diff = null, addChild }: StructureViewProps) {
+export function StructureView({ group, orgSlug, modelSlug, refParam, diff = null, addChild }: StructureViewProps) {
   const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?${refParam}`;
-  const componentsHref = (containerId: UUID) => `/o/${orgSlug}/m/${modelSlug}/component/${containerId}?${refParam}`;
   const parentExternal = attributesRecord(group.parent.attributes).isExternal === true;
   const diffById = diff ? new Map<UUID, ElementVersionDiff>(diff.elements.map((e) => [e.elementId, e])) : null;
 
@@ -63,7 +61,7 @@ export function StructureView({ kind, group, orgSlug, modelSlug, refParam, diff 
           {addChild}
         </div>
 
-        {group.children.length === 0 && <EmptyState>{kind === 'container' ? 'No containers yet.' : 'No components yet.'}</EmptyState>}
+        {group.children.length === 0 && <EmptyState>No containers yet.</EmptyState>}
 
         <div className={styles.children}>
           {group.children.map((child) => (
@@ -75,11 +73,6 @@ export function StructureView({ kind, group, orgSlug, modelSlug, refParam, diff 
                 </Link>
                 {diffBadge(diffById, child.element_id)}
               </div>
-              {kind === 'container' && (
-                <LinkButton to={componentsHref(child.element_id)} variant="ghost">
-                  Components →
-                </LinkButton>
-              )}
             </div>
           ))}
         </div>

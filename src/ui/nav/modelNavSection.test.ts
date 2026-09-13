@@ -15,7 +15,6 @@ describe('modelNavSectionFor', () => {
     expect(modelNavSectionFor('/landscape')).toBe('landscape');
     expect(modelNavSectionFor('/context/abc')).toBe('landscape');
     expect(modelNavSectionFor('/container/abc')).toBe('landscape');
-    expect(modelNavSectionFor('/component/abc')).toBe('landscape');
   });
 
   it('matches changes, list and detail', () => {

@@ -1,20 +1,19 @@
 /**
- * The Container/Component views' shared grouping (UI-principles.md §6.1):
- * "one system/container, its containers/components, plus external systems/
- * containers they `uses`/`flows_to`... layered inside the [parent] frame;
- * externals outside." Grouping, same spirit as
- * src/ui/context/contextGrouping.ts — a deterministic classification, with
- * src/ui/structureView/StructureView.tsx's DOM/CSS renderer doing the
- * actual placement.
+ * The Container view's grouping (UI-principles.md §6.1): "one system, its
+ * containers, plus external systems/containers they `uses`/`flows_to`...
+ * layered inside the [parent] frame; externals outside." Grouping, same
+ * spirit as src/ui/context/contextGrouping.ts — a deterministic
+ * classification, with src/ui/structureView/StructureView.tsx's DOM/CSS
+ * renderer doing the actual placement. This used to be shared with a
+ * Component view one level deeper, until S1 item 18 removed the component
+ * level from the taxonomy entirely.
  *
  * "External" here means, precisely: the other endpoint of a `uses`/
  * `flows_to` relationship touching one of `parent`'s own children, where
  * that endpoint is not itself one of those children — a container in a
  * *different* system, or a whole system reached via `container → system
- * uses` (ADR-001's `relationship_type_rules`), or (for components) a
- * container reached via `component → container uses`. A relationship
- * between two of the parent's own children is drawn inline, not listed as
- * external.
+ * uses` (ADR-001's `relationship_type_rules`). A relationship between two
+ * of the parent's own children is drawn inline, not listed as external.
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
@@ -26,7 +25,7 @@ export interface StructureExternal {
 
 export interface StructureGroup {
   parent: ElementsHeadRow;
-  /** `parent`'s own children (containers, or components) — sorted deterministically. */
+  /** `parent`'s own children (containers) — sorted deterministically. */
   children: ElementsHeadRow[];
   /** Relationships between two of `children` themselves — drawn inside the frame. */
   internalEdges: RelationshipsHeadRow[];

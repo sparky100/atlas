@@ -12,9 +12,8 @@ describe('RELATIONSHIP_TYPE_RULES', () => {
     expect(findRelationshipTypeRule('uses', 'actor', 'container')).toBeDefined();
   });
 
-  it('S1 item 11a: an actor still cannot use a capability or a component, or flow to anything at all', () => {
+  it('S1 item 11a: an actor still cannot use a capability, or flow to anything at all', () => {
     expect(findRelationshipTypeRule('uses', 'actor', 'capability')).toBeUndefined();
-    expect(findRelationshipTypeRule('uses', 'actor', 'component')).toBeUndefined();
     expect(findRelationshipTypeRule('flows_to', 'actor', 'system')).toBeUndefined();
   });
 

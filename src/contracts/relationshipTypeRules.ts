@@ -45,9 +45,7 @@ export const RELATIONSHIP_TYPE_RULES: readonly RelationshipTypeRule[] = [
   { relationshipType: 'supports', fromType: 'container', toType: 'capability', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: 1 },
   { relationshipType: 'uses', fromType: 'system', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'uses', fromType: 'container', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
-  { relationshipType: 'uses', fromType: 'component', toType: 'component', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'uses', fromType: 'container', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
-  { relationshipType: 'uses', fromType: 'component', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   // S1 item 11a: an actor (a person, team, or external organisation) can
   // use a system or container directly — "Ofgem uses the reporting
   // system" is a `uses` edge, not an `owns` one; `owns` stays reserved for

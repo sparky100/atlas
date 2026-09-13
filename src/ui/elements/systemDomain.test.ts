@@ -49,18 +49,6 @@ describe('resolveElementDomain (Prompt 7k item 3)', () => {
     expect(resolveElementDomain(container, byId)).toBe('ot');
   });
 
-  it("a component inherits through its container's parent system", () => {
-    const system = element('sys-1', 'system', null, { domain: 'ot' });
-    const container = element('cont-1', 'container', 'sys-1');
-    const component = element('comp-1', 'component', 'cont-1');
-    const byId = new Map([
-      ['sys-1', system],
-      ['cont-1', container],
-      ['comp-1', component],
-    ]);
-    expect(resolveElementDomain(component, byId)).toBe('ot');
-  });
-
   it('defaults to "it" when the parent chain never reaches a system', () => {
     const container = element('cont-1', 'container', 'missing-parent');
     expect(resolveElementDomain(container, new Map([['cont-1', container]]))).toBe('it');

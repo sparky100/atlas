@@ -30,8 +30,8 @@ export function domainToneFor(value: string): ChipTone | undefined {
  * A system's own `domain`, defaulting to `'it'` when absent or not a
  * recognised value (`SystemDomain`'s own doc comment, `delta.ts`) — never
  * written back, just how every reader treats the gap. Only meaningful for
- * a System; a Container/Component's domain is `resolveElementDomain`'s
- * job below, since neither carries the attribute itself.
+ * a System; a Container's domain is `resolveElementDomain`'s job below,
+ * since it doesn't carry the attribute itself.
  */
 export function domainOf(system: ElementsHeadRow): SystemDomain {
   const value = attributesRecord(system.attributes).domain;
@@ -40,27 +40,27 @@ export function domainOf(system: ElementsHeadRow): SystemDomain {
 
 /**
  * The domain a `uses`/`flows_to` endpoint resolves to for boundary-crossing
- * purposes — a System reads its own `domain` (`domainOf`). A Container or
- * Component checks its *own* `domain` first ("platforms and modules": a
- * platform's module can now carry its own override,
- * `ContainerAttributes.domain`'s own doc comment) before inheriting by
- * walking `parent_id` up until a System is reached (a Container's parent is
- * always a System, a Component's parent is always a Container, per
- * `relationshipTypeRules.ts`'s own hierarchy — so at most two hops). An
+ * purposes — a System reads its own `domain` (`domainOf`). A Container
+ * checks its *own* `domain` first ("platforms and modules": a platform's
+ * module can now carry its own override, `ContainerAttributes.domain`'s
+ * own doc comment) before inheriting by walking `parent_id` up until a
+ * System is reached (a Container's parent is always a System, per
+ * `relationshipTypeRules.ts`'s own hierarchy — so exactly one hop). An
  * element missing from `elementsById` (shouldn't happen for a live edge's
  * own endpoints, but `listUsesAndFlowsToEndpointElements`'s own
  * caller-supplied scope could in principle miss one) or a chain that never
  * reaches a System defaults to `'it'`, the same "absent reads as it" stance
- * `domainOf` takes. Fully backward-compatible: an ordinary Container/
- * Component that never sets `domain` (every one before this feature, and
- * most after it) falls straight through to the parent walk exactly as
- * before.
+ * `domainOf` takes. Fully backward-compatible: an ordinary Container that
+ * never sets `domain` (every one before this feature, and most after it)
+ * falls straight through to the parent walk exactly as before.
  */
 export function resolveElementDomain(element: ElementsHeadRow, elementsById: ReadonlyMap<string, ElementsHeadRow>): SystemDomain {
   let current: ElementsHeadRow | undefined = element;
-  // Bounded by the taxonomy's own fixed depth (system → container →
-  // component, ADR-000) — never an unbounded walk of caller-supplied data.
-  for (let hop = 0; hop < 4 && current; hop++) {
+  // Bounded by the taxonomy's own fixed depth (system → container,
+  // ADR-000) — never an unbounded walk of caller-supplied data. One hop
+  // of margin above the exact depth, same conservative-not-exact stance
+  // this bound already took before S1 item 18 shortened the chain.
+  for (let hop = 0; hop < 3 && current; hop++) {
     if (current.element_type === 'system') return domainOf(current);
     const ownValue = attributesRecord(current.attributes).domain;
     if (ownValue === 'ot' || ownValue === 'hybrid') return ownValue;

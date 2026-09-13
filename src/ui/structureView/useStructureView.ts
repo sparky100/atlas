@@ -35,31 +35,28 @@ interface StructureViewKindConfig {
 }
 
 /**
- * Container and Component are the same shape (UI-principles §6.1: "one
+ * S1 item 18: this used to be a `kind`-parameterised config shared with a
+ * Component view one level deeper (UI-principles §6.1: "one
  * [system|container], its [containers|components], plus external
- * [systems/containers|containers] they `uses`[/`flows_to`]") — one
- * `kind`-parameterised config, not two near-duplicate hooks. The one real
- * difference `relationship_type_rules` (ADR-001) draws between them:
- * Container also has `flows_to` at container grain; Component only ever
- * has `uses`.
+ * [systems/containers|containers] they `uses`[/`flows_to`]") — the
+ * component level is gone from the taxonomy entirely now, so Container is
+ * this hook's only shape and the config collapses to a single constant
+ * rather than a `Record` keyed by a union with one member left.
  */
-const CONFIG: Record<'container' | 'component', StructureViewKindConfig> = {
-  container: { viewKind: 'container', parentType: 'system', relationshipTypes: ['uses', 'flows_to'], viewNamePrefix: 'Containers' },
-  component: { viewKind: 'component', parentType: 'container', relationshipTypes: ['uses'], viewNamePrefix: 'Components' },
-};
+const CONFIG: StructureViewKindConfig = { viewKind: 'container', parentType: 'system', relationshipTypes: ['uses', 'flows_to'], viewNamePrefix: 'Containers' };
 
 /**
- * Loads the Container or Component view. No `view_layouts` — same reason
- * as useSystemContext.ts: DOM/CSS grouping, no pixel position to persist.
+ * Loads the Container view. No `view_layouts` — same reason as
+ * useSystemContext.ts: DOM/CSS grouping, no pixel position to persist.
  *
  * Sprint C1: a branch ref folds via src/db/branchProjection.ts instead of
  * querying `elements_head`/`relationships_head` — same reasoning as
  * useLandscape.ts's own Sprint C1 note.
  */
-export function useStructureView(kind: 'container' | 'component', modelId: UUID, orgId: UUID, userId: UUID | null, parentId: UUID, ref: Ref, mode: ViewMode): StructureViewState {
+export function useStructureView(modelId: UUID, orgId: UUID, userId: UUID | null, parentId: UUID, ref: Ref, mode: ViewMode): StructureViewState {
   const [state, setState] = useState<StructureViewState>({ status: 'loading' });
   const refParam = refParamOf(ref);
-  const config = CONFIG[kind];
+  const config = CONFIG;
 
   useEffect(() => {
     if (!userId) return undefined;
@@ -135,13 +132,13 @@ export function useStructureView(kind: 'container' | 'component', modelId: UUID,
     }
 
     load().catch((e: unknown) => {
-      if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : `Failed to load this ${kind}` });
+      if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load this container' });
     });
 
     return () => {
       cancelled = true;
     };
-  }, [kind, modelId, orgId, userId, parentId, refParam, mode, config.parentType, config.relationshipTypes, config.viewKind, config.viewNamePrefix]);
+  }, [modelId, orgId, userId, parentId, refParam, mode]);
 
   return state;
 }

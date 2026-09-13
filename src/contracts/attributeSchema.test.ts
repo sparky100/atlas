@@ -66,12 +66,11 @@ describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
 });
 
 describe('System/container version (S1 item 11)', () => {
-  it('is a plain, optional text field on both system and container, not on capability/actor/component', () => {
+  it('is a plain, optional text field on both system and container, not on capability/actor', () => {
     expect(ATTRIBUTE_SCHEMA_BY_TYPE.system.find((f) => f.key === 'version')).toMatchObject({ label: 'Version', required: false, kind: 'text' });
     expect(ATTRIBUTE_SCHEMA_BY_TYPE.container.find((f) => f.key === 'version')).toMatchObject({ label: 'Version', required: false, kind: 'text' });
     expect(ATTRIBUTE_SCHEMA_BY_TYPE.capability.some((f) => f.key === 'version')).toBe(false);
     expect(ATTRIBUTE_SCHEMA_BY_TYPE.actor.some((f) => f.key === 'version')).toBe(false);
-    expect(ATTRIBUTE_SCHEMA_BY_TYPE.component.some((f) => f.key === 'version')).toBe(false);
   });
 });
 
@@ -121,9 +120,8 @@ describe('defaultCreateAttributes', () => {
     expect(defaultCreateAttributes('actor')).toEqual({ subtype: 'person', isExternal: false });
   });
 
-  it('has no required fields to default for capability or component', () => {
+  it('has no required fields to default for capability', () => {
     expect(defaultCreateAttributes('capability')).toEqual({});
-    expect(defaultCreateAttributes('component')).toEqual({});
   });
 
   it("defaults a system's lifecycleStatus to active on main — an architect quick-adding it is recording an estate that already exists", () => {

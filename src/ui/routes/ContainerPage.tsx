@@ -28,8 +28,9 @@ import styles from './ViewPage.module.css';
 
 /**
  * The Container view route (UI-principles §6.1/§2.1 — Sprint U2 step 3):
- * one system's containers. The zoom chain's fourth stop (capability →
- * landscape → context → **containers** → components).
+ * one system's containers. The zoom chain's last stop (capability →
+ * landscape → context → **containers**) — S1 item 18 removed the
+ * component level that used to sit one stop further.
  *
  * Blocking: element creation's search-first "Add" control lives here for
  * containers (parented on this page's own `systemId`) — the brief's "on a
@@ -39,7 +40,7 @@ import styles from './ViewPage.module.css';
  *
  * Check D1: `<main>` escapes the page's usual centred max-width once
  * there's real content — `ViewPage.module.css`'s own `.mainWithView`
- * comment has the full reasoning, shared with Context/Component.
+ * comment has the full reasoning, shared with Context.
  */
 export function ContainerPage() {
   const { orgSlug, modelSlug, systemId } = useParams<{ orgSlug: string; modelSlug: string; systemId: string }>();
@@ -65,7 +66,7 @@ export function ContainerPage() {
   const writeHeadCommitId = editingBranch?.head_commit_id ?? null;
   const canAdd = canEdit && searchCommitId !== null && writeHeadCommitId !== null;
 
-  const state = useStructureView('container', model?.id ?? '', organisation?.id ?? '', userId, systemId ?? '', ref, mode);
+  const state = useStructureView(model?.id ?? '', organisation?.id ?? '', userId, systemId ?? '', ref, mode);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -136,7 +137,6 @@ export function ContainerPage() {
         )}
         {state.status === 'ready' && (
           <StructureView
-            kind="container"
             group={state.data.group}
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}

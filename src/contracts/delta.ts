@@ -22,7 +22,7 @@ export type ISODate = string;
 // Taxonomy (ADR-001)
 // ---------------------------------------------------------------------------
 
-export const ELEMENT_TYPES = ['capability', 'system', 'container', 'component', 'actor'] as const;
+export const ELEMENT_TYPES = ['capability', 'system', 'container', 'actor'] as const;
 export type ElementType = (typeof ELEMENT_TYPES)[number];
 
 export const RELATIONSHIP_TYPES = ['supports', 'uses', 'owns', 'flows_to'] as const;
@@ -40,7 +40,7 @@ export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
  * catalogue entries (model as a capability tag, not a type), maturity/heat-
  * map ratings, and org-chart reporting lines beyond a flat Actor. "External"
  * is deliberately an attribute (`isExternal`) on System/Container/Actor, not
- * a sixth element type; "contains" is deliberately structural (`parentId`),
+ * a fifth element type; "contains" is deliberately structural (`parentId`),
  * not a seventh relationship type — see ADR-001's Alternatives Rejected.
  */
 export const DELIBERATELY_NOT_MODELLED = [
@@ -232,11 +232,6 @@ export interface ContainerAttributes {
   version?: string;
 }
 
-export interface ComponentAttributes {
-  description?: string;
-  technology?: string;
-}
-
 export interface ActorAttributes {
   subtype: ActorSubtype;
   /** Person only. */
@@ -250,7 +245,6 @@ export interface ElementAttributesByType {
   capability: CapabilityAttributes;
   system: SystemAttributes;
   container: ContainerAttributes;
-  component: ComponentAttributes;
   actor: ActorAttributes;
 }
 
@@ -352,7 +346,7 @@ export type ElementCreate<T extends ElementType = ElementType> = T extends Eleme
       elementId: UUID;
       elementType: T;
       name: string;
-      /** Structural parent (ADR-001). Required non-null for container and component; null for top-level capability, system, actor. */
+      /** Structural parent (ADR-001). Required non-null for container; null for top-level capability, system, actor. */
       parentId: UUID | null;
       attributes: ElementAttributesByType[T];
     }

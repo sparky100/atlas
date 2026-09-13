@@ -577,8 +577,6 @@ describe('C9: relationship.create enforces RELATIONSHIP_TYPE_RULES', () => {
         return { lifecycleStatus: 'active', isExternal: false };
       case 'container':
         return { isExternal: false };
-      case 'component':
-        return {};
       case 'actor':
         return { subtype: 'person', isExternal: false };
     }
@@ -629,7 +627,7 @@ describe('C9: relationship.create enforces RELATIONSHIP_TYPE_RULES', () => {
       ['uses', 'actor', 'capability'],
       ['supports', 'capability', 'system'],
       ['owns', 'system', 'system'],
-      ['flows_to', 'component', 'component'],
+      ['flows_to', 'actor', 'actor'],
     ];
     for (const [relationshipType, fromType, toType] of examples) {
       expect(isRelationshipTripleAllowed(relationshipType, fromType, toType)).toBe(false);

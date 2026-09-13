@@ -20,7 +20,6 @@ export const AllTypes: Story = {
           { type: 'capability' as const, label: 'Capability' },
           { type: 'system' as const, label: 'System' },
           { type: 'container' as const, label: 'Container' },
-          { type: 'component' as const, label: 'Component' },
           { type: 'actor' as const, actorSubtype: 'person' as const, label: 'Actor · person' },
           { type: 'actor' as const, actorSubtype: 'team' as const, label: 'Actor · team' },
           { type: 'actor' as const, actorSubtype: 'organisation' as const, label: 'Actor · organisation' },

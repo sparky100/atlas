@@ -1,16 +1,19 @@
 /**
- * Context, Container and Component's core user path (Sprint H1 item 9,
- * closing the audit's own "zero Playwright coverage" finding for all
- * three — docs/AUDIT-2026-09-U2.md §5.3): from one seeded System, descend
- * the zoom chain (UI-principles §2.1) System → Context → Containers →
- * Components, following the real "Containers →"/"Components →" links each
- * page renders, and see each level's own child at the bottom.
+ * Context and Container's core user path (Sprint H1 item 9, closing the
+ * audit's own "zero Playwright coverage" finding for both —
+ * docs/AUDIT-2026-09-U2.md §5.3): from one seeded System, descend the
+ * zoom chain (UI-principles §2.1) System → Context → Containers,
+ * following the real "Containers →" link the Context page renders, and
+ * see the container at the bottom. This originally continued one level
+ * further, Containers → Components, following a "Components →" link —
+ * S1 item 18 removed the component level from the taxonomy entirely, so
+ * Container is now the zoom chain's last stop.
  *
  * Same "needs a real Supabase" limitation as e2e/element-edit.spec.ts —
- * seeds its System/Container/Component via the real commitToBranch path
- * from Node, then drives navigation through the actual browser. No
- * genesis-commit bootstrap (ADR-018): main already has a real head the
- * instant createModel's insert fires.
+ * seeds its System/Container via the real commitToBranch path from Node,
+ * then drives navigation through the actual browser. No genesis-commit
+ * bootstrap (ADR-018): main already has a real head the instant
+ * createModel's insert fires.
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
@@ -22,7 +25,7 @@ import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
 
-test('descending the zoom chain: a system\'s context, its containers, and a container\'s components', async ({ page }) => {
+test('descending the zoom chain: a system\'s context, then its containers', async ({ page }) => {
   const env = loadEnv();
 
   const email = `zoomchain-${randomUUID()}@example.test`;
@@ -63,11 +66,9 @@ test('descending the zoom chain: a system\'s context, its containers, and a cont
 
   const systemId = randomUUID();
   const containerId = randomUUID();
-  const componentId = randomUUID();
   const deltas: Delta[] = [
     { kind: 'element.create', id: randomUUID(), elementId: systemId, elementType: 'system', name: 'Billing Service', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
     { kind: 'element.create', id: randomUUID(), elementId: containerId, elementType: 'container', name: 'API Gateway', parentId: systemId, attributes: { isExternal: false }, sourceId: seedSourceId, confidence: 1 },
-    { kind: 'element.create', id: randomUUID(), elementId: componentId, elementType: 'component', name: 'Auth Module', parentId: containerId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
   ];
   const envelope: CommitEnvelope = {
     id: randomUUID(),
@@ -75,7 +76,7 @@ test('descending the zoom chain: a system\'s context, its containers, and a cont
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    title: 'seed Billing Service, its API Gateway container, and an Auth Module component',
+    title: 'seed Billing Service and its API Gateway container',
     body: null,
     deltas,
   };
@@ -97,10 +98,4 @@ test('descending the zoom chain: a system\'s context, its containers, and a cont
   // belongs to, not just the model — proof the page resolved the real
   // parent, not just the URL's raw id.
   await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByText('Billing Service')).toBeVisible();
-
-  await page.getByRole('link', { name: 'Components →' }).click();
-  await expect(page).toHaveURL(new RegExp(`/component/${containerId}`));
-  await expect(page.getByRole('heading', { name: 'Components' })).toBeVisible();
-  await expect(page.getByText('Auth Module')).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByText('API Gateway')).toBeVisible();
 });

@@ -6,8 +6,9 @@
  * — a `commit:` ref fell through to `getBranch(supabase, '')` (a commit
  * ref has no `branchId`), which `assertRealId` throws on immediately.
  * Every page that calls the hook directly with the raw selected ref
- * (`ElementPage`, `ContainerPage`, `ComponentPage`, `ModelHome`,
- * `LandscapePage` — `EditingBranchBanner` already guarded its own call)
+ * (`ElementPage`, `ContainerPage`, `ModelHome`, `LandscapePage` —
+ * `EditingBranchBanner` already guarded its own call; `ComponentPage`
+ * also did until S1 item 18 removed it along with the component level)
  * hit this on every render with a commit ref selected: a doomed query,
  * and — before S1 item 9's error-banner fix too — a verbose technical
  * error banner naming none of that to the user.

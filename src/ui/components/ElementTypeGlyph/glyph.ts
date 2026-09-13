@@ -4,7 +4,6 @@ const GLYPH: Record<ElementType, string> = {
   capability: '◫',
   system: '▣',
   container: '▢',
-  component: '▫',
   actor: '◉', // overridden for subtype 'team' below
 };
 

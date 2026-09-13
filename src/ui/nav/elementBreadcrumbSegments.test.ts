@@ -31,15 +31,6 @@ describe('elementBreadcrumbSegments', () => {
     expect(elementBreadcrumbSegments(container, null, 'acme', 'model1', 'ref=main')).toEqual([{ label: 'API', href: '/o/acme/m/model1/container/?ref=main' }]);
   });
 
-  it('gives a component two segments: its parent container (Container view), then itself (Component view scoped by the container)', () => {
-    const container = element('c1', 'container', 'API', 'sys1');
-    const component = element('comp1', 'component', 'Auth Handler', 'c1');
-    expect(elementBreadcrumbSegments(component, container, 'acme', 'model1', 'ref=main')).toEqual([
-      { label: 'API', href: '/o/acme/m/model1/container/sys1?ref=main' },
-      { label: 'Auth Handler', href: '/o/acme/m/model1/component/c1?ref=main' },
-    ]);
-  });
-
   it('gives an actor no segments at all', () => {
     const actor = element('a1', 'actor', 'Platform Team', null);
     expect(elementBreadcrumbSegments(actor, null, 'acme', 'model1', 'ref=main')).toEqual([]);
