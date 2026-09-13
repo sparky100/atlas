@@ -7,8 +7,8 @@
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
-import { computeLandscapeLayout, MIN_LAYOUT_WIDTH, type LandscapeLayout } from './layout';
-import type { LayoutWorkerRequest, LayoutWorkerResponse } from './layout.worker';
+import { computeLandscapeLayout, MIN_LAYOUT_WIDTH, type LandscapeLaneDisplayOptions, type LandscapeLayout } from './layout';
+import type { LayoutWorkerLaneDisplay, LayoutWorkerRequest, LayoutWorkerResponse } from './layout.worker';
 
 interface PendingRequest {
   resolve: (layout: LandscapeLayout) => void;
@@ -44,6 +44,16 @@ function getWorker(): Worker {
  * the result is written against a `Promise<LandscapeLayout>` either way, so
  * this is the only place that distinction lives.
  */
+/** V2: `LandscapeLaneDisplayOptions` (real `Set`s, for a caller's own convenience) → the worker's portable array wire shape. */
+function toWorkerLaneDisplay(laneDisplay: LandscapeLaneDisplayOptions | undefined): LayoutWorkerLaneDisplay | undefined {
+  if (!laneDisplay) return undefined;
+  return {
+    ...(laneDisplay.collapsedLaneKeys ? { collapsedLaneKeys: [...laneDisplay.collapsedLaneKeys] } : {}),
+    ...(laneDisplay.expandedLaneKeys ? { expandedLaneKeys: [...laneDisplay.expandedLaneKeys] } : {}),
+    ...(laneDisplay.pinnedLaneKeys ? { pinnedLaneKeys: [...laneDisplay.pinnedLaneKeys] } : {}),
+  };
+}
+
 export function computeLandscapeLayoutInWorker(
   systems: readonly ElementsHeadRow[],
   supportsEdges: readonly RelationshipsHeadRow[],
@@ -51,14 +61,25 @@ export function computeLandscapeLayoutInWorker(
   actors: readonly ElementsHeadRow[] = [],
   /** Item 7: the canvas's own on-screen width at layout time — see `layout.ts`'s own parameter doc. */
   layoutWidthHint: number = MIN_LAYOUT_WIDTH,
+  /** V2: per-lane collapse/pin overrides — optional, omitted reproduces `computeLandscapeLayout`'s own pre-V2 default. */
+  laneDisplay?: LandscapeLaneDisplayOptions,
 ): Promise<LandscapeLayout> {
   if (typeof Worker === 'undefined') {
-    return Promise.resolve(computeLandscapeLayout(systems, supportsEdges, capabilitiesById, actors, layoutWidthHint));
+    return Promise.resolve(computeLandscapeLayout(systems, supportsEdges, capabilitiesById, actors, layoutWidthHint, laneDisplay));
   }
   const requestId = nextRequestId++;
   return new Promise((resolve, reject) => {
     pending.set(requestId, { resolve, reject });
-    const request: LayoutWorkerRequest = { requestId, systems: [...systems], supportsEdges: [...supportsEdges], capabilities: [...capabilitiesById.entries()], actors: [...actors], layoutWidthHint };
+    const workerLaneDisplay = toWorkerLaneDisplay(laneDisplay);
+    const request: LayoutWorkerRequest = {
+      requestId,
+      systems: [...systems],
+      supportsEdges: [...supportsEdges],
+      capabilities: [...capabilitiesById.entries()],
+      actors: [...actors],
+      layoutWidthHint,
+      ...(workerLaneDisplay ? { laneDisplay: workerLaneDisplay } : {}),
+    };
     getWorker().postMessage(request);
   });
 }

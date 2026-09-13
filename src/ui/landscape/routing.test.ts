@@ -42,6 +42,10 @@ function supports(fromId: string, toId: string): RelationshipsHeadRow {
   return { relationship_id: `r-${fromId}-${toId}`, relationship_type: 'supports', from_element_id: fromId, to_element_id: toId, attributes: { role: 'primary' }, exists_delta_id: `d-r-${fromId}-${toId}` };
 }
 
+function actor(id: string, name: string): ElementsHeadRow {
+  return { element_id: id, element_type: 'actor', name, parent_id: null, attributes: { subtype: 'team' }, exists_delta_id: `d-${id}` };
+}
+
 /** Every routed segment, for every possible pair of nodes in `layout`, crosses no *other* node's tile. Deterministic — every input is fixed test data, no randomness (CLAUDE.md rule 6). */
 function assertNoEdgeCrossesAnyOtherTile(layout: LandscapeLayout): void {
   const all: LandscapeNodePosition[] = [...layout.nodes, ...layout.actorNodes];
@@ -51,7 +55,7 @@ function assertNoEdgeCrossesAnyOtherTile(layout: LandscapeLayout): void {
     for (const to of all) {
       if (from.elementId === to.elementId) continue;
       const obstacles = all.filter((n) => n.elementId !== from.elementId && n.elementId !== to.elementId);
-      const points = routeLandscapeEdge(from, to, obstacles, channels);
+      const points = routeLandscapeEdge(from, to, obstacles, channels, layout.lanes);
 
       for (const obstacle of obstacles) {
         const rect = { x: obstacle.x, y: obstacle.y, w: NODE_WIDTH, h: NODE_HEIGHT };
@@ -79,7 +83,7 @@ describe('routeLandscapeEdge / computeLandscapeChannels (item 9)', () => {
     const channels = computeLandscapeChannels(layout);
     const [a, b] = layout.nodes;
     if (!a || !b) throw new Error('expected two nodes');
-    const points = routeLandscapeEdge(a, b, [], channels);
+    const points = routeLandscapeEdge(a, b, [], channels, layout.lanes);
     expect(points).toHaveLength(2);
   });
 
@@ -97,7 +101,7 @@ describe('routeLandscapeEdge / computeLandscapeChannels (item 9)', () => {
 
     const channels = computeLandscapeChannels(layout);
     const obstacles = layout.nodes.filter((n) => n.elementId !== a.elementId && n.elementId !== c.elementId);
-    const points = routeLandscapeEdge(a, c, obstacles, channels);
+    const points = routeLandscapeEdge(a, c, obstacles, channels, layout.lanes);
 
     expect(points.length).toBeGreaterThan(2); // a real detour, not the straight line
     assertNoEdgeCrossesAnyOtherTile(layout);
@@ -116,6 +120,41 @@ describe('routeLandscapeEdge / computeLandscapeChannels (item 9)', () => {
     expect(layout.lanes).toHaveLength(laneCount);
     expect(layout.nodes).toHaveLength(10);
     assertNoEdgeCrossesAnyOtherTile(layout);
+  });
+
+  it('V2 "never diagonal across a lane": an unobstructed pair in two different lanes still detours, not the straight line', () => {
+    // Two lanes, one system each, both the first (index 0) member of their
+    // own row — so they share an x-column and, pre-V2, an unobstructed
+    // straight vertical line would have connected them directly. Different
+    // lanes now force the detour regardless.
+    const capA = capability('cap-a', 'Alpha');
+    const capB = capability('cap-b', 'Bravo');
+    const sysA = system('sys-a', 'Alpha System');
+    const sysB = system('sys-b', 'Bravo System');
+    const layout = computeLandscapeLayout([sysA, sysB], [supports('sys-a', 'cap-a'), supports('sys-b', 'cap-b')], new Map([['cap-a', capA], ['cap-b', capB]]));
+    const nodeA = layout.nodes.find((n) => n.elementId === 'sys-a');
+    const nodeB = layout.nodes.find((n) => n.elementId === 'sys-b');
+    if (!nodeA || !nodeB) throw new Error('expected both nodes');
+    expect(nodeA.x).toBe(nodeB.x); // confirms the setup: same column, so only the lane rule forces a detour
+    expect(nodeA.y).not.toBe(nodeB.y); // different lanes really do sit at different y
+
+    const channels = computeLandscapeChannels(layout);
+    const points = routeLandscapeEdge(nodeA, nodeB, [], channels, layout.lanes);
+    expect(points.length).toBeGreaterThan(2);
+  });
+
+  it('V2: an unobstructed pair of actors sharing the top row (above every lane) still gets a straight line', () => {
+    const cap = capability('cap-1', 'Payments');
+    const sys = system('sys-1', 'System One');
+    const actors = [actor('act-1', 'Ops A'), actor('act-2', 'Ops B')];
+    const layout = computeLandscapeLayout([sys], [supports('sys-1', 'cap-1')], new Map([['cap-1', cap]]), actors);
+    const [a, b] = layout.actorNodes;
+    if (!a || !b) throw new Error('expected two actor nodes');
+    expect(a.y).toBe(b.y); // same row, above every lane
+
+    const channels = computeLandscapeChannels(layout);
+    const points = routeLandscapeEdge(a, b, [], channels, layout.lanes);
+    expect(points).toHaveLength(2);
   });
 
   it('still avoids every tile once actors and a wider (item 7) canvas are in play', () => {
