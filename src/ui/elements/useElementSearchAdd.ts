@@ -3,6 +3,7 @@ import type { ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { hasExactMatch, loadSearchPool, matchElements, type SearchPoolElement } from '../../db/elementSearch';
 import { enrichElementMatches, type MatchEnrichment } from './enrichElementMatches';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface SearchResultRow {
@@ -55,6 +56,11 @@ export function useElementSearchAdd(commitId: UUID, modelId: UUID, elementType: 
         if (!cancelled) setPool(loaded);
       })
       .catch((e: unknown) => {
+        // S1 audit follow-up (item 15's own reportError rollout missed this
+        // one) — the enrichment catch below stays silent on purpose (its
+        // own comment), but a failure to load the search pool at all is a
+        // real load failure.
+        reportError("Couldn't load existing elements to search against.", e);
         if (!cancelled) setPoolError(e instanceof Error ? e.message : 'Could not load existing elements to search against.');
       });
     return () => {

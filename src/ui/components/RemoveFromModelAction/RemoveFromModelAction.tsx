@@ -76,7 +76,7 @@ export function RemoveFromModelAction({
         Remove &ldquo;{element.name}&rdquo; from the model? This retracts it — it can be restored later, but it and everything below disappear from every view until then.
       </Text>
       <Text as="p" tone="muted" size="sm">
-        This commit will retract:
+        This will retract:
       </Text>
       <ul className={styles.goesList}>
         <li>

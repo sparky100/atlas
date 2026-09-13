@@ -3,6 +3,7 @@ import type { HomeMode } from '../../contracts/userPreferences';
 import { getUserPreferences, upsertUserPreferences } from '../../db/userPreferences';
 import type { UUID } from '../../contracts/delta';
 import { resolveDefaultColourBy, type ColourByMode } from './metrics';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface UseColourByPreferenceResult {
@@ -38,7 +39,11 @@ export function useColourByPreference(userId: UUID | null, homeMode: HomeMode, h
       .then((row) => {
         if (!cancelled) setSavedColourBy(row?.capability_map_colour_by ?? null);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
+        // S1 audit follow-up: the load half only — `setColourBy`'s own
+        // write-path catch below is a user-triggered save with its own
+        // "best-effort, local state already updated" stance, unaffected.
+        reportError("Couldn't load your saved colour-by preference.", e);
         if (!cancelled) setSavedColourBy(null);
       });
     return () => {

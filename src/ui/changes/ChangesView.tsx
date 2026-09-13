@@ -143,7 +143,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
           </form>
           {!mainHeadCommitId && (
             <Text as="p" tone="muted" size="sm">
-              This model has no commits yet — there is nothing to base a change on.
+              This model has nothing on main yet — there is nothing to base a change on.
             </Text>
           )}
           {error !== null && <Text as="p">{error}</Text>}

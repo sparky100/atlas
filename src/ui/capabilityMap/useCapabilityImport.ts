@@ -3,6 +3,7 @@ import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
 import { getCapabilityMap, listCapabilityMapItems, listSeedableCapabilityMaps, type CapabilityMapRow } from '../../db/capabilityMapTemplates';
 import { seedModelFromCapabilityMap } from '../../db/seedFromMap';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export type CapabilityImportStatus = 'loadingMaps' | 'idle' | 'seeding';
@@ -48,6 +49,11 @@ export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabil
         }
       })
       .catch((e: unknown) => {
+        // S1 audit follow-up (item 15's own reportError rollout missed this
+        // one): the initial-load half only, same "load vs. action" scoping
+        // that rollout drew everywhere else — `importMap` below is a
+        // mutation with its own local error display, left untouched.
+        reportError("Couldn't load starter capability maps.", e);
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Could not load starter capability maps.');
           setStatus('idle');

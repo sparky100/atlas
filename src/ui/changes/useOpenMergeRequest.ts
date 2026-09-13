@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getOpenMergeRequestForBranch } from '../../db/mergeRequests';
 import type { MergeRequestRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface UseOpenMergeRequestResult {
@@ -22,7 +23,8 @@ export function useOpenMergeRequest(branchId: UUID): UseOpenMergeRequestResult {
       .then((row) => {
         if (!cancelled) setRequest(row);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
+        reportError("Couldn't check for an open review request.", e);
         if (!cancelled) setRequest(null);
       });
     return () => {

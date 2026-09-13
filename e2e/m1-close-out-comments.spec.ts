@@ -100,7 +100,7 @@ test('comment on a branch-only element, merge the change, see the comment on mai
   // being distinct from an ordinary one (`useElementPage.ts`'s own
   // `notPresentAtRef` state, ElementPage.tsx's own rendering of it).
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${draftSystemId}`);
-  await expect(page.getByText('This element is not present at the current ref.', { exact: false })).toBeVisible();
+  await expect(page.getByText('This element is not present here.', { exact: false })).toBeVisible();
 
   // 2. Comment on it from the branch's own view, mentioning bob.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${draftSystemId}?ref=branch:${branchId}`);

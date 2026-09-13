@@ -203,7 +203,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           {openRequest === null && branch.status === 'draft' && (
             <>
               <Text as="p" tone="muted" size="sm">
-                Submitting opens the review queue for this change (SPEC §7.4) — a reviewer sees every delta, conflict, and affected capability before it can merge into main.
+                Submitting opens the review queue for this change — a reviewer sees every edit, conflict, and affected capability before it can merge into main.
               </Text>
               {canEdit && (
                 <Button
@@ -381,11 +381,11 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
 
       <Panel>
         <Text as="h2" size="lg">
-          Deltas on this change
+          Edits on this change
         </Text>
         {summaryState.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {summaryState.status === 'error' && <Text as="p">{summaryState.message}</Text>}
-        {summaryState.status === 'ready' && summaryState.summary.subjects.length === 0 && <EmptyState>No deltas yet — this change hasn't diverged from main.</EmptyState>}
+        {summaryState.status === 'ready' && summaryState.summary.subjects.length === 0 && <EmptyState>No edits yet — this change hasn't diverged from main.</EmptyState>}
         {summaryState.status === 'ready' && summaryState.summary.subjects.length > 0 && (
           <ul className={styles.subjectList}>
             {summaryState.summary.subjects.map((subject) => (

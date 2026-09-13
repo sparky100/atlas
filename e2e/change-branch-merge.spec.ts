@@ -101,7 +101,7 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
 
   // 5. The change page's own summary of its deltas (Sprint C1 step 6).
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
-  await expect(page.getByText('Deltas on this change')).toBeVisible();
+  await expect(page.getByText('Edits on this change')).toBeVisible();
   await expect(page.getByText('vendor → Acme Corp')).toBeVisible();
 
   // 6. Submit for review (Sprint C1 step 7) — lands on the review request's own page.

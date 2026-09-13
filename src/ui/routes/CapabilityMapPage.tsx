@@ -240,7 +240,7 @@ export function CapabilityMapPage() {
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && canEdit && <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reload} />}
-        {state.status === 'refNotFound' && !canEdit && <Text as="p">This model has no commits yet at this ref.</Text>}
+        {state.status === 'refNotFound' && !canEdit && <Text as="p">Nothing here yet.</Text>}
         {state.status === 'ready' && state.data.tree.l1.length === 0 && state.data.tree.orphans.length === 0 && canEdit && (
           <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reload} />
         )}

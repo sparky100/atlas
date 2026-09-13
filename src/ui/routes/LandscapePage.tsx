@@ -425,7 +425,7 @@ export function LandscapePage() {
           <>
             {capabilityLandscapeState.status === 'loading' && <Text tone="muted">Loading…</Text>}
             {capabilityLandscapeState.status === 'error' && <Text as="p">{capabilityLandscapeState.message}</Text>}
-            {capabilityLandscapeState.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
+            {capabilityLandscapeState.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
             {capabilityLandscapeState.status === 'ready' && (
               <>
                 <CapabilityLandscapeList
@@ -463,7 +463,7 @@ export function LandscapePage() {
           <>
             {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
             {state.status === 'error' && <Text as="p">{state.message}</Text>}
-            {state.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
+            {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
             {state.status === 'ready' && state.data.layout.nodes.length === 0 && state.data.layout.actorNodes.length === 0 && (
               <div>
                 <EmptyState>No systems yet.</EmptyState>

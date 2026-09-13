@@ -203,11 +203,11 @@ export function ElementPage() {
         {viewing ? <ViewingBranchBanner activeRef={ref} /> : <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />}
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
-        {state.status === 'refNotFound' && <Text as="p">This model has no commits yet at this ref.</Text>}
+        {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
         {state.status === 'notPresentAtRef' && (
           <Panel>
             <Text as="p" tone="muted">
-              This element is not present at the current ref. It may have been retracted, or never existed here.
+              This element is not present here. It may have been retracted, or never existed at this point.
             </Text>
           </Panel>
         )}

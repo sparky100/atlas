@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getProfile } from '../../db/profiles';
 import type { ProfileRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface UseOwnProfileResult {
@@ -34,11 +35,13 @@ export function useOwnProfile(userId: string | null): UseOwnProfileResult {
       .then((row) => {
         if (!cancelled) setProfile(row);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
         // A failed lookup leaves `profile` at whatever it already was —
         // `RequireAuth`'s gate below treats "still loading" and "errored"
-        // the same way (don't block the app on this), so there's nothing
-        // else useful to do with the error here.
+        // the same way (don't block the app on this) — but still reported
+        // (S1 audit follow-up, same "silent fallback, still worth a trace"
+        // shape `useBreadcrumbElement.ts` already established for item 15).
+        reportError("Couldn't load your profile.", e);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
