@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { allTilesOf, anchorFor, computeContextDiagramLayout, curveBetween, MIN_DIAGRAM_WIDTH, MODULE_WIDTH, tileTopAnchor, type DiagramTile, type DiagramUnitInput } from './contextDiagramLayout';
+import { allTilesOf, anchorFor, computeContextDiagramLayout, curveBetween, MIN_DIAGRAM_WIDTH, MODULE_WIDTH, resolveEdgeLabelOverlaps, tileTopAnchor, type DiagramTile, type DiagramUnitInput, type EdgeLabelPlacement, type ResolvedEdgeLabel } from './contextDiagramLayout';
 import { NODE_HEIGHT, NODE_WIDTH } from '../landscape/layout';
+
+/** A fixed-width-per-character stand-in for `ctx.measureText(text).width` — deterministic and easy to reason about (e.g. "reads customer records from" at 7px/char is 196px), unlike a real font's own kerning-dependent metrics. */
+function fixedWidthMeasurer(pxPerChar: number): (text: string) => number {
+  return (text) => text.length * pxPerChar;
+}
+
+/** Two axis-aligned rects (pill bounding boxes, centre + size) overlap on both axes at once. */
+function pillsOverlap(a: ResolvedEdgeLabel, b: ResolvedEdgeLabel): boolean {
+  const aLeft = a.x - a.width / 2;
+  const aRight = a.x + a.width / 2;
+  const bLeft = b.x - b.width / 2;
+  const bRight = b.x + b.width / 2;
+  const aTop = a.y - a.height / 2;
+  const aBottom = a.y + a.height / 2;
+  const bTop = b.y - b.height / 2;
+  const bBottom = b.y + b.height / 2;
+  return aLeft < bRight && bLeft < aRight && aTop < bBottom && bTop < aBottom;
+}
 
 function unit(elementId: string, modules: { elementId: string; capabilityName: string | null }[] = []): DiagramUnitInput {
   return { elementId, modules };
@@ -286,5 +304,99 @@ describe('layoutNeighbourBand (via computeContextDiagramLayout)', () => {
       expect(tile.x).toBeGreaterThanOrEqual(0);
       expect(tile.x + tile.w).toBeLessThanOrEqual(layout.width);
     }
+  });
+});
+
+describe('resolveEdgeLabelOverlaps', () => {
+  const measure = fixedWidthMeasurer(7);
+
+  it('leaves a single label exactly where it started', () => {
+    const [label] = resolveEdgeLabelOverlaps([{ text: 'reads customer records from', x: 100, y: 200, targetY: 260 }], measure, 1);
+    expect(label?.x).toBe(100);
+    expect(label?.y).toBe(200);
+    expect(label?.lines).toEqual(['reads customer records from']);
+  });
+
+  it('leaves two labels alone when they are already far enough apart, in either axis', () => {
+    const [a, b] = resolveEdgeLabelOverlaps(
+      [
+        { text: 'uses', x: 100, y: 200, targetY: 260 },
+        { text: 'uses', x: 400, y: 200, targetY: 260 }, // same y band, far apart in x
+      ],
+      measure,
+      1,
+    );
+    expect(a && b && pillsOverlap(a, b)).toBe(false);
+  });
+
+  it("bug fix, \"two neighbours connected to adjacent modules with 25+ character verbs\": two labels starting at the same y, close together in x (adjacent-module spacing), push apart and never overlap", () => {
+    const placements: EdgeLabelPlacement[] = [
+      { text: 'sends billing events across the network to', x: 100, y: 200, targetY: 260 },
+      { text: 'submits meter readings and settlement data to', x: 180, y: 200, targetY: 140 }, // pushes the opposite way (its own target is above)
+    ];
+    const resolved = resolveEdgeLabelOverlaps(placements, measure, 1);
+    expect(resolved).toHaveLength(2);
+    const [a, b] = resolved as [ResolvedEdgeLabel, ResolvedEdgeLabel];
+    expect(pillsOverlap(a, b)).toBe(false);
+    // The first label is never moved (nothing placed before it to collide
+    // with) — only the second, later one in the caller's own array order.
+    expect(a.x).toBe(100);
+    expect(a.y).toBe(200);
+  });
+
+  it('pushes the later label vertically, toward its own target, before ever wrapping it', () => {
+    const placements: EdgeLabelPlacement[] = [
+      { text: 'uses', x: 100, y: 200, targetY: 260 },
+      { text: 'uses', x: 106, y: 200, targetY: 260 }, // 6px apart in x — well under the 16px min gap, so this is a real collision
+    ];
+    const resolved = resolveEdgeLabelOverlaps(placements, measure, 1);
+    const [a, b] = resolved as [ResolvedEdgeLabel, ResolvedEdgeLabel];
+    expect(pillsOverlap(a, b)).toBe(false);
+    expect(b.lines).toEqual(['uses']); // still one line — a short label always clears via push alone
+    expect(b.y).toBeGreaterThan(200); // pushed down, toward its own targetY (260)
+  });
+
+  it('pushes toward a target above, not below, when the edge points the other way', () => {
+    const placements: EdgeLabelPlacement[] = [
+      { text: 'uses', x: 100, y: 200, targetY: 140 },
+      { text: 'uses', x: 106, y: 200, targetY: 140 },
+    ];
+    const [, b] = resolveEdgeLabelOverlaps(placements, measure, 1);
+    expect(b?.y).toBeLessThan(200);
+  });
+
+  it('wraps to two lines when two push attempts still leave a genuine collision — a label squeezed between two already-resolved ones directly above and below it, at the same x, so no amount of vertical pushing alone can clear both at once', () => {
+    // A (fixed) and B (pushed down twice to clear A) end up
+    // `LABEL_PUSH_STEP * 2` apart — exactly the gap two more push attempts
+    // can close from either side, so C, starting between them, can clear
+    // one but never both within its own two-attempt budget. Its wrap is
+    // real (a shorter box than an unwrapped one would be); this
+    // deliberately doesn't also assert C ends up clear of both neighbours
+    // — `resolveEdgeLabelOverlaps`'s own doc comment is explicit that a
+    // genuine vertical squeeze like this "isn't something more width can
+    // fix anyway."
+    const placements: EdgeLabelPlacement[] = [
+      { text: 'uses', x: 100, y: 200, targetY: 260 },
+      { text: 'uses', x: 100, y: 200, targetY: 260 },
+      { text: 'submits settlement and reconciliation data to', x: 100, y: 200, targetY: 260 },
+    ];
+    const resolved = resolveEdgeLabelOverlaps(placements, measure, 1);
+    const [, , c] = resolved as [ResolvedEdgeLabel, ResolvedEdgeLabel, ResolvedEdgeLabel];
+    expect(c.lines.length).toBe(2);
+    // Wrapping narrows the box (roughly half the one-line width) rather
+    // than widening it.
+    const oneLineWidth = measure(placements[2]?.text ?? '') + 12;
+    expect(c.width).toBeLessThan(oneLineWidth);
+  });
+
+  it('is deterministic — the same inputs always produce the same result', () => {
+    const placements: EdgeLabelPlacement[] = [
+      { text: 'reads customer records from', x: 100, y: 200, targetY: 260 },
+      { text: 'writes billing updates to', x: 130, y: 200, targetY: 260 },
+      { text: 'flags overdue accounts to', x: 160, y: 200, targetY: 140 },
+    ];
+    const first = resolveEdgeLabelOverlaps(placements, measure, 1);
+    const second = resolveEdgeLabelOverlaps(placements, measure, 1);
+    expect(second).toEqual(first);
   });
 });

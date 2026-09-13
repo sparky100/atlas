@@ -417,3 +417,114 @@ export function curveBetween(lower: { x: number; y: number }, upper: { x: number
   const midY = (lower.y + upper.y) / 2;
   return { cp1: { x: lower.x, y: midY }, cp2: { x: upper.x, y: midY }, mid: { x: (lower.x + upper.x) / 2, y: midY } };
 }
+
+export interface EdgeLabelPlacement {
+  text: string;
+  x: number;
+  y: number;
+  /**
+   * The y this label's own edge points toward — its arrow's destination
+   * anchor, not its source. `curveBetween`'s own midpoint sits exactly
+   * halfway between the two, so pushing "toward the target" (rather than
+   * an arbitrary direction) never walks a label back over the tile its
+   * own edge just left.
+   */
+  targetY: number;
+}
+
+export interface ResolvedEdgeLabel {
+  /** One line, or two once collision resolution wraps it. */
+  lines: string[];
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const LABEL_PUSH_STEP = 10;
+const LABEL_MIN_GAP_X = 16;
+const LABEL_PILL_PADDING_X = 12;
+const LABEL_PILL_HEIGHT_1_LINE = 18;
+const LABEL_PILL_HEIGHT_2_LINE = 30;
+
+/** Greedily fills the first line up to `targetWidth`, puts every remaining word on the second — no further wrap or truncation, since two lines comfortably holds any verb phrase this diagram actually renders (a hard single-line cap already ran before this is ever reached — see `resolveEdgeLabelOverlaps`'s own doc comment). A single word already over `targetWidth` still gets its own line rather than being split mid-word. */
+function wrapToTwoLines(text: string, measureWidth: (s: string) => number, targetWidth: number): string[] {
+  const words = text.split(/\s+/).filter((w) => w.length > 0);
+  if (words.length <= 1) return [text];
+  let splitAt = 1;
+  for (let i = 2; i <= words.length; i += 1) {
+    if (measureWidth(words.slice(0, i).join(' ')) <= targetWidth) splitAt = i;
+    else break;
+  }
+  const first = words.slice(0, splitAt).join(' ');
+  const second = words.slice(splitAt).join(' ');
+  return second.length > 0 ? [first, second] : [first];
+}
+
+function pillFor(lines: readonly string[], x: number, y: number, measureWidth: (s: string) => number, textScale: number): ResolvedEdgeLabel {
+  const width = Math.max(...lines.map(measureWidth)) + LABEL_PILL_PADDING_X * textScale;
+  const height = (lines.length > 1 ? LABEL_PILL_HEIGHT_2_LINE : LABEL_PILL_HEIGHT_1_LINE) * textScale;
+  return { lines: [...lines], x, y, width, height };
+}
+
+/** "Share a y band" (both pills' y-ranges overlap) with less than `LABEL_MIN_GAP_X` (16px) of horizontal clearance between them — a real box intersection is the same test with a negative gap. */
+function pillsCollide(a: ResolvedEdgeLabel, b: ResolvedEdgeLabel, minGapX: number): boolean {
+  const sharesYBand = a.y - a.height / 2 < b.y + b.height / 2 && b.y - b.height / 2 < a.y + a.height / 2;
+  if (!sharesYBand) return false;
+  const aLeft = a.x - a.width / 2;
+  const aRight = a.x + a.width / 2;
+  const bLeft = b.x - b.width / 2;
+  const bRight = b.x + b.width / 2;
+  const gap = aRight <= bLeft ? bLeft - aRight : bRight <= aLeft ? aLeft - bRight : -1; // -1: a literal overlap, not just a crowded gap
+  return gap < minGapX;
+}
+
+/**
+ * V1 fix, "two adjacent-module verb labels never render on top of each
+ * other": `curveBetween`'s own "always in the clear gutter" guarantee
+ * only protects a label from *tile* collisions — nothing stops two edges
+ * landing in that same gutter, close together in x (adjacent modules sit
+ * only `MODULE_WIDTH + MODULE_GUTTER_X` = 80px apart, easily narrower
+ * than a 25+ character verb's own pill), from colliding with *each
+ * other*. Resolved here, deterministically (CLAUDE.md rule 6), in the
+ * caller's own array order — each label is checked only against labels
+ * already placed before it, never re-litigated once resolved:
+ *
+ * 1. Collides with an earlier label? Push this one vertically toward its
+ *    own `targetY` (never the source — see `EdgeLabelPlacement.targetY`'s
+ *    own comment) by `LABEL_PUSH_STEP`, up to two tries, re-checking
+ *    after each.
+ * 2. Still colliding after two pushes? Wrap the text to two lines (half
+ *    the rough width, at the cost of height) at its current, already-
+ *    pushed position — one more line to fix a horizontal crowding is
+ *    usually enough; a vertical push already tried and failed, so this
+ *    doesn't try pushing again.
+ *
+ * `measureWidth` is injected (a thin wrapper over a real
+ * `CanvasRenderingContext2D.measureText` in `ContextDiagramCanvas.tsx`)
+ * so this stays a pure, unit-testable function with no canvas of its own.
+ */
+export function resolveEdgeLabelOverlaps(placements: readonly EdgeLabelPlacement[], measureWidth: (text: string) => number, textScale: number): ResolvedEdgeLabel[] {
+  const minGapX = LABEL_MIN_GAP_X * textScale;
+  const pushStep = LABEL_PUSH_STEP * textScale;
+
+  const resolved: ResolvedEdgeLabel[] = [];
+  for (const placement of placements) {
+    let box = pillFor([placement.text], placement.x, placement.y, measureWidth, textScale);
+    const pushSign = placement.targetY >= placement.y ? 1 : -1;
+    for (let attempt = 0; attempt < 2 && resolved.some((r) => pillsCollide(box, r, minGapX)); attempt += 1) {
+      box = { ...box, y: box.y + pushSign * pushStep };
+    }
+    if (resolved.some((r) => pillsCollide(box, r, minGapX))) {
+      // Half the current (unwrapped) text width, not the full width — the
+      // full text obviously already fits within its own width, so wrapping
+      // against that target would just hand every word back onto one line
+      // and change nothing.
+      const targetWidth = (box.width - LABEL_PILL_PADDING_X * textScale) / 2;
+      const wrapped = wrapToTwoLines(placement.text, measureWidth, targetWidth);
+      box = pillFor(wrapped, box.x, box.y, measureWidth, textScale);
+    }
+    resolved.push(box);
+  }
+  return resolved;
+}
