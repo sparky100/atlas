@@ -8,6 +8,7 @@ import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { quantizeScale } from '../landscape/zoom';
 import { NODE_HEIGHT, NODE_WIDTH } from '../landscape/layout';
 import { allTilesOf, anchorFor, computeContextDiagramLayout, type ContextDiagramLayout, type DiagramTile, type DiagramUnitInput } from './contextDiagramLayout';
+import { kindOf, SYSTEM_KIND_LABEL } from '../elements/systemKind';
 import { edgeLabel, type ContextGroup } from './contextGrouping';
 import type { ContextModule } from './contextDiagramData';
 import styles from './ContextDiagramCanvas.module.css';
@@ -69,14 +70,18 @@ function readTokens(el: HTMLElement): CanvasTokens {
   };
 }
 
-/** V1's own "Tone: lifecycle ... only" — a system tile's fill tint comes from its own recorded lifecycle status, the same `lifecycleToneFor` mapping `ElementHeader.tsx`'s own status chip already uses; nothing else (criticality, hosting model, exposure) is read here. An actor or container carries no `lifecycleStatus` of its own, so this naturally returns no tone for either — the same "silent when the fact doesn't apply" shape `landscapeTileColourFor` uses for its own colour-by modes. */
-function toneColour(element: ElementsHeadRow, tokens: CanvasTokens): string | undefined {
-  if (element.element_type !== 'system') return undefined;
-  const status = attributesRecord(element.attributes).lifecycleStatus;
+/** The shared status→fill-colour lookup both a top-level tile (`toneColour`, below) and a module sub-tile use — factored out once a second caller (the module fix, V1 fix) needed the exact same mapping from a plain status string rather than a whole element row. */
+function toneColourForStatus(status: string | null | undefined, tokens: CanvasTokens): string | undefined {
   if (typeof status !== 'string') return undefined;
   const tone = lifecycleToneFor(status);
   if (!tone) return undefined;
   return { ok: tokens.statusOk, warn: tokens.statusWarn, danger: tokens.statusDanger, info: tokens.statusInfo, neutral: tokens.statusNeutral }[tone];
+}
+
+/** V1's own "Tone: lifecycle ... only" — a system tile's fill tint comes from its own recorded lifecycle status, the same `lifecycleToneFor` mapping `ElementHeader.tsx`'s own status chip already uses; nothing else (criticality, hosting model, exposure) is read here. An actor carries no `lifecycleStatus` of its own, so this naturally returns no tone for it — the same "silent when the fact doesn't apply" shape `landscapeTileColourFor` uses for its own colour-by modes. A module (container) sub-tile's own tone is computed separately, from `ContextModule.lifecycleStatus` (V1 fix — see `drawTile`'s own module loop), since a module's data never reaches this function's own `elementsById`-keyed lookup. */
+function toneColour(element: ElementsHeadRow, tokens: CanvasTokens): string | undefined {
+  if (element.element_type !== 'system') return undefined;
+  return toneColourForStatus(attributesRecord(element.attributes).lifecycleStatus as string | undefined, tokens);
 }
 
 function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
@@ -101,11 +106,52 @@ function truncate(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return low === 0 ? '' : text.slice(0, low) + '…';
 }
 
+/**
+ * V1 fix, "two-line wrap": greedily fills each line with as many whole
+ * words as fit `maxWidth` (the current `ctx.font`'s own metrics), up to
+ * `maxLines` lines; whatever's left over after the last allowed line is
+ * ellipsized onto it via `truncate` above, rather than silently dropped.
+ * Module names/capabilities and a platform's own one-sentence description
+ * are all narrow, fixed-width canvas text with no CSS wrapping to fall back
+ * on — this is this file's own equivalent.
+ */
+function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
+  const words = text.split(/\s+/).filter((w) => w.length > 0);
+  if (words.length === 0 || maxLines <= 0) return [];
+  const lines: string[] = [];
+  let remaining = words;
+  while (remaining.length > 0 && lines.length < maxLines) {
+    const isLastAllowedLine = lines.length === maxLines - 1;
+    let count = 1;
+    while (count < remaining.length && ctx.measureText(remaining.slice(0, count + 1).join(' ')).width <= maxWidth) count += 1;
+    if (isLastAllowedLine && count < remaining.length) {
+      lines.push(truncate(ctx, remaining.join(' '), maxWidth));
+      remaining = [];
+    } else {
+      lines.push(remaining.slice(0, count).join(' '));
+      remaining = remaining.slice(count);
+    }
+  }
+  return lines;
+}
+
+/**
+ * V1 fix, "fit to fill (max 1.5×)": was capped at a plain `1` — a small
+ * diagram (a system with only one or two neighbours) fit-to-viewed at
+ * 100% scale even when the canvas had ample room to fill with a larger,
+ * easier-to-read diagram. Capping the *fit* scale at 1.5× (not removing the
+ * cap entirely — a two-neighbour diagram filling a 1400px-wide monitor at
+ * whatever multiple that implies would look absurd) lets a small diagram
+ * genuinely fill the available space instead of floating at native size in
+ * the middle of it.
+ */
+const FIT_MAX_SCALE = 1.5;
+
 function computeFitTransform(worldWidth: number, worldHeight: number, displayWidth: number, displayHeight: number): Transform {
   if (worldWidth <= 0 || worldHeight <= 0 || displayWidth <= 0 || displayHeight <= 0) return { scale: 1, tx: 0, ty: 0 };
   const availableWidth = Math.max(1, displayWidth - FIT_MARGIN_PX * 2);
   const availableHeight = Math.max(1, displayHeight - FIT_MARGIN_PX * 2);
-  const rawScale = Math.min(availableWidth / worldWidth, availableHeight / worldHeight, 1);
+  const rawScale = Math.min(availableWidth / worldWidth, availableHeight / worldHeight, FIT_MAX_SCALE);
   const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, rawScale));
   const tx = (displayWidth - worldWidth * scale) / 2;
   const ty = (displayHeight - worldHeight * scale) / 2;
@@ -150,6 +196,24 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
     for (const n of [...group.internal, ...group.external]) map.set(n.element.element_id, n.element);
     return map;
   }, [group]);
+
+  // V1 fix: a module (container) never lands in `elementsById` above — by
+  // design, `useSystemContext.ts` excludes a platform's own module ids from
+  // the neighbour query (its own doc comment explains why: an edge attaching
+  // to a module still means "this neighbour touches the hub", not "here's a
+  // second, separate neighbour named by the module's own id"). `platformModulesById`
+  // (V1's own module-name/capability/lifecycle data, `contextDiagramData.ts`)
+  // is the *only* source of a module's own name/tone — this flattens every
+  // platform's own module list into one lookup by module id, the same shape
+  // `elementsById` gives every other tile. Without this, a module tile's own
+  // name/tone silently read as blank (this fix's own root cause).
+  const moduleByElementId = useMemo(() => {
+    const map = new Map<UUID, ContextModule>();
+    for (const modules of platformModulesById.values()) {
+      for (const module of modules) map.set(module.elementId, module);
+    }
+    return map;
+  }, [platformModulesById]);
 
   const layout = useMemo<ContextDiagramLayout>(
     () =>
@@ -255,11 +319,19 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         ctx.restore();
       }
 
-      const edgeLabels: { text: string; worldX: number; worldY: number }[] = [];
+      const edgeLabels: { text: string; worldX: number; worldY: number; angle: number }[] = [];
       const platformMarkers: { worldX: number; worldY: number }[] = [];
       for (const edge of edges) {
-        const from = anchorFor(edge.fromTile, edge.fromEndpoint);
-        const to = anchorFor(edge.toTile, edge.toEndpoint);
+        // V1 fix: the platform-fallback anchor now returns a point on the
+        // tile's own rectangle boundary, facing the *other* endpoint's own
+        // tile centre (`clipToRectBoundary`'s own comment) — each side's
+        // `anchorFor` call needs the other side's centre for that, computed
+        // up front here rather than inside `anchorFor` itself (which only
+        // ever sees one tile at a time).
+        const fromCentre = { x: edge.fromTile.x + edge.fromTile.w / 2, y: edge.fromTile.y + edge.fromTile.h / 2 };
+        const toCentre = { x: edge.toTile.x + edge.toTile.w / 2, y: edge.toTile.y + edge.toTile.h / 2 };
+        const from = anchorFor(edge.fromTile, edge.fromEndpoint, toCentre);
+        const to = anchorFor(edge.toTile, edge.toEndpoint, fromCentre);
         if (from.isPlatformFallback) platformMarkers.push({ worldX: from.x, worldY: from.y });
         if (to.isPlatformFallback) platformMarkers.push({ worldX: to.x, worldY: to.y });
 
@@ -271,14 +343,17 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         ctx.lineTo(to.x, to.y);
         ctx.stroke();
 
-        if (showLabels && edge.label.trim().length > 0) {
-          edgeLabels.push({ text: edge.label, worldX: (from.x + to.x) / 2, worldY: (from.y + to.y) / 2 });
-        }
-
         // One arrowhead, direction-only (UI-principles §9) — same shape
         // LandscapeCanvas.tsx's own arrowhead uses, oriented along this
         // edge's own line (never routed here, so always the direct angle).
+        // V1 fix, "edge labels along the line": the same angle now also
+        // orients the label text itself (below, screen-space pass) instead
+        // of drawing it flat/horizontal.
         const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        if (showLabels && edge.label.trim().length > 0) {
+          edgeLabels.push({ text: edge.label, worldX: (from.x + to.x) / 2, worldY: (from.y + to.y) / 2, angle });
+        }
+
         const arrowX = to.x - Math.cos(angle) * (NODE_HEIGHT / 2);
         const arrowY = to.y - Math.sin(angle) * (NODE_HEIGHT / 2);
         ctx.translate(arrowX, arrowY);
@@ -294,6 +369,12 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
       }
 
       const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; maxWidth: number }[] = [];
+      // V1 fix: "the platform tile shows the platform's name, kind and one
+      // sentence" — a separate list from `nodeLabels` above (a plain tile
+      // never has `tile.modules`, so never contributes here), since a
+      // platform's own title bar needs three lines' worth of content, not
+      // one.
+      const platformTitles: { glyph: string; name: string; kind: string; description: string | null; worldX: number; worldY: number; maxWidth: number }[] = [];
       const moduleLabels: { name: string; capability: string | null; worldX: number; worldY: number; maxWidth: number }[] = [];
 
       const drawTile = (tile: DiagramTile, isHub: boolean): void => {
@@ -316,20 +397,40 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
 
         if (showLabels) {
           const glyph = element.element_type === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph(element.element_type);
-          const titleY = tile.modules ? tile.y + 12 : tile.y + tile.h / 2;
-          nodeLabels.push({ glyph, name: element.name, worldX: tile.x, worldY: titleY, maxWidth: tile.w - 30 });
+          if (tile.modules) {
+            const description = attributesRecord(element.attributes).description;
+            platformTitles.push({
+              glyph,
+              name: element.name,
+              kind: SYSTEM_KIND_LABEL[kindOf(element)],
+              description: typeof description === 'string' && description.trim().length > 0 ? description : null,
+              worldX: tile.x + 8,
+              worldY: tile.y + 14,
+              maxWidth: tile.w - 16,
+            });
+          } else {
+            nodeLabels.push({ glyph, name: element.name, worldX: tile.x, worldY: tile.y + tile.h / 2, maxWidth: tile.w - 30 });
+          }
         }
 
         for (const module of tile.modules ?? []) {
+          // V1 fix: a module's own name/capability/tone come from
+          // `moduleByElementId` (this component's own flattening of
+          // `platformModulesById`, above) — `elementsById` never contains a
+          // module (`useSystemContext.ts`'s own deliberate exclusion), which
+          // is exactly why a module tile's name silently rendered blank
+          // before this fix.
+          const moduleData = moduleByElementId.get(module.elementId);
+          const moduleTone = toneColourForStatus(moduleData?.lifecycleStatus, tokens);
           ctx.save();
           roundRectPath(ctx, module.x, module.y, module.w, module.h, 6);
-          ctx.fillStyle = tokens.surfaceRaised;
+          ctx.fillStyle = moduleTone ? `color-mix(in srgb, ${moduleTone} 20%, ${tokens.surfaceRaised})` : tokens.surfaceRaised;
           ctx.fill();
           ctx.strokeStyle = tokens.border;
           ctx.lineWidth = 1;
           ctx.stroke();
           ctx.restore();
-          if (showLabels) moduleLabels.push({ name: elementsById.get(module.elementId)?.name ?? '', capability: module.capabilityName, worldX: module.x + module.w / 2, worldY: module.y + 12, maxWidth: module.w - 8 });
+          if (showLabels) moduleLabels.push({ name: moduleData?.name ?? '', capability: module.capabilityName, worldX: module.x + module.w / 2, worldY: module.y + 10, maxWidth: module.w - 8 });
         }
       };
 
@@ -345,35 +446,83 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
       const textScale = quantizeScale(transform.scale, MIN_SCALE, MAX_SCALE);
       const toScreen = (worldX: number, worldY: number): [number, number] => [worldX * transform.scale + transform.tx, worldY * transform.scale + transform.ty];
       ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
 
+      // V1 fix, "two-line wrap": a name that doesn't fit on one line wraps
+      // to a second rather than truncating hard — `wrapLines` measures
+      // against the exact font just set, so it's called here in the
+      // screen-space pass, not while building `nodeLabels` above.
       for (const label of nodeLabels) {
         const [x, y] = toScreen(label.worldX, label.worldY);
         ctx.fillStyle = tokens.text;
         ctx.font = `${(14 * textScale).toFixed(2)}px sans-serif`;
         ctx.fillText(label.glyph, x + 8 * textScale, y);
         ctx.font = `${(12 * textScale).toFixed(2)}px sans-serif`;
-        ctx.fillText(truncate(ctx, label.name, label.maxWidth * textScale), x + 26 * textScale, y);
+        const lines = wrapLines(ctx, label.name, label.maxWidth * textScale, 2);
+        const lineHeight = 13 * textScale;
+        const startY = y - ((lines.length - 1) * lineHeight) / 2;
+        lines.forEach((line, i) => {
+          ctx.fillText(line, x + 26 * textScale, startY + i * lineHeight);
+        });
       }
 
-      ctx.textAlign = 'center';
-      ctx.font = `${(10 * textScale).toFixed(2)}px sans-serif`;
-      for (const label of moduleLabels) {
-        const [x, y] = toScreen(label.worldX, label.worldY);
+      // V1 fix: the platform tile's own title — name, kind, and one
+      // sentence (`docs/prompts/atlas-prompt-pack.md`'s own V1 wording,
+      // "Centre: the system as a tile (name, type, one sentence)").
+      for (const title of platformTitles) {
+        const [x, y] = toScreen(title.worldX, title.worldY);
         ctx.fillStyle = tokens.text;
-        ctx.fillText(truncate(ctx, label.name, label.maxWidth * textScale), x, y);
-        if (label.capability) {
-          ctx.fillStyle = tokens.textMuted;
-          ctx.font = `${(9 * textScale).toFixed(2)}px sans-serif`;
-          ctx.fillText(truncate(ctx, label.capability, label.maxWidth * textScale), x, y + 12 * textScale);
-          ctx.font = `${(10 * textScale).toFixed(2)}px sans-serif`;
+        ctx.font = `${(14 * textScale).toFixed(2)}px sans-serif`;
+        ctx.fillText(title.glyph, x, y);
+        ctx.font = `${(12 * textScale).toFixed(2)}px sans-serif`;
+        ctx.fillText(truncate(ctx, title.name, (title.maxWidth - 20) * textScale), x + 18 * textScale, y);
+        ctx.fillStyle = tokens.textMuted;
+        ctx.font = `${(10 * textScale).toFixed(2)}px sans-serif`;
+        ctx.fillText(title.kind, x, y + 14 * textScale);
+        if (title.description) {
+          const descLines = wrapLines(ctx, title.description, title.maxWidth * textScale, 2);
+          descLines.forEach((line, i) => {
+            ctx.fillText(line, x, y + (30 + i * 12) * textScale);
+          });
         }
       }
 
+      ctx.textAlign = 'center';
+      for (const label of moduleLabels) {
+        const [x, y] = toScreen(label.worldX, label.worldY);
+        ctx.fillStyle = tokens.text;
+        ctx.font = `${(10 * textScale).toFixed(2)}px sans-serif`;
+        const nameLines = wrapLines(ctx, label.name, label.maxWidth * textScale, 2);
+        nameLines.forEach((line, i) => {
+          ctx.fillText(line, x, y + i * 11 * textScale);
+        });
+        // V1 fix: absent entirely (never a placeholder/blank second line)
+        // when this module supports nothing yet — the capability chip only
+        // ever draws when there's a real capability name to show.
+        if (label.capability) {
+          ctx.fillStyle = tokens.textMuted;
+          ctx.font = `${(9 * textScale).toFixed(2)}px sans-serif`;
+          const capLines = wrapLines(ctx, label.capability, label.maxWidth * textScale, 2);
+          capLines.forEach((line, i) => {
+            ctx.fillText(line, x, y + (26 + i * 10) * textScale);
+          });
+        }
+      }
+
+      // V1 fix, "edge labels along the line": rotated to the edge's own
+      // angle (computed alongside the arrowhead above) instead of drawn
+      // flat/horizontal — flipped by π whenever that angle points leftward,
+      // so the text itself is never upside down.
       ctx.fillStyle = tokens.textMuted;
       ctx.font = `${(11 * textScale).toFixed(2)}px sans-serif`;
       for (const label of edgeLabels) {
         const [x, y] = toScreen(label.worldX, label.worldY);
-        ctx.fillText(truncate(ctx, label.text, NODE_WIDTH * 1.5 * textScale), x, y - 8 * textScale);
+        const angle = label.angle > Math.PI / 2 || label.angle < -Math.PI / 2 ? label.angle + Math.PI : label.angle;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillText(truncate(ctx, label.text, NODE_WIDTH * 1.5 * textScale), 0, -8 * textScale);
+        ctx.restore();
       }
 
       // V1's own "which module?" marker — a small filled "?" badge at the
@@ -398,7 +547,7 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
     return () => {
       observer.disconnect();
     };
-  }, [layout, edges, elementsById, transform, hover]);
+  }, [layout, edges, elementsById, moduleByElementId, transform, hover]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
