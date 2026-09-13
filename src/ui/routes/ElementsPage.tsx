@@ -20,6 +20,7 @@ import styles from './ElementsPage.module.css';
 
 const VALID_FILTERS: readonly ElementBrowseFilter[] = [
   'unlinked-systems',
+  'platform-supports-move-to-module',
   'unowned-capabilities',
   'stale-attributes',
   'no-technical-owner',

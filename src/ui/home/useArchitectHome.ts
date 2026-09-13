@@ -16,6 +16,7 @@ import {
   findCriticalSystemsWithoutBusinessOwner,
   findExternalInterfacesMissingClassification,
   findExternalOrganisationAccess,
+  findPlatformSupportsThatShouldMoveToModule,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
@@ -60,6 +61,8 @@ export interface ArchitectHomeData {
   duplicatesCount: 0;
   /** Handoff 7d's Health findings (`docs/HANDOFF-7d-architect-door.md`) — the first three, built against real queries; `duplicatesCount` above is the fourth. */
   systemsWithoutCapability: ElementsHeadRow[];
+  /** S1 item 19's own informational nudge: a platform with modules that itself carries a direct `supports` edge, probably meant for the module. */
+  platformSupportsThatShouldMoveToModule: ElementsHeadRow[];
   capabilitiesWithoutOwner: ElementsHeadRow[];
   staleAttributes: StaleAttributesFinding;
   /** Sprint U4-1 B5's fifth finding: `uses`/`flows_to` relationships with no verb-phrase label. */
@@ -149,6 +152,11 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
 
       const myOpenBranches = changeBranches.filter((b) => b.created_by === userId && MY_OPEN_STATUSES.includes(b.status));
       const usesAndFlowsToEndpointsById = new Map([...usesAndFlowsToEndpoints, ...actors].map((el) => [el.element_id, el]));
+      // S1 item 19: `usesAndFlowsToEndpoints` is already every system and
+      // container in the model (`listUsesAndFlowsToEndpointElements`'s own
+      // doc comment), so a platform's own modules are already in hand here
+      // — no second query needed just to find them.
+      const containers = usesAndFlowsToEndpoints.filter((el) => el.element_type === 'container');
 
       // Sprint U4-1 B2: author display name and named-subject links for
       // each shown commit, both batched once across every row rather than
@@ -193,7 +201,8 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             oldestReviewItem: reviewQueue[0] ?? null,
             myOpenBranches,
             duplicatesCount: 0,
-            systemsWithoutCapability: findSystemsWithoutCapability(systems, supportsEdges),
+            systemsWithoutCapability: findSystemsWithoutCapability(systems, supportsEdges, containers),
+            platformSupportsThatShouldMoveToModule: findPlatformSupportsThatShouldMoveToModule(systems, supportsEdges, containers),
             capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges),
             staleAttributes: computeStaleAttributesFinding(facts, systems),
             unlabeledVerbRelationships: findUnlabeledVerbRelationships(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
