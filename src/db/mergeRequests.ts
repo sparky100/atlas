@@ -4,38 +4,41 @@
  * (submit/request_changes/approve/reject/merge_branch from step 2's
  * `20260906161000_merge_review_queue.sql`, plus this step's own
  * `resubmit_merge_request`), computing a fresh `MergeReview` for a branch,
- * and pushing the field-conflict resolution commit SPEC §7.4 describes.
+ * and pushing the refresh SPEC §7.5 describes.
  *
- * Scope note: SPEC §7.4 also names bespoke structural-conflict actions
- * (keep retraction / keep element, duplicate-relationship survivor pick,
- * cardinality primary pick) and identity's "merge now" (`atlas.merge_elements`,
- * itself deferred past this sprint — SPEC §11). Building the dependency-
- * closure cascade those need ("keeping the retraction also retracts 3
- * relationships and re-parents 2 containers") is a substantial, separable
- * unit of work. This module gives a reviewer a one-click resolution for
- * field conflicts (the common case) and a real path for every other
- * conflict class: reopen the branch (`requestChanges`) and fix it with the
- * ordinary branch editor (Sprint C1 steps 3-4 — un-retract an element,
- * remove a dangling relationship, drop a duplicate), then push a refresh
- * with no resolutions of its own and resubmit. The review UI names this
- * explicitly on structural-conflict cards rather than silently omitting
- * their actions.
+ * Refresh covers both SPEC §7.4's field-conflict actions (keep this
+ * change / keep main / enter a value) and its structural-conflict actions
+ * (keep retraction / keep element with the dependent cascade, duplicate-
+ * relationship survivor pick, cardinality primary/role pick — ADR-021,
+ * C2b) — `pushRefresh` below builds both kinds of resolution off one
+ * shared `merge_resolution` source and commits them atomically via
+ * `atlas.refresh_branch` (ADR-021 §5 item 5). Identity's "merge now"
+ * (`atlas.merge_elements`) remains deferred past this sprint (SPEC §11) —
+ * "keep both" (dismiss) is the only action there.
  *
  * Every RPC below is called via `.schema('atlas')`: these functions live
  * in the atlas schema (SPEC §2), not public, and `supabase.rpc()` on its
  * own only ever resolves against whatever schema the client is scoped to
  * (public by default) — see src/db/commits.ts's own note on this.
  */
-import type { CommitEnvelope, Delta, UUID } from '../contracts/delta';
+import type { Delta, UUID } from '../contracts/delta';
+import { fromRefreshBranchResult, toRefreshBranchParams, type RefreshBranchCommitInput, type ResolvedConflictWireRow } from '../contracts/rows';
 import { foldFromGenesis, headHash } from '../engine/head';
 import { computeMergeReview, type MergeReview } from '../engine/merge';
-import { buildFieldConflictResolutions, unresolvedFieldConflictKeys, type FieldConflictChoice } from '../engine/mergeResolution';
+import {
+  buildFieldConflictResolutions,
+  buildStructuralResolutions,
+  unresolvedFieldConflictKeys,
+  unresolvedStructuralFindings,
+  type FieldConflictChoice,
+  type StructuralChoice,
+} from '../engine/mergeResolution';
 import { serializeHeadProjection } from '../engine/projection';
 import { listAliasesForModel } from './aliases';
 import { getBranch, getMainBranch } from './branches';
 import type { Client } from './client';
 import { buildCommitLoader } from './commitLoader';
-import { commitToBranch, type CommitResult, type ResolvedConflictInput } from './commits';
+import type { CommitResult } from './commits';
 import { createMergeResolutionSource } from './sources';
 import type { BranchRow, MergeRequestRow } from './types';
 
@@ -188,53 +191,98 @@ export interface PushRefreshInput {
   review: MergeReview;
   /** Empty is a valid refresh: pulling in main with nothing to resolve (SPEC §7.1's "then the final merge is a merge commit with zero deltas"). */
   choices: FieldConflictChoice[];
+  /** ADR-021 §4, C2b — one per blocking structural finding the reviewer has resolved. Empty (the default) when the branch has no structural findings, or none are resolved yet — `unresolvedStructuralFindings` still refuses the push either way. */
+  structuralChoices?: StructuralChoice[];
 }
 
 /**
- * SPEC §7.5's refresh, restricted to this step's field-conflict actions: a
- * `merge` commit on the branch (`parent = branch.head`, `mergedBranchHead =
- * main.head`) carrying one resolution delta per staged choice plus the
- * matching `resolved_conflicts` rows — an ordinary commit through
- * `src/db/commits.ts`'s existing path (SPEC §7.5's own implementation
- * note), not a distinct procedure. Structural conflicts this refresh
- * doesn't resolve are simply carried across unchanged, same as if the
- * reviewer had fixed them by hand before calling this. Refuses (C15) rather
- * than committing when a FIELD_CONFLICT key has no matching choice.
+ * SPEC §7.5's refresh: "prepare, replay, decide" (ADR-021 §2, §3.3, C2b) —
+ * one shared `merge_resolution` source, `buildFieldConflictResolutions` and
+ * `buildStructuralResolutions` both driven by it, then one call to
+ * `atlas.refresh_branch` (ADR-021 §5 item 5) that writes the optional
+ * `preparation` commit and the `merge` commit atomically. Every refresh
+ * goes through this one RPC now, prep-commit or not, rather than keeping
+ * the old single-`commit_deltas` path as a special case for the empty-`P`
+ * majority (ADR-021 §5 item 5's own "otherwise everything goes through the
+ * RPC for one code path"). Refuses (C15, amended) rather than committing
+ * when any FIELD_CONFLICT key or blocking structural finding has no
+ * matching choice.
  */
 export async function pushRefresh(supabase: Client, input: PushRefreshInput): Promise<CommitResult> {
-  const { modelId, orgId, userId, branch, mainHeadCommitId, review, choices } = input;
+  const { modelId, orgId, userId, branch, mainHeadCommitId, review, choices, structuralChoices = [] } = input;
 
-  // SPEC §7.5's C15: every FIELD_CONFLICT key needs an explicit choice
-  // before this refresh lands, or main's value would silently win with no
-  // record at all (mergeResolution.ts's own comment on `apply()` never
-  // re-validating `previousDeltaId`).
-  const unresolved = unresolvedFieldConflictKeys(review.threeWay.fields, choices);
-  if (unresolved.length > 0) {
-    return { ok: false, reason: 'invalid', message: `${String(unresolved.length)} field conflict(s) still need a resolution before refreshing: ${unresolved.map((u) => `${u.subjectId}.${u.attribute}`).join(', ')}` };
+  const unresolvedFields = unresolvedFieldConflictKeys(review.threeWay.fields, choices);
+  if (unresolvedFields.length > 0) {
+    return {
+      ok: false,
+      reason: 'invalid',
+      message: `${String(unresolvedFields.length)} field conflict(s) still need a resolution before refreshing: ${unresolvedFields.map((u) => `${u.subjectId}.${u.attribute}`).join(', ')}`,
+    };
+  }
+  const unresolvedStructural = unresolvedStructuralFindings(review.classification.findings, structuralChoices);
+  if (unresolvedStructural.length > 0) {
+    return {
+      ok: false,
+      reason: 'invalid',
+      message: `${String(unresolvedStructural.length)} structural conflict(s) still need a resolution before refreshing: ${unresolvedStructural.map((f) => f.detail).join('; ')}`,
+    };
   }
 
-  let deltas: Delta[] = [];
-  let resolvedConflicts: ResolvedConflictInput[] = [];
-  if (choices.length > 0) {
+  let mergeDeltas: Delta[] = [];
+  let prepDeltas: Delta[] = [];
+  let resolvedConflicts: ResolvedConflictWireRow[] = [];
+  if (choices.length > 0 || structuralChoices.length > 0) {
     const sourceId = crypto.randomUUID();
     await createMergeResolutionSource(supabase, { id: sourceId, orgId, modelId, createdBy: userId, branchTitle: branch.title ?? branch.name });
-    const built = buildFieldConflictResolutions(review.threeWay.fields, review.threeWay.ours, choices, sourceId, () => crypto.randomUUID());
-    deltas = built.deltas;
-    resolvedConflicts = built.resolvedConflicts.map((rc) => ({ id: crypto.randomUUID(), ...rc }));
+    const mintId = () => crypto.randomUUID();
+
+    if (choices.length > 0) {
+      const built = buildFieldConflictResolutions(review.threeWay.fields, review.threeWay.ours, choices, sourceId, mintId);
+      mergeDeltas = [...mergeDeltas, ...built.deltas];
+      resolvedConflicts = [
+        ...resolvedConflicts,
+        ...built.resolvedConflicts.map((rc) => ({ id: crypto.randomUUID(), winning_delta_id: rc.winningDeltaId, discarded_delta_id: rc.discardedDeltaId, resolution_delta_id: rc.resolutionDeltaId, rationale: null })),
+      ];
+    }
+    if (structuralChoices.length > 0) {
+      const built = buildStructuralResolutions(review, structuralChoices, sourceId, mintId);
+      prepDeltas = built.prepDeltas;
+      mergeDeltas = [...mergeDeltas, ...built.mergeDeltas];
+      resolvedConflicts = [
+        ...resolvedConflicts,
+        ...built.resolvedConflicts.map((rc) => ({ id: crypto.randomUUID(), winning_delta_id: rc.winningDeltaId, discarded_delta_id: rc.discardedDeltaId, resolution_delta_id: rc.resolutionDeltaId, rationale: rc.rationale })),
+      ];
+    }
   }
 
-  const envelope: CommitEnvelope = {
+  const totalResolutions = mergeDeltas.length;
+  const prepCommit: RefreshBranchCommitInput | null = prepDeltas.length > 0 ? { id: crypto.randomUUID(), title: `Prepare refresh from main: ${String(prepDeltas.length)} preparatory delta(s)`, deltas: prepDeltas } : null;
+  const mergeCommit: RefreshBranchCommitInput = {
     id: crypto.randomUUID(),
-    branchId: branch.id,
-    parentCommitId: branch.head_commit_id,
-    mergedBranchHeadCommitId: mainHeadCommitId,
-    kind: 'merge',
-    title: deltas.length > 0 ? `Refresh from main, resolving ${String(deltas.length)} conflict(s)` : 'Refresh from main',
-    body: null,
-    deltas,
+    title: totalResolutions > 0 ? `Refresh from main, resolving ${String(totalResolutions)} conflict(s)` : 'Refresh from main',
+    deltas: mergeDeltas,
   };
 
-  return commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId: branch.head_commit_id, envelope, resolvedConflicts });
+  const params = toRefreshBranchParams({
+    branchId: branch.id,
+    expectedHeadCommitId: branch.head_commit_id,
+    mainHeadCommitId,
+    prepCommit,
+    mergeCommit,
+    resolvedConflicts,
+  });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.schema('atlas').rpc('refresh_branch', params as unknown as Record<string, unknown>);
+  if (error) return { ok: false, reason: 'invalid', message: `pushRefresh: ${error.message}` };
+
+  const result = fromRefreshBranchResult(data as never);
+  if (result.status === 'stale_head') {
+    return { ok: false, reason: 'conflict', message: 'main (or another refresh) advanced since this branch head was last read — reload and try again.' };
+  }
+  if (result.status === 'invalid') {
+    return { ok: false, reason: 'invalid', message: result.reason };
+  }
+  return { ok: true, commitId: result.mergeCommitId };
 }
 
 // Re-exported so a caller building a full "resolve, refresh, resubmit" flow

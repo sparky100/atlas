@@ -4,9 +4,14 @@ import { dismissIdentityPairOnBranch, getBranch } from '../../db/branches';
 import { computeMergeReviewForBranch, pushRefresh } from '../../db/mergeRequests';
 import type { BranchRow } from '../../db/types';
 import type { MergeReview } from '../../engine/merge';
-import type { FieldConflictChoice } from '../../engine/mergeResolution';
+import type { FieldConflictChoice, StructuralChoice } from '../../engine/mergeResolution';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
+
+/** `StructuralChoice`'s own key: a retraction choice is keyed by its element; a duplicate/cardinality pair choice by its own pair (order-independent — both sides of a pair should key to the same slot). */
+function structuralChoiceKey(choice: StructuralChoice): string {
+  return choice.class === 'retraction' ? `retraction ${choice.elementId}` : `${choice.class} ${[choice.relationshipId, choice.relatedRelationshipId].sort().join(' ')}`;
+}
 
 export interface BranchRebaseData {
   review: MergeReview;
@@ -36,6 +41,7 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
   const [actionStatus, setActionStatus] = useState<ActionStatus>('idle');
   const [actionError, setActionError] = useState<string | null>(null);
   const [fieldChoices, setFieldChoices] = useState<Map<string, FieldConflictChoice>>(new Map());
+  const [structuralChoices, setStructuralChoices] = useState<Map<string, StructuralChoice>>(new Map());
   // Optimistic-only additions not yet reflected in the `branch` prop's own
   // `dismissed_identity_pairs` (the RPC call is in flight, or the parent
   // hasn't re-fetched the branch since) — same shape as
@@ -56,6 +62,7 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
         }
         setState({ status: 'ready', review: computed.review, mainHeadCommitId: computed.mainHeadCommitId });
         setFieldChoices(new Map());
+        setStructuralChoices(new Map());
       })
       .catch((e: unknown) => {
         reportError("Couldn't compute this rebase.", e);
@@ -86,6 +93,14 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
     });
   }, []);
 
+  const setStructuralChoice = useCallback((choice: StructuralChoice) => {
+    setStructuralChoices((prev) => {
+      const next = new Map(prev);
+      next.set(structuralChoiceKey(choice), choice);
+      return next;
+    });
+  }, []);
+
   const pushRebase = useCallback(async () => {
     if (state.status !== 'ready') return;
     if (!userId) {
@@ -103,6 +118,7 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
         mainHeadCommitId: state.mainHeadCommitId,
         review: state.review,
         choices: [...fieldChoices.values()],
+        structuralChoices: [...structuralChoices.values()],
       });
       if (!result.ok) {
         setActionError(result.message);
@@ -119,9 +135,21 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
     } finally {
       setActionStatus('idle');
     }
-  }, [state, modelId, branch, userId, fieldChoices, onRebased]);
+  }, [state, modelId, branch, userId, fieldChoices, structuralChoices, onRebased]);
 
   const fieldChoiceFor = useMemo(() => (subjectId: UUID, attribute: string) => fieldChoices.get(fieldChoiceKey(subjectId, attribute)), [fieldChoices]);
+  const retractionChoiceFor = useMemo(() => (elementId: UUID) => {
+    const choice = structuralChoices.get(`retraction ${elementId}`);
+    return choice?.class === 'retraction' ? choice : undefined;
+  }, [structuralChoices]);
+  const pairChoiceFor = useMemo(
+    () => (relationshipId: UUID, relatedRelationshipId: UUID, findingClass: 'structural:duplicate-relationship' | 'structural:cardinality') => {
+      const cls = findingClass === 'structural:duplicate-relationship' ? 'duplicate-relationship' : 'cardinality';
+      const choice = structuralChoices.get(`${cls} ${[relationshipId, relatedRelationshipId].sort().join(' ')}`);
+      return choice?.class === cls ? choice : undefined;
+    },
+    [structuralChoices],
+  );
 
   const dismissIdentityPair = useCallback(
     (oid: UUID, tid: UUID) => {
@@ -143,5 +171,20 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
     [branch.dismissed_identity_pairs, pendingDismissals],
   );
 
-  return { state, reload, actionStatus, actionError, fieldChoiceFor, setFieldChoice, clearFieldChoice, stagedChoiceCount: fieldChoices.size, pushRebase, dismissIdentityPair, isIdentityPairDismissed };
+  return {
+    state,
+    reload,
+    actionStatus,
+    actionError,
+    fieldChoiceFor,
+    setFieldChoice,
+    clearFieldChoice,
+    retractionChoiceFor,
+    pairChoiceFor,
+    setStructuralChoice,
+    stagedChoiceCount: fieldChoices.size + structuralChoices.size,
+    pushRebase,
+    dismissIdentityPair,
+    isIdentityPairDismissed,
+  };
 }

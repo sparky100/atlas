@@ -64,10 +64,12 @@ Design (c) below. Designs (a) and (b) are the two named in the issue; (a) is wor
 
 Accepted as design (c) with two changes to the text below; where a later section still says `manual` for `P`, or lists C19 among C2b's items, this section wins.
 
-1. **`P` is a `commit_kind` of its own: `preparation`.** Not a `manual` commit with a marker. Its own migration (an `ALTER TYPE ... ADD VALUE` in its own file, per the `genesis` precedent, then the function that uses it), a contract update to `CommitKind`, and a round-trip test — rule 1. C18 is keyed on the kind: a `preparation` commit may contain only the deltas §3.3's preparation table derives from the findings, and nothing else may carry them. `atlas.refresh_branch` checks that `p_prep_commit`, when present, is written with kind `preparation`, that the `merge` commit's `parent_commit_id` is that commit (adjacency), and that both share one `merge_resolution` source; `atlas.commit_deltas` accepts `preparation` on a `change` branch only when called from `refresh_branch` (never from a client directly — same pattern as `genesis`, which only `on_model_created` may insert). `describeEnvelope` gives it a fixed title shape, "Prepare refresh from main: …", and the activity feed (architect door, change page) labels it as a preparation step of the refresh that follows, never as an independent edit.
+1. **`P` is a `commit_kind` of its own: `preparation`.** Not a `manual` commit with a marker. Its own migration (an `ALTER TYPE ... ADD VALUE` in its own file, per the `genesis` precedent, then the function that uses it), a contract update to `CommitKind`, and a round-trip test — rule 1. C21 is keyed on the kind (renumbered — see amendment 3 below): a `preparation` commit may contain only the deltas §3.3's preparation table derives from the findings, and nothing else may carry them. `atlas.refresh_branch` checks that `p_prep_commit`, when present, is written with kind `preparation`, that the `merge` commit's `parent_commit_id` is that commit (adjacency), and that both share one `merge_resolution` source; `atlas.commit_deltas` accepts `preparation` on a `change` branch only when called from `refresh_branch` (never from a client directly — same pattern as `genesis`, which only `on_model_created` may insert). `describeEnvelope` gives it a fixed title shape, "Prepare refresh from main: …", and the activity feed (architect door, change page) labels it as a preparation step of the refresh that follows, never as an independent edit.
 2. **C19, P-30 and the P-2 extension land now, in a PR of their own, before Sprints 7i–7k.** The fast-forward fold rule closes the latent `HASH`-incident path in §1.2 on its own and depends on nothing else here. Sprint C2b's scope is then §5 items 2–6 plus §7's tests, scheduled after 7k. `docs/prompts/atlas-prompt-pack.md`'s deferred register and SPEC §11 record both halves. **Landed** (out of the original stated order — 7i–7k had already shipped by the time this item was actually picked up; §2's item 1 note has the implementation pointer). C2b (item 2 above, §5 items 2–6, §7's tests) is still open.
 
 Two UI-principles lines were added with this acceptance (§4.3, §5.3): the Case B `Q` default (§4.1) and the collapsed display of a restore/retract pair on the element page's supersession chain.
+
+3. **Numbering correction, found when C2b was actually picked up (13 September):** this ADR's original draft called the `preparation`-kind-commit invariant "C18." By the time C2b was implemented, `src/contracts/delta.ts`'s `COMMIT_INVARIANTS` had already reached C1–C20 through unrelated work in between (Prompt 7k item 4's `via`/integration-platform check landed as the real C18; S1 item 11a's external-owner-role check landed as C20) — this ADR's own C19 (fast-forward fold, §2.1) was implemented under the C19 slot exactly as drafted here, since C19 was still free when §2.1 landed, but "C18" for the preparation-kind check now collides with an unrelated, already-shipped invariant. §6 below uses **C21** for the preparation-kind check throughout; every other section referencing "C18" for this purpose is superseded by this amendment. No change to the underlying rule, only to its id.
 
 ---
 
@@ -241,7 +243,22 @@ resolved_conflicts:
     keep ours:   {winning: R_o's promoting delta, discarded: main's promoting delta, resolution: M's promote(R_o), 'primary'}
     keep theirs: {winning: main's promoting delta, discarded: R_o's promoting delta, resolution: P's reassign(R_o), 'primary'}
 ```
-For `supports` the reassigned value is always `'secondary'` — the one other state the type has. For `owns` there is no equivalent natural "next" role: `'business'`/`'technical'`/`'service'` aren't ordered, so "demote" doesn't name a single target value the way it does for `supports`. **Open sub-question, not resolved by this amendment** (Prompt 7k item 2 only changed the contract/cardinality `classifyMerge` and the engine check against; it did not build C2b): when C2b's builder is actually implemented, the loser's own reassignment target for an `owns` collision needs an explicit answer — retract the loser's edge outright (simplest, but loses the fact that someone *is* an owner of that target in some capacity, just not this one) versus prompting the reviewer for which role the loser becomes (more information-preserving, more UI surface). Decide this when `buildStructuralResolutions` (§5 item 2) is actually written, not silently here.
+For `supports` the reassigned value is always `'secondary'` — the one other state the type has. For `owns` there is no equivalent natural "next" role: `'business'`/`'technical'`/`'service'` aren't ordered, so "demote" doesn't name a single target value the way it does for `supports`.
+
+**Resolved when `buildStructuralResolutions` was actually written (13 September):** the loser's `owns` edge is retracted outright, not reassigned to one of the other two roles — simpler, needs no role-picker UI surface at this stage (card actions are §5 item 6, a separate, later step), and matches how a duplicate-relationship's loser is already handled (§4.2). Since `owns` has no neutral, always-legal "demoted" value the way `supports` has `'secondary'`, `P` retracts `R_o` outright rather than reassigning it — for *both* choices, since `R_o` staying live would block `X`'s replay of `R_t`'s promotion (C17) regardless of which side eventually wins:
+
+```
+P:  rretract(R_o)                         prev = R_o's own existsDeltaId          [C17 for the replay]
+M:  replay X   → R_t's promotion applies
+M own, if the reviewer keeps ours:
+    rretract(R_t)                         prev = R_t's own existsDeltaId (from the just-applied replay)
+    rrestore(R_o)                         prev = P's rretract(R_o)
+M own, if the reviewer keeps theirs: nothing — R_o stays retracted, R_t stands
+resolved_conflicts:
+    keep ours:   {winning: R_o's promoting delta, discarded: R_t's promoting delta, resolution: M's rrestore(R_o), 'primary'}
+    keep theirs: {winning: R_t's promoting delta, discarded: R_o's promoting delta, resolution: P's rretract(R_o), 'primary'}
+```
+`resolved_conflicts`' `rationale` stays `'primary'` for both types, for one shared card-action vocabulary — extending `owns` to a reassignment prompt later, if ever wanted, is additive (a new choice shape), not a breaking change to this one.
 
 When the pair is also a duplicate (§4.2), the survivor pick subsumes the primary/role pick: the loser is retracted, and `P` reassigns `R_o` only if the loser is `R_t` and `R_t`'s replay would otherwise throw — i.e. always, since `R_o` holds the colliding value on `O` at replay time.
 
@@ -264,7 +281,7 @@ When the pair is also a duplicate (§4.2), the survivor pick subsumes the primar
      p_resolved_conflicts jsonb             -- rows referencing deltas in either commit
    ) returns jsonb                          -- {status: 'ok', prepCommitId, mergeCommitId} | {status: 'stale_head'} | {status: 'invalid', reason}
    ```
-   Calls `atlas.commit_deltas` twice (kinds `preparation` then `merge` — §2a amendment 1 — the second with `p_merged_branch_head_commit_id = T` and `p_resolved_conflicts`), in one transaction, verifying kind, adjacency and shared source (C18). `commit_deltas` itself does not change; `20260906170000_merge_refresh_base_commit_id.sql`'s "move `base_commit_id` on a change-branch merge" applies to `M` as today. A `jsonb` status return per the working rule ("RPCs that signal an outcome return `jsonb` with an explicit status, never a row type"). `src/db/mergeRequests.ts`'s `pushRefresh` becomes a wrapper that builds both envelopes with the engine and calls this; the single-`commitToBranch` path stays for the empty-`P` case only if measured to matter, otherwise everything goes through the RPC for one code path.
+   Calls `atlas.commit_deltas` twice (kinds `preparation` then `merge` — §2a amendment 1 — the second with `p_merged_branch_head_commit_id = T` and `p_resolved_conflicts`), in one transaction, verifying kind, adjacency and shared source (C21, §2a amendment 3). `commit_deltas` itself does not change; `20260906170000_merge_refresh_base_commit_id.sql`'s "move `base_commit_id` on a change-branch merge" applies to `M` as today. A `jsonb` status return per the working rule ("RPCs that signal an outcome return `jsonb` with an explicit status, never a row type"). `src/db/mergeRequests.ts`'s `pushRefresh` becomes a wrapper that builds both envelopes with the engine and calls this; the single-`commitToBranch` path stays for the empty-`P` case only if measured to matter, otherwise everything goes through the RPC for one code path.
 6. **`src/ui/reviews/ConflictCards.tsx`** — real actions on `StructuralConflictCard` per §4 (direction choice with the computed cascade spelled out in consequences, survivor pick, primary pick); `BranchRebasePanel` and `ReviewRequestView` both call the same `pushRefresh`. The "reopen and fix by hand" path remains available as the escape hatch and is no longer the only path.
 
 ---
@@ -272,8 +289,8 @@ When the pair is also a duplicate (§4.2), the survivor pick subsumes the primar
 ## 6. Invariants added or amended (SPEC §5.2)
 
 - **C15 (amended):** a merge commit's own deltas are exactly: one resolution per FIELD_CONFLICT key, plus the decision deltas §4 derives from the reviewer's choice for every blocking structural finding, plus nothing else. Every structural finding has a choice.
-- **C18 (new):** a `preparation`-kind commit (§2a amendment 1: written only by `atlas.refresh_branch`, immediately before a `merge` commit, sharing its `merge_resolution` source) contains only deltas §3.3's preparation table derives from the findings — restores of elements the branch retracted and main touched, retracts of the branch's own relationships to elements main retracted, demotions of the branch's primaries that main's primaries collide with — and no other commit kind may carry them. Checked by the engine before the RPC is called; the RPC checks the kind, the adjacency (`M.parent_commit_id = P.id`) and the shared source.
-- **C19 (new, `fold`):** a merge commit whose first parent is in the ancestry of its second parent folds to the second parent's state plus its own deltas.
+- **C21 (new — numbered per §2a amendment 3, drafted as "C18" before the collision was found):** a `preparation`-kind commit (§2a amendment 1: written only by `atlas.refresh_branch`, immediately before a `merge` commit, sharing its `merge_resolution` source) contains only deltas §3.3's preparation table derives from the findings — restores of elements the branch retracted and main touched, retracts of the branch's own relationships to elements main retracted, demotions of the branch's primaries that main's primaries collide with — and no other commit kind may carry them. Checked by the engine before the RPC is called; the RPC checks the kind, the adjacency (`M.parent_commit_id = P.id`) and the shared source.
+- **C19 (already landed, §2.1/§5 item 1 — quoted here for completeness, not new):** a merge commit whose first parent is in the ancestry of its second parent folds to the second parent's state plus its own deltas.
 - **§6.6 obligation (amended):** P-2 covers both merge shapes.
 
 ---
@@ -284,7 +301,7 @@ Property (Vitest + fast-check, no database):
 
 | Id | Property |
 |---|---|
-| P-29 | For generated `(base, ours, theirs)` triples covering every structural class (both directions), converged retractions, both cardinality types and both cardinality shapes, and every legal choice: `buildStructuralResolutions` yields `P`, `M` such that `fold(O) ⊕ P ⊕ replay(X) ⊕ M` never throws; the result passes V2, V6 and C17; it equals a directly constructed oracle head for that choice (element present/absent, relationships present/absent, primaries as chosen, children re-parented); every `resolved_conflicts` row references delta ids that exist in `X`, `O`'s ancestry, `P` or `M`; and C18 holds for `P`. |
+| P-29 | For generated `(base, ours, theirs)` triples covering every structural class (both directions), converged retractions, both cardinality types and both cardinality shapes, and every legal choice: `buildStructuralResolutions` yields `P`, `M` such that `fold(O) ⊕ P ⊕ replay(X) ⊕ M` never throws; the result passes V2, V6 and C17; it equals a directly constructed oracle head for that choice (element present/absent, relationships present/absent, primaries as chosen, children re-parented); every `resolved_conflicts` row references delta ids that exist in `X`, `O`'s ancestry, `P` or `M`; and C21 (§2a amendment 3) holds for `P`. |
 | P-30 | Fast-forward rule: for any branch with `mergeBase(B) == main.head`, `headHash(fold(mainMergeCommit)) == headHash(fold(B.head))`; for any refresh commit with no structural findings, the new `fold` equals the old replay bit for bit. |
 | P-31 | Determinism (rule 6): two runs of the builder over the same inputs with the same id minter produce identical `P`, `M`, rows. |
 | P-32 | Split after a resolved refresh: for any accepted subset, `buildSplitDeltas` folds over the merge base and passes C8/C9 (the existing property, with resolved refreshes in the generators). |
@@ -315,7 +332,7 @@ Playwright (folded in from C2 step 7, deferred to here):
 | Document | Section | Change |
 |---|---|---|
 | `SPEC-data-model.md` | §3.1 `commit_kind`, §5.1 kinds | new value `preparation` (own migration, `CommitKind` contract update, round-trip test — §2a amendment 1); `merge` on main folds by C19 |
-| | §5.2 | C15 amended; C18, C19 added; `COMMIT_INVARIANTS` in `src/contracts/delta.ts` updated to match |
+| | §5.2 | C15 amended; C21 added (§2a amendment 3 — C19 already landed under §2.1); `COMMIT_INVARIANTS` in `src/contracts/delta.ts` updated to match |
 | | §6.2 `fold` | the fast-forward branch of the pseudocode |
 | | §6.6 | P-2 covers both merge shapes |
 | | §7.3 table | `cardinality` covers `supports.role`; converged-retract row (non-blocking, auto-resolved) |
@@ -325,7 +342,7 @@ Playwright (folded in from C2 step 7, deferred to here):
 | | §11 | C2b row: retargeted from "design decision needed" to this ADR; split-ordering row added |
 | `ADR-000-foundations.md` | ADR-006 | amendment note pointing here; index line for ADR-021 |
 | `UI-principles.md` | §5.3 | structural cards have actions; consequences wording |
-| `src/contracts/delta.ts` | `COMMIT_INVARIANTS` | C15/C18/C19 text |
+| `src/contracts/delta.ts` | `COMMIT_INVARIANTS` | C15 amended, C21 added (C19 already present) |
 | `src/db/types.ts`, `rows.ts` | none | no new columns |
 | `src/engine/describeEnvelope.ts`, activity feed (`src/ui`) | — | fixed title for `preparation` commits; labelled as a step of the following refresh, never as an independent edit (§2a amendment 1) |
 | `docs/prompts/atlas-prompt-pack.md` | deferred register | C19/P-30/P-2 PR now; C2b (§5 items 2–6, §7 tests) after 7k (§2a amendment 2) |
@@ -350,4 +367,4 @@ Sizing: this is one engine builder driven by findings, one `fold` branch, one cl
 
 - History on a structurally-resolved branch shows a preparation commit before the refresh. The element page's supersession chain and the change page's activity make the pair legible by rationale; a reader who wonders "why was `E` restored then retracted in the same minute" gets the answer from the `resolved_conflicts` row's `rationale` and the refresh commit's title.
 - The engine stays the single place fold semantics live; the RPC composes two `commit_deltas` calls and adds no logic of its own beyond adjacency and the stale-head check.
-- The state-merge redesign (§3.4) remains the long-term answer if replay-based merging accumulates more special cases; this ADR adds one rule (C19) and one convention (C18), which is the budget it should stay within.
+- The state-merge redesign (§3.4) remains the long-term answer if replay-based merging accumulates more special cases; this ADR adds one rule (C19) and one convention (C21, §2a amendment 3), which is the budget it should stay within.

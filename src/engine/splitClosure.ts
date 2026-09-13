@@ -36,8 +36,9 @@
  * folding the result with the same `apply`/`fold` every other commit path
  * uses, not by re-deriving the guarantee by a separate argument.
  */
-import type { Delta, UUID } from '../contracts/delta';
-import type { Head } from './deltas';
+import { factKeyOf, type Delta, type UUID } from '../contracts/delta';
+import type { OwnDeltaOrigin } from './branch';
+import { cloneHead, factMapKey, fold, type CommitContext, type Head } from './deltas';
 
 export type SplitSubjectType = 'element' | 'relationship';
 
@@ -211,37 +212,172 @@ export function computeSplitClosure(branchDeltas: readonly Delta[], baseHead: He
   return { accepted: included, pulledIn, blocked };
 }
 
+const SCRATCH_CTX: CommitContext = { authorId: 'split-scratch', createdAt: '1970-01-01T00:00:00.000Z' };
+
+/** `create`/`retract`/`restore`, for either subject type — the delta kinds that toggle whether a subject exists at all, as opposed to an `update`'s attribute value. */
+function isExistenceKind(kind: Delta['kind']): boolean {
+  return kind !== 'element.update' && kind !== 'relationship.update';
+}
+
+/**
+ * Would applying `delta` to `head` actually change anything? Used to drop
+ * an existence-toggle that's redundant against the split's own
+ * accumulating state (ADR-021 §5 item 4, below) — most often a
+ * `preparation`-kind delta that was only ever mechanical scaffolding, but
+ * checked structurally rather than by commit kind (see that function's own
+ * doc comment for why).
+ */
+function wouldChangeState(head: Head, delta: Delta): boolean {
+  switch (delta.kind) {
+    case 'element.create':
+    case 'relationship.create':
+      return true;
+    case 'element.retract':
+      return head.elements.has(delta.elementId);
+    case 'element.restore':
+      return !head.elements.has(delta.elementId);
+    case 'relationship.retract':
+      return head.relationships.has(delta.relationshipId);
+    case 'relationship.restore':
+      return !head.relationships.has(delta.relationshipId);
+    case 'element.update':
+    case 'relationship.update': {
+      const { subjectId, attribute } = factKeyOf(delta);
+      return head.facts.get(factMapKey(subjectId, attribute))?.value !== delta.value;
+    }
+  }
+}
+
+/** ADR-021 §5 item 4's own ordering: element restores and creates, then relationship creates, then updates, then relationship retracts, then element retracts. */
+function bucketOf(kind: Delta['kind']): number {
+  switch (kind) {
+    case 'element.restore':
+    case 'element.create':
+      return 1;
+    case 'relationship.create':
+      return 2;
+    case 'element.update':
+    case 'relationship.update':
+      return 3;
+    case 'relationship.retract':
+      return 4;
+    case 'element.retract':
+      return 5;
+    case 'relationship.restore':
+      // Not named in the ADR's own list (its five buckets are written for
+      // the shapes ADR-021 §4's own sequences actually produce, and a
+      // relationship.restore there is always the *last* own-delta for its
+      // subject already — §4.1 Case B's rrestore(S_i)/rrestore(Q)).
+      // Grouped with the other "bring something back" bucket rather than
+      // invented a sixth one for a single-caller shape.
+      return 1;
+  }
+}
+
 /**
  * The split's own fresh deltas (ADR-006 amendment step 2: "writes one
  * fresh commit whose deltas are the closure's effect folded over the
  * merge base... never copied delta rows"). For every subject in
  * `closure.accepted`, replays that subject's own branch deltas verbatim
- * except for `id` (freshly minted, CLAUDE.md rule 6 — no `Math.random`)
- * and `previousDeltaId` (re-pointed to the id this same replay minted for
- * the delta it supersedes, not the original branch's own chain, which the
- * split's fresh commit has no ancestry relationship with). Deltas for
- * subjects not in `closure.accepted` are dropped entirely — they stay
- * behind on the original branch, untouched (rule 1: "the remainder...
- * stays on the original branch").
+ * — same `id`... no: a *fresh* `id` (CLAUDE.md rule 6 — no `Math.random`)
+ * — and `previousDeltaId` re-pointed to whatever this split's own
+ * accumulating state (starting from `baseHead`, the current merge base)
+ * currently asserts for that fact key, not the original branch's own
+ * chain (which the split's fresh commit has no ancestry relationship
+ * with). Deltas for subjects not in `closure.accepted` are dropped
+ * entirely — they stay behind on the original branch, untouched (rule 1:
+ * "the remainder... stays on the original branch").
+ *
+ * `origins` (`branch.ts`'s `listOwnDeltaOrigins`) carries each delta's
+ * originating commit kind — needed not because the kind itself matters to
+ * this function (it doesn't check it directly), but because only
+ * `listOwnDeltaOrigins`, not the plain `listOwnDeltas`, has the per-commit
+ * granularity this needs to reconstruct chronological order across a
+ * branch that has been through one or more resolved refreshes.
+ *
+ * ADR-021 §5 item 4, §1.3.3's own bug: after a structurally-resolved
+ * refresh, a subject's own existence can be toggled more than once within
+ * the branch's own history — retracted, then a `preparation` commit
+ * restores it so main's exclusive commits could replay, then the `merge`
+ * commit's own decision either re-retracts it (keep-retraction) or leaves
+ * it restored (keep-element). Naively replaying every one of those steps
+ * verbatim, in original order, over the *current* merge base (which, after
+ * the refresh, already reflects main's own state) fails in both
+ * directions: the base may already hold what an earlier step assumed it
+ * didn't (a redundant `restore`), or a later step may re-establish exactly
+ * what an earlier one already achieved (two retracts of the same subject).
+ * Three passes fix this without needing a full net-effect diff rebuild —
+ * every surviving delta is still one of the branch's own real delta rows,
+ * just fewer of them and correctly re-anchored:
+ *
+ * 1. **Collapse each subject's own existence-toggle chain** (`create`/
+ *    `retract`/`restore`, on either subject type) to just its
+ *    chronologically *last* delta — the one that actually determines the
+ *    branch's own current existence state for that subject, however many
+ *    commits (manual, preparation, merge) touched it along the way.
+ *    Attribute `update`s are never collapsed — always kept, verbatim, in
+ *    original order, preserving per-attribute provenance exactly as
+ *    before; only existence toggling is a candidate.
+ * 2. **Order across subjects by dependency** (the bucket order above),
+ *    stable within each bucket — a real, separate concern from step 1:
+ *    even after collapsing, a relationship retract may still need to run
+ *    before the element retract it made valid.
+ * 3. **Re-anchor and drop what's still redundant.** Mint a fresh id, and
+ *    look up `previousDeltaId` against this split's own accumulating state
+ *    (a scratch clone of `baseHead`, using the real `apply`/`fold` so this
+ *    stays consistent with every other fold in the codebase) rather than
+ *    the branch's own historical chain, which the split has no ancestry
+ *    relationship with. Before that: if the survivor from step 1 is
+ *    *itself* still a no-op against the accumulating state (ADR-021 §4.1
+ *    Case A's "keep element" — the branch's own restore ends up asserting
+ *    exactly what the new base already holds, once main's own concurrent
+ *    state is the starting point rather than the branch's original,
+ *    pre-refresh one), it's dropped too — silently, not an error, since
+ *    "already true" is exactly what it was trying to establish.
  */
-export function buildSplitDeltas(branchDeltas: readonly Delta[], closure: SplitClosureResult, mintId: () => UUID): Delta[] {
+export function buildSplitDeltas(origins: readonly OwnDeltaOrigin[], closure: SplitClosureResult, baseHead: Head, mintId: () => UUID): Delta[] {
+  const accepted = origins.filter((o) => closure.accepted.has(subjectIdOf(o.delta)));
+
+  const lastExistenceIndexBySubject = new Map<UUID, number>();
+  accepted.forEach((o, i) => {
+    if (isExistenceKind(o.delta.kind)) lastExistenceIndexBySubject.set(subjectIdOf(o.delta), i);
+  });
+  const collapsed = accepted.filter((o, i) => !isExistenceKind(o.delta.kind) || lastExistenceIndexBySubject.get(subjectIdOf(o.delta)) === i);
+
+  const ordered = collapsed
+    .map((o, i) => ({ o, i }))
+    .sort((a, b) => bucketOf(a.o.delta.kind) - bucketOf(b.o.delta.kind) || a.i - b.i)
+    .map(({ o }) => o.delta);
+
+  const scratch = cloneHead(baseHead);
   const idMap = new Map<UUID, UUID>();
   const result: Delta[] = [];
-  for (const delta of branchDeltas) {
-    if (!closure.accepted.has(subjectIdOf(delta))) continue;
+  for (const delta of ordered) {
+    if (isExistenceKind(delta.kind) && !wouldChangeState(scratch, delta)) continue;
+
     const freshId = mintId();
     idMap.set(delta.id, freshId);
     const rest = { ...delta, id: freshId };
     if ('previousDeltaId' in rest) {
       const mapped = idMap.get(rest.previousDeltaId);
-      // A `previousDeltaId` pointing outside this split's own replayed set
-      // (the delta it supersedes came from *before* the branch's own
-      // history — i.e., from the merge base itself) is left exactly as
-      // the original branch delta had it: the merge base's own delta id
-      // is still valid ancestry for the split's fresh commit, since the
-      // split is parented on that same merge base.
-      if (mapped) rest.previousDeltaId = mapped;
+      if (mapped) {
+        rest.previousDeltaId = mapped;
+      } else {
+        // Not part of this split's own replayed set — anchor against
+        // whatever this fact key currently asserts on the scratch head
+        // (which starts as `baseHead` and accumulates every delta this
+        // split has emitted so far), rather than blindly keeping the
+        // original branch-historical id. For an ordinary key nothing here
+        // has touched, that's exactly the original id anyway (baseHead's
+        // own currently-asserting delta for an untouched key never
+        // changed); for a key a collapsed-away delta had touched, this is
+        // what actually makes the reference valid again.
+        const { subjectId, attribute } = factKeyOf(delta);
+        const currentFact = scratch.facts.get(factMapKey(subjectId, attribute));
+        if (currentFact) rest.previousDeltaId = currentFact.deltaId;
+      }
     }
+    fold(scratch, [rest], SCRATCH_CTX);
     result.push(rest);
   }
   return result;

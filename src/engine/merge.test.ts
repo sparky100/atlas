@@ -19,6 +19,10 @@ function createContainer(id: UUID, elementId: UUID, name: string, parentId: UUID
   return { kind: 'element.create', id, elementId, elementType: 'container', name, parentId, attributes: { isExternal: false }, sourceId: 'src', confidence: 1 };
 }
 
+function createCapability(id: UUID, elementId: UUID, name: string, parentId: UUID | null = null): Delta {
+  return { kind: 'element.create', id, elementId, elementType: 'capability', name, parentId, attributes: {}, sourceId: 'src', confidence: 1 };
+}
+
 function createActor(id: UUID, elementId: UUID, name: string): Delta {
   return { kind: 'element.create', id, elementId, elementType: 'actor', name, parentId: null, attributes: { subtype: 'team', isExternal: false }, sourceId: 'src', confidence: 1 };
 }
@@ -31,8 +35,19 @@ function retract(id: UUID, elementId: UUID, previousDeltaId: UUID): Delta {
   return { kind: 'element.retract', id, elementId, elementType: 'system', previousDeltaId, sourceId: 'src', confidence: 1 };
 }
 
-function createRel(id: UUID, relationshipId: UUID, relationshipType: 'uses' | 'owns' | 'flows_to', fromElementId: UUID, toElementId: UUID, attributes: Record<string, unknown> = {}): Delta {
+function createRel(
+  id: UUID,
+  relationshipId: UUID,
+  relationshipType: 'uses' | 'owns' | 'flows_to' | 'supports',
+  fromElementId: UUID,
+  toElementId: UUID,
+  attributes: Record<string, unknown> = {},
+): Delta {
   return { kind: 'relationship.create', id, relationshipId, relationshipType, fromElementId, toElementId, attributes: attributes as never, sourceId: 'src', confidence: 1 };
+}
+
+function updateRel(id: UUID, relationshipId: UUID, relationshipType: 'uses' | 'owns' | 'flows_to' | 'supports', attribute: string, value: unknown, previousDeltaId: UUID): Delta {
+  return { kind: 'relationship.update', id, relationshipId, relationshipType, attribute: attribute as never, value: value as never, previousDeltaId, sourceId: 'src', confidence: 1 };
 }
 
 /** Folds baseDeltas alone for `base`, baseDeltas+oursExtra for `ours`, baseDeltas+theirsExtra for `theirs`, and computes the field diff — the shape classifyMerge takes. */
@@ -158,6 +173,81 @@ describe('structural: cardinality', () => {
     );
     const result = classifyMerge(input);
     expect(result.findings.filter((f) => f.class === 'structural:cardinality')).toEqual([]);
+  });
+
+  it('both sides creating a primary supports relationship on the same anchor is blocking (ADR-021 §5 item 2)', () => {
+    const input = scenario(
+      [createEl('d0', 'sys', 'System'), createCapability('d1', 'capA', 'Capability A'), createCapability('d2', 'capB', 'Capability B')],
+      [createRel('d-ours', 'rel-ours', 'supports', 'sys', 'capA', { role: 'primary' })],
+      [createRel('d-theirs', 'rel-theirs', 'supports', 'sys', 'capB', { role: 'primary' })],
+    );
+    const result = classifyMerge(input);
+    expect(result.hasBlockingConflict).toBe(true);
+    expect(result.findings).toContainEqual(expect.objectContaining({ class: 'structural:cardinality', blocking: true, subjectId: 'rel-ours', relatedSubjectId: 'rel-theirs' }));
+  });
+
+  it('a primary and a secondary supports on the same anchor is not a cardinality conflict — secondary has no cardinality limit', () => {
+    const input = scenario(
+      [createEl('d0', 'sys', 'System'), createCapability('d1', 'capA', 'Capability A'), createCapability('d2', 'capB', 'Capability B')],
+      [createRel('d-ours', 'rel-ours', 'supports', 'sys', 'capA', { role: 'primary' })],
+      [createRel('d-theirs', 'rel-theirs', 'supports', 'sys', 'capB', { role: 'secondary' })],
+    );
+    const result = classifyMerge(input);
+    expect(result.findings.filter((f) => f.class === 'structural:cardinality')).toEqual([]);
+  });
+
+  it('the create-vs-promote shape: one side creates a new primary, the other promotes an existing secondary to primary on the same anchor', () => {
+    const input = scenario(
+      [createEl('d0', 'sys', 'System'), createCapability('d1', 'capA', 'Capability A'), createCapability('d2', 'capB', 'Capability B'), createRel('d3', 'rel-existing', 'supports', 'sys', 'capA', { role: 'secondary' })],
+      [createRel('d-ours', 'rel-ours', 'supports', 'sys', 'capB', { role: 'primary' })],
+      [updateRel('d-theirs', 'rel-existing', 'supports', 'role', 'primary', 'd3')],
+    );
+    const result = classifyMerge(input);
+    expect(result.hasBlockingConflict).toBe(true);
+    expect(result.findings).toContainEqual(expect.objectContaining({ class: 'structural:cardinality', blocking: true, subjectId: 'rel-ours', relatedSubjectId: 'rel-existing' }));
+  });
+
+  it('the promote-vs-promote shape: both sides promote different existing owns edges to the same role on the same target', () => {
+    const input = scenario(
+      [
+        createActor('d0', 'owner1', 'Team A'),
+        createActor('d1', 'owner2', 'Team B'),
+        createEl('d2', 'target', 'Target System'),
+        createRel('d3', 'rel1', 'owns', 'owner1', 'target', { role: 'technical' }),
+        createRel('d4', 'rel2', 'owns', 'owner2', 'target', { role: 'service' }),
+      ],
+      [updateRel('d-ours', 'rel1', 'owns', 'role', 'business', 'd3')],
+      [updateRel('d-theirs', 'rel2', 'owns', 'role', 'business', 'd4')],
+    );
+    const result = classifyMerge(input);
+    expect(result.hasBlockingConflict).toBe(true);
+    expect(result.findings).toContainEqual(expect.objectContaining({ class: 'structural:cardinality', blocking: true, subjectId: 'rel1', relatedSubjectId: 'rel2' }));
+  });
+
+  it('a pre-existing primary neither side touches is not re-flagged just because it exists (UNCHANGED, not a collision)', () => {
+    const input = scenario(
+      [createEl('d0', 'sys', 'System'), createCapability('d1', 'capA', 'Capability A'), createRel('d2', 'rel-existing', 'supports', 'sys', 'capA', { role: 'primary' })],
+      [updateAttr('d-ours', 'sys', 'vendor', 'Acme', 'd0')],
+      [],
+    );
+    const result = classifyMerge(input);
+    expect(result.findings.filter((f) => f.class === 'structural:cardinality')).toEqual([]);
+  });
+});
+
+describe('structural: converged-retract', () => {
+  it('both sides retracting the same element is a non-blocking finding, never a card, but not "clean" either', () => {
+    const input = scenario([createEl('d0', 'el', 'X')], [retract('d-ours', 'el', 'd0')], [retract('d-theirs', 'el', 'd0')]);
+    const result = classifyMerge(input);
+    expect(result.hasBlockingConflict).toBe(false);
+    expect(result.findings).toEqual([expect.objectContaining({ class: 'structural:converged-retract', blocking: false, subjectId: 'el' })]);
+    expect(result.clean).not.toContain('el');
+  });
+
+  it('a plain refresh with only a converged retract has zero blocking conflicts (the case that used to throw before ADR-021)', () => {
+    const input = scenario([createEl('d0', 'a', 'A'), createEl('d1', 'b', 'B')], [retract('d-ours', 'a', 'd0')], [retract('d-theirs', 'a', 'd0')]);
+    const result = classifyMerge(input);
+    expect(result.hasBlockingConflict).toBe(false);
   });
 });
 

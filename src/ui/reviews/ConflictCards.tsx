@@ -9,7 +9,8 @@ import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import type { FactRow, Head } from '../../engine/deltas';
 import type { ConflictFinding } from '../../engine/merge';
-import type { FieldConflictChoice } from '../../engine/mergeResolution';
+import type { CardinalityChoice, DuplicateRelationshipChoice, FieldConflictChoice, RetractionChoice } from '../../engine/mergeResolution';
+import type { PairCardData, RetractionCardData } from '../../engine/structuralFindingGroups';
 import type { ThreeWayDiff } from '../../engine/branch';
 import { computeVersionDiff } from '../../engine/versionDiff';
 import { elementBreadcrumb, subjectName } from './elementBreadcrumb';
@@ -23,24 +24,180 @@ import styles from './ConflictCards.module.css';
  * on main" panel (src/ui/reviews/BranchRebasePanel.tsx, Sprint C1 step 8):
  * both show the exact same findings for the exact same branch/main pair,
  * one before a merge request exists, one after — no reason for the cards
- * themselves, or their one-click field-conflict resolution, to differ.
+ * themselves, or their one-click resolution actions (field conflicts, and
+ * — ADR-021, C2b — retraction/duplicate-relationship/cardinality), to
+ * differ. `../../engine/structuralFindingGroups.ts` groups the raw
+ * findings into what each structural card below actually needs.
  */
 
-export function StructuralConflictCard({ finding, heads, commentsSlot }: { finding: ConflictFinding; heads: readonly Head[]; commentsSlot?: ReactNode }) {
+export interface RetractionConflictCardProps {
+  data: RetractionCardData;
+  /** Contributor+ on this change — false renders the card read-only. */
+  canResolve: boolean;
+  choice: RetractionChoice | undefined;
+  onChoose: (choice: RetractionChoice) => void;
+  commentsSlot?: ReactNode;
+}
+
+/**
+ * One card per retracted element (ADR-021 §4.1, C2b) — whichever of
+ * `structural:retract-vs-modify`/`dangling-endpoint`/`dangling-parent` it
+ * arrived as, grouped by `groupStructuralFindings`. "Keep retraction" /
+ * "keep element" with the cascade spelled out in consequences
+ * (UI-principles §5.3: "keeping the retraction also retracts N
+ * relationship(s) and re-parents M container(s) under X"). Case B ("main
+ * retracted, keep element") also lists the element's pre-existing
+ * relationships main retracted alongside it, each defaulting to restored —
+ * the reviewer unticks any that should stay retracted (§5.3's own
+ * amendment; not decidable from history which main actually meant).
+ */
+export function RetractionConflictCard({ data, canResolve, choice, onChoose, commentsSlot }: RetractionConflictCardProps) {
+  const { elementId, elementName, group, retractedSide, keepingSide, preExistingRelationships, formerParentName } = data;
+  const [excludedPreExisting, setExcludedPreExisting] = useState<ReadonlySet<UUID>>(new Set());
+
+  const relatedCount = group.danglingRelationshipIds.size;
+  const childCount = group.danglingChildIds.size;
+  const consequences: string[] = [];
+  if (relatedCount > 0) consequences.push(`retracts ${String(relatedCount)} relationship${relatedCount === 1 ? '' : 's'}`);
+  if (childCount > 0) consequences.push(`re-parents ${String(childCount)} container${childCount === 1 ? '' : 's'}${formerParentName ? ` under ${formerParentName}` : ''}`);
+
+  function choose(action: 'keep-retraction' | 'keep-element') {
+    onChoose(action === 'keep-element' ? { class: 'retraction', elementId, action, excludePreExistingRelationshipIds: [...excludedPreExisting] } : { class: 'retraction', elementId, action });
+  }
+
+  function toggleRestore(relationshipId: UUID, restore: boolean) {
+    const next = new Set(excludedPreExisting);
+    if (restore) next.delete(relationshipId);
+    else next.add(relationshipId);
+    setExcludedPreExisting(next);
+    if (choice?.action === 'keep-element') onChoose({ class: 'retraction', elementId, action: 'keep-element', excludePreExistingRelationshipIds: [...next] });
+  }
+
   return (
     <li className={styles.card}>
       <div className={styles.cardTitle}>
-        <Chip tone="danger">{finding.class.replace('structural:', '').replace(/-/g, ' ')}</Chip>
+        <Chip tone="danger">retraction</Chip>
         <Text as="span" size="lg">
-          {subjectName(heads, finding.subjectId)}
+          {elementName}
+        </Text>
+      </div>
+      <Text as="p" size="sm">
+        Retracted on {retractedSide === 'ours' ? 'this change' : 'main'}, modified on {keepingSide === 'ours' ? 'this change' : 'main'}.
+      </Text>
+      {consequences.length > 0 && (
+        <Text as="p" tone="muted" size="sm">
+          Keeping the retraction also {consequences.join(' and ')}.
+        </Text>
+      )}
+      {canResolve ? (
+        <>
+          <div className={styles.actionsRow}>
+            <Button
+              variant={choice?.action === 'keep-retraction' ? 'primary' : 'secondary'}
+              onClick={() => {
+                choose('keep-retraction');
+              }}
+            >
+              Keep retraction
+            </Button>
+            <Button
+              variant={choice?.action === 'keep-element' ? 'primary' : 'secondary'}
+              onClick={() => {
+                choose('keep-element');
+              }}
+            >
+              Keep element
+            </Button>
+          </div>
+          {choice?.action === 'keep-element' && preExistingRelationships.length > 0 && (
+            <div className={styles.checklist}>
+              <Text as="p" tone="muted" size="sm">
+                Pre-existing relationships main retracted alongside this element — restored by default:
+              </Text>
+              {preExistingRelationships.map((rel) => (
+                <label key={rel.relationshipId} className={styles.checklistRow}>
+                  <input
+                    type="checkbox"
+                    checked={!excludedPreExisting.has(rel.relationshipId)}
+                    onChange={(e) => {
+                      toggleRestore(rel.relationshipId, e.target.checked);
+                    }}
+                  />
+                  <Text as="span" size="sm">
+                    {rel.name}
+                  </Text>
+                </label>
+              ))}
+            </div>
+          )}
+          {choice && (
+            <Text as="p" tone="muted" size="sm">
+              Staged: {choice.action === 'keep-retraction' ? 'keep retraction' : 'keep element'} — applies on the next refresh.
+            </Text>
+          )}
+        </>
+      ) : (
+        <Text as="p" tone="muted" size="sm">
+          Only a contributor on this change can resolve this.
+        </Text>
+      )}
+      {commentsSlot}
+    </li>
+  );
+}
+
+export interface PairConflictCardProps {
+  data: PairCardData;
+  /** Contributor+ on this change — false renders the card read-only. */
+  canResolve: boolean;
+  choice: (DuplicateRelationshipChoice | CardinalityChoice) | undefined;
+  onChoose: (choice: DuplicateRelationshipChoice | CardinalityChoice) => void;
+  commentsSlot?: ReactNode;
+}
+
+/** Duplicate-relationship survivor pick, or cardinality primary/role pick (ADR-021 §4.2/§4.3, C2b) — same shape, one card per pair. */
+export function PairConflictCard({ data, canResolve, choice, onChoose, commentsSlot }: PairConflictCardProps) {
+  const { findingClass, relationshipId, relatedRelationshipId, finding, relationshipTypeLabel } = data;
+  const label = findingClass === 'structural:duplicate-relationship' ? 'duplicate' : 'cardinality';
+
+  function choose(keep: 'ours' | 'theirs') {
+    if (findingClass === 'structural:duplicate-relationship') onChoose({ class: 'duplicate-relationship', relationshipId, relatedRelationshipId, keep });
+    else onChoose({ class: 'cardinality', relationshipId, relatedRelationshipId, keep });
+  }
+
+  return (
+    <li className={styles.card}>
+      <div className={styles.cardTitle}>
+        <Chip tone="danger">{label}</Chip>
+        <Text as="span" size="lg">
+          {relationshipTypeLabel}
         </Text>
       </div>
       <Text as="p" size="sm">
         {finding.detail}
       </Text>
-      {finding.relatedSubjectId && (
+      {canResolve ? (
+        <div className={styles.actionsRow}>
+          <Button
+            variant={choice?.keep === 'ours' ? 'primary' : 'secondary'}
+            onClick={() => {
+              choose('ours');
+            }}
+          >
+            Keep this change's
+          </Button>
+          <Button
+            variant={choice?.keep === 'theirs' ? 'primary' : 'secondary'}
+            onClick={() => {
+              choose('theirs');
+            }}
+          >
+            Keep main's
+          </Button>
+        </div>
+      ) : (
         <Text as="p" tone="muted" size="sm">
-          Related: {subjectName(heads, finding.relatedSubjectId)}
+          Only a contributor on this change can resolve this.
         </Text>
       )}
       {commentsSlot}

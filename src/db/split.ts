@@ -9,7 +9,7 @@
  */
 import type { CommitEnvelope, UUID } from '../contracts/delta';
 import { envelopeToDeltaRows } from '../contracts/rows';
-import { listOwnDeltas, mergeBase } from '../engine/branch';
+import { listOwnDeltaOrigins, mergeBase } from '../engine/branch';
 import { foldFromGenesis } from '../engine/head';
 import { buildSplitDeltas, computeSplitClosure, type SplitClosureResult } from '../engine/splitClosure';
 import { buildCommitLoader } from './commitLoader';
@@ -35,8 +35,8 @@ export async function previewSplitClosure(supabase: Client, input: SplitClosureP
   const loader = await buildCommitLoader(supabase, modelId);
   const base = mergeBase(branch.head_commit_id, mainHeadCommitId, loader);
   const baseHead = foldFromGenesis(base, loader);
-  const branchDeltas = listOwnDeltas({ baseCommitId: base, headCommitId: branch.head_commit_id }, loader);
-  return computeSplitClosure(branchDeltas, baseHead, requestedSubjectIds);
+  const origins = listOwnDeltaOrigins({ baseCommitId: base, headCommitId: branch.head_commit_id }, loader);
+  return computeSplitClosure(origins.map((o) => o.delta), baseHead, requestedSubjectIds);
 }
 
 export interface ExecuteSplitInput {
@@ -70,13 +70,13 @@ export async function splitAndMergeSubset(supabase: Client, input: ExecuteSplitI
   const loader = await buildCommitLoader(supabase, modelId);
   const base = mergeBase(branch.head_commit_id, mainHeadCommitId, loader);
   const baseHead = foldFromGenesis(base, loader);
-  const branchDeltas = listOwnDeltas({ baseCommitId: base, headCommitId: branch.head_commit_id }, loader);
-  const closure = computeSplitClosure(branchDeltas, baseHead, requestedSubjectIds);
+  const origins = listOwnDeltaOrigins({ baseCommitId: base, headCommitId: branch.head_commit_id }, loader);
+  const closure = computeSplitClosure(origins.map((o) => o.delta), baseHead, requestedSubjectIds);
   if (closure.accepted.size === 0) {
     return { ok: false, reason: 'nothing_accepted', closure };
   }
 
-  const freshDeltas = buildSplitDeltas(branchDeltas, closure, () => crypto.randomUUID());
+  const freshDeltas = buildSplitDeltas(origins, closure, baseHead, () => crypto.randomUUID());
   const commitId = crypto.randomUUID();
   // `branchId` here is only ever used to compute `deltaRows` locally
   // (envelopeToDeltaRows needs *an* envelope id to stamp onto every row as

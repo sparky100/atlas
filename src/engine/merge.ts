@@ -31,6 +31,7 @@ export type ConflictClass =
   | 'structural:dangling-parent'
   | 'structural:duplicate-relationship'
   | 'structural:cardinality'
+  | 'structural:converged-retract'
   | 'identity'
   | 'identity:strong';
 
@@ -115,6 +116,7 @@ export function classifyMerge(input: MergeClassifyInput, options: MergeClassifyO
 
   const blockingSubjects = new Set<UUID>();
   const identitySubjects = new Set<UUID>();
+  const nonBlockingStructuralSubjects = new Set<UUID>();
 
   // ---- field-conflict: subject exists on both sides, some non-existence field disagrees. ----
   for (const [subjectId, subjectFields] of fieldsBySubject) {
@@ -127,14 +129,26 @@ export function classifyMerge(input: MergeClassifyInput, options: MergeClassifyO
   }
 
   // ---- one-sided retractions: existed at base, exists on exactly one side now. ----
+  // Both sides retracting the same subject (existed at base, gone on both) is
+  // its own case — "converged existence" (ADR-021 §1.3.1) — a plain refresh
+  // with zero conflicts used to throw here (replaying the other side's
+  // retract onto a head where this side already removed it), so it gets a
+  // non-blocking finding purely so the resolution builder has something to
+  // attach its automatic `restore`-then-replay fix-up to (ADR-021 §4.1's
+  // "converged retraction" — never a card, resolved without asking).
   const oneSidedRetractions = new Map<UUID, { retractedSide: 'ours' | 'theirs'; keepingSide: 'ours' | 'theirs' }>();
   for (const subjectId of subjectsTouched) {
     if (!existsIn(base, subjectId)) continue;
     const inOurs = existsIn(ours, subjectId);
     const inTheirs = existsIn(theirs, subjectId);
-    if (inOurs !== inTheirs) {
-      oneSidedRetractions.set(subjectId, { retractedSide: inOurs ? 'theirs' : 'ours', keepingSide: inOurs ? 'ours' : 'theirs' });
+    if (inOurs === inTheirs) {
+      if (!inOurs) {
+        findings.push(finding('structural:converged-retract', false, subjectId, 'both sides retracted this element'));
+        nonBlockingStructuralSubjects.add(subjectId);
+      }
+      continue;
     }
+    oneSidedRetractions.set(subjectId, { retractedSide: inOurs ? 'theirs' : 'ours', keepingSide: inOurs ? 'ours' : 'theirs' });
   }
 
   for (const [subjectId, { retractedSide, keepingSide }] of oneSidedRetractions) {
@@ -191,7 +205,7 @@ export function classifyMerge(input: MergeClassifyInput, options: MergeClassifyO
     }
   }
 
-  // ---- structural: duplicate-relationship / cardinality — compare relationships new on both sides. ----
+  // ---- structural: duplicate-relationship — compare relationships new on both sides. ----
   const newRelsOurs = newEntriesOf(ours.relationships, base);
   const newRelsTheirs = newEntriesOf(theirs.relationships, base);
   for (const [oid, orow] of newRelsOurs) {
@@ -206,18 +220,67 @@ export function classifyMerge(input: MergeClassifyInput, options: MergeClassifyO
         blockingSubjects.add(oid);
         blockingSubjects.add(tid);
       }
-      if (
-        orow.relationshipType === 'owns' &&
-        trow.relationshipType === 'owns' &&
-        orow.toElementId === trow.toElementId &&
-        typeof orow.attributes.role === 'string' &&
-        orow.attributes.role === trow.attributes.role
-      ) {
+    }
+  }
+
+  // ---- structural: cardinality (ADR-021 §5 item 2) ----
+  // A `role` field newly asserted on one side — whether the relationship is
+  // brand new (its initial attributes are still "new relative to base" per
+  // the per-key diff, SPEC §7.2) or an existing relationship promoted to a
+  // new role — collides with the same anchor+value newly asserted on the
+  // other side, on a *different* relationship. Covers both cardinality
+  // shapes in one pass: `supports.role = 'primary'` (anchor = fromElementId,
+  // the only value with a cardinality limit — 'secondary' has none) and
+  // `owns.role` of any value (anchor = toElementId, each role capped
+  // independently, Prompt 7k item 2). Only OURS/THEIRS-classified fields
+  // qualify: a promotion nobody opposed. Both-sides-changed-the-same-
+  // relationship's role is FIELD_CONFLICT (different values) or CONVERGED
+  // (same value) — a single relationship's own field conflict, not a
+  // collision between two relationships, and not this check's concern.
+  // A pre-existing primary/role holder neither side touched never appears
+  // here (its field classification is UNCHANGED) — and needs no finding:
+  // whichever side promotes a new holder must, by C17, have first demoted
+  // or retracted the old one within its own commit history, so replaying
+  // that side's exclusive commits in order demotes it before promoting the
+  // new one, with no collision ever reaching `apply`.
+  const cardinalityCandidates = new Map<string, { side: 'ours' | 'theirs'; relationshipId: UUID; value: string }[]>();
+  for (const f of fields) {
+    if (f.attribute !== 'role' || (f.classification !== 'OURS' && f.classification !== 'THEIRS')) continue;
+    const side: 'ours' | 'theirs' = f.classification === 'OURS' ? 'ours' : 'theirs';
+    const sideHead = side === 'ours' ? ours : theirs;
+    const rel = sideHead.relationships.get(f.subjectId);
+    if (!rel) continue;
+    const value = (side === 'ours' ? f.ours : f.theirs)?.value;
+    let anchorElementId: UUID | undefined;
+    let candidateValue: string | undefined;
+    if (rel.relationshipType === 'supports' && value === 'primary') {
+      anchorElementId = rel.fromElementId;
+      candidateValue = value;
+    } else if (rel.relationshipType === 'owns' && typeof value === 'string') {
+      anchorElementId = rel.toElementId;
+      candidateValue = value;
+    }
+    if (!anchorElementId || candidateValue === undefined) continue;
+    const key = `${rel.relationshipType}:${anchorElementId}:${candidateValue}`;
+    const entry = { side, relationshipId: f.subjectId, value: candidateValue };
+    const list = cardinalityCandidates.get(key);
+    if (list) list.push(entry);
+    else cardinalityCandidates.set(key, [entry]);
+  }
+  for (const candidates of cardinalityCandidates.values()) {
+    const oursEntries = candidates.filter((c) => c.side === 'ours');
+    const theirsEntries = candidates.filter((c) => c.side === 'theirs');
+    for (const o of oursEntries) {
+      const orow = ours.relationships.get(o.relationshipId);
+      if (!orow) continue;
+      for (const t of theirsEntries) {
+        if (o.relationshipId === t.relationshipId) continue;
+        const noun = orow.relationshipType === 'supports' ? 'a primary supports' : `an owns (${o.value})`;
         findings.push(
-          finding('structural:cardinality', true, oid, `both sides created a ${orow.attributes.role} owns relationship targeting ${orow.toElementId}`, { relatedSubjectId: tid }),
+          finding('structural:cardinality', true, o.relationshipId, `both sides asserted ${noun} relationship on the same anchor`, { relatedSubjectId: t.relationshipId }),
         );
-        blockingSubjects.add(oid);
-        blockingSubjects.add(tid);
+        blockingSubjects.add(o.relationshipId);
+        blockingSubjects.add(t.relationshipId);
       }
     }
   }
@@ -251,7 +314,7 @@ export function classifyMerge(input: MergeClassifyInput, options: MergeClassifyO
     }
   }
 
-  const clean = [...subjectsTouched].filter((id) => !blockingSubjects.has(id) && !identitySubjects.has(id));
+  const clean = [...subjectsTouched].filter((id) => !blockingSubjects.has(id) && !identitySubjects.has(id) && !nonBlockingStructuralSubjects.has(id));
 
   return { findings, hasBlockingConflict: findings.some((f) => f.blocking), clean };
 }

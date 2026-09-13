@@ -17,9 +17,14 @@ import {
 } from '../../db/mergeRequests';
 import type { BranchRow, MergeRequestRow, ProfileRow, SourceRow } from '../../db/types';
 import type { MergeReview } from '../../engine/merge';
-import type { FieldConflictChoice } from '../../engine/mergeResolution';
+import type { FieldConflictChoice, StructuralChoice } from '../../engine/mergeResolution';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
+
+/** `StructuralChoice`'s own key: a retraction choice is keyed by its element; a duplicate/cardinality pair choice by its own pair (order-independent — both sides of a pair should key to the same slot). */
+function structuralChoiceKey(choice: StructuralChoice): string {
+  return choice.class === 'retraction' ? `retraction ${choice.elementId}` : `${choice.class} ${[choice.relationshipId, choice.relatedRelationshipId].sort().join(' ')}`;
+}
 
 export interface ReviewRequestData {
   request: MergeRequestRow;
@@ -77,6 +82,7 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
   const [actionStatus, setActionStatus] = useState<ActionStatus>('idle');
   const [actionError, setActionError] = useState<string | null>(null);
   const [fieldChoices, setFieldChoices] = useState<Map<string, FieldConflictChoice>>(new Map());
+  const [structuralChoices, setStructuralChoices] = useState<Map<string, StructuralChoice>>(new Map());
   // Optimistic-only additions not yet reflected in `state.request.dismissed_identity_pairs`
   // (the RPC call below is in flight, or its result hasn't triggered a
   // reload yet) — merged with the server-persisted list in
@@ -92,7 +98,10 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
       .then((result) => {
         if (cancelled) return;
         setState(result);
-        if (result.status === 'ready') setFieldChoices(new Map());
+        if (result.status === 'ready') {
+          setFieldChoices(new Map());
+          setStructuralChoices(new Map());
+        }
       })
       .catch((e: unknown) => {
         reportError("Couldn't load this review request.", e);
@@ -119,6 +128,14 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
     setFieldChoices((prev) => {
       const next = new Map(prev);
       next.delete(fieldChoiceKey(subjectId, attribute));
+      return next;
+    });
+  }, []);
+
+  const setStructuralChoice = useCallback((choice: StructuralChoice) => {
+    setStructuralChoices((prev) => {
+      const next = new Map(prev);
+      next.set(structuralChoiceKey(choice), choice);
       return next;
     });
   }, []);
@@ -187,6 +204,7 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
         mainHeadCommitId,
         review,
         choices: [...fieldChoices.values()],
+        structuralChoices: [...structuralChoices.values()],
       });
       if (!commitResult.ok) {
         setActionError(commitResult.message);
@@ -209,7 +227,7 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
     } finally {
       setActionStatus('idle');
     }
-  }, [state, modelId, userId, fieldChoices, reload]);
+  }, [state, modelId, userId, fieldChoices, structuralChoices, reload]);
 
   const approve = useCallback(async () => {
     if (state.status !== 'ready') return;
@@ -261,6 +279,18 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
   }, [state, modelId, reload]);
 
   const fieldChoiceFor = useMemo(() => (subjectId: UUID, attribute: string) => fieldChoices.get(fieldChoiceKey(subjectId, attribute)), [fieldChoices]);
+  const retractionChoiceFor = useMemo(() => (elementId: UUID) => {
+    const choice = structuralChoices.get(`retraction ${elementId}`);
+    return choice?.class === 'retraction' ? choice : undefined;
+  }, [structuralChoices]);
+  const pairChoiceFor = useMemo(
+    () => (relationshipId: UUID, relatedRelationshipId: UUID, findingClass: 'structural:duplicate-relationship' | 'structural:cardinality') => {
+      const cls = findingClass === 'structural:duplicate-relationship' ? 'duplicate-relationship' : 'cardinality';
+      const choice = structuralChoices.get(`${cls} ${[relationshipId, relatedRelationshipId].sort().join(' ')}`);
+      return choice?.class === cls ? choice : undefined;
+    },
+    [structuralChoices],
+  );
 
   return {
     state,
@@ -270,7 +300,10 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
     fieldChoiceFor,
     setFieldChoice,
     clearFieldChoice,
-    stagedChoiceCount: fieldChoices.size,
+    retractionChoiceFor,
+    pairChoiceFor,
+    setStructuralChoice,
+    stagedChoiceCount: fieldChoices.size + structuralChoices.size,
     isIdentityPairDismissed,
     dismissIdentityPair,
     reopenForEdits,

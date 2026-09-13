@@ -11,7 +11,8 @@ import { useThreadCounts } from '../comments/useThreadCounts';
 import { canApproveOrMergeRequest, canReviewMergeRequest, useMembership } from '../orgs/useMembership';
 import { useAuth } from '../auth/useAuth';
 import { branchStatusTone } from '../changes/branchStatus';
-import { CleanChanges, FieldConflictCard, IdentityWarningCard, StructuralConflictCard } from './ConflictCards';
+import { groupStructuralFindings } from '../../engine/structuralFindingGroups';
+import { CleanChanges, FieldConflictCard, IdentityWarningCard, PairConflictCard, RetractionConflictCard } from './ConflictCards';
 import { subjectAnchorType } from './elementBreadcrumb';
 import { mergeRequestStatusTone } from './mergeRequestStatus';
 import { SplitReviewPanel } from './SplitReviewPanel';
@@ -37,13 +38,15 @@ export interface ReviewRequestViewProps {
  * three-way context, before or after a merge request exists.
  *
  * Scope: field-conflict cards resolve with one click (keep this change /
- * keep main / enter a value, per §7.4). Structural conflicts and identity
- * warnings are rendered with full three-way context but their bespoke
- * resolution actions (retract-cascade, duplicate-relationship survivor
- * pick, cardinality pick, `atlas.merge_elements`) are not built this step —
- * see src/db/mergeRequests.ts's own module comment for why, and each
- * structural card names the real path that exists today: reopen the
- * branch and fix it with the ordinary editor, then refresh.
+ * keep main / enter a value, per §7.4). Structural conflicts now resolve
+ * with real actions too (ADR-021, C2b): keep-retraction/keep-element with
+ * the cascade named in consequences, duplicate-relationship survivor pick,
+ * cardinality primary/role pick — `src/engine/structuralFindingGroups.ts`
+ * groups the findings, `useReviewRequest.ts` stages the choices,
+ * `src/db/mergeRequests.ts`'s `pushRefresh` builds and commits the
+ * resolution via `atlas.refresh_branch`. Identity warnings' own
+ * `atlas.merge_elements` remains unbuilt (SPEC §11) — "keep both" (dismiss)
+ * is the only action there.
  */
 export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, modelSlug }: ReviewRequestViewProps) {
   const { userId } = useAuth();
@@ -73,8 +76,9 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
   const { classification, threeWay } = review;
   const blockingFindings = classification.findings.filter((f) => f.blocking);
   const identityFindings = classification.findings.filter((f) => !f.blocking);
-  const structuralFindings = blockingFindings.filter((f) => f.class !== 'field-conflict');
   const fieldConflictFindings = blockingFindings.filter((f) => f.class === 'field-conflict');
+  const { retractions, duplicates, cardinalities } = groupStructuralFindings(review);
+  const structuralCardCount = retractions.length + duplicates.length + cardinalities.length;
   // S1 item 3: "counts of things, not facts" — `classification.findings` is
   // flat and per-attribute (two conflicting attributes on one element are
   // two entries), so counting it directly counts conflicting *facts*, not
@@ -143,17 +147,41 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
         <SplitReviewPanel modelId={modelId} branch={branch} mainHeadCommitId={mainHeadCommitId} review={review} canSplit={canApproveOrMerge} onSplit={rr.reload} />
       )}
 
-      {structuralFindings.length > 0 && (
+      {structuralCardCount > 0 && (
         <Panel>
           <Text as="h2" size="lg">
             Structural conflicts
           </Text>
-          <Text as="p" tone="muted" size="sm">
-            No one-click resolution yet for these — reopen this change for edits, fix them with the ordinary change editor (un-retract, remove the dangling relationship, drop the duplicate), then push a refresh.
-          </Text>
           <ul className={styles.cardList}>
-            {structuralFindings.map((finding, i) => (
-              <StructuralConflictCard key={`${finding.class}-${finding.subjectId}-${String(i)}`} finding={finding} heads={heads} commentsSlot={renderCardComments(finding.subjectId)} />
+            {retractions.map((data) => (
+              <RetractionConflictCard
+                key={data.elementId}
+                data={data}
+                canResolve={canReview}
+                choice={rr.retractionChoiceFor(data.elementId)}
+                onChoose={rr.setStructuralChoice}
+                commentsSlot={renderCardComments(data.elementId)}
+              />
+            ))}
+            {duplicates.map((data) => (
+              <PairConflictCard
+                key={`${data.relationshipId} ${data.relatedRelationshipId}`}
+                data={data}
+                canResolve={canReview}
+                choice={rr.pairChoiceFor(data.relationshipId, data.relatedRelationshipId, data.findingClass)}
+                onChoose={rr.setStructuralChoice}
+                commentsSlot={renderCardComments(data.relationshipId)}
+              />
+            ))}
+            {cardinalities.map((data) => (
+              <PairConflictCard
+                key={`${data.relationshipId} ${data.relatedRelationshipId}`}
+                data={data}
+                canResolve={canReview}
+                choice={rr.pairChoiceFor(data.relationshipId, data.relatedRelationshipId, data.findingClass)}
+                onChoose={rr.setStructuralChoice}
+                commentsSlot={renderCardComments(data.relationshipId)}
+              />
             ))}
           </ul>
         </Panel>
