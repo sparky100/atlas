@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { allTilesOf, anchorFor, computeContextDiagramLayout, curveBetween, MODULE_WIDTH, tileTopAnchor, type DiagramTile, type DiagramUnitInput } from './contextDiagramLayout';
+import { allTilesOf, anchorFor, computeContextDiagramLayout, curveBetween, MIN_DIAGRAM_WIDTH, MODULE_WIDTH, tileTopAnchor, type DiagramTile, type DiagramUnitInput } from './contextDiagramLayout';
 import { NODE_HEIGHT, NODE_WIDTH } from '../landscape/layout';
 
 function unit(elementId: string, modules: { elementId: string; capabilityName: string | null }[] = []): DiagramUnitInput {
   return { elementId, modules };
+}
+
+/** Two axis-aligned rects overlap on both axes at once — the exact "same box" bug report's own failure condition. */
+function tilesOverlap(a: DiagramTile | undefined, b: DiagramTile | undefined): boolean {
+  if (!a || !b) throw new Error('expected both tiles to exist');
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
 describe('computeContextDiagramLayout', () => {
@@ -213,5 +219,72 @@ describe('layoutNeighbourBand (via computeContextDiagramLayout)', () => {
     expect(layout.internalNeighbours).toHaveLength(3);
     const ys = new Set(layout.internalNeighbours.map((t) => t.y));
     expect(ys.size).toBe(1); // one plain row, same as before this polish
+  });
+
+  it('bug fix: two neighbours attached to adjacent modules never overlap, even though modules sit far closer together (MODULE_WIDTH + gutter, 80px) than a neighbour tile is wide (NODE_WIDTH, 160px) — the exact geometry that produced "two neighbours render in the same box and their labels concatenate"', () => {
+    const sap = unit('sap', [{ elementId: 'fi', capabilityName: 'Finance' }, { elementId: 'pm', capabilityName: 'Asset Management' }]);
+    const graphicalDesignTool = { ...unit('graphical-design-tool'), attachedToModuleId: 'fi' };
+    const crm = { ...unit('crm'), attachedToModuleId: 'pm' };
+    const layout = computeContextDiagramLayout(sap, [graphicalDesignTool, crm], []);
+    const t1 = layout.internalNeighbours.find((t) => t.elementId === 'graphical-design-tool');
+    const t2 = layout.internalNeighbours.find((t) => t.elementId === 'crm');
+    expect(t1).toBeDefined();
+    expect(t2).toBeDefined();
+    expect(tilesOverlap(t1, t2)).toBe(false);
+    // Each is its own single-member column (index 0), so a real fix keeps
+    // them on the same row — the overlap this test guards against is
+    // purely horizontal, not resolved by accidentally landing on different rows.
+    expect(t1?.y).toBeCloseTo(t2?.y ?? 0);
+  });
+
+  it('bug fix, three or more neighbours across adjacent modules: every column is pairwise non-overlapping, and left-to-right module order is preserved', () => {
+    const sap = unit('sap', [
+      { elementId: 'fi', capabilityName: 'Finance' },
+      { elementId: 'pm', capabilityName: 'Asset Management' },
+      { elementId: 'mm', capabilityName: 'Spend Control' },
+    ]);
+    const neighbours = [
+      { ...unit('a'), attachedToModuleId: 'fi' },
+      { ...unit('b'), attachedToModuleId: 'pm' },
+      { ...unit('c'), attachedToModuleId: 'mm' },
+    ];
+    const layout = computeContextDiagramLayout(sap, neighbours, []);
+    const tiles = ['a', 'b', 'c'].map((id) => layout.internalNeighbours.find((t) => t.elementId === id));
+    for (const tile of tiles) expect(tile).toBeDefined();
+    for (let i = 0; i < tiles.length; i++) {
+      for (let j = i + 1; j < tiles.length; j++) {
+        expect(tilesOverlap(tiles[i], tiles[j])).toBe(false);
+      }
+    }
+    expect(tiles[0]?.x ?? 0).toBeLessThanOrEqual(tiles[1]?.x ?? 0);
+    expect(tiles[1]?.x ?? 0).toBeLessThanOrEqual(tiles[2]?.x ?? 0);
+  });
+
+  it('bug fix: two neighbours on the same module stack vertically with zero overlap, never the horizontal-overlap bug', () => {
+    const sap = unit('sap', [{ elementId: 'fi', capabilityName: 'Finance' }]);
+    const n1 = { ...unit('n1'), attachedToModuleId: 'fi' };
+    const n2 = { ...unit('n2'), attachedToModuleId: 'fi' };
+    const layout = computeContextDiagramLayout(sap, [n1, n2], []);
+    const t1 = layout.internalNeighbours.find((t) => t.elementId === 'n1');
+    const t2 = layout.internalNeighbours.find((t) => t.elementId === 'n2');
+    expect(tilesOverlap(t1, t2)).toBe(false);
+    expect(t1?.x).toBeCloseTo(t2?.x ?? 0); // same column
+    expect(t1?.y).not.toBeCloseTo(t2?.y ?? 0); // different rows within it
+  });
+
+  it("the diagram's own width grows to keep every resolved column inside the boundary, when several adjacent modules each have their own attached neighbour", () => {
+    const sap = unit('sap', [
+      { elementId: 'fi', capabilityName: 'Finance' },
+      { elementId: 'pm', capabilityName: 'Asset Management' },
+      { elementId: 'mm', capabilityName: 'Spend Control' },
+      { elementId: 'co', capabilityName: 'Compliance' },
+      { elementId: 'ps', capabilityName: 'Estates' },
+    ]);
+    const neighbours = ['fi', 'pm', 'mm', 'co', 'ps'].map((moduleId, i) => ({ ...unit(`n${String(i)}`), attachedToModuleId: moduleId }));
+    const layout = computeContextDiagramLayout(sap, neighbours, [], MIN_DIAGRAM_WIDTH);
+    for (const tile of layout.internalNeighbours) {
+      expect(tile.x).toBeGreaterThanOrEqual(0);
+      expect(tile.x + tile.w).toBeLessThanOrEqual(layout.width);
+    }
   });
 });

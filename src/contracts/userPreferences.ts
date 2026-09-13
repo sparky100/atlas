@@ -45,6 +45,20 @@ export type CapabilityMapColourByMode = (typeof CAPABILITY_MAP_COLOUR_BY_MODES)[
 export const LANDSCAPE_COLOUR_BY_MODES = ['none', 'metric:criticality', 'metric:hostingModel', 'metric:domain'] as const;
 export type LandscapeColourByMode = (typeof LANDSCAPE_COLOUR_BY_MODES)[number];
 
+/**
+ * V2 "landscape focus and filters", decision 1 (UI-principles.md §10): a
+ * lane's own collapse state is a two-directional override, not a single
+ * "collapsed set" — a lane with no members defaults to collapsed, a lane
+ * with members defaults to expanded (`src/ui/landscape/layout.ts`'s own
+ * `isLaneCollapsed`), and a user can override either default in either
+ * direction. Two arrays record that: a key here means "force collapsed
+ * regardless of this lane's own default"; `landscapeExpandedLaneKeys`'
+ * own doc comment is the mirror image. `null` — the common case — means no
+ * override has ever been saved for any lane, same "no saved row, no saved
+ * choice" reasoning `landscapeColourBy` already uses.
+ */
+export type LandscapeLaneKeyList = readonly string[];
+
 export const DEFAULT_DENSITY: DensityPreference = 'comfortable';
 export const DEFAULT_THEME: ThemePreference = 'system';
 
@@ -74,6 +88,17 @@ export interface UserPreferences {
    * is pending.
    */
   landscapeColourBy: LandscapeColourByMode | null;
+  /** V2: see `LandscapeLaneKeyList`'s own doc comment. Force-collapsed lane keys. */
+  landscapeCollapsedLaneKeys: LandscapeLaneKeyList | null;
+  /** V2: see `LandscapeLaneKeyList`'s own doc comment. Force-expanded lane keys. */
+  landscapeExpandedLaneKeys: LandscapeLaneKeyList | null;
+  /**
+   * V2: pinned lane keys, in the user's own chosen display order — array
+   * order *is* display order among pinned lanes (`layout.ts`'s own pin
+   * sort tier). `null` means nothing pinned; every lane then keeps
+   * `layout.ts`'s existing `laneSortKey` order unchanged.
+   */
+  landscapePinnedLaneKeys: LandscapeLaneKeyList | null;
   /** ISO 8601 timestamp; DB-assigned, never client-chosen. */
   updatedAt: string;
 }
@@ -86,6 +111,9 @@ export interface UserPreferencesRow {
   theme: ThemePreference;
   capability_map_colour_by: CapabilityMapColourByMode | null;
   landscape_colour_by: LandscapeColourByMode | null;
+  landscape_collapsed_lane_keys: LandscapeLaneKeyList | null;
+  landscape_expanded_lane_keys: LandscapeLaneKeyList | null;
+  landscape_pinned_lane_keys: LandscapeLaneKeyList | null;
   updated_at: string;
 }
 
@@ -97,6 +125,9 @@ export function toUserPreferencesRow(prefs: UserPreferences): UserPreferencesRow
     theme: prefs.theme,
     capability_map_colour_by: prefs.capabilityMapColourBy,
     landscape_colour_by: prefs.landscapeColourBy,
+    landscape_collapsed_lane_keys: prefs.landscapeCollapsedLaneKeys,
+    landscape_expanded_lane_keys: prefs.landscapeExpandedLaneKeys,
+    landscape_pinned_lane_keys: prefs.landscapePinnedLaneKeys,
     updated_at: prefs.updatedAt,
   };
 }
@@ -109,6 +140,9 @@ export function fromUserPreferencesRow(row: UserPreferencesRow): UserPreferences
     theme: row.theme,
     capabilityMapColourBy: row.capability_map_colour_by,
     landscapeColourBy: row.landscape_colour_by,
+    landscapeCollapsedLaneKeys: row.landscape_collapsed_lane_keys,
+    landscapeExpandedLaneKeys: row.landscape_expanded_lane_keys,
+    landscapePinnedLaneKeys: row.landscape_pinned_lane_keys,
     updatedAt: row.updated_at,
   };
 }
@@ -131,6 +165,9 @@ export function defaultUserPreferences(userId: UUID, isOwnerOrArchitect: boolean
     theme: DEFAULT_THEME,
     capabilityMapColourBy: null,
     landscapeColourBy: null,
+    landscapeCollapsedLaneKeys: null,
+    landscapeExpandedLaneKeys: null,
+    landscapePinnedLaneKeys: null,
     updatedAt: new Date(0).toISOString(),
   };
 }

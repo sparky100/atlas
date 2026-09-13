@@ -379,13 +379,13 @@ export function LandscapeCanvas({
       if (viaPosition) {
         const obstaclesToVia = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== viaPosition.elementId);
         const obstaclesFromVia = allPositions.filter((n) => n.elementId !== viaPosition.elementId && n.elementId !== edge.to_element_id);
-        result.push({ edge, points: routeLandscapeEdge(from, viaPosition, obstaclesToVia, channels) });
-        result.push({ edge, points: routeLandscapeEdge(viaPosition, to, obstaclesFromVia, channels) });
+        result.push({ edge, points: routeLandscapeEdge(from, viaPosition, obstaclesToVia, channels, layout.lanes) });
+        result.push({ edge, points: routeLandscapeEdge(viaPosition, to, obstaclesFromVia, channels, layout.lanes) });
         continue;
       }
 
       const obstacles = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== edge.to_element_id);
-      result.push({ edge, points: routeLandscapeEdge(from, to, obstacles, channels) });
+      result.push({ edge, points: routeLandscapeEdge(from, to, obstacles, channels, layout.lanes) });
     }
     return result;
   }, [layout, edges, routeViaPlatforms]);
