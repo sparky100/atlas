@@ -117,6 +117,7 @@ export type ExposureTone = 'ok' | 'warn' | 'info';
  */
 export function computeExposureTone(
   supportsEdges: readonly RelationshipsHeadRow[],
+  /** Bug fix: despite the name, this must also carry any *container* that can appear as a `supports` edge's own `from_element_id` — a platform's own module supports a capability directly too (S1 item 20). An edge whose supporter isn't in this map is silently skipped, so a container-only supporter used to vanish here entirely (see `useDirectorHome.ts`'s own caller-side fix). */
   systemsById: ReadonlyMap<UUID, ElementsHeadRow>,
   plannedReplacementSystemIds: ReadonlySet<UUID> = new Set(),
 ): ExposureTone {
@@ -223,6 +224,7 @@ export interface CapabilityTileData {
 export function buildCapabilityTiles(
   capabilities: readonly ElementsHeadRow[],
   supportsEdges: readonly RelationshipsHeadRow[],
+  /** Same "systems and container-supporters both" map `computeExposureTone` expects — see that function's own doc comment. */
   systemsById: ReadonlyMap<UUID, ElementsHeadRow>,
   plannedReplacements: readonly PlannedReplacement[],
 ): CapabilityTileData[] {

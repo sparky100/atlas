@@ -210,6 +210,84 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
   expect(finalReplacementBranch?.status).toBe('approved');
 });
 
+/**
+ * Bug fix: a capability supported only by a container (a platform's own
+ * module, S1 item 20 — a module can `supports` a capability directly, the
+ * same as a system) used to read as "nothing recorded" here —
+ * `useDirectorHome.ts` only fetched `system`-type elements into the map
+ * `buildCapabilityTiles`/`computeExposureTone` (`src/db/modelHome.ts`)
+ * look supporters up in, so a container supporter's own edge was silently
+ * dropped even though the capability's own element page showed the real
+ * relationship.
+ */
+test('director door: a capability supported only by a container (a platform module) is not "nothing recorded"', async ({ page }) => {
+  const env = loadEnv();
+
+  const email = `directordoorcontainer-${randomUUID()}@example.test`;
+  const password = `${randomUUID()}Aa1!`;
+
+  await page.goto('/sign-in');
+  await page.getByText("Don't have an account? Create one").click();
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('heading', { name: 'Your organisations' })).toBeVisible();
+
+  const signedIn = createSupabaseClient(env);
+  const { error: signInError } = await signedIn.auth.signInWithPassword({ email, password });
+  if (signInError) throw new Error(`director-door container fixture sign-in: ${signInError.message}`);
+  const { data: userData, error: getUserError } = await signedIn.auth.getUser();
+  if (getUserError) throw new Error(`director-door container fixture: could not read the signed-in user: ${getUserError.message}`);
+  const userId = userData.user.id;
+
+  const orgId = randomUUID();
+  const orgSlug = `directordoorcontainer-${orgId.slice(0, 8)}`;
+  await createOrganisation(signedIn, { id: orgId, name: 'Director Door Container Org', slug: orgSlug, createdBy: userId });
+
+  const modelId = randomUUID();
+  const modelSlug = `directordoorcontainer-model-${modelId.slice(0, 8)}`;
+  await createModel(signedIn, { id: modelId, orgId, name: 'Director Door Container Model', slug: modelSlug, createdBy: userId });
+
+  const main = await getMainBranch(signedIn, modelId);
+  if (!main) throw new Error('main branch was not auto-created');
+
+  const { error: sourceError } = await signedIn.from('sources').insert({ id: randomUUID(), org_id: orgId, model_id: modelId, kind: 'manual', name: 'Seed', user_id: userId, created_by: userId });
+  if (sourceError) throw new Error(`seed source: ${sourceError.message}`);
+  const { data: sourceRow } = await signedIn.from('sources').select('id').eq('model_id', modelId).eq('user_id', userId).single();
+  const seedSourceId = (sourceRow as { id: string }).id;
+
+  const platformId = randomUUID();
+  const crmId = randomUUID(); // the container — a platform's own module, not a system
+  const capabilityId = randomUUID();
+  const envelope: CommitEnvelope = {
+    id: randomUUID(),
+    branchId: main.id,
+    parentCommitId: main.head_commit_id,
+    mergedBranchHeadCommitId: null,
+    kind: 'manual',
+    title: 'seed a platform with a module that supports a capability directly',
+    body: null,
+    deltas: [
+      { kind: 'element.create', id: randomUUID(), elementId: platformId, elementType: 'system', name: 'Dynamics 365', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false, kind: 'platform' }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: crmId, elementType: 'container', name: 'CRM', parentId: platformId, attributes: { isExternal: false }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: capabilityId, elementType: 'capability', name: 'Customer Contact', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: crmId, toElementId: capabilityId, attributes: { role: 'primary' }, sourceId: seedSourceId, confidence: 1 },
+    ],
+  };
+  const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: main.head_commit_id, envelope });
+  if (!seedResult.ok) throw new Error(`seeding director-door container fixture: ${seedResult.message}`);
+
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
+  await page.getByRole('button', { name: 'Director view' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
+  const tile = page.getByRole('link', { name: /Customer Contact/ });
+  await expect(tile).toBeVisible();
+  await expect(tile.getByText('1 system')).toBeVisible();
+  await expect(tile.getByText('no known supporters')).toHaveCount(0);
+  await expect(page.getByText('1 with nothing recorded')).toHaveCount(0);
+});
+
 test('director door: the empty-model state offers the real starter-map picker, not a hard-coded sector list', async ({ page }) => {
   const env = loadEnv();
 
