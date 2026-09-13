@@ -28,50 +28,9 @@
   margin-bottom: var(--space-6);
 }
 
-.groups {
-  display: flex;
-  gap: var(--space-8);
-  flex-wrap: wrap;
-}
-
-.group {
-  flex: 1 1 260px;
-  min-width: 240px;
-}
-
-.groupTitle {
-  margin-bottom: var(--space-2);
-}
-
-.neighbours {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/** V1: the diagram/mobile-list body — a flex column so the canvas (itself `flex: 1`, `ContextDiagramCanvas.module.css`) can grow to fill whatever height `ViewPage.module.css`'s `.mainWithView` leaves it, same shape the landscape's own canvas row uses. */
+.diagram {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-}
-
-.neighbour {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
-}
-
-.neighbourTitle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.neighbourTitle > a {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-height: 360px;
 }

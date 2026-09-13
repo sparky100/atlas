@@ -101,18 +101,40 @@ function byNameThenId(a: ElementsHeadRow, b: ElementsHeadRow): number {
 
 /**
  * @param hub The system this Context view is scoped to.
- * @param relationships Every relationship touching `hub` — `src/db/elements.ts`'s `listRelationshipsForElement`, unfiltered; this function does the type filtering itself so the query stays the same one every other "everything touching this element" reader already uses.
+ * @param relationships Every relationship touching `hub` — `src/db/elements.ts`'s `listRelationshipsForElement`, unfiltered — plus, since V1, every `uses`/`flows_to` edge touching one of `hub`'s own modules directly (`useSystemContext.ts`'s own caller widens the query for exactly this reason: "Platforms and modules" lets a flow attach to a specific module rather than the platform itself). This function does the type filtering itself so the query stays the same one every other "everything touching this element" reader already uses.
  * @param elementsById Every other endpoint named by `relationships`, by id — batch-loaded via `getElementsByIds`.
+ * @param hubModuleIds V1's own addition — `hub`'s own module (container) ids, when `hub` is a platform with modules; empty otherwise. A `uses`/`flows_to` edge naming one of these as an endpoint is treated as touching the hub itself (the *other* side is the real neighbour), the same way an edge naming `hub.element_id` directly always has been — without this, an edge attaching to a module rather than the platform would be misread as a neighbour named by the module's own id, which is never what it means.
  */
-export function computeContextGroup(hub: ElementsHeadRow, relationships: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): ContextGroup {
+export function computeContextGroup(
+  hub: ElementsHeadRow,
+  relationships: readonly RelationshipsHeadRow[],
+  elementsById: ReadonlyMap<UUID, ElementsHeadRow>,
+  hubModuleIds: ReadonlySet<UUID> = new Set(),
+): ContextGroup {
   const neighbourEdges = new Map<UUID, RelationshipsHeadRow[]>();
   const ownerEntries: { actorId: UUID; role: string }[] = [];
   // Keyed by capability id, not a list: at most one supports edge is ever
   // expected between one system and one capability, so the last one seen
   // (there should only ever be one) simply wins.
   const supportsEdgeByCapabilityId = new Map<UUID, RelationshipsHeadRow>();
+  const isHubSide = (id: UUID) => id === hub.element_id || hubModuleIds.has(id);
 
   for (const rel of relationships) {
+    if (rel.relationship_type === 'uses' || rel.relationship_type === 'flows_to') {
+      // V1: either endpoint may be the hub's own module rather than the hub
+      // itself — `otherId` is whichever side is *not* hub-or-module, not
+      // simply "whichever side isn't `hub.element_id`" any more.
+      const fromIsHubSide = isHubSide(rel.from_element_id);
+      const toIsHubSide = isHubSide(rel.to_element_id);
+      if (!fromIsHubSide && !toIsHubSide) continue; // neither end touches the hub or one of its modules — not this hub's edge at all (shouldn't reach here given how the caller scopes the query, but never assumed).
+      if (fromIsHubSide && toIsHubSide) continue; // both ends are the hub/its own modules — not a real neighbour edge.
+      const otherId = fromIsHubSide ? rel.to_element_id : rel.from_element_id;
+      const list = neighbourEdges.get(otherId) ?? [];
+      list.push(rel);
+      neighbourEdges.set(otherId, list);
+      continue;
+    }
+
     const otherId = rel.from_element_id === hub.element_id ? rel.to_element_id : rel.from_element_id;
     if (otherId === hub.element_id) continue; // a self-relationship shouldn't exist, but this function never assumes it can't.
 
@@ -129,11 +151,9 @@ export function computeContextGroup(hub: ElementsHeadRow, relationships: readonl
       supportsEdgeByCapabilityId.set(rel.to_element_id, rel);
       continue;
     }
-    if (rel.relationship_type !== 'uses' && rel.relationship_type !== 'flows_to') continue; // owns-the-other-way, or a supports edge in the other direction: not a Context node source.
-
-    const list = neighbourEdges.get(otherId) ?? [];
-    list.push(rel);
-    neighbourEdges.set(otherId, list);
+    // Anything else here is `owns`-the-other-way or a `supports` edge in
+    // the other direction — not a Context node source; `uses`/`flows_to`
+    // is handled entirely by the branch above.
   }
 
   const internal: ContextNeighbour[] = [];

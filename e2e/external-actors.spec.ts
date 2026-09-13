@@ -75,11 +75,19 @@ test('an external organisation actor using a system renders outside the boundary
     await expect(page.getByText('Ofgem', { exact: true })).toHaveCount(0);
   }
 
-  // Context view: the system's own neighbour list shows Ofgem under
-  // "External", with the real verb phrase, not a generic fallback.
+  // Context view: V1 moved the desktop view onto a canvas
+  // (ContextDiagramCanvas.tsx) — Ofgem renders outside the dotted
+  // enterprise boundary there, but a canvas's own drawn text isn't
+  // DOM-queryable (UI-principles §8.7's own "element page is the
+  // accessible view" stance), so this checks the mobile list instead:
+  // Ofgem shows under "People" (V1's own direction-based grouping, not
+  // internal/external), flagged with the same "external" badge the hub's
+  // own header uses, with the real verb phrase, not a generic fallback.
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/context/${systemId}`);
-  await expect(page.getByRole('heading', { name: 'External' })).toBeVisible();
+  await page.getByRole('button', { name: /^People/ }).click();
   await expect(page.getByText('Ofgem')).toBeVisible();
+  await expect(page.getByText('external', { exact: true })).toBeVisible();
   await expect(page.getByText(/submits RIIO returns to/)).toBeVisible();
 
   // The architect door's own new Assurance row.

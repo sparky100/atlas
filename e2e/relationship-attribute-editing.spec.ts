@@ -111,9 +111,20 @@ test('editing a uses edge\'s verb phrase updates the row on the element page and
 
   // Sprint U4-2c item 1's own Context-view change: the neighbour's label is
   // the real verb now, not a fixed "uses" placeholder — `edgeLabel`
-  // (contextGrouping.ts).
+  // (contextGrouping.ts). V1 moved the desktop view onto a canvas
+  // (ContextDiagramCanvas.tsx), whose own drawn text is exactly as
+  // inaccessible to a DOM-based assertion as any other canvas in this
+  // product (UI-principles §8.7: "the element page ... is the accessible
+  // view"), so this checks the mobile list (ContextMobileList.tsx) — the
+  // one place V1 keeps this same fact as real, queryable DOM text.
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/context/${meterReadingId}`);
-  await expect(page.getByRole('heading', { name: 'Meter Reading Service' })).toBeVisible();
+  // The hub's own name is a link, not a semantic heading, on this page
+  // (pre-existing — the same reason e2e/context-header.spec.ts's own two
+  // tests already fail against unmodified main on this exact assertion
+  // shape, confirmed via `git stash` before this PR touched anything here).
+  await expect(page.getByRole('link', { name: 'Meter Reading Service' }).first()).toBeVisible();
+  await page.getByRole('button', { name: /^Uses/ }).click();
   await expect(page.getByText('streams live billing events to →')).toBeVisible();
 });
 

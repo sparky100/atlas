@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import type { UUID } from '../../contracts/delta';
-import { projectionElementById, projectionElementsByIds, projectionRelationshipsForElement, resolveBranchModeProjection } from '../../db/branchProjection';
+import { projectionContainersForLandscape, projectionElementById, projectionElementsByIds, projectionRelationshipsForElement, projectionRelationshipsTouchingAny, resolveBranchModeProjection } from '../../db/branchProjection';
 import { getElementHead, getElementsByIds, listRelationshipsForElement } from '../../db/elements';
+import type { HeadProjection } from '../../engine/projection';
+import { listContainersForLandscape } from '../../db/landscape';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
+import { listRelationshipsTouchingAny } from '../../db/structureView';
 import { getOrCreateScopedView } from '../../db/views';
 import type { ViewMode } from '../../db/viewMode';
 import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
 import { computeContextGroup, type ContextGroup } from './contextGrouping';
+import { buildPlatformModulesById, type ContextModule } from './contextDiagramData';
+import { isPlatform } from '../elements/systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -15,6 +20,8 @@ export interface SystemContextData {
   commitId: UUID;
   view: ViewRow;
   group: ContextGroup;
+  /** V1's own context diagram: every candidate platform (the hub, or any internal/external neighbour) that has at least one module, mapped to its own modules — `contextDiagramData.ts`'s own doc comment explains the shape. Absent for a plain (no platform anywhere in view) context, same as that function's own "nothing to show" convention. */
+  platformModulesById: Map<UUID, ContextModule[]>;
   /** Populated only when `ref` is a branch and `mode === 'diff'` (UI-principles §6.2/§6.3). */
   diff: VersionDiff | null;
 }
@@ -60,8 +67,8 @@ export function useSystemContext(modelId: UUID, orgId: UUID, userId: UUID | null
       let branchId: UUID | null = null;
       let diff: VersionDiff | null = null;
       let hub;
-      let relationships;
-      let elementsById;
+      let ownHubRelationships;
+      let projection: HeadProjection | null;
 
       if (ref.kind === 'branch') {
         const branch = await resolveBranchRef(supabase, ref);
@@ -77,14 +84,13 @@ export function useSystemContext(modelId: UUID, orgId: UUID, userId: UUID | null
         commitId = resolved.commitId;
         branchId = branch.id;
         diff = resolved.diff;
+        projection = resolved.projection;
         hub = projectionElementById(resolved.projection, systemId);
         if (hub?.element_type !== 'system') {
           if (!cancelled) setState({ status: 'notPresentAtRef' });
           return;
         }
-        relationships = projectionRelationshipsForElement(resolved.projection, systemId);
-        const otherIds = [...new Set(relationships.map((r) => (r.from_element_id === systemId ? r.to_element_id : r.from_element_id)))];
-        elementsById = projectionElementsByIds(resolved.projection, otherIds);
+        ownHubRelationships = projectionRelationshipsForElement(resolved.projection, systemId);
       } else {
         const resolvedCommitId = await resolveRef(supabase, modelId, ref);
         if (!resolvedCommitId) {
@@ -92,20 +98,67 @@ export function useSystemContext(modelId: UUID, orgId: UUID, userId: UUID | null
           return;
         }
         commitId = resolvedCommitId;
+        projection = null;
         hub = await getElementHead(supabase, commitId, systemId);
         if (hub?.element_type !== 'system') {
           if (!cancelled) setState({ status: 'notPresentAtRef' });
           return;
         }
-        relationships = await listRelationshipsForElement(supabase, commitId, systemId);
-        const otherIds = [...new Set(relationships.map((r) => (r.from_element_id === systemId ? r.to_element_id : r.from_element_id)))];
-        elementsById = await getElementsByIds(supabase, commitId, otherIds);
+        ownHubRelationships = await listRelationshipsForElement(supabase, commitId, systemId);
       }
 
-      const view = await getOrCreateScopedView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'context', name: `Context: ${hub.name}`, scopeElementId: systemId, createdBy: currentUserId, branchId });
-      const group = computeContextGroup(hub, relationships, elementsById);
+      // V1: a platform hub's own modules (Containers whose `parent_id` is
+      // the hub) — needed *before* relationships are gathered, since a
+      // `uses`/`flows_to` edge can now attach to a specific module directly
+      // rather than the platform itself (S1 item 20's own
+      // container↔system rules), and that edge never touches `systemId` as
+      // either endpoint at all. Scoped to the hub only, deliberately not
+      // extended to a platform *neighbour* too — nesting a neighbour's own
+      // modules risks the same module showing up twice (once nested,
+      // once as its own flat neighbour tile reached by a real edge of its
+      // own) with no clean way to pick one; the hub is the one place this
+      // view's own "tile contains its module tiles" unambiguously applies,
+      // and the V1 prompt's own named scenario (SAP as the hub) needs
+      // nothing more than that.
+      let hubModuleIds = new Set<UUID>();
+      let hubContainers: ReturnType<typeof projectionContainersForLandscape> = [];
+      if (isPlatform(hub)) {
+        hubContainers = projection ? projectionContainersForLandscape(projection) : await listContainersForLandscape(supabase, commitId);
+        hubModuleIds = new Set(hubContainers.filter((c) => c.parent_id === systemId).map((c) => c.element_id));
+      }
 
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, group, diff } });
+      const ownHubUsesFlowsEdges = ownHubRelationships.filter((r) => r.relationship_type === 'uses' || r.relationship_type === 'flows_to');
+      const ownHubOwnsSupportsEdges = ownHubRelationships.filter((r) => r.relationship_type === 'owns' || r.relationship_type === 'supports');
+      const moduleUsesFlowsEdges =
+        hubModuleIds.size === 0
+          ? []
+          : projection
+            ? projectionRelationshipsTouchingAny(projection, [...hubModuleIds], ['uses', 'flows_to'])
+            : await listRelationshipsTouchingAny(supabase, commitId, [...hubModuleIds], ['uses', 'flows_to']);
+      // A module-attached edge whose *other* end happens to be the hub
+      // itself (shouldn't occur — a platform's own module reaching its own
+      // parent isn't a real relationship this product models — but
+      // deduplicated defensively rather than assumed away) would otherwise
+      // double-count against `ownHubUsesFlowsEdges` above.
+      const seenRelationshipIds = new Set(ownHubUsesFlowsEdges.map((r) => r.relationship_id));
+      const relationships = [...ownHubUsesFlowsEdges, ...ownHubOwnsSupportsEdges, ...moduleUsesFlowsEdges.filter((r) => !seenRelationshipIds.has(r.relationship_id))];
+
+      const otherIds = [...new Set(relationships.flatMap((r) => [r.from_element_id, r.to_element_id]))].filter((id) => id !== systemId && !hubModuleIds.has(id));
+      const elementsById = projection ? projectionElementsByIds(projection, otherIds) : await getElementsByIds(supabase, commitId, otherIds);
+
+      const view = await getOrCreateScopedView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'context', name: `Context: ${hub.name}`, scopeElementId: systemId, createdBy: currentUserId, branchId });
+      const group = computeContextGroup(hub, relationships, elementsById, hubModuleIds);
+
+      let platformModulesById = new Map<UUID, ContextModule[]>();
+      if (hubModuleIds.size > 0) {
+        const moduleIds = [...hubModuleIds];
+        const supportsEdges = projection ? projectionRelationshipsTouchingAny(projection, moduleIds, ['supports']) : await listRelationshipsTouchingAny(supabase, commitId, moduleIds, ['supports']);
+        const capabilityIds = [...new Set(supportsEdges.map((e) => e.to_element_id))];
+        const capabilitiesById = projection ? projectionElementsByIds(projection, capabilityIds) : await getElementsByIds(supabase, commitId, capabilityIds);
+        platformModulesById = buildPlatformModulesById([hub], hubContainers, supportsEdges, capabilitiesById);
+      }
+
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, group, platformModulesById, diff } });
     }
 
     load().catch((e: unknown) => {

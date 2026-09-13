@@ -109,7 +109,16 @@ export function ContextPage() {
             </Text>
           </Panel>
         )}
-        {state.status === 'ready' && <ContextView group={state.data.group} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} refParam={refParam} diff={state.data.diff} />}
+        {state.status === 'ready' && (
+          <ContextView
+            group={state.data.group}
+            platformModulesById={state.data.platformModulesById}
+            orgSlug={organisation?.slug ?? ''}
+            modelSlug={model.slug}
+            refParam={refParam}
+            diff={state.data.diff}
+          />
+        )}
         </main>
       </div>
     </div>
