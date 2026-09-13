@@ -48,7 +48,7 @@ Applied by every session, cloud or desktop. Put into CLAUDE.md by prompt P1.
 6. Repeat 4–5 until the definition of usable holds by golden path.
 **Gate before any feature sprint:** S2's eight golden paths green at 1280 and 390; E8's targets met (route < 300 ms, action < 500 ms on the DNO model); the context view built as a diagram (platform modules inside the tile); E1 merged; the deploy workflow has one green run or has been removed with `pnpm release` documented as the only path; one post-S2 walkthrough filed through the intake with its S3 (if any) closed.
 
-7. Then features, in order: **F0 + F3 as one sprint — decisions and options** (intent, decisions, explore changes as high-level options, the comparison view; the product's centre: which capabilities are changing or weak → options → a documented decision → a change) → **F3a** multiple reviewers and sign-up shape → **F7** accounts and access → **F1** custom attributes → **E2** C2b → **E7** merge_elements → **F2** capture (K1) → **F4** duplicates report → **F5** roadmap → **F6** value streams. E2 and E7 must precede F2: capture review is where structural conflicts and merge-into-X become daily events.
+7. Then features, in order: **F0 + F3 as one sprint — decisions and options** (intent, decisions, explore changes as high-level options, the comparison view; the product's centre: which capabilities are changing or weak → options → a documented decision → a change) → **F3a** multiple reviewers and sign-up shape → **F7** accounts and access → **F1** custom attributes → **F8** export → **E2** C2b → **E7** merge_elements → **F2** capture (K1) → **F4** duplicates report → **F5** roadmap → **F6** value streams. E2 and E7 must precede F2: capture review is where structural conflicts and merge-into-X become daily events.
 8. Plumbing alongside, desktop only, never the same files as the active S/F sprint, each with its own prompt below: **E3** delta-apply in SQL and **E4** LLM proxy edge function (both before F2); **E5** typed Supabase client (any time after S2); **E6** landscape p5 fps profile (after S2); **E8** performance (after S2, before features).
 
 ---
@@ -188,6 +188,14 @@ Prerequisites: S2. Engine change allowed.
 
 ```
 F1. Core attributes stay code; the long tail becomes data. Table attribute_definitions (org_id, key, label, kind text|number|date|boolean|select|link, options, applies_to element/relationship types, required, description, order). Owner UI under organisation settings: define, reorder, deprecate. Stored in the same JSONB attributes with provenance; rendered after core attributes by the generic attribute row; browse filter/sort; export; capture targets. No colour-by, no findings, no engine rules; validation at commit from the definition. Promotion to core = code change + data-migration commit. Contract, migration, round-trip tests, ADR-001 amendment recording the core/custom split. Golden path: define a select attribute, set it on a system, filter the browse table by it.
+```
+
+### F8 — export
+
+Prerequisites: F1 (custom attributes render in the browse table).
+
+```
+F8. Export from the browse table (any element type, any filter applied) and from a capability-scoped or landscape view: CSV always; .xlsx with one sheet per element type plus a "Relationships" sheet (from, type, to, verb, role), using the xlsx skill's conventions. Columns = core attributes + custom attributes + a provenance summary (source, age) for the filtered/visible set. Server-side generation (edge function or scheduled job) for anything over ~500 rows, since the 50-id client guard rules out an unbounded client-side fetch. "Export" action on the browse table toolbar and on a capability's "N systems →" list. Golden path: filter browse to systems in one capability, export .xlsx, confirm columns match what was visible.
 ```
 
 ### E2 — C2b structural-conflict resolution (ADR-021)
