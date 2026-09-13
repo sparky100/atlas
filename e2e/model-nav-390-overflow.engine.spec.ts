@@ -142,6 +142,7 @@ test('model-scoped routes: no horizontal scroll at 390px, including a long branc
     { path: `/o/${orgSlug}/m/${modelSlug}/capability-map${refQuery}`, heading: 'Capability map' },
     { path: `/o/${orgSlug}/m/${modelSlug}/landscape${refQuery}`, heading: /^Landscape/ },
     { path: `/o/${orgSlug}/m/${modelSlug}/changes`, heading: 'Changes' },
+    { path: `/o/${orgSlug}/m/${modelSlug}/decisions`, heading: 'Decisions' },
     { path: `/o/${orgSlug}/m/${modelSlug}/versions${refQuery}`, heading: 'Versions' },
     { path: `/o/${orgSlug}/m/${modelSlug}/review`, heading: 'Review queue' },
   ];

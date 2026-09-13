@@ -9,7 +9,7 @@
  * highlighting the right rail item there is the honest answer, not
  * something a path-prefix match alone would produce.
  */
-export type ModelNavSection = 'home' | 'capability-map' | 'landscape' | 'changes' | 'versions' | 'review' | null;
+export type ModelNavSection = 'home' | 'capability-map' | 'landscape' | 'changes' | 'decisions' | 'versions' | 'review' | null;
 
 /** `pathname` is everything after the model slug, e.g. `/landscape`, `/context/abc`, `` (home) — matches `App.tsx`'s own route suffixes exactly. */
 export function modelNavSectionFor(modelRelativePath: string): ModelNavSection {
@@ -18,6 +18,7 @@ export function modelNavSectionFor(modelRelativePath: string): ModelNavSection {
   if (path.startsWith('/capability-map')) return 'capability-map';
   if (path.startsWith('/landscape') || path.startsWith('/context/') || path.startsWith('/container/')) return 'landscape';
   if (path.startsWith('/changes')) return 'changes';
+  if (path.startsWith('/decisions')) return 'decisions';
   if (path.startsWith('/versions') || path.startsWith('/diff')) return 'versions';
   if (path.startsWith('/review')) return 'review';
   return null;

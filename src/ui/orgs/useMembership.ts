@@ -20,6 +20,7 @@ export {
   canManageOrgSettings,
   canRestoreModel,
   canReviewMergeRequest,
+  canStartDecision,
 } from './roleGates';
 
 export interface UseMembershipResult {

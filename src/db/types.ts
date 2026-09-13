@@ -248,6 +248,92 @@ export interface NotificationRow {
   created_at: string;
 }
 
+// ---------------------------------------------------------------------------
+// Decisions (ADR-013, extended by ADR-022 for prompt pack F3 — see
+// docs/ADR-022-decisions-schema.md and supabase/migrations/20260913110000_decisions.sql
+// for the full column-by-column rationale).
+// ---------------------------------------------------------------------------
+
+export type DecisionStatus = 'proposed' | 'accepted' | 'superseded' | 'rejected';
+export type DecisionArgumentStance = 'for' | 'against' | 'neutral';
+/** SPEC-data-model.md §3.8's own already-corrected value list — `'branch'`, not ADR-013's original `'change_branch'`. An option (F3) is a `decision_links` row with `linked_type: 'branch'` pointing at an `explore`-intent branch (F0) — no separate `decision_options` table. */
+export type DecisionLinkedType = 'element' | 'relationship' | 'branch' | 'assumption' | 'evidence';
+export type AssumptionStatus = 'open' | 'validated' | 'invalidated';
+export type EvidenceKind = 'document' | 'link' | 'capture_job_ref' | 'comment_ref';
+
+/** The literal shape of a row in `decisions`. `decided_by`/`decided_at`/`branch_id` are set only by `atlas.choose_decision_option` (PR5) — never by a plain client update, whatever `status='proposed'` allows for the other columns. */
+export interface DecisionRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  title: string;
+  /** F3's own "context" — ADR-013 named this `statement`; F3 reuses the column rather than adding a second near-duplicate text field. */
+  statement: string;
+  status: DecisionStatus;
+  /** F3's own "owner" — distinct from `decided_by` (who actually closed it). Required at creation. */
+  owner_id: UUID;
+  needed_by: string | null;
+  /** Which health-finding check a "Start a decision" click traced back to (PR6) — a stable string key, never a frozen snapshot of computed finding text. */
+  source_finding_key: string | null;
+  /** F3's own "may cite a Lens map by URL; no shared schema" — a bare column, no FK. */
+  lens_map_url: string | null;
+  decided_by: UUID | null;
+  decided_at: string | null;
+  /** The chosen option's branch, once accepted (PR5). */
+  branch_id: UUID | null;
+  superseded_decision_id: UUID | null;
+  created_by: UUID;
+  created_at: string;
+}
+
+/** The literal shape of a row in `decision_arguments` — a decision's own pro/con list. Written only by `atlas.choose_decision_option` (PR5); no open insert grant exists until then. */
+export interface DecisionArgumentRow {
+  id: UUID;
+  decision_id: UUID;
+  stance: DecisionArgumentStance;
+  body: string;
+  author: UUID;
+  created_at: string;
+}
+
+/** The literal shape of a row in `decision_links` — a polymorphic link from a decision to whatever it concerns (`element`/`relationship`) or offers as an option (`branch`, F3's own options mechanism) or cites (`assumption`/`evidence`). Primary key `(decision_id, linked_type, linked_id)`, so no `id` column of its own. */
+export interface DecisionLinkRow {
+  decision_id: UUID;
+  linked_type: DecisionLinkedType;
+  linked_id: UUID;
+  created_by: UUID;
+  created_at: string;
+}
+
+/** The literal shape of a row in `assumptions` — first-class and independent of any one decision (ADR-013). Schema-complete; no authoring UI ships this sprint (CLAUDE.md rule 7). */
+export interface AssumptionRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  statement: string;
+  confidence: number;
+  status: AssumptionStatus;
+  owner: UUID | null;
+  /** Set true on every linked decision when this assumption's own status changes (the "re-review nudge") — the mechanism that actually sets this is unbuilt this sprint (ADR-013's own deferred workflow layer). */
+  linked_review_pending: boolean;
+  created_by: UUID;
+  created_at: string;
+}
+
+/** The literal shape of a row in `evidence`. Schema-complete; no authoring UI ships this sprint (CLAUDE.md rule 7). */
+export interface EvidenceRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  kind: EvidenceKind;
+  pointer: string;
+  description: string | null;
+  /** A piece of evidence that is also a capture source is the same row in both roles (SPEC §3.8 amendment) — nullable, since not every piece of evidence originated from the capture pipeline. */
+  source_id: UUID | null;
+  added_by: UUID;
+  added_at: string;
+}
+
 /** The literal shape of a row in `views` (SPEC §3.9, ADR-011) — a saved query, not a saved drawing. */
 export interface ViewRow {
   id: UUID;

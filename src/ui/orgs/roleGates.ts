@@ -123,3 +123,8 @@ export function canManageOrgSettings(role: MemberRole | null): boolean {
 export function canBackfillCapabilityOrder(role: MemberRole | null): boolean {
   return role === 'owner';
 }
+
+/** Prompt pack F3, ADR-022: mirrors `decisions_insert`'s own RLS floor (`supabase/migrations/20260913110000_decisions.sql`) — same as `canCreateChangeBranch`, starting a decision is a lightweight, contributor-level act. */
+export function canStartDecision(role: MemberRole | null): boolean {
+  return canCreateChangeBranch(role);
+}
