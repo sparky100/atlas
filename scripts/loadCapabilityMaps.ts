@@ -10,11 +10,10 @@
  * Run with `pnpm content:load-capability-maps`. Safe to re-run while a
  * map is still `draft`: it's looked up by its own (sector, version) and
  * replaced wholesale (its items/sources deleted and reinserted), never
- * duplicated. Once `published`, re-running against the same file
- * correctly fails — `capability_map_items_guard_immutable`
- * (20260906190000) rejects any further insert/update/delete on that
- * map's items, by design (SPEC §3.10: a published map is fixed history;
- * the fix for wanting different content is a new version, not an edit).
+ * duplicated. A map already `published` is skipped outright — it is fixed
+ * history (SPEC §3.10, `capability_map_items_guard_immutable`,
+ * 20260906190000), so a re-run has nothing to write for it and the fix
+ * for wanting different content is a new version, not an edit.
  *
  * Node-only, not part of the Vite bundle or any Supabase edge function —
  * a one-off content-loading tool, run manually or from CI, the same
@@ -69,6 +68,16 @@ async function loadOne(supabase: ReturnType<typeof createServiceRoleClient>, fil
 
   const existing = await supabase.from('capability_maps').select('id, status').eq('sector', content.sector).eq('version', content.version).maybeSingle();
   if (existing.error) throw new Error(`${label}: ${existing.error.message}`);
+  // A map already `published` is fixed history (SPEC §3.10,
+  // capability_map_items_guard_immutable) — a re-run of this loader has
+  // nothing to write for it, so skip it rather than let the wholesale
+  // delete-then-reinsert below trip the immutability trigger. This is
+  // what makes `pnpm content:load-capability-maps` safe to re-run against
+  // a project that already has published maps on it.
+  if (existing.data?.status === 'published') {
+    console.log(`${label}: already published — skipping (immutable; publish a new version to change it)`);
+    return;
+  }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see src/db/branches.ts's module comment.
   const mapId: string = existing.data?.id ?? randomUUID();
 

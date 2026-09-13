@@ -115,8 +115,9 @@ Re-running is safe **for a draft map**: the loader upserts by
 `(sector, version)`, replacing that map's `capability_map_items`/
 `capability_map_sources` wholesale rather than accumulating duplicates.
 Once a map is published (below), re-running the loader against its
-`(sector, version)` fails loudly instead — publish content by adding a
-new version, not by editing a version that's already out.
+`(sector, version)` skips it (a published map is fixed history) —
+publish content by adding a new version, not by editing a version that's
+already out.
 
 ## Starting a map from a real model (`content:export-capability-map`)
 
