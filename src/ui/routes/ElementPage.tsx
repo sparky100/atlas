@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { ATTRIBUTE_SCHEMA_BY_TYPE } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
-import type { AliasRow, BranchRow, SourceRow } from '../../db/types';
+import type { AliasRow, BranchIntent, BranchRow, SourceRow } from '../../db/types';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { AttributeEditRow } from '../components/AttributeEditRow/AttributeEditRow';
 import { AttributeRow } from '../components/AttributeRow/AttributeRow';
@@ -100,6 +100,11 @@ export function ElementPage() {
   // Sprint 7i item 4: "Propose a change" — the contributor-at-main path
   // `ElementHeader.tsx`'s own former comment named as a real, named gap.
   const [proposingChange, setProposingChange] = useState(false);
+  // Prompt pack F0: "element page → correct or propose" — `correct` is the
+  // more common reason to be fixing something from an element's own page
+  // (provenance work), so it's the default; a one-line toggle switches to
+  // `propose` for a genuine future plan started from here.
+  const [proposeChangeIntent, setProposeChangeIntent] = useState<BranchIntent>('correct');
   // Prompt 7k item 5: "Retire…"/"Remove from model…" — same inline-panel
   // convention as `proposingChange` above, one at a time (opening either
   // closes the other, same as `editor`'s own idle/editing exclusivity).
@@ -270,11 +275,21 @@ export function ElementPage() {
             )}
             {proposingChange && (
               <Panel>
+                {/* Prompt pack F0: "element page → correct or propose" — a one-line toggle between the two, correct the default (see this state's own comment). */}
+                <div className={styles.intentToggle ?? ''}>
+                  <Button variant={proposeChangeIntent === 'correct' ? 'primary' : 'ghost'} onClick={() => { setProposeChangeIntent('correct'); }}>
+                    Correct the record
+                  </Button>
+                  <Button variant={proposeChangeIntent === 'propose' ? 'primary' : 'ghost'} onClick={() => { setProposeChangeIntent('propose'); }}>
+                    Propose a plan
+                  </Button>
+                </div>
                 <ProposeChangePicker
                   modelId={model.id}
                   orgId={organisation?.id ?? ''}
                   userId={userId}
-                  defaultDescription={`Proposes a change to ${state.data.element.name}`}
+                  defaultDescription={`${proposeChangeIntent === 'correct' ? 'Corrects' : 'Proposes a change to'} ${state.data.element.name}`}
+                  defaultIntent={proposeChangeIntent}
                   onChosen={(branch) => {
                     setProposingChange(false);
                     void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/e/${elementId ?? ''}?ref=${refParamOf({ kind: 'branch', branchId: branch.id })}`);
@@ -476,6 +491,7 @@ const PLACEHOLDER_BRANCH: BranchRow = {
   cancelled_at: null,
   cancelled_by: null,
   dismissed_identity_pairs: [],
+  intent: null,
 };
 
 /** Sprint U4-1 D1: "alias moves into attributes" — each alias renders as its own read-only row, same shape as any other attribute (`aliasAsFact` gives `AttributeRow` a `FactsRow` to work with), labelled by its real `alias_type` (`ALIAS_TYPE_LABELS`) rather than the header's old single undifferentiated "aka" bucket. Appended after the schema-driven fields — an alias is always additional identifying information, never a substitute for one of them. */

@@ -117,6 +117,11 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         ...(branch.target_date ? { targetDate: branch.target_date } : {}),
         createdBy: userId ?? '',
         mainHeadCommitId: main.head_commit_id,
+        // Prompt pack F0: a duplicate keeps its source branch's own intent
+        // — `branch.intent` is only ever `null` for a non-`change` kind,
+        // which this action never duplicates from, but the fallback keeps
+        // this call exhaustive over `BranchIntent` regardless.
+        intent: branch.intent ?? 'propose',
       });
       // Same "lands you inside, editing" convention `ChangesView.tsx`'s own
       // create form already establishes — a duplicate is a fresh draft the

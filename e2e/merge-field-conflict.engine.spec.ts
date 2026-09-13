@@ -36,7 +36,7 @@ test('a field conflict renders with its three-way context, resolves with one cli
 
   // The change branch: forks at the seed commit, then edits vendor independently of main.
   const branchId = randomUUID();
-  await createChangeBranch(signedIn, { id: branchId, orgId, modelId, name: 'change-vendor', title: 'Change the vendor', createdBy: userId, mainHeadCommitId: seedCommitId });
+  await createChangeBranch(signedIn, { id: branchId, orgId, modelId, name: 'change-vendor', title: 'Change the vendor', createdBy: userId, intent: 'propose', mainHeadCommitId: seedCommitId });
 
   const branchEnvelope: CommitEnvelope = {
     id: randomUUID(),

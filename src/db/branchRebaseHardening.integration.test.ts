@@ -65,7 +65,7 @@ describe('BranchRebasePanel hardening against a real local Supabase (S1 item 16)
   it('dismiss_identity_pair_on_branch persists across a fresh fetch, and dismissing the same pair twice is a no-op', async () => {
     const main = await getMainBranch(alice.client, modelId);
     if (!main?.head_commit_id) throw new Error('main branch not found');
-    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `identity-dismiss-${randomUUID().slice(0, 8)}`, createdBy: alice.id, mainHeadCommitId: main.head_commit_id });
+    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `identity-dismiss-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'propose', mainHeadCommitId: main.head_commit_id });
     expect(branch.dismissed_identity_pairs).toEqual([]);
 
     const pairKey = ['element-a', 'element-b'].sort().join(' ');
@@ -87,7 +87,7 @@ describe('BranchRebasePanel hardening against a real local Supabase (S1 item 16)
   it('a viewer cannot see a draft change branch, and can once it is shared_for_review', async () => {
     const main = await getMainBranch(alice.client, modelId);
     if (!main?.head_commit_id) throw new Error('main branch not found');
-    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `viewer-visibility-${randomUUID().slice(0, 8)}`, createdBy: alice.id, mainHeadCommitId: main.head_commit_id });
+    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `viewer-visibility-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'propose', mainHeadCommitId: main.head_commit_id });
     expect(branch.shared_for_review).toBe(false);
 
     // SPEC §10.2/P-23: a viewer sees main, tagged commits, and

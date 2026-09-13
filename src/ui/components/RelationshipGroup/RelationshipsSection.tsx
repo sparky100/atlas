@@ -483,4 +483,5 @@ const PLACEHOLDER_BRANCH: BranchRow = {
   cancelled_at: null,
   cancelled_by: null,
   dismissed_identity_pairs: [],
+  intent: null,
 };

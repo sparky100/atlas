@@ -10,6 +10,8 @@ import type { UUID } from '../../contracts/delta';
 import type { MemberRole } from '../../db/types';
 import { formatDate } from '../time';
 import { branchStatusTone } from '../changes/branchStatus';
+import { defaultIntentForEntryPoint } from '../changes/branchIntent';
+import type { BranchIntent } from '../../db/types';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { attributesRecord } from '../elements/attributesRecord';
 import { ProposeChangePicker } from './ProposeChangePicker';
@@ -43,7 +45,12 @@ export interface DirectorHomeProps {
  */
 export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSlug, modelSlug }: DirectorHomeProps) {
   const capabilityMapHref = `/o/${orgSlug}/m/${modelSlug}/capability-map`;
-  const [proposingChange, setProposingChange] = useState(false);
+  // Prompt pack F0: which entry point (if either) is currently open, and
+  // therefore which intent the picker it opens should default to —
+  // `null` means neither is open. A single piece of state rather than two
+  // booleans, since only one of "Propose a change"/"What happened" can be
+  // open at a time.
+  const [changeEntryIntent, setChangeEntryIntent] = useState<BranchIntent | null>(null);
   const navigate = useNavigate();
   const canPropose = canCreateChangeBranch(role);
 
@@ -110,29 +117,41 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
               {data.openChanges.length} open{data.nextTargetDate ? ` · next target ${formatDate(data.nextTargetDate)}` : ''}
             </Text>
             {canPropose && (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setProposingChange(true);
-                }}
-              >
-                Propose a change
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setChangeEntryIntent(defaultIntentForEntryPoint('directorDoor'));
+                  }}
+                >
+                  Propose a change
+                </Button>
+                {/* Prompt pack F0's own "'what happened' → record" entry point — genuinely new, no prior surface for it anywhere in this app. Same gate as "Propose a change" (a lightweight, contributor-level act like opening any other change). */}
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setChangeEntryIntent(defaultIntentForEntryPoint('whatHappened'));
+                  }}
+                >
+                  What happened
+                </Button>
+              </>
             )}
           </div>
-          {proposingChange && (
+          {changeEntryIntent && (
             <Panel>
               <ProposeChangePicker
                 modelId={modelId}
                 orgId={orgId}
                 userId={userId}
+                defaultIntent={changeEntryIntent}
                 onChosen={(branch) => {
-                  setProposingChange(false);
+                  setChangeEntryIntent(null);
                   // ChangePage.tsx routes on the branch id in the path itself, not `?ref=` — there's nothing to select once you're already on that change's own page.
                   void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`);
                 }}
                 onCancel={() => {
-                  setProposingChange(false);
+                  setChangeEntryIntent(null);
                 }}
               />
             </Panel>

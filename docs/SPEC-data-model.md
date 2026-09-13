@@ -259,10 +259,11 @@ A named mutable pointer to a commit (ADR-002).
 | `description` | text | nullable; change branches: free-text description of the change, set at creation |
 | `target_date` | date | nullable; change branches: the intended delivery date shown on the change page and roadmap |
 | `split_from` | uuid | → `branches(id)`, nullable; set only on a branch created by partial acceptance in the review queue (§1 S-22, ADR-006 amendment) — the branch it was split out of |
+| `intent` | text | nullable, `check (intent is null or intent in ('record','propose','correct','explore'))`; prompt pack F0 — the change's own "why," set at creation, editable only while `status = 'draft'` (`atlas.guard_branch_intent_update`) |
 | `created_by` | uuid | → `auth.users(id)` |
 | `updated_at` | timestamptz | not null |
 
-Partial unique index `(model_id) where kind = 'main'`. Index `(model_id, status)`. Index `(split_from) where split_from is not null`. Check: `kind = 'main'` ⇒ `status = 'draft'` (main is always open). Check: `kind = 'capture_draft'` ⇒ `status in ('draft','archived')`. Check: `split_from is not null` ⇒ `kind = 'change'`. (ADR-018 removed the old kind-conditional `base_commit_id`/`head_commit_id` nullability checks — both columns are simply `not null` now, for every branch kind, so there is nothing left to check per-kind.)
+Partial unique index `(model_id) where kind = 'main'`. Index `(model_id, status)`. Index `(split_from) where split_from is not null`. Check: `kind = 'main'` ⇒ `status = 'draft'` (main is always open). Check: `kind = 'capture_draft'` ⇒ `status in ('draft','archived')`. Check: `split_from is not null` ⇒ `kind = 'change'`. Check: `(kind = 'change') = (intent is not null)` — every change branch carries an intent, main and capture_draft never do (F0). `atlas.split_branch` carries the split branch's own `intent` forward onto the new branch (a split is a subset of the same change, never a change of purpose). (ADR-018 removed the old kind-conditional `base_commit_id`/`head_commit_id` nullability checks — both columns are simply `not null` now, for every branch kind, so there is nothing left to check per-kind.)
 
 #### `commits`
 An ordered batch of deltas on a branch. Ancestry is a DAG: two parents on a merge (ADR-002).

@@ -59,6 +59,8 @@ export interface ModelRow {
 export type BranchKind = 'main' | 'change' | 'capture_draft';
 /** S1 item 4: `cancelled` — a proposer or owner/architect calling it off from `draft`/`proposed`, via `atlas.cancel_change`; terminal, like `merged`/`rejected`. */
 export type BranchStatus = 'draft' | 'proposed' | 'in_review' | 'approved' | 'merged' | 'rejected' | 'archived' | 'cancelled';
+/** Prompt pack F0 ("change intent — the why"): why a change branch exists, set at creation and editable only while `status === 'draft'` (`atlas.guard_branch_intent_update`, `20260913100000_change_intent.sql`) — `null` for `main`/`capture_draft` branches, never `null` for a `change` one (a DB constraint enforces this pairing). Drives the change workspace's header line, required fields, and review weight (`src/ui/changes/branchIntent.ts`) — never read by `src/engine`, the same stance `BranchStatus` itself takes. */
+export type BranchIntent = 'record' | 'propose' | 'correct' | 'explore';
 
 /**
  * The literal shape of a row in `branches`
@@ -101,6 +103,8 @@ export interface BranchRow {
   cancelled_by: UUID | null;
   /** S1 item 16: identity-warning pairs dismissed on this draft's own rebase panel, before any merge request exists — see `20260913020000_branch_identity_dismissals.sql`'s own comment for why this is a separate column from `MergeRequestRow.dismissed_identity_pairs`. */
   dismissed_identity_pairs: string[];
+  /** Prompt pack F0: `null` for `main`/`capture_draft`; always set for a `change` branch. See `BranchIntent`'s own doc comment. */
+  intent: BranchIntent | null;
 }
 
 export type MergeRequestStatus = 'pending' | 'changes_requested' | 'approved' | 'merged' | 'rejected';

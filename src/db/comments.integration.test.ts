@@ -218,7 +218,7 @@ describe('comments, mentions, notifications, and realtime against a real local S
   it('a viewer cannot see a comment anchored to an element that only exists on a draft (non-shared) branch, but a contributor can', async () => {
     const main = await getMainBranch(alice.client, modelId);
     if (!main?.head_commit_id) throw new Error('main branch not found');
-    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: 'viewer-visibility-check', createdBy: alice.id, mainHeadCommitId: main.head_commit_id });
+    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: 'viewer-visibility-check', createdBy: alice.id, intent: 'propose', mainHeadCommitId: main.head_commit_id });
     if (!branch.head_commit_id) throw new Error('branch has no head at creation');
 
     const elementId = randomUUID();
@@ -295,7 +295,7 @@ describe('comments, mentions, notifications, and realtime against a real local S
   it('a comment on a branch element survives merge to main, still listed on the element, and becomes visible to a viewer once merged', async () => {
     const main = await getMainBranch(alice.client, modelId);
     if (!main?.head_commit_id) throw new Error('main branch not found');
-    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: 'comment-survives-merge', createdBy: alice.id, mainHeadCommitId: main.head_commit_id });
+    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: 'comment-survives-merge', createdBy: alice.id, intent: 'propose', mainHeadCommitId: main.head_commit_id });
     if (!branch.head_commit_id) throw new Error('branch has no head at creation');
 
     const elementId = randomUUID();
@@ -361,7 +361,7 @@ describe('comments, mentions, notifications, and realtime against a real local S
   it('a comment on a branch element is unchanged by a refresh (rebase) pulling main forward', async () => {
     const mainBeforeFork = await getMainBranch(alice.client, modelId);
     if (!mainBeforeFork?.head_commit_id) throw new Error('main branch not found');
-    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: 'comment-survives-refresh', createdBy: alice.id, mainHeadCommitId: mainBeforeFork.head_commit_id });
+    const branch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: 'comment-survives-refresh', createdBy: alice.id, intent: 'propose', mainHeadCommitId: mainBeforeFork.head_commit_id });
     if (!branch.head_commit_id) throw new Error('branch has no head at creation');
 
     const elementId = randomUUID();

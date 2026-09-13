@@ -150,7 +150,7 @@ test('a failed save surfaces its error in the UI instead of leaving the editor o
   const { signedIn, orgId, orgSlug, modelId, modelSlug, userId, seedCommitId, createDeltaId, seedSourceId, systemId } = fixture;
 
   const branchId = randomUUID();
-  await createChangeBranch(signedIn, { id: branchId, orgId, modelId, name: 'race-vendor', title: 'Race the vendor field', createdBy: userId, mainHeadCommitId: seedCommitId });
+  await createChangeBranch(signedIn, { id: branchId, orgId, modelId, name: 'race-vendor', title: 'Race the vendor field', createdBy: userId, intent: 'propose', mainHeadCommitId: seedCommitId });
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=branch:${branchId}`);
   await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible();

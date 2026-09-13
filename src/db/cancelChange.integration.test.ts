@@ -69,7 +69,7 @@ describe('cancel a change against a real local Supabase', () => {
     const main = await getMainBranch(owner.client, modelId);
     if (!main) throw new Error('main branch missing');
     const branchId = randomUUID();
-    await createChangeBranch(createdBy.client, { id: branchId, orgId, modelId, name: `doomed-${randomUUID().slice(0, 8)}`, createdBy: createdBy.id, mainHeadCommitId: main.head_commit_id });
+    await createChangeBranch(createdBy.client, { id: branchId, orgId, modelId, name: `doomed-${randomUUID().slice(0, 8)}`, createdBy: createdBy.id, intent: 'propose', mainHeadCommitId: main.head_commit_id });
     return branchId;
   }
 

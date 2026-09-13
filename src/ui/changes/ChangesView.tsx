@@ -12,8 +12,9 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { useThreadCounts } from '../comments/useThreadCounts';
-import type { BranchRow } from '../../db/types';
+import type { BranchIntent, BranchRow } from '../../db/types';
 import { branchStatusTone } from './branchStatus';
+import { INTENT_OPTIONS } from './branchIntent';
 import { useChangeSummaries } from './useChangeSummaries';
 import { useChanges } from './useChanges';
 import styles from './ChangesView.module.css';
@@ -45,6 +46,10 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [targetDate, setTargetDate] = useState('');
+  // Prompt pack F0: this form's own "New change" surface is the one entry
+  // point with no fixed default per `branchIntent.ts`'s own
+  // `defaultIntentForEntryPoint` doc comment — the person picks explicitly.
+  const [intent, setIntent] = useState<BranchIntent>('propose');
   // Changes list unresolved count (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s
   // 6b: "the meta row: branch status chip, Target: YYYY-MM-DD, and the
   // unresolved count") — `anchor_type = 'change'` counts key on the same
@@ -76,12 +81,13 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
             className={styles.form}
             onSubmit={(e) => {
               e.preventDefault();
-              void createChange({ name, title, description, targetDate }).then((branch) => {
+              void createChange({ name, title, description, targetDate, intent }).then((branch) => {
                 if (branch) {
                   setName('');
                   setTitle('');
                   setDescription('');
                   setTargetDate('');
+                  setIntent('propose');
                   // "The create-change flow lands you inside" — a freshly
                   // created change is always `draft`, so unlike
                   // `ChangePage.tsx`'s own "Edit in this change" there is no
@@ -123,6 +129,26 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
               }}
               disabled={!mainHeadCommitId}
             />
+            {/* Prompt pack F0: no fixed default for this one surface (see `intent`'s own state comment) — an explicit choice, always. */}
+            <div className={styles.formRow}>
+              <Text as="label" size="sm" tone="muted">
+                Why
+              </Text>
+              <select
+                className={styles.input}
+                value={intent}
+                onChange={(e) => {
+                  setIntent(e.target.value as BranchIntent);
+                }}
+                disabled={!mainHeadCommitId}
+              >
+                {INTENT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className={styles.formRow}>
               <Text as="label" size="sm" tone="muted">
                 Target date
