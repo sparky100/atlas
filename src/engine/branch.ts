@@ -11,7 +11,7 @@
  * branch id it would need to look up.
  */
 
-import type { Delta, UUID } from '../contracts/delta';
+import type { CommitKind, Delta, UUID } from '../contracts/delta';
 import type { FactRow, Head } from './deltas';
 import { EngineError } from './errors';
 import { ancestry, exclusive, foldFromGenesis, mustLoadCommit, topo, type CommitLoader } from './head';
@@ -48,10 +48,24 @@ export function toBe(branch: BranchFork, loader: CommitLoader): Head {
   return foldFromGenesis(branch.headCommitId, loader);
 }
 
+/** One of the branch's own deltas, tagged with the kind of commit it came from — `listSplitCandidateOrigins` (splitClosure.ts, ADR-021 §5 item 4) needs this to tell a `preparation` commit's mechanical deltas apart from a real edit. */
+export interface OwnDeltaOrigin {
+  delta: Delta;
+  commitKind: CommitKind;
+}
+
+/** Every delta the branch itself has introduced since its fork point, tagged with its originating commit's kind, in dependency order — not main's. */
+export function listOwnDeltaOrigins(branch: BranchFork, loader: CommitLoader): OwnDeltaOrigin[] {
+  const ownCommitIds = topo(exclusive(branch.headCommitId, branch.baseCommitId, loader), loader);
+  return ownCommitIds.flatMap((id) => {
+    const node = mustLoadCommit(id, loader);
+    return node.deltas.map((delta) => ({ delta, commitKind: node.kind }));
+  });
+}
+
 /** Every delta the branch itself has introduced since its fork point, in dependency order — not main's. */
 export function listOwnDeltas(branch: BranchFork, loader: CommitLoader): Delta[] {
-  const ownCommitIds = topo(exclusive(branch.headCommitId, branch.baseCommitId, loader), loader);
-  return ownCommitIds.flatMap((id) => [...mustLoadCommit(id, loader).deltas]);
+  return listOwnDeltaOrigins(branch, loader).map((o) => o.delta);
 }
 
 // ---------------------------------------------------------------------------

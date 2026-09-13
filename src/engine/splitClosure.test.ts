@@ -3,8 +3,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Delta, UUID } from '../contracts/delta';
-import { emptyHead, fold, type CommitContext, type Head } from './deltas';
+import type { OwnDeltaOrigin } from './branch';
+import { cloneHead, emptyHead, fold, type CommitContext, type Head } from './deltas';
 import { buildSplitDeltas, computeSplitClosure } from './splitClosure';
+
+function asOrigins(deltas: readonly Delta[]): OwnDeltaOrigin[] {
+  return deltas.map((delta) => ({ delta, commitKind: 'manual' }));
+}
 
 const ctx: CommitContext = { authorId: 'author-1', createdAt: '2026-01-01T00:00:00.000Z' };
 
@@ -133,7 +138,7 @@ describe('buildSplitDeltas', () => {
     const closure = computeSplitClosure(branchDeltas, emptyHead(), new Set(['sys-a']));
     let i = 0;
     const fresh: UUID[] = ['fresh-1', 'fresh-2'];
-    const built = buildSplitDeltas(branchDeltas, closure, () => {
+    const built = buildSplitDeltas(asOrigins(branchDeltas), closure, emptyHead(), () => {
       const id = fresh[i];
       i += 1;
       if (!id) throw new Error('ran out of fresh ids');
@@ -150,7 +155,7 @@ describe('buildSplitDeltas', () => {
     const closure = computeSplitClosure(branchDeltas, emptyHead(), new Set(['sys-a']));
     let i = 0;
     const fresh: UUID[] = ['fresh-create', 'fresh-update'];
-    const built = buildSplitDeltas(branchDeltas, closure, () => {
+    const built = buildSplitDeltas(asOrigins(branchDeltas), closure, emptyHead(), () => {
       const id = fresh[i];
       i += 1;
       if (!id) throw new Error('ran out of fresh ids');
@@ -159,10 +164,13 @@ describe('buildSplitDeltas', () => {
     expect(built[1]).toMatchObject({ id: 'fresh-update', previousDeltaId: 'fresh-create' });
   });
 
-  it('leaves previousDeltaId untouched when it points outside the split — the merge base already has that delta', () => {
+  it('re-anchors previousDeltaId to the merge base\'s own currently-asserting delta when it points outside the split', () => {
+    // sys-a already exists at the merge base (created there as 'base-create') — the branch only updates it.
+    const baseHead = fold(emptyHead(), [createSystem('base-create', 'sys-a', 'A')], ctx);
     const branchDeltas: Delta[] = [{ kind: 'element.update', id: 'd1', elementId: 'sys-a', elementType: 'system', attribute: 'name', value: 'Renamed', previousDeltaId: 'base-create', sourceId: 'src', confidence: 1 }];
-    const closure = computeSplitClosure(branchDeltas, emptyHead(), new Set(['sys-a']));
-    const built = buildSplitDeltas(branchDeltas, closure, () => 'fresh-1');
+    const closure = computeSplitClosure(branchDeltas, baseHead, new Set(['sys-a']));
+    const built = buildSplitDeltas(asOrigins(branchDeltas), closure, baseHead, () => 'fresh-1');
+    // 'base-create' is exactly what the merge base currently asserts for sys-a's name — re-anchoring lands on the same id the original branch delta already had, for this untouched-by-anyone-else case.
     expect(built[0]).toMatchObject({ id: 'fresh-1', previousDeltaId: 'base-create' });
   });
 
@@ -171,9 +179,63 @@ describe('buildSplitDeltas', () => {
     const branchDeltas: Delta[] = [createSystem('d1', 'sys-a', 'A'), createSystem('d2', 'sys-b', 'B'), createUses('d3', 'rel-1', 'sys-a', 'sys-b')];
     const closure = computeSplitClosure(branchDeltas, baseHead, new Set(['rel-1']));
     let i = 0;
-    const built = buildSplitDeltas(branchDeltas, closure, () => `fresh-${String((i += 1))}`);
+    const built = buildSplitDeltas(asOrigins(branchDeltas), closure, baseHead, () => `fresh-${String((i += 1))}`);
     const folded = fold(emptyHead(), built, ctx);
     expect(folded.elements.size).toBe(2);
     expect(folded.relationships.size).toBe(1);
+  });
+
+  describe('after a resolved refresh (ADR-021 §5 item 4, §1.3.3)', () => {
+    // Base: E, F. Our own branch retracts E. Main independently creates a
+    // `uses` relationship F -> E — the exact shape issue #76 named. The
+    // refresh resolves it; the branch's own delta history (what
+    // listOwnDeltaOrigins would return) now literally contains
+    // [retract(e), restore(e)_prep, ...decision deltas]. The split's own
+    // merge base is main's *current* head (post-refresh) — which already
+    // has E live and the relationship F->E live, since main's own commits
+    // are now part of it.
+    const eAndF: Delta[] = [createSystem('d0', 'e', 'E'), createSystem('d1', 'f', 'F')];
+    const mainCreatesRel: Delta = createUses('d-main-rel', 'r', 'f', 'e');
+    const newMainHead = fold(emptyHead(), [...eAndF, mainCreatesRel], ctx);
+
+    it('keep-retraction: the original retract and the preparation restore both collapse away; only the final retract (re-anchored) and the relationship retract survive', () => {
+      const origins: OwnDeltaOrigin[] = [
+        { delta: retractEl('d-ours-retract', 'e', 'system', 'd0'), commitKind: 'manual' },
+        { delta: { kind: 'element.restore', id: 'd-p-restore', elementId: 'e', elementType: 'system', previousDeltaId: 'd-ours-retract', sourceId: 'src', confidence: 1 }, commitKind: 'preparation' },
+        { delta: retractRel('d-m-rretract', 'r', 'uses', 'd-main-rel'), commitKind: 'merge' },
+        { delta: retractEl('d-m-final-retract', 'e', 'system', 'd-p-restore'), commitKind: 'merge' },
+      ];
+      const closure = computeSplitClosure(
+        origins.map((o) => o.delta),
+        newMainHead,
+        new Set(['e', 'r']),
+      );
+      let i = 0;
+      const built = buildSplitDeltas(origins, closure, newMainHead, () => `fresh-${String((i += 1))}`);
+
+      expect(built.map((d) => d.kind)).toEqual(['relationship.retract', 'element.retract']);
+      expect(built[1]).toMatchObject({ elementId: 'e', previousDeltaId: 'd0' }); // re-anchored to the new base's own exists-delta, not the (now-collapsed) preparation restore
+
+      const folded = fold(cloneHead(newMainHead), built, ctx);
+      expect(folded.elements.has('e')).toBe(false);
+      expect(folded.relationships.has('r')).toBe(false);
+    });
+
+    it('keep-element: the whole existence chain collapses to nothing — main already holds exactly what the branch ends up wanting', () => {
+      const origins: OwnDeltaOrigin[] = [
+        { delta: retractEl('d-ours-retract', 'e', 'system', 'd0'), commitKind: 'manual' },
+        { delta: { kind: 'element.restore', id: 'd-p-restore', elementId: 'e', elementType: 'system', previousDeltaId: 'd-ours-retract', sourceId: 'src', confidence: 1 }, commitKind: 'preparation' },
+        // keep-element: no merge-own deltas at all for e.
+      ];
+      const closure = computeSplitClosure(
+        origins.map((o) => o.delta),
+        newMainHead,
+        new Set(['e']),
+      );
+      const built = buildSplitDeltas(origins, closure, newMainHead, () => 'fresh-1');
+
+      expect(built).toEqual([]);
+      expect(() => fold(newMainHead, built, ctx)).not.toThrow();
+    });
   });
 });
