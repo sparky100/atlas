@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allTilesOf, anchorFor, computeContextDiagramLayout, MODULE_WIDTH, type DiagramTile, type DiagramUnitInput } from './contextDiagramLayout';
+import { allTilesOf, anchorFor, computeContextDiagramLayout, curveBetween, MODULE_WIDTH, tileTopAnchor, type DiagramTile, type DiagramUnitInput } from './contextDiagramLayout';
 import { NODE_HEIGHT, NODE_WIDTH } from '../landscape/layout';
 
 function unit(elementId: string, modules: { elementId: string; capabilityName: string | null }[] = []): DiagramUnitInput {
@@ -107,29 +107,111 @@ describe('allTilesOf', () => {
 });
 
 describe('anchorFor', () => {
-  it('anchors to a specific module sub-tile when the edge endpoint names that module', () => {
+  it("anchors to a specific module sub-tile's own bottom edge when the edge endpoint names that module — V1 polish: \"entering module tiles from below\"", () => {
     const layout = computeContextDiagramLayout(unit('sap', [{ elementId: 'fi', capabilityName: 'Finance' }, { elementId: 'pm', capabilityName: null }]), [], []);
-    const towards = { x: layout.hub.x + layout.hub.w / 2, y: layout.hub.y + layout.hub.h + 200 };
-    const anchor = anchorFor(layout.hub, 'fi', towards);
+    const anchor = anchorFor(layout.hub, 'fi');
     expect(anchor.isPlatformFallback).toBe(false);
     const fiModule = layout.hub.modules?.find((m) => m.elementId === 'fi');
     expect(anchor.x).toBeCloseTo((fiModule?.x ?? 0) + MODULE_WIDTH / 2);
+    expect(anchor.y).toBeCloseTo((fiModule?.y ?? 0) + (fiModule?.h ?? 0));
   });
 
-  it('falls back to a point on the platform tile\'s own boundary, flagged, when the edge endpoint is the platform itself — V1 fix: never the tile\'s interior centre, which used to draw the line and marker through the module row', () => {
+  it("falls back to the platform tile's own bottom edge, flagged, when the edge endpoint is the platform itself", () => {
     const layout = computeContextDiagramLayout(unit('sap', [{ elementId: 'fi', capabilityName: 'Finance' }]), [], []);
-    const towards = { x: layout.hub.x + layout.hub.w / 2, y: layout.hub.y + layout.hub.h + 200 };
-    const anchor = anchorFor(layout.hub, 'sap', towards);
+    const anchor = anchorFor(layout.hub, 'sap');
     expect(anchor.isPlatformFallback).toBe(true);
-    // On the tile's own bottom edge (facing `towards`, which sits straight below), not its interior centre.
     expect(anchor.y).toBeCloseTo(layout.hub.y + layout.hub.h);
     expect(anchor.x).toBeCloseTo(layout.hub.x + layout.hub.w / 2);
   });
 
-  it('is never flagged as a platform fallback for a plain (no-module) tile', () => {
+  it("is never flagged as a platform fallback for a plain (no-module) tile, and still anchors at its own bottom edge", () => {
     const layout = computeContextDiagramLayout(unit('hub'), [], []);
-    const towards = { x: layout.hub.x + layout.hub.w + 200, y: layout.hub.y };
-    const anchor = anchorFor(layout.hub, 'hub', towards);
+    const anchor = anchorFor(layout.hub, 'hub');
     expect(anchor.isPlatformFallback).toBe(false);
+    expect(anchor.y).toBeCloseTo(layout.hub.y + layout.hub.h);
+  });
+});
+
+describe('tileTopAnchor', () => {
+  it("V1 polish, \"leaving neighbours from above\": anchors at a tile's own top-centre", () => {
+    const layout = computeContextDiagramLayout(unit('hub'), [unit('n1')], []);
+    const neighbour = layout.internalNeighbours[0];
+    if (!neighbour) throw new Error('expected a neighbour tile');
+    const anchor = tileTopAnchor(neighbour);
+    expect(anchor).toEqual({ x: neighbour.x + neighbour.w / 2, y: neighbour.y });
+  });
+});
+
+describe('curveBetween', () => {
+  it("has vertical tangents at both ends (cp1 shares lower's x, cp2 shares upper's x)", () => {
+    const lower = { x: 100, y: 300 };
+    const upper = { x: 160, y: 200 };
+    const curve = curveBetween(lower, upper);
+    expect(curve.cp1.x).toBe(lower.x);
+    expect(curve.cp2.x).toBe(upper.x);
+    expect(curve.cp1.y).toBe(curve.cp2.y);
+  });
+
+  it("V1 polish, \"label pill on the free segment\": the midpoint always sits exactly halfway between lower.y and upper.y, regardless of x offset", () => {
+    const lower = { x: 40, y: 400 };
+    const upper = { x: 260, y: 120 };
+    const curve = curveBetween(lower, upper);
+    expect(curve.mid.y).toBeCloseTo((lower.y + upper.y) / 2);
+    expect(curve.mid.x).toBeCloseTo((lower.x + upper.x) / 2);
+  });
+
+  it('collapses to a dead-straight vertical line when lower and upper already share an x (the common case: a neighbour column-aligned under its own module)', () => {
+    const lower = { x: 150, y: 400 };
+    const upper = { x: 150, y: 200 };
+    const curve = curveBetween(lower, upper);
+    expect(curve.cp1.x).toBe(150);
+    expect(curve.cp2.x).toBe(150);
+    expect(curve.mid.x).toBe(150);
+  });
+});
+
+describe('layoutNeighbourBand (via computeContextDiagramLayout)', () => {
+  it('V1 polish, "neighbour columns spaced beneath the module they connect to": a neighbour attached to a module is centred directly under that module, not packed into a generic wrapped row', () => {
+    const sap = unit('sap', [{ elementId: 'fi', capabilityName: 'Finance' }, { elementId: 'pm', capabilityName: 'Asset Management' }]);
+    const n1 = { ...unit('n1'), attachedToModuleId: 'pm' };
+    const layout = computeContextDiagramLayout(sap, [n1], []);
+    const pmModule = layout.hub.modules?.find((m) => m.elementId === 'pm');
+    const n1Tile = layout.internalNeighbours.find((t) => t.elementId === 'n1');
+    expect(n1Tile).toBeDefined();
+    expect(n1Tile?.x).toBeCloseTo((pmModule?.x ?? 0) + (pmModule?.w ?? 0) / 2 - (n1Tile?.w ?? 0) / 2);
+  });
+
+  it('stacks two neighbours attached to the same module vertically, both still centred under it', () => {
+    const sap = unit('sap', [{ elementId: 'fi', capabilityName: 'Finance' }]);
+    const n1 = { ...unit('n1'), attachedToModuleId: 'fi' };
+    const n2 = { ...unit('n2'), attachedToModuleId: 'fi' };
+    const layout = computeContextDiagramLayout(sap, [n1, n2], []);
+    const fiModule = layout.hub.modules?.find((m) => m.elementId === 'fi');
+    const t1 = layout.internalNeighbours.find((t) => t.elementId === 'n1');
+    const t2 = layout.internalNeighbours.find((t) => t.elementId === 'n2');
+    expect(t1?.x).toBeCloseTo(t2?.x ?? 0);
+    expect(t1?.x).toBeCloseTo((fiModule?.x ?? 0) + (fiModule?.w ?? 0) / 2 - (t1?.w ?? 0) / 2);
+    expect(t1?.y).not.toBeCloseTo(t2?.y ?? 0);
+  });
+
+  it('an unattached neighbour still lays out via the centre-weighted band, below any module columns, never overlapping them', () => {
+    const sap = unit('sap', [{ elementId: 'fi', capabilityName: 'Finance' }]);
+    const attached = { ...unit('n1'), attachedToModuleId: 'fi' };
+    const unattached = unit('n2'); // no attachedToModuleId — e.g. an edge straight to the platform itself
+    const layout = computeContextDiagramLayout(sap, [attached, unattached], []);
+    const attachedTile = layout.internalNeighbours.find((t) => t.elementId === 'n1');
+    const unattachedTile = layout.internalNeighbours.find((t) => t.elementId === 'n2');
+    expect(attachedTile).toBeDefined();
+    expect(unattachedTile).toBeDefined();
+    // The unattached tile never occupies the same y-band as the attached column's own tile.
+    const overlapsVertically = (attachedTile?.y ?? 0) < (unattachedTile?.y ?? 0) + (unattachedTile?.h ?? 0) && (unattachedTile?.y ?? 0) < (attachedTile?.y ?? 0) + (attachedTile?.h ?? 0);
+    expect(overlapsVertically).toBe(false);
+  });
+
+  it('with no hub modules at all, every neighbour is unattached and this reduces to the plain centre-weighted band — no regression for an ordinary (non-platform) hub', () => {
+    const layout = computeContextDiagramLayout(unit('hub'), [unit('n1'), unit('n2'), unit('n3')], []);
+    expect(layout.internalNeighbours).toHaveLength(3);
+    const ys = new Set(layout.internalNeighbours.map((t) => t.y));
+    expect(ys.size).toBe(1); // one plain row, same as before this polish
   });
 });

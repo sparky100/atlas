@@ -55,10 +55,18 @@ const PLATFORM_TITLE_HEIGHT = 68;
 
 const TILE_GUTTER_X = 24;
 const TILE_GUTTER_Y = 20;
-const ROW_GUTTER_Y = 32;
+/**
+ * V1 polish: was 32 — the gap between the hub/module row and the internal
+ * neighbour row. Edges now curve through this gap (`curveBetween`) with a
+ * label pill sitting at its own vertical midpoint (`ContextDiagramCanvas.tsx`'s
+ * own drawing code) — 32px was tight for a pill plus curve clearance, so
+ * this grew enough to hold both comfortably.
+ */
+const ROW_GUTTER_Y = 56;
 const PADDING = 32;
 export const BOUNDARY_MARGIN = 8;
-const EXTERNAL_GUTTER_Y = 32;
+/** V1 polish: was 32 — see `ROW_GUTTER_Y`'s own comment; the same reasoning applies to the boundary→external gap. */
+const EXTERNAL_GUTTER_Y = 56;
 export const MIN_DIAGRAM_WIDTH = 960;
 
 export interface ModuleTile {
@@ -122,6 +130,17 @@ export interface DiagramUnitInput {
   elementId: UUID;
   /** This unit's own modules (empty for a plain system/actor/container, or a platform with none yet) — see `ContextDiagramCanvas.tsx`'s own caller for how these come from `contextDiagramData.ts`'s `buildPlatformModulesById`. */
   modules: readonly { elementId: UUID; capabilityName: string | null }[];
+  /**
+   * V1 polish, "neighbour columns spaced beneath the module they connect
+   * to": a neighbour unit's own hint of which one of the *hub's* modules it
+   * should be column-aligned under — the hub module id every one of this
+   * neighbour's edges attaches to, when they all agree on the same one
+   * (`ContextDiagramCanvas.tsx`'s own `attachedModuleIdFor`), else `null`
+   * (unattached — the hub isn't a platform, the edge attaches to the
+   * platform itself rather than a module, or the neighbour has edges to two
+   * *different* modules). Meaningless on the hub's own unit; ignored there.
+   */
+  attachedToModuleId?: UUID | null;
 }
 
 function byElementId(a: DiagramUnitInput, b: DiagramUnitInput): number {
@@ -182,6 +201,65 @@ function packRow(units: readonly DiagramUnitInput[], top: number, availableWidth
 }
 
 /**
+ * V1 polish, "neighbour columns spaced beneath the module they connect to,
+ * edges never crossing tiles": when the hub is a platform with modules, a
+ * neighbour that names one of those modules on every one of its edges
+ * (`unit.attachedToModuleId`) is placed in its own column, centred directly
+ * under that module — stacked vertically with any other neighbour sharing
+ * the same module, in module x-order — rather than packed into a generic
+ * wrapped row. Since the module sits directly above, the edge between them
+ * (`curveBetween`, `ContextDiagramCanvas.tsx`) is a straight vertical run
+ * through open space, never crossing another tile.
+ *
+ * A neighbour with no such single module (an ordinary, non-platform hub —
+ * every neighbour is unattached then — or a genuine edge straight to the
+ * platform itself, or one with edges to two different modules) falls back
+ * to `packRow`'s own centre-weighted wrapped row, placed *below* every
+ * module column's own stack — a separate vertical band, so it can never
+ * share a row with (and so never crosses) a column tile. For an ordinary
+ * hub (`hubModules` empty), every neighbour is unattached and this reduces
+ * to exactly `packRow` across the full available width — this sprint's own
+ * existing, unchanged behaviour for a plain (non-platform) context.
+ */
+function layoutNeighbourBand(units: readonly DiagramUnitInput[], hubModules: readonly ModuleTile[], top: number, availableWidth: number, originX: number): { tiles: DiagramTile[]; height: number } {
+  const hubModuleIds = new Set(hubModules.map((m) => m.elementId));
+  const byModule = new Map<UUID, DiagramUnitInput[]>();
+  const unattached: DiagramUnitInput[] = [];
+  for (const unit of units) {
+    const moduleId = unit.attachedToModuleId;
+    if (moduleId && hubModuleIds.has(moduleId)) {
+      const list = byModule.get(moduleId) ?? [];
+      list.push(unit);
+      byModule.set(moduleId, list);
+    } else {
+      unattached.push(unit);
+    }
+  }
+
+  const tiles: DiagramTile[] = [];
+  let columnsHeight = 0;
+  for (const module of hubModules) {
+    const columnUnits = [...(byModule.get(module.elementId) ?? [])].sort(byElementId);
+    if (columnUnits.length === 0) continue;
+    const centreX = module.x + module.w / 2;
+    columnUnits.forEach((unit, i) => {
+      tiles.push({ elementId: unit.elementId, x: centreX - NODE_WIDTH / 2, y: top + i * (NODE_HEIGHT + TILE_GUTTER_Y), w: NODE_WIDTH, h: NODE_HEIGHT });
+    });
+    columnsHeight = Math.max(columnsHeight, columnUnits.length * NODE_HEIGHT + (columnUnits.length - 1) * TILE_GUTTER_Y);
+  }
+
+  let bandHeight = columnsHeight;
+  if (unattached.length > 0) {
+    const unattachedTop = columnsHeight > 0 ? top + columnsHeight + TILE_GUTTER_Y : top;
+    const packed = packRow([...unattached].sort(byElementId), unattachedTop, availableWidth, originX);
+    tiles.push(...packed.tiles);
+    bandHeight = (columnsHeight > 0 ? columnsHeight + TILE_GUTTER_Y : 0) + packed.height;
+  }
+
+  return { tiles, height: bandHeight };
+}
+
+/**
  * @param hub The system this Context view is scoped to, plus its own module list (empty unless it's a platform with modules).
  * @param internalNeighbours Non-external `uses`/`flows_to` neighbours — systems, containers (S1 item 20) and actors (S1 item 11a) alike, each with its own module list (empty for anything but a platform).
  * @param externalNeighbours Same shape, for `isExternal` neighbours — placed below the boundary, same as the landscape's own external band.
@@ -204,7 +282,8 @@ export function computeContextDiagramLayout(
   const hubTile: DiagramTile = { elementId: hub.elementId, x: hubX, y, w: hubSize.w, h: hubSize.h, ...(hub.modules.length > 0 ? { modules: placeModules(hubX, y, hubSize.w, hub.modules) } : {}) };
   y += hubSize.h + ROW_GUTTER_Y;
 
-  const internalRow = packRow([...internalNeighbours].sort(byElementId), y, availableWidth, PADDING);
+  const hubModules = hubTile.modules ?? [];
+  const internalRow = layoutNeighbourBand(internalNeighbours, hubModules, y, availableWidth, PADDING);
   if (internalRow.tiles.length > 0) y += internalRow.height;
 
   const boundaryBottom = Math.max(boundaryTop, y);
@@ -212,7 +291,7 @@ export function computeContextDiagramLayout(
   let externalRow: { tiles: DiagramTile[]; height: number } = { tiles: [], height: 0 };
   if (externalNeighbours.length > 0) {
     y = boundaryBottom + EXTERNAL_GUTTER_Y;
-    externalRow = packRow([...externalNeighbours].sort(byElementId), y, availableWidth, PADDING);
+    externalRow = layoutNeighbourBand(externalNeighbours, hubModules, y, availableWidth, PADDING);
     y += externalRow.height;
   }
 
@@ -239,45 +318,57 @@ export interface DiagramAnchor {
 }
 
 /**
- * Where a straight line from `tile`'s own centre to `towards` crosses this
- * tile's own rectangle boundary — standard rect/line clipping (scale the
- * centre-to-`towards` vector down by whichever axis, x or y, hits the
- * rectangle's own half-width/half-height first). V1 fix: the platform
- * fallback anchor below used to return the tile's own *centre* unconditionally,
- * despite its own doc comment already promising "the platform tile's own
- * edge" — for a wide platform tile (widened to fit a row of module
- * sub-tiles) that put the anchor deep inside the box, so the line and its
- * "which module?" marker both drew through/behind the module row instead of
- * sitting at the tile's own border, exactly the messy crossing a live
- * screenshot showed for a plain system → platform edge.
+ * V1 polish, "entering module tiles from below": the hub side of an edge
+ * always anchors at the *bottom* edge of whichever box it names — a
+ * specific module's own sub-tile when `endpointElementId` (the edge's
+ * actual `from`/`to` id) names one directly, or the hub tile's own bottom
+ * edge otherwise, flagged `isPlatformFallback: true` (S1 item 20's own "a
+ * flow whose endpoint is a platform rather than one of its modules" — V1's
+ * "which module?" marker draws here). Every neighbour this diagram ever
+ * places sits *below* its hub (`computeContextDiagramLayout`'s own row
+ * ordering — internal neighbours below the hub, external neighbours below
+ * that), so "the bottom edge" is always the side facing the neighbour it
+ * connects to — never the tile's interior centre, which is what a v1-fix-era
+ * version of this function used to return (drawing the line, and the
+ * platform-fallback case especially, through the module row instead of at
+ * the tile's own border).
  */
-function clipToRectBoundary(tile: DiagramTile, towards: { x: number; y: number }): { x: number; y: number } {
-  const cx = tile.x + tile.w / 2;
-  const cy = tile.y + tile.h / 2;
-  const dx = towards.x - cx;
-  const dy = towards.y - cy;
-  if (dx === 0 && dy === 0) return { x: cx, y: cy };
-  const scaleX = dx !== 0 ? tile.w / 2 / Math.abs(dx) : Infinity;
-  const scaleY = dy !== 0 ? tile.h / 2 / Math.abs(dy) : Infinity;
-  const scale = Math.min(scaleX, scaleY);
-  return { x: cx + dx * scale, y: cy + dy * scale };
+export function anchorFor(tile: DiagramTile, endpointElementId: UUID): DiagramAnchor {
+  const module = tile.modules?.find((m) => m.elementId === endpointElementId);
+  if (module) return { x: module.x + module.w / 2, y: module.y + module.h, isPlatformFallback: false };
+  const isFallback = (tile.modules?.length ?? 0) > 0 && endpointElementId === tile.elementId;
+  return { x: tile.x + tile.w / 2, y: tile.y + tile.h, isPlatformFallback: isFallback };
+}
+
+/** V1 polish, "leaving neighbours from above": the neighbour side of an edge always anchors at the top-centre of its own tile — the side facing the hub/module above it. Never a module sub-tile lookup: decision 11 (`docs/UI-principles.md` §10) means a *neighbour* platform's own modules are never nested here, so a neighbour tile is always this one plain box. */
+export function tileTopAnchor(tile: DiagramTile): { x: number; y: number } {
+  return { x: tile.x + tile.w / 2, y: tile.y };
+}
+
+export interface EdgeCurve {
+  cp1: { x: number; y: number };
+  cp2: { x: number; y: number };
+  /** The curve's own midpoint — always sitting exactly halfway between `lower` and `upper` in y, which by construction (the gutter between a neighbour row and the row above it) is a band no tile occupies. V1 polish's own "label pill on the free segment, never over a tile" anchors here. */
+  mid: { x: number; y: number };
 }
 
 /**
- * Where an edge should anchor on `tile`'s own unit — a specific module's
- * sub-tile centre when `endpointElementId` (the edge's actual `from`/`to`
- * id) names one of that unit's modules directly, or a point on the unit's
- * own rectangle boundary, facing `towards` (the other endpoint's own
- * anchor-side tile centre), with `isPlatformFallback: true` otherwise (S1
- * item 20's own "a flow whose endpoint is a platform rather than one of its
- * modules" — V1's "which module?" marker draws here, now genuinely at the
- * tile's own edge rather than its centre — see `clipToRectBoundary`'s own
- * comment for why that changed).
+ * V1 polish, "orthogonal/curved edge routing ... label pill on the free
+ * segment": a cubic Bézier between `lower` (a neighbour's own top anchor —
+ * always the larger y, since every neighbour sits below its hub) and
+ * `upper` (a hub/module bottom anchor), with a vertical tangent at each end
+ * (`cp1`/`cp2` share their adjacent anchor's own x) — the curve leaves
+ * `lower` straight up and arrives at `upper` straight down, bowing sideways
+ * only in the open gutter between them if the two don't already share an x
+ * (the common case, when a neighbour is column-aligned under its own
+ * module, is a dead-straight vertical line — see `layoutNeighbourBand`'s
+ * own comment for why that's the usual outcome). The midpoint (`mid`) of a
+ * curve built this way always falls exactly on the horizontal line halfway
+ * between `lower.y` and `upper.y` — a symmetric Bézier's own property — so
+ * it's always in the clear gutter band, never over a tile, with no need for
+ * per-diagram collision checking.
  */
-export function anchorFor(tile: DiagramTile, endpointElementId: UUID, towards: { x: number; y: number }): DiagramAnchor {
-  const module = tile.modules?.find((m) => m.elementId === endpointElementId);
-  if (module) return { x: module.x + module.w / 2, y: module.y + module.h / 2, isPlatformFallback: false };
-  const isFallback = (tile.modules?.length ?? 0) > 0 && endpointElementId === tile.elementId;
-  if (!isFallback) return { x: tile.x + tile.w / 2, y: tile.y + tile.h / 2, isPlatformFallback: false };
-  return { ...clipToRectBoundary(tile, towards), isPlatformFallback: true };
+export function curveBetween(lower: { x: number; y: number }, upper: { x: number; y: number }): EdgeCurve {
+  const midY = (lower.y + upper.y) / 2;
+  return { cp1: { x: lower.x, y: midY }, cp2: { x: upper.x, y: midY }, mid: { x: (lower.x + upper.x) / 2, y: midY } };
 }
