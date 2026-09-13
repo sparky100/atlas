@@ -230,6 +230,47 @@ function existsIn(head: Head, id: UUID): boolean {
   return head.elements.has(id) || head.relationships.has(id);
 }
 
+/** One retracted element's worth of grouped findings — see `groupRetractionFindings`. */
+export interface RetractionFindingGroup {
+  elementId: UUID;
+  danglingRelationshipIds: Set<UUID>;
+  danglingChildIds: Set<UUID>;
+  hasFieldModification: boolean;
+  converged: boolean;
+}
+
+/**
+ * Groups retraction-shaped findings — `structural:retract-vs-modify`,
+ * `structural:dangling-endpoint`, `structural:dangling-parent`, and
+ * `structural:converged-retract` — by the element actually being retracted
+ * (ADR-021 §4.1: "the three are the same conflict seen through the
+ * element, a relationship, or a child" and get one card, one choice).
+ * Shared by `buildStructuralResolutions` below and the review UI's own
+ * card grouping (`src/ui/reviews`) — one place computes which findings
+ * belong to the same retracted element, so a card and the resolution it
+ * builds can never disagree about the grouping.
+ */
+export function groupRetractionFindings(findings: readonly ConflictFinding[]): Map<UUID, RetractionFindingGroup> {
+  const groups = new Map<UUID, RetractionFindingGroup>();
+  function groupFor(elementId: UUID): RetractionFindingGroup {
+    let g = groups.get(elementId);
+    if (!g) {
+      g = { elementId, danglingRelationshipIds: new Set(), danglingChildIds: new Set(), hasFieldModification: false, converged: false };
+      groups.set(elementId, g);
+    }
+    return g;
+  }
+  for (const f of findings) {
+    if (f.class === 'structural:retract-vs-modify') groupFor(f.subjectId).hasFieldModification = true;
+    else if (f.class === 'structural:dangling-endpoint') {
+      const g = groupFor(f.subjectId);
+      if (f.relatedSubjectId) g.danglingRelationshipIds.add(f.relatedSubjectId);
+    } else if (f.class === 'structural:dangling-parent' && f.relatedSubjectId) groupFor(f.relatedSubjectId).danglingChildIds.add(f.subjectId);
+    else if (f.class === 'structural:converged-retract') groupFor(f.subjectId).converged = true;
+  }
+  return groups;
+}
+
 function currentDeltaId(head: Head, subjectId: UUID, attribute: string): UUID {
   const fact = head.facts.get(factMapKey(subjectId, attribute));
   if (!fact) throw new EngineError(`buildStructuralResolutions: ${subjectId}.${attribute} has no currently-asserting delta in the head it was found in`);
@@ -284,30 +325,7 @@ export function buildStructuralResolutions(review: MergeReview, choices: readonl
   const retractionChoiceByElement = new Map<UUID, RetractionChoice>();
   for (const c of choices) if (c.class === 'retraction') retractionChoiceByElement.set(c.elementId, c);
 
-  // ---- retraction-shaped findings, grouped per retracted element ----
-  interface RetractionGroup {
-    danglingRelationshipIds: Set<UUID>;
-    danglingChildIds: Set<UUID>;
-    hasFieldModification: boolean;
-    converged: boolean;
-  }
-  const groups = new Map<UUID, RetractionGroup>();
-  function groupFor(elementId: UUID): RetractionGroup {
-    let g = groups.get(elementId);
-    if (!g) {
-      g = { danglingRelationshipIds: new Set(), danglingChildIds: new Set(), hasFieldModification: false, converged: false };
-      groups.set(elementId, g);
-    }
-    return g;
-  }
-  for (const f of findings) {
-    if (f.class === 'structural:retract-vs-modify') groupFor(f.subjectId).hasFieldModification = true;
-    else if (f.class === 'structural:dangling-endpoint') {
-      const g = groupFor(f.subjectId);
-      if (f.relatedSubjectId) g.danglingRelationshipIds.add(f.relatedSubjectId);
-    } else if (f.class === 'structural:dangling-parent' && f.relatedSubjectId) groupFor(f.relatedSubjectId).danglingChildIds.add(f.subjectId);
-    else if (f.class === 'structural:converged-retract') groupFor(f.subjectId).converged = true;
-  }
+  const groups = groupRetractionFindings(findings);
 
   for (const [elementId, group] of groups) {
     const elementType = base.elements.get(elementId)?.elementType;

@@ -4,22 +4,17 @@
  * (submit/request_changes/approve/reject/merge_branch from step 2's
  * `20260906161000_merge_review_queue.sql`, plus this step's own
  * `resubmit_merge_request`), computing a fresh `MergeReview` for a branch,
- * and pushing the field-conflict resolution commit SPEC §7.4 describes.
+ * and pushing the refresh SPEC §7.5 describes.
  *
- * Scope note: SPEC §7.4 also names bespoke structural-conflict actions
- * (keep retraction / keep element, duplicate-relationship survivor pick,
- * cardinality primary pick) and identity's "merge now" (`atlas.merge_elements`,
- * itself deferred past this sprint — SPEC §11). Building the dependency-
- * closure cascade those need ("keeping the retraction also retracts 3
- * relationships and re-parents 2 containers") is a substantial, separable
- * unit of work. This module gives a reviewer a one-click resolution for
- * field conflicts (the common case) and a real path for every other
- * conflict class: reopen the branch (`requestChanges`) and fix it with the
- * ordinary branch editor (Sprint C1 steps 3-4 — un-retract an element,
- * remove a dangling relationship, drop a duplicate), then push a refresh
- * with no resolutions of its own and resubmit. The review UI names this
- * explicitly on structural-conflict cards rather than silently omitting
- * their actions.
+ * Refresh covers both SPEC §7.4's field-conflict actions (keep this
+ * change / keep main / enter a value) and its structural-conflict actions
+ * (keep retraction / keep element with the dependent cascade, duplicate-
+ * relationship survivor pick, cardinality primary/role pick — ADR-021,
+ * C2b) — `pushRefresh` below builds both kinds of resolution off one
+ * shared `merge_resolution` source and commits them atomically via
+ * `atlas.refresh_branch` (ADR-021 §5 item 5). Identity's "merge now"
+ * (`atlas.merge_elements`) remains deferred past this sprint (SPEC §11) —
+ * "keep both" (dismiss) is the only action there.
  *
  * Every RPC below is called via `.schema('atlas')`: these functions live
  * in the atlas schema (SPEC §2), not public, and `supabase.rpc()` on its

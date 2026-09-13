@@ -3,7 +3,8 @@ import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { Text } from '../components/Text/Text';
 import type { BranchRow } from '../../db/types';
-import { FieldConflictCard, IdentityWarningCard, StructuralConflictCard } from './ConflictCards';
+import { groupStructuralFindings } from '../../engine/structuralFindingGroups';
+import { FieldConflictCard, IdentityWarningCard, PairConflictCard, RetractionConflictCard } from './ConflictCards';
 import { useBranchRebase } from './useBranchRebase';
 import styles from './BranchRebasePanel.module.css';
 
@@ -41,8 +42,9 @@ export function BranchRebasePanel({ modelId, branch, userId, canEdit, onRebased 
   const { classification, threeWay } = review;
   const blockingFindings = classification.findings.filter((f) => f.blocking);
   const identityFindings = classification.findings.filter((f) => !f.blocking);
-  const structuralFindings = blockingFindings.filter((f) => f.class !== 'field-conflict');
   const fieldConflictFindings = blockingFindings.filter((f) => f.class === 'field-conflict');
+  const { retractions, duplicates, cardinalities } = groupStructuralFindings(review);
+  const structuralCardCount = retractions.length + duplicates.length + cardinalities.length;
 
   if (threeWay.upToDateWithMain && classification.findings.length === 0) {
     return (
@@ -84,17 +86,32 @@ export function BranchRebasePanel({ modelId, branch, userId, canEdit, onRebased 
         </div>
       )}
 
-      {structuralFindings.length > 0 && (
+      {structuralCardCount > 0 && (
         <div className={styles.section}>
           <Text as="h3" size="md">
             Structural conflicts
           </Text>
-          <Text as="p" tone="muted" size="sm">
-            Fix these with the ordinary change editor (un-retract, remove the dangling relationship, drop the duplicate), then rebase.
-          </Text>
           <ul className={styles.cardList}>
-            {structuralFindings.map((finding, i) => (
-              <StructuralConflictCard key={`${finding.class}-${finding.subjectId}-${String(i)}`} finding={finding} heads={[threeWay.ours, threeWay.theirs, threeWay.base]} />
+            {retractions.map((data) => (
+              <RetractionConflictCard key={data.elementId} data={data} canResolve={canEdit} choice={rebase.retractionChoiceFor(data.elementId)} onChoose={rebase.setStructuralChoice} />
+            ))}
+            {duplicates.map((data) => (
+              <PairConflictCard
+                key={`${data.relationshipId} ${data.relatedRelationshipId}`}
+                data={data}
+                canResolve={canEdit}
+                choice={rebase.pairChoiceFor(data.relationshipId, data.relatedRelationshipId, data.findingClass)}
+                onChoose={rebase.setStructuralChoice}
+              />
+            ))}
+            {cardinalities.map((data) => (
+              <PairConflictCard
+                key={`${data.relationshipId} ${data.relatedRelationshipId}`}
+                data={data}
+                canResolve={canEdit}
+                choice={rebase.pairChoiceFor(data.relationshipId, data.relatedRelationshipId, data.findingClass)}
+                onChoose={rebase.setStructuralChoice}
+              />
             ))}
           </ul>
         </div>
