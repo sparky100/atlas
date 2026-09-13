@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import type { ActorSubtype, UUID } from '../../contracts/delta';
+import type { UUID } from '../../contracts/delta';
 import type { ElementVersionDiff, VersionDiff } from '../../engine/versionDiff';
 import { Chip } from '../components/Chip/Chip';
 import { LinkButton } from '../components/Button/LinkButton';
@@ -8,7 +8,12 @@ import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyp
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { attributesRecord } from '../elements/attributesRecord';
-import { edgeLabel, type ContextGroup, type ContextNeighbour } from './contextGrouping';
+import { isPlatform } from '../elements/systemKind';
+import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
+import { ContextDiagramCanvas } from './ContextDiagramCanvas';
+import { ContextMobileList } from './ContextMobileList';
+import type { ContextModule } from './contextDiagramData';
+import type { ContextGroup } from './contextGrouping';
 import styles from './ContextView.module.css';
 
 // Prompt 7k item 2: "Business owner: Housing · Technical owner: IT
@@ -26,45 +31,47 @@ function ownsRoleLabel(role: string): string {
 
 export interface ContextViewProps {
   group: ContextGroup;
+  /** V1's own platform/module data — `useSystemContext.ts`'s own doc comment explains the shape; empty when nothing in view is a platform with modules. */
+  platformModulesById: ReadonlyMap<UUID, ContextModule[]>;
   orgSlug: string;
   modelSlug: string;
   /** The full `ref=...` query fragment (`refQueryParam`), not a bare token — see `CapabilityMapView.tsx`'s identical `refParam` doc comment for why. */
   refParam: string;
-  /** UI-principles §6.2/§6.3 — present only when a branch's Diff mode is active. This DOM view reuses `DiffBadge` (the same pill src/ui/versions/VersionDiffView.tsx already renders) rather than §6.3's canvas-specific border/fill/ghost treatment, which is written for shapes on a canvas, not list rows. */
+  /** UI-principles §6.2/§6.3 — present only when a branch's Diff mode is active. Kept for the hub's own header badge only — V1's new canvas/mobile-list body has no diff treatment of its own (see this component's own module comment for why). */
   diff?: VersionDiff | null;
 }
 
+const MOBILE_BREAKPOINT_PX = 768;
 
 /**
  * The Context view's renderer (UI-principles §6.1: "one system, every
  * system/actor it has a relationship with... radial, scope at centre,
- * externals outside a ring"). Rendered as DOM/CSS, not Canvas — the same
- * departure the capability map already took (src/ui/capabilityMap/
- * CapabilityMapView.tsx's module comment) and for the same reason: §8.6's
- * 60fps/2,000-node performance budget is named for *a landscape view*
- * specifically; a system's own immediate neighbours are a bounded handful,
- * never that scale, so the simpler, accessible-by-default DOM renderer is
- * the right call here too, not a second Canvas layout engine for a shape
- * (radial rings) the landscape's lane-based one has no use for.
+ * externals outside a ring"). V1 (docs/prompts/atlas-prompt-pack.md)
+ * replaces this view's own body with a real diagram — `ContextDiagramCanvas.tsx`
+ * on desktop, `ContextMobileList.tsx` below `MOBILE_BREAKPOINT_PX` — on the
+ * landscape's own canvas technology, finally delivering on UI-principles
+ * §6.1's closing paragraph ("the same renderer, a different query and
+ * layout preset") that the DOM/CSS departure this view took before V1 was
+ * itself recorded as a deviation from (§10 decision 7).
  *
- * Grouped, not laid out on a literal circle: "internal" and "external" are
- * two labelled lists rather than two concentric pixel radii — the same
- * relationship the ring metaphor describes (closer vs. further out), in a
- * form that is, per §8.7, already its own accessible view (a list), not a
- * diagram standing in need of one.
+ * The hub block's own "Supports: ..."/"Owned by: ..." header lines
+ * (`.headerSummary` below) are kept exactly as V1's own wording asks
+ * ("Header keeps Supports ... and Owned by") — real header content, never
+ * a diagram node or a drawn edge, same as before this sprint. V1 adds one
+ * change to the "Supports:" line specifically: a platform hub with modules
+ * shows each module's own capability ("FI → Finance, PM → Asset
+ * Management") instead of the hub's own (usually empty, per "Platforms and
+ * modules") direct `supports` edges — "grouped by module for platforms,"
+ * V1's own wording.
  *
- * Sprint U4-2b item 12: the hub block's own "Supports: ..."/"Owned by: ..."
- * lines (`.headerSummary` below) are real header content, not part of the
- * internal/external groups — `group.supports`/`group.owners` are exactly
- * the two things `contextGrouping.ts`'s own module comment already keeps
- * out of both (never a Context node, never a drawn edge). The empty-state
- * condition below still checks only `internal`/`external`/`owners` — a
- * system that supports a capability but connects to no other system or
- * actor is still "no connections to other systems or actors yet", even
- * though its own "Supports:" line renders above that message.
+ * No diff highlighting on the new canvas/mobile body — V1 doesn't ask for
+ * it, unlike the landscape, and this view's own diff support stays scoped
+ * to the hub's header badge, unchanged from before this sprint.
  */
-export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }: ContextViewProps) {
+export function ContextView({ group, platformModulesById, orgSlug, modelSlug, refParam, diff = null }: ContextViewProps) {
+  const narrow = useIsNarrowViewport(MOBILE_BREAKPOINT_PX);
   const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?${refParam}`;
+  const neighbourContextHref = (systemId: UUID) => `/o/${orgSlug}/m/${modelSlug}/context/${systemId}?${refParam}`;
   const containersHref = `/o/${orgSlug}/m/${modelSlug}/container/${group.hub.element_id}?${refParam}`;
   const hubExternal = attributesRecord(group.hub.attributes).isExternal === true;
   const diffById = new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []);
@@ -72,6 +79,8 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }
   // S1 item 11a — see the "Owned by" line's own comment below.
   const internalOwners = group.owners.filter((o) => !o.isExternal);
   const externalOwners = group.owners.filter((o) => o.isExternal);
+  const hubModules = platformModulesById.get(group.hub.element_id) ?? [];
+  const showModuleGroupedSupports = isPlatform(group.hub) && hubModules.length > 0;
 
   return (
     <div>
@@ -92,13 +101,34 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }
         </LinkButton>
       </div>
 
-      {(group.supports.length > 0 || group.owners.length > 0) && (
+      {(group.supports.length > 0 || showModuleGroupedSupports || group.owners.length > 0) && (
         <div className={styles.headerSummary}>
+          {/* V1: a platform hub's own modules, each with its own capability
+              chip — "Platforms and modules" put the real `supports` edge on
+              the module, not the platform, so the hub's own `group.supports`
+              is normally empty for a real platform; this reads the same
+              module data the diagram itself draws instead. */}
+          {showModuleGroupedSupports && (
+            <Text as="p" tone="muted" size="sm">
+              Supports:{' '}
+              {hubModules.map((module, i) => (
+                <span key={module.elementId}>
+                  {i > 0 && ', '}
+                  <Link to={elementHref(module.elementId)}>{module.name}</Link>
+                  {module.capabilityName && ` → ${module.capabilityName}`}
+                </span>
+              ))}
+            </Text>
+          )}
           {/* Item 12: "Supports: <capabilities, primary first>", each one a
               link — computeContextGroup already sorted the list; this just
               renders it, and the capability's own element page is the link
               target (the same page every other Context/element-page link in
-              this view already points at). */}
+              this view already points at). Still shown for a platform hub
+              too if it somehow also carries a direct edge of its own (S1
+              item 19's own "move to module" nudge case) — nothing here is
+              ever silently hidden just because the module-grouped line above
+              also rendered. */}
           {group.supports.length > 0 && (
             <Text as="p" tone="muted" size="sm">
               Supports:{' '}
@@ -163,55 +193,15 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }
         </div>
       )}
 
-      <div className={styles.groups}>
-        {group.internal.length > 0 && (
-          <div className={styles.group}>
-            <Text as="h2" size="sm" tone="muted" className={styles.groupTitle}>
-              Connections
-            </Text>
-            <NeighbourList neighbours={group.internal} hubId={group.hub.element_id} elementHref={elementHref} diffById={diff ? diffById : null} />
-          </div>
-        )}
-        {group.external.length > 0 && (
-          <div className={styles.group}>
-            <Text as="h2" size="sm" tone="muted" className={styles.groupTitle}>
-              External
-            </Text>
-            <NeighbourList neighbours={group.external} hubId={group.hub.element_id} elementHref={elementHref} diffById={diff ? diffById : null} />
-          </div>
-        )}
-      </div>
+      {(group.internal.length > 0 || group.external.length > 0) && (
+        <div className={styles.diagram}>
+          {narrow ? (
+            <ContextMobileList group={group} platformModulesById={platformModulesById} elementHref={elementHref} neighbourContextHref={neighbourContextHref} />
+          ) : (
+            <ContextDiagramCanvas group={group} platformModulesById={platformModulesById} elementHref={elementHref} neighbourContextHref={neighbourContextHref} />
+          )}
+        </div>
+      )}
     </div>
-  );
-}
-
-function NeighbourList({ neighbours, hubId, elementHref, diffById }: { neighbours: ContextNeighbour[]; hubId: UUID; elementHref: (id: UUID) => string; diffById: Map<UUID, ElementVersionDiff> | null }) {
-  return (
-    <ul className={styles.neighbours}>
-      {neighbours.map((neighbour) => {
-        const neighbourAttrs = attributesRecord(neighbour.element.attributes);
-        const external = neighbourAttrs.isExternal === true;
-        // S1 item 11a: an actor can now reach here (a `uses` edge, not
-        // just `owns`) — its own subtype glyph (person/team/organisation),
-        // not the bare fallback `LandscapeCanvas.tsx`/`LandscapeMobileList.tsx`
-        // both already avoid the same way.
-        const actorSubtype = neighbour.element.element_type === 'actor' && typeof neighbourAttrs.subtype === 'string' ? (neighbourAttrs.subtype as ActorSubtype) : undefined;
-        const neighbourDiff = diffById?.get(neighbour.element.element_id);
-        return (
-          <li key={neighbour.element.element_id} className={styles.neighbour}>
-            <div className={styles.neighbourTitle}>
-              <ElementTypeGlyph type={neighbour.element.element_type} external={external} {...(actorSubtype !== undefined ? { actorSubtype } : {})} />
-              <Link to={elementHref(neighbour.element.element_id)}>
-                <Text as="span">{neighbour.element.name}</Text>
-              </Link>
-              {diffById && neighbourDiff && <DiffBadge state={neighbourDiff.state} changedCount={neighbourDiff.state === 'changed' ? neighbourDiff.changedAttributes.length : undefined} />}
-            </div>
-            <Text as="span" size="sm" tone="muted">
-              {neighbour.edges.map((edge) => edgeLabel(edge, hubId)).join(', ')}
-            </Text>
-          </li>
-        );
-      })}
-    </ul>
   );
 }

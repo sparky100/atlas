@@ -172,6 +172,51 @@ describe('computeContextGroup', () => {
     expect(byId.get('owner1')).toMatchObject({ isExternal: false, externalOrganisation: null });
     expect(byId.get('owner2')).toMatchObject({ isExternal: true, externalOrganisation: 'Ofgem' });
   });
+
+  // V1 (the context diagram): a `flows_to`/`uses` edge can now attach to
+  // one of the hub's own modules directly (S1 item 20's container↔system
+  // rules) rather than the hub itself — `hubModuleIds` is how the caller
+  // tells this function which ids count as "the hub side" for exactly
+  // that reason.
+  describe('V1: hubModuleIds — an edge attached to one of the hub\'s own modules', () => {
+    it('resolves the *other* endpoint as the neighbour, not the module itself, when the module is the "to" side', () => {
+      const hub = system('sap', 'SAP');
+      const salesforce = system('salesforce', 'Salesforce');
+      const group = computeContextGroup(hub, [flowsToEdge('salesforce', 'fi', 'sends billing events to')], new Map([['salesforce', salesforce]]), new Set(['fi']));
+      expect(group.internal.map((n) => n.element.element_id)).toEqual(['salesforce']);
+      // The edge itself is untouched — its own `to_element_id` still names
+      // the module directly, for the diagram's own module-anchor lookup.
+      expect(group.internal[0]?.edges[0]?.to_element_id).toBe('fi');
+    });
+
+    it('resolves the *other* endpoint as the neighbour when the module is the "from" side', () => {
+      const hub = system('sap', 'SAP');
+      const consumerPortal = system('consumer-portal', 'Consumer Portal');
+      const group = computeContextGroup(hub, [usesEdge('consumer-portal', 'fi', 'reads balances from')], new Map([['consumer-portal', consumerPortal]]), new Set(['fi']));
+      expect(group.internal.map((n) => n.element.element_id)).toEqual(['consumer-portal']);
+    });
+
+    it('still resolves the neighbour correctly for an edge that names the hub itself, not a module', () => {
+      const hub = system('sap', 'SAP');
+      const ofgem = actor('ofgem', 'Ofgem', true, 'Ofgem');
+      const group = computeContextGroup(hub, [usesEdge('ofgem', 'sap', 'submits RIIO returns to')], new Map([['ofgem', ofgem]]), new Set(['fi', 'pm']));
+      expect(group.external.map((n) => n.element.element_id)).toEqual(['ofgem']);
+    });
+
+    it('drops an edge between two of the hub\'s own modules — never a real neighbour edge', () => {
+      const hub = system('sap', 'SAP');
+      const group = computeContextGroup(hub, [usesEdge('fi', 'pm', 'internal transfer')], new Map(), new Set(['fi', 'pm']));
+      expect(group.internal).toEqual([]);
+      expect(group.external).toEqual([]);
+    });
+
+    it('with no hubModuleIds given (the default), an edge naming a would-be module id is simply not recognised as touching the hub at all', () => {
+      const hub = system('sap', 'SAP');
+      const salesforce = system('salesforce', 'Salesforce');
+      const group = computeContextGroup(hub, [flowsToEdge('salesforce', 'fi', 'sends billing events to')], new Map([['salesforce', salesforce]]));
+      expect(group.internal).toEqual([]);
+    });
+  });
 });
 
 describe('edgeLabel (Sprint U4-2c item 1: "edit a verb ... and see it on the context view")', () => {
