@@ -7,7 +7,7 @@ import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { quantizeScale } from '../landscape/zoom';
 import { NODE_WIDTH } from '../landscape/layout';
-import { allTilesOf, anchorFor, computeContextDiagramLayout, curveBetween, tileTopAnchor, type ContextDiagramLayout, type DiagramTile, type DiagramUnitInput } from './contextDiagramLayout';
+import { allTilesOf, anchorFor, computeContextDiagramLayout, curveBetween, resolveEdgeLabelOverlaps, tileTopAnchor, type ContextDiagramLayout, type DiagramTile, type DiagramUnitInput, type EdgeLabelPlacement } from './contextDiagramLayout';
 import { kindOf, SYSTEM_KIND_LABEL } from '../elements/systemKind';
 import { edgeLabel, type ContextGroup, type ContextNeighbour } from './contextGrouping';
 import type { ContextModule } from './contextDiagramData';
@@ -363,7 +363,7 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         ctx.restore();
       }
 
-      const edgeLabels: { text: string; worldX: number; worldY: number }[] = [];
+      const edgeLabels: { text: string; worldX: number; worldY: number; worldTargetY: number }[] = [];
       const platformMarkers: { worldX: number; worldY: number }[] = [];
       for (const edge of edges) {
         // V1 polish: the hub/module side always anchors at its own tile's
@@ -399,7 +399,11 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         // pill in the screen-space pass below, not here (needs the actual
         // font metrics to size itself).
         if (showLabels && edge.label.trim().length > 0) {
-          edgeLabels.push({ text: edge.label, worldX: curve.mid.x, worldY: curve.mid.y });
+          // V1 fix, "push toward the target": the same anchor the
+          // arrowhead below points at — pushing toward the source instead
+          // would walk an overlap-resolved label back over the tile its
+          // own edge just left.
+          edgeLabels.push({ text: edge.label, worldX: curve.mid.x, worldY: curve.mid.y, worldTargetY: edge.arrowAtHub ? hubAnchor.y : neighbourAnchor.y });
         }
 
         // One arrowhead, at the target only (UI-principles §9) — always
@@ -569,21 +573,43 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
       // this text no longer needs to follow a line's own angle — it's
       // always sitting on the open horizontal band between two rows, so
       // plain centred text reads cleanly without rotation.
+      //
+      // V1 fix, "two adjacent-module labels never render on top of each
+      // other": that "always in the clear gutter" guarantee is a tile
+      // collision guarantee, not a label-vs-label one — resolved here via
+      // `resolveEdgeLabelOverlaps` (`contextDiagramLayout.ts`'s own doc
+      // comment has the full algorithm). Each placement's own text is
+      // still hard-capped at the same single-line width as before
+      // (`truncate`) *before* overlap resolution ever sees it — a wildly
+      // long single label was never this fix's own problem to solve, and
+      // capping it first keeps `resolveEdgeLabelOverlaps`'s own two-line
+      // wrap working from a bounded starting width.
       ctx.font = `${(11 * textScale).toFixed(2)}px sans-serif`;
-      for (const label of edgeLabels) {
+      ctx.textAlign = 'center';
+      const placements: EdgeLabelPlacement[] = edgeLabels.map((label) => {
         const [x, y] = toScreen(label.worldX, label.worldY);
-        const text = truncate(ctx, label.text, NODE_WIDTH * 1.5 * textScale);
-        const textWidth = ctx.measureText(text).width;
-        const pillW = textWidth + 12 * textScale;
-        const pillH = 18 * textScale;
-        roundRectPath(ctx, x - pillW / 2, y - pillH / 2, pillW, pillH, pillH / 2);
+        const [, targetY] = toScreen(label.worldX, label.worldTargetY);
+        return { text: truncate(ctx, label.text, NODE_WIDTH * 1.5 * textScale), x, y, targetY };
+      });
+      const resolvedLabels = resolveEdgeLabelOverlaps(placements, (text) => ctx.measureText(text).width, textScale);
+      const edgeLabelLineHeight = 12 * textScale;
+      for (const pill of resolvedLabels) {
+        // Opaque, and drawn after every edge/tile above (z-order) — a
+        // pushed-apart pair no longer needs this, but a pair still sharing
+        // a y band by design (the min-gap check, not a genuine collision)
+        // must never let one's edge line or the other's own pill show
+        // through the gap between them.
+        roundRectPath(ctx, pill.x - pill.width / 2, pill.y - pill.height / 2, pill.width, pill.height, pill.height / 2);
         ctx.fillStyle = tokens.surfaceRaised;
         ctx.fill();
         ctx.strokeStyle = tokens.border;
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.fillStyle = tokens.textMuted;
-        ctx.fillText(text, x, y);
+        const startY = pill.y - ((pill.lines.length - 1) * edgeLabelLineHeight) / 2;
+        pill.lines.forEach((line, i) => {
+          ctx.fillText(line, pill.x, startY + i * edgeLabelLineHeight);
+        });
       }
 
       // V1's own "which module?" marker — a small filled "?" badge at the
