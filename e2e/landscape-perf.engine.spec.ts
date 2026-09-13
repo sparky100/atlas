@@ -23,12 +23,12 @@ import { getMainBranch } from '../src/db/branches';
 import { commitToBranch } from '../src/db/commits';
 import { loadEnv } from '../src/db/env';
 import { emptyHead, fold } from '../src/engine/deltas';
-import { serializeHeadProjection } from '../src/engine/projection';
+import { envelopeToDeltaRows } from '../src/contracts/rows';
 import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { EDGE_COUNT, FIXED_RUN_SEED, generateLandscapeFixture, singleAttributeEditDelta, SYSTEM_COUNT } from './fixtures/landscapeFixture';
 
-test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
+test.describe('landscape performance (Sprint U1 step 4b, ADR-015; E3 amendment)', () => {
   test('commit_deltas payload size for a single-element edit stays within budget', () => {
     const sourceId = randomUUID();
     const authorId = randomUUID();
@@ -40,21 +40,35 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015)', () => {
     // (Sprint C1-H item 1 closing (b) — a fixed seed there collided on
     // deltas.id, global not per-model, on any retry against the same
     // still-live local Supabase).
+    //
+    // E3 amendment (docs/prompts/atlas-prompt-pack.md, ADR-015): a main
+    // commit with no restore delta now takes commit_deltas's incremental
+    // path (atlas.apply_deltas_to_main_projection,
+    // supabase/migrations/20260913100000_delta_apply_in_sql.sql) —
+    // src/db/commits.ts sends the deltas only, never the whole computed
+    // elements_head/relationships_head/facts projection this test used to
+    // measure. `fold` still runs client-side (validation is unchanged —
+    // ADR-015's own "alternatives rejected" section), but its result is no
+    // longer serialised onto the wire; what actually crosses the wire now
+    // is exactly `envelopeToDeltaRows`'s own output, the same shape
+    // `commitToBranch` builds for its real RPC call.
     const head = fold(emptyHead(), generateLandscapeFixture(sourceId, FIXED_RUN_SEED), ctx);
-    const headAfterEdit = fold(head, [singleAttributeEditDelta(sourceId, FIXED_RUN_SEED)], ctx);
-    const projection = serializeHeadProjection(headAfterEdit);
-    const payload = { elementsHead: projection.elementsHead, relationshipsHead: projection.relationshipsHead, facts: projection.facts };
+    const editDelta = singleAttributeEditDelta(sourceId, FIXED_RUN_SEED);
+    fold(head, [editDelta], ctx); // still validated client-side, same as before — result just isn't sent.
+    const deltaRows = envelopeToDeltaRows({ id: randomUUID(), branchId: randomUUID(), parentCommitId: randomUUID(), mergedBranchHeadCommitId: null, kind: 'manual', title: 'single attribute edit', body: null, deltas: [editDelta] }, { orgId: '', modelId: '', createdBy: '' });
+    const payload = { p_deltas: deltaRows, p_elements_head: null, p_relationships_head: null, p_facts: null };
     const bytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
 
-    // Measured baseline against this exact fixture (2,010 elements, 6,000
-    // relationships, ~16,000 facts): ~8.45 MB. Budgeted with headroom so
-    // this doesn't flake on an incidental serialisation-format change —
-    // it exists to catch a real regression (e.g. a duplicated array, or a
-    // fact row that no longer clears an optional field to null), not a
-    // few-percent wobble. If this ever needs raising, replace the number,
-    // don't delete the test — that's the whole point of ADR-015 having one.
-    const BUDGET_BYTES = 12 * 1024 * 1024;
-    expect(bytes, `commit_deltas payload for a single-element edit was ${(bytes / 1024 / 1024).toFixed(2)}MB`).toBeLessThan(BUDGET_BYTES);
+    // Old budget (pre-E3, the whole projection): 12 MB, measured baseline
+    // ~8.45 MB against this exact fixture (2,010 elements, 6,000
+    // relationships, ~16,000 facts) — payload size scaled with model size
+    // regardless of how small the actual edit was. E3's own stated target:
+    // < 200 KB for a single edit at 2,000 elements — and since the payload
+    // is now just the edited delta(s), it no longer scales with model size
+    // at all; a real regression here looks like "the whole projection got
+    // sent again" (e.g. a restore-detection bug), not a few-percent wobble.
+    const BUDGET_BYTES = 200 * 1024;
+    expect(bytes, `commit_deltas payload for a single-element edit was ${(bytes / 1024).toFixed(2)}KB`).toBeLessThan(BUDGET_BYTES);
   });
 
   test('scripted pan+zoom holds ≥55fps p50 / ≥45fps p5 on a 2,000-system/4,000-edge landscape', async ({ page }) => {

@@ -174,7 +174,19 @@ export async function commitToBranch(supabase: Client, input: CommitToBranchInpu
   }));
 
   const isMain = branch.kind === 'main';
-  const projection = isMain ? serializeHeadProjection(newHead) : null;
+  // E3 (docs/prompts/atlas-prompt-pack.md): a commit with no restore delta
+  // takes the incremental path — atlas.apply_deltas_to_main_projection
+  // (supabase/migrations/20260913100000_delta_apply_in_sql.sql) applies
+  // just this commit's own deltas to the existing projection rows
+  // server-side, so the payload becomes the deltas only. A restore needs
+  // the retracted subject's last-known attribute values reconstructed
+  // from the model's full delta history — that function's own header
+  // comment explains why this is a materially harder problem, deliberately
+  // out of scope for now — so a commit containing one still sends the
+  // full client-computed projection, the pre-E3 path, unchanged.
+  const hasRestore = envelope.deltas.some((d) => d.kind === 'element.restore' || d.kind === 'relationship.restore');
+  const needsFullProjection = isMain && hasRestore;
+  const projection = needsFullProjection ? serializeHeadProjection(newHead) : null;
 
   // .schema('atlas'): every RPC this repo calls lives in the atlas schema
   // (SPEC §2), not public — supabase.rpc() defaults to whatever schema the
