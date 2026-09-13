@@ -135,6 +135,19 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
       browseLabel: 'Review and link →',
     },
     {
+      // S1 item 19: purely informational (see this finding's own doc
+      // comment, healthFindings.ts) — the platform already counts as
+      // linked either way (findSystemsWithoutCapability above already
+      // credits a module's own supports edge), this only nudges that the
+      // edge's likely home is one level down.
+      key: 'platform-supports-move-to-module',
+      count: data.platformSupportsThatShouldMoveToModule.length,
+      summary: `${String(data.platformSupportsThatShouldMoveToModule.length)} platform supports edge${data.platformSupportsThatShouldMoveToModule.length === 1 ? '' : 's'} that could move to a module`,
+      items: elementItems(data.platformSupportsThatShouldMoveToModule),
+      browseHref: browseHref('platform-supports-move-to-module'),
+      browseLabel: 'Review and move →',
+    },
+    {
       key: 'unowned-capabilities',
       count: data.capabilitiesWithoutOwner.length,
       summary: `${String(data.capabilitiesWithoutOwner.length)} ${plural(data.capabilitiesWithoutOwner.length, 'capability', 'capabilities')} with no owner`,

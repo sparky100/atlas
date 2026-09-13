@@ -8,6 +8,7 @@ import {
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
+  findPlatformSupportsThatShouldMoveToModule,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
@@ -32,10 +33,11 @@ export type ElementBrowseSortKey = 'name' | 'type' | 'owner' | 'lifecycle';
  * Prompt 7k item 2 adds `no-technical-owner`; item 1 adds
  * `critical-no-business-owner` and `critical-exposed`; item 4 adds
  * `unused-integration-platform`; item 5 adds `essential-no-technical-owner`
- * and `critical-support-end`.
+ * and `critical-support-end`; S1 item 19 adds `platform-supports-move-to-module`.
  */
 export type ElementBrowseFilter =
   | 'unlinked-systems'
+  | 'platform-supports-move-to-module'
   | 'unowned-capabilities'
   | 'stale-attributes'
   | 'no-technical-owner'
@@ -141,7 +143,12 @@ export function useElementBrowse(
       let ids: Set<UUID> | null = null;
       if (filter === 'unlinked-systems') {
         const systems = elements.filter((e) => e.element_type === 'system');
-        ids = new Set(findSystemsWithoutCapability(systems, supportsEdges).map((e) => e.element_id));
+        const containers = elements.filter((e) => e.element_type === 'container');
+        ids = new Set(findSystemsWithoutCapability(systems, supportsEdges, containers).map((e) => e.element_id));
+      } else if (filter === 'platform-supports-move-to-module') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const containers = elements.filter((e) => e.element_type === 'container');
+        ids = new Set(findPlatformSupportsThatShouldMoveToModule(systems, supportsEdges, containers).map((e) => e.element_id));
       } else if (filter === 'unowned-capabilities') {
         const capabilities = elements.filter((e) => e.element_type === 'capability');
         ids = new Set(findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));

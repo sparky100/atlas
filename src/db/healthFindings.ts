@@ -28,6 +28,7 @@ import { isStale, monthsSince, monthsUntil, STALE_AFTER_MONTHS } from '../contra
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { SystemDomain, UUID } from '../contracts/delta';
 import { attributesRecord } from '../ui/elements/attributesRecord';
+import { isPlatform } from '../ui/elements/systemKind';
 import { resolveElementDomain } from '../ui/elements/systemDomain';
 import type { Client } from './client';
 import { selectAll } from './selectAll';
@@ -288,10 +289,69 @@ export async function listFactsForCommit(supabase: Client, commitId: string): Pr
   return selectAll<FactsRow>(query);
 }
 
-/** Systems with no `supports` edge into any capability at all — Handoff 7d's "systems not linked to a capability" finding. */
-export function findSystemsWithoutCapability(systems: readonly ElementsHeadRow[], supportsEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
-  const linkedSystemIds = new Set(supportsEdges.map((edge) => edge.from_element_id));
-  return systems.filter((system) => !linkedSystemIds.has(system.element_id));
+/** Every `container` in `containers`, grouped by its own `parent_id` — a platform's modules, keyed by the platform's own element id. Shared by `findSystemsWithoutCapability` and `findPlatformSupportsThatShouldMoveToModule` below so the two findings never define "this platform's modules" two different ways. */
+function groupModulesByPlatformId(containers: readonly ElementsHeadRow[]): Map<UUID, ElementsHeadRow[]> {
+  const result = new Map<UUID, ElementsHeadRow[]>();
+  for (const module of containers) {
+    if (module.parent_id === null) continue;
+    const existing = result.get(module.parent_id);
+    if (existing) existing.push(module);
+    else result.set(module.parent_id, [module]);
+  }
+  return result;
+}
+
+/**
+ * Systems with no `supports` edge into any capability at all — Handoff 7d's
+ * "systems not linked to a capability" finding.
+ *
+ * S1 item 19: "Platforms and modules" (ADR-000's amendment) put a
+ * platform's own `supports` edge on its modules (`container`s), never on
+ * the platform itself — so a platform whose modules are fully linked used
+ * to still show up here every time, since nothing ever checked a
+ * `from_element_id` that wasn't the platform's own. `containers` (every
+ * `container` element in the model, optional and defaulting to `[]` for
+ * every caller that never has a platform to worry about) lets a platform
+ * count as linked through any of its modules; a platform with no modules
+ * at all is judged on its own `supports` edge, same as before — there is
+ * nowhere lower to check.
+ */
+export function findSystemsWithoutCapability(
+  systems: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  containers: readonly ElementsHeadRow[] = [],
+): ElementsHeadRow[] {
+  const linkedElementIds = new Set(supportsEdges.map((edge) => edge.from_element_id));
+  const modulesByPlatformId = groupModulesByPlatformId(containers);
+  return systems.filter((system) => {
+    if (isPlatform(system)) {
+      const modules = modulesByPlatformId.get(system.element_id);
+      if (modules && modules.length > 0) return !modules.some((module) => linkedElementIds.has(module.element_id));
+    }
+    return !linkedElementIds.has(system.element_id);
+  });
+}
+
+/**
+ * S1 item 19's own informational nudge: a platform *with* modules that
+ * itself still carries a direct `supports` edge — legal (`relationshipTypeRules.ts`
+ * allows `supports` from a `system`, platform or not), but probably meant
+ * for the module that actually does the work, the same way `RelationshipAdd.tsx`'s
+ * own picker steers a fresh edge there. Not a "problem" the way
+ * `findSystemsWithoutCapability` above is — the platform already counts as
+ * linked either way — purely a "did you mean to put this on the module?"
+ * visibility check, the same informational shape `findExternalOrganisationAccess`
+ * already established. Vacuous for a platform with no modules: there's
+ * nowhere lower to move the edge to, so it's never flagged.
+ */
+export function findPlatformSupportsThatShouldMoveToModule(
+  systems: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  containers: readonly ElementsHeadRow[],
+): ElementsHeadRow[] {
+  const linkedElementIds = new Set(supportsEdges.map((edge) => edge.from_element_id));
+  const modulesByPlatformId = groupModulesByPlatformId(containers);
+  return systems.filter((system) => isPlatform(system) && (modulesByPlatformId.get(system.element_id)?.length ?? 0) > 0 && linkedElementIds.has(system.element_id));
 }
 
 /**

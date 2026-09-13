@@ -12,6 +12,7 @@ import {
   findCriticalSystemsWithoutBusinessOwner,
   findExternalInterfacesMissingClassification,
   findExternalOrganisationAccess,
+  findPlatformSupportsThatShouldMoveToModule,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
@@ -61,6 +62,59 @@ describe('findSystemsWithoutCapability', () => {
     const systems = [system('sys-1'), system('sys-2')];
     const edges = [relationship('r1', 'supports', 'sys-2', 'cap-1')];
     expect(findSystemsWithoutCapability(systems, edges).map((s) => s.element_id)).toEqual(['sys-1']);
+  });
+
+  // S1 item 19: SAP (a platform) with FI and PM as its own modules, each
+  // independently supporting a capability — SAP itself never carries a
+  // `supports` edge, since "Platforms and modules" puts that on the module.
+  it('a platform with modules counts as linked if any module supports a capability, even with no supports edge of its own', () => {
+    const systems = [system('sap', { kind: 'platform' })];
+    const containers = [container('fi', 'sap'), container('pm', 'sap')];
+    const edges = [relationship('r1', 'supports', 'fi', 'finance'), relationship('r2', 'supports', 'pm', 'asset-mgmt')];
+    expect(findSystemsWithoutCapability(systems, edges, containers)).toEqual([]);
+  });
+
+  it('a platform with modules is still flagged if none of its modules supports a capability', () => {
+    const systems = [system('sap', { kind: 'platform' })];
+    const containers = [container('fi', 'sap'), container('pm', 'sap')];
+    expect(findSystemsWithoutCapability(systems, [], containers).map((s) => s.element_id)).toEqual(['sap']);
+  });
+
+  it('a platform with no modules at all is judged on its own supports edge, same as an ordinary system', () => {
+    const linked = [system('sap-linked', { kind: 'platform' })];
+    const linkedEdges = [relationship('r1', 'supports', 'sap-linked', 'finance')];
+    expect(findSystemsWithoutCapability(linked, linkedEdges, [])).toEqual([]);
+
+    const unlinked = [system('sap-unlinked', { kind: 'platform' })];
+    expect(findSystemsWithoutCapability(unlinked, [], []).map((s) => s.element_id)).toEqual(['sap-unlinked']);
+  });
+});
+
+describe('findPlatformSupportsThatShouldMoveToModule', () => {
+  it('flags a platform with modules that itself carries a direct supports edge', () => {
+    const systems = [system('sap', { kind: 'platform' })];
+    const containers = [container('fi', 'sap'), container('pm', 'sap')];
+    const edges = [relationship('r1', 'supports', 'sap', 'finance')];
+    expect(findPlatformSupportsThatShouldMoveToModule(systems, edges, containers).map((s) => s.element_id)).toEqual(['sap']);
+  });
+
+  it('does not flag a platform whose modules (not the platform itself) carry the supports edges', () => {
+    const systems = [system('sap', { kind: 'platform' })];
+    const containers = [container('fi', 'sap'), container('pm', 'sap')];
+    const edges = [relationship('r1', 'supports', 'fi', 'finance'), relationship('r2', 'supports', 'pm', 'asset-mgmt')];
+    expect(findPlatformSupportsThatShouldMoveToModule(systems, edges, containers)).toEqual([]);
+  });
+
+  it('does not flag a platform with no modules — there is nowhere lower to move the edge', () => {
+    const systems = [system('sap', { kind: 'platform' })];
+    const edges = [relationship('r1', 'supports', 'sap', 'finance')];
+    expect(findPlatformSupportsThatShouldMoveToModule(systems, edges, [])).toEqual([]);
+  });
+
+  it('does not flag an ordinary (non-platform) system with its own supports edge', () => {
+    const systems = [system('sys-1')];
+    const edges = [relationship('r1', 'supports', 'sys-1', 'finance')];
+    expect(findPlatformSupportsThatShouldMoveToModule(systems, edges, [])).toEqual([]);
   });
 });
 
