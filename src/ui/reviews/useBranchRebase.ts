@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
-import { getBranch } from '../../db/branches';
+import { dismissIdentityPairOnBranch, getBranch } from '../../db/branches';
 import { computeMergeReviewForBranch, pushRefresh } from '../../db/mergeRequests';
 import type { BranchRow } from '../../db/types';
 import type { MergeReview } from '../../engine/merge';
@@ -36,6 +36,13 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
   const [actionStatus, setActionStatus] = useState<ActionStatus>('idle');
   const [actionError, setActionError] = useState<string | null>(null);
   const [fieldChoices, setFieldChoices] = useState<Map<string, FieldConflictChoice>>(new Map());
+  // Optimistic-only additions not yet reflected in the `branch` prop's own
+  // `dismissed_identity_pairs` (the RPC call is in flight, or the parent
+  // hasn't re-fetched the branch since) — same shape as
+  // useReviewRequest.ts's own `pendingDismissals`, merged with the
+  // server-persisted list in `isIdentityPairDismissed` below, never the
+  // sole source of truth.
+  const [pendingDismissals, setPendingDismissals] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -116,5 +123,25 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
 
   const fieldChoiceFor = useMemo(() => (subjectId: UUID, attribute: string) => fieldChoices.get(fieldChoiceKey(subjectId, attribute)), [fieldChoices]);
 
-  return { state, reload, actionStatus, actionError, fieldChoiceFor, setFieldChoice, clearFieldChoice, stagedChoiceCount: fieldChoices.size, pushRebase };
+  const dismissIdentityPair = useCallback(
+    (oid: UUID, tid: UUID) => {
+      const pairKey = [oid, tid].sort().join(' ');
+      setPendingDismissals((prev) => new Set(prev).add(pairKey));
+      void dismissIdentityPairOnBranch(supabase, branch.id, pairKey).catch((e: unknown) => {
+        setActionError(e instanceof Error ? e.message : 'Could not dismiss this identity warning.');
+      });
+    },
+    [branch.id],
+  );
+
+  const isIdentityPairDismissed = useCallback(
+    (oid: UUID, tid: UUID) => {
+      const pairKey = [oid, tid].sort().join(' ');
+      if (branch.dismissed_identity_pairs.includes(pairKey)) return true;
+      return pendingDismissals.has(pairKey);
+    },
+    [branch.dismissed_identity_pairs, pendingDismissals],
+  );
+
+  return { state, reload, actionStatus, actionError, fieldChoiceFor, setFieldChoice, clearFieldChoice, stagedChoiceCount: fieldChoices.size, pushRebase, dismissIdentityPair, isIdentityPairDismissed };
 }

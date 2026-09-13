@@ -475,6 +475,7 @@ const PLACEHOLDER_BRANCH: BranchRow = {
   cancel_reason: null,
   cancelled_at: null,
   cancelled_by: null,
+  dismissed_identity_pairs: [],
 };
 
 /** Sprint U4-1 D1: "alias moves into attributes" — each alias renders as its own read-only row, same shape as any other attribute (`aliasAsFact` gives `AttributeRow` a `FactsRow` to work with), labelled by its real `alias_type` (`ALIAS_TYPE_LABELS`) rather than the header's old single undifferentiated "aka" bucket. Appended after the schema-driven fields — an alias is always additional identifying information, never a substitute for one of them. */

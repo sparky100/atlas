@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -18,10 +17,6 @@ export interface BranchRebasePanelProps {
   onRebased: () => void;
 }
 
-function dismissKey(oid: UUID, tid: UUID): string {
-  return [oid, tid].sort().join(' ');
-}
-
 /**
  * A draft change's own "rebase on main" (Sprint C1 step 8, the user's
  * brief: "Rebase branch on new main head with conflict surfacing") —
@@ -38,7 +33,6 @@ function dismissKey(oid: UUID, tid: UUID): string {
  */
 export function BranchRebasePanel({ modelId, branch, userId, canEdit, onRebased }: BranchRebasePanelProps) {
   const rebase = useBranchRebase(modelId, branch, userId, onRebased);
-  const [dismissedIdentityPairs, setDismissedIdentityPairs] = useState<Set<string>>(new Set());
 
   if (rebase.state.status === 'loading') return <Text tone="muted">Checking against main…</Text>;
   if (rebase.state.status === 'error') return <Text as="p">{rebase.state.message}</Text>;
@@ -138,10 +132,10 @@ export function BranchRebasePanel({ modelId, branch, userId, canEdit, onRebased 
                 key={`${finding.subjectId}-${finding.relatedSubjectId ?? ''}-${String(i)}`}
                 finding={finding}
                 heads={[threeWay.ours, threeWay.theirs, threeWay.base]}
-                dismissed={finding.relatedSubjectId ? dismissedIdentityPairs.has(dismissKey(finding.subjectId, finding.relatedSubjectId)) : false}
+                dismissed={finding.relatedSubjectId ? rebase.isIdentityPairDismissed(finding.subjectId, finding.relatedSubjectId) : false}
                 onDismiss={() => {
                   const relatedId = finding.relatedSubjectId;
-                  if (relatedId) setDismissedIdentityPairs((prev) => new Set(prev).add(dismissKey(finding.subjectId, relatedId)));
+                  if (relatedId) rebase.dismissIdentityPair(finding.subjectId, relatedId);
                 }}
               />
             ))}
