@@ -22,7 +22,16 @@ export default defineConfig({
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // S2 (docs/prompts/atlas-prompt-pack.md): "fix until they pass at 1280
+    // and 390" — the golden-path specs are the ones this line actually
+    // names, so only they run twice; every other spec here already picks
+    // its own viewport explicitly where it matters (e.g. the many
+    // `page.setViewportSize({width:390,...})` calls throughout) rather
+    // than needing a whole second project.
+    { name: 'chromium-390', use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 } }, testMatch: /golden-path-.*\.spec\.ts/ },
+  ],
   webServer: {
     // `--host 127.0.0.1`, not just `--port`: `vite preview`'s default host
     // is `localhost`, which some sandboxed/CI network namespaces resolve

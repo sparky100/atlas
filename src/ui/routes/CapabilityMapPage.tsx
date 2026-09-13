@@ -94,15 +94,31 @@ export function CapabilityMapPage() {
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const canEdit = ref.kind === 'main' && canEditOnMain(role);
-  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
 
   const { state, reload } = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref, mainBranch?.head_commit_id ?? null);
+  // S2 flow 1 bug fix: every mutation on this page (importing a starter
+  // map, adding a capability, reordering one, backfilling order) commits
+  // to main, moving its head — the caller must refresh `mainBranch` itself
+  // (`useMainBranch.ts`'s own reload doc comment: "call after any commit
+  // that may have moved main's head"), not just re-run `useCapabilityMap`
+  // at the *old*, now-stale `head_commit_id` it was given. Every one of
+  // this page's own `onCreated`/`onReordered`/`onBackfilled`/`onImported`
+  // callbacks used to pass the bare `reload` above and hit exactly this:
+  // the mutation genuinely lands (a real commit is created server-side)
+  // but the page keeps re-fetching the commit from before it, so nothing
+  // ever appears to change. `reloadAll` is every one of those callbacks
+  // now.
+  const reloadAll = () => {
+    reloadMainBranch();
+    reload();
+  };
   // S1 item 13: called unconditionally here (not inside `BackfillCapabilityOrderAction`
   // itself) — see that component's own module comment for why owning this
   // hook one level up, in a component that stays mounted across the
   // `reload` it triggers, is what lets its own success message survive to
   // be seen at all.
-  const backfillOrder = useBackfillCapabilityOrder({ modelId: model?.id ?? '', userId, onBackfilled: reload });
+  const backfillOrder = useBackfillCapabilityOrder({ modelId: model?.id ?? '', userId, onBackfilled: reloadAll });
 
   // Sprint U4-1 C4: "exposure for director home mode, coverage for
   // architect" — the same home_mode this org's ModelHome.tsx switches
@@ -201,7 +217,7 @@ export function CapabilityMapPage() {
                 userId={userId}
                 branch={mainBranch}
                 expectedHeadCommitId={state.data.commitId}
-                onCreated={reload}
+                onCreated={reloadAll}
               />
               {(state.data.tree.l1.length > 0 || state.data.tree.orphans.length > 0) && (
                 <div className={styles.menuWrapper}>
@@ -239,10 +255,10 @@ export function CapabilityMapPage() {
 
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
-        {state.status === 'refNotFound' && canEdit && <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reload} />}
+        {state.status === 'refNotFound' && canEdit && <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reloadAll} />}
         {state.status === 'refNotFound' && !canEdit && <Text as="p">Nothing here yet.</Text>}
         {state.status === 'ready' && state.data.tree.l1.length === 0 && state.data.tree.orphans.length === 0 && canEdit && (
-          <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reload} />
+          <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reloadAll} />
         )}
         {state.status === 'ready' && (
           <CapabilityMapView
@@ -256,7 +272,7 @@ export function CapabilityMapPage() {
             modelSlug={model.slug}
             refParam={refParam}
             reorderCapability={
-              canEdit && mainBranch ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: mainBranch, expectedHeadCommitId: state.data.commitId, onReordered: reload } : undefined
+              canEdit && mainBranch ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: mainBranch, expectedHeadCommitId: state.data.commitId, onReordered: reloadAll } : undefined
             }
             reorderMode={reorderMode}
             onReorderModeChange={setReorderMode}
