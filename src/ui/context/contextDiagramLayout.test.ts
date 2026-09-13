@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allTilesOf, anchorFor, computeContextDiagramLayout, MODULE_WIDTH, type DiagramUnitInput } from './contextDiagramLayout';
+import { allTilesOf, anchorFor, computeContextDiagramLayout, MODULE_WIDTH, type DiagramTile, type DiagramUnitInput } from './contextDiagramLayout';
 import { NODE_HEIGHT, NODE_WIDTH } from '../landscape/layout';
 
 function unit(elementId: string, modules: { elementId: string; capabilityName: string | null }[] = []): DiagramUnitInput {
@@ -66,6 +66,35 @@ describe('computeContextDiagramLayout', () => {
     const layout = computeContextDiagramLayout(unit('hub'), [], [], 400);
     expect(layout.width).toBeGreaterThanOrEqual(960);
   });
+
+  it('V1 fix, "centre-weighted layout": a short row of neighbours is centred within the diagram width, not left-hugging', () => {
+    // Three plain tiles: nowhere near enough to fill a 960px-wide row, so
+    // the old left-packed behaviour would start them flush at PADDING.
+    const layout = computeContextDiagramLayout(unit('hub'), [unit('n1'), unit('n2'), unit('n3')], []);
+    const row = layout.internalNeighbours;
+    const leftEdge = Math.min(...row.map((t) => t.x));
+    const rightEdge = Math.max(...row.map((t) => t.x + t.w));
+    const rowCentre = (leftEdge + rightEdge) / 2;
+    expect(rowCentre).toBeCloseTo(layout.width / 2, 0);
+    // The old behaviour: left-hugging at PADDING (32) — confirm this isn't it.
+    expect(leftEdge).toBeGreaterThan(32);
+  });
+
+  it('centre-weighted layout still wraps and centres each row independently when neighbours overflow one row', () => {
+    const many = Array.from({ length: 20 }, (_, i) => unit(`n${String(i)}`));
+    const layout = computeContextDiagramLayout(unit('hub'), many, [], 960);
+    const rows = new Map<number, DiagramTile[]>();
+    for (const tile of layout.internalNeighbours) {
+      const row = rows.get(tile.y) ?? [];
+      row.push(tile);
+      rows.set(tile.y, row);
+    }
+    for (const row of rows.values()) {
+      const leftEdge = Math.min(...row.map((t) => t.x));
+      const rightEdge = Math.max(...row.map((t) => t.x + t.w));
+      expect((leftEdge + rightEdge) / 2).toBeCloseTo(layout.width / 2, 0);
+    }
+  });
 });
 
 describe('allTilesOf', () => {
@@ -80,21 +109,27 @@ describe('allTilesOf', () => {
 describe('anchorFor', () => {
   it('anchors to a specific module sub-tile when the edge endpoint names that module', () => {
     const layout = computeContextDiagramLayout(unit('sap', [{ elementId: 'fi', capabilityName: 'Finance' }, { elementId: 'pm', capabilityName: null }]), [], []);
-    const anchor = anchorFor(layout.hub, 'fi');
+    const towards = { x: layout.hub.x + layout.hub.w / 2, y: layout.hub.y + layout.hub.h + 200 };
+    const anchor = anchorFor(layout.hub, 'fi', towards);
     expect(anchor.isPlatformFallback).toBe(false);
     const fiModule = layout.hub.modules?.find((m) => m.elementId === 'fi');
     expect(anchor.x).toBeCloseTo((fiModule?.x ?? 0) + MODULE_WIDTH / 2);
   });
 
-  it('falls back to the platform tile\'s own centre, flagged, when the edge endpoint is the platform itself', () => {
+  it('falls back to a point on the platform tile\'s own boundary, flagged, when the edge endpoint is the platform itself — V1 fix: never the tile\'s interior centre, which used to draw the line and marker through the module row', () => {
     const layout = computeContextDiagramLayout(unit('sap', [{ elementId: 'fi', capabilityName: 'Finance' }]), [], []);
-    const anchor = anchorFor(layout.hub, 'sap');
+    const towards = { x: layout.hub.x + layout.hub.w / 2, y: layout.hub.y + layout.hub.h + 200 };
+    const anchor = anchorFor(layout.hub, 'sap', towards);
     expect(anchor.isPlatformFallback).toBe(true);
+    // On the tile's own bottom edge (facing `towards`, which sits straight below), not its interior centre.
+    expect(anchor.y).toBeCloseTo(layout.hub.y + layout.hub.h);
+    expect(anchor.x).toBeCloseTo(layout.hub.x + layout.hub.w / 2);
   });
 
   it('is never flagged as a platform fallback for a plain (no-module) tile', () => {
     const layout = computeContextDiagramLayout(unit('hub'), [], []);
-    const anchor = anchorFor(layout.hub, 'hub');
+    const towards = { x: layout.hub.x + layout.hub.w + 200, y: layout.hub.y };
+    const anchor = anchorFor(layout.hub, 'hub', towards);
     expect(anchor.isPlatformFallback).toBe(false);
   });
 });

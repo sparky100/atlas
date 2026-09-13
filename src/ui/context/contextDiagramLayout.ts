@@ -31,11 +31,27 @@ import type { UUID } from '../../contracts/delta';
 import { NODE_HEIGHT, NODE_WIDTH } from '../landscape/layout';
 
 export const MODULE_WIDTH = 72;
-export const MODULE_HEIGHT = 40;
+/**
+ * V1 fix: was 40 — room for exactly one line of name and one of capability,
+ * truncated hard the moment either overflowed the 72px-wide tile. The fix
+ * request's "capability... never a blank tile" and "labelled with the
+ * module's own name" both need real room to show that text — `ModuleTile`'s
+ * name/capability now wrap to up to two lines each (`ContextDiagramCanvas.tsx`),
+ * so the box needs to fit four short lines, not two.
+ */
+export const MODULE_HEIGHT = 68;
 const MODULE_GUTTER_X = 8;
 const MODULE_PADDING = 8;
-/** Height of a platform tile's own title bar (name + glyph), above its row of module sub-tiles. */
-const PLATFORM_TITLE_HEIGHT = 24;
+/**
+ * Height of a platform tile's own title bar (name + glyph, kind, and a
+ * one-sentence description), above its row of module sub-tiles. V1 fix: was
+ * 24 — just enough for a glyph and one line of the platform's own name. The
+ * fix request adds a kind label and a one-sentence description to the
+ * platform tile's own title bar (`ContextDiagramCanvas.tsx`'s drawing code)
+ * — name line, kind line, description wrapped to up to two lines — so the
+ * title bar needs room for four short lines, not one.
+ */
+const PLATFORM_TITLE_HEIGHT = 68;
 
 const TILE_GUTTER_X = 24;
 const TILE_GUTTER_Y = 20;
@@ -112,26 +128,57 @@ function byElementId(a: DiagramUnitInput, b: DiagramUnitInput): number {
   return a.elementId.localeCompare(b.elementId);
 }
 
-/** One row of tiles, wrapped left-to-right at `availableWidth` — unlike `layout.ts`'s own `layoutRow` (a strict uniform-width column grid), tiles here can vary in width (a platform's own widened tile), so this packs greedily by actual width instead of a fixed items-per-row count. */
+/**
+ * One row of tiles, wrapped left-to-right at `availableWidth` — unlike
+ * `layout.ts`'s own `layoutRow` (a strict uniform-width column grid), tiles
+ * here can vary in width (a platform's own widened tile), so this packs
+ * greedily by actual width instead of a fixed items-per-row count.
+ *
+ * V1 fix, "centre-weighted layout": each wrapped row is centred within
+ * `availableWidth` on its own (the hub above it is already centred the same
+ * way — `computeContextDiagramLayout`'s own `hubX`) rather than hugging the
+ * left edge, so a short last row (the common case — neighbours rarely divide
+ * evenly into full rows) reads as balanced around the hub's own centre line
+ * instead of stranded to one side.
+ */
 function packRow(units: readonly DiagramUnitInput[], top: number, availableWidth: number, originX: number): { tiles: DiagramTile[]; height: number } {
   if (units.length === 0) return { tiles: [], height: 0 };
   const sized = units.map((unit) => ({ unit, size: tileSize(unit.modules.length) }));
 
-  const tiles: DiagramTile[] = [];
-  let x = originX;
-  let y = top;
-  let rowHeight = 0;
-  for (const { unit, size } of sized) {
-    if (x !== originX && x + size.w > originX + availableWidth) {
-      x = originX;
-      y += rowHeight + TILE_GUTTER_Y;
-      rowHeight = 0;
+  // First pass: group into rows by width alone (no x/y yet) — the same
+  // greedy wrap the old single-pass version did, just deferring placement
+  // until each row's own total width is known.
+  const rows: (typeof sized)[] = [];
+  let current: typeof sized = [];
+  let currentWidth = 0;
+  for (const entry of sized) {
+    const entryWidth = current.length === 0 ? entry.size.w : entry.size.w + TILE_GUTTER_X;
+    if (current.length > 0 && currentWidth + entryWidth > availableWidth) {
+      rows.push(current);
+      current = [entry];
+      currentWidth = entry.size.w;
+    } else {
+      current.push(entry);
+      currentWidth += entryWidth;
     }
-    tiles.push({ elementId: unit.elementId, x, y, w: size.w, h: size.h, ...(unit.modules.length > 0 ? { modules: placeModules(x, y, size.w, unit.modules) } : {}) });
-    x += size.w + TILE_GUTTER_X;
-    rowHeight = Math.max(rowHeight, size.h);
   }
-  return { tiles, height: y + rowHeight - top };
+  if (current.length > 0) rows.push(current);
+
+  // Second pass: place each row, centred — same shape as the hub's own
+  // `hubX = PADDING + (availableWidth - hubSize.w) / 2` one level up.
+  const tiles: DiagramTile[] = [];
+  let y = top;
+  for (const row of rows) {
+    const rowWidth = row.reduce((sum, { size }, i) => sum + size.w + (i > 0 ? TILE_GUTTER_X : 0), 0);
+    const rowHeight = Math.max(...row.map(({ size }) => size.h));
+    let x = originX + (availableWidth - rowWidth) / 2;
+    for (const { unit, size } of row) {
+      tiles.push({ elementId: unit.elementId, x, y, w: size.w, h: size.h, ...(unit.modules.length > 0 ? { modules: placeModules(x, y, size.w, unit.modules) } : {}) });
+      x += size.w + TILE_GUTTER_X;
+    }
+    y += rowHeight + TILE_GUTTER_Y;
+  }
+  return { tiles, height: y - TILE_GUTTER_Y - top };
 }
 
 /**
@@ -192,15 +239,45 @@ export interface DiagramAnchor {
 }
 
 /**
+ * Where a straight line from `tile`'s own centre to `towards` crosses this
+ * tile's own rectangle boundary — standard rect/line clipping (scale the
+ * centre-to-`towards` vector down by whichever axis, x or y, hits the
+ * rectangle's own half-width/half-height first). V1 fix: the platform
+ * fallback anchor below used to return the tile's own *centre* unconditionally,
+ * despite its own doc comment already promising "the platform tile's own
+ * edge" — for a wide platform tile (widened to fit a row of module
+ * sub-tiles) that put the anchor deep inside the box, so the line and its
+ * "which module?" marker both drew through/behind the module row instead of
+ * sitting at the tile's own border, exactly the messy crossing a live
+ * screenshot showed for a plain system → platform edge.
+ */
+function clipToRectBoundary(tile: DiagramTile, towards: { x: number; y: number }): { x: number; y: number } {
+  const cx = tile.x + tile.w / 2;
+  const cy = tile.y + tile.h / 2;
+  const dx = towards.x - cx;
+  const dy = towards.y - cy;
+  if (dx === 0 && dy === 0) return { x: cx, y: cy };
+  const scaleX = dx !== 0 ? tile.w / 2 / Math.abs(dx) : Infinity;
+  const scaleY = dy !== 0 ? tile.h / 2 / Math.abs(dy) : Infinity;
+  const scale = Math.min(scaleX, scaleY);
+  return { x: cx + dx * scale, y: cy + dy * scale };
+}
+
+/**
  * Where an edge should anchor on `tile`'s own unit — a specific module's
  * sub-tile centre when `endpointElementId` (the edge's actual `from`/`to`
- * id) names one of that unit's modules directly, or the unit's own centre
- * with `isPlatformFallback: true` otherwise (S1 item 20's own "a flow whose
- * endpoint is a platform rather than one of its modules" — V1's "which
- * module?" marker draws here).
+ * id) names one of that unit's modules directly, or a point on the unit's
+ * own rectangle boundary, facing `towards` (the other endpoint's own
+ * anchor-side tile centre), with `isPlatformFallback: true` otherwise (S1
+ * item 20's own "a flow whose endpoint is a platform rather than one of its
+ * modules" — V1's "which module?" marker draws here, now genuinely at the
+ * tile's own edge rather than its centre — see `clipToRectBoundary`'s own
+ * comment for why that changed).
  */
-export function anchorFor(tile: DiagramTile, endpointElementId: UUID): DiagramAnchor {
+export function anchorFor(tile: DiagramTile, endpointElementId: UUID, towards: { x: number; y: number }): DiagramAnchor {
   const module = tile.modules?.find((m) => m.elementId === endpointElementId);
   if (module) return { x: module.x + module.w / 2, y: module.y + module.h / 2, isPlatformFallback: false };
-  return { x: tile.x + tile.w / 2, y: tile.y + tile.h / 2, isPlatformFallback: (tile.modules?.length ?? 0) > 0 && endpointElementId === tile.elementId };
+  const isFallback = (tile.modules?.length ?? 0) > 0 && endpointElementId === tile.elementId;
+  if (!isFallback) return { x: tile.x + tile.w / 2, y: tile.y + tile.h / 2, isPlatformFallback: false };
+  return { ...clipToRectBoundary(tile, towards), isPlatformFallback: true };
 }
