@@ -3,7 +3,7 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { listChangeBranches } from '../../db/branches';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
-import { listSystemsForLandscape } from '../../db/landscape';
+import { listContainersForLandscape, listSystemsForLandscape } from '../../db/landscape';
 import {
   buildCapabilityTiles,
   commitsSincePreviousTag,
@@ -97,17 +97,25 @@ export function useDirectorHome(
         return;
       }
 
-      const [capabilities, supportsEdges, systems, counts, changeBranches, tags, plannedReplacements] = await Promise.all([
+      const [capabilities, supportsEdges, systems, containers, counts, changeBranches, tags, plannedReplacements] = await Promise.all([
         listCapabilitiesForMap(supabase, commitId),
         listAllSupportsEdges(supabase, commitId),
         listSystemsForLandscape(supabase, commitId),
+        listContainersForLandscape(supabase, commitId),
         loadModelCounts(supabase, commitId, modelId),
         listChangeBranches(supabase, modelId),
         listTagsForModel(supabase, modelId),
         loadPlannedReplacements(supabase, modelId),
       ]);
 
-      const systemsById = new Map<UUID, ElementsHeadRow>(systems.map((s) => [s.element_id, s]));
+      // Bug fix: a `supports` edge's own `from_element_id` can be a
+      // container just as validly as a system (S1 item 20 — a platform's
+      // own module supports a capability directly) — `buildCapabilityTiles`/
+      // `computeExposureTone` (`modelHome.ts`) both silently drop any edge
+      // whose supporter isn't in this map, so a capability supported only
+      // by a container used to read as "no known supporters" here even
+      // though its own element page showed the real relationship.
+      const systemsById = new Map<UUID, ElementsHeadRow>([...systems, ...containers].map((s) => [s.element_id, s]));
       // Handoff 7d's grid is level-1 tiles only — `listCapabilitiesForMap`
       // returns every level (1-3); computeCapabilityMapTree's own `l1`
       // array is the real, parent_id-derived level-1 set (never a fixed
