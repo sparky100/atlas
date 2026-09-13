@@ -354,6 +354,53 @@ export function findPlatformSupportsThatShouldMoveToModule(
   return systems.filter((system) => isPlatform(system) && (modulesByPlatformId.get(system.element_id)?.length ?? 0) > 0 && linkedElementIds.has(system.element_id));
 }
 
+export interface PlatformFlowEndpoint {
+  relationshipId: UUID;
+  relationshipType: 'uses' | 'flows_to';
+  fromName: string;
+  toName: string;
+  /** Which side of the edge names the platform itself rather than one of its modules — `'both'` only when a platform with modules flows to/uses another platform with modules, naming itself on both ends. */
+  platformSide: 'from' | 'to' | 'both';
+}
+
+/**
+ * S1 item 20's own informational nudge, the `uses`/`flows_to` sibling of
+ * `findPlatformSupportsThatShouldMoveToModule` above: once `uses`/`flows_to`
+ * legally reach a `container`↔`system` pair either direction (this item's
+ * own `relationshipTypeRules.ts` addition), an edge can now point straight
+ * at a platform system itself instead of naming the specific module that
+ * actually sends or receives the flow. Legal either way — this is purely a
+ * "did you mean the module?" visibility check, same informational shape as
+ * item 19's finding — and, per that same reasoning, vacuous for a platform
+ * with no modules (nowhere lower to point the edge at). This is also the
+ * "which module?" marker the V1 sprint's own context-diagram prompt
+ * describes from the rendering side (`docs/prompts/atlas-prompt-pack.md`'s
+ * "### V1" section): "flows attach to the module when the relationship's
+ * endpoint is a container, else to the platform edge with a 'which
+ * module?' marker (health finding)" — this is that health finding.
+ */
+export function findFlowsToPlatformInsteadOfModule(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): PlatformFlowEndpoint[] {
+  const containers = [...elementsById.values()].filter((el) => el.element_type === 'container');
+  const modulesByPlatformId = groupModulesByPlatformId(containers);
+  const platformsWithModulesIds = new Set(
+    [...elementsById.values()].filter((el) => el.element_type === 'system' && isPlatform(el) && (modulesByPlatformId.get(el.element_id)?.length ?? 0) > 0).map((el) => el.element_id),
+  );
+
+  const result: PlatformFlowEndpoint[] = [];
+  for (const edge of edges) {
+    if (edge.relationship_type !== 'uses' && edge.relationship_type !== 'flows_to') continue;
+    const fromIsPlatform = platformsWithModulesIds.has(edge.from_element_id);
+    const toIsPlatform = platformsWithModulesIds.has(edge.to_element_id);
+    if (!fromIsPlatform && !toIsPlatform) continue;
+    const from = elementsById.get(edge.from_element_id);
+    const to = elementsById.get(edge.to_element_id);
+    if (!from || !to) continue;
+    const platformSide: PlatformFlowEndpoint['platformSide'] = fromIsPlatform && toIsPlatform ? 'both' : fromIsPlatform ? 'from' : 'to';
+    result.push({ relationshipId: edge.relationship_id, relationshipType: edge.relationship_type, fromName: from.name, toName: to.name, platformSide });
+  }
+  return result;
+}
+
 /**
  * Whether `capability` counts as owned, `selfOwnedIds`-owned itself or
  * through an ancestor — capped at a grandparent walk, same bound as

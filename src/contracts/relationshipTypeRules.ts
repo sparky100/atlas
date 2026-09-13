@@ -46,6 +46,12 @@ export const RELATIONSHIP_TYPE_RULES: readonly RelationshipTypeRule[] = [
   { relationshipType: 'uses', fromType: 'system', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'uses', fromType: 'container', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'uses', fromType: 'container', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  // S1 item 20: the reverse direction — a system `uses` a container
+  // directly (e.g. a system calling into one specific module of a
+  // platform, rather than the platform's own system-level endpoint).
+  // `container→system` above already covered the other direction; nothing
+  // before this made `system→container` legal for `uses` at all.
+  { relationshipType: 'uses', fromType: 'system', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   // S1 item 11a: an actor (a person, team, or external organisation) can
   // use a system or container directly — "Ofgem uses the reporting
   // system" is a `uses` edge, not an `owns` one; `owns` stays reserved for
@@ -59,6 +65,14 @@ export const RELATIONSHIP_TYPE_RULES: readonly RelationshipTypeRule[] = [
   { relationshipType: 'owns', fromType: 'actor', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: 1, maxPrimaryPerFrom: null },
   { relationshipType: 'flows_to', fromType: 'system', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'flows_to', fromType: 'container', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  // S1 item 20: `flows_to` gains the same container↔system reach `uses`
+  // already had one direction of (`uses(container,system)` above) and now
+  // has both — a data flow between a specific module and a whole system
+  // (or vice versa) is exactly as legitimate a fact as one between two
+  // whole systems or two modules; there was never a reason `flows_to`
+  // should be more restrictive than `uses` here.
+  { relationshipType: 'flows_to', fromType: 'container', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  { relationshipType: 'flows_to', fromType: 'system', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
 ] as const;
 
 /** The rule for a triple, or `undefined` if the triple isn't legal (C9/V3). */
