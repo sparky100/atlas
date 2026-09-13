@@ -8,7 +8,7 @@ import type { ChipTone } from '../components/Chip/Chip';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff, VersionDiffState } from '../../engine/versionDiff';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
-import { BOUNDARY_MARGIN, computeLandscapeChannels, NODE_HEIGHT, NODE_WIDTH, REFERENCE_CHIP_HEIGHT, REFERENCE_CHIP_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
+import { BOUNDARY_MARGIN, computeLandscapeChannels, laneAt, NODE_HEIGHT, NODE_WIDTH, REFERENCE_CHIP_HEIGHT, REFERENCE_CHIP_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
 import { landscapeTileColourFor } from './landscapeColour';
 import { quantizeScale } from './zoom';
 import styles from './LandscapeCanvas.module.css';
@@ -63,6 +63,27 @@ export interface LandscapeCanvasProps {
    * a stored preference, keeping this item's migration footprint at zero.
    */
   routeViaPlatforms?: boolean | undefined;
+  /**
+   * V2 "landscape focus and filters": the currently-focused system/actor,
+   * if any — `null`/`undefined` means no focus is active (every node full
+   * opacity, every `uses`/`flows_to` edge subject to `showConnections`
+   * alone). While focused, every *other* node fades to 20% opacity
+   * (`focusAlpha` in `drawNode`) and only this element's own edges draw
+   * (`visibleEdges`), regardless of `showConnections`.
+   */
+  focusedElementId?: UUID | null | undefined;
+  /** A different tile was clicked while nothing (or someone else) was focused — see `handlePointerUp`'s own click-focus-vs-navigate precedence comment for exactly when this fires instead of a real navigation. */
+  onFocusElement?: (elementId: UUID) => void;
+  /** Escape, or a click on empty canvas background — decision 2's own "background click clears focus, same as Escape." */
+  onClearFocus?: () => void;
+  /**
+   * V2: "edges hidden by default; 'Show connections' toggle" — off (the
+   * default) draws no `uses`/`flows_to` edge at all while nothing is
+   * focused; on, draws every one, exactly like this canvas always used to.
+   * Meaningless while a focus is active (that always shows the focused
+   * element's own edges regardless) — see `visibleEdges`'s own comment.
+   */
+  showConnections?: boolean | undefined;
 }
 
 interface Transform {
@@ -322,6 +343,10 @@ export function LandscapeCanvas({
   commentsOnlyFilter = false,
   colourBy = 'none',
   routeViaPlatforms = false,
+  focusedElementId = null,
+  onFocusElement,
+  onClearFocus,
+  showConnections = false,
 }: LandscapeCanvasProps) {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -343,8 +368,32 @@ export function LandscapeCanvas({
   const diffByElementId = useMemo(() => new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []), [diff]);
   const diffByRelationshipId = useMemo(() => new Map<UUID, RelationshipVersionDiff>(diff?.relationships.map((r) => [r.relationshipId, r]) ?? []), [diff]);
 
-  // Item 9: routed once per `layout`/`edges` change, not per draw — a
-  // straight line when nothing's in the way (the common case), an
+  // V2 "landscape focus and filters": "edges hidden by default; 'Show
+  // connections' toggle" — off (and no focus active) means no edge draws
+  // at all. Focus overrides `showConnections` entirely rather than
+  // combining with it: the whole point of focus is "show me this one
+  // subject's own connections regardless of the global toggle."
+  const visibleEdges = useMemo(() => {
+    if (focusedElementId != null) return edges.filter((e) => e.from_element_id === focusedElementId || e.to_element_id === focusedElementId);
+    return showConnections ? edges : [];
+  }, [edges, focusedElementId, showConnections]);
+
+  // V2: every element one `uses`/`flows_to` hop from the focused element,
+  // either direction — computed off the real edge graph, never the routed
+  // (possibly via-adjusted) one, so a "route via platforms" leg doesn't
+  // itself count as a neighbour hop.
+  const focusNeighbourIds = useMemo(() => {
+    const result = new Set<UUID>();
+    if (focusedElementId == null) return result;
+    for (const edge of edges) {
+      if (edge.from_element_id === focusedElementId) result.add(edge.to_element_id);
+      else if (edge.to_element_id === focusedElementId) result.add(edge.from_element_id);
+    }
+    return result;
+  }, [edges, focusedElementId]);
+
+  // Item 9: routed once per `layout`/`visibleEdges` change, not per draw —
+  // a straight line when nothing's in the way (the common case), an
   // orthogonal detour through a clear channel otherwise (`layout.ts`'s own
   // comment on `routeLandscapeEdge`). Recomputing this per animation frame
   // during a pan/zoom drag would repeat the same O(edges × nodes) obstacle
@@ -359,8 +408,35 @@ export function LandscapeCanvas({
     // purposes; edge endpoint lookup needs the same combination.
     const positionById = new Map(allPositions.map((n) => [n.elementId, n]));
     const channels = computeLandscapeChannels(layout);
-    const result: { edge: RelationshipsHeadRow; points: { x: number; y: number }[] }[] = [];
-    for (const edge of edges) {
+    const segments: { edge: RelationshipsHeadRow; points: { x: number; y: number }[] }[] = [];
+    // V2: "edges to platforms end at a lane-edge chip unless the platform
+    // is in focus" — a small fake `LandscapeNodePosition` centred exactly
+    // on that lane's own top edge (so `routeLandscapeEdge`'s `NODE_WIDTH/
+    // HEIGHT`-based centre math lands the edge, and the drawn pill below,
+    // on the same point), keyed by the *real* node so the routing's own
+    // per-node obstacle exclusion still works. `null` when this endpoint
+    // isn't in the platform band, or is itself the focused element (focus
+    // wants the real edge into the real tile, not a chip standing in for
+    // it).
+    const platformChipsByElementId = new Map<UUID, { elementId: UUID; name: string; x: number; y: number }>();
+    const chipPositionFor = (position: LandscapeNodePosition): LandscapeNodePosition | null => {
+      if (position.elementId === focusedElementId) return null;
+      const lane = laneAt(position.y + NODE_HEIGHT / 2, layout.lanes);
+      if (lane?.region !== 'platform') return null;
+      const centreX = position.x + NODE_WIDTH / 2;
+      const centreY = lane.y;
+      if (!platformChipsByElementId.has(position.elementId)) {
+        platformChipsByElementId.set(position.elementId, {
+          elementId: position.elementId,
+          name: systemsById.get(position.elementId)?.name ?? '',
+          x: centreX - REFERENCE_CHIP_WIDTH / 2,
+          y: centreY - REFERENCE_CHIP_HEIGHT / 2,
+        });
+      }
+      return { elementId: position.elementId, x: centreX - NODE_WIDTH / 2, y: centreY - NODE_HEIGHT / 2 };
+    };
+
+    for (const edge of visibleEdges) {
       const from = positionById.get(edge.from_element_id);
       const to = positionById.get(edge.to_element_id);
       if (!from || !to) continue;
@@ -373,22 +449,26 @@ export function LandscapeCanvas({
       // that doesn't resolve on this map (the platform system exists but
       // isn't itself placed here — shouldn't happen in practice, since the
       // platform is a system too, but not asserted away) falls back to the
-      // direct edge rather than drawing nothing.
+      // direct edge rather than drawing nothing. Deliberately not subject
+      // to the platform-chip redirection below: routing "via" a platform
+      // is the one case that's supposed to visibly enter it.
       const via = attributesRecord(edge.attributes).via;
       const viaPosition = viaPositionFor(typeof via === 'string' ? via : undefined, positionById, routeViaPlatforms);
       if (viaPosition) {
         const obstaclesToVia = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== viaPosition.elementId);
         const obstaclesFromVia = allPositions.filter((n) => n.elementId !== viaPosition.elementId && n.elementId !== edge.to_element_id);
-        result.push({ edge, points: routeLandscapeEdge(from, viaPosition, obstaclesToVia, channels, layout.lanes) });
-        result.push({ edge, points: routeLandscapeEdge(viaPosition, to, obstaclesFromVia, channels, layout.lanes) });
+        segments.push({ edge, points: routeLandscapeEdge(from, viaPosition, obstaclesToVia, channels, layout.lanes) });
+        segments.push({ edge, points: routeLandscapeEdge(viaPosition, to, obstaclesFromVia, channels, layout.lanes) });
         continue;
       }
 
       const obstacles = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== edge.to_element_id);
-      result.push({ edge, points: routeLandscapeEdge(from, to, obstacles, channels, layout.lanes) });
+      const fromChip = chipPositionFor(from);
+      const toChip = chipPositionFor(to);
+      segments.push({ edge, points: routeLandscapeEdge(fromChip ?? from, toChip ?? to, obstacles, channels, layout.lanes) });
     }
-    return result;
-  }, [layout, edges, routeViaPlatforms]);
+    return { segments, platformEdgeChips: [...platformChipsByElementId.values()] };
+  }, [layout, visibleEdges, routeViaPlatforms, focusedElementId, systemsById]);
 
   const fitToView = useCallback(() => {
     const wrapper = wrapperRef.current;
@@ -583,6 +663,13 @@ export function LandscapeCanvas({
         if (!system) continue;
         referenceChips.push({ text: `⇢ ${system.name}`, x: marker.x, y: marker.y });
       }
+      // V2: the platform lane-edge chip an edge terminates at instead of
+      // the real platform tile (`routedEdges`'s own comment) — a `→ {name}`
+      // pill, drawn identically to a reference chip's own small pill below
+      // but with its own distinct arrow glyph and label, never folded into
+      // `referenceChips` itself (a different concept: this marks where an
+      // edge stops, not "this system also supports this lane").
+      const platformEdgeChips = routedEdges.platformEdgeChips.map((chip) => ({ text: `→ ${chip.name}`, x: chip.x, y: chip.y }));
 
       const edgeMarkers: { text: string; worldX: number; worldY: number; colour: string }[] = [];
       // S1 item 11a: an actor's own `uses` edge shows its verb phrase
@@ -596,7 +683,7 @@ export function LandscapeCanvas({
       const edgeLabels: { text: string; worldX: number; worldY: number }[] = [];
       if (edgeScreenWidth >= 0.25) {
         const simplified = edgeScreenWidth < 0.5;
-        for (const { edge, points } of routedEdges) {
+        for (const { edge, points } of routedEdges.segments) {
           // Culling against the routed path's own bounding box, not just
           // the two endpoints — item 9's detours can bow out sideways well
           // past the straight-line box between `from`/`to`.
@@ -715,9 +802,15 @@ export function LandscapeCanvas({
         const hasAnyThread = (threadCountsForNode?.total ?? 0) > 0;
         const diffAlpha = diff && elementType === 'system' && nodeState === 'unchanged' ? 0.6 : 1;
         const filterAlpha = commentsOnlyFilter && !hasAnyThread ? 0.25 : 1;
+        // V2: "subject plus direct neighbours at full opacity, rest at
+        // 20%" — a third multiplicative term, composed the same way as the
+        // two above rather than replacing them, so a focused-but-filtered
+        // node reads fainter still instead of one fade silently overriding
+        // the other.
+        const focusAlpha = focusedElementId == null || elementId === focusedElementId || focusNeighbourIds.has(elementId) ? 1 : 0.2;
 
         ctx.save();
-        ctx.globalAlpha = diffAlpha * filterAlpha;
+        ctx.globalAlpha = diffAlpha * filterAlpha * focusAlpha;
         roundRectPath(ctx, x, y, NODE_WIDTH, NODE_HEIGHT, 8);
         if (diff && nodeState === 'removed') {
           const pattern = createHatchPattern(ctx, tokens.diffRemoved);
@@ -782,7 +875,7 @@ export function LandscapeCanvas({
       // fixed on-screen size within a zoom step, not scale continuously
       // with the gesture the way node geometry does, so it can't share the
       // world-transformed pass above.
-      if (laneLabels.length > 0 || nodeLabels.length > 0 || diffMarkers.length > 0 || edgeMarkers.length > 0 || edgeLabels.length > 0 || extraLaneMarkers.length > 0 || referenceChips.length > 0 || commentMarkers.length > 0 || hollowCommentMarkers.length > 0) {
+      if (laneLabels.length > 0 || nodeLabels.length > 0 || diffMarkers.length > 0 || edgeMarkers.length > 0 || edgeLabels.length > 0 || extraLaneMarkers.length > 0 || referenceChips.length > 0 || platformEdgeChips.length > 0 || commentMarkers.length > 0 || hollowCommentMarkers.length > 0) {
         const textScale = quantizeScale(transform.scale, MIN_SCALE, MAX_SCALE);
         const toScreen = (worldX: number, worldY: number): [number, number] => [worldX * transform.scale + transform.tx, worldY * transform.scale + transform.ty];
         ctx.textBaseline = 'middle';
@@ -805,6 +898,25 @@ export function LandscapeCanvas({
           ctx.fillStyle = tokens.surfaceRaised;
           ctx.fill();
           ctx.strokeStyle = tokens.border;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.fillStyle = tokens.textMuted;
+          const truncated = truncate(ctx, chip.text, w - 12 * textScale);
+          ctx.fillText(truncated, x + 6 * textScale, y + h / 2);
+        }
+
+        // V2's own platform lane-edge chip — same pill shape as a
+        // reference chip, distinguished only by its `→ {name}` text (this
+        // component's own `routedEdges` comment explains why it's a
+        // separate concept, not folded into `referenceChips` above).
+        for (const chip of platformEdgeChips) {
+          const [x, y] = toScreen(chip.x, chip.y);
+          const w = REFERENCE_CHIP_WIDTH * transform.scale;
+          const h = REFERENCE_CHIP_HEIGHT * transform.scale;
+          roundRectPath(ctx, x, y, w, h, h / 2);
+          ctx.fillStyle = tokens.surfaceRaised;
+          ctx.fill();
+          ctx.strokeStyle = tokens.statusInfo;
           ctx.lineWidth = 1;
           ctx.stroke();
           ctx.fillStyle = tokens.textMuted;
@@ -902,7 +1014,7 @@ export function LandscapeCanvas({
     return () => {
       observer.disconnect();
     };
-  }, [layout, routedEdges, systemsById, actorsById, diff, diffByElementId, diffByRelationshipId, transform, hover, threadCounts, commentsOnlyFilter, colourBy]);
+  }, [layout, routedEdges, systemsById, actorsById, diff, diffByElementId, diffByRelationshipId, transform, hover, threadCounts, commentsOnlyFilter, colourBy, focusedElementId, focusNeighbourIds]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -978,7 +1090,16 @@ export function LandscapeCanvas({
       return;
     }
     const hit = nodeAt(screenX, screenY);
-    if (hit) void navigate(hit.elementType === 'system' ? nodeHref(hit.elementId) : actorHref(hit.elementId));
+    // V2 decision 2: "click focuses; click again navigates." A hit on the
+    // already-focused tile is today's exact behaviour, unchanged — it
+    // navigates. A hit on any other tile focuses instead of navigating; a
+    // miss (empty canvas background) clears focus, same as Escape.
+    if (hit) {
+      if (hit.elementId === focusedElementId) void navigate(hit.elementType === 'system' ? nodeHref(hit.elementId) : actorHref(hit.elementId));
+      else onFocusElement?.(hit.elementId);
+    } else {
+      onClearFocus?.();
+    }
   }
 
   function zoomBy(factor: number, center?: { x: number; y: number }): void {
@@ -1008,6 +1129,10 @@ export function LandscapeCanvas({
     else if (e.key === 'n' && hover) onNewCommentShortcut?.(hover.elementId);
     else if (e.key === 'Escape' && extraLanesPopover) setExtraLanesPopover(null);
     else if (e.key === 'Escape' && hoverReference) setHoverReference(null);
+    // V2 decision 2: "Escape clears" focus — appended after the two
+    // existing Escape branches above, same style, so a popover/reference
+    // tooltip still takes precedence when one happens to be open too.
+    else if (e.key === 'Escape' && focusedElementId != null) onClearFocus?.();
   }
 
   // Secondary-supporter wording: the reference chip's own resolved system
@@ -1044,6 +1169,12 @@ export function LandscapeCanvas({
       data-ty={transform.ty}
       data-layout-width={layout.width}
       data-layout-height={layout.height}
+      // V2: Playwright's own hook onto focus state — the `data-scale`/
+      // `data-tx`/`data-ty` precedent above, extended so a test can assert
+      // the actual computed focused/neighbour set directly rather than
+      // inferring it indirectly from click side-effects.
+      data-focused-element-id={focusedElementId ?? ''}
+      data-focus-neighbour-ids={[...focusNeighbourIds].join(',')}
     >
       <canvas
         ref={canvasRef}

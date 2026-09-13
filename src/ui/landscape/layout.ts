@@ -356,6 +356,17 @@ export interface LandscapeLaneDisplayOptions {
 }
 
 /**
+ * The empty options object, shared rather than a fresh `{}` at every call
+ * site — `computeLandscapeLayout`'s own default parameter value needs no
+ * such care (a plain function call, not a React hook dependency), but
+ * `useLandscapeDisplay.ts` passes this same reference into a `useEffect`
+ * dependency array, where a *new* object literal on every render would
+ * mean "no lane-display preference set" re-triggers a recompute (and the
+ * resulting re-render) forever.
+ */
+export const EMPTY_LANE_DISPLAY: LandscapeLaneDisplayOptions = {};
+
+/**
  * Whether a lane should render collapsed (header line only, no member
  * tiles placed) — an explicit override wins in either direction; absent
  * either override, an empty lane defaults to collapsed and a non-empty one
@@ -391,7 +402,7 @@ export function computeLandscapeLayout(
   l1AncestorByCapabilityId: ReadonlyMap<UUID, ElementsHeadRow>,
   actors: readonly ElementsHeadRow[] = [],
   layoutWidthHint: number = MIN_LAYOUT_WIDTH,
-  laneDisplay: LandscapeLaneDisplayOptions = {},
+  laneDisplay: LandscapeLaneDisplayOptions = EMPTY_LANE_DISPLAY,
 ): LandscapeLayout {
   const layoutWidth = Math.max(MIN_LAYOUT_WIDTH, layoutWidthHint);
   const availableRowWidth = layoutWidth - 2 * PADDING;

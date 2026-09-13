@@ -34,6 +34,7 @@ import { useCapabilityLandscape } from '../landscape/useCapabilityLandscape';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { useLandscape } from '../landscape/useLandscape';
 import { useLandscapeColourByPreference } from '../landscape/useLandscapeColourByPreference';
+import { useLandscapeDisplay } from '../landscape/useLandscapeDisplay';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import { parseCapabilityParam, zoomQueryString } from '../nav/zoomParams';
 import styles from './LandscapePage.module.css';
@@ -151,8 +152,27 @@ export function LandscapePage() {
   // loading anything, and this page renders `CapabilityLandscapeList`
   // instead of the canvas/mobile list either one of the other two hooks
   // feeds.
-  const { state } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId === null, searchCommitId, canvasWidth ?? undefined);
+  const { state } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId === null, searchCommitId);
   const { state: capabilityLandscapeState } = useCapabilityLandscape(model?.id ?? null, ref, mode, capabilityId, searchCommitId);
+  // V2 "landscape focus and filters": layout/grouping no longer come from
+  // `useLandscape` itself (that hook's own `LandscapeData` comment) — this
+  // page passes hardcoded empty filters/lane-display for now (this PR's own
+  // explicit scope: independently verifiable before any new filter/focus-
+  // panel UI exists). `filters`/`laneDisplay` are omitted here rather than
+  // passed as fresh object literals, so `useLandscapeDisplay`'s own stable
+  // defaults (`EMPTY_LANDSCAPE_FILTERS`/`EMPTY_LANE_DISPLAY`) are what's
+  // actually threaded into its effect's dependency array.
+  const displayInput = state.status === 'ready' ? state.data : null;
+  const displayState = useLandscapeDisplay(displayInput, undefined, undefined, canvasWidth ?? undefined);
+  // V2: click-to-focus — plain, unpersisted view state, the same shape
+  // `routeViaPlatforms`/`commentsOnlyFilter` already use below.
+  const [focusedElementId, setFocusedElementId] = useState<UUID | null>(null);
+  // "Edges hidden by default; 'Show connections' toggle" — hardcoded off
+  // for now (this PR's own scope note: "hardcoded empty filters/local
+  // state so this PR is independently verifiable before any new UI
+  // exists"); PR3 adds the real toggle, in the new focus panel, as a
+  // `useState` the same shape as `routeViaPlatforms` below.
+  const showConnections = false;
 
   // Sprint U4-1 E1: see this component's own module comment.
   const narrow = useIsNarrowViewport(768);
@@ -285,13 +305,13 @@ export function LandscapePage() {
   // canvas *can* render at this viewport width. Item 13: never on mobile —
   // the list renders inside the ordinary column, full-width treatment is a
   // canvas-specific need this content doesn't have.
-  const hasContent = state.status === 'ready' && (state.data.layout.nodes.length > 0 || state.data.layout.actorNodes.length > 0);
+  const hasContent = displayState.status === 'ready' && (displayState.display.layout.nodes.length > 0 || displayState.display.layout.actorNodes.length > 0);
   const showCanvas = hasContent && !narrow;
   // Item 7 regression fix: the CSS-class decision below must NOT depend on
   // `hasContent` (load state), unlike `showCanvas` above (correct for
   // deciding *what renders*). `<main>` is the element `canvasWidthRef`
-  // measures, and that measurement feeds `useLandscape`'s `layoutWidthHint`
-  // — itself one of that hook's own effect dependencies. Coupling the class
+  // measures, and that measurement feeds `useLandscapeDisplay`'s
+  // `layoutWidthHint` — itself one of that hook's own effect dependencies. Coupling the class
   // to `hasContent` meant every loading→ready transition flipped the class,
   // resized `<main>`, re-fired the `ResizeObserver`, and re-triggered the
   // very reload that flips `hasContent` again: an infinite loop (confirmed
@@ -464,7 +484,10 @@ export function LandscapePage() {
             {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
             {state.status === 'error' && <Text as="p">{state.message}</Text>}
             {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
-            {state.status === 'ready' && state.data.layout.nodes.length === 0 && state.data.layout.actorNodes.length === 0 && (
+            {/* V2: the raw fetch (`state`) can be ready while layout/grouping is still computing in the worker (`useLandscapeDisplay`) — a brief gap this hook's own split introduces that the old single-effect version never had. */}
+            {state.status === 'ready' && displayState.status === 'loading' && <Text tone="muted">Loading…</Text>}
+            {displayState.status === 'error' && <Text as="p">{displayState.message}</Text>}
+            {state.status === 'ready' && displayState.status === 'ready' && displayState.display.layout.nodes.length === 0 && displayState.display.layout.actorNodes.length === 0 && (
               <div>
                 <EmptyState>No systems yet.</EmptyState>
                 {canAdd && (
@@ -489,10 +512,10 @@ export function LandscapePage() {
               </div>
             )}
             {/* Item 13: <768px renders the list, never the canvas — same `state.data`. S1 item 12 adds comment markers/panel here too, the same `threadCounts` map the canvas already computes — no viewport-fit math needed, this list has no pixels to lay out. */}
-            {state.status === 'ready' && hasContent && narrow && (
+            {state.status === 'ready' && displayState.status === 'ready' && hasContent && narrow && (
               <>
                 <LandscapeMobileList
-                  groups={state.data.groups}
+                  groups={displayState.display.groups}
                   elementHref={elementHref}
                   contextHref={nodeHref}
                   threadCounts={threadCounts}
@@ -521,10 +544,10 @@ export function LandscapePage() {
                 )}
               </>
             )}
-            {state.status === 'ready' && showCanvas && (
+            {state.status === 'ready' && displayState.status === 'ready' && showCanvas && (
               <div className={styles.canvasRow}>
                 <LandscapeCanvas
-                  layout={state.data.layout}
+                  layout={displayState.display.layout}
                   systemsById={state.data.systemsById}
                   actorsById={state.data.actorsById}
                   edges={state.data.edges}
@@ -536,6 +559,12 @@ export function LandscapePage() {
                   commentsOnlyFilter={commentsOnlyFilter}
                   colourBy={colourBy}
                   routeViaPlatforms={routeViaPlatforms}
+                  focusedElementId={focusedElementId}
+                  onFocusElement={setFocusedElementId}
+                  onClearFocus={() => {
+                    setFocusedElementId(null);
+                  }}
+                  showConnections={showConnections}
                   onCommentMarkerClick={(elementId) => {
                     setCommentsPanelElementId(elementId);
                     setAutoFocusComposer(false);
