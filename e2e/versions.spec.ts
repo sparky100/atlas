@@ -112,12 +112,11 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
   await expect(versionList.getByText('v2', { exact: true })).toBeVisible();
 
   // Open v1 read-only: the ref lands in the URL and the page renders (no
-  // "no commits yet at this ref" — that only happens if the ref failed to
-  // resolve).
+  // "Nothing here yet." — that only happens if the ref failed to resolve).
   const v1Row = versionList.locator('li', { hasText: 'v1' });
   await v1Row.getByRole('link', { name: 'Open →' }).click();
   await expect(page).toHaveURL(/ref=tag%3Av1|ref=tag:v1/);
-  await expect(page.getByText('no commits yet at this ref')).toHaveCount(0);
+  await expect(page.getByText('Nothing here yet.')).toHaveCount(0);
 
   // Diff v1 → v2: System B shows as Added; System A shows as Changed,
   // naming its changed attribute by human label ("Vendor"), never the raw

@@ -163,7 +163,7 @@ export function ModelSettingsView({ model, role, orgSlug, onChanged }: ModelSett
             Delete
           </Text>
           <Text as="p" tone="muted" size="sm">
-            Permanently deletes this model and everything in it — every commit, delta, comment and version. This cannot be undone.
+            Permanently deletes this model and everything in it — every edit, comment and version. This cannot be undone.
           </Text>
           <TypedNameConfirm
             requiredName={model.name}

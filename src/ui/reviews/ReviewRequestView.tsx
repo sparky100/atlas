@@ -187,7 +187,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
             Identity warnings
           </Text>
           <Text as="p" tone="muted" size="sm">
-            Advisory only — never blocks approval. "Merge now" isn't built yet (element merge is a later sprint); "Keep both" just dismisses the warning for this browser session.
+            Advisory only — never blocks approval. "Merge now" isn't built yet; "Keep both" just dismisses the warning for this browser session.
           </Text>
           <ul className={styles.cardList}>
             {identityFindings.map((finding, i) => (

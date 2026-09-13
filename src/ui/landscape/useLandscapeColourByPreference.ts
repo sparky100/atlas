@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { LandscapeColourByMode } from '../../contracts/userPreferences';
 import { getUserPreferences, upsertUserPreferences } from '../../db/userPreferences';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface UseLandscapeColourByPreferenceResult {
@@ -30,7 +31,10 @@ export function useLandscapeColourByPreference(userId: UUID | null): UseLandscap
       .then((row) => {
         if (!cancelled) setSavedColourBy(row?.landscape_colour_by ?? null);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
+        // S1 audit follow-up: the load half only — `setColourBy`'s own
+        // write-path catch below is a user-triggered save, unaffected.
+        reportError("Couldn't load your saved colour-by preference.", e);
         if (!cancelled) setSavedColourBy(null);
       });
     return () => {

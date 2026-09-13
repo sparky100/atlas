@@ -48,7 +48,7 @@ test('removing a system from the model retracts every one of its relationships a
   await page.getByRole('button', { name: 'Remove from model', exact: true }).click();
 
   // One commit later, the element is gone from this ref entirely.
-  await expect(page.getByText('This element is not present at the current ref', { exact: false })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('This element is not present here', { exact: false })).toBeVisible({ timeout: 15_000 });
 
   // Its relationships went with it, in the same commit — Metering no
   // longer lists Field Devices Gateway as a supporter.

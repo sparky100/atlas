@@ -75,6 +75,37 @@ export default defineConfig(
       '@typescript-eslint/no-unsafe-member-access': 'off',
     },
   },
+  // CLAUDE.md §2 Language / S1 item 5: UI copy says change, live estate/
+  // main, version, edit — never branch, head, commit, tag, delta, fold,
+  // ref, RPC, SPEC, sprint. Scoped to what a user actually reads (JSX text
+  // and the handful of attributes that render as visible/assistive text —
+  // aria-label, title, placeholder, alt), not every string literal in
+  // src/ui: a query key, a CSS class, an internal error-message argument
+  // (`assertRealId('getBranch', ...)`) or a ref-kind literal (`'main'`)
+  // is source code, not UI copy, and flagging those would just be noise
+  // this rule was never meant to police. The versions page is the one
+  // named exception (its own technical detail — ref/tag/commit vocabulary
+  // is the page's actual subject, UI-principles §6.2/§6.3).
+  {
+    files: ['src/ui/**/*.tsx'],
+    ignores: ['src/ui/versions/**/*.tsx', 'src/ui/routes/VersionsPage.tsx', 'src/ui/routes/VersionDiffPage.tsx', '**/*.test.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'JSXText[value=/\\b(branch|branches|head|heads|commit|commits|tag|tags|delta|deltas|fold|folds|folding|ref|refs|rpc|spec|specs|sprint|sprints)\\b/i]',
+          message:
+            'CLAUDE.md §2 Language: UI copy uses change, live estate/main, version, edit — never branch, head, commit, tag, delta, fold, ref, RPC, SPEC, sprint (allow-listed for the versions page only).',
+        },
+        {
+          selector:
+            'JSXAttribute[name.name=/^(aria-label|title|placeholder|alt)$/] > Literal[value=/\\b(branch|branches|head|heads|commit|commits|tag|tags|delta|deltas|fold|folds|folding|ref|refs|rpc|spec|specs|sprint|sprints)\\b/i]',
+          message:
+            'CLAUDE.md §2 Language: UI copy uses change, live estate/main, version, edit — never branch, head, commit, tag, delta, fold, ref, RPC, SPEC, sprint (allow-listed for the versions page only).',
+        },
+      ],
+    },
+  },
   {
     // This file itself: it's a *.js file, so parserOptions.projectService's
     // allowDefaultProject above gives it a synthetic, type-info-poor

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { loadSearchPoolForTypes, matchElements, type SearchPoolElement } from '../../db/elementSearch';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export type RelationshipTargetSearchStatus = 'loading' | 'ready' | 'error';
@@ -49,6 +50,8 @@ export function useRelationshipTargetSearch(commitId: UUID, modelId: UUID, targe
         if (!cancelled) setPool(loaded);
       })
       .catch((e: unknown) => {
+        // S1 audit follow-up (item 15's own reportError rollout missed this one).
+        reportError("Couldn't load existing elements to search against.", e);
         if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load existing elements to search against.');
       });
     return () => {

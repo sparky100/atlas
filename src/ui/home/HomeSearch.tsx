@@ -124,7 +124,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
 
       {activeRef.kind === 'branch' && (
         <Text as="p" tone="faint" size="xs">
-          Searched against main&rsquo;s head, not this change.
+          Searched against main, not this change.
         </Text>
       )}
 

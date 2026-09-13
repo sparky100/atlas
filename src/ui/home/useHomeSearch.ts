@@ -3,6 +3,7 @@ import type { ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { hasExactMatch, loadSearchPoolForTypes, matchElements, type SearchPoolElement } from '../../db/elementSearch';
 import { enrichElementMatches, type MatchEnrichment } from '../elements/enrichElementMatches';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 /** Top-level-only element types (ADR-001: `parentId` required non-null for container/component) — the only kinds a home-page search-and-create, with nowhere to pick a parent, can sensibly offer. */
@@ -59,6 +60,8 @@ export function useHomeSearch(commitId: UUID, modelId: UUID): UseHomeSearchResul
         if (!cancelled) setPool(loaded);
       })
       .catch((e: unknown) => {
+        // S1 audit follow-up (item 15's own reportError rollout missed this one).
+        reportError("Couldn't load existing elements to search against.", e);
         if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load existing elements to search against.');
       });
     return () => {

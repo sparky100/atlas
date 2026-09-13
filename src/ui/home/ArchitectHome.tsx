@@ -449,7 +449,7 @@ export function ArchitectHome({ data, orgSlug, modelSlug }: ArchitectHomeProps) 
             Recent activity
           </Text>
           {data.recentCommits.length === 0 ? (
-            <EmptyState>No commits on main yet.</EmptyState>
+            <EmptyState>No activity on main yet.</EmptyState>
           ) : (
             <>
               <ul className={styles.commitList}>{shownActivity.map(activityRow)}</ul>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { HomeMode } from '../../contracts/userPreferences';
 import { getUserPreferences, upsertUserPreferences } from '../../db/userPreferences';
 import type { UUID } from '../../contracts/delta';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface UseHomeModeResult {
@@ -44,7 +45,10 @@ export function useHomeMode(userId: UUID | null, isOwnerOrArchitect: boolean): U
       .then((row) => {
         if (!cancelled) setSavedHomeMode(row?.home_mode ?? null);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
+        // S1 audit follow-up: the load half only — `setHomeMode`'s own
+        // write-path catch below is a user-triggered save, unaffected.
+        reportError("Couldn't load your saved home view preference.", e);
         if (!cancelled) setSavedHomeMode(null);
       });
     return () => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { refParamOf, resolveBranchRef, type Ref } from '../../db/ref';
 import type { UUID } from '../../contracts/delta';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 /**
@@ -26,7 +27,12 @@ export function useBranchLabel(ref: Ref): { label: string | undefined; branchId:
       .then((branch) => {
         if (!cancelled) setLabel(branch?.title ?? branch?.name);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
+        // S1 audit follow-up: still reported (console detail) even though
+        // the local fallback (`refLabelOf`'s own short-id-fragment default)
+        // stays deliberately silent — same shape `useBreadcrumbElement.ts`
+        // already established for item 15.
+        reportError("Couldn't load this change's label.", e);
         if (!cancelled) setLabel(undefined);
       });
     return () => {
