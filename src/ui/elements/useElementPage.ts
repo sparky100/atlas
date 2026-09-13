@@ -30,6 +30,7 @@ import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref
 import { attributesRecord } from './attributesRecord';
 import { capabilityLevel } from './capabilityDepth';
 import { isIntegrationPlatform, isPlatform } from './systemKind';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface ElementPageData {
@@ -147,8 +148,14 @@ function commitSource(commitId: UUID): ElementSource {
   };
 }
 
-/** `main`/`tag` read the materialised tables directly; a branch ref folds its head in memory (see the comment above `ElementSource`). */
-async function resolveElementSource(modelId: UUID, ref: Ref): Promise<ElementSource | null> {
+/**
+ * `main`/`tag` read the materialised tables directly; a branch ref folds
+ * its head in memory (see the comment above `ElementSource`).
+ * `mainCommitIdHint` (S1 item 15, A2 remainder): the caller's own
+ * already-resolved main head commit id, used only for `ref.kind === 'main'`
+ * — `resolveRef`'s own round trip is skipped in exactly that case.
+ */
+async function resolveElementSource(modelId: UUID, ref: Ref, mainCommitIdHint: UUID | null): Promise<ElementSource | null> {
   if (ref.kind === 'branch') {
     const branch = await resolveBranchRef(supabase, ref);
     if (!branch) return null;
@@ -165,7 +172,7 @@ async function resolveElementSource(modelId: UUID, ref: Ref): Promise<ElementSou
     const projection = await loadProjectionAtCommit(supabase, modelId, commitId);
     return projectionSource(commitId, projection);
   }
-  const commitId = await resolveRef(supabase, modelId, ref);
+  const commitId = ref.kind === 'main' && mainCommitIdHint ? mainCommitIdHint : await resolveRef(supabase, modelId, ref);
   if (!commitId) return null;
   return commitSource(commitId);
 }
@@ -176,16 +183,30 @@ export interface UseElementPageResult {
   reload: () => void;
 }
 
-export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): UseElementPageResult {
+export function useElementPage(
+  modelId: UUID,
+  elementId: UUID,
+  ref: Ref,
+  /** S1 item 15 (A2 remainder): the caller's own already-resolved main head commit id — `resolveElementSource`'s own parameter comment. */
+  mainCommitIdHint: UUID | null = null,
+): UseElementPageResult {
   const [state, setState] = useState<ElementPageState>({ status: 'loading' });
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
+    // S1 item 15: guard on `modelId`/`elementId` before firing, matching
+    // `useBreadcrumbElement.ts`'s own established fix for the identical
+    // shape — most callers pass `model?.id ?? ''` before their own model
+    // resolves, and without this guard the effect fires once against an
+    // empty modelId, throws, and (now that this hook's catch also calls
+    // `reportError`) leaves a misleading "Couldn't load this element."
+    // banner up even after the very next render loads it successfully.
+    if (!modelId || !elementId) return undefined;
     let cancelled = false;
     setState({ status: 'loading' });
 
     async function load(): Promise<void> {
-      const source = await resolveElementSource(modelId, ref);
+      const source = await resolveElementSource(modelId, ref, mainCommitIdHint);
       if (!source) {
         if (!cancelled) setState({ status: 'refNotFound' });
         return;
@@ -303,6 +324,7 @@ export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): UseEle
     }
 
     load().catch((e: unknown) => {
+      reportError("Couldn't load this element.", e);
       if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load element' });
     });
 
@@ -316,7 +338,7 @@ export function useElementPage(modelId: UUID, elementId: UUID, ref: Ref): UseEle
     // the real dependency; `ref` itself is still read from the closure
     // (always the latest one, since the effect body re-runs whenever the
     // string does).
-  }, [modelId, elementId, refParamOf(ref), reloadToken]);
+  }, [modelId, elementId, refParamOf(ref), reloadToken, mainCommitIdHint]);
 
   return {
     state,

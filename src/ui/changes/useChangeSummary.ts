@@ -3,6 +3,7 @@ import type { UUID } from '../../contracts/delta';
 import { resolveChangeLineage, type ChangeLineage } from '../../db/branches';
 import { loadChangeSummary, type ChangeSummary } from '../../db/changeSummary';
 import type { BranchRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export type ChangeSummaryState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; summary: ChangeSummary; lineage: ChangeLineage };
@@ -29,6 +30,7 @@ export function useChangeSummary(modelId: UUID, branch: BranchRow | null): Chang
         setState({ status: 'ready', summary: summary ?? { subjects: [], affectedCapabilities: [], otherOpenChanges: [], sourcesById: new Map() }, lineage });
       })
       .catch((e: unknown) => {
+        reportError("Couldn't load this change's summary.", e);
         if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load this change.' });
       });
 

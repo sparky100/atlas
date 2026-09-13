@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getOrganisationBySlug } from '../../db/organisations';
 import type { OrganisationRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface UseOrganisationBySlugResult {
@@ -22,6 +23,7 @@ export function useOrganisationBySlug(slug: string): UseOrganisationBySlugResult
         if (!cancelled) setOrganisation(org);
       })
       .catch((e: unknown) => {
+        reportError("Couldn't load this organisation.", e);
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load organisation');
       })
       .finally(() => {

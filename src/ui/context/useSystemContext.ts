@@ -8,6 +8,7 @@ import type { ViewMode } from '../../db/viewMode';
 import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
 import { computeContextGroup, type ContextGroup } from './contextGrouping';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface SystemContextData {
@@ -43,7 +44,13 @@ export function useSystemContext(modelId: UUID, orgId: UUID, userId: UUID | null
   const refParam = refParamOf(ref);
 
   useEffect(() => {
-    if (!userId) return undefined;
+    // S1 item 15: guard on `modelId`/`systemId` too, not just `userId` —
+    // same fix as `useBreadcrumbElement.ts`'s own precedent for this exact
+    // shape (a caller's `model?.id ?? ''` fires this effect once before its
+    // own model resolves; left unguarded, `reportError`'s new catch-all
+    // here would otherwise post a banner that outlives the load that
+    // follows it).
+    if (!userId || !modelId || !systemId) return undefined;
     const currentUserId = userId;
     let cancelled = false;
     setState({ status: 'loading' });
@@ -102,6 +109,7 @@ export function useSystemContext(modelId: UUID, orgId: UUID, userId: UUID | null
     }
 
     load().catch((e: unknown) => {
+      reportError("Couldn't load this system's context.", e);
       if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load this system’s context' });
     });
 

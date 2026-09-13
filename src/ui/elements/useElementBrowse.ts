@@ -18,6 +18,7 @@ import {
 } from '../../db/healthFindings';
 import { listAllSupportsEdges } from '../../db/modelHome';
 import { resolveRef } from '../../db/ref';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export type ElementBrowseStatus = 'loading' | 'error' | 'ready';
@@ -93,7 +94,12 @@ function compareRows(a: BrowseRow, b: BrowseRow, key: ElementBrowseSortKey): num
  * is) — `facts` (can be large, CLAUDE.md rule 8's own caution) only when
  * `filter === 'stale-attributes'` actually asks for it.
  */
-export function useElementBrowse(modelId: UUID, filter: ElementBrowseFilter = null): ElementBrowseState {
+export function useElementBrowse(
+  modelId: UUID,
+  filter: ElementBrowseFilter = null,
+  /** S1 item 15 (A2 remainder): the caller's own already-resolved main head commit id — this hook only ever reads `main`, same shape `useDirectorHome.ts`'s own parameter comment explains. */
+  mainCommitIdHint: UUID | null = null,
+): ElementBrowseState {
   const [status, setStatus] = useState<ElementBrowseStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   // One object, not three separate `useState`s: `commitId` and
@@ -115,7 +121,7 @@ export function useElementBrowse(modelId: UUID, filter: ElementBrowseFilter = nu
     setStatus('loading');
 
     async function load(): Promise<void> {
-      const resolvedCommitId = await resolveRef(supabase, modelId, { kind: 'main' });
+      const resolvedCommitId = mainCommitIdHint ?? (await resolveRef(supabase, modelId, { kind: 'main' }));
       if (!resolvedCommitId) {
         if (!cancelled) {
           setError('This model has no commits yet.');
@@ -178,6 +184,7 @@ export function useElementBrowse(modelId: UUID, filter: ElementBrowseFilter = nu
     }
 
     load().catch((e: unknown) => {
+      reportError("Couldn't load elements.", e);
       if (!cancelled) {
         setError(e instanceof Error ? e.message : 'Failed to load elements.');
         setStatus('error');
@@ -187,7 +194,7 @@ export function useElementBrowse(modelId: UUID, filter: ElementBrowseFilter = nu
     return () => {
       cancelled = true;
     };
-  }, [modelId, filter, reloadToken]);
+  }, [modelId, filter, reloadToken, mainCommitIdHint]);
 
   const setSort = (key: ElementBrowseSortKey) => {
     if (key === sortKey) {

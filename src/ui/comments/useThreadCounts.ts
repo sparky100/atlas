@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getThreadCounts } from '../../db/comments';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface ThreadCount {
@@ -55,6 +56,7 @@ export function useThreadCounts(modelId: UUID | null, anchorIds: readonly UUID[]
         setState({ status: 'ready', counts: new Map(rows.map((r) => [r.anchor_id, { open: r.open_count, total: r.total_count }])) });
       })
       .catch((e: unknown) => {
+        reportError("Couldn't load comment counts.", e);
         if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Could not load comment counts.' });
       });
     return () => {

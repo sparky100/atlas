@@ -18,6 +18,7 @@ import {
 import type { BranchRow, MergeRequestRow, ProfileRow, SourceRow } from '../../db/types';
 import type { MergeReview } from '../../engine/merge';
 import type { FieldConflictChoice } from '../../engine/mergeResolution';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface ReviewRequestData {
@@ -94,6 +95,7 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
         if (result.status === 'ready') setFieldChoices(new Map());
       })
       .catch((e: unknown) => {
+        reportError("Couldn't load this review request.", e);
         if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load this review request.' });
       });
     return () => {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getMyMembership } from '../../db/organisations';
 import type { MemberRole } from '../../db/types';
 import type { UUID } from '../../contracts/delta';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 // Re-exported for every existing import site (`import { canEditOnMain, useMembership } from '../orgs/useMembership'`)
@@ -43,7 +44,8 @@ export function useMembership(orgId: UUID | null, userId: UUID | null): UseMembe
       .then((row) => {
         if (!cancelled) setRole(row?.role ?? null);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
+        reportError("Couldn't load your membership.", e);
         if (!cancelled) setRole(null);
       })
       .finally(() => {

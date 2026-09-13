@@ -4,6 +4,7 @@ import { listBranchesByIds } from '../../db/branches';
 import { listCommentsForAnchor, type AnchorComments } from '../../db/comments';
 import { listProfilesByIds } from '../../db/profiles';
 import type { AnchorType, BranchRow, ProfileRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export type UseAnchorCommentsState =
@@ -56,6 +57,7 @@ export function useAnchorComments(modelId: UUID | null, anchorType: AnchorType, 
         setState({ status: 'ready', data, profiles, branches });
       })
       .catch((e: unknown) => {
+        reportError("Couldn't load comments.", e);
         if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Could not load comments.' });
       });
 

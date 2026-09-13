@@ -6,6 +6,7 @@ import { getElementsByIds } from '../../db/elements';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
 import { getOrCreateModelView } from '../../db/views';
 import type { ViewRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { effectiveModuleAttributes } from '../elements/moduleAttributes';
 import { computeCapabilityMapTree, type CapabilityMapTree } from './layout';
 import { supabase } from '../supabaseClient';
@@ -38,19 +39,31 @@ export interface UseCapabilityMapResult {
  * itself ("a view is a saved query", ADR-011), which is what a future
  * feature (per-user expand state, annotations) would hang off later.
  */
-export function useCapabilityMap(modelId: UUID, orgId: UUID, userId: UUID | null, ref: Ref): UseCapabilityMapResult {
+export function useCapabilityMap(
+  modelId: UUID,
+  orgId: UUID,
+  userId: UUID | null,
+  ref: Ref,
+  /** S1 item 15 (A2 remainder): the caller's own already-resolved main head commit id — same race-tolerant dedup shape `useStructureView.ts`'s own parameter comment explains. */
+  mainCommitIdHint: UUID | null = null,
+): UseCapabilityMapResult {
   const [state, setState] = useState<CapabilityMapState>({ status: 'loading' });
   const [reloadToken, setReloadToken] = useState(0);
   const refParam = refParamOf(ref);
 
   useEffect(() => {
-    if (!userId) return undefined;
+    // S1 item 15: guard on `modelId` too, not just `userId` — same fix as
+    // `useBreadcrumbElement.ts`'s own precedent for this exact shape (the
+    // page's `model?.id ?? ''` fires this effect once before its own model
+    // resolves; left unguarded, `reportError`'s new catch-all here would
+    // otherwise post a banner that outlives the load that follows it).
+    if (!userId || !modelId) return undefined;
     const currentUserId = userId;
     let cancelled = false;
     setState({ status: 'loading' });
 
     async function load(): Promise<void> {
-      const commitId = await resolveRef(supabase, modelId, ref);
+      const commitId = ref.kind === 'main' && mainCommitIdHint ? mainCommitIdHint : await resolveRef(supabase, modelId, ref);
       if (!commitId) {
         if (!cancelled) setState({ status: 'refNotFound' });
         return;
@@ -96,6 +109,7 @@ export function useCapabilityMap(modelId: UUID, orgId: UUID, userId: UUID | null
     }
 
     load().catch((e: unknown) => {
+      reportError("Couldn't load the capability map.", e);
       if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load the capability map' });
     });
 
@@ -104,7 +118,7 @@ export function useCapabilityMap(modelId: UUID, orgId: UUID, userId: UUID | null
     };
     // Same pitfall/fix as useElementPage.ts / useLandscape.ts: `refParam`
     // (a stable string) is the real dependency, not `ref` itself.
-  }, [modelId, orgId, userId, refParam, reloadToken]);
+  }, [modelId, orgId, userId, refParam, reloadToken, mainCommitIdHint]);
 
   return {
     state,

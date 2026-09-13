@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getBranch, updateBranchMetadata, type UpdateBranchMetadataInput } from '../../db/branches';
 import type { BranchRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export type ChangeStatus = 'loading' | 'idle' | 'saving' | 'not_found';
@@ -31,6 +32,7 @@ export function useChange(branchId: UUID): UseChangeResult {
         setStatus(row ? 'idle' : 'not_found');
       })
       .catch((e: unknown) => {
+        reportError("Couldn't load this change.", e);
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load this change.');
           setStatus('idle');

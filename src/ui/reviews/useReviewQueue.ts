@@ -3,6 +3,7 @@ import type { UUID } from '../../contracts/delta';
 import { getBranch } from '../../db/branches';
 import { listOpenMergeRequestsForModel } from '../../db/mergeRequests';
 import type { BranchRow, MergeRequestRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface ReviewQueueRow {
@@ -27,6 +28,7 @@ export function useReviewQueue(modelId: UUID): ReviewQueueState & { reload: () =
         setState({ status: 'ready', rows: requests.map((request, i) => ({ request, branch: branches[i] ?? null })) });
       })
       .catch((e: unknown) => {
+        reportError("Couldn't load the review queue.", e);
         if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load the review queue.' });
       });
     return () => {

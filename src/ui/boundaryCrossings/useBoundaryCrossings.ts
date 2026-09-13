@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
 import { findBoundaryCrossings, listAllUsesAndFlowsToEdges, listUsesAndFlowsToEndpointElements, type BoundaryCrossing } from '../../db/healthFindings';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export type BoundaryCrossingsState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; crossings: BoundaryCrossing[] };
@@ -35,6 +36,7 @@ export function useBoundaryCrossings(modelId: UUID): BoundaryCrossingsState {
     }
 
     load().catch((e: unknown) => {
+      reportError("Couldn't load boundary crossings.", e);
       if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load boundary crossings.' });
     });
     return () => {

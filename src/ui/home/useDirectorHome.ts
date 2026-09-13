@@ -20,6 +20,7 @@ import { listTagsForModel } from '../../db/tags';
 import type { BranchRow, ProfileRow, TagRow } from '../../db/types';
 import { resolveRef } from '../../db/ref';
 import { computeCapabilityMapTree } from '../capabilityMap/layout';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface OpenChangeRow {
@@ -70,7 +71,12 @@ function compareByTargetDateAscending(a: BranchRow, b: BranchRow): number {
  * director's branch-scoped to-be zoom (`src/db/modelHome.ts`'s own module
  * comment).
  */
-export function useDirectorHome(modelId: UUID, orgId: UUID): DirectorHomeState {
+export function useDirectorHome(
+  modelId: UUID,
+  orgId: UUID,
+  /** S1 item 15 (A2 remainder): the caller's own already-resolved main head commit id — this hook only ever reads `main`, so a caller with one already in hand (`useMainBranch`) skips this hook's own `resolveRef` round trip entirely. */
+  mainCommitIdHint: UUID | null = null,
+): DirectorHomeState {
   const [state, setState] = useState<DirectorHomeLoadState>({ status: 'loading' });
   const [reloadToken, setReloadToken] = useState(0);
   const reload = useCallback(() => {
@@ -83,7 +89,7 @@ export function useDirectorHome(modelId: UUID, orgId: UUID): DirectorHomeState {
     setState({ status: 'loading' });
 
     async function load(): Promise<void> {
-      const commitId = await resolveRef(supabase, modelId, { kind: 'main' });
+      const commitId = mainCommitIdHint ?? (await resolveRef(supabase, modelId, { kind: 'main' }));
       if (!commitId) {
         // ADR-018: a real model's main always has a head. An empty tree
         // (no capabilities yet) is `ready` with zero tiles, not this.
@@ -151,13 +157,14 @@ export function useDirectorHome(modelId: UUID, orgId: UUID): DirectorHomeState {
     }
 
     load().catch((e: unknown) => {
+      reportError("Couldn't load the director view.", e);
       if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load the director view' });
     });
 
     return () => {
       cancelled = true;
     };
-  }, [modelId, orgId, reloadToken]);
+  }, [modelId, orgId, reloadToken, mainCommitIdHint]);
 
   return { ...state, reload };
 }

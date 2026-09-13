@@ -10,6 +10,7 @@ import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref
 import type { ViewMode } from '../../db/viewMode';
 import { capabilitySubtreeIds, computeCapabilityLandscapeRows, type CapabilityLandscapeRows } from './capabilityLandscapeRows';
 import { withModuleLabels } from './landscapeModules';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export type CapabilityLandscapeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: CapabilityLandscapeRows };
@@ -123,6 +124,7 @@ export function useCapabilityLandscape(
     }
 
     load().catch((e: unknown) => {
+      reportError("Couldn't load the capability landscape.", e);
       if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load the capability landscape' });
     });
 

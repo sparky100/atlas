@@ -4,6 +4,7 @@ import { buildCommitLoader } from '../../db/commitLoader';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
 import { foldFromGenesis } from '../../engine/head';
 import { computeVersionDiff, type VersionDiff } from '../../engine/versionDiff';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export interface VersionDiffData {
@@ -31,6 +32,12 @@ export function useVersionDiff(modelId: UUID, toBe: Ref, asIs: Ref): VersionDiff
   const asIsParam = refParamOf(asIs);
 
   useEffect(() => {
+    // S1 item 15: guard on `modelId` — same fix as `useBreadcrumbElement.ts`'s
+    // own precedent for this exact shape (a caller's `model?.id ?? ''` fires
+    // this effect once before its own model resolves; left unguarded,
+    // `reportError`'s new catch-all here would otherwise post a banner that
+    // outlives the load that follows it).
+    if (!modelId) return undefined;
     let cancelled = false;
     setState({ status: 'loading' });
 
@@ -50,6 +57,7 @@ export function useVersionDiff(modelId: UUID, toBe: Ref, asIs: Ref): VersionDiff
     }
 
     load().catch((e: unknown) => {
+      reportError("Couldn't compute the version diff.", e);
       if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to compute the version diff' });
     });
 

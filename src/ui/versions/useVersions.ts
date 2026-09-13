@@ -3,6 +3,7 @@ import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
 import { createTag, listTagsForModel } from '../../db/tags';
 import type { TagRow } from '../../db/types';
+import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export type VersionsStatus = 'loading' | 'idle' | 'tagging';
@@ -43,6 +44,7 @@ export function useVersions(modelId: UUID, orgId: UUID, userId: UUID | null): Us
         setStatus('idle');
       })
       .catch((e: unknown) => {
+        reportError("Couldn't load versions.", e);
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load versions.');
           setStatus('idle');

@@ -54,11 +54,12 @@ export function ContainerPage() {
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
-  const capability = useBreadcrumbElement(model?.id ?? null, ref, capabilityId);
   const { label: branchLabel } = useBranchLabel(ref);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
+  // S1 item 15 (A2 remainder): same dedup hint as `useStructureView` below.
+  const capability = useBreadcrumbElement(model?.id ?? null, ref, capabilityId, mainBranch?.head_commit_id ?? null);
   const canEdit = !viewing && editingBranch !== null && canEditBranch(role, editingBranch);
   // See LandscapePage.tsx's identical comment: ADR-018 guarantees both are
   // never null in practice; BranchRow's own type hasn't been narrowed yet.
@@ -66,7 +67,7 @@ export function ContainerPage() {
   const writeHeadCommitId = editingBranch?.head_commit_id ?? null;
   const canAdd = canEdit && searchCommitId !== null && writeHeadCommitId !== null;
 
-  const state = useStructureView(model?.id ?? '', organisation?.id ?? '', userId, systemId ?? '', ref, mode);
+  const state = useStructureView(model?.id ?? '', organisation?.id ?? '', userId, systemId ?? '', ref, mode, mainBranch?.head_commit_id ?? null);
 
   if (orgLoading || modelsLoading || !model) {
     return (
