@@ -13,7 +13,6 @@ import {
   RELATIONSHIP_TYPES,
   type ActorAttributes,
   type CapabilityAttributes,
-  type ComponentAttributes,
   type ContainerAttributes,
   type Criticality,
   type Delta,
@@ -80,7 +79,6 @@ const containerAttributes: fc.Arbitrary<ContainerAttributes> = fc.record(
   { description: fc.string(), technology: fc.string(), isExternal: fc.boolean(), introduced: isoDate, plannedEnd: isoDate, version: fc.string() },
   { requiredKeys: ['isExternal'] },
 );
-const componentAttributes: fc.Arbitrary<ComponentAttributes> = fc.record({ description: fc.string(), technology: fc.string() }, { requiredKeys: [] });
 const actorAttributes: fc.Arbitrary<ActorAttributes> = fc.record(
   // S1 item 11a: 'organisation' — see ActorSubtype's own doc comment (delta.ts).
   { subtype: fc.constantFrom('person' as const, 'team' as const, 'organisation' as const), email: fc.string(), orgUnit: fc.string(), isExternal: fc.boolean(), externalOrganisation: fc.string() },
@@ -111,10 +109,6 @@ const elementCreateArb: fc.Arbitrary<Delta> = fc.oneof(
   fc.tuple(provenanceBase, uuid, fc.string({ minLength: 1, maxLength: 40 }), uuid, containerAttributes).map(
     ([base, elementId, name, parentId, attributes]) =>
       ({ ...base, kind: 'element.create', elementId, elementType: 'container', name, parentId, attributes }) satisfies Delta,
-  ),
-  fc.tuple(provenanceBase, uuid, fc.string({ minLength: 1, maxLength: 40 }), uuid, componentAttributes).map(
-    ([base, elementId, name, parentId, attributes]) =>
-      ({ ...base, kind: 'element.create', elementId, elementType: 'component', name, parentId, attributes }) satisfies Delta,
   ),
   fc.tuple(provenanceBase, uuid, fc.string({ minLength: 1, maxLength: 40 }), fc.option(uuid, { nil: null }), actorAttributes).map(
     ([base, elementId, name, parentId, attributes]) =>

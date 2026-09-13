@@ -24,7 +24,6 @@
 import type {
   ActorAttributes,
   CapabilityAttributes,
-  ComponentAttributes,
   ContainerAttributes,
   ElementType,
   SystemAttributes,
@@ -174,12 +173,6 @@ const CONTAINER_ORDER: (keyof ContainerAttributes)[] = [
   'domain',
 ];
 
-const COMPONENT_META: Record<keyof ComponentAttributes, AttributeFieldMeta> = {
-  technology: { label: 'Technology', required: false, kind: 'text' },
-  description: { label: 'Description', required: false, kind: 'text', multiline: true },
-};
-const COMPONENT_ORDER: (keyof ComponentAttributes)[] = ['technology', 'description'];
-
 // S1 item 11a: 'organisation' — a third-party entity (a regulator, a
 // supplier), see `ActorSubtype`'s own doc comment (delta.ts).
 const ACTOR_SUBTYPE_OPTIONS = ['person', 'team', 'organisation'] as const;
@@ -197,7 +190,6 @@ export const ATTRIBUTE_SCHEMA_BY_TYPE: Record<ElementType, readonly AttributeFie
   capability: schemaOf(CAPABILITY_ORDER, CAPABILITY_META),
   system: schemaOf(SYSTEM_ORDER, SYSTEM_META),
   container: schemaOf(CONTAINER_ORDER, CONTAINER_META),
-  component: schemaOf(COMPONENT_ORDER, COMPONENT_META),
   actor: schemaOf(ACTOR_ORDER, ACTOR_META),
 };
 

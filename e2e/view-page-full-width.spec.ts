@@ -1,24 +1,27 @@
 /**
  * Check D1 (docs/CHECK-U4-2a.md): "Canvas routes (landscape, capability
- * map, context, container, component) escape page max-width, fill the
- * viewport from the nav rail to the right edge... Fit computes against
- * that box." Landscape already did this (Sprint U4-2a item 5); found
- * "Partial" for the other four — `CapabilityMapPage.module.css`/
- * `ViewPage.module.css`'s own `.main` stayed a fixed `max-width: 1400px`
- * regardless of viewport width. This spec is the missing coverage for
- * those four, at a viewport wide enough (1800px) that a fixed 1400px cap
- * would leave a very visible gap on the right if the escape weren't real.
+ * map, context, container) escape page max-width, fill the viewport from
+ * the nav rail to the right edge... Fit computes against that box."
+ * Landscape already did this (Sprint U4-2a item 5); found "Partial" for
+ * the other three — `CapabilityMapPage.module.css`/`ViewPage.module.css`'s
+ * own `.main` stayed a fixed `max-width: 1400px` regardless of viewport
+ * width. This spec is the missing coverage for those three, at a viewport
+ * wide enough (1800px) that a fixed 1400px cap would leave a very visible
+ * gap on the right if the escape weren't real. This originally covered a
+ * fourth route, Component, one level deeper than Container — S1 item 18
+ * removed the component level from the taxonomy entirely, so Container is
+ * now the zoom chain's last stop.
  *
  * "Fit computes against that box" only ever applied to Landscape (a real
- * zoom/pan canvas) — the other four are plain reflowing DOM (this file's
+ * zoom/pan canvas) — the other three are plain reflowing DOM (this file's
  * own routes' module comments), so this only checks the width escape
  * itself, not a Fit computation none of them has.
  *
  * Same "needs a real Supabase" limitation as every Playwright test in
- * this repo — seeds a capability, and a System → Container → Component
- * chain (the same shape e2e/zoom-chain-structure.spec.ts's own fixture
- * uses) via the real commitToBranch path from Node, then drives
- * navigation through the actual browser.
+ * this repo — seeds a capability, and a System → Container chain (the
+ * same shape e2e/zoom-chain-structure.spec.ts's own fixture uses) via the
+ * real commitToBranch path from Node, then drives navigation through the
+ * actual browser.
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
@@ -40,7 +43,7 @@ async function mainWidth(page: Page): Promise<number> {
   return page.locator('main').evaluate((el) => el.getBoundingClientRect().width);
 }
 
-test('capability map, context, container and component all escape the page\'s usual centred max-width once they have real content', async ({ page }) => {
+test('capability map, context and container all escape the page\'s usual centred max-width once they have real content', async ({ page }) => {
   const env = loadEnv();
 
   const email = `viewpage-width-${randomUUID()}@example.test`;
@@ -81,12 +84,10 @@ test('capability map, context, container and component all escape the page\'s us
   const capabilityId = randomUUID();
   const systemId = randomUUID();
   const containerId = randomUUID();
-  const componentId = randomUUID();
   const deltas: Delta[] = [
     { kind: 'element.create', id: randomUUID(), elementId: capabilityId, elementType: 'capability', name: 'Billing', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 },
     { kind: 'element.create', id: randomUUID(), elementId: systemId, elementType: 'system', name: 'Billing Service', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
     { kind: 'element.create', id: randomUUID(), elementId: containerId, elementType: 'container', name: 'API Gateway', parentId: systemId, attributes: { isExternal: false }, sourceId: seedSourceId, confidence: 1 },
-    { kind: 'element.create', id: randomUUID(), elementId: componentId, elementType: 'component', name: 'Auth Module', parentId: containerId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
   ];
   const envelope: CommitEnvelope = {
     id: randomUUID(),
@@ -94,7 +95,7 @@ test('capability map, context, container and component all escape the page\'s us
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    title: 'seed a capability, and a system with a container and component',
+    title: 'seed a capability, and a system with a container',
     body: null,
     deltas,
   };
@@ -120,10 +121,6 @@ test('capability map, context, container and component all escape the page\'s us
 
   await page.getByRole('link', { name: 'Containers →' }).click();
   await expect(page.getByText('API Gateway')).toBeVisible();
-  expect(await mainWidth(page)).toBeGreaterThan(ESCAPED_WIDTH_FLOOR);
-
-  await page.getByRole('link', { name: 'Components →' }).click();
-  await expect(page.getByText('Auth Module')).toBeVisible();
   expect(await mainWidth(page)).toBeGreaterThan(ESCAPED_WIDTH_FLOOR);
 });
 

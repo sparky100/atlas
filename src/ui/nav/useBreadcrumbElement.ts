@@ -10,9 +10,9 @@ import { supabase } from '../supabaseClient';
  * segment's label — `null` while loading, absent, or not found (a stale
  * link to a since-retracted element shouldn't break the page it points
  * into, just omit that one segment). Used for the `?capability=` zoom
- * param (src/ui/nav/zoomParams.ts) and, on the Component page, the
- * system a container's own `parent_id` names — same "resolve one extra
- * element for a breadcrumb label" shape either way.
+ * param (src/ui/nav/zoomParams.ts) — the Component page's own analogous
+ * use (resolving the system a container's own `parent_id` named) was
+ * removed along with that page, S1 item 18.
  *
  * Sprint U4-2a item 2: takes `UUID | null`, not just `UUID` — this used to
  * guard on `elementId` alone, so a caller passing `model?.id ?? ''` (every

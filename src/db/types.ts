@@ -182,12 +182,13 @@ export interface AliasRow {
 }
 
 /**
- * Landscape and capability_map are whole-model queries; context/container/
- * component scope to one element (SPEC §3.9). Sprint U1 step 4 only ever
- * creates `landscape` rows — the other four are real schema, not yet a
- * built renderer.
+ * Landscape and capability_map are whole-model queries; context/container
+ * scope to one element (SPEC §3.9). Sprint U1 step 4 only ever creates
+ * `landscape` rows — the other three are real schema, not yet a built
+ * renderer. `component` was a fourth scoped kind until S1 item 18 removed
+ * the component level from the taxonomy entirely.
  */
-export type ViewKind = 'landscape' | 'context' | 'container' | 'component' | 'capability_map';
+export type ViewKind = 'landscape' | 'context' | 'container' | 'capability_map';
 
 // ---------------------------------------------------------------------------
 // Collaboration (Sprint M1a): profiles, comments, mentions, notifications.

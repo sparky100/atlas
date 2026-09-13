@@ -56,20 +56,19 @@ export async function listAllUsesAndFlowsToEdges(supabase: Client, commitId: str
 
 /**
  * Every element `uses`/`flows_to` can legally touch (`relationshipTypeRules.ts`:
- * system↔system, container↔container, component↔component, container→system,
- * component→container) — one commit-scoped query filtered by a fixed
- * 3-value `element_type` list, not an `.in(element_id, ...)` sized by
- * however many unlabeled edges this finding turns up (CLAUDE.md rule 8;
- * same reasoning `listAllUsesAndFlowsToEdges` above gives for its own
- * `.in()`). `findUnlabeledVerbRelationships`'s only use for these rows is
- * `name`, for the finding's own named examples.
+ * system↔system, container↔container, container→system) — one commit-scoped
+ * query filtered by a fixed 2-value `element_type` list, not an
+ * `.in(element_id, ...)` sized by however many unlabeled edges this finding
+ * turns up (CLAUDE.md rule 8; same reasoning `listAllUsesAndFlowsToEdges`
+ * above gives for its own `.in()`). `findUnlabeledVerbRelationships`'s only
+ * use for these rows is `name`, for the finding's own named examples.
  */
 export async function listUsesAndFlowsToEndpointElements(supabase: Client, commitId: string): Promise<ElementsHeadRow[]> {
   const query = supabase
     .from('elements_head')
     .select('element_id, element_type, name, parent_id, attributes, exists_delta_id', { count: 'exact' })
     .eq('commit_id', commitId)
-    .in('element_type', ['system', 'container', 'component'])
+    .in('element_type', ['system', 'container'])
     .order('element_id');
   return selectAll<ElementsHeadRow>(query);
 }
@@ -129,7 +128,7 @@ function isBoundaryCrossingPair(a: SystemDomain, b: SystemDomain): boolean {
 /**
  * Every `uses`/`flows_to` edge whose two endpoints resolve to opposite
  * sides of the IT/OT boundary (`resolveElementDomain`, walking up to the
- * nearest System for a Container/Component endpoint) — Prompt 7k item 3's
+ * nearest System for a Container endpoint) — Prompt 7k item 3's
  * "Boundary crossings" list, reachable from the architect door
  * (`BoundaryCrossingsPage.tsx`), and the shared basis both this item's own
  * health finding (`findBoundaryCrossingsMissingClassificationOrVerb`,

@@ -58,7 +58,7 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | Type | Values |
 |---|---|
 | `member_role` | `owner`, `architect`, `contributor`, `viewer` |
-| `element_type` | `capability`, `system`, `container`, `component`, `actor` |
+| `element_type` | `capability`, `system`, `container`, `actor` (S1 item 18 removed `component`, `20260913010000_remove_component_element_type.sql`; `deltas.element_type` itself moved from this enum to plain `text` in the same migration — that column's own historical rows are immutable, see the migration's own comment) |
 | `relationship_type` | `supports`, `uses`, `owns`, `flows_to` |
 | `branch_kind` | `main`, `change`, `capture_draft` |
 | `branch_status` | `draft`, `proposed`, `in_review`, `approved`, `merged`, `rejected`, `archived` |
@@ -76,7 +76,7 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | `comment_status` | `open`, `resolved` |
 | `anchor_type` | `element`, `relationship`, `change`, `decision`, `version` (Sprint M1a amendment — see §3.8; `comment_visibility`, `delta`, and `branch` from the original draft are gone: visibility is dropped for now, `branch` is renamed `change`, and `delta` has no replacement yet, so an attribute-level "comment on this value" anchor isn't reachable until it does) |
 | `notification_kind` | `mention`, `reply` (Sprint M1a added `mention`; Sprint M1b added `reply` in its own migration, `20260906340000_notification_kind_reply.sql`, per the `commit_kind`/`genesis` precedent — extensible by name, not by schema) |
-| `view_kind` | `landscape`, `context`, `container`, `component`, `capability_map` |
+| `view_kind` | `landscape`, `context`, `container`, `capability_map` (S1 item 18 removed `component`, `20260913010000_remove_component_element_type.sql`) |
 | `annotation_kind` | `text`, `highlight`, `arrow` |
 | `map_status` | `draft`, `published`, `deprecated` |
 | `validation_level` | `structural`, `schema` |
@@ -200,7 +200,7 @@ Which `(relationship_type, from_type, to_type)` triples are legal, and cardinali
 | `max_primary_per_to` | int | nullable — used by `owns` (1) |
 | `max_primary_per_from` | int | nullable — used by `supports` (1, Sprint U4-1 B4: `supports.role`, the landscape lane a system's tile is placed in) |
 
-Primary key `(relationship_type, from_type, to_type)`. No `org_id`; product content. Seed rows:
+Primary key `(relationship_type, from_type, to_type)`. No `org_id`; product content. Seed rows (S1 item 18 removed the two `component` rows this table used to carry, `uses: component→component` and `uses: component→container`):
 
 | relationship_type | from | to | max_per_from | max_primary_per_to | max_primary_per_from |
 |---|---|---|---|---|---|
@@ -208,9 +208,7 @@ Primary key `(relationship_type, from_type, to_type)`. No `org_id`; product cont
 | supports | container | capability | | | 1 |
 | uses | system | system | | | |
 | uses | container | container | | | |
-| uses | component | component | | | |
 | uses | container | system | | | |
-| uses | component | container | | | |
 | uses | actor | system | | | |
 | uses | actor | container | | | |
 | owns | actor | capability | | 1 | |
@@ -561,7 +559,7 @@ A saved query, not a drawing (ADR-011).
 | `model_id` | uuid | → `models(id)` |
 | `name` | text | not null |
 | `kind` | view_kind | not null |
-| `scope_element_id` | uuid | nullable; required for `context`/`container`/`component`, must be null for `landscape`/`capability_map` |
+| `scope_element_id` | uuid | nullable; required for `context`/`container`, must be null for `landscape`/`capability_map` |
 | `branch_id` | uuid | → `branches(id)`, nullable = main |
 | `created_by` | uuid | → `auth.users(id)`, not null (Sprint H1 note, docs/AUDIT-2026-09-U2.md §2.E.3 item 12: the `→` was missing here — the migrated column is a real FK) |
 
@@ -850,7 +848,7 @@ A tombstone `$exists` fact with `live = false` is kept in memory for C7 checks a
 | Rule | Level | Check |
 |---|---|---|
 | V1 | schema | every `elements_head.attributes` and `relationships_head.attributes` validates against `type_schemas` for `(type, models.schema_version)`; required attributes present |
-| V2 | structural | every `parent_id` references an element in the same head with the required type: capability→capability, container→system, component→container; capability/system/actor parents are null or (capability only) a capability. Every relationship endpoint references an element in the same head. |
+| V2 | structural | every `parent_id` references an element in the same head with the required type: capability→capability, container→system; capability/system/actor parents are null or (capability only) a capability. Every relationship endpoint references an element in the same head. |
 | V3 | schema | every relationship's `(type, from.type, to.type)` is in `relationship_type_rules`; `max_per_from`, `max_primary_per_to`, and `max_primary_per_from` respected — as of Sprint U4-1, the triple-legality half (C9) and both primary-cardinality rules (`max_primary_per_to` for `owns`, `max_primary_per_from` for `supports`) are enforced in `apply()` as C17, on every fold, with a database partial-unique-index as backstop for each; `max_per_from` (a non-primary per-type count cap, unused by any seed row today) has no enforcement anywhere — see `relationship_type_rules`'s own correction note in §3.3 |
 | V4 | structural | no cycle in `parent_id` |
 | V5 | structural | no element id in the head appears as `merged_element_id` in `element_merges` |
@@ -1027,7 +1025,7 @@ Order, first hit wins:
 
 1. **Exact id** — the source carries an Atlas element id (a round-tripped export). Match if the id exists in `elements_head` at main's head or in `aliases` as `merged_id` (resolve to the survivor).
 2. **Alias** — normalised token (`lower`, collapse whitespace, strip punctuation) equals `lower(alias_value)` for the model. `aliases` uniqueness guarantees one hit.
-3. **Name + type + context** — trigram similarity of normalised name ≥ 0.6 against `elements_head.name` where `element_type` matches **and** the structural context matches: for a container/component the proposed parent resolves to the same parent; for a capability the proposed parent code/name resolves to the same parent; for systems and actors the context is the type alone. Multiple hits above threshold → propose the best but flag `ambiguous` in `capture_jobs.stats` and in the delta's `sourceRef`.
+3. **Name + type + context** — trigram similarity of normalised name ≥ 0.6 against `elements_head.name` where `element_type` matches **and** the structural context matches: for a container the proposed parent resolves to the same parent; for a capability the proposed parent code/name resolves to the same parent; for systems and actors the context is the type alone. Multiple hits above threshold → propose the best but flag `ambiguous` in `capture_jobs.stats` and in the delta's `sourceRef`.
 4. **No match** → `element.create` with a fresh id, confidence as scored by the extractor.
 
 Every match at level 2 or 3 also emits an `aliases` insert proposal (type `name` or `source_system_key`) so the next document matches at level 2.
@@ -1429,7 +1427,7 @@ Sprint H1 item 12 (docs/AUDIT-2026-09-U2.md's own deferred-items review, §7.2):
 | `atlas.merge_elements` and §8's name+type+context trigram identity matching | The SQL procedure that actually executes an identity merge (RT-6), and the fuzzy-matching algorithm (trigram similarity ≥ 0.6, structural context, P-19) that would ever produce a candidate pair for it to merge | **Q1** | Neither has a reason to exist independently of the other: `merge_elements` has nothing to merge until something proposes "these two elements might be the same," and the matching algorithm only matters once the capture pipeline (Sprint K1) produces draft elements to match against a model's existing ones. Both wait on that same upstream dependency, and both land together once Q1 actually does the identity-matching work — Sprint C1 closes without either, per this row's own retargeting. The GIN trigram index this depends on (`elements_head_name_trgm_idx`, §3.5) is already migrated — the index exists; nothing queries it for matching purposes yet. |
 | ~~Per-element accept/skip split, and the change page's split/delivered-remaining view (ADR-006's amendment)~~ | **Closed, Sprint C2 (Prompt 7b steps 1/2/3/5/6).** `src/engine/splitClosure.ts`'s `computeSplitClosure` (dependency closure: pull-in for new relationship endpoints and new-child parents, block for a retract whose dependent isn't also accepted) + `atlas.split_branch` (`20260911020000_split_branch.sql`) + the review queue's own accept/skip UI (`SplitReviewPanel.tsx`) + the change page's delivered/remaining panel (`ChangeView.tsx`, already built against `resolveChangeLineage` — real data now that something creates a split). Property-tested (folding the closure's own result over the merge base never violates C8/C9 — checked by actually folding, not a hand-rolled re-check), integration-tested against a real Supabase, and covered end-to-end by `e2e/split-branch.spec.ts`. | — | — |
 | ~~Server-persisted identity-warning dismissals (P-18)~~ | **Closed, Sprint C2 step 7.** `atlas.dismiss_identity_pair` (`20260911030000_persist_identity_dismissals.sql`) — a dedicated `merge_requests.dismissed_identity_pairs` column, not folded into `classification` itself (which is wholly recomputed on every refresh/resubmit and would silently drop a dismissal recorded there). `useReviewRequest.ts`'s own `isIdentityPairDismissed`/`dismissIdentityPair` now read/write it instead of local-only React state. Integration-tested (`src/db/reviewQueueHardening.integration.test.ts`): persists across a fresh fetch, idempotent on a repeat dismissal. | — | — |
-| Playwright coverage for the review queue (`BranchRebasePanel`, `/review` list) | No automated test exercises `BranchRebasePanel.tsx`'s own pre-review-request rebase flow, the `/review` queue list page, or a branch-ref visit to Context/Container/Component asserting the As-is/To-be/Diff mode control renders there | **C2b** | Grouped with C2b (below) rather than shipped alone — the same review-queue UI surface both touch, and C2b's own structural-conflict actions are the more natural thing for this coverage to exercise once they exist, rather than writing throwaway coverage now that would need rewriting once C2b lands. |
+| Playwright coverage for the review queue (`BranchRebasePanel`, `/review` list) | No automated test exercises `BranchRebasePanel.tsx`'s own pre-review-request rebase flow, the `/review` queue list page, or a branch-ref visit to Context/Container asserting the As-is/To-be/Diff mode control renders there | **C2b** | Grouped with C2b (below) rather than shipped alone — the same review-queue UI surface both touch, and C2b's own structural-conflict actions are the more natural thing for this coverage to exercise once they exist, rather than writing throwaway coverage now that would need rewriting once C2b lands. |
 | Structural-conflict bespoke resolution actions (docs/AUDIT-2026-09-C1.md §7) | Retract-cascade, duplicate-relationship survivor pick, cardinality pick, and `atlas.merge_elements` — structural conflicts render with full three-way context (`src/ui/reviews/ConflictCards.tsx`, shared by `ReviewRequestView.tsx`/`BranchRebasePanel.tsx`) but their own resolution actions "are not built this step" (`src/engine/mergeResolution.ts`'s own scope note: "field conflicts only"); today's real path, named on each structural card, is "reopen the branch and fix it with the ordinary editor, then refresh" | **C2b — retargeted from C2, Sprint C2's own step 4, found not safely buildable within that sprint.** A real engine gap, not just missing UI: a `merge`-kind commit's own fold (SPEC §6.2) applies "theirs'" exclusive deltas *unconditionally*, before any resolution delta — for a field conflict this is harmless (theirs' update lands, then the resolution delta overwrites it), but for `structural:retract-vs-modify` when *our own branch* retracted the element and *main* modified it, folding main's exclusive `element.update` onto a head where the branch already retracted that element throws (`apply()` requires the target to exist) before a resolution ever gets a chance to run. Closing this needs either resolution applied *during* the fold (not after) or a two-phase refresh (detect the conflict, skip the offending delta, apply the resolution in its place) — a real engine decision, not a UI one, written up with the exact failing scenario in the tracking issue for a decision before building. | Tracking issue: [#76](https://github.com/sparky100/atlas/issues/76) — read it before starting; it names the exact scenario and both candidate designs, neither chosen yet. |
 | Capture-draft review-queue item kind (docs/AUDIT-2026-09-C1.md §7) | UI-principles §5 names two review-queue item kinds; `src/ui/reviews/ReviewQueueView.tsx`'s own comment says only merge requests are rendered today — capture drafts are "not built here (the capture pipeline itself doesn't exist yet, ADR-004/SPEC §8's own deferral)" | **Sprint K1** | Depends on ADR-004's capture pipeline existing at all — nothing produces a `capture_draft` branch today, so there is nothing for this item kind to represent until Sprint K1 builds the pipeline that does. |
 | Roadmap view (target-date timeline across changes, UI-principles' change-page cross-reference) | No roadmap page or query exists yet — `branches.target_date` (§3.4) is captured but nothing renders a timeline over it | **R1** | Depends on the split/closure work above for an accurate "one logical change" grouping (a split branch's target date should roll up to its original, not appear as a second entry) — sequenced after C2, not before. |
