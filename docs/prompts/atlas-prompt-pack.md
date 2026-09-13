@@ -46,14 +46,16 @@ Applied by every session, cloud or desktop. Put into CLAUDE.md by prompt P1.
 4. **S2** — golden paths: write the eight click-only specs (flow 2 covers V1), fix what they expose, ship nothing else.
 5. **Human walkthrough**, findings filed via the intake → **S3**.
 6. Repeat 4–5 until the definition of usable holds by golden path.
-**Gate before any feature sprint:** S2's eight golden paths green at 1280 and 390; the context view built as a diagram (platform modules inside the tile); E1 merged; the deploy workflow has one green run or has been removed with `pnpm release` documented as the only path; one post-S2 walkthrough filed through the intake with its S3 (if any) closed.
+**Gate before any feature sprint:** S2's eight golden paths green at 1280 and 390; E8's targets met (route < 300 ms, action < 500 ms on the DNO model); the context view built as a diagram (platform modules inside the tile); E1 merged; the deploy workflow has one green run or has been removed with `pnpm release` documented as the only path; one post-S2 walkthrough filed through the intake with its S3 (if any) closed.
 
-7. Then features, in order: **F0 + F3 as one sprint — decisions and options** (intent, decisions, explore changes as high-level options, the comparison view; the product's centre: which capabilities are changing or weak → options → a documented decision → a change) → **F3a** multiple reviewers and sign-up shape → **F1** custom attributes → **F2** capture (K1) → **E2** C2b → **F4** duplicates → **F5** roadmap → **F6** value streams.
-8. Plumbing alongside, desktop only, never the same files as the active S/F sprint, each with its own prompt below: **E3** delta-apply in SQL and **E4** LLM proxy edge function (both before F2); **E5** typed Supabase client (any time after S2); **E6** landscape p5 fps profile (after S2).
+7. Then features, in order: **F0 + F3 as one sprint — decisions and options** (intent, decisions, explore changes as high-level options, the comparison view; the product's centre: which capabilities are changing or weak → options → a documented decision → a change) → **F3a** multiple reviewers and sign-up shape → **F7** accounts and access → **F1** custom attributes → **E2** C2b → **E7** merge_elements → **F2** capture (K1) → **F4** duplicates report → **F5** roadmap → **F6** value streams. E2 and E7 must precede F2: capture review is where structural conflicts and merge-into-X become daily events.
+8. Plumbing alongside, desktop only, never the same files as the active S/F sprint, each with its own prompt below: **E3** delta-apply in SQL and **E4** LLM proxy edge function (both before F2); **E5** typed Supabase client (any time after S2); **E6** landscape p5 fps profile (after S2); **E8** performance (after S2, before features).
 
 ---
 
 ## 4. Prompts
+
+
 
 ### P1 — process (first)
 
@@ -135,6 +137,14 @@ Flows: (1) create a model and seed the electricity map; (2) add a system with de
 Rename every existing deep-linking spec *.engine.spec.ts. CLAUDE.md coverage rule applies from this PR. Screen record diff in the summary.
 ```
 
+### E8 — performance
+
+Prerequisites: S2; E3 in progress or done. Run before the feature sprints.
+
+```
+E8. First measure: timing log per route (resolve → first paint → data complete) and network waterfalls for six routes and three actions (add system, add relationship, save attribute) on the DNO model; numbers committed to docs/perf/2026-09.md. Then: (1) one model-level data layer (react-query or equivalent) caching org, model, branches, head, profiles across routes, invalidated on commit; pages read from it, no per-page resolveRef. (2) Main reads the projection, never folds; branch reads fold once per (branch, head) and cache. (3) After a commit, apply the returned deltas to the cached head and re-render, then revalidate in the background; no full reload. (4) Non-critical panels (comment counts, health findings, recent activity) load after first paint. (5) Realtime resync only on relevant events. Targets asserted in a Playwright timing spec: route change < 300 ms to content, action to updated UI < 500 ms on the DNO model. After numbers committed.
+```
+
 ### F0 — change intent (the why)
 
 Prerequisites: S2. Decided 12 September. A change carries an `intent`, chosen at creation, that sets what the workspace shows and how heavy the review is:
@@ -148,6 +158,12 @@ Prerequisites: S2. Decided 12 September. A change carries an `intent`, chosen at
 F0. `branches.intent` (record | propose | correct | explore), set at creation (defaulting from the entry point: element page → correct or propose; director door → propose; "what happened" → record), editable while Draft. Change workspace renders by intent: header line ("Recording: Dynamics went live 3 Sept" / "Proposing: replace ADQM by March" / "Correction" / "Exploring: option B for Customer Contact"); required fields per intent; review weight per intent (correct and record: single approver, no split; propose and explore: full queue). Changes list groups by intent; the roadmap (F5) shows record on the delivered date and propose on the target date; explore never appears on the roadmap. Golden paths: one change of each intent end to end.
 ```
 
+### F3 — decisions and options (with F0; the product's centre)
+
+A problem or opportunity is a decision, created first: context, owner, needed-by date, linked to the capability and systems involved. Options are explore changes linked to the decision, deliberately coarse (name, a paragraph, capabilities affected, systems added/retired, a few numbers), each a visible To-be. The decision page compares options side by side (capabilities affected, exposure after, systems added/retired, boundary crossings, cost from custom attributes, To-be links). Choosing records choice and reasons; the chosen exploration converts to a propose change; the others are cancelled "not chosen: see decision". "Why is this here" on any element walks back to the decision and its losing options. "Start a decision" is an action on every health-finding row and on a capability tile, pre-filling capability, systems, needed-by and context from the finding; the decision page shows the finding it came from. A decision may cite a Lens map by URL; no shared schema. First golden path of the sprint, the loop in one flow (assess → decide → explore → choose → update): SAP PM within 12 months of support end appears in Assurance; Start a decision; three explorations (upgrade, replace with Maximo, extend support); compare; choose; the chosen one becomes a proposal, is reviewed and merged; the finding clears and the roadmap shows the replacement. Second golden path: from a weak capability on the director door, create a decision, sketch two options, compare, choose, watch the chosen one become a proposal.
+
+Decision node (title, context, options, choice, consequences, date, decided-by, status incl. superseded-by); links to change, element/capability, assumption/evidence (evidence reuses facts; assumptions light node); decision list and page; "why is this here" on the element page; export as ADR markdown; notification tray deep links for decision anchors. Golden path: record a decision on a change, merge, find it from the retired system's page.
+
 ### F3a — review with multiple reviewers; sign-up shape
 
 Prerequisites: F0/F3 (intent). Decided 12 September.
@@ -158,6 +174,14 @@ Sign-up: first sign-in offers "just me" or "my organisation"; sets the org name 
 Golden path: a change touching two systems with different owners; both approve; a third reviewer abstains without blocking; merge. A correct-intent change merges on one approval.
 ```
 
+### F7 — accounts and access
+
+Prerequisites: F3a. A pilot org hits these in its first week.
+
+```
+F7. (1) Invite emails via Supabase auth invite or a transactional provider, with org name and inviter; resend and revoke; pending invites listed in org settings. (2) Profile page: display name, handle, avatar, own email, notification preferences (mentions, replies, assigned reviews), sign out everywhere. (3) Magic link and password reset verified on mobile; error copy reviewed. (4) Model sharing across organisations: model_shares (model, shared_with_org, optional tag, viewer-only), RLS per SPEC §9's deferred clauses, "Shared with us" on the org home; the consultant case (one person, several client orgs) documented. (5) Membership audit on the org settings page. SSO recorded as a pilot-feedback item, not built. Golden path: invite a second account, accept from the email on mobile, assign a role, share a model read-only with a second org.
+```
+
 ### F1 — custom attributes
 
 Prerequisites: S2. Engine change allowed.
@@ -166,23 +190,21 @@ Prerequisites: S2. Engine change allowed.
 F1. Core attributes stay code; the long tail becomes data. Table attribute_definitions (org_id, key, label, kind text|number|date|boolean|select|link, options, applies_to element/relationship types, required, description, order). Owner UI under organisation settings: define, reorder, deprecate. Stored in the same JSONB attributes with provenance; rendered after core attributes by the generic attribute row; browse filter/sort; export; capture targets. No colour-by, no findings, no engine rules; validation at commit from the definition. Promotion to core = code change + data-migration commit. Contract, migration, round-trip tests, ADR-001 amendment recording the core/custom split. Golden path: define a select attribute, set it on a system, filter the browse table by it.
 ```
 
-### F2 — capture pipeline (K1)
-
-Prerequisites: F1; delta-apply in SQL landed; LLM proxy edge function deployed to the Architecture project. From `docs/SPEC-capture.md` (Prompt 10, already written): sources; candidate extraction for spreadsheet/CSV, PDF, pasted text; matching (exact id → alias → name+context); capture-draft branch; re-import diff; review queue for candidates (accept / merge into / reject / split) built on the S1 review page; aliases learned from merges; `supports` and technical-owner and `via` as first-class inferred fields; fixture set of ten messy inventories and a scoring script — the pipeline is done when it passes the fixtures. Starter-map upgrade flow (diff a model's tree against a newer map version, propose additions as a capture-draft) rides on this. Golden path: import a CSV of twelve systems, review, accept ten, merge, see them on the landscape.
-
 ### E2 — C2b structural-conflict resolution (ADR-021)
 
 Prerequisites: E1; S2. Per ADR-021 §5 items 2–6 and §7: `preparation` commit kind; `atlas.refresh_branch`; classifier fixes (supports.role cardinality, converged retracts); `buildStructuralResolutions`; split-delta ordering; card actions; P-29, P-31, P-32, integration and the deferred Playwright. Issue #76.
 
-### F3 — decisions and options (with F0; the product's centre)
+### E7 — merge_elements and identity matching
 
-A problem or opportunity is a decision, created first: context, owner, needed-by date, linked to the capability and systems involved. Options are explore changes linked to the decision, deliberately coarse (name, a paragraph, capabilities affected, systems added/retired, a few numbers), each a visible To-be. The decision page compares options side by side (capabilities affected, exposure after, systems added/retired, boundary crossings, cost from custom attributes, To-be links). Choosing records choice and reasons; the chosen exploration converts to a propose change; the others are cancelled "not chosen: see decision". "Why is this here" on any element walks back to the decision and its losing options. "Start a decision" is an action on every health-finding row and on a capability tile, pre-filling capability, systems, needed-by and context from the finding; the decision page shows the finding it came from. A decision may cite a Lens map by URL; no shared schema. First golden path of the sprint, the loop in one flow (assess → decide → explore → choose → update): SAP PM within 12 months of support end appears in Assurance; Start a decision; three explorations (upgrade, replace with Maximo, extend support); compare; choose; the chosen one becomes a proposal, is reviewed and merged; the finding clears and the roadmap shows the replacement. Second golden path: from a weak capability on the director door, create a decision, sketch two options, compare, choose, watch the chosen one become a proposal.
+Prerequisites: E1. Before F2. `atlas.merge_elements(winner, loser)` as one reversible action per ADR-019: references re-pointed via relationship.update deltas, the loser's name recorded as an alias, the loser tombstoned by element.retract, all in one commit; undo restores exactly. Trigram identity matching (name + context: owner, vendor, description) in the classifier and the capture matcher, thresholds documented. UI: "Merge into…" on the element header menu with a preview of what re-points. Property test: merge then undo is the identity; integration through the RPC; golden path: merge two near-duplicate systems, old name found by search, undo.
 
-Decision node (title, context, options, choice, consequences, date, decided-by, status incl. superseded-by); links to change, element/capability, assumption/evidence (evidence reuses facts; assumptions light node); decision list and page; "why is this here" on the element page; export as ADR markdown; notification tray deep links for decision anchors. Golden path: record a decision on a change, merge, find it from the retired system's page.
+### F2 — capture pipeline (K1)
 
-### F4 — duplicates (Q1)
+Prerequisites: F1; E2 (C2b); E7 (merge_elements); E3 (delta-apply); E4 (LLM proxy deployed). Decide in design whether the edge function validates with the TypeScript contract (preferred) so `type_schemas` is never built. From `docs/SPEC-capture.md` (Prompt 10, already written): sources; candidate extraction for spreadsheet/CSV, PDF, pasted text; matching (exact id → alias → name+context); capture-draft branch; re-import diff; review queue for candidates (accept / merge into / reject / split) built on the S1 review page; aliases learned from merges; `supports` and technical-owner and `via` as first-class inferred fields; fixture set of ten messy inventories and a scoring script — the pipeline is done when it passes the fixtures. Starter-map upgrade flow (diff a model's tree against a newer map version, propose additions as a capture-draft) rides on this. Golden path: import a CSV of twelve systems, review, accept ten, merge, see them on the landscape.
 
-Nightly candidate job (name/alias similarity, shared owner, overlapping relationships); count on the architect door; list with merge / not-a-duplicate; `atlas.merge_elements` with alias recording (ADR-019); trigram identity matching in the classifier. Golden path: two near-duplicate systems, merge from the report, old name found by search.
+### F4 — duplicates report (Q1)
+
+Prerequisites: E7. Nightly candidate job (name/alias similarity, shared owner, overlapping relationships); count on the architect door; list with merge (E7) / not-a-duplicate remembered. Golden path: two near-duplicate systems, merge from the report, old name found by search.
 
 ### F5 — roadmap (R1)
 
@@ -236,7 +258,7 @@ Every row has (or gets, in P1) a SPEC §11 row and an issue. A row leaves only w
 | Item | Target | Issue |
 |---|---|---|
 | C19 fast-forward fold rule | E1 | create |
-| C2b structural-conflict resolution + deferred Playwright | E2 | #76 |
+| C2b structural-conflict resolution + deferred Playwright | E2 (before F2) | #76 |
 | Reviewer read-only view of a change | S1 | create |
 | Submit for review on the banner | S1 | create |
 | Cancel a change | S1 | create |
@@ -252,7 +274,7 @@ Every row has (or gets, in P1) a SPEC §11 row and an issue. A row leaves only w
 | Starter-map upgrade flow | F2 | create |
 | Delta-apply in SQL | before F2 | create |
 | LLM proxy edge function | before F2 | create |
-| merge_elements + trigram matching | F4 | create |
+| merge_elements + trigram matching | E7 (before F2) | create |
 | Roadmap | F5 | create |
 | Notification tray deep links (decision, version anchors) | F3 / F5 | create |
 | Value streams | F6 | create |
@@ -262,5 +284,5 @@ Every row has (or gets, in P1) a SPEC §11 row and an issue. A row leaves only w
 | Landscape position persistence with layout versioning | not scheduled | create |
 | Security zone on containers; compliance view | not scheduled | create |
 | Keyboard shortcuts for As-is/To-be/Diff; propose-change picker for contributors at main | S-track | create |
-| type_schemas (JSON-Schema generator) | F2 if capture needs it, else never | create |
+| type_schemas (JSON-Schema generator) | never, if F2's edge function validates with the TypeScript contract | create |
 | Deploy workflow (token privileges) | P1 | create |

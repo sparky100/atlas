@@ -6,10 +6,10 @@ import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { quantizeScale } from '../landscape/zoom';
-import { NODE_HEIGHT, NODE_WIDTH } from '../landscape/layout';
-import { allTilesOf, anchorFor, computeContextDiagramLayout, type ContextDiagramLayout, type DiagramTile, type DiagramUnitInput } from './contextDiagramLayout';
+import { NODE_WIDTH } from '../landscape/layout';
+import { allTilesOf, anchorFor, computeContextDiagramLayout, curveBetween, tileTopAnchor, type ContextDiagramLayout, type DiagramTile, type DiagramUnitInput } from './contextDiagramLayout';
 import { kindOf, SYSTEM_KIND_LABEL } from '../elements/systemKind';
-import { edgeLabel, type ContextGroup } from './contextGrouping';
+import { edgeLabel, type ContextGroup, type ContextNeighbour } from './contextGrouping';
 import type { ContextModule } from './contextDiagramData';
 import styles from './ContextDiagramCanvas.module.css';
 
@@ -136,39 +136,74 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 }
 
 /**
- * V1 fix, "fit to fill (max 1.5×)": was capped at a plain `1` — a small
- * diagram (a system with only one or two neighbours) fit-to-viewed at
- * 100% scale even when the canvas had ample room to fill with a larger,
- * easier-to-read diagram. Capping the *fit* scale at 1.5× (not removing the
- * cap entirely — a two-neighbour diagram filling a 1400px-wide monitor at
- * whatever multiple that implies would look absurd) lets a small diagram
- * genuinely fill the available space instead of floating at native size in
- * the middle of it.
+ * V1 polish, "fit uses width up to 1.5×": was `Math.min(width-ratio,
+ * height-ratio, 1.5)` — on the column-per-module layout (`layoutNeighbourBand`,
+ * `contextDiagramLayout.ts`), a platform with several stacked neighbours
+ * under one module reads as genuinely *tall*, so the height ratio was
+ * usually the smaller, binding term and the diagram rarely reached anywhere
+ * near 1.5× however wide the canvas was. Driven by width alone (still
+ * capped at 1.5× so a tiny diagram in a very wide window doesn't blow up
+ * absurdly), a wide canvas now actually fills with the diagram — a tall
+ * result is scrolled/panned into view via the existing drag/zoom controls,
+ * same as the landscape's own canvas already relies on for a dense model.
  */
 const FIT_MAX_SCALE = 1.5;
 
 function computeFitTransform(worldWidth: number, worldHeight: number, displayWidth: number, displayHeight: number): Transform {
   if (worldWidth <= 0 || worldHeight <= 0 || displayWidth <= 0 || displayHeight <= 0) return { scale: 1, tx: 0, ty: 0 };
   const availableWidth = Math.max(1, displayWidth - FIT_MARGIN_PX * 2);
-  const availableHeight = Math.max(1, displayHeight - FIT_MARGIN_PX * 2);
-  const rawScale = Math.min(availableWidth / worldWidth, availableHeight / worldHeight, FIT_MAX_SCALE);
+  const rawScale = Math.min(availableWidth / worldWidth, FIT_MAX_SCALE);
   const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, rawScale));
   const tx = (displayWidth - worldWidth * scale) / 2;
   const ty = (displayHeight - worldHeight * scale) / 2;
   return { scale, tx, ty };
 }
 
+/**
+ * V1 polish: named by which side is the hub-side and which is the
+ * neighbour-side, rather than by logical `from`/`to` — every edge in this
+ * diagram anchors the same physical way regardless of its own direction
+ * (hub/module side at its own tile's bottom edge, neighbour side at its own
+ * tile's top edge; `curveBetween`'s own comment), so the drawing code needs
+ * "which is which side," not "which is from/to." `arrowAtHub` alone still
+ * carries the edge's real direction (the arrowhead is the only place it
+ * shows up visually).
+ */
 interface DrawEdge {
-  fromTile: DiagramTile;
-  toTile: DiagramTile;
-  fromEndpoint: UUID;
-  toEndpoint: UUID;
+  hubTile: DiagramTile;
+  hubEndpoint: UUID;
+  neighbourTile: DiagramTile;
+  neighbourEndpoint: UUID;
+  /** True when this edge's own `to_element_id` is the hub/module side (the arrowhead belongs there); false when it's the neighbour side. */
+  arrowAtHub: boolean;
   label: string;
 }
 
 function unitOf(element: ElementsHeadRow, platformModulesById: ReadonlyMap<UUID, ContextModule[]>): DiagramUnitInput {
   const modules = platformModulesById.get(element.element_id) ?? [];
   return { elementId: element.element_id, modules: modules.map((m) => ({ elementId: m.elementId, capabilityName: m.capabilityName })) };
+}
+
+/**
+ * V1 polish, "neighbour columns spaced beneath the module they connect to":
+ * a neighbour's own `attachedToModuleId` hint (`DiagramUnitInput`'s own doc
+ * comment) — the one hub module every one of this neighbour's edges names,
+ * when they all agree, else `null`. Reads `hubModuleIds` alone (not the
+ * placed `layout.hub.modules` — computing that hint has to happen *before*
+ * layout, not after) so there's no circularity between "which column does
+ * this neighbour belong to" and "where did layout put the modules."
+ */
+function attachedModuleIdFor(neighbour: ContextNeighbour, hubModuleIds: ReadonlySet<UUID>): UUID | null {
+  const moduleIds = new Set<UUID>();
+  for (const edge of neighbour.edges) {
+    if (hubModuleIds.has(edge.from_element_id)) moduleIds.add(edge.from_element_id);
+    else if (hubModuleIds.has(edge.to_element_id)) moduleIds.add(edge.to_element_id);
+  }
+  return moduleIds.size === 1 ? ([...moduleIds][0] ?? null) : null;
+}
+
+function neighbourUnitOf(neighbour: ContextNeighbour, platformModulesById: ReadonlyMap<UUID, ContextModule[]>, hubModuleIds: ReadonlySet<UUID>): DiagramUnitInput {
+  return { ...unitOf(neighbour.element, platformModulesById), attachedToModuleId: attachedModuleIdFor(neighbour, hubModuleIds) };
 }
 
 /**
@@ -215,15 +250,21 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
     return map;
   }, [platformModulesById]);
 
+  // V1 polish: the hub's own module ids, needed *before* layout runs to
+  // compute each neighbour's own `attachedToModuleId` hint — see
+  // `attachedModuleIdFor`'s own comment for why this reads `platformModulesById`
+  // directly rather than the layout's already-placed `layout.hub.modules`.
+  const hubModuleIds = useMemo(() => new Set((platformModulesById.get(group.hub.element_id) ?? []).map((m) => m.elementId)), [platformModulesById, group.hub.element_id]);
+
   const layout = useMemo<ContextDiagramLayout>(
     () =>
       computeContextDiagramLayout(
         unitOf(group.hub, platformModulesById),
-        group.internal.map((n) => unitOf(n.element, platformModulesById)),
-        group.external.map((n) => unitOf(n.element, platformModulesById)),
+        group.internal.map((n) => neighbourUnitOf(n, platformModulesById, hubModuleIds)),
+        group.external.map((n) => neighbourUnitOf(n, platformModulesById, hubModuleIds)),
         layoutWidthHint,
       ),
-    [group, platformModulesById, layoutWidthHint],
+    [group, platformModulesById, hubModuleIds, layoutWidthHint],
   );
 
   const tileByElementId = useMemo(() => new Map(allTilesOf(layout).map((t) => [t.elementId, t])), [layout]);
@@ -235,9 +276,12 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
       if (!neighbourTile) continue;
       for (const edge of neighbour.edges) {
         const fromIsHub = edge.from_element_id === group.hub.element_id || (layout.hub.modules?.some((m) => m.elementId === edge.from_element_id) ?? false);
-        const fromTile = fromIsHub ? layout.hub : neighbourTile;
-        const toTile = fromIsHub ? neighbourTile : layout.hub;
-        result.push({ fromTile, toTile, fromEndpoint: edge.from_element_id, toEndpoint: edge.to_element_id, label: edgeLabel(edge, group.hub.element_id) });
+        const hubEndpoint = fromIsHub ? edge.from_element_id : edge.to_element_id;
+        const neighbourEndpoint = fromIsHub ? edge.to_element_id : edge.from_element_id;
+        // The arrow belongs at the logical `to` side — `arrowAtHub` is true
+        // exactly when the hub/module side is that `to` side, i.e. the edge
+        // does *not* run hub → neighbour.
+        result.push({ hubTile: layout.hub, hubEndpoint, neighbourTile, neighbourEndpoint, arrowAtHub: !fromIsHub, label: edgeLabel(edge, group.hub.element_id) });
       }
     }
     return result;
@@ -319,45 +363,54 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         ctx.restore();
       }
 
-      const edgeLabels: { text: string; worldX: number; worldY: number; angle: number }[] = [];
+      const edgeLabels: { text: string; worldX: number; worldY: number }[] = [];
       const platformMarkers: { worldX: number; worldY: number }[] = [];
       for (const edge of edges) {
-        // V1 fix: the platform-fallback anchor now returns a point on the
-        // tile's own rectangle boundary, facing the *other* endpoint's own
-        // tile centre (`clipToRectBoundary`'s own comment) — each side's
-        // `anchorFor` call needs the other side's centre for that, computed
-        // up front here rather than inside `anchorFor` itself (which only
-        // ever sees one tile at a time).
-        const fromCentre = { x: edge.fromTile.x + edge.fromTile.w / 2, y: edge.fromTile.y + edge.fromTile.h / 2 };
-        const toCentre = { x: edge.toTile.x + edge.toTile.w / 2, y: edge.toTile.y + edge.toTile.h / 2 };
-        const from = anchorFor(edge.fromTile, edge.fromEndpoint, toCentre);
-        const to = anchorFor(edge.toTile, edge.toEndpoint, fromCentre);
-        if (from.isPlatformFallback) platformMarkers.push({ worldX: from.x, worldY: from.y });
-        if (to.isPlatformFallback) platformMarkers.push({ worldX: to.x, worldY: to.y });
+        // V1 polish: the hub/module side always anchors at its own tile's
+        // bottom edge, the neighbour side at its own tile's top edge
+        // (`anchorFor`/`tileTopAnchor`'s own comments) — every neighbour
+        // this diagram places sits below its hub, so this is always "lower
+        // anchor = neighbour, upper anchor = hub/module," never the other
+        // way round, regardless of the edge's own logical direction.
+        const hubAnchor = anchorFor(edge.hubTile, edge.hubEndpoint);
+        const neighbourAnchor = tileTopAnchor(edge.neighbourTile);
+        if (hubAnchor.isPlatformFallback) platformMarkers.push({ worldX: hubAnchor.x, worldY: hubAnchor.y });
 
+        // V1 polish, "orthogonal/curved edge routing entering module tiles
+        // from below and leaving neighbours from above": a Bézier curve,
+        // vertical at both ends, rather than a straight line — see
+        // `curveBetween`'s own comment for why this is a dead-straight
+        // vertical run whenever a neighbour sits in its own module's column
+        // (the common case), and only bows sideways for an unattached
+        // neighbour placed elsewhere in the band.
+        const curve = curveBetween(neighbourAnchor, hubAnchor);
         ctx.save();
         ctx.strokeStyle = tokens.borderStrong;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(from.x, from.y);
-        ctx.lineTo(to.x, to.y);
+        ctx.moveTo(neighbourAnchor.x, neighbourAnchor.y);
+        ctx.bezierCurveTo(curve.cp1.x, curve.cp1.y, curve.cp2.x, curve.cp2.y, hubAnchor.x, hubAnchor.y);
         ctx.stroke();
+        ctx.restore();
 
-        // One arrowhead, direction-only (UI-principles §9) — same shape
-        // LandscapeCanvas.tsx's own arrowhead uses, oriented along this
-        // edge's own line (never routed here, so always the direct angle).
-        // V1 fix, "edge labels along the line": the same angle now also
-        // orients the label text itself (below, screen-space pass) instead
-        // of drawing it flat/horizontal.
-        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        // V1 polish, "label pill on the free segment, never over a tile":
+        // the curve's own midpoint always falls in the open gutter between
+        // the two rows (`curveBetween`'s own comment) — drawn as a filled
+        // pill in the screen-space pass below, not here (needs the actual
+        // font metrics to size itself).
         if (showLabels && edge.label.trim().length > 0) {
-          edgeLabels.push({ text: edge.label, worldX: (from.x + to.x) / 2, worldY: (from.y + to.y) / 2, angle });
+          edgeLabels.push({ text: edge.label, worldX: curve.mid.x, worldY: curve.mid.y });
         }
 
-        const arrowX = to.x - Math.cos(angle) * (NODE_HEIGHT / 2);
-        const arrowY = to.y - Math.sin(angle) * (NODE_HEIGHT / 2);
-        ctx.translate(arrowX, arrowY);
-        ctx.rotate(angle);
+        // One arrowhead, at the target only (UI-principles §9) — always
+        // vertical now (both anchors are a tile's own top/bottom edge), so
+        // no angle computation is needed: `arrowAtHub` alone says whether it
+        // points up into the hub/module or down into the neighbour.
+        const targetAnchor = edge.arrowAtHub ? hubAnchor : neighbourAnchor;
+        const arrowSign = edge.arrowAtHub ? -1 : 1; // up into the hub/module, or down into the neighbour
+        ctx.save();
+        ctx.translate(targetAnchor.x, targetAnchor.y);
+        ctx.rotate(arrowSign > 0 ? Math.PI / 2 : -Math.PI / 2);
         ctx.beginPath();
         ctx.moveTo(0, 0);
         ctx.lineTo(-8, -4);
@@ -509,20 +562,28 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         }
       }
 
-      // V1 fix, "edge labels along the line": rotated to the edge's own
-      // angle (computed alongside the arrowhead above) instead of drawn
-      // flat/horizontal — flipped by π whenever that angle points leftward,
-      // so the text itself is never upside down.
-      ctx.fillStyle = tokens.textMuted;
+      // V1 polish, "label pill on the free segment, never over a tile": a
+      // filled rounded pill sized to the text, centred on the curve's own
+      // midpoint (`curveBetween`'s own comment on why that point is always
+      // in the clear gutter between rows). The vertical routing above means
+      // this text no longer needs to follow a line's own angle — it's
+      // always sitting on the open horizontal band between two rows, so
+      // plain centred text reads cleanly without rotation.
       ctx.font = `${(11 * textScale).toFixed(2)}px sans-serif`;
       for (const label of edgeLabels) {
         const [x, y] = toScreen(label.worldX, label.worldY);
-        const angle = label.angle > Math.PI / 2 || label.angle < -Math.PI / 2 ? label.angle + Math.PI : label.angle;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(angle);
-        ctx.fillText(truncate(ctx, label.text, NODE_WIDTH * 1.5 * textScale), 0, -8 * textScale);
-        ctx.restore();
+        const text = truncate(ctx, label.text, NODE_WIDTH * 1.5 * textScale);
+        const textWidth = ctx.measureText(text).width;
+        const pillW = textWidth + 12 * textScale;
+        const pillH = 18 * textScale;
+        roundRectPath(ctx, x - pillW / 2, y - pillH / 2, pillW, pillH, pillH / 2);
+        ctx.fillStyle = tokens.surfaceRaised;
+        ctx.fill();
+        ctx.strokeStyle = tokens.border;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = tokens.textMuted;
+        ctx.fillText(text, x, y);
       }
 
       // V1's own "which module?" marker — a small filled "?" badge at the
