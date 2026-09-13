@@ -12,6 +12,7 @@ export {
   canArchiveModel,
   canBackfillCapabilityOrder,
   canCancelChange,
+  canChooseDecisionOption,
   canCreateChangeBranch,
   canCreateModel,
   canDeleteModel,

@@ -89,10 +89,27 @@ export async function listDecisionLinksForDecision(supabase: Client, decisionId:
   return data as DecisionLinkRow[];
 }
 
-/** A decision's own pro/con list — always empty until `atlas.choose_decision_option` (PR5) writes the one reasons row a chosen option gets. Queried anyway so the decision page renders an honestly-empty section, not a hardcoded placeholder. */
+/** A decision's own pro/con list — empty until `atlas.choose_decision_option` writes the one reasons row a chosen option gets (`chooseDecisionOption`, below). Queried regardless of whether that's happened yet, so the decision page renders an honestly-empty section, not a hardcoded placeholder. */
 export async function listDecisionArgumentsForDecision(supabase: Client, decisionId: UUID): Promise<DecisionArgumentRow[]> {
   assertRealId('listDecisionArgumentsForDecision', 'decision_id', decisionId);
   const { data, error } = await supabase.from('decision_arguments').select('*').eq('decision_id', decisionId).order('created_at', { ascending: true });
   if (error) throw new Error(`listDecisionArgumentsForDecision: ${error.message}`);
   return data as DecisionArgumentRow[];
+}
+
+/**
+ * F3 PR5's "Choose": `atlas.choose_decision_option`
+ * (`20260913120000_choose_decision_option.sql`) — the only writer
+ * `decision_arguments` has. Atomically accepts the decision, records
+ * `reasons` as the one `decision_arguments` row, flips `chosenBranchId`'s
+ * own `intent` to `propose`, and cancels every other `branch`-linked
+ * option still in draft. `chosenBranchId` must already be a `branch`-typed
+ * link on this decision, `explore`-intent, `draft` — the RPC validates all
+ * three itself, this is not re-checked client-side.
+ */
+export async function chooseDecisionOption(supabase: Client, decisionId: UUID, chosenBranchId: UUID, reasons: string): Promise<DecisionRow> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.schema('atlas').rpc('choose_decision_option', { p_decision_id: decisionId, p_chosen_branch_id: chosenBranchId, p_reasons: reasons });
+  if (error) throw new Error(`chooseDecisionOption: ${error.message}`);
+  return data as DecisionRow;
 }

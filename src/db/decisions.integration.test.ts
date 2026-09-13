@@ -1,28 +1,31 @@
 /**
- * Integration tests for prompt pack F3 PR4's decision schema (ADR-013,
+ * Integration tests for prompt pack F3's decision schema (ADR-013,
  * extended by ADR-022 — `docs/ADR-022-decisions-schema.md`,
- * `supabase/migrations/20260913110000_decisions.sql`) against a real local
+ * `supabase/migrations/20260913110000_decisions.sql`/
+ * `20260913120000_choose_decision_option.sql`) against a real local
  * Supabase. Same "this sandbox has no Docker route" limitation named in
  * `repository.integration.test.ts`'s own module comment — written and
  * reasoned through against the real RLS/trigger behaviour, not executed
  * here.
  *
  * Covers: the `decisions` round-trip, its draft-only (`status='proposed'`)
- * update guard, `decision_links`'s own status-gated insert, that
- * `decision_arguments` has genuinely no open insert grant yet (PR5's own
- * `atlas.choose_decision_option` is the only writer), a minimal
- * `assumptions`/`evidence` round-trip, and the `'decision'` anchor wiring
- * on `comments` (`atlas.check_anchor`/`atlas.anchor_visible_to_viewer`).
+ * update guard, `decision_links`'s own status-gated insert, a minimal
+ * `assumptions`/`evidence` round-trip, the `'decision'` anchor wiring on
+ * `comments` (`atlas.check_anchor`/`atlas.anchor_visible_to_viewer`), and
+ * (PR5) `atlas.choose_decision_option` end to end — three `explore`-intent
+ * options, choosing one, asserting the chosen branch's flipped `propose`
+ * intent, the other two's `cancel_reason`, the one `decision_arguments`
+ * row, and `decisions.status`/`branch_id`/`decided_by`/`decided_at`.
  */
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { CommitEnvelope, Delta } from '../contracts/delta';
-import { createChangeBranch, getMainBranch } from './branches';
+import { createChangeBranch, getBranch, getMainBranch } from './branches';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { commitToBranch } from './commits';
 import { createComment, listCommentsForAnchor } from './comments';
-import { createDecision, createDecisionLink, getDecision, listDecisionArgumentsForDecision, listDecisionLinksForDecision, listDecisionsForModel } from './decisions';
+import { chooseDecisionOption, createDecision, createDecisionLink, getDecision, listDecisionArgumentsForDecision, listDecisionLinksForDecision, listDecisionsForModel } from './decisions';
 import { loadEnv } from './env';
 import { createModel } from './models';
 import { createOrganisation } from './organisations';
@@ -133,12 +136,15 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
     expect(titleError).toBeNull();
     expect((await getDecision(alice.client, decision.id))?.title).toBe('Revised title');
 
-    // atlas.guard_decision_update rejects a plain update touching any of the
-    // choose_decision_option-only columns, even though the grant itself
-    // would already refuse it (the trigger is defence-in-depth, same shape
-    // as branches.intent's own guard).
-    const { error: statusError } = await service.from('decisions').update({ status: 'accepted', decided_by: alice.id, decided_at: new Date().toISOString(), branch_id: null }).eq('id', decision.id);
-    // (service role bypasses RLS but not the trigger — this still proves the trigger, not just the grant, is what refuses it.)
+    // status/decided_by/decided_at/branch_id are never granted to a plain
+    // authenticated client at all (the same "sensitive column simply isn't
+    // grantable" shape branches.status itself already uses) — Postgres
+    // refuses this at the column-privilege level before atlas.
+    // guard_decision_update's own timing check ever runs. Using alice's
+    // own signed-in client here (not the service role, which bypasses
+    // column grants entirely, same as it bypasses RLS) is what actually
+    // proves this boundary.
+    const { error: statusError } = await alice.client.from('decisions').update({ status: 'accepted', decided_by: alice.id, decided_at: new Date().toISOString(), branch_id: null }).eq('id', decision.id);
     expect(statusError).not.toBeNull();
   });
 
@@ -221,5 +227,67 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
     const asViewer = await listCommentsForAnchor(bob.client, modelId, 'decision', decision.id);
     expect(asViewer.threads.map((t) => t.root.id)).toContain(comment.id);
     await service.auth.admin.deleteUser(bob.id);
+  });
+
+  describe('atlas.choose_decision_option (prompt pack F3 PR5)', () => {
+    it("choosing one of three explore-intent options flips its own intent to propose, cancels the other two (with a 'Not chosen' reason), records the one decision_arguments row, and closes the decision", async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Which replacement?', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+
+      const options = await Promise.all(
+        ['option-a', 'option-b', 'option-c'].map((name) =>
+          createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `${name}-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id }),
+        ),
+      );
+      await Promise.all(options.map((o) => createDecisionLink(alice.client, { decisionId: decision.id, linkedType: 'branch', linkedId: o.id, createdBy: alice.id })));
+
+      const chosen = options[1];
+      if (!chosen) throw new Error('expected three options');
+      const notChosen = options.filter((o) => o.id !== chosen.id);
+
+      const accepted = await chooseDecisionOption(alice.client, decision.id, chosen.id, 'Option B has the lowest boundary-crossing count and no criticality regressions.');
+      expect(accepted).toMatchObject({ status: 'accepted', branch_id: chosen.id, decided_by: alice.id });
+      expect(accepted.decided_at).not.toBeNull();
+
+      const chosenBranchAfter = await getBranch(alice.client, chosen.id);
+      expect(chosenBranchAfter).toMatchObject({ intent: 'propose', status: 'draft' });
+
+      for (const other of notChosen) {
+        const otherAfter = await getBranch(alice.client, other.id);
+        expect(otherAfter).toMatchObject({ status: 'cancelled', cancel_reason: `Not chosen: see decision ${decision.id}` });
+        expect(otherAfter?.cancelled_at).not.toBeNull();
+      }
+
+      const args = await listDecisionArgumentsForDecision(alice.client, decision.id);
+      expect(args).toHaveLength(1);
+      expect(args[0]).toMatchObject({ decision_id: decision.id, stance: 'for', author: alice.id, body: 'Option B has the lowest boundary-crossing count and no criticality regressions.' });
+
+      // Closed: even title (a grantable column) is no longer plain-editable once accepted.
+      const { error: editAfterChooseError } = await alice.client.from('decisions').update({ title: 'Trying to edit after choosing' }).eq('id', decision.id);
+      expect(editAfterChooseError).not.toBeNull();
+    });
+
+    it('refuses a non-owner/architect caller, a branch not linked to the decision, and a branch that is not a draft explore-intent option', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Refusal checks', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const option = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `refusal-option-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
+      await createDecisionLink(alice.client, { decisionId: decision.id, linkedType: 'branch', linkedId: option.id, createdBy: alice.id });
+
+      const unlinkedBranch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `unlinked-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
+      await expect(chooseDecisionOption(alice.client, decision.id, unlinkedBranch.id, 'not a linked option')).rejects.toThrow();
+
+      const bob = await createSignedInUser('decisions-bob-contributor');
+      const { error: inviteError } = await alice.client.from('members').insert({ org_id: orgId, user_id: bob.id, role: 'contributor', invited_by: alice.id });
+      if (inviteError) throw new Error(`inviting bob as contributor: ${inviteError.message}`);
+      await expect(chooseDecisionOption(bob.client, decision.id, option.id, 'a contributor should not be able to choose')).rejects.toThrow();
+      await service.auth.admin.deleteUser(bob.id);
+
+      // Submit the option for review — it leaves 'draft', so it's no longer a legal choice even though it's still linked.
+      await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: randomUUID(), p_branch_id: option.id, p_classification: {} });
+      await expect(chooseDecisionOption(alice.client, decision.id, option.id, 'no longer a draft')).rejects.toThrow();
+    });
   });
 });

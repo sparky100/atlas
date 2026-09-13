@@ -162,31 +162,34 @@ create policy decisions_update on decisions
 
 revoke update on decisions from authenticated;
 grant select, insert on decisions to authenticated;
--- status/decided_by/decided_at/branch_id/superseded_decision_id are
--- atlas.choose_decision_option-only (PR5) — never in this grant list, so a
--- plain client update can't touch them even while status='proposed'
--- (the trigger below also refuses if it tries).
+-- status/decided_by/decided_at/branch_id/superseded_decision_id are never
+-- in this grant list — Postgres refuses a plain client UPDATE naming any
+-- of them (insufficient column privilege) before the guard trigger below
+-- ever runs, the same "sensitive column simply isn't grantable at all"
+-- shape `branches.status` itself already uses (no plain-update grant, no
+-- guard trigger for it either — only RPCs touch it). `atlas.
+-- choose_decision_option` (PR5) is `security definer`, so it writes these
+-- columns directly regardless of this grant list, same as every other
+-- privileged RPC in this schema.
 grant update (title, statement, owner_id, needed_by, source_finding_key, lens_map_url) on decisions to authenticated;
 
 -- No delete policy: a decision is never deleted, only superseded (ADR-013).
 
+-- Guards only *when*, not *which columns* — the grant list above already
+-- settles which columns a plain client may ever set at all. A decision's
+-- own fields are editable only while `status = 'proposed'`; this also
+-- lets atlas.choose_decision_option's (PR5) own `status='accepted'`
+-- transition through cleanly, since that update runs while `old.status`
+-- is still `'proposed'` (its own precondition, checked before the update)
+-- — an *earlier* column-equality check here would have blocked that
+-- RPC's own legitimate write, which is exactly the bug this comment
+-- exists to warn a future editor away from reintroducing.
 create or replace function atlas.guard_decision_update()
 returns trigger
 language plpgsql
 set search_path = public, pg_temp
 as $$
 begin
-  if new.status is distinct from old.status
-     or new.decided_by is distinct from old.decided_by
-     or new.decided_at is distinct from old.decided_at
-     or new.branch_id is distinct from old.branch_id
-     or new.superseded_decision_id is distinct from old.superseded_decision_id
-     or new.org_id is distinct from old.org_id
-     or new.model_id is distinct from old.model_id
-     or new.created_by is distinct from old.created_by
-     or new.created_at is distinct from old.created_at then
-    raise exception 'guard_decision_update: only title/statement/owner_id/needed_by/source_finding_key/lens_map_url may change by plain update — status/decided_by/decided_at/branch_id/superseded_decision_id are atlas.choose_decision_option-only' using errcode = '42501';
-  end if;
   if old.status <> 'proposed' then
     raise exception 'guard_decision_update: a decision''s own fields are only editable while proposed' using errcode = '42501';
   end if;
