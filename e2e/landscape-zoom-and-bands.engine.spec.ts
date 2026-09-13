@@ -222,7 +222,12 @@ test('landscape actors and boundary: an internal and an external actor render ab
   const scale = Number(await wrapper.getAttribute('data-scale'));
   const tx = Number(await wrapper.getAttribute('data-tx'));
   const ty = Number(await wrapper.getAttribute('data-ty'));
-  await canvas.click({ position: { x: (externalActorNode.x + NODE_WIDTH / 2) * scale + tx, y: (externalActorNode.y + NODE_HEIGHT / 2) * scale + ty } });
+  const actorPosition = { x: (externalActorNode.x + NODE_WIDTH / 2) * scale + tx, y: (externalActorNode.y + NODE_HEIGHT / 2) * scale + ty };
+  // V2 "landscape focus and filters", decision 2: applies to an actor tile
+  // exactly like a system one — the first click focuses, the second (same
+  // tile, now already focused) navigates.
+  await canvas.click({ position: actorPosition });
+  await canvas.click({ position: actorPosition });
   await expect(page).toHaveURL(new RegExp(`/e/${externalActorId}\\?ref=main`));
   await expect(page.getByRole('heading', { name: 'Vendor Contact' })).toBeVisible();
 });

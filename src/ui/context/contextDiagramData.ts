@@ -19,6 +19,16 @@ export interface ContextModule {
   elementId: UUID;
   name: string;
   capabilityName: string | null;
+  /**
+   * The module's own `lifecycleStatus` (`ContainerAttributes`, uninherited
+   * from its platform — the same "a module's own, uninherited attributes
+   * only" scope `layout.ts`'s own landscape placement already uses for a
+   * module tile, per that decision's own reasoning: a module's tile tone is
+   * a fact about *that module* alone, e.g. SAP BW itself recorded as
+   * `retiring` while SAP as a whole stays `active`). `null` when the module
+   * has never had one recorded.
+   */
+  lifecycleStatus: string | null;
 }
 
 /**
@@ -74,7 +84,15 @@ export function buildPlatformModulesById(
     const sorted = [...modules].sort((a, b) => a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id));
     result.set(
       platformId,
-      sorted.map((module) => ({ elementId: module.element_id, name: module.name, capabilityName: capabilityNameByModuleId.get(module.element_id) ?? null })),
+      sorted.map((module) => {
+        const lifecycleStatus = attributesRecord(module.attributes).lifecycleStatus;
+        return {
+          elementId: module.element_id,
+          name: module.name,
+          capabilityName: capabilityNameByModuleId.get(module.element_id) ?? null,
+          lifecycleStatus: typeof lifecycleStatus === 'string' ? lifecycleStatus : null,
+        };
+      }),
     );
   }
   return result;

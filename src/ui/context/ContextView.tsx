@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import type { ElementVersionDiff, VersionDiff } from '../../engine/versionDiff';
@@ -81,6 +82,75 @@ export function ContextView({ group, platformModulesById, orgSlug, modelSlug, re
   const externalOwners = group.owners.filter((o) => o.isExternal);
   const hubModules = platformModulesById.get(group.hub.element_id) ?? [];
   const showModuleGroupedSupports = isPlatform(group.hub) && hubModules.length > 0;
+  // V1 polish, "header collapses to a one-line summary when the diagram
+  // renders": the same condition that decides whether the diagram body
+  // mounts below (`(group.internal.length > 0 || group.external.length >
+  // 0)`) — once the diagram is taking up real canvas space, the header
+  // doesn't also need three separate paragraphs' worth of the same facts;
+  // one compact line, still linking every name, does. The empty-state case
+  // (no diagram at all) keeps the fuller, multi-line summary unchanged —
+  // there's no canvas competing for space there.
+  const hasDiagram = group.internal.length > 0 || group.external.length > 0;
+
+  const supportsModulesPart = showModuleGroupedSupports ? (
+    <>
+      Supports:{' '}
+      {hubModules.map((module, i) => (
+        <span key={module.elementId}>
+          {i > 0 && ', '}
+          <Link to={elementHref(module.elementId)}>{module.name}</Link>
+          {module.capabilityName && ` → ${module.capabilityName}`}
+        </span>
+      ))}
+    </>
+  ) : null;
+
+  const supportsDirectPart =
+    group.supports.length > 0 ? (
+      <>
+        Supports:{' '}
+        {group.supports.map((s, i) => (
+          <span key={s.capability.element_id}>
+            {i > 0 && ', '}
+            <Link to={elementHref(s.capability.element_id)}>{s.capability.name}</Link>
+          </span>
+        ))}
+      </>
+    ) : null;
+
+  const ownersPart =
+    group.owners.length > 0 ? (
+      <>
+        {OWNS_ROLE_ORDER.filter((role) => internalOwners.some((o) => o.role === role)).map((role, groupIndex) => (
+          <span key={role}>
+            {groupIndex > 0 && ' · '}
+            {ownsRoleLabel(role)} owner:{' '}
+            {internalOwners
+              .filter((o) => o.role === role)
+              .map((owner, i) => (
+                <span key={owner.actor.element_id}>
+                  {i > 0 && ', '}
+                  <Link to={elementHref(owner.actor.element_id)}>{owner.actor.name}</Link>
+                </span>
+              ))}
+          </span>
+        ))}
+        {externalOwners.length > 0 && (
+          <span>
+            {internalOwners.length > 0 && ' · '}
+            External:{' '}
+            {externalOwners.map((owner, i) => (
+              <span key={owner.actor.element_id}>
+                {i > 0 && ', '}
+                <Link to={elementHref(owner.actor.element_id)}>{owner.externalOrganisation ?? owner.actor.name}</Link>
+              </span>
+            ))}
+          </span>
+        )}
+      </>
+    ) : null;
+
+  const collapsedSummaryParts = [supportsModulesPart, supportsDirectPart, ownersPart].filter((p): p is ReactElement => p !== null);
 
   return (
     <div>
@@ -101,88 +171,63 @@ export function ContextView({ group, platformModulesById, orgSlug, modelSlug, re
         </LinkButton>
       </div>
 
-      {(group.supports.length > 0 || showModuleGroupedSupports || group.owners.length > 0) && (
-        <div className={styles.headerSummary}>
-          {/* V1: a platform hub's own modules, each with its own capability
-              chip — "Platforms and modules" put the real `supports` edge on
-              the module, not the platform, so the hub's own `group.supports`
-              is normally empty for a real platform; this reads the same
-              module data the diagram itself draws instead. */}
-          {showModuleGroupedSupports && (
-            <Text as="p" tone="muted" size="sm">
-              Supports:{' '}
-              {hubModules.map((module, i) => (
-                <span key={module.elementId}>
-                  {i > 0 && ', '}
-                  <Link to={elementHref(module.elementId)}>{module.name}</Link>
-                  {module.capabilityName && ` → ${module.capabilityName}`}
-                </span>
-              ))}
-            </Text>
-          )}
-          {/* Item 12: "Supports: <capabilities, primary first>", each one a
-              link — computeContextGroup already sorted the list; this just
-              renders it, and the capability's own element page is the link
-              target (the same page every other Context/element-page link in
-              this view already points at). Still shown for a platform hub
-              too if it somehow also carries a direct edge of its own (S1
-              item 19's own "move to module" nudge case) — nothing here is
-              ever silently hidden just because the module-grouped line above
-              also rendered. */}
-          {group.supports.length > 0 && (
-            <Text as="p" tone="muted" size="sm">
-              Supports:{' '}
-              {group.supports.map((s, i) => (
-                <span key={s.capability.element_id}>
-                  {i > 0 && ', '}
-                  <Link to={elementHref(s.capability.element_id)}>{s.capability.name}</Link>
-                </span>
-              ))}
-            </Text>
-          )}
-          {group.owners.length > 0 && (
-            <Text as="p" tone="muted" size="sm">
-              {/* Prompt 7k item 2: grouped by role ("Business owner: Housing
-                  · Technical owner: IT Operations"), not a single flat
-                  "Owned by:" list — computeContextGroup already sorted
-                  `owners` by role, so within each role group the actors are
-                  already in the right order too. S1 item 11a: only ever
-                  *internal* owners here — an external owner can only ever
-                  hold role "service" (C20, src/engine/deltas.ts), and is
-                  split into its own trailing "External:" clause below
-                  instead, naming the organisation rather than folding it
-                  in as one more "Service owner" name indistinguishable
-                  from an internal one. */}
-              {OWNS_ROLE_ORDER.filter((role) => internalOwners.some((o) => o.role === role)).map((role, groupIndex) => (
-                <span key={role}>
-                  {groupIndex > 0 && ' · '}
-                  {ownsRoleLabel(role)} owner:{' '}
-                  {internalOwners
-                    .filter((o) => o.role === role)
-                    .map((owner, i) => (
-                      <span key={owner.actor.element_id}>
-                        {i > 0 && ', '}
-                        <Link to={elementHref(owner.actor.element_id)}>{owner.actor.name}</Link>
-                      </span>
-                    ))}
-                </span>
-              ))}
-              {externalOwners.length > 0 && (
-                <span>
-                  {internalOwners.length > 0 && ' · '}
-                  External:{' '}
-                  {externalOwners.map((owner, i) => (
-                    <span key={owner.actor.element_id}>
-                      {i > 0 && ', '}
-                      <Link to={elementHref(owner.actor.element_id)}>{owner.externalOrganisation ?? owner.actor.name}</Link>
-                    </span>
-                  ))}
-                </span>
-              )}
-            </Text>
-          )}
-        </div>
-      )}
+      {(group.supports.length > 0 || showModuleGroupedSupports || group.owners.length > 0) &&
+        (hasDiagram ? (
+          // V1 polish: one compact line once the diagram is rendering
+          // below — same content as the fuller block, just not competing
+          // with the canvas for vertical space.
+          <Text as="p" tone="muted" size="sm" className={styles.headerSummaryCollapsed}>
+            {collapsedSummaryParts.map((part, i) => (
+              <span key={i}>
+                {i > 0 && ' · '}
+                {part}
+              </span>
+            ))}
+          </Text>
+        ) : (
+          <div className={styles.headerSummary}>
+            {/* V1: a platform hub's own modules, each with its own capability
+                chip — "Platforms and modules" put the real `supports` edge on
+                the module, not the platform, so the hub's own `group.supports`
+                is normally empty for a real platform; this reads the same
+                module data the diagram itself draws instead. */}
+            {supportsModulesPart && (
+              <Text as="p" tone="muted" size="sm">
+                {supportsModulesPart}
+              </Text>
+            )}
+            {/* Item 12: "Supports: <capabilities, primary first>", each one a
+                link — computeContextGroup already sorted the list; this just
+                renders it, and the capability's own element page is the link
+                target (the same page every other Context/element-page link in
+                this view already points at). Still shown for a platform hub
+                too if it somehow also carries a direct edge of its own (S1
+                item 19's own "move to module" nudge case) — nothing here is
+                ever silently hidden just because the module-grouped line above
+                also rendered. */}
+            {supportsDirectPart && (
+              <Text as="p" tone="muted" size="sm">
+                {supportsDirectPart}
+              </Text>
+            )}
+            {ownersPart && (
+              <Text as="p" tone="muted" size="sm">
+                {/* Prompt 7k item 2: grouped by role ("Business owner: Housing
+                    · Technical owner: IT Operations"), not a single flat
+                    "Owned by:" list — computeContextGroup already sorted
+                    `owners` by role, so within each role group the actors are
+                    already in the right order too. S1 item 11a: only ever
+                    *internal* owners here — an external owner can only ever
+                    hold role "service" (C20, src/engine/deltas.ts), and is
+                    split into its own trailing "External:" clause below
+                    instead, naming the organisation rather than folding it
+                    in as one more "Service owner" name indistinguishable
+                    from an internal one. */}
+                {ownersPart}
+              </Text>
+            )}
+          </div>
+        ))}
 
       {group.internal.length === 0 && group.external.length === 0 && group.owners.length === 0 && (
         <div>

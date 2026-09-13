@@ -27,6 +27,13 @@ const userPreferencesArb: fc.Arbitrary<UserPreferences> = fc.record({
   capabilityMapColourBy: fc.option(fc.constantFrom(...CAPABILITY_MAP_COLOUR_BY_MODES), { nil: null }),
   // Prompt 7k item 1: same nullable shape, a sibling column not a shared one.
   landscapeColourBy: fc.option(fc.constantFrom(...LANDSCAPE_COLOUR_BY_MODES), { nil: null }),
+  // V2: arbitrary strings are fine here — round-trip only needs identity
+  // preservation, not semantic lane-key validity (a real lane key is
+  // whatever `layout.ts`'s own lane keys happen to be, which this test
+  // doesn't need to know about).
+  landscapeCollapsedLaneKeys: fc.option(fc.array(fc.string()), { nil: null }),
+  landscapeExpandedLaneKeys: fc.option(fc.array(fc.string()), { nil: null }),
+  landscapePinnedLaneKeys: fc.option(fc.array(fc.string()), { nil: null }),
   updatedAt: fc.date({ noInvalidDate: true }).map((d) => d.toISOString()),
 });
 

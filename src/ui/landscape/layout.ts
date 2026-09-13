@@ -165,6 +165,8 @@ export interface LandscapeLane {
   region: LandscapeLaneRegion;
   y: number;
   height: number;
+  /** V2 "landscape focus and filters": this lane's own resolved collapse state (`isLaneCollapsed`'s own result, computed once here rather than re-derived by every consumer) — `LandscapeFocusPanel.tsx`'s per-lane list reads this directly instead of re-implementing the override/emptiness tie-break itself. */
+  collapsed: boolean;
 }
 
 /** The enterprise boundary's own y-range (item 3) — spans every `'capability'`/`'unassigned'` lane, never an `'external'` one or the actor row above it. `LandscapeCanvas.tsx` draws the rectangle `BOUNDARY_MARGIN` outside this range; `top === bottom` for a model with no internal lanes at all (nothing to draw). */
@@ -182,6 +184,11 @@ export interface LandscapeLayout {
   boundary: LandscapeBoundary;
   width: number;
   height: number;
+}
+
+/** The lane whose y-range contains `y`, or `undefined` above the topmost lane (the actor row). Shared by `routeLandscapeEdge`'s cross-lane check and `LandscapeCanvas.tsx`'s platform-edge-chip logic — one lookup, not two. */
+export function laneAt(y: number, lanes: readonly LandscapeLane[]): LandscapeLane | undefined {
+  return lanes.find((lane) => y >= lane.y && y < lane.y + lane.height);
 }
 
 function isExternal(element: ElementsHeadRow): boolean {
@@ -334,11 +341,62 @@ function groupSystemsByLane(systems: readonly ElementsHeadRow[], supportsEdges: 
 export { groupSystemsByLane };
 
 /**
+ * V2 "landscape focus and filters", decision 1 (UI-principles.md §10):
+ * per-lane collapse/expand and pin, both remembered per user
+ * (`src/ui/landscape/useLandscapeLaneDisplayPreference.ts`) but passed in
+ * here as plain sets/arrays — this module has no idea preferences exist,
+ * same separation `colourBy` already keeps between "what a mode is" and
+ * "where the chosen mode is stored."
+ */
+export interface LandscapeLaneDisplayOptions {
+  /** Lane keys explicitly forced collapsed, regardless of `isLaneCollapsed`'s own emptiness-based default. */
+  collapsedLaneKeys?: ReadonlySet<string>;
+  /** Lane keys explicitly forced expanded, regardless of the default. */
+  expandedLaneKeys?: ReadonlySet<string>;
+  /** In the user's own chosen order — every other lane keeps `laneSortKey`'s existing order, appended after every pinned one. */
+  pinnedLaneKeys?: readonly string[];
+}
+
+/**
+ * The empty options object, shared rather than a fresh `{}` at every call
+ * site — `computeLandscapeLayout`'s own default parameter value needs no
+ * such care (a plain function call, not a React hook dependency), but
+ * `useLandscapeDisplay.ts` passes this same reference into a `useEffect`
+ * dependency array, where a *new* object literal on every render would
+ * mean "no lane-display preference set" re-triggers a recompute (and the
+ * resulting re-render) forever.
+ */
+export const EMPTY_LANE_DISPLAY: LandscapeLaneDisplayOptions = {};
+
+/**
+ * Whether a lane should render collapsed (header line only, no member
+ * tiles placed) — an explicit override wins in either direction; absent
+ * either override, an empty lane defaults to collapsed and a non-empty one
+ * to expanded (decision 1's own wording). A key present in *both* override
+ * sets (shouldn't happen — the UI only ever writes one direction per
+ * toggle — but nothing at the type level prevents stale/conflicting saved
+ * state) resolves collapsed: the safer default is less screen space, not
+ * more.
+ */
+function isLaneCollapsed(key: string, isEmpty: boolean, laneDisplay: LandscapeLaneDisplayOptions): boolean {
+  if (laneDisplay.collapsedLaneKeys?.has(key)) return true;
+  if (laneDisplay.expandedLaneKeys?.has(key)) return false;
+  return isEmpty;
+}
+
+/** A pinned lane's own index in `pinnedLaneKeys` (display order among pinned lanes); every unpinned lane ties at `pinnedLaneKeys.length`, falling through to `laneSortKey`'s own existing order below. */
+function pinTier(key: string, pinnedLaneKeys: readonly string[]): number {
+  const index = pinnedLaneKeys.indexOf(key);
+  return index === -1 ? pinnedLaneKeys.length : index;
+}
+
+/**
  * @param systems Landscape nodes (src/db/landscape.ts's `listSystemsForLandscape`).
  * @param supportsEdges `supports` relationships from a system to a capability (`listSupportsEdgesForSystems`) — used only for lane assignment, never rendered as edges themselves (§6.1: landscape edges are `uses`/`flows_to` only).
  * @param l1AncestorByCapabilityId Every capability actually named by `supportsEdges`' targets, mapped to its own level-1 ancestor row (itself, if it already is one) — `src/ui/elements/capabilityDepth.ts`'s `l1AncestorOf`, resolved by the caller for each distinct target id. Lane labels come from these ancestor rows' own names, never a leaf sub-capability's.
  * @param actors Actors (`src/db/landscape.ts`'s `listActorsForLandscape`) — item 3's own top row for internal ones; an external actor instead joins the external band below the boundary (S1 item 11a), same as an external system.
  * @param layoutWidthHint Item 7: the canvas's own on-screen width at layout time, when the caller has one — clamped to `MIN_LAYOUT_WIDTH` below. Omitted (this module's own tests, mostly) means "just use the floor."
+ * @param laneDisplay V2: per-lane collapse/pin overrides — optional, defaulting to `{}`, which reproduces this function's exact pre-V2 behaviour (every lane's collapse follows emptiness alone, no pins) for every existing call site.
  */
 export function computeLandscapeLayout(
   systems: readonly ElementsHeadRow[],
@@ -346,16 +404,19 @@ export function computeLandscapeLayout(
   l1AncestorByCapabilityId: ReadonlyMap<UUID, ElementsHeadRow>,
   actors: readonly ElementsHeadRow[] = [],
   layoutWidthHint: number = MIN_LAYOUT_WIDTH,
+  laneDisplay: LandscapeLaneDisplayOptions = EMPTY_LANE_DISPLAY,
 ): LandscapeLayout {
   const layoutWidth = Math.max(MIN_LAYOUT_WIDTH, layoutWidthHint);
   const availableRowWidth = layoutWidth - 2 * PADDING;
   const itemsPerRow = Math.max(1, Math.floor((availableRowWidth + NODE_GUTTER_X) / (NODE_WIDTH + NODE_GUTTER_X)));
 
-  const { boundaryKeys, hasExternalLane: hasExternalSystemLane, byLane, l1CapabilitiesById, extraLaneCountByElementId, referenceTargets } = groupSystemsByLane(
+  const { boundaryKeys: unpinnedOrderedKeys, hasExternalLane: hasExternalSystemLane, byLane, l1CapabilitiesById, extraLaneCountByElementId, referenceTargets } = groupSystemsByLane(
     systems,
     supportsEdges,
     l1AncestorByCapabilityId,
   );
+  const pinnedLaneKeys = laneDisplay.pinnedLaneKeys ?? [];
+  const boundaryKeys = pinnedLaneKeys.length === 0 ? unpinnedOrderedKeys : [...unpinnedOrderedKeys].sort((a, b) => pinTier(a, pinnedLaneKeys) - pinTier(b, pinnedLaneKeys));
 
   // S1 item 11a: an external actor joins the external band below the
   // boundary, alongside external systems, rather than the top actor row —
@@ -392,16 +453,26 @@ export function computeLandscapeLayout(
    * row (`actorRow`, above) already gets.
    */
   function placeLane(key: string, region: LandscapeLaneRegion, actorMembers: readonly ElementsHeadRow[] = []): void {
-    const members = [...(byLane.get(key) ?? [])].sort(byNameThenId);
+    const rawMembers = [...(byLane.get(key) ?? [])].sort(byNameThenId);
+    const rawActorMembers = [...actorMembers].sort(byNameThenId);
+    // V2: a collapsed lane (explicitly overridden, or empty by the
+    // isLaneCollapsed default) places zero member tiles — exactly the
+    // same "header line only" branch this function already took for a
+    // genuinely empty lane before V2, now reached for a non-empty lane
+    // too when the user has explicitly collapsed it. `byLane`/
+    // `referenceTargets` (read elsewhere, e.g. reference chips) are
+    // untouched — only this lane's own pixel placement hides its members.
+    const collapsed = isLaneCollapsed(key, rawMembers.length === 0 && rawActorMembers.length === 0, laneDisplay);
+    const members = collapsed ? [] : rawMembers;
     const label = key === EXTERNAL_LANE_KEY ? 'External' : key === OT_ZONE_LANE_KEY ? 'OT' : key === PLATFORM_BAND_KEY ? 'Platforms' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
     const row = layoutRow(members, y + LANE_LABEL_HEIGHT, itemsPerRow);
-    const sortedActorMembers = [...actorMembers].sort(byNameThenId);
+    const sortedActorMembers = collapsed ? [] : rawActorMembers;
     const actorRowTop = y + LANE_LABEL_HEIGHT + (members.length > 0 ? row.height + NODE_GUTTER_Y : 0);
     const laneActorRow = layoutRow(sortedActorMembers, actorRowTop, itemsPerRow);
     const hasAnyMembers = members.length > 0 || sortedActorMembers.length > 0;
     const contentHeight = row.height + (sortedActorMembers.length > 0 ? (members.length > 0 ? NODE_GUTTER_Y : 0) + laneActorRow.height : 0);
     const laneHeight = hasAnyMembers ? LANE_LABEL_HEIGHT + contentHeight + LANE_GUTTER_Y : LANE_LABEL_HEIGHT + EMPTY_LANE_GUTTER_Y;
-    lanes.push({ key, label, region, y, height: laneHeight });
+    lanes.push({ key, label, region, y, height: laneHeight, collapsed });
 
     for (const node of row.nodes) {
       const extraLaneCount = extraLaneCountByElementId.get(node.elementId);
@@ -548,19 +619,27 @@ function nearestChannel(channels: readonly number[], target: number): number {
 /**
  * The polyline (world-space points, first and last are the two node
  * centres) an edge from `from` to `to` should draw as — a plain 2-point
- * straight line when nothing else is in the way (the common case, and
- * visually simplest), or an orthogonal detour through the clear channels
- * `computeLandscapeChannels` derived, when the direct line would otherwise
- * cross a third node's tile. `obstacles` is every OTHER node in the
+ * straight line when nothing else is in the way *and* both ends sit in the
+ * same lane (the common case, and visually simplest), or an orthogonal
+ * detour through the clear channels `computeLandscapeChannels` derived,
+ * when either the direct line would otherwise cross a third node's tile,
+ * or the two ends sit in different lanes (V2's "orthogonal via inter-lane
+ * gutters, never diagonal across a lane" — a cross-lane pair always
+ * detours, obstructed or not). `obstacles` is every OTHER node in the
  * diagram (systems and actors both — the caller excludes `from`/`to`
- * themselves before calling).
+ * themselves before calling). `lanes` is required, not optional, so every
+ * call site has to acknowledge the cross-lane rule rather than silently
+ * keep the old (sometimes-diagonal) behaviour; the actor row above every
+ * lane has no `laneAt` match at all, so two actors up there share one
+ * implicit band and still get a straight line when unobstructed.
  */
-export function routeLandscapeEdge(from: LandscapeNodePosition, to: LandscapeNodePosition, obstacles: readonly LandscapeNodePosition[], channels: LandscapeChannels): { x: number; y: number }[] {
+export function routeLandscapeEdge(from: LandscapeNodePosition, to: LandscapeNodePosition, obstacles: readonly LandscapeNodePosition[], channels: LandscapeChannels, lanes: readonly LandscapeLane[]): { x: number; y: number }[] {
   const fromCentre = { x: from.x + NODE_WIDTH / 2, y: from.y + NODE_HEIGHT / 2 };
   const toCentre = { x: to.x + NODE_WIDTH / 2, y: to.y + NODE_HEIGHT / 2 };
 
   const blocked = obstacles.some((n) => segmentCrossesRect(fromCentre.x, fromCentre.y, toCentre.x, toCentre.y, { x: n.x, y: n.y, w: NODE_WIDTH, h: NODE_HEIGHT }));
-  if (!blocked) return [fromCentre, toCentre];
+  const sameLane = (laneAt(fromCentre.y, lanes)?.key ?? '$aboveLanes') === (laneAt(toCentre.y, lanes)?.key ?? '$aboveLanes');
+  if (!blocked && sameLane) return [fromCentre, toCentre];
 
   // Exit `from` sideways into whichever of its two adjacent column
   // channels leans toward `to` (always safe — the gap next to a tile's own

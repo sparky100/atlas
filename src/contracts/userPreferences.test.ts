@@ -32,3 +32,40 @@ describe('capabilityMapColourBy wire <-> row (Sprint U4-1 C4)', () => {
     expect(fromUserPreferencesRow(row).capabilityMapColourBy).toBeNull();
   });
 });
+
+describe('landscape lane collapse/pin wire <-> row (V2)', () => {
+  it('defaults all three to null — no row means no saved override, same as capabilityMapColourBy', () => {
+    const prefs = defaultUserPreferences('u1', false);
+    expect(prefs.landscapeCollapsedLaneKeys).toBeNull();
+    expect(prefs.landscapeExpandedLaneKeys).toBeNull();
+    expect(prefs.landscapePinnedLaneKeys).toBeNull();
+  });
+
+  it('carries a real array through toUserPreferencesRow/fromUserPreferencesRow unchanged, for each field', () => {
+    const prefs = {
+      ...defaultUserPreferences('u1', true),
+      landscapeCollapsedLaneKeys: ['cap-a', 'cap-b'],
+      landscapeExpandedLaneKeys: ['$ot'],
+      landscapePinnedLaneKeys: ['cap-c', 'cap-a'],
+    };
+    const row = toUserPreferencesRow(prefs);
+    expect(row.landscape_collapsed_lane_keys).toEqual(['cap-a', 'cap-b']);
+    expect(row.landscape_expanded_lane_keys).toEqual(['$ot']);
+    expect(row.landscape_pinned_lane_keys).toEqual(['cap-c', 'cap-a']);
+    const back = fromUserPreferencesRow(row);
+    expect(back.landscapeCollapsedLaneKeys).toEqual(['cap-a', 'cap-b']);
+    expect(back.landscapeExpandedLaneKeys).toEqual(['$ot']);
+    expect(back.landscapePinnedLaneKeys).toEqual(['cap-c', 'cap-a']);
+  });
+
+  it('carries null through unchanged, for each field', () => {
+    const row = toUserPreferencesRow(defaultUserPreferences('u1', true));
+    expect(row.landscape_collapsed_lane_keys).toBeNull();
+    expect(row.landscape_expanded_lane_keys).toBeNull();
+    expect(row.landscape_pinned_lane_keys).toBeNull();
+    const back = fromUserPreferencesRow(row);
+    expect(back.landscapeCollapsedLaneKeys).toBeNull();
+    expect(back.landscapeExpandedLaneKeys).toBeNull();
+    expect(back.landscapePinnedLaneKeys).toBeNull();
+  });
+});

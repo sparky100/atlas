@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -27,13 +27,19 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { CapabilityLandscapeList } from '../landscape/CapabilityLandscapeList';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
+import { LandscapeFilterBar } from '../landscape/LandscapeFilterBar';
+import { LandscapeFocusPanel } from '../landscape/LandscapeFocusPanel';
+import { parseLandscapeFilters, landscapeFiltersToSearchParams } from '../landscape/landscapeFilterParams';
 import { LANDSCAPE_COLOUR_BY_OPTIONS } from '../landscape/landscapeColour';
 import { LandscapeMobileList } from '../landscape/LandscapeMobileList';
+import type { LandscapeLaneDisplayOptions } from '../landscape/layout';
 import { useCanvasWidth } from '../landscape/useCanvasWidth';
 import { useCapabilityLandscape } from '../landscape/useCapabilityLandscape';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { useLandscape } from '../landscape/useLandscape';
 import { useLandscapeColourByPreference } from '../landscape/useLandscapeColourByPreference';
+import { useLandscapeDisplay } from '../landscape/useLandscapeDisplay';
+import { useLandscapeLaneDisplayPreference } from '../landscape/useLandscapeLaneDisplayPreference';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import { parseCapabilityParam, zoomQueryString } from '../nav/zoomParams';
 import styles from './LandscapePage.module.css';
@@ -151,8 +157,80 @@ export function LandscapePage() {
   // loading anything, and this page renders `CapabilityLandscapeList`
   // instead of the canvas/mobile list either one of the other two hooks
   // feeds.
-  const { state } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId === null, searchCommitId, canvasWidth ?? undefined);
+  const { state } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId === null, searchCommitId);
   const { state: capabilityLandscapeState } = useCapabilityLandscape(model?.id ?? null, ref, mode, capabilityId, searchCommitId);
+  // V2 "landscape focus and filters": `?capabilities=`/`?lifecycle=`/
+  // `?criticality=`/`?kind=`/`?domain=` — parsed fresh from `searchParams`
+  // (itself stable across renders unless the URL's own query string
+  // changes, react-router's own `useSearchParams` memoises it that way),
+  // so this stays a stable reference across every render that doesn't
+  // actually change the filter — required for `useLandscapeDisplay`'s own
+  // effect dependency array to settle rather than recompute forever.
+  const filters = useMemo(() => parseLandscapeFilters(searchParams), [searchParams]);
+  // Decision 1 (UI-principles.md §10): per-lane collapse/expand and pin,
+  // remembered per user — converted from the hook's own plain arrays into
+  // the `Set`-based shape `layout.ts` takes, memoised on those arrays' own
+  // identity so an unrelated re-render doesn't rebuild (and thereby
+  // recompute layout for) a `laneDisplay` that hasn't actually changed.
+  const { collapsedLaneKeys, expandedLaneKeys, pinnedLaneKeys, setLaneCollapsed, setLanePinned, reorderPinnedLane } = useLandscapeLaneDisplayPreference(userId);
+  const laneDisplay = useMemo<LandscapeLaneDisplayOptions>(
+    () => ({ collapsedLaneKeys: new Set(collapsedLaneKeys), expandedLaneKeys: new Set(expandedLaneKeys), pinnedLaneKeys }),
+    [collapsedLaneKeys, expandedLaneKeys, pinnedLaneKeys],
+  );
+  const displayInput = state.status === 'ready' ? state.data : null;
+  const displayState = useLandscapeDisplay(displayInput, filters, laneDisplay, canvasWidth ?? undefined);
+  // V2: click-to-focus — plain, unpersisted view state, the same shape
+  // `routeViaPlatforms`/`commentsOnlyFilter` already use below.
+  const [rawFocusedElementId, setFocusedElementId] = useState<UUID | null>(null);
+  // "Edges hidden by default; 'Show connections' toggle" — same unpersisted
+  // per-session shape as `routeViaPlatforms` below; the real toggle lives
+  // in the new focus panel now.
+  const [showConnections, setShowConnections] = useState(false);
+  // A filter or lane-collapse change can remove the currently-focused tile
+  // from the layout entirely (filtered out, or its lane just collapsed) —
+  // a *derived* value (never written back to `rawFocusedElementId` itself)
+  // rather than an effect that calls `setFocusedElementId` on every such
+  // change: every reader below sees the tile as unfocused the instant it's
+  // no longer drawn, with no extra render round trip.
+  const focusedElementId = useMemo(() => {
+    if (rawFocusedElementId === null || displayState.status !== 'ready') return rawFocusedElementId;
+    const stillPresent = displayState.display.layout.nodes.some((n) => n.elementId === rawFocusedElementId) || displayState.display.layout.actorNodes.some((n) => n.elementId === rawFocusedElementId);
+    return stillPresent ? rawFocusedElementId : null;
+  }, [rawFocusedElementId, displayState]);
+  // Every level-1 capability lane in the model, independent of any filter
+  // currently active — the filter bar's own capability facet needs the
+  // whole universe of choices, not just what the current (possibly
+  // already-filtered) layout still shows (`LandscapeFilterBar.tsx`'s own
+  // prop comment).
+  const capabilityOptions = useMemo(() => {
+    if (state.status !== 'ready') return [];
+    const byId = new Map<UUID, string>();
+    for (const capability of state.data.l1AncestorByCapabilityId.values()) byId.set(capability.element_id, capability.name);
+    return [...byId.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [state]);
+  // The active-focus summary (`LandscapeFocusPanel`'s own "Focused: {name}
+  // · {N} neighbours") — the same one-hop neighbour computation
+  // `LandscapeCanvas.tsx`'s own `focusNeighbourIds` does internally,
+  // duplicated here at page level rather than lifted into a shared prop:
+  // this is the only other place that needs it, and it's cheap (a handful
+  // of Set operations over already-loaded edges).
+  const focusedElementName =
+    focusedElementId && state.status === 'ready' ? (state.data.systemsById.get(focusedElementId)?.name ?? state.data.actorsById.get(focusedElementId)?.name ?? null) : null;
+  const focusNeighbourCount =
+    focusedElementId && state.status === 'ready'
+      ? new Set(state.data.edges.flatMap((e) => (e.from_element_id === focusedElementId ? [e.to_element_id] : e.to_element_id === focusedElementId ? [e.from_element_id] : []))).size
+      : 0;
+  // §8.8's canvas `f` shortcut — its first real binding (V2): open every
+  // facet's `<details>` in the filter bar and move focus to the first one.
+  const filterBarRef = useRef<HTMLDivElement>(null);
+  const openFilterBar = () => {
+    const container = filterBarRef.current;
+    if (!container) return;
+    container.querySelectorAll('details').forEach((details) => {
+      details.open = true;
+    });
+    container.querySelector('summary')?.focus();
+  };
 
   // Sprint U4-1 E1: see this component's own module comment.
   const narrow = useIsNarrowViewport(768);
@@ -285,13 +363,13 @@ export function LandscapePage() {
   // canvas *can* render at this viewport width. Item 13: never on mobile —
   // the list renders inside the ordinary column, full-width treatment is a
   // canvas-specific need this content doesn't have.
-  const hasContent = state.status === 'ready' && (state.data.layout.nodes.length > 0 || state.data.layout.actorNodes.length > 0);
+  const hasContent = displayState.status === 'ready' && (displayState.display.layout.nodes.length > 0 || displayState.display.layout.actorNodes.length > 0);
   const showCanvas = hasContent && !narrow;
   // Item 7 regression fix: the CSS-class decision below must NOT depend on
   // `hasContent` (load state), unlike `showCanvas` above (correct for
   // deciding *what renders*). `<main>` is the element `canvasWidthRef`
-  // measures, and that measurement feeds `useLandscape`'s `layoutWidthHint`
-  // — itself one of that hook's own effect dependencies. Coupling the class
+  // measures, and that measurement feeds `useLandscapeDisplay`'s
+  // `layoutWidthHint` — itself one of that hook's own effect dependencies. Coupling the class
   // to `hasContent` meant every loading→ready transition flipped the class,
   // resized `<main>`, re-fired the `ResizeObserver`, and re-triggered the
   // very reload that flips `hasContent` again: an infinite loop (confirmed
@@ -366,23 +444,6 @@ export function LandscapePage() {
               </label>
             </div>
           )}
-          {/* Prompt 7k item 4: "route via platforms" — off (direct edges) by default, desktop canvas only, same unpersisted per-session toggle shape as the comments-only filter above. */}
-          {state.status === 'ready' && showCanvas && (
-            <div className={styles.actions}>
-              <label className={styles.commentsOnlyToggle}>
-                <input
-                  type="checkbox"
-                  checked={routeViaPlatforms}
-                  onChange={(e) => {
-                    setRouteViaPlatforms(e.target.checked);
-                  }}
-                />
-                <Text as="span" size="sm" tone="muted">
-                  Route via platforms
-                </Text>
-              </label>
-            </div>
-          )}
           {state.status === 'ready' && !narrow && addControls && <div className={styles.actions}>{addControls}</div>}
           {state.status === 'ready' && narrow && canAdd && (
             <div className={styles.actions}>
@@ -405,6 +466,19 @@ export function LandscapePage() {
             </div>
           )}
         </div>
+
+        {/* V2 "landscape focus and filters": desktop canvas only, same gate as colour-by/comments-only/route-via-platforms above (this plan's own PR3 grouping note: "gated on `showCanvas` like every other canvas-only control"). Wrapped in a plain ref'd div so the canvas's own `f` shortcut (§8.8) can open every facet's `<details>` and move focus there — the filter bar has no imperative API of its own, and doesn't need one just for this. */}
+        {state.status === 'ready' && showCanvas && (
+          <div ref={filterBarRef}>
+            <LandscapeFilterBar
+              filters={filters}
+              capabilityOptions={capabilityOptions}
+              onChange={(next) => {
+                setSearchParams((prev) => landscapeFiltersToSearchParams(next, prev));
+              }}
+            />
+          </div>
+        )}
 
         {ref.kind === 'branch' && (
           <BranchViewModeControl
@@ -464,7 +538,10 @@ export function LandscapePage() {
             {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
             {state.status === 'error' && <Text as="p">{state.message}</Text>}
             {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
-            {state.status === 'ready' && state.data.layout.nodes.length === 0 && state.data.layout.actorNodes.length === 0 && (
+            {/* V2: the raw fetch (`state`) can be ready while layout/grouping is still computing in the worker (`useLandscapeDisplay`) — a brief gap this hook's own split introduces that the old single-effect version never had. */}
+            {state.status === 'ready' && displayState.status === 'loading' && <Text tone="muted">Loading…</Text>}
+            {displayState.status === 'error' && <Text as="p">{displayState.message}</Text>}
+            {state.status === 'ready' && displayState.status === 'ready' && displayState.display.layout.nodes.length === 0 && displayState.display.layout.actorNodes.length === 0 && (
               <div>
                 <EmptyState>No systems yet.</EmptyState>
                 {canAdd && (
@@ -489,10 +566,10 @@ export function LandscapePage() {
               </div>
             )}
             {/* Item 13: <768px renders the list, never the canvas — same `state.data`. S1 item 12 adds comment markers/panel here too, the same `threadCounts` map the canvas already computes — no viewport-fit math needed, this list has no pixels to lay out. */}
-            {state.status === 'ready' && hasContent && narrow && (
+            {state.status === 'ready' && displayState.status === 'ready' && hasContent && narrow && (
               <>
                 <LandscapeMobileList
-                  groups={state.data.groups}
+                  groups={displayState.display.groups}
                   elementHref={elementHref}
                   contextHref={nodeHref}
                   threadCounts={threadCounts}
@@ -521,10 +598,10 @@ export function LandscapePage() {
                 )}
               </>
             )}
-            {state.status === 'ready' && showCanvas && (
+            {state.status === 'ready' && displayState.status === 'ready' && showCanvas && (
               <div className={styles.canvasRow}>
                 <LandscapeCanvas
-                  layout={state.data.layout}
+                  layout={displayState.display.layout}
                   systemsById={state.data.systemsById}
                   actorsById={state.data.actorsById}
                   edges={state.data.edges}
@@ -536,6 +613,13 @@ export function LandscapePage() {
                   commentsOnlyFilter={commentsOnlyFilter}
                   colourBy={colourBy}
                   routeViaPlatforms={routeViaPlatforms}
+                  focusedElementId={focusedElementId}
+                  onFocusElement={setFocusedElementId}
+                  onClearFocus={() => {
+                    setFocusedElementId(null);
+                  }}
+                  showConnections={showConnections}
+                  onOpenFilterBar={openFilterBar}
                   onCommentMarkerClick={(elementId) => {
                     setCommentsPanelElementId(elementId);
                     setAutoFocusComposer(false);
@@ -551,6 +635,22 @@ export function LandscapePage() {
                   onNewCommentShortcut={(elementId) => {
                     setCommentsPanelElementId(elementId);
                     setAutoFocusComposer(true);
+                  }}
+                />
+                <LandscapeFocusPanel
+                  routeViaPlatforms={routeViaPlatforms}
+                  onRouteViaPlatformsChange={setRouteViaPlatforms}
+                  showConnections={showConnections}
+                  onShowConnectionsChange={setShowConnections}
+                  lanes={displayState.display.layout.lanes}
+                  pinnedLaneKeys={pinnedLaneKeys}
+                  onSetLaneCollapsed={setLaneCollapsed}
+                  onSetLanePinned={setLanePinned}
+                  onReorderPinnedLane={reorderPinnedLane}
+                  focusedElementName={focusedElementName}
+                  focusNeighbourCount={focusNeighbourCount}
+                  onClearFocus={() => {
+                    setFocusedElementId(null);
                   }}
                 />
                 {commentsPanelElementId && (

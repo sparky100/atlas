@@ -19,9 +19,6 @@ import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
 import { l1AncestorOf, loadCapabilityAncestry } from '../elements/capabilityDepth';
 import { isPlatform } from '../elements/systemKind';
-import { computeLandscapeGroups, type LandscapeGroups } from './landscapeGroups';
-import type { LandscapeLayout } from './layout';
-import { computeLandscapeLayoutInWorker } from './layoutWorkerClient';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -32,9 +29,19 @@ export interface LandscapeData {
   /** Landscape canvas, structural (item 3) — every Actor at this commit, keyed for `LandscapeCanvas.tsx`'s own actor-row render, the same shape `systemsById` already has. */
   actorsById: Map<UUID, ElementsHeadRow>;
   edges: RelationshipsHeadRow[];
-  layout: LandscapeLayout;
-  /** Sprint U4-2b item 13: the same systems/actors, grouped for the <768px list renderer (`LandscapeMobileList.tsx`) instead of laid out in pixels — computed once here, alongside `layout`, from the exact same inputs, rather than re-derived from `layout`'s own pixel output. */
-  groups: LandscapeGroups;
+  /**
+   * V2 "landscape focus and filters": this hook used to compute `layout`/
+   * `groups` itself, right here, from these two plus `systemsById`/
+   * `actorsById` above. Now it just fetches and exposes the raw inputs —
+   * `useLandscapeDisplay.ts` is the one that calls `computeLandscapeLayout`/
+   * `computeLandscapeGroups` (still off the main thread, via the same Web
+   * Worker), so it can recompute both whenever a filter or a lane collapse/
+   * pin preference changes, from data already sitting here, with no
+   * Supabase round trip — this hook's own effect (and its dependency array)
+   * stays exactly as it was, deliberately unaware any of that exists.
+   */
+  supportsEdges: RelationshipsHeadRow[];
+  l1AncestorByCapabilityId: Map<UUID, ElementsHeadRow>;
   /** Populated only when `ref` is a branch and `mode === 'diff'` (UI-principles §6.2/§6.3) — `null` for `main`/`tag`, and for `asIs`/`toBe`, where there's nothing to highlight against. */
   diff: VersionDiff | null;
 }
@@ -71,19 +78,18 @@ export interface UseLandscapeResult {
 }
 
 /**
- * Loads the landscape's data and computes its layout fresh every time
- * (Sprint U4-2b item 6, UI-principles §6.4): no `view_layouts` read or
- * write for the landscape kind any more, and no "Reset layout" action to
- * go with it — auto-layout runs on every open, full stop. The algorithm is
- * already deterministic for the same query result (`layout.ts`'s own
- * module comment — CLAUDE.md rule 6), so two people still see the same
- * picture; what's gone is the old "first visit's layout wins until
- * someone resets it" persistence, which bought nothing a deterministic
- * algorithm doesn't already give for free, at the cost of a stale picture
- * after the model itself changed shape. A drag (there is no per-node drag
- * gesture built yet — only the canvas-wide pan `LandscapeCanvas.tsx`
- * implements) would be session-only state in that component if one is
- * ever added, never written back here.
+ * Loads the landscape's raw data fresh every time (Sprint U4-2b item 6,
+ * UI-principles §6.4): no `view_layouts` read or write for the landscape
+ * kind any more, and no "Reset layout" action to go with it. Layout itself
+ * is no longer computed here (V2 "landscape focus and filters" — see
+ * `LandscapeData`'s own comment) — `useLandscapeDisplay.ts` derives it from
+ * this hook's output, fresh, every time it's asked, off the same
+ * deterministic algorithm (`layout.ts`'s own module comment — CLAUDE.md
+ * rule 6), so two people still see the same picture for the same filters/
+ * lane state. A drag (there is no per-node drag gesture built yet — only
+ * the canvas-wide pan `LandscapeCanvas.tsx` implements) would be
+ * session-only state in that component if one is ever added, never written
+ * back here.
  *
  * `enabled` (Sprint U4-2c item 2): `false` skips this effect entirely,
  * leaving `state` at `{ status: 'loading' }` forever — `LandscapePage.tsx`
@@ -132,15 +138,6 @@ export function useLandscape(
    * in play) — `null` there is the only ever value and never blocks them.
    */
   mainCommitIdHint: UUID | null = null,
-  /**
-   * Item 7: the canvas's own on-screen width at layout time — `LandscapePage.tsx`'s
-   * `useCanvasWidth` measurement of `<main>`, passed straight through to
-   * `computeLandscapeLayoutInWorker`/`computeLandscapeLayout` (their own
-   * parameter doc has the full reasoning). `undefined` (no measurement
-   * yet, e.g. the very first render before the `ResizeObserver` fires)
-   * means "use the floor" there, same as omitting it entirely.
-   */
-  layoutWidthHint?: number,
 ): UseLandscapeResult {
   const [state, setState] = useState<LandscapeState>({ status: 'loading' });
   const refParam = refParamOf(ref);
@@ -265,19 +262,9 @@ export function useLandscape(
       // own module comment names capability_map's identical stance.
       const view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId: currentOrgId, modelId: currentModelId, kind: 'landscape', name: 'Landscape', createdBy: currentUserId, branchId });
 
-      // UI-principles §8.6: layout runs off the main thread. Fresh every
-      // load (item 6) — no saved position to merge in, for systems or
-      // actors alike.
-      const layout: LandscapeLayout = await computeLandscapeLayoutInWorker(allSystems, supportsEdges, l1AncestorByCapabilityId, allActors, layoutWidthHint);
-
       const systemsById = new Map(allSystems.map((s) => [s.element_id, s]));
       const actorsById = new Map(allActors.map((a) => [a.element_id, a]));
-      // Item 13: the same classification `computeLandscapeLayoutInWorker`
-      // used for pixel placement, without any of the pixel math — cheap
-      // enough (a handful of Map operations) to run on the main thread,
-      // unlike `layout` itself.
-      const groups = computeLandscapeGroups(allSystems, supportsEdges, l1AncestorByCapabilityId, allActors, edges);
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, actorsById, edges, layout, groups, diff } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, actorsById, edges, supportsEdges, l1AncestorByCapabilityId, diff } });
     }
 
     load().catch((e: unknown) => {
@@ -291,7 +278,7 @@ export function useLandscape(
     // `ref`'s string form (`refParam`) is the real dependency, same pitfall
     // and same fix as useElementPage.ts — `ref` itself is read from the
     // closure, always the latest one.
-  }, [modelId, orgId, userId, refParam, mode, enabled, mainCommitIdHint, layoutWidthHint]);
+  }, [modelId, orgId, userId, refParam, mode, enabled, mainCommitIdHint]);
 
   return { state };
 }

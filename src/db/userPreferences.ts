@@ -23,6 +23,12 @@ export interface UpsertUserPreferencesInput {
   capabilityMapColourBy?: UserPreferencesRow['capability_map_colour_by'];
   /** Prompt 7k item 1: the landscape's own colour-by mode — same omitted-leaves-untouched convention as `capabilityMapColourBy`. */
   landscapeColourBy?: UserPreferencesRow['landscape_colour_by'];
+  /** V2: force-collapsed lane keys — same omitted-leaves-untouched convention. */
+  landscapeCollapsedLaneKeys?: UserPreferencesRow['landscape_collapsed_lane_keys'];
+  /** V2: force-expanded lane keys — same omitted-leaves-untouched convention. */
+  landscapeExpandedLaneKeys?: UserPreferencesRow['landscape_expanded_lane_keys'];
+  /** V2: pinned lane keys, in display order — same omitted-leaves-untouched convention. */
+  landscapePinnedLaneKeys?: UserPreferencesRow['landscape_pinned_lane_keys'];
 }
 
 /**
@@ -38,6 +44,9 @@ export async function upsertUserPreferences(supabase: Client, input: UpsertUserP
   if (input.theme !== undefined) patch.theme = input.theme;
   if (input.capabilityMapColourBy !== undefined) patch.capability_map_colour_by = input.capabilityMapColourBy;
   if (input.landscapeColourBy !== undefined) patch.landscape_colour_by = input.landscapeColourBy;
+  if (input.landscapeCollapsedLaneKeys !== undefined) patch.landscape_collapsed_lane_keys = input.landscapeCollapsedLaneKeys;
+  if (input.landscapeExpandedLaneKeys !== undefined) patch.landscape_expanded_lane_keys = input.landscapeExpandedLaneKeys;
+  if (input.landscapePinnedLaneKeys !== undefined) patch.landscape_pinned_lane_keys = input.landscapePinnedLaneKeys;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('user_preferences').upsert(patch, { onConflict: 'user_id' }).select('*').single();

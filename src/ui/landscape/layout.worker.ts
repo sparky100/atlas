@@ -10,9 +10,16 @@
  * both are in scope — the cast keeps this file out of that conflict
  * without needing a second tsconfig just for worker files.
  */
-import { computeLandscapeLayout, type LandscapeLayout } from './layout';
+import { computeLandscapeLayout, type LandscapeLaneDisplayOptions, type LandscapeLayout } from './layout';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
+
+/** V2: the wire shape of `LandscapeLaneDisplayOptions` — plain arrays, not `Set`, for the same "portable across every structured-clone implementation" reasoning `capabilities` below already gives for `Map`. */
+export interface LayoutWorkerLaneDisplay {
+  collapsedLaneKeys?: string[];
+  expandedLaneKeys?: string[];
+  pinnedLaneKeys?: string[];
+}
 
 export interface LayoutWorkerRequest {
   requestId: number;
@@ -23,6 +30,8 @@ export interface LayoutWorkerRequest {
   actors: ElementsHeadRow[];
   /** Item 7: the canvas's own on-screen width at layout time — see `layout.ts`'s own parameter doc. */
   layoutWidthHint: number;
+  /** V2: per-lane collapse/pin overrides — optional, omitted reproduces `computeLandscapeLayout`'s own pre-V2 default. */
+  laneDisplay?: LayoutWorkerLaneDisplay;
 }
 
 export interface LayoutWorkerResponse {
@@ -38,7 +47,12 @@ interface WorkerLike {
 const ctx = self as unknown as WorkerLike;
 
 ctx.onmessage = (event) => {
-  const { requestId, systems, supportsEdges, capabilities, actors, layoutWidthHint } = event.data;
-  const layout = computeLandscapeLayout(systems, supportsEdges, new Map(capabilities), actors, layoutWidthHint);
+  const { requestId, systems, supportsEdges, capabilities, actors, layoutWidthHint, laneDisplay } = event.data;
+  const laneDisplayOptions: LandscapeLaneDisplayOptions = {
+    ...(laneDisplay?.collapsedLaneKeys ? { collapsedLaneKeys: new Set(laneDisplay.collapsedLaneKeys) } : {}),
+    ...(laneDisplay?.expandedLaneKeys ? { expandedLaneKeys: new Set(laneDisplay.expandedLaneKeys) } : {}),
+    ...(laneDisplay?.pinnedLaneKeys ? { pinnedLaneKeys: laneDisplay.pinnedLaneKeys } : {}),
+  };
+  const layout = computeLandscapeLayout(systems, supportsEdges, new Map(capabilities), actors, layoutWidthHint, laneDisplayOptions);
   ctx.postMessage({ requestId, layout });
 };
