@@ -22,6 +22,7 @@ function branch(overrides: Partial<BranchRow>): BranchRow {
     cancel_reason: null,
     cancelled_at: null,
     cancelled_by: null,
+    dismissed_identity_pairs: [],
     ...overrides,
   };
 }

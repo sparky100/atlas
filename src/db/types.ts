@@ -99,6 +99,8 @@ export interface BranchRow {
   cancel_reason: string | null;
   cancelled_at: string | null;
   cancelled_by: UUID | null;
+  /** S1 item 16: identity-warning pairs dismissed on this draft's own rebase panel, before any merge request exists — see `20260913020000_branch_identity_dismissals.sql`'s own comment for why this is a separate column from `MergeRequestRow.dismissed_identity_pairs`. */
+  dismissed_identity_pairs: string[];
 }
 
 export type MergeRequestStatus = 'pending' | 'changes_requested' | 'approved' | 'merged' | 'rejected';

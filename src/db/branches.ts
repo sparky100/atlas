@@ -144,6 +144,23 @@ export async function updateBranchMetadata(supabase: Client, branchId: UUID, inp
   if (error) throw new Error(`updateBranchMetadata: ${error.message}`);
 }
 
+/**
+ * S1 item 16: the persisted counterpart to `dismissIdentityPair`
+ * (`src/db/mergeRequests.ts`) for the pre-submission window — a draft
+ * change's own rebase panel (`BranchRebasePanel.tsx`) has no merge request
+ * yet to persist a "keep both" dismissal against, so this writes to the
+ * branch itself instead (`atlas.dismiss_identity_pair_on_branch`,
+ * `20260913020000_branch_identity_dismissals.sql`). Same idempotent-append
+ * shape, same sorted "<idA> <idB>" pair-key convention.
+ */
+export async function dismissIdentityPairOnBranch(supabase: Client, branchId: UUID, pairKey: string): Promise<BranchRow> {
+  assertRealId('dismissIdentityPairOnBranch', 'id', branchId);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.schema('atlas').rpc('dismiss_identity_pair_on_branch', { p_branch_id: branchId, p_pair_key: pairKey });
+  if (error) throw new Error(`dismissIdentityPairOnBranch: ${error.message}`);
+  return data as BranchRow;
+}
+
 /** Every branch split out of `branchId` (ADR-006 amendment, SPEC §1 S-22) — empty until the review queue's split-into-a-new-branch mechanic exists to create one. */
 export async function listSplitBranches(supabase: Client, branchId: UUID): Promise<BranchRow[]> {
   assertRealId('listSplitBranches', 'split_from', branchId);
