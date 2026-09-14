@@ -8,7 +8,7 @@ import type { ChipTone } from '../components/Chip/Chip';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff, VersionDiffState } from '../../engine/versionDiff';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
-import { BOUNDARY_MARGIN, computeLandscapeChannels, laneAt, NODE_HEIGHT, NODE_WIDTH, REFERENCE_CHIP_HEIGHT, REFERENCE_CHIP_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
+import { BOUNDARY_MARGIN, computeLandscapeChannels, laneAt, laneLabelLeftInset, NODE_HEIGHT, NODE_WIDTH, REFERENCE_CHIP_HEIGHT, REFERENCE_CHIP_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
 import { landscapeTileColourFor } from './landscapeColour';
 import { quantizeScale } from './zoom';
 import styles from './LandscapeCanvas.module.css';
@@ -650,7 +650,7 @@ export function LandscapeCanvas({
       const referenceChips: { text: string; x: number; y: number }[] = [];
       for (const lane of layout.lanes) {
         if (lane.y > visible.bottom || lane.y + lane.height < visible.top) continue;
-        laneLabels.push({ text: lane.label.toUpperCase(), worldX: 4, worldY: lane.y + 8 });
+        laneLabels.push({ text: lane.label.toUpperCase(), worldX: laneLabelLeftInset(lane.region), worldY: lane.y + 8 });
         ctx.strokeStyle = tokens.border;
         ctx.lineWidth = 1;
         ctx.beginPath();
