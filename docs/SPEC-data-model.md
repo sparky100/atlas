@@ -164,6 +164,35 @@ Per-person UI preferences. Keyed on the user, not the membership: preferences fo
 
 No `org_id` (exception to S-20: the row is not org-bearing). RLS: `user_id = auth.uid()` for select, insert, update; no delete policy (a row is reset, not removed). Defaults in the UI when no row exists: architect door for `owner`/`architect` members, director door otherwise; the row is created on first change, not on sign-up. `capability_map_colour_by` is the one column here without a fixed default — unlike its three siblings, null (no override ever saved) resolves in the UI, not the schema: exposure for director home mode, coverage for architect, "none" while the model has no systems at all (`src/ui/capabilityMap/metrics.ts`'s `resolveDefaultColourBy`) — a saved value always wins over that computed default ("remember last choice per user").
 
+#### `attribute_definitions` (F1, "custom attributes")
+Org-defined attributes — core attributes stay code (§3.3's own note: "attribute order and per-type attribute definitions live in `src/contracts` as code," materialised as `ATTRIBUTE_SCHEMA_BY_TYPE`); the long tail becomes org-scoped data instead. A definition applies across every model in the organisation, never a single model — org-scoped like `organisations`/`model_shares`, not model-scoped like `models` itself.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | uuid | pk |
+| `org_id` | uuid | → `organisations(id)` |
+| `key` | text | not null, non-empty — the `attributes` jsonb key an `element.update_custom`/`relationship.update_custom` delta (§4.1) writes |
+| `label` | text | not null, non-empty |
+| `kind` | text | not null, `check (kind in ('text','number','date','boolean','select','link'))` |
+| `options` | text[] | nullable — `kind = 'select'` only, the allowed values in display order |
+| `applies_to` | text[] | not null, `check (array_length(applies_to,1) > 0 and applies_to <@ array['capability','system','container','actor'])` — relationship-scoped custom attributes are out of scope for now |
+| `required` | boolean | not null default false |
+| `description` | text | nullable |
+| `order_index` | int | not null default 0 |
+| `deprecated_at` | timestamptz | nullable — soft-disable, mirroring `models.archived_at`: a deprecated definition disappears from "add a value" pickers, but a value already set on an element keeps rendering unchanged |
+| `created_by` | uuid | → `auth.users(id)` |
+| `created_at` | timestamptz | not null default now() |
+
+Unique `(org_id, key)` — a key is reused across every element type it applies to, never redefined twice for the same org. Index `(org_id, order_index)`.
+
+RLS: select for any org member (`atlas.is_member(org_id)` — every member's element/browse pages need to read these to render/filter by them, not just an owner); insert/update owner-only (`atlas.has_role(org_id, 'owner')`), matching `organisation_settings.sql`'s own shape; no delete policy — deprecate is this table's only "retire" mechanism. Reorder (`order_index`) and deprecate (`deprecated_at`) are both plain, owner-gated column writes, not RPCs: neither needs an atomic cross-table effect (unlike `merge_requests`/`decisions`), and neither has a restrictive lifecycle state to gate *when* an edit is allowed (unlike `decisions`/`branches.intent`), so a guard trigger would add nothing a plain grant-list doesn't already cover.
+
+A custom value is stored in the same `elements_head.attributes`/`relationships_head.attributes` jsonb as any core attribute, with the same provenance (`facts`, §3.6) — `element.update_custom`/`relationship.update_custom` (§4.1) are the only delta kinds that write one, deliberately kept separate from `element.update`/`relationship.update` rather than widening those kinds' own closed attribute-key union (see §4.1's own note). No engine-level (fold-time) validation exists for a custom attribute's value, matching — not exceeding — the bar core attributes are already held to: `atlas.commit_deltas`/`apply()` write the `attributes` jsonb verbatim regardless of kind; validation for both is client-side only, at the commit boundary (`src/contracts/attributeSchema.ts`'s `validateAttributeValue`/`validateCustomAttributeValue`), before a delta is ever built.
+
+Promotion to core (the prompt's own "code change + data-migration commit") is a documented process, not an in-app feature: add the field to `delta.ts`/`attributeSchema.ts`, write a migration copying `attributes.<key>` values into wherever the newly-core field needs to live, retire the `attribute_definitions` row. Nothing in the product does this for you.
+
+F8 ("export") lists its column set as "core attributes + custom attributes + provenance" — this table and its rendering/validation path are what make that literally satisfiable now; F8 itself is not otherwise touched by this sprint.
+
 ### 3.3 Schema registry
 
 **Deferred to Sprint K1 (ADR-015).** `type_schemas` as specified below needs a full TypeScript-type-to-JSON-Schema generator plus a checked-in seed and validator (RT-5) — real schema-validation infrastructure that Sprint U1's element page (which only needed attribute order and labels) never required. Attribute order and per-type attribute definitions live in `src/contracts` as code until then; validation of attribute values happens in the TypeScript contracts at the commit boundary, with tests, not against this table. The shape below is unchanged and still the target once K1 builds it.
@@ -698,14 +727,18 @@ The authoritative definition is `src/contracts/delta.ts`. Summary:
 |---|---|---|
 | `element.create` | `(elementId, $exists)` plus one fact per key in `attributes`, plus `name`, plus `parentId` | `elementId`, `elementType`, `name`, `parentId`, `attributes` |
 | `element.update` | `(elementId, attribute)` | `elementId`, `elementType`, `attribute`, `value`, `previousDeltaId` |
+| `element.update_custom` (F1) | `(elementId, attribute)`, `attribute` an org-defined `attribute_definitions.key` | `elementId`, `elementType`, `attribute`, `value`, `previousDeltaId` |
 | `element.retract` | withdraws `(elementId, $exists)` | `elementId`, `elementType`, `previousDeltaId` |
 | `element.restore` | re-asserts `(elementId, $exists)` | `elementId`, `elementType`, `previousDeltaId` |
 | `relationship.create` | `(relationshipId, $exists)` plus one per attribute; endpoints are part of the existence fact | `relationshipId`, `relationshipType`, `fromElementId`, `toElementId`, `attributes` |
 | `relationship.update` | `(relationshipId, attribute)` | `relationshipId`, `relationshipType`, `attribute`, `value`, `previousDeltaId` |
+| `relationship.update_custom` (F1) | `(relationshipId, attribute)`, `attribute` an org-defined `attribute_definitions.key` | `relationshipId`, `relationshipType`, `attribute`, `value`, `previousDeltaId` |
 | `relationship.retract` | withdraws `$exists` | `relationshipId`, `relationshipType`, `previousDeltaId` |
 | `relationship.restore` | re-asserts `$exists` | `relationshipId`, `relationshipType`, `previousDeltaId` |
 
 Base fields on every delta: `id`, `sourceId`, `sourceRef?`, `effectiveDate?`, `confidence`.
+
+**F1 note.** `element.update_custom`/`relationship.update_custom` are deliberately separate kinds, not `element.update`/`relationship.update` with a widened `attribute` type: `ElementUpdate<T>`'s own `attribute` is a distributive conditional type keyed by a *closed* literal union (every core attribute key for `T`), so a typo'd or removed core key is a compile error — widening it to accept an arbitrary org-defined string would lose that guarantee for every element update, core included. Keeping the two kinds apart also means a custom key that happens to be spelled `name`/`parentId` (element) or is otherwise mistaken for a promoted column is never special-cased the way the real `name`/`parentId` update path is (`src/engine/deltas.ts`'s `apply()`) — a custom key always writes straight into the `attributes` jsonb, never the row's own promoted columns.
 
 ### 4.2 Why `previousDeltaId` on create-shaped facts
 
