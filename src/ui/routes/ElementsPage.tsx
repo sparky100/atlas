@@ -1,4 +1,7 @@
+import { useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router';
+import type { AttributeDefinitionKind } from '../../contracts/attributeSchema';
+import type { Json } from '../../contracts/rows';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ElementBrowseTable } from '../components/ElementBrowseTable/ElementBrowseTable';
@@ -14,6 +17,7 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import { refLabelOf } from '../../db/ref';
 import { useModels } from '../models/useModels';
 import { canEditOnMain, useMembership } from '../orgs/useMembership';
+import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { useElementBrowse, type ElementBrowseFilter } from '../elements/useElementBrowse';
 import styles from './ElementsPage.module.css';
@@ -31,6 +35,16 @@ const VALID_FILTERS: readonly ElementBrowseFilter[] = [
 
 function parseFilterParam(value: string | null): ElementBrowseFilter {
   return VALID_FILTERS.includes(value as ElementBrowseFilter) ? (value as ElementBrowseFilter) : null;
+}
+
+/** F1 ("custom attributes") PR4: `?customValue=` is always a raw URL string — parsed to the chosen definition's own `kind` before it ever reaches `useElementBrowse`'s equality filter, which never re-parses it. */
+function parseCustomFilterValue(kind: AttributeDefinitionKind, raw: string): Json {
+  if (kind === 'number') {
+    const parsed = Number(raw);
+    return Number.isNaN(parsed) ? raw : parsed;
+  }
+  if (kind === 'boolean') return raw === 'true';
+  return raw;
 }
 
 /**
@@ -53,8 +67,7 @@ function parseFilterParam(value: string | null): ElementBrowseFilter {
  */
 export function ElementsPage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
-  const [searchParams] = useSearchParams();
-  const filter = parseFilterParam(searchParams.get('filter'));
+  const [searchParams, setSearchParams] = useSearchParams();
   const { userId } = useAuth();
   const { ref } = useSelectedRef();
   const { label: branchLabel } = useBranchLabel(ref);
@@ -65,6 +78,51 @@ export function ElementsPage() {
   const { role } = useMembership(organisation?.id ?? null, userId);
   const canEdit = canEditOnMain(role);
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
+  // F1 ("custom attributes") PR4: read-only here, same reuse as
+  // ElementPage.tsx's own PR3 wiring — any member can see these
+  // (attribute_definitions_select's RLS), and this page only ever filters/
+  // sorts by them, never edits the definitions themselves.
+  const { definitions: attributeDefinitions } = useAttributeDefinitions(organisation?.id ?? null, userId);
+
+  // `?customAttr=`/`?customValue=` are mutually exclusive with the named
+  // `?filter=` (a browse is filtered by one thing at a time, matching this
+  // page's existing single-`filter` shape). Memoized on `searchParams`
+  // (stable across renders that don't change the URL, same convention
+  // `LandscapePage.tsx`'s own `parseLandscapeFilters` memo uses) — an
+  // object filter built fresh every render would otherwise retrigger
+  // `useElementBrowse`'s own fetch effect every render, since its
+  // dependency array compares `filter` by reference.
+  const customAttrKey = searchParams.get('customAttr');
+  const customValueRaw = searchParams.get('customValue');
+  const filter = useMemo<ElementBrowseFilter>(() => {
+    if (customAttrKey !== null) {
+      const definition = attributeDefinitions.find((d) => d.key === customAttrKey);
+      if (definition && customValueRaw !== null) {
+        return { custom: definition.key, value: parseCustomFilterValue(definition.kind, customValueRaw) };
+      }
+      // A definition is selected (driving the picker + the dynamic column)
+      // but no value has been chosen yet — not a real filter, so fall
+      // through to "no filter" rather than filtering on an empty value.
+      return null;
+    }
+    return parseFilterParam(searchParams.get('filter'));
+  }, [searchParams, customAttrKey, customValueRaw, attributeDefinitions]);
+
+  const setCustomAttrParams = (next: { key: string | null; value: string | null }) => {
+    const params = new URLSearchParams(searchParams);
+    if (next.key === null) {
+      params.delete('customAttr');
+      params.delete('customValue');
+    } else {
+      params.set('customAttr', next.key);
+      if (next.value === null) params.delete('customValue');
+      else params.set('customValue', next.value);
+      // A custom attribute filter replaces any named finding filter — the
+      // two are never combined.
+      params.delete('filter');
+    }
+    setSearchParams(params);
+  };
 
   const state = useElementBrowse(model?.id ?? '', filter, mainBranch?.head_commit_id ?? null);
   const onLinked = () => {
@@ -112,6 +170,9 @@ export function ElementsPage() {
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}
             unresolvedCounts={threadCounts}
+            attributeDefinitions={attributeDefinitions}
+            customAttr={{ key: customAttrKey, value: customValueRaw }}
+            onCustomAttrChange={setCustomAttrParams}
             linkSupportsInline={
               filter === 'unlinked-systems' && canEdit && mainBranch
                 ? {
