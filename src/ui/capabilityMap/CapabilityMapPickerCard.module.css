@@ -5,6 +5,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  /* Picker-grid fix: explicit, not just relying on CSS Grid's own default
+     `align-items: stretch` — a card fills its own cell's height (set by
+     whichever card in the row is tallest) rather than sitting short inside
+     it, now that `.summary`'s own clamp keeps every card's *natural*
+     height close to the same value in the first place. */
+  height: 100%;
 }
 
 .header {
@@ -13,8 +19,37 @@
   gap: var(--space-2);
 }
 
+/* Picker-grid fix: "truncate with 'more' rather than growing/shrinking the
+   card" — clamped to 3 lines while collapsed (the common case; measured by
+   `CapabilityMapPickerCard.tsx`'s own ResizeObserver, not assumed), full
+   height once expanded. `display: -webkit-box` lives on this wrapping div,
+   not the `Text` inside it — `Text` has no ref of its own to measure
+   overflow on directly. */
 .summary {
   margin-top: var(--space-1);
+}
+
+.summary[data-expanded='false'] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.summaryToggle {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.summaryToggle:hover {
+  color: var(--text);
 }
 
 .actions {

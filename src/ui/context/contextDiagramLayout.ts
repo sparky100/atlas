@@ -30,7 +30,18 @@
 import type { UUID } from '../../contracts/delta';
 import { NODE_HEIGHT, NODE_WIDTH } from '../landscape/layout';
 
-export const MODULE_WIDTH = 72;
+/**
+ * V1 fix: was 72. A tile-text review against the longest real content label
+ * ("Regulatory Compliance & Price-Control Reporting", the `utility`/
+ * `electricity_network` maps' own level-1 name) at 8-module width found the
+ * capability line still hard-pressed at 72px, even with the two-line wrap
+ * `ContextDiagramCanvas.tsx` already gives it. Widened using exactly the
+ * width `MODULE_GUTTER_X`'s own cut below frees per module (7 gutters × 4px
+ * saved ÷ 8 modules ≈ 3.5px, rounded up to a clean 4px) — same ~4px scale
+ * both constants move by, so an 8-module platform tile's own overall width
+ * barely changes even though each module individually gets more room.
+ */
+export const MODULE_WIDTH = 76;
 /**
  * V1 fix: was 40 — room for exactly one line of name and one of capability,
  * truncated hard the moment either overflowed the 72px-wide tile. The fix
@@ -40,7 +51,15 @@ export const MODULE_WIDTH = 72;
  * so the box needs to fit four short lines, not two.
  */
 export const MODULE_HEIGHT = 68;
-const MODULE_GUTTER_X = 8;
+/**
+ * V1 fix: was 8. Trimmed by the same ~4px `MODULE_WIDTH`'s own comment
+ * describes — a tile-text review found modules crowded at 8-module width,
+ * and the gutter is pure spacing (never text), the cheapest place to claw
+ * width back from before accepting that any label would need to shrink.
+ * `MODULE_WIDTH` above is widened using exactly what this cut frees, so the
+ * two changes are one decision, not two independent tweaks.
+ */
+const MODULE_GUTTER_X = 4;
 const MODULE_PADDING = 8;
 /**
  * Height of a platform tile's own title bar (name + glyph, kind, and a
