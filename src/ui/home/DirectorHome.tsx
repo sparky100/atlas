@@ -83,7 +83,7 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
     <div className={styles.door}>
       <section aria-label="Where are we weak">
         <div className={styles.sectionHeader}>
-          <Text as="h2" size="lg">
+          <Text as="h2" size="xl" className={styles.sectionTitle}>
             Where are we weak
           </Text>
           <Link to={capabilityMapHref} className={styles.sectionLink}>
@@ -92,11 +92,28 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
             </Text>
           </Link>
         </div>
-        <div className={styles.weaknessChips}>
-          <Chip tone={data.exposedCount > 0 ? 'warn' : 'ok'}>
-            {data.exposedCount} {data.exposedCount === 1 ? 'capability' : 'capabilities'} exposed
-          </Chip>
-          <Chip tone={data.unrecordedCount > 0 ? 'neutral' : 'ok'}>{data.unrecordedCount} with nothing recorded</Chip>
+        {/* Visual pass item 4: these are the first thing a director should
+            read, so they get the same big-number/muted-label stat
+            treatment ArchitectHome.tsx's own Review queue count already
+            uses — a Chip communicates state at a glance, not "read me
+            first". Colour still carries the tone (green/plain when 0). */}
+        <div className={styles.statsRow}>
+          <div className={styles.stat}>
+            <Text as="span" size="2xl" className={data.exposedCount > 0 ? styles.statWarn : undefined}>
+              {data.exposedCount}
+            </Text>
+            <Text as="span" tone="muted" size="sm">
+              {data.exposedCount === 1 ? 'capability' : 'capabilities'} exposed
+            </Text>
+          </div>
+          <div className={styles.stat}>
+            <Text as="span" size="2xl" className={data.unrecordedCount > 0 ? styles.statNeutral : undefined}>
+              {data.unrecordedCount}
+            </Text>
+            <Text as="span" tone="muted" size="sm">
+              with nothing recorded
+            </Text>
+          </div>
         </div>
 
         <div className={styles.tileGrid}>
@@ -112,7 +129,7 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
       <div className={styles.lowerRow}>
         <section className={styles.changesColumn} aria-label="What's changing">
           <div className={styles.sectionHeader}>
-            <Text as="h2" size="lg">
+            <Text as="h2" size="xl" className={styles.sectionTitle}>
               What's changing
             </Text>
             <Text as="span" tone="muted" size="sm">
@@ -203,7 +220,7 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
         </section>
 
         <section className={styles.versionsColumn} aria-label="What's recent">
-          <Text as="h2" size="lg">
+          <Text as="h2" size="xl" className={styles.sectionTitle}>
             What's recent
           </Text>
           {data.versions.length === 0 ? (
@@ -256,6 +273,11 @@ const TONE_CHIP: Record<CapabilityTileData['tone'], ChipTone> = { ok: 'ok', warn
 
 function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: CapabilityTileProps) {
   const href = `/o/${orgSlug}/m/${modelSlug}/e/${tile.capability.element_id}`;
+  // Visual pass item 1: "no known supporters" specifically, not every weak
+  // tile — `buildCapabilityTiles` (`modelHome.ts`) sets `tone: 'neutral'`
+  // exactly when `supportingSystems.length === 0`, so this reuses that
+  // existing classification rather than re-deriving it from the list.
+  const isWeak = tile.tone === 'neutral';
   // Prompt pack F3 PR6: F3's own second named golden path, "from the
   // director door's weak-capability tile, start a decision" — only ever
   // offered on an emphasised (weak, `tone !== 'ok'`) tile, never a healthy
@@ -304,9 +326,11 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
     </>
   );
 
+  const linkClassName = [emphasised ? styles.tileEmphasised : styles.tile, isWeak ? styles.tileWeak : ''].filter(Boolean).join(' ');
+
   return (
     <div className={styles.tileWrapper}>
-      <Link to={href} className={emphasised ? styles.tileEmphasised : styles.tile}>
+      <Link to={href} className={linkClassName}>
         {emphasised ? <BlueprintFrame>{content}</BlueprintFrame> : content}
       </Link>
       {startDecisionHref !== null && (

@@ -1,7 +1,10 @@
 .door {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  /* Visual pass item 2: was --space-8 — a clearer break between "Where are
+     we weak" and the changes/versions row below than stacked cards
+     touching, on top of each section's own border-bottom divider. */
+  gap: var(--space-12);
 }
 
 .sectionHeader {
@@ -18,10 +21,34 @@
   white-space: nowrap;
 }
 
-.weaknessChips {
+/* Visual pass item 3: bold beyond whatever the browser's own <h2>/<h3>
+   default happens to be, so a heading reads clearly heavier than the
+   card body text under it rather than "too close in weight". */
+.sectionTitle {
+  font-weight: 700;
+}
+
+/* Visual pass item 4: "the first thing a director should read" — a
+   big-number/muted-label stat, the same shape ArchitectHome.tsx's own
+   Review queue count already uses, not a Chip pill. */
+.statsRow {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-6);
   margin-bottom: var(--space-3);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.statWarn {
+  color: var(--status-warn);
+}
+
+.statNeutral {
+  color: var(--status-neutral);
 }
 
 /* Handoff 7d: "12 level-1 tiles at full width" is typical, not fixed —
@@ -61,12 +88,22 @@
   min-height: var(--tile-min-height);
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius-sm);
-  padding: var(--space-2);
+  /* Visual pass item 2: was --space-2 — the tile name, exposing-systems
+     list, footer line and chips were sitting close to snug against the
+     border. */
+  padding: var(--space-3);
   box-sizing: border-box;
 }
 
 .tileEmphasised {
   min-height: var(--tile-min-height-emphasised);
+}
+
+/* Visual pass item 1: "no known supporters" specifically (DirectorHome.tsx's
+   own `isWeak`) — BlueprintFrame's `.frame` sets no background of its own,
+   so this shows through it exactly the way the emphasised border does. */
+.tileWeak {
+  background: var(--status-weak-bg);
 }
 
 .statusBar {

@@ -106,6 +106,17 @@
   --status-danger: #d55e00;
   --status-info: #0072b2;
   --status-neutral: #8a93a1;
+
+  /* Director/architect door visual pass: a card-level "this needs
+     attention" background tint (a capability card with no known
+     supporters; a Health finding with a non-zero count) — distinct from
+     the five tones above (which drive a dot/chip/thin status bar) because
+     this is a binary "does this card get a tint at all", not another
+     value the tone system needs a variant for. Derived from --status-warn
+     the same way --diff-none derives from --border above, so light/dark
+     and the data-theme override all recompute for free with no separate
+     block per theme. */
+  --status-weak-bg: rgb(from var(--status-warn) r g b / 14%);
 }
 
 @media (prefers-color-scheme: dark) {

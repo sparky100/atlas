@@ -15,7 +15,25 @@
 .side {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  /* Visual pass item 2: was --space-4 — Review queue/Health findings and
+     My changes/Recent activity read as stacked cards touching at that gap;
+     each Panel already has its own border, so more space between them
+     (rather than a second divider inside an already-bordered card) is the
+     fix. */
+  gap: var(--space-6);
+}
+
+/* Visual pass item 3: bold beyond whatever the browser's own <h2>/<h3>
+   default happens to be, so a heading reads clearly heavier than the card
+   body text under it rather than "too close in weight" — DirectorHome's
+   own `.sectionTitle` (DirectorHome.module.css) is the same rule, kept as
+   two copies since the two doors already have independent CSS modules. */
+.sectionTitle {
+  font-weight: 700;
+}
+
+.subsectionTitle {
+  font-weight: 700;
 }
 
 .counts {
@@ -94,5 +112,7 @@
 .findingPlate {
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius-sm);
-  padding: var(--space-2);
+  /* Visual pass item 2: was --space-2, matching DirectorHome.module.css's
+     own `.tile` padding bump for the same reason. */
+  padding: var(--space-3);
 }
