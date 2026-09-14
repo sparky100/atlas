@@ -5,7 +5,7 @@ import {
   computeStaleAttributesFinding,
   findBoundaryCrossings,
   findBoundaryCrossingsMissingClassification,
-  findBoundaryCrossingsMissingClassificationOrVerb,
+  findBoundaryCrossingsMissingVerb,
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
@@ -532,7 +532,7 @@ describe('findBoundaryCrossings (Prompt 7k item 3)', () => {
   });
 });
 
-describe('findBoundaryCrossingsMissingClassificationOrVerb (Prompt 7k item 3)', () => {
+describe('findBoundaryCrossingsMissingVerb (Prompt 7k item 3)', () => {
   const elementsById = new Map([
     ['sys-it', system('sys-it')],
     ['sys-ot', system('sys-ot', { domain: 'ot' })],
@@ -540,17 +540,22 @@ describe('findBoundaryCrossingsMissingClassificationOrVerb (Prompt 7k item 3)', 
 
   it('flags a crossing with no verb-phrase label', () => {
     const edges = [relationship('r1', 'uses', 'sys-it', 'sys-ot')];
-    expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, elementsById).map((c) => c.relationshipId)).toEqual(['r1']);
+    expect(findBoundaryCrossingsMissingVerb(edges, elementsById).map((c) => c.relationshipId)).toEqual(['r1']);
   });
 
-  it('flags a flows_to crossing with a verb but no data classification', () => {
+  // Narrowed deliberately: a flows_to crossing that has a verb but no data
+  // classification is Assurance's own finding (findBoundaryCrossingsMissingClassification)
+  // alone, not this one too — the two used to overlap, showing the same
+  // crossing under both "Health findings" and "Assurance" for what read as
+  // the same reason (found during a walkthrough).
+  it('does not flag a flows_to crossing that has a verb but is missing only its data classification', () => {
     const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to' })];
-    expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, elementsById).map((c) => c.relationshipId)).toEqual(['r1']);
+    expect(findBoundaryCrossingsMissingVerb(edges, elementsById)).toEqual([]);
   });
 
   it('does not flag a fully-classified crossing', () => {
     const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to', dataClassification: 'official' })];
-    expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, elementsById)).toEqual([]);
+    expect(findBoundaryCrossingsMissingVerb(edges, elementsById)).toEqual([]);
   });
 
   it('does not flag a non-crossing edge at all, regardless of metadata', () => {
@@ -559,7 +564,7 @@ describe('findBoundaryCrossingsMissingClassificationOrVerb (Prompt 7k item 3)', 
       ['sys-it-2', system('sys-it-2')],
     ]);
     const edges = [relationship('r1', 'uses', 'sys-it-1', 'sys-it-2')];
-    expect(findBoundaryCrossingsMissingClassificationOrVerb(edges, bothIt)).toEqual([]);
+    expect(findBoundaryCrossingsMissingVerb(edges, bothIt)).toEqual([]);
   });
 });
 

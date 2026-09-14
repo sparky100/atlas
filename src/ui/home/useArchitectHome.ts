@@ -9,7 +9,7 @@ import {
   computeStaleAttributesFinding,
   findBoundaryCrossings,
   findBoundaryCrossingsMissingClassification,
-  findBoundaryCrossingsMissingClassificationOrVerb,
+  findBoundaryCrossingsMissingVerb,
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
@@ -77,8 +77,8 @@ export interface ArchitectHomeData {
   criticalSystemsWithoutBusinessOwner: ElementsHeadRow[];
   /** Prompt 7k item 1: critical systems whose `plannedEnd` falls within `STALE_AFTER_MONTHS`, with no planned replacement (see `findCriticalExposedSystems`'s own comment on that half). */
   criticalExposedSystems: ElementsHeadRow[];
-  /** Prompt 7k item 3's own health finding: `uses`/`flows_to` edges crossing the IT/OT boundary with no verb-phrase label or (for `flows_to`) data classification. */
-  boundaryCrossingsMissingClassificationOrVerb: BoundaryCrossing[];
+  /** Prompt 7k item 3's own health finding: `uses`/`flows_to` edges crossing the IT/OT boundary with no verb-phrase label — a labelling concern, kept separate from Assurance's own missing-classification finding below so a crossing missing both isn't shown as the same finding twice (see `findBoundaryCrossingsMissingVerb`'s own doc comment). */
+  boundaryCrossingsMissingVerb: BoundaryCrossing[];
   /** Prompt 7k item 3's "Boundary crossings" count-and-link block — every IT/OT crossing, not just the ones missing metadata (that's the health finding above); the full list lives at `BoundaryCrossingsPage.tsx`. */
   boundaryCrossingsCount: number;
   /** Prompt 7k item 4's own health finding: integration platforms with nothing routed via them. */
@@ -214,7 +214,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             systemsWithoutTechnicalOwner: findSystemsWithoutTechnicalOwner(systems, ownsEdges),
             criticalSystemsWithoutBusinessOwner: findCriticalSystemsWithoutBusinessOwner(systems, ownsEdges),
             criticalExposedSystems: findCriticalExposedSystems(systems),
-            boundaryCrossingsMissingClassificationOrVerb: findBoundaryCrossingsMissingClassificationOrVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
+            boundaryCrossingsMissingVerb: findBoundaryCrossingsMissingVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             boundaryCrossingsCount: findBoundaryCrossings(usesAndFlowsToEdges, usesAndFlowsToEndpointsById).length,
             unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges),
             systemsSupportingEssentialFunctionWithoutTechnicalOwner: findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supportsEdges, ownsEdges),

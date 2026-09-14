@@ -217,10 +217,15 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       browseHref: browseHref('critical-exposed'),
     },
     {
-      key: 'boundary-crossings-missing-metadata',
-      count: data.boundaryCrossingsMissingClassificationOrVerb.length,
-      summary: `${String(data.boundaryCrossingsMissingClassificationOrVerb.length)} boundary crossing${data.boundaryCrossingsMissingClassificationOrVerb.length === 1 ? '' : 's'} with no data classification or verb`,
-      items: boundaryCrossingItems(data.boundaryCrossingsMissingClassificationOrVerb),
+      // Labelling only — a crossing missing its *data classification* is
+      // Assurance's own finding below, not this one too (found during a
+      // walkthrough: the same crossing showed up twice, once in each
+      // section, with near-identical wording — see
+      // `findBoundaryCrossingsMissingVerb`'s own doc comment).
+      key: 'boundary-crossings-missing-verb',
+      count: data.boundaryCrossingsMissingVerb.length,
+      summary: `${String(data.boundaryCrossingsMissingVerb.length)} boundary crossing${data.boundaryCrossingsMissingVerb.length === 1 ? '' : 's'} with no verb label`,
+      items: boundaryCrossingItems(data.boundaryCrossingsMissingVerb),
     },
     {
       key: 'unused-integration-platform',
@@ -407,24 +412,19 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
             Health findings
           </Text>
 
-          {/* Prompt 7k item 3's own count-and-link block — every IT/OT
+          {/* Prompt 7k item 3's own count-and-link line — every IT/OT
               crossing, not just the ones a finding below flags as missing
               metadata; the full list still lives at BoundaryCrossingsPage.tsx.
               S1 item 6 moves this from its own standalone panel to inside
-              Health findings, first. */}
-          <div className={styles.count}>
-            <Text as="span" size="2xl">
-              {data.boundaryCrossingsCount}
-            </Text>
-            <Text as="span" tone="muted" size="sm">
-              IT/OT crossing{data.boundaryCrossingsCount === 1 ? '' : 's'}
-            </Text>
-          </div>
-          <Link to={`/o/${orgSlug}/m/${modelSlug}/boundary-crossings`}>
-            <Text as="span" size="sm">
-              View all →
-            </Text>
-          </Link>
+              Health findings, first. Deliberately *not* the same big `.count`
+              headline treatment Review queue uses above (found during a
+              walkthrough: styled that way, it read as this whole panel's
+              total finding count, which it never was — it's one specific
+              metric among several findings below it). */}
+          <Text as="p" tone="muted" size="sm">
+            {data.boundaryCrossingsCount} IT/OT crossing{data.boundaryCrossingsCount === 1 ? '' : 's'} in this model —{' '}
+            <Link to={`/o/${orgSlug}/m/${modelSlug}/boundary-crossings`}>view all →</Link>
+          </Text>
 
           {activeHealthChecks.length > 0 && (
             <div className={styles.findingPlates}>
