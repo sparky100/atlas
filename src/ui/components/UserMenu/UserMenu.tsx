@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { Link } from 'react-router';
 import { useAuth } from '../../auth/useAuth';
 import { Button } from '../Button/Button';
 import { Text } from '../Text/Text';
@@ -42,10 +43,16 @@ export function UserMenu() {
           </Text>
         )}
         <ThemeDensityToggle />
+        <Link to="/profile" className={styles.profileLink} onClick={() => { setOpen(false); }}>
+          <Text as="span" size="sm">
+            Profile
+          </Text>
+        </Link>
+        {/* Sprint F7 item 2: this device only — the profile page's own "Sign out everywhere" is the explicit, heavier action (`{scope:'global'}`); this one previously had no scope at all, which supabase-js v2 defaults to 'global' — narrowing it to 'local' is the actual behaviour change this decision makes, not just a label. */}
         <Button
           variant="ghost"
           onClick={() => {
-            void signOut();
+            void signOut('local');
           }}
         >
           Sign out

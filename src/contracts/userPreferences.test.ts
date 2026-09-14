@@ -69,3 +69,21 @@ describe('landscape lane collapse/pin wire <-> row (V2)', () => {
     expect(back.landscapePinnedLaneKeys).toBeNull();
   });
 });
+
+describe('notification preferences wire <-> row (Sprint F7 item 3)', () => {
+  it('defaults both to true — notify is the sensible default until a user says otherwise', () => {
+    const prefs = defaultUserPreferences('u1', false);
+    expect(prefs.notifyOnMention).toBe(true);
+    expect(prefs.notifyOnReply).toBe(true);
+  });
+
+  it('carries false through toUserPreferencesRow/fromUserPreferencesRow unchanged, for each field independently', () => {
+    const prefs = { ...defaultUserPreferences('u1', true), notifyOnMention: false };
+    const row = toUserPreferencesRow(prefs);
+    expect(row.notify_on_mention).toBe(false);
+    expect(row.notify_on_reply).toBe(true);
+    const back = fromUserPreferencesRow(row);
+    expect(back.notifyOnMention).toBe(false);
+    expect(back.notifyOnReply).toBe(true);
+  });
+});

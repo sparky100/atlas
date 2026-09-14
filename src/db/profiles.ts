@@ -68,8 +68,21 @@ export interface UpdateMyProfileInput {
   avatarUrl?: string | null;
 }
 
-/** Editable by the user only (RLS): `user_id = auth.uid()` is enforced server-side regardless of what `input.userId` says, so a stale or wrong id here fails the update rather than silently editing someone else's row. */
-export async function updateMyProfile(supabase: Client, input: UpdateMyProfileInput): Promise<ProfileRow> {
+export type UpdateMyProfileResult = { status: 'updated'; profile: ProfileRow } | { status: 'handle_taken' };
+
+/**
+ * Editable by the user only (RLS): `user_id = auth.uid()` is enforced
+ * server-side regardless of what `input.userId` says, so a stale or wrong
+ * id here fails the update rather than silently editing someone else's
+ * row. Sprint F7 item 2: `handle` is globally unique
+ * (`profiles_handle_unique`) — a taken handle now surfaces as a structured
+ * `{status:'handle_taken'}` result (the same `23505`-catching shape
+ * `createInvite`'s own doc comment already uses for its own unique
+ * index), not a raw constraint error, since the profile page is this
+ * function's first caller that can actually hit it (its one prior caller,
+ * `DisplayNamePrompt.tsx`, never sets `handle`).
+ */
+export async function updateMyProfile(supabase: Client, input: UpdateMyProfileInput): Promise<UpdateMyProfileResult> {
   const patch: Record<string, unknown> = {};
   if (input.displayName !== undefined) patch.display_name = input.displayName;
   if (input.handle !== undefined) patch.handle = input.handle;
@@ -77,6 +90,9 @@ export async function updateMyProfile(supabase: Client, input: UpdateMyProfileIn
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
   const { data, error } = await supabase.schema('atlas').from('profiles').update(patch).eq('user_id', input.userId).select('*').single();
-  if (error) throw new Error(`updateMyProfile: ${error.message}`);
-  return data as ProfileRow;
+  if (error) {
+    if (error.code === '23505') return { status: 'handle_taken' };
+    throw new Error(`updateMyProfile: ${error.message}`);
+  }
+  return { status: 'updated', profile: data as ProfileRow };
 }

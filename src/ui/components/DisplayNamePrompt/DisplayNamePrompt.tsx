@@ -36,7 +36,15 @@ export function DisplayNamePrompt({ userId, onDone }: DisplayNamePromptProps) {
     setSubmitting(true);
     setError(null);
     try {
-      await updateMyProfile(supabase, { userId, displayName: trimmed });
+      const result = await updateMyProfile(supabase, { userId, displayName: trimmed });
+      // 'handle_taken' can't actually happen here (this prompt never sets
+      // `handle`), but the result is a discriminated union now — handled
+      // rather than assumed away, matching every other structured-result
+      // caller in this codebase.
+      if (result.status === 'handle_taken') {
+        setError('Something unexpected went wrong saving your name.');
+        return;
+      }
       onDone();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save your name');

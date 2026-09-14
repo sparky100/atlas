@@ -53,3 +53,14 @@
 .menu.open {
   display: flex;
 }
+
+/* Sprint F7 item 2: a plain link, styled to read as a menu row alongside
+   the "Sign out" button beneath it, not an underlined inline link. */
+.profileLink {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.profileLink:hover {
+  text-decoration: underline;
+}

@@ -99,6 +99,20 @@ export interface UserPreferences {
    * `layout.ts`'s existing `laneSortKey` order unchanged.
    */
   landscapePinnedLaneKeys: LandscapeLaneKeyList | null;
+  /**
+   * Sprint F7 item 3: whether an @mention creates an in-app notification
+   * for this user — always a real boolean (`not null default true`),
+   * never nullable like the colour-by/lane-key fields above, since there's
+   * no context-dependent default to compute: "notify" is the sensible
+   * default for everyone until they say otherwise. "Assigned reviews" is
+   * named in the prompt this item comes from but ships no preference of
+   * its own — no `notification_kind` for it exists yet (F3a's
+   * review-verdict mechanism, which would produce that kind, was paused,
+   * not built).
+   */
+  notifyOnMention: boolean;
+  /** Sprint F7 item 3: same as `notifyOnMention`, for a reply-to-a-thread notification. */
+  notifyOnReply: boolean;
   /** ISO 8601 timestamp; DB-assigned, never client-chosen. */
   updatedAt: string;
 }
@@ -114,6 +128,8 @@ export interface UserPreferencesRow {
   landscape_collapsed_lane_keys: LandscapeLaneKeyList | null;
   landscape_expanded_lane_keys: LandscapeLaneKeyList | null;
   landscape_pinned_lane_keys: LandscapeLaneKeyList | null;
+  notify_on_mention: boolean;
+  notify_on_reply: boolean;
   updated_at: string;
 }
 
@@ -128,6 +144,8 @@ export function toUserPreferencesRow(prefs: UserPreferences): UserPreferencesRow
     landscape_collapsed_lane_keys: prefs.landscapeCollapsedLaneKeys,
     landscape_expanded_lane_keys: prefs.landscapeExpandedLaneKeys,
     landscape_pinned_lane_keys: prefs.landscapePinnedLaneKeys,
+    notify_on_mention: prefs.notifyOnMention,
+    notify_on_reply: prefs.notifyOnReply,
     updated_at: prefs.updatedAt,
   };
 }
@@ -143,6 +161,8 @@ export function fromUserPreferencesRow(row: UserPreferencesRow): UserPreferences
     landscapeCollapsedLaneKeys: row.landscape_collapsed_lane_keys,
     landscapeExpandedLaneKeys: row.landscape_expanded_lane_keys,
     landscapePinnedLaneKeys: row.landscape_pinned_lane_keys,
+    notifyOnMention: row.notify_on_mention,
+    notifyOnReply: row.notify_on_reply,
     updatedAt: row.updated_at,
   };
 }
@@ -168,6 +188,8 @@ export function defaultUserPreferences(userId: UUID, isOwnerOrArchitect: boolean
     landscapeCollapsedLaneKeys: null,
     landscapeExpandedLaneKeys: null,
     landscapePinnedLaneKeys: null,
+    notifyOnMention: true,
+    notifyOnReply: true,
     updatedAt: new Date(0).toISOString(),
   };
 }

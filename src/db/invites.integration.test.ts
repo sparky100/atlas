@@ -143,4 +143,32 @@ describe('invite by email against a real local Supabase', () => {
     const reinvited = await createInvite(owner.client, { id: randomUUID(), orgId, email, role: 'contributor', invitedBy: owner.id });
     expect(reinvited.status).toBe('created');
   });
+
+  // Sprint F7 item 1: `last_sent_at` (20260914030000_invites_last_sent_at.sql)
+  // is the one column any client write to `invites` can ever reach — the
+  // edge function itself writes it via this exact same RLS-scoped update,
+  // not a service-role bypass, so this is the real authorization boundary
+  // for "who can mark an invite as sent."
+  it('an owner can set last_sent_at directly; a non-owner cannot; no other column is writable', async () => {
+    const email = `lastsent-${randomUUID().slice(0, 8)}@example.test`;
+    const created = await createInvite(owner.client, { id: randomUUID(), orgId, email, role: 'viewer', invitedBy: owner.id });
+    expect(created.status).toBe('created');
+    if (created.status !== 'created') throw new Error('unreachable');
+
+    const now = new Date().toISOString();
+    const { error: ownerError } = await owner.client.from('invites').update({ last_sent_at: now }).eq('id', created.invite.id);
+    expect(ownerError).toBeNull();
+
+    const invites = await listInvites(owner.client, orgId);
+    expect(invites.find((i) => i.id === created.invite.id)?.last_sent_at).toBe(now);
+
+    const { error: architectError } = await architect.client.from('invites').update({ last_sent_at: now }).eq('id', created.invite.id);
+    expect(architectError).not.toBeNull();
+
+    // The column grant is `last_sent_at` only — `role` (any other column)
+    // must still be unwritable, matching this table's "never by a client
+    // write" stance for everything except this one field.
+    const { error: roleWriteError } = await owner.client.from('invites').update({ role: 'owner' }).eq('id', created.invite.id);
+    expect(roleWriteError).not.toBeNull();
+  });
 });

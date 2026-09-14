@@ -17,6 +17,7 @@ import { ModelHome } from './routes/ModelHome';
 import { ModelSettingsPage } from './routes/ModelSettingsPage';
 import { OrganisationSettingsPage } from './routes/OrganisationSettingsPage';
 import { OrgHome } from './routes/OrgHome';
+import { ProfilePage } from './routes/ProfilePage';
 import { RequireAuth } from './routes/RequireAuth';
 import { ReviewQueuePage } from './routes/ReviewQueuePage';
 import { ReviewRequestPage } from './routes/ReviewRequestPage';
@@ -44,6 +45,8 @@ export function App() {
           <Route path="/sign-in" element={<SignIn />} />
           <Route element={<RequireAuth />}>
             <Route path="/" element={<Home />} />
+            {/* Sprint F7 item 2: top-level, not org-scoped — a profile follows the person across every org (ADR-009), same reasoning user_preferences is user-scoped rather than org-scoped. */}
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/o/:orgSlug" element={<OrgHome />} />
             <Route path="/o/:orgSlug/settings" element={<OrganisationSettingsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug" element={<ModelHome />} />
