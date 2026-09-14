@@ -8,7 +8,11 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 export default defineConfig(
   {
-    ignores: ['dist/**', 'node_modules/**', 'supabase/.temp/**', 'coverage/**', 'storybook-static/**', 'playwright-report/**', 'test-results/**'],
+    // `supabase/functions/**`: Deno edge functions (Sprint F7 item 1's
+    // send-invite-email is the first) — a different runtime with its own
+    // globals (`Deno`) and remote `https://esm.sh/...` imports this repo's
+    // Node-based tsconfig/eslint project can't and shouldn't resolve.
+    ignores: ['dist/**', 'node_modules/**', 'supabase/.temp/**', 'supabase/functions/**', 'coverage/**', 'storybook-static/**', 'playwright-report/**', 'test-results/**'],
   },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,

@@ -8,7 +8,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfirm';
 import type { MemberRole, OrganisationRow } from '../../db/types';
-import { formatDate } from '../time';
+import { formatDate, formatRelativeTime } from '../time';
 import { AttributeDefinitionsPanel } from './AttributeDefinitionsPanel';
 import { canManageOrgSettings } from './roleGates';
 import { useInvites } from './useInvites';
@@ -39,14 +39,20 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
   const canManage = canManageOrgSettings(role);
   const { status, error, update, remove } = useOrganisationSettings(organisation.id, onChanged);
   const { members, loading: membersLoading, error: membersError, changeRole, remove: removeMemberRow } = useMembers(organisation.id);
-  const { invites, loading: invitesLoading, error: invitesError, create: createInviteRow, revoke: revokeInviteRow } = useInvites(organisation.id, userId);
+  const { invites, loading: invitesLoading, error: invitesError, create: createInviteRow, revoke: revokeInviteRow, resend: resendInviteRow } = useInvites(organisation.id, userId);
   const [name, setName] = useState(organisation.name);
   const [slug, setSlug] = useState(organisation.slug);
   const [deleteResult, setDeleteResult] = useState<'has_models' | 'not_found' | null>(null);
   const [deleteModelCount, setDeleteModelCount] = useState(0);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<MemberRole>('contributor');
-  const [inviteResult, setInviteResult] = useState<'already_pending' | null>(null);
+  const [inviteResult, setInviteResult] = useState<'already_pending' | 'created_email_failed' | null>(null);
+  const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
+  // Sprint F7 item 1: per-invite resend feedback — a plain map, not lifted
+  // into `useInvites` itself, since it's transient per-click UI state
+  // (same "own this in the component, not the hook" shape `inviteResult`
+  // above already uses for create).
+  const [resendStatusByInviteId, setResendStatusByInviteId] = useState<Record<UUID, 'sending' | 'sent' | 'error'>>({});
   const navigate = useNavigate();
   // Real label/input association (`htmlFor`/`id`) — `ModelSettingsView.tsx`'s
   // own fix for the same issue (a sibling `Text as="label"` with no `for`
@@ -183,10 +189,15 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
             onSubmit={(e) => {
               e.preventDefault();
               setInviteResult(null);
+              setInviteEmailError(null);
               void createInviteRow(inviteEmail, inviteRole).then((result) => {
                 if (!result) return;
                 if (result.status === 'already_pending') {
                   setInviteResult('already_pending');
+                } else if (result.status === 'created_email_failed') {
+                  setInviteResult('created_email_failed');
+                  setInviteEmailError(result.emailError);
+                  setInviteEmail('');
                 } else {
                   setInviteEmail('');
                 }
@@ -232,28 +243,57 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
             </Button>
           </form>
           {inviteResult === 'already_pending' && <Text as="p">There's already a pending invite for that email at this organisation.</Text>}
+          {inviteResult === 'created_email_failed' && <Text as="p">The invite was created, but the email couldn't be sent{inviteEmailError ? `: ${inviteEmailError}` : '.'} You can resend it below.</Text>}
           {invitesError !== null && <Text as="p">{invitesError}</Text>}
           {!invitesLoading && invites.length === 0 && <EmptyState>No invites yet.</EmptyState>}
           {invites.length > 0 && (
             <ul className={styles.memberList}>
-              {invites.map((invite) => (
-                <li key={invite.id} className={styles.memberRow}>
-                  <div className={styles.memberIdentity}>
-                    <Text as="span">{invite.email}</Text>
-                    <Chip tone={invite.consumed_at === null ? 'neutral' : 'ok'}>{invite.consumed_at === null ? 'Pending' : 'Joined'}</Chip>
-                    <Chip tone="neutral">{invite.role}</Chip>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    aria-label={`Revoke invite for ${invite.email}`}
-                    onClick={() => {
-                      void revokeInviteRow(invite.id);
-                    }}
-                  >
-                    Revoke
-                  </Button>
-                </li>
-              ))}
+              {invites.map((invite) => {
+                const resendStatus = resendStatusByInviteId[invite.id];
+                return (
+                  <li key={invite.id} className={styles.memberRow}>
+                    <div className={styles.memberIdentity}>
+                      <Text as="span">{invite.email}</Text>
+                      <Chip tone={invite.consumed_at === null ? 'neutral' : 'ok'}>{invite.consumed_at === null ? 'Pending' : 'Joined'}</Chip>
+                      <Chip tone="neutral">{invite.role}</Chip>
+                      <Text as="span" tone="muted" size="sm">
+                        {invite.last_sent_at ? `Email last sent ${formatRelativeTime(invite.last_sent_at, new Date())}` : 'Email not sent yet'}
+                      </Text>
+                      {resendStatus === 'error' && (
+                        <Text as="span" tone="muted" size="sm">
+                          Resend failed
+                        </Text>
+                      )}
+                    </div>
+                    <div className={styles.memberActions}>
+                      {invite.consumed_at === null && (
+                        <Button
+                          variant="ghost"
+                          aria-label={`Resend invite for ${invite.email}`}
+                          disabled={resendStatus === 'sending'}
+                          onClick={() => {
+                            setResendStatusByInviteId((prev) => ({ ...prev, [invite.id]: 'sending' }));
+                            void resendInviteRow(invite.id).then((result) => {
+                              setResendStatusByInviteId((prev) => ({ ...prev, [invite.id]: result === 'sent' ? 'sent' : 'error' }));
+                            });
+                          }}
+                        >
+                          {resendStatus === 'sending' ? 'Resending…' : 'Resend'}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        aria-label={`Revoke invite for ${invite.email}`}
+                        onClick={() => {
+                          void revokeInviteRow(invite.id);
+                        }}
+                      >
+                        Revoke
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Panel>

@@ -41,6 +41,8 @@ export interface InviteRow {
   created_at: string;
   consumed_at: string | null;
   consumed_by: UUID | null;
+  /** Sprint F7 item 1: when the invite email (Resend) was last successfully sent — null until the first successful send. The only column on this row any client write ever reaches (`20260914030000_invites_last_sent_at.sql`). */
+  last_sent_at: string | null;
 }
 
 /** The literal shape of a row in `models`. */

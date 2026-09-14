@@ -55,6 +55,28 @@ export async function revokeInvite(supabase: Client, id: UUID): Promise<void> {
   if (error) throw new Error(`revokeInvite: ${error.message}`);
 }
 
+export type SendInviteEmailResult = { status: 'sent' } | { status: 'error'; message: string };
+
+/**
+ * Sprint F7 item 1: invokes the `send-invite-email` edge function (Resend)
+ * for one already-created invite — never bundled into `createInvite`
+ * itself (decision, see the F7 plan's own "create and send are decoupled"
+ * note): a failed send must never lose the invite row, so this is always
+ * a separate call the caller can retry ("Resend") independent of creation.
+ * The edge function re-derives its own owner check from the caller's
+ * forwarded session via `invites_select`'s RLS — this wrapper trusts
+ * nothing client-side either; a non-owner caller just gets `status:
+ * 'error'` back from the function's own 404.
+ */
+export async function sendInviteEmail(supabase: Client, inviteId: UUID): Promise<SendInviteEmailResult> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.functions.invoke('send-invite-email', { body: { inviteId } });
+  if (error) return { status: 'error', message: error instanceof Error ? error.message : 'Could not reach the email service.' };
+  const result = data as { status: 'sent' } | { status: 'error'; message: string } | null;
+  if (result?.status === 'sent') return { status: 'sent' };
+  return { status: 'error', message: result?.status === 'error' ? result.message : 'The email service did not confirm the send.' };
+}
+
 /**
  * Re-runs invite consumption against the now-authenticated caller —
  * closes the one gap the `auth.users`-insert trigger alone can't cover
