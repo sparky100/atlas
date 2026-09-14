@@ -132,9 +132,9 @@ function isBoundaryCrossingPair(a: SystemDomain, b: SystemDomain): boolean {
  * nearest System for a Container endpoint) — Prompt 7k item 3's
  * "Boundary crossings" list, reachable from the architect door
  * (`BoundaryCrossingsPage.tsx`), and the shared basis both this item's own
- * health finding (`findBoundaryCrossingsMissingClassificationOrVerb`,
- * below) and item 5's narrower Assurance finding (classification only,
- * PR5) are built from — one crossing-detection pass, not two.
+ * health finding (`findBoundaryCrossingsMissingVerb`, below) and item 5's
+ * Assurance finding (classification only, PR5) are built from — one
+ * crossing-detection pass, not two.
  */
 export function findBoundaryCrossings(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): BoundaryCrossing[] {
   const result: BoundaryCrossing[] = [];
@@ -158,18 +158,30 @@ export function findBoundaryCrossings(edges: readonly RelationshipsHeadRow[], el
   return result;
 }
 
-/** Prompt 7k item 3's own health finding: "a crossing with no data classification or verb" — the wider of the two crossing-metadata findings (item 5's Assurance finding, below, checks classification alone). */
-export function findBoundaryCrossingsMissingClassificationOrVerb(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): BoundaryCrossing[] {
-  return findBoundaryCrossings(edges, elementsById).filter((crossing) => crossing.missingVerb || crossing.missingDataClassification);
+/**
+ * Prompt 7k item 3's own health finding: a crossing with no verb-phrase
+ * label — a labelling/hygiene concern, distinct from item 5's Assurance
+ * finding below (missing data classification, the CAF A3/B4-relevant
+ * fact). Originally "missing classification or verb", which made a
+ * crossing missing both appear as what looked like the same finding twice
+ * — once here, once under Assurance — with no way to tell the two apart
+ * (found during a walkthrough, issue-reported). Narrowed to verb-only so
+ * each finding owns exactly one fact and a crossing is never flagged twice
+ * for the same reason; a crossing missing only its data classification is
+ * now Assurance's finding alone, not this one's too.
+ */
+export function findBoundaryCrossingsMissingVerb(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): BoundaryCrossing[] {
+  return findBoundaryCrossings(edges, elementsById).filter((crossing) => crossing.missingVerb);
 }
 
 /**
- * Prompt 7k item 5's own narrower Assurance finding: boundary crossings
- * missing a data classification specifically — the CAF A3/B4-relevant
- * subset of item 3's own wider finding above (which also flags a missing
- * verb, a labelling concern rather than a regulatory-data one). Same
- * `findBoundaryCrossings` pass, not a second detection (that function's own
- * module comment).
+ * Prompt 7k item 5's own Assurance finding: boundary crossings missing a
+ * data classification specifically — the CAF A3/B4-relevant fact, and the
+ * sole finding that flags it (item 3's own `findBoundaryCrossingsMissingVerb`
+ * above covers the labelling concern only, not classification, precisely so
+ * a crossing missing its classification is never flagged in both places).
+ * Same `findBoundaryCrossings` pass, not a second detection (that
+ * function's own module comment).
  */
 export function findBoundaryCrossingsMissingClassification(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): BoundaryCrossing[] {
   return findBoundaryCrossings(edges, elementsById).filter((crossing) => crossing.missingDataClassification);
