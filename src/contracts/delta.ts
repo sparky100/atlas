@@ -116,6 +116,20 @@ export type DataClassification = 'public' | 'official' | 'official_sensitive' | 
 export type SupportsRole = 'primary' | 'secondary';
 /** Prompt 7k item 2: which capacity an `owns` edge asserts ownership in — replaces the earlier `OwnsAttributes.primary: boolean` (Sprint U4-1), which only ever distinguished "the" owner from a secondary one and had no room for more than one kind of owner at once. Always set at creation, defaulting to `'business'` on a capability target and prompted for on a system target (`RelationshipAdd.tsx`) — never left unset, same reasoning `SupportsRole` above already gives. Cardinality is per `(toElementId, role)` (C17, `20260911070000_owns_role.sql`'s backstop index): a target may have at most one `business`, one `technical` and one `service` owner, but all three may be different actors at once. */
 export type OwnsRole = 'business' | 'technical' | 'service';
+/**
+ * How well a system's `supports` edge fits the capability it supports — a
+ * leaf-level fact recorded on the relationship itself (never rolled up at
+ * the edge), ordered `excellent` < `good` < `adequate` < `poor` where
+ * "worse" is a higher number (`src/ui/elements/fitForPurposeTone.ts`'s
+ * `FIT_FOR_PURPOSE_ORDER`, the same "worst-of = max" shape `Criticality`'s
+ * own order already gives `worstCriticality`). A capability's own fit is
+ * the worst-of its supporting edges, rolled up worst-of-children to level-1
+ * (`src/ui/capabilityMap/metrics.ts`'s `worstFitForPurpose`/
+ * `worstFitForPurposeAcross`). Absent means "not rated yet" and is silent —
+ * never a recorded `'adequate'`, same stance every other optional attribute
+ * here takes.
+ */
+export type FitForPurpose = 'poor' | 'adequate' | 'good' | 'excellent';
 
 /**
  * Attributes stored in `elements_head.attributes` (jsonb). `name` and
@@ -261,6 +275,10 @@ export interface SupportsAttributes {
   description?: string;
   /** Sprint U4-1 B4 — see `SupportsRole`'s own doc comment. */
   role: SupportsRole;
+  /** A leaf-level rating of how well this specific system fits this capability — see `FitForPurpose`'s own doc comment. Optional; absent means unrated and is silent everywhere (never treated as a recorded value). */
+  fitForPurpose?: FitForPurpose;
+  /** Optional free-text rationale for the `fitForPurpose` rating, shown alongside it on the relationship's own expanded attributes — deliberately not the rating's *source* (that's the delta's own provenance, ADR-007); this is the "why", in the author's own words. */
+  fitForPurposeNotes?: string;
 }
 export interface UsesAttributes {
   description?: string;

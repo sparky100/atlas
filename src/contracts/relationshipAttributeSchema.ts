@@ -24,14 +24,17 @@ function schemaOf<T extends string>(order: readonly T[], meta: Record<T, Attribu
 }
 
 const SUPPORTS_ROLE_OPTIONS = ['primary', 'secondary'] as const;
+const FIT_FOR_PURPOSE_OPTIONS = ['excellent', 'good', 'adequate', 'poor'] as const;
 const OWNS_ROLE_OPTIONS = ['business', 'technical', 'service'] as const;
 const DATA_CLASSIFICATION_OPTIONS = ['public', 'official', 'official_sensitive', 'special_category'] as const;
 
 const SUPPORTS_META = {
   role: { label: 'Role', required: true, kind: 'enum', options: SUPPORTS_ROLE_OPTIONS },
+  fitForPurpose: { label: 'Fit for purpose', required: false, kind: 'enum', options: FIT_FOR_PURPOSE_OPTIONS },
+  fitForPurposeNotes: { label: 'Fit notes', required: false, kind: 'text', multiline: true },
   description: { label: 'Description', required: false, kind: 'text', multiline: true },
-} satisfies Record<'role' | 'description', AttributeFieldMeta>;
-const SUPPORTS_ORDER = ['role', 'description'] as const;
+} satisfies Record<'role' | 'fitForPurpose' | 'fitForPurposeNotes' | 'description', AttributeFieldMeta>;
+const SUPPORTS_ORDER = ['role', 'fitForPurpose', 'fitForPurposeNotes', 'description'] as const;
 
 const USES_META = {
   // Sprint U4-1 B5 / SPEC §3's own decision: `description` on `uses` holds

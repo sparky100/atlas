@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateTileColourFor, lifecycleExposure, oldestLifecycleStage, otShareOf, resolveDefaultColourBy, supportingSystemIds, tileColourFor, worstCriticality } from './metrics';
+import { aggregateTileColourFor, lifecycleExposure, oldestLifecycleStage, otShareOf, resolveDefaultColourBy, supportingSystemIds, tileColourFor, worstCriticality, worstFitForPurpose } from './metrics';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 
 function system(id: string, lifecycleStatus?: string, plannedEnd?: string, criticality?: string, domain?: string): ElementsHeadRow {
@@ -11,8 +11,9 @@ function system(id: string, lifecycleStatus?: string, plannedEnd?: string, criti
   return { element_id: id, element_type: 'system', name: id, parent_id: null, attributes: attrs, exists_delta_id: `d-${id}` };
 }
 
-function supports(systemId: string, capabilityId: string): RelationshipsHeadRow {
-  return { relationship_id: `r-${systemId}-${capabilityId}`, relationship_type: 'supports', from_element_id: systemId, to_element_id: capabilityId, attributes: {}, exists_delta_id: `d-r-${systemId}` };
+function supports(systemId: string, capabilityId: string, fitForPurpose?: string): RelationshipsHeadRow {
+  const attrs: Record<string, Json> = fitForPurpose === undefined ? {} : { fitForPurpose };
+  return { relationship_id: `r-${systemId}-${capabilityId}`, relationship_type: 'supports', from_element_id: systemId, to_element_id: capabilityId, attributes: attrs, exists_delta_id: `d-r-${systemId}` };
 }
 
 const NOW = new Date('2026-06-15T00:00:00Z');
@@ -90,6 +91,26 @@ describe('worstCriticality (Prompt 7k item 1)', () => {
   });
 });
 
+describe('worstFitForPurpose', () => {
+  it('returns the worst (poor) rating among a capability\'s supporting edges', () => {
+    const edges = [supports('sys-1', 'cap-1', 'good'), supports('sys-2', 'cap-1', 'poor')];
+    expect(worstFitForPurpose('cap-1', edges)).toBe('poor');
+  });
+
+  it('ignores edges into other capabilities', () => {
+    const edges = [supports('sys-1', 'cap-1', 'good'), supports('sys-2', 'cap-2', 'poor')];
+    expect(worstFitForPurpose('cap-1', edges)).toBe('good');
+  });
+
+  it('returns null when no supporting edge has a recorded fitForPurpose', () => {
+    expect(worstFitForPurpose('cap-1', [supports('sys-1', 'cap-1')])).toBeNull();
+  });
+
+  it('returns null for a capability with no supporting systems at all', () => {
+    expect(worstFitForPurpose('cap-1', [])).toBeNull();
+  });
+});
+
 describe('otShareOf (Prompt 7k item 3)', () => {
   it('counts supporting systems whose domain resolves to ot, out of the total', () => {
     const systemsById = new Map([
@@ -160,6 +181,15 @@ describe('tileColourFor', () => {
   it('OT share: silent (no tone/label) when nothing supporting is OT — unlike coverage, zero is the ordinary case here', () => {
     const systemsById = new Map([['sys-1', system('sys-1')]]);
     expect(tileColourFor('metric:otShare', 'cap-1', [supports('sys-1', 'cap-1')], systemsById)).toEqual({ tone: undefined, label: undefined });
+  });
+
+  it('fit: colours by the worst-of fitForPurpose rating among supporting edges (poor → danger)', () => {
+    const edges = [supports('sys-1', 'cap-1', 'adequate'), supports('sys-2', 'cap-1', 'poor')];
+    expect(tileColourFor('metric:fitForPurpose', 'cap-1', edges, new Map())).toEqual({ tone: 'danger', label: 'poor' });
+  });
+
+  it('fit: no tone when no supporting edge has a recorded fitForPurpose', () => {
+    expect(tileColourFor('metric:fitForPurpose', 'cap-1', [supports('sys-1', 'cap-1')], new Map())).toEqual({ tone: undefined, label: undefined });
   });
 });
 
@@ -244,6 +274,15 @@ describe('aggregateTileColourFor (Sprint U4-1 C3 review note: L1 group header)',
   it('OT share: silent when nothing in the group is OT', () => {
     const systemsById = new Map([['sys-1', system('sys-1')]]);
     expect(aggregateTileColourFor('metric:otShare', ['cap-1'], [supports('sys-1', 'cap-1')], systemsById)).toEqual({ tone: undefined, label: undefined });
+  });
+
+  it('fit: worst-of-children — one poor-rated edge on any descendant makes the whole group read as poor', () => {
+    const edges = [supports('sys-1', 'cap-1', 'excellent'), supports('sys-2', 'cap-2', 'poor')];
+    expect(aggregateTileColourFor('metric:fitForPurpose', ['cap-1', 'cap-2'], edges, new Map())).toEqual({ tone: 'danger', label: 'poor' });
+  });
+
+  it('fit: silent when nothing in the group has a recorded fitForPurpose', () => {
+    expect(aggregateTileColourFor('metric:fitForPurpose', ['cap-1', 'cap-2'], [supports('sys-1', 'cap-1')], new Map())).toEqual({ tone: undefined, label: undefined });
   });
 });
 

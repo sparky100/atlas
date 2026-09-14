@@ -41,6 +41,7 @@ import { useLandscape } from '../landscape/useLandscape';
 import { useLandscapeColourByPreference } from '../landscape/useLandscapeColourByPreference';
 import { useLandscapeDisplay } from '../landscape/useLandscapeDisplay';
 import { useLandscapeLaneDisplayPreference } from '../landscape/useLandscapeLaneDisplayPreference';
+import { fitForPurposeToneFor } from '../elements/fitForPurposeTone';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import { parseCapabilityParam, zoomQueryString } from '../nav/zoomParams';
 import styles from './LandscapePage.module.css';
@@ -408,6 +409,11 @@ export function LandscapePage() {
                 {capabilityLandscapeState.data.rollup.supportedCapabilityCount}/{capabilityLandscapeState.data.rollup.totalCapabilityCount} capabilities supported
               </Chip>
               <Chip tone={capabilityLandscapeState.data.rollup.isOwned ? 'ok' : 'warn'}>{capabilityLandscapeState.data.rollup.isOwned ? 'owned' : 'no owner recorded'}</Chip>
+              {capabilityLandscapeState.data.rollup.fitForPurpose !== null && (
+                <Chip tone={fitForPurposeToneFor(capabilityLandscapeState.data.rollup.fitForPurpose)}>
+                  fit · {capabilityLandscapeState.data.rollup.fitForPurpose}
+                </Chip>
+              )}
             </div>
           )}
           {/* Prompt 7k item 1: the landscape's own colour-by mode — desktop canvas only, same scoping as the comments-only filter beside it. */}

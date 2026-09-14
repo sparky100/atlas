@@ -156,7 +156,7 @@ export function useCapabilityLandscape(
       const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, subtreeSupportsEdges, allOwnsEdgesForRollup);
       const rollup = rootCapability
         ? computeCapabilityRollup(rootCapability, capabilities, capabilitiesById, subtreeSupportsEdges, selfOwnedIds)
-        : { subtreeCapabilityIds: [], subtreeSupportsEdges: [], supportingSystemIds: [], supportedCapabilityCount: 0, totalCapabilityCount: 0, isOwned: false };
+        : { subtreeCapabilityIds: [], subtreeSupportsEdges: [], supportingSystemIds: [], supportedCapabilityCount: 0, totalCapabilityCount: 0, isOwned: false, fitForPurpose: null };
 
       if (!cancelled) setState({ status: 'ready', data: { rows, rollup } });
     }
