@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeLandscapeLayout, EXTERNAL_LANE_KEY, MIN_LAYOUT_WIDTH, OT_ZONE_LANE_KEY, PLATFORM_BAND_KEY, UNASSIGNED_LANE_KEY, viaPositionFor } from './layout';
+import { BOUNDARY_MARGIN, computeLandscapeLayout, EXTERNAL_LANE_KEY, laneLabelLeftInset, MIN_LAYOUT_WIDTH, OT_ZONE_LANE_KEY, PLATFORM_BAND_KEY, UNASSIGNED_LANE_KEY, viaPositionFor } from './layout';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 
 function system(id: string, name: string, isExternal = false, domain?: Json, kind?: Json): ElementsHeadRow {
@@ -445,6 +445,23 @@ describe('viaPositionFor (Prompt 7k item 4)', () => {
 
   it('returns undefined when via does not resolve to a node on this map (the platform exists but isn\'t placed here)', () => {
     expect(viaPositionFor('sys-not-on-map', positionById, true)).toBeUndefined();
+  });
+});
+
+describe('laneLabelLeftInset (lane-label fix: never drawn across the enterprise boundary or a zone rectangle)', () => {
+  it('clears the enterprise boundary\'s own left edge for every region the boundary actually encloses', () => {
+    expect(laneLabelLeftInset('capability')).toBeGreaterThan(BOUNDARY_MARGIN);
+    expect(laneLabelLeftInset('unassigned')).toBeGreaterThan(BOUNDARY_MARGIN);
+  });
+
+  it('clears the nested OT/platform zone rectangle\'s own left edge — further right than the plain boundary inset, since that rectangle sits further right than the boundary\'s own line', () => {
+    const boundaryInset = laneLabelLeftInset('capability');
+    expect(laneLabelLeftInset('ot')).toBeGreaterThan(boundaryInset);
+    expect(laneLabelLeftInset('platform')).toBeGreaterThan(boundaryInset);
+  });
+
+  it('an external lane sits below the boundary entirely, never behind either dashed line, and keeps the original small inset', () => {
+    expect(laneLabelLeftInset('external')).toBe(4);
   });
 });
 

@@ -56,6 +56,13 @@
   padding: var(--space-1) var(--space-2);
   font-size: var(--font-size-xs);
   transform: translate(8px, -50%);
-  white-space: nowrap;
+  /* Tile-text fix: a plain tile's own name is always short, but a module
+     tooltip can now carry a full, untruncated capability name ("Regulatory
+     Compliance & Price-Control Reporting") — `nowrap` alone would draw that
+     as one unbroken line running off the canvas. `max-width` + `normal`
+     wraps only when content actually needs it; a short tile name still
+     renders on one line either way. */
+  max-width: 220px;
+  white-space: normal;
   z-index: 1;
 }

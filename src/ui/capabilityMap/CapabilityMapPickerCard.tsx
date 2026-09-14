@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { listCapabilityMapItems, type CapabilityMapItemRow, type CapabilityMapRow } from '../../db/capabilityMapTemplates';
 import { Button } from '../components/Button/Button';
@@ -59,6 +59,39 @@ function PreviewNodeView({ node }: { node: CapabilityMapPreviewNode }) {
  */
 export function CapabilityMapPickerCard({ map, importDisabled, onImport }: CapabilityMapPickerCardProps) {
   const [preview, setPreview] = useState<PreviewState>({ status: 'closed' });
+  // Picker-grid fix: "consistent height regardless of description length
+  // (truncate with 'more' rather than growing/shrinking the card)" — a
+  // long `summary` used to set the whole row's height (CSS Grid's own
+  // default `align-items: stretch` then stretched every shorter card in
+  // that row to match), which is the actual mechanism behind "3 narrow
+  // cards with dead space." Clamping `summary` to a fixed number of lines
+  // bounds every card's own natural height to roughly the same value
+  // regardless of how long its real content is; `summaryClamped` (measured,
+  // not guessed — a `Text` component has no ref of its own to measure
+  // directly, so the clamp lives on this wrapping div instead) says
+  // whether that clamp is actually hiding text right now, so the "more"
+  // toggle only ever appears when there's something to reveal.
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const [summaryClamped, setSummaryClamped] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = summaryRef.current;
+    if (!el || summaryExpanded) return undefined;
+    const measure = () => {
+      setSummaryClamped(el.scrollHeight > el.clientHeight + 1);
+    };
+    measure();
+    // Grid column count (and therefore how many words fit per line) changes
+    // across the auto-fill breakpoints above and on an ordinary window
+    // resize — re-measuring on mount alone would leave a card's own "more"
+    // button stuck on whatever was true at the width it first rendered at.
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+    };
+  }, [map.summary, summaryExpanded]);
 
   function loadPreview(): void {
     if (preview.status === 'loading' || preview.status === 'ready') return;
@@ -84,9 +117,18 @@ export function CapabilityMapPickerCard({ map, importDisabled, onImport }: Capab
         {map.sector} v{map.version}
       </Text>
       {map.summary !== null && (
-        <Text as="p" size="sm" className={styles.summary}>
-          {map.summary}
-        </Text>
+        <>
+          <div ref={summaryRef} className={styles.summary} data-expanded={summaryExpanded}>
+            <Text as="p" size="sm">
+              {map.summary}
+            </Text>
+          </div>
+          {(summaryClamped || summaryExpanded) && (
+            <button type="button" className={styles.summaryToggle} onClick={() => { setSummaryExpanded((e) => !e); }}>
+              {summaryExpanded ? 'less' : 'more'}
+            </button>
+          )}
+        </>
       )}
 
       <div className={styles.actions}>

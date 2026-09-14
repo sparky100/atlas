@@ -51,6 +51,20 @@ describe('computeContextDiagramLayout', () => {
     expect(layout.hub.modules?.map((m) => m.capabilityName)).toEqual(['Finance', 'Asset Management']);
   });
 
+  it('module tile-text fix: an 8-module platform tile fits every module at MODULE_WIDTH, MODULE_GUTTER_X apart, none overlapping — the content check against "Regulatory Compliance & Price-Control Reporting" (the utility/electricity_network maps\' own longest level-1 name) is a canvas-text one, done visually in ContextDiagramCanvas.tsx, not here; this only guards the layout arithmetic the widened tile depends on', () => {
+    const modules = Array.from({ length: 8 }, (_, i) => ({ elementId: `m${String(i)}`, capabilityName: i === 0 ? 'Regulatory Compliance & Price-Control Reporting' : null }));
+    const layout = computeContextDiagramLayout(unit('sap', modules), [], []);
+    const placed = layout.hub.modules ?? [];
+    expect(placed).toHaveLength(8);
+    for (const module of placed) expect(module.w).toBe(MODULE_WIDTH);
+    const sorted = [...placed].sort((a, b) => a.x - b.x);
+    for (let i = 1; i < sorted.length; i++) {
+      const gap = (sorted[i]?.x ?? 0) - ((sorted[i - 1]?.x ?? 0) + (sorted[i - 1]?.w ?? 0));
+      expect(gap).toBeCloseTo(4); // MODULE_GUTTER_X, post-fix
+      expect(tilesOverlap(sorted[i - 1], sorted[i])).toBe(false);
+    }
+  });
+
   it('the hub is horizontally centred within the diagram width', () => {
     const layout = computeContextDiagramLayout(unit('hub'), [], []);
     const hubCentre = layout.hub.x + layout.hub.w / 2;

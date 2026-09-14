@@ -17,30 +17,22 @@
 }
 
 /**
- * Sprint U4-2a item 4: cards, not the old single-column list — a
- * responsive grid, same breakpoint shape as CapabilityMapView.module.css's
- * own `.columns` (this repo's one existing precedent for "several
- * independent cards, narrower at mobile"), though this list is rarely
- * more than eight-or-so items, so it never needs that file's own 5-column
- * top tier.
+ * Sprint U4-2a item 4: cards, not the old single-column list. Picker-grid
+ * fix: was a 3-breakpoint fixed column count (1/2/3, topping out at 3 from
+ * 1280px up) — on a wide desktop that left a hard-coded 3-up grid with
+ * dead space to the right of the third column, however much room was
+ * actually available. `auto-fill`/`minmax(280px, 1fr)` fills the
+ * container with as many 280px-or-wider columns as fit, growing smoothly
+ * with viewport width (4-5 up at 1280px, more at 1920px) rather than
+ * capping at an arbitrary 3, and collapsing to one full-width column the
+ * moment less than two 280px columns fit (390px mobile) — no separate
+ * mobile media query needed, `auto-fill` already does it.
  */
 .grid {
   list-style: none;
   margin: var(--space-4) 0 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--space-3);
-}
-
-@media (min-width: 768px) {
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1280px) {
-  .grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }

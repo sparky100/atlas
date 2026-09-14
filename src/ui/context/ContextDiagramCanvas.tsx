@@ -225,6 +225,20 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
   const [transform, setTransform] = useState<Transform>({ scale: 1, tx: 0, ty: 0 });
   const [hover, setHover] = useState<HoverState | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; startTransform: Transform; moved: boolean } | null>(null);
+  /**
+   * Tile-text fix: "ellipsis with title-attribute tooltip only past two
+   * lines" — a module has no DOM node of its own to carry a real `title`
+   * attribute (this is a `<canvas>`, `LandscapeCanvas.tsx`'s own reasoning),
+   * so this is the same overlay `.tooltip` div the top-level hover state
+   * already renders, keyed by module id instead of by tile. Populated by
+   * `draw()` below (the one place `nameLines`/`capLines` — and therefore
+   * whether either actually got ellipsized — are already computed), read by
+   * `handlePointerMove`'s own hit-test. A ref, not state: it changes every
+   * `draw()` call (i.e. every render), and re-deriving it there is free —
+   * turning it into state would just add a render this component doesn't
+   * need.
+   */
+  const moduleTooltipsRef = useRef<Map<UUID, string>>(new Map());
 
   const elementsById = useMemo(() => {
     const map = new Map<UUID, ElementsHeadRow>([[group.hub.element_id, group.hub]]);
@@ -432,7 +446,7 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
       // platform's own title bar needs three lines' worth of content, not
       // one.
       const platformTitles: { glyph: string; name: string; kind: string; description: string | null; worldX: number; worldY: number; maxWidth: number }[] = [];
-      const moduleLabels: { name: string; capability: string | null; worldX: number; worldY: number; maxWidth: number }[] = [];
+      const moduleLabels: { elementId: UUID; name: string; capability: string | null; worldX: number; worldY: number; maxWidth: number }[] = [];
 
       const drawTile = (tile: DiagramTile, isHub: boolean): void => {
         const element = elementsById.get(tile.elementId);
@@ -487,7 +501,7 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
           ctx.lineWidth = 1;
           ctx.stroke();
           ctx.restore();
-          if (showLabels) moduleLabels.push({ name: moduleData?.name ?? '', capability: module.capabilityName, worldX: module.x + module.w / 2, worldY: module.y + 10, maxWidth: module.w - 8 });
+          if (showLabels) moduleLabels.push({ elementId: module.elementId, name: moduleData?.name ?? '', capability: module.capabilityName, worldX: module.x + module.w / 2, worldY: module.y + 10, maxWidth: module.w - 8 });
         }
       };
 
@@ -545,6 +559,7 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
       }
 
       ctx.textAlign = 'center';
+      moduleTooltipsRef.current = new Map();
       for (const label of moduleLabels) {
         const [x, y] = toScreen(label.worldX, label.worldY);
         ctx.fillStyle = tokens.text;
@@ -553,16 +568,35 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         nameLines.forEach((line, i) => {
           ctx.fillText(line, x, y + i * 11 * textScale);
         });
+        // Tile-text fix: "module code stays at current size; capability
+        // label below renders one size smaller" — 10px name, 9px capability,
+        // already the case before this fix; unchanged here.
+        //
         // V1 fix: absent entirely (never a placeholder/blank second line)
         // when this module supports nothing yet — the capability chip only
         // ever draws when there's a real capability name to show.
+        let capLines: string[] = [];
         if (label.capability) {
           ctx.fillStyle = tokens.textMuted;
           ctx.font = `${(9 * textScale).toFixed(2)}px sans-serif`;
-          const capLines = wrapLines(ctx, label.capability, label.maxWidth * textScale, 2);
+          capLines = wrapLines(ctx, label.capability, label.maxWidth * textScale, 2);
           capLines.forEach((line, i) => {
             ctx.fillText(line, x, y + (26 + i * 10) * textScale);
           });
+        }
+        // Tile-text fix: "ellipsis with title-attribute tooltip only past
+        // two lines" — `wrapLines` only ever appends "…" (via `truncate`)
+        // on its own last allowed line, and only when the real text didn't
+        // fit; checking the last rendered line for it is a reliable,
+        // reasoning-free signal, cheaper than re-deriving "did this
+        // overflow" a second way. Keyed by module id, not tile position, so
+        // `handlePointerMove`'s own `moduleAt()` hit-test (already computed
+        // for click navigation) can look it up directly.
+        const nameTruncated = nameLines.at(-1)?.endsWith('…') ?? false;
+        const capabilityTruncated = capLines.at(-1)?.endsWith('…') ?? false;
+        if (nameTruncated || capabilityTruncated) {
+          const full = label.capability ? `${label.name} — ${label.capability}` : label.name;
+          moduleTooltipsRef.current.set(label.elementId, full);
         }
       }
 
@@ -655,6 +689,18 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         setHover(null);
         return;
       }
+    }
+    // Tile-text fix: a module tile only ever shows a tooltip when its own
+    // text actually truncated (`moduleTooltipsRef`'s own comment) — checked
+    // before the plain tile hover below so hovering a module reveals its
+    // own full text rather than the platform tile's name underneath it;
+    // hovering a module with nothing truncated shows no tooltip at all,
+    // rather than falling back to the platform's.
+    const moduleId = moduleAt(screenX, screenY);
+    if (moduleId) {
+      const tooltip = moduleTooltipsRef.current.get(moduleId);
+      setHover(tooltip ? { label: tooltip, screenX, screenY } : null);
+      return;
     }
     const tile = tileAt(screenX, screenY);
     const element = tile ? elementsById.get(tile.elementId) : undefined;

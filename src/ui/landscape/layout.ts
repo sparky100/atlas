@@ -514,6 +514,30 @@ export function computeLandscapeLayout(
 
 export { BOUNDARY_MARGIN };
 
+/**
+ * Lane-label fix: a lane label's own left edge used to be a bare 4px
+ * regardless of region — inside the enterprise boundary (whose own left
+ * edge sits at `BOUNDARY_MARGIN`, item 3) that meant the label's text,
+ * extending rightward from its origin, drew straight across the
+ * boundary's dashed line rather than beside it. Every value here clears
+ * whichever dashed line (if any) that lane's own label could cross, plus a
+ * further 8px so the text never starts flush against a rounded corner:
+ * `'external'` sits below the boundary entirely (never behind either
+ * line) and keeps the original 4px; `'ot'`/`'platform'` sit behind their
+ * own zone rectangle nested *inside* the boundary (`BOUNDARY_MARGIN * 2`,
+ * Prompt 7k items 3/4); every other region sits behind the boundary's own
+ * line only. A pure function of `region` alone, not `layout.width` — the
+ * canvas's own width only ever moves each rectangle's own right edge and
+ * each lane's own y, never these left edges, so the fix holds at every
+ * breakpoint without special-casing (`LandscapeCanvas.tsx`'s own lane-
+ * label loop is this function's only caller).
+ */
+export function laneLabelLeftInset(region: LandscapeLaneRegion): number {
+  if (region === 'external') return 4;
+  if (region === 'ot' || region === 'platform') return BOUNDARY_MARGIN * 2 + 8;
+  return BOUNDARY_MARGIN + 8;
+}
+
 // --- Item 9: edges route around unrelated tiles ---
 //
 // The layout above places every node on a strict column/row grid (a lane's
