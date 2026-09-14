@@ -17,7 +17,7 @@
  * schema-driven table, using the same `endpoints` map it already has.
  */
 import type { RelationshipType } from './delta';
-import type { AttributeFieldMeta, AttributeFieldSchema, AttributeValidationResult } from './attributeSchema';
+import { validateByKind, type AttributeFieldMeta, type AttributeFieldSchema, type AttributeValidationResult } from './attributeSchema';
 
 function schemaOf<T extends string>(order: readonly T[], meta: Record<T, AttributeFieldMeta>): AttributeFieldSchema[] {
   return order.map((key) => ({ key, ...meta[key] }));
@@ -76,33 +76,10 @@ export function validateRelationshipAttributeValue(relationshipType: Relationshi
   const field = relationshipAttributeFieldSchema(relationshipType, key);
   if (!field) return { ok: false, error: `${relationshipType} has no attribute "${key}"` };
   if (field.editable === false) return { ok: false, error: `${field.label} is not directly editable` };
+  return validateByKind(field, raw);
+}
 
-  const isEmpty = raw === undefined || raw === null || raw === '';
-  if (isEmpty) {
-    if (field.required) return { ok: false, error: `${field.label} is required` };
-    return { ok: true, value: null };
-  }
-
-  switch (field.kind) {
-    case 'boolean': {
-      if (typeof raw !== 'boolean') return { ok: false, error: `${field.label} must be true or false` };
-      return { ok: true, value: raw };
-    }
-    case 'text': {
-      if (typeof raw !== 'string') return { ok: false, error: `${field.label} must be text` };
-      const trimmed = raw.trim();
-      if (trimmed === '') return field.required ? { ok: false, error: `${field.label} is required` } : { ok: true, value: null };
-      return { ok: true, value: trimmed };
-    }
-    case 'date': {
-      if (typeof raw !== 'string') return { ok: false, error: `${field.label} must be a valid date (YYYY-MM-DD)` };
-      return { ok: true, value: raw };
-    }
-    case 'enum': {
-      if (typeof raw !== 'string' || !field.options?.includes(raw)) {
-        return { ok: false, error: `${field.label} must be one of: ${field.options?.join(', ') ?? ''}` };
-      }
-      return { ok: true, value: raw };
-    }
-  }
+/** F1's relationship-side twin of `attributeSchema.ts`'s own `validateCustomAttributeValue` — same reasoning, same shared `validateByKind`. */
+export function validateCustomRelationshipAttributeValue(field: AttributeFieldSchema, raw: unknown): AttributeValidationResult {
+  return validateByKind(field, raw);
 }

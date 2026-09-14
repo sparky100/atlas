@@ -19,6 +19,7 @@ export function describeDelta(delta: Delta): string {
     case 'element.create':
       return `Created — "${delta.name}"`;
     case 'element.update':
+    case 'element.update_custom':
       return `${delta.attribute} → ${formatValue(delta.value)}`;
     case 'element.retract':
       return 'Retracted';
@@ -27,6 +28,7 @@ export function describeDelta(delta: Delta): string {
     case 'relationship.create':
       return `Created (${delta.relationshipType})`;
     case 'relationship.update':
+    case 'relationship.update_custom':
       return `${delta.attribute} → ${formatValue(delta.value)}`;
     case 'relationship.retract':
       return 'Retracted';

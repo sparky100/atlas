@@ -105,6 +105,16 @@ function describeDelta(delta: Delta, nameLookup: NameLookup): string {
       return `Add ${delta.elementType} ${delta.name}`;
     case 'element.update':
       return describeElementUpdate(delta.elementType, delta.elementId, delta.attribute, delta.value, nameLookup);
+    case 'element.update_custom': {
+      // No `attributeFieldSchema` lookup here — a custom key has no entry
+      // in that hardcoded, core-only registry by definition; `humanizeKey`
+      // is the same fallback `describeElementUpdate` already uses whenever
+      // a core lookup comes up empty, so a custom attribute's commit title
+      // degrades exactly the way an unrecognised core one already would.
+      const name = resolveName(nameLookup, delta.elementId);
+      const label = humanizeKey(delta.attribute);
+      return isEmpty(delta.value) ? `Clear ${name} ${label}` : `Set ${name} ${label} to ${formatValue(delta.value)}`;
+    }
     case 'element.retract':
       return `Retract ${resolveName(nameLookup, delta.elementId)}`;
     case 'element.restore':
@@ -112,6 +122,10 @@ function describeDelta(delta: Delta, nameLookup: NameLookup): string {
     case 'relationship.create':
       return describeRelationshipCreate(delta.relationshipType, delta.fromElementId, delta.toElementId, nameLookup);
     case 'relationship.update': {
+      const label = humanizeKey(delta.attribute);
+      return isEmpty(delta.value) ? `Clear ${delta.relationshipType} ${label}` : `Set ${delta.relationshipType} ${label} to ${formatValue(delta.value)}`;
+    }
+    case 'relationship.update_custom': {
       const label = humanizeKey(delta.attribute);
       return isEmpty(delta.value) ? `Clear ${delta.relationshipType} ${label}` : `Set ${delta.relationshipType} ${label} to ${formatValue(delta.value)}`;
     }

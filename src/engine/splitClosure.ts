@@ -216,7 +216,7 @@ const SCRATCH_CTX: CommitContext = { authorId: 'split-scratch', createdAt: '1970
 
 /** `create`/`retract`/`restore`, for either subject type — the delta kinds that toggle whether a subject exists at all, as opposed to an `update`'s attribute value. */
 function isExistenceKind(kind: Delta['kind']): boolean {
-  return kind !== 'element.update' && kind !== 'relationship.update';
+  return kind !== 'element.update' && kind !== 'element.update_custom' && kind !== 'relationship.update' && kind !== 'relationship.update_custom';
 }
 
 /**
@@ -241,7 +241,9 @@ function wouldChangeState(head: Head, delta: Delta): boolean {
     case 'relationship.restore':
       return !head.relationships.has(delta.relationshipId);
     case 'element.update':
-    case 'relationship.update': {
+    case 'element.update_custom':
+    case 'relationship.update':
+    case 'relationship.update_custom': {
       const { subjectId, attribute } = factKeyOf(delta);
       return head.facts.get(factMapKey(subjectId, attribute))?.value !== delta.value;
     }
@@ -257,7 +259,9 @@ function bucketOf(kind: Delta['kind']): number {
     case 'relationship.create':
       return 2;
     case 'element.update':
+    case 'element.update_custom':
     case 'relationship.update':
+    case 'relationship.update_custom':
       return 3;
     case 'relationship.retract':
       return 4;
