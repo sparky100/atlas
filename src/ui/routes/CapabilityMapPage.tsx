@@ -266,6 +266,8 @@ export function CapabilityMapPage() {
             supportsEdges={state.data.supportsEdges}
             systemsById={state.data.systemsById}
             hasSystems={state.data.hasSystems}
+            capabilities={state.data.capabilities}
+            selfOwnedIds={state.data.selfOwnedIds}
             colourBy={colourBy}
             onColourByChange={setColourBy}
             orgSlug={organisation?.slug ?? ''}

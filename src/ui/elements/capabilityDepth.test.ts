@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capabilityLevel, l1AncestorOf, loadCapabilityAncestry } from './capabilityDepth';
+import { capabilityLevel, capabilitySubtreeIds, l1AncestorOf, loadCapabilityAncestry } from './capabilityDepth';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 
@@ -26,6 +26,33 @@ describe('capabilityLevel', () => {
 
   it('is null when nesting goes deeper than 3 levels', () => {
     expect(capabilityLevel(capability('p', 'gp'), capability('gp', 'ggp'))).toBeNull();
+  });
+});
+
+describe('capabilitySubtreeIds', () => {
+  it('includes the root and every descendant, across more than one level', () => {
+    const root = capability('root', null);
+    const child = capability('child', 'root');
+    const grandchild = capability('grandchild', 'child');
+    const unrelated = capability('unrelated', null);
+    const ids = capabilitySubtreeIds('root', [root, child, grandchild, unrelated]);
+    expect(ids).toEqual(new Set(['root', 'child', 'grandchild']));
+  });
+
+  it('never includes a sibling or an unrelated capability', () => {
+    const root = capability('root', null);
+    const sibling = capability('sibling', null);
+    const ids = capabilitySubtreeIds('root', [root, sibling]);
+    expect(ids).toEqual(new Set(['root']));
+  });
+
+  it('is order-independent (CLAUDE.md rule 6: deterministic given the same inputs)', () => {
+    const root = capability('root', null);
+    const child = capability('child', 'root');
+    const grandchild = capability('grandchild', 'child');
+    const a = capabilitySubtreeIds('root', [root, child, grandchild]);
+    const b = capabilitySubtreeIds('root', [grandchild, child, root]);
+    expect(a).toEqual(b);
   });
 });
 

@@ -112,21 +112,26 @@ function capability(id: string): ElementsHeadRow {
 
 describe('buildCapabilityTiles', () => {
   it('is neutral ("nothing recorded") for a capability with no supporting systems', () => {
-    const tiles = buildCapabilityTiles([capability('cap-1')], [], new Map(), []);
-    expect(tiles).toEqual([{ capability: capability('cap-1'), supportingSystems: [], exposedSystems: [], tone: 'neutral' }]);
+    const caps = [capability('cap-1')];
+    const tiles = buildCapabilityTiles(caps, caps, [], new Map(), [], new Set());
+    expect(tiles).toEqual([
+      { capability: capability('cap-1'), supportingSystems: [], exposedSystems: [], tone: 'neutral', supportedCapabilityCount: 0, totalCapabilityCount: 1, isOwned: false },
+    ]);
   });
 
   it('is ok for a capability whose supporting systems are all active', () => {
     const sys = system('sys-1', 'active');
     const systemsById = new Map([['sys-1', sys]]);
-    const tiles = buildCapabilityTiles([capability('cap-1')], [supportsEdge('sys-1', 'cap-1')], systemsById, []);
+    const caps = [capability('cap-1')];
+    const tiles = buildCapabilityTiles(caps, caps, [supportsEdge('sys-1', 'cap-1')], systemsById, [], new Set());
     expect(tiles[0]).toMatchObject({ tone: 'ok', supportingSystems: [sys], exposedSystems: [] });
   });
 
   it('warns and names the exposed system when a supporting system is retiring with no planned replacement', () => {
     const sys = system('sys-1', 'retiring');
     const systemsById = new Map([['sys-1', sys]]);
-    const tiles = buildCapabilityTiles([capability('cap-1')], [supportsEdge('sys-1', 'cap-1')], systemsById, []);
+    const caps = [capability('cap-1')];
+    const tiles = buildCapabilityTiles(caps, caps, [supportsEdge('sys-1', 'cap-1')], systemsById, [], new Set());
     expect(tiles[0]).toMatchObject({ tone: 'warn', exposedSystems: [sys] });
   });
 
@@ -134,7 +139,8 @@ describe('buildCapabilityTiles', () => {
     const sys = system('sys-1', 'retiring');
     const systemsById = new Map([['sys-1', sys]]);
     const replacements: PlannedReplacement[] = [{ capabilityId: 'cap-1', exposedSystemId: 'sys-1', replacementSystemId: 'sys-2', branchId: 'branch-1' }];
-    const tiles = buildCapabilityTiles([capability('cap-1')], [supportsEdge('sys-1', 'cap-1')], systemsById, replacements);
+    const caps = [capability('cap-1')];
+    const tiles = buildCapabilityTiles(caps, caps, [supportsEdge('sys-1', 'cap-1')], systemsById, replacements, new Set());
     expect(tiles[0]?.tone).toBe('info');
   });
 
@@ -144,7 +150,8 @@ describe('buildCapabilityTiles', () => {
       ['sys-2', system('sys-2', 'active')],
     ]);
     const edges = [supportsEdge('sys-1', 'cap-exposed'), supportsEdge('sys-2', 'cap-healthy')];
-    const tiles = buildCapabilityTiles([capability('cap-exposed'), capability('cap-healthy'), capability('cap-unrecorded')], edges, systemsById, []);
+    const caps = [capability('cap-exposed'), capability('cap-healthy'), capability('cap-unrecorded')];
+    const tiles = buildCapabilityTiles(caps, caps, edges, systemsById, [], new Set());
     expect(tiles.map((t) => t.tone)).toEqual(['warn', 'ok', 'neutral']);
   });
 
@@ -152,8 +159,24 @@ describe('buildCapabilityTiles', () => {
     const sys = system('sys-1', 'retiring');
     const systemsById = new Map([['sys-1', sys]]);
     const replacements: PlannedReplacement[] = [{ capabilityId: 'cap-other', exposedSystemId: 'sys-1', replacementSystemId: 'sys-2', branchId: 'branch-1' }];
-    const tiles = buildCapabilityTiles([capability('cap-1')], [supportsEdge('sys-1', 'cap-1')], systemsById, replacements);
+    const caps = [capability('cap-1')];
+    const tiles = buildCapabilityTiles(caps, caps, [supportsEdge('sys-1', 'cap-1')], systemsById, replacements, new Set());
     expect(tiles[0]?.tone).toBe('warn');
+  });
+
+  it('rolls a supporter of a descendant capability up into its level-1 ancestor tile', () => {
+    const l1 = capability('cap-l1');
+    const l2 = { ...capability('cap-l2'), parent_id: 'cap-l1' };
+    const sys = system('sys-1', 'active');
+    const systemsById = new Map([['sys-1', sys]]);
+    const tiles = buildCapabilityTiles([l1], [l1, l2], [supportsEdge('sys-1', 'cap-l2')], systemsById, [], new Set());
+    expect(tiles[0]).toMatchObject({ supportingSystems: [sys], supportedCapabilityCount: 1, totalCapabilityCount: 2 });
+  });
+
+  it('isOwned is true when the level-1 capability is self-owned', () => {
+    const caps = [capability('cap-1')];
+    const tiles = buildCapabilityTiles(caps, caps, [], new Map(), [], new Set(['cap-1']));
+    expect(tiles[0]?.isOwned).toBe(true);
   });
 });
 

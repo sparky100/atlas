@@ -292,12 +292,15 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
         {tile.supportingSystems.length === 0
           ? 'no known supporters'
           : `${tile.supportingSystems.length.toString()} ${tile.supportingSystems.length === 1 ? 'system' : 'systems'}${tile.exposedSystems.length > 0 ? ` · ${tile.exposedSystems.length.toString()} exposed` : ''}`}
+        {' · '}
+        {tile.supportedCapabilityCount}/{tile.totalCapabilityCount} supported
       </Text>
       {emphasised && (
         <Chip tone={TONE_CHIP[tile.tone]} glyph={<span className={styles.dot} />}>
           {TONE_LABEL[tile.tone]}
         </Chip>
       )}
+      <Chip tone={tile.isOwned ? 'ok' : 'warn'}>{tile.isOwned ? 'owned' : 'no owner'}</Chip>
     </>
   );
 

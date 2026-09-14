@@ -3,6 +3,8 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { listChangeBranches } from '../../db/branches';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
+import { listOwnsEdges } from '../../db/elementBrowse';
+import { computeSelfOwnedCapabilityIds } from '../../db/healthFindings';
 import { listContainersForLandscape, listSystemsForLandscape } from '../../db/landscape';
 import {
   buildCapabilityTiles,
@@ -97,7 +99,7 @@ export function useDirectorHome(
         return;
       }
 
-      const [capabilities, supportsEdges, systems, containers, counts, changeBranches, tags, plannedReplacements] = await Promise.all([
+      const [capabilities, supportsEdges, systems, containers, counts, changeBranches, tags, plannedReplacements, ownsEdges] = await Promise.all([
         listCapabilitiesForMap(supabase, commitId),
         listAllSupportsEdges(supabase, commitId),
         listSystemsForLandscape(supabase, commitId),
@@ -106,6 +108,7 @@ export function useDirectorHome(
         listChangeBranches(supabase, modelId),
         listTagsForModel(supabase, modelId),
         loadPlannedReplacements(supabase, modelId),
+        listOwnsEdges(supabase, commitId),
       ]);
 
       // Bug fix: a `supports` edge's own `from_element_id` can be a
@@ -121,7 +124,12 @@ export function useDirectorHome(
       // array is the real, parent_id-derived level-1 set (never a fixed
       // "12 tiles" count — it reflows to however many a map actually has).
       const level1Capabilities = computeCapabilityMapTree(capabilities).l1.map((column) => column.capability);
-      const tiles = buildCapabilityTiles(level1Capabilities, supportsEdges, systemsById, plannedReplacements);
+      // Capability rollup's own owner-coverage input (`healthFindings.ts`'s
+      // `computeSelfOwnedCapabilityIds`) — the whole model's capabilities,
+      // not just level-1, since a business owner can sit anywhere in the
+      // tree and still roll up to its level-1 ancestor.
+      const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsEdges, ownsEdges);
+      const tiles = buildCapabilityTiles(level1Capabilities, capabilities, supportsEdges, systemsById, plannedReplacements, selfOwnedIds);
       const exposedCount = tiles.filter((t) => t.tone === 'warn' || t.tone === 'info').length;
       const unrecordedCount = tiles.filter((t) => t.tone === 'neutral').length;
 
