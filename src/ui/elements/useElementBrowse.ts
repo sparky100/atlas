@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
-import type { ElementsHeadRow } from '../../contracts/rows';
+import type { ElementsHeadRow, Json } from '../../contracts/rows';
 import { listAllElements, loadOwnersByElementId, lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
+import { attributesRecord } from './attributesRecord';
+import { compareCustomAttributeValues, sortKeyEquals, type ElementBrowseSortKey } from './elementBrowseSort';
 import {
   computeStaleAttributesFinding,
   findCapabilitiesWithoutOwner,
@@ -23,7 +25,12 @@ import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 export type ElementBrowseStatus = 'loading' | 'error' | 'ready';
-export type ElementBrowseSortKey = 'name' | 'type' | 'owner' | 'lifecycle';
+// `ElementBrowseSortKey`/`sortKeyEquals`/`compareCustomAttributeValues` now
+// live in `./elementBrowseSort` (see that file's own module comment for
+// why) — re-exported here so every existing import site (`ElementsPage.tsx`,
+// `ElementBrowseTable.tsx`) is unaffected.
+export type { ElementBrowseSortKey } from './elementBrowseSort';
+export { sortKeyEquals } from './elementBrowseSort';
 
 /**
  * Sprint U4-1 B3: the "pre-filtered to the finding" links the architect
@@ -35,6 +42,12 @@ export type ElementBrowseSortKey = 'name' | 'type' | 'owner' | 'lifecycle';
  * `unused-integration-platform`; item 5 adds `essential-no-technical-owner`
  * and `critical-support-end`; S1 item 19 adds `platform-supports-move-to-module`.
  */
+/** F1 PR4: `{ custom, value }` filters to elements whose own `attributes[custom] === value` — an org-defined attribute's own equality filter, `value` already parsed to the definition's own `kind` by the caller (`ElementsPage.tsx`'s `parseCustomFilterValue`), never a raw string here. One generic variant rather than a fixed literal per attribute (decision 6), same shape `ElementBrowseSortKey`'s own `{ custom }` variant uses. */
+export interface CustomAttributeBrowseFilter {
+  custom: string;
+  value: Json;
+}
+
 export type ElementBrowseFilter =
   | 'unlinked-systems'
   | 'platform-supports-move-to-module'
@@ -46,6 +59,7 @@ export type ElementBrowseFilter =
   | 'unused-integration-platform'
   | 'essential-no-technical-owner'
   | 'critical-support-end'
+  | CustomAttributeBrowseFilter
   | null;
 
 export type ElementBrowseState =
@@ -68,6 +82,9 @@ export type ElementBrowseState =
     };
 
 function compareRows(a: BrowseRow, b: BrowseRow, key: ElementBrowseSortKey): number {
+  if (typeof key === 'object') {
+    return compareCustomAttributeValues(attributesRecord(a.element.attributes)[key.custom], attributesRecord(b.element.attributes)[key.custom]) || a.element.name.localeCompare(b.element.name);
+  }
   switch (key) {
     case 'name':
       return a.element.name.localeCompare(b.element.name);
@@ -176,6 +193,11 @@ export function useElementBrowse(
       } else if (filter === 'critical-support-end') {
         const systems = elements.filter((e) => e.element_type === 'system');
         ids = new Set(findCriticalSystemsPastOrNearSupportEnd(systems).map((e) => e.element_id));
+      } else if (filter !== null && typeof filter === 'object') {
+        // F1 PR4: an org-defined attribute's own equality filter — `value`
+        // arrives already parsed to the definition's `kind` by the caller,
+        // so this is a plain `===`, never a second parse here.
+        ids = new Set(elements.filter((e) => attributesRecord(e.attributes)[filter.custom] === filter.value).map((e) => e.element_id));
       }
 
       const rows: BrowseRow[] = elements.map((element) => ({
@@ -204,7 +226,7 @@ export function useElementBrowse(
   }, [modelId, filter, reloadToken, mainCommitIdHint]);
 
   const setSort = (key: ElementBrowseSortKey) => {
-    if (key === sortKey) {
+    if (sortKeyEquals(key, sortKey)) {
       setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortKey(key);

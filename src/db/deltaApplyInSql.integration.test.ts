@@ -334,4 +334,103 @@ describe('delta-apply in SQL (E3) against a real local Supabase', () => {
     if (restoredError) throw new Error(`reading restored row: ${restoredError.message}`);
     expect(restoredRow.name).toBe('Restorable System');
   });
+
+  // F1 ("custom attributes"): element.update_custom/relationship.update_custom
+  // (supabase/migrations/20260914010000_custom_attribute_delta_kinds.sql,
+  // 20260914020000_attribute_definitions.sql) are the two newest delta
+  // kinds `apply_deltas_to_main_projection` has been taught — a main-branch
+  // commit setting an org-defined attribute takes this same incremental
+  // path (no restore delta involved), so this is the one place a bug in
+  // that migration's new SQL branches (a typo, a wrong column, the
+  // deliberately-skipped name/parentId special-casing) would actually
+  // surface: neither the TypeScript property tests nor a plain unit test
+  // touch this function at all.
+  it('element.update_custom and relationship.update_custom each match a from-genesis fold, including a custom key that shadows a promoted column name', async () => {
+    const main = await getMainBranch(alice.client, modelId);
+    if (!main) throw new Error('main branch was not auto-created');
+
+    const fromId = randomUUID();
+    const toId = randomUUID();
+    const createFromDeltaId = randomUUID();
+    const createRelDeltaId = randomUUID();
+    const relationshipId = randomUUID();
+    const setupDeltas: Delta[] = [
+      { kind: 'element.create', id: createFromDeltaId, elementId: fromId, elementType: 'system', name: 'Custom Attr From System', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: toId, elementType: 'system', name: 'Custom Attr To System', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId, confidence: 1 },
+      { kind: 'relationship.create', id: createRelDeltaId, relationshipId, relationshipType: 'uses', fromElementId: fromId, toElementId: toId, attributes: { description: 'reads from' }, sourceId, confidence: 1 },
+    ];
+    const setupResult = await commitToBranch(alice.client, {
+      modelId,
+      branchId: main.id,
+      expectedHeadCommitId: main.head_commit_id,
+      envelope: { id: randomUUID(), branchId: main.id, parentCommitId: main.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title: 'set up custom-attribute fixture', body: null, deltas: setupDeltas },
+    });
+    if (!setupResult.ok) throw new Error(`setup commit failed: ${setupResult.message}`);
+    await expectProjectionMatchesFold(alice.client, modelId, setupResult.commitId);
+
+    const mainAfterSetup = await getMainBranch(alice.client, modelId);
+    if (!mainAfterSetup) throw new Error('main branch disappeared');
+    // 'name' is a real, promoted elements_head column for a core update —
+    // used here as a *custom* key on purpose, to prove
+    // element.update_custom never hits element.update's own name/parentId
+    // special-casing: it must land in `attributes.name`, and the row's own
+    // `name` column must stay untouched.
+    const customDeltas: Delta[] = [
+      { kind: 'element.update_custom', id: randomUUID(), elementId: fromId, elementType: 'system', attribute: 'name', value: 'not the promoted column', previousDeltaId: createFromDeltaId, sourceId, confidence: 1 },
+      { kind: 'element.update_custom', id: randomUUID(), elementId: fromId, elementType: 'system', attribute: 'org-defined-priority', value: 'high', previousDeltaId: createFromDeltaId, sourceId, confidence: 1 },
+      { kind: 'relationship.update_custom', id: randomUUID(), relationshipId, relationshipType: 'uses', attribute: 'org-defined-note', value: 'flagged for review', previousDeltaId: createRelDeltaId, sourceId, confidence: 1 },
+    ];
+    const customResult = await commitToBranch(alice.client, {
+      modelId,
+      branchId: mainAfterSetup.id,
+      expectedHeadCommitId: mainAfterSetup.head_commit_id,
+      envelope: { id: randomUUID(), branchId: mainAfterSetup.id, parentCommitId: mainAfterSetup.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title: 'set custom attributes', body: null, deltas: customDeltas },
+    });
+    if (!customResult.ok) throw new Error(`custom-attribute commit failed: ${customResult.message}`);
+    await expectProjectionMatchesFold(alice.client, modelId, customResult.commitId);
+
+    const { data: fromRow, error: fromError } = await alice.client
+      .from('elements_head')
+      .select('name, attributes')
+      .eq('commit_id', customResult.commitId)
+      .eq('element_id', fromId)
+      .single();
+    if (fromError) throw new Error(`reading from-element row: ${fromError.message}`);
+    expect((fromRow as { name: string }).name).toBe('Custom Attr From System');
+    expect((fromRow as { attributes: Record<string, unknown> }).attributes.name).toBe('not the promoted column');
+    expect((fromRow as { attributes: Record<string, unknown> }).attributes['org-defined-priority']).toBe('high');
+
+    const { data: relRow, error: relError } = await alice.client
+      .from('relationships_head')
+      .select('attributes')
+      .eq('commit_id', customResult.commitId)
+      .eq('relationship_id', relationshipId)
+      .single();
+    if (relError) throw new Error(`reading relationship row: ${relError.message}`);
+    expect((relRow.attributes as Record<string, unknown>)['org-defined-note']).toBe('flagged for review');
+
+    // Clearing a custom attribute (value: null) removes the key entirely,
+    // same as a core attribute's own clear-to-null path.
+    const mainAfterCustom = await getMainBranch(alice.client, modelId);
+    if (!mainAfterCustom) throw new Error('main branch disappeared');
+    const clearDeltas: Delta[] = [{ kind: 'element.update_custom', id: randomUUID(), elementId: fromId, elementType: 'system', attribute: 'org-defined-priority', value: null, previousDeltaId: createFromDeltaId, sourceId, confidence: 1 }];
+    const clearResult = await commitToBranch(alice.client, {
+      modelId,
+      branchId: mainAfterCustom.id,
+      expectedHeadCommitId: mainAfterCustom.head_commit_id,
+      envelope: { id: randomUUID(), branchId: mainAfterCustom.id, parentCommitId: mainAfterCustom.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title: 'clear a custom attribute', body: null, deltas: clearDeltas },
+    });
+    if (!clearResult.ok) throw new Error(`clear commit failed: ${clearResult.message}`);
+    await expectProjectionMatchesFold(alice.client, modelId, clearResult.commitId);
+
+    const { data: clearedRow, error: clearedError } = await alice.client
+      .from('elements_head')
+      .select('attributes')
+      .eq('commit_id', clearResult.commitId)
+      .eq('element_id', fromId)
+      .single();
+    if (clearedError) throw new Error(`reading cleared row: ${clearedError.message}`);
+    expect((clearedRow.attributes as Record<string, unknown>)['org-defined-priority']).toBeUndefined();
+    expect((clearedRow.attributes as Record<string, unknown>).name).toBe('not the promoted column');
+  });
 });

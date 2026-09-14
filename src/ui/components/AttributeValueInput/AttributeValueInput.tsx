@@ -77,6 +77,36 @@ export function AttributeValueInput({ id, field, value, onChange, invalid }: Att
     );
   }
 
+  if (field.kind === 'number') {
+    return (
+      <input
+        id={id}
+        type="number"
+        className={styles.input}
+        value={stringValue}
+        onChange={(e) => {
+          onChange(e.target.value);
+        }}
+        aria-invalid={invalid}
+      />
+    );
+  }
+
+  if (field.kind === 'link') {
+    return (
+      <input
+        id={id}
+        type="url"
+        className={styles.input}
+        value={stringValue}
+        onChange={(e) => {
+          onChange(e.target.value);
+        }}
+        aria-invalid={invalid}
+      />
+    );
+  }
+
   if (field.multiline === true) {
     return (
       <textarea

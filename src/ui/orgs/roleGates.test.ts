@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
-import { canApproveOrMergeRequest, canArchiveModel, canDeleteModel, canEditBranch, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
+import { canApproveOrMergeRequest, canArchiveModel, canDeleteModel, canEditBranch, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
   return {
@@ -112,5 +112,15 @@ describe('canManageOrgSettings', () => {
     expect(canManageOrgSettings('contributor')).toBe(false);
     expect(canManageOrgSettings('viewer')).toBe(false);
     expect(canManageOrgSettings(null)).toBe(false);
+  });
+});
+
+describe('canManageAttributeDefinitions', () => {
+  it('owner only (mirrors attribute_definitions_insert/_update RLS)', () => {
+    expect(canManageAttributeDefinitions('owner')).toBe(true);
+    expect(canManageAttributeDefinitions('architect')).toBe(false);
+    expect(canManageAttributeDefinitions('contributor')).toBe(false);
+    expect(canManageAttributeDefinitions('viewer')).toBe(false);
+    expect(canManageAttributeDefinitions(null)).toBe(false);
   });
 });

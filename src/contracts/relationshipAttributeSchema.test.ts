@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RELATIONSHIP_TYPES } from './delta';
-import { RELATIONSHIP_ATTRIBUTE_SCHEMA_BY_TYPE, validateRelationshipAttributeValue } from './relationshipAttributeSchema';
+import { RELATIONSHIP_ATTRIBUTE_SCHEMA_BY_TYPE, validateCustomRelationshipAttributeValue, validateRelationshipAttributeValue } from './relationshipAttributeSchema';
 
 describe('RELATIONSHIP_ATTRIBUTE_SCHEMA_BY_TYPE', () => {
   it('has a schema for every relationship type', () => {
@@ -63,5 +63,22 @@ describe('validateRelationshipAttributeValue', () => {
 
   it('refuses to validate `via` — not directly editable through this schema', () => {
     expect(validateRelationshipAttributeValue('uses', 'via', 'anything').ok).toBe(false);
+  });
+});
+
+describe("F1: validateCustomRelationshipAttributeValue — the relationship-side twin of attributeSchema.ts's own validateCustomAttributeValue", () => {
+  it('validates a number field on an ad hoc field schema, exactly like the element-side function', () => {
+    const field = { key: 'bandwidthMbps', label: 'Bandwidth (Mbps)', required: false, kind: 'number' } as const;
+    expect(validateCustomRelationshipAttributeValue(field, '100')).toEqual({ ok: true, value: 100 });
+    expect(validateCustomRelationshipAttributeValue(field, 'fast')).toMatchObject({ ok: false });
+  });
+
+  it('validates a link field on an ad hoc field schema', () => {
+    const field = { key: 'runbookUrl', label: 'Runbook URL', required: true, kind: 'link' } as const;
+    expect(validateCustomRelationshipAttributeValue(field, 'https://runbooks.example.com/x')).toEqual({
+      ok: true,
+      value: 'https://runbooks.example.com/x',
+    });
+    expect(validateCustomRelationshipAttributeValue(field, '')).toEqual({ ok: false, error: 'Runbook URL is required' });
   });
 });

@@ -450,6 +450,21 @@ const fixturesByKind: Record<DeltaKind, () => KindFixture> = {
     },
     expectedInverseKind: 'element.update',
   }),
+  'element.update_custom': () => ({
+    headBefore: fold(emptyHead(), [createSystemDelta('d-create', 'el-1')], ctx),
+    delta: {
+      kind: 'element.update_custom',
+      id: 'd-update-custom',
+      elementId: 'el-1',
+      elementType: 'system',
+      attribute: 'org-defined-priority',
+      value: 'high',
+      previousDeltaId: 'd-create',
+      sourceId: FIXTURE_SOURCE,
+      confidence: 1,
+    },
+    expectedInverseKind: 'element.update_custom',
+  }),
   'element.retract': () => ({
     headBefore: fold(emptyHead(), [createSystemDelta('d-create', 'el-1')], ctx),
     delta: { kind: 'element.retract', id: 'd-retract', elementId: 'el-1', elementType: 'system', previousDeltaId: 'd-create', sourceId: FIXTURE_SOURCE, confidence: 1 },
@@ -484,6 +499,21 @@ const fixturesByKind: Record<DeltaKind, () => KindFixture> = {
     },
     expectedInverseKind: 'relationship.update',
   }),
+  'relationship.update_custom': () => ({
+    headBefore: fold(ownsEndpointsHead(), [createOwnsDelta('d-rcreate', 'rel-1')], ctx),
+    delta: {
+      kind: 'relationship.update_custom',
+      id: 'd-rupdate-custom',
+      relationshipId: 'rel-1',
+      relationshipType: 'owns',
+      attribute: 'org-defined-note',
+      value: 'reviewed quarterly',
+      previousDeltaId: 'd-rcreate',
+      sourceId: FIXTURE_SOURCE,
+      confidence: 1,
+    },
+    expectedInverseKind: 'relationship.update_custom',
+  }),
   'relationship.retract': () => ({
     headBefore: fold(ownsEndpointsHead(), [createOwnsDelta('d-rcreate', 'rel-1')], ctx),
     delta: { kind: 'relationship.retract', id: 'd-rretract', relationshipId: 'rel-1', relationshipType: 'owns', previousDeltaId: 'd-rcreate', sourceId: FIXTURE_SOURCE, confidence: 1 },
@@ -516,7 +546,7 @@ describe('every DeltaKind: apply + invert (exhaustive over DeltaKind at compile 
   }
 
   it('has exactly one fixture per DeltaKind (catches an accidentally-duplicated key silently shadowing another)', () => {
-    expect(Object.keys(fixturesByKind).length).toBe(8);
+    expect(Object.keys(fixturesByKind).length).toBe(10);
   });
 });
 

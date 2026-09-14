@@ -9,7 +9,9 @@ function summarise(delta: DeltaHistoryRow): string {
     case 'element_create':
       return `created — ${delta.name ?? ''}`;
     case 'element_update':
+    case 'element_update_custom':
     case 'relationship_update':
+    case 'relationship_update_custom':
       return `${delta.attribute}: ${JSON.stringify(delta.value)}`;
     case 'element_retract':
     case 'relationship_retract':

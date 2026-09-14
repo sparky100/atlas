@@ -5,7 +5,8 @@
  * to "the delta union, commit envelope, invariants" specifically). They
  * live here, next to the repository code that's their only consumer.
  */
-import type { UUID } from '../contracts/delta';
+import type { AttributeDefinitionKind } from '../contracts/attributeSchema';
+import type { ElementType, UUID } from '../contracts/delta';
 import type { SourceKind } from '../contracts/sources';
 export type { AnchorType, CommentStatus, NotificationKind } from '../contracts/comments';
 import type { AnchorType, CommentStatus, NotificationKind } from '../contracts/comments';
@@ -373,6 +374,35 @@ export interface ViewAnnotationRow {
   kind: AnnotationKind;
   geometry: Record<string, unknown>;
   text: string | null;
+  created_by: UUID;
+  created_at: string;
+}
+
+/**
+ * F1 ("custom attributes") — org-defined attributes, stored as data rather
+ * than code (`src/contracts/attributeSchema.ts`'s `AttributeDefinitionKind`
+ * doc comment explains why that type lives in `src/contracts`, not here).
+ * `applies_to` names which element types this definition shows up on — an
+ * `ElementType[]`, never a `RelationshipType`; the prompt pack's own
+ * "element/relationship types" language is about the *feature* covering
+ * both, not this one column carrying a mixed union (a relationship-scoped
+ * custom attribute is out of this sprint's PR1/PR3 scope — see the F1 plan's
+ * own "Set and view on an element" framing — so `applies_to` only ever
+ * needs `ElementType` today; widening it is additive, not a breaking change,
+ * if a relationship-scoped version is ever built).
+ */
+export interface AttributeDefinitionRow {
+  id: UUID;
+  org_id: UUID;
+  key: string;
+  label: string;
+  kind: AttributeDefinitionKind;
+  options: readonly string[] | null;
+  applies_to: readonly ElementType[];
+  required: boolean;
+  description: string | null;
+  order_index: number;
+  deprecated_at: string | null;
   created_by: UUID;
   created_at: string;
 }

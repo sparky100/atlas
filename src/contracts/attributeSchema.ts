@@ -30,7 +30,17 @@ import type {
 } from './delta';
 import type { Json } from './rows';
 
-export type AttributeKind = 'text' | 'boolean' | 'date' | 'enum';
+/**
+ * F1 ("custom attributes") adds `number`/`link` — the prompt's own six
+ * kinds are `text|number|date|boolean|select|link`; `select` is this
+ * union's existing `enum` under a different name in that prose, not a
+ * fourth thing to add (an `attribute_definitions.kind` of `'select'`
+ * maps to `'enum'` at the one boundary that matters,
+ * `attributeDefinitionToFieldSchema` below — every core field already
+ * uses `enum`, and renaming it here for zero behavioural gain would be
+ * pure churn across every `*_META` table in this file).
+ */
+export type AttributeKind = 'text' | 'number' | 'boolean' | 'date' | 'enum' | 'link';
 
 export interface AttributeFieldMeta {
   label: string;
@@ -198,6 +208,43 @@ export function attributeFieldSchema(elementType: ElementType, key: string): Att
 }
 
 /**
+ * F1's own wire kind for an `attribute_definitions` row — the prompt's own
+ * `text|number|date|boolean|select|link` verbatim, kept distinct from
+ * `AttributeKind` (`'enum'`, not `'select'` — see `AttributeKind`'s own doc
+ * comment). Lives here, not `src/db/types.ts`, so `attributeDefinitionToFieldSchema`
+ * below can convert between the two without `src/db` importing back into
+ * `src/contracts` — `src/db/types.ts`'s `AttributeDefinitionRow` imports
+ * this type, not the reverse.
+ */
+export type AttributeDefinitionKind = 'text' | 'number' | 'date' | 'boolean' | 'select' | 'link';
+
+/**
+ * F1: an `attribute_definitions` row → the same `AttributeFieldSchema`
+ * shape every core field already uses, so `AttributeRow`/`AttributeEditRow`/
+ * `AttributeValueInput`/`validateCustomAttributeValue` need no changes at
+ * all to render, edit, and validate a custom attribute — only this one
+ * small mapping function knows a definition is custom rather than core.
+ * Takes a minimal structural shape, not the full `AttributeDefinitionRow`,
+ * so this file never needs to import from `src/db`.
+ */
+export function attributeDefinitionToFieldSchema(def: {
+  key: string;
+  label: string;
+  kind: AttributeDefinitionKind;
+  options: readonly string[] | null;
+  required: boolean;
+}): AttributeFieldSchema {
+  return {
+    key: def.key,
+    label: def.label,
+    // F1's own 'select' is this file's own 'enum' — see AttributeKind's doc comment.
+    kind: def.kind === 'select' ? 'enum' : def.kind,
+    required: def.required,
+    ...(def.options ? { options: def.options } : {}),
+  };
+}
+
+/**
  * The attributes a search-first "Add" (Blocking: element creation) supplies
  * for a brand-new element, which only ever collects a name — every
  * `required: true` field needs *some* value or the create is malformed
@@ -259,7 +306,33 @@ export function validateAttributeValue(elementType: ElementType, key: string, ra
   const field = attributeFieldSchema(elementType, key);
   if (!field) return { ok: false, error: `${elementType} has no attribute "${key}"` };
   if (field.editable === false) return { ok: false, error: `${field.label} is not directly editable` };
+  return validateByKind(field, raw);
+}
 
+/**
+ * F1: the custom-attribute twin of `validateAttributeValue` above — same
+ * commit-boundary trust level (client-side only, before a delta is built;
+ * see `ElementUpdateCustom`'s own doc comment in `delta.ts` for why this is
+ * deliberately not a stricter bar than core attributes get). Takes an
+ * already-resolved field (an `attribute_definitions` row mapped via
+ * `attributeDefinitionToFieldSchema`, below) rather than looking one up —
+ * the caller already has it, since it came from the org's own definitions,
+ * not from a hardcoded per-element-type table.
+ */
+export function validateCustomAttributeValue(field: AttributeFieldSchema, raw: unknown): AttributeValidationResult {
+  return validateByKind(field, raw);
+}
+
+/**
+ * The `isEmpty` handling plus per-`kind` check shared by
+ * `validateAttributeValue`/`validateCustomAttributeValue` above and
+ * `relationshipAttributeSchema.ts`'s own element-attribute counterparts —
+ * exported so that file (and any future one with the same "a schema, an
+ * already-resolved field, validate a raw value against it" shape) doesn't
+ * duplicate the per-kind checks, particularly now that F1 has six of them
+ * instead of four.
+ */
+export function validateByKind(field: AttributeFieldSchema, raw: unknown): AttributeValidationResult {
   const isEmpty = raw === undefined || raw === null || raw === '';
   if (isEmpty) {
     if (field.required) return { ok: false, error: `${field.label} is required` };
@@ -277,6 +350,12 @@ export function validateAttributeValue(elementType: ElementType, key: string, ra
       if (trimmed === '') return field.required ? { ok: false, error: `${field.label} is required` } : { ok: true, value: null };
       return { ok: true, value: trimmed };
     }
+    case 'number': {
+      const num = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
+      if (typeof raw !== 'number' && typeof raw !== 'string') return { ok: false, error: `${field.label} must be a number` };
+      if (Number.isNaN(num)) return { ok: false, error: `${field.label} must be a number` };
+      return { ok: true, value: num };
+    }
     case 'date': {
       if (typeof raw !== 'string' || !isValidIsoDate(raw)) return { ok: false, error: `${field.label} must be a valid date (YYYY-MM-DD)` };
       return { ok: true, value: raw };
@@ -286,6 +365,17 @@ export function validateAttributeValue(elementType: ElementType, key: string, ra
         return { ok: false, error: `${field.label} must be one of: ${field.options?.join(', ') ?? ''}` };
       }
       return { ok: true, value: raw };
+    }
+    case 'link': {
+      if (typeof raw !== 'string') return { ok: false, error: `${field.label} must be a URL` };
+      const trimmed = raw.trim();
+      if (trimmed === '') return field.required ? { ok: false, error: `${field.label} is required` } : { ok: true, value: null };
+      try {
+        new URL(trimmed);
+      } catch {
+        return { ok: false, error: `${field.label} must be a valid URL` };
+      }
+      return { ok: true, value: trimmed };
     }
   }
 }

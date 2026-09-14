@@ -17,6 +17,14 @@
 export type UUID = string;
 /** Calendar date, ISO 8601 `YYYY-MM-DD`. */
 export type ISODate = string;
+/**
+ * A jsonb column's value. Defined here, not in `rows.ts` (its own former
+ * home), so F1's custom-attribute delta kinds below can use it without a
+ * circular import — `rows.ts` depends on this file already (`subjectOf`/
+ * `EXISTS_ATTRIBUTE`), never the other way round. `rows.ts` re-exports this
+ * so none of its own existing importers need to change.
+ */
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
 // ---------------------------------------------------------------------------
 // Taxonomy (ADR-001)
@@ -366,6 +374,34 @@ export type ElementUpdate<T extends ElementType = ElementType> = T extends Eleme
     }[ElementAttributeKey<T>]
   : never;
 
+/**
+ * F1 ("custom attributes"): sets a value for an org-defined
+ * `attribute_definitions` key, never one of the closed literal keys
+ * `ElementUpdate<T>` above already knows about — deliberately a separate
+ * delta kind, not a widened `ElementUpdate`. `ElementUpdate`'s own
+ * `attribute: K` is a closed union specifically so a typo'd or removed core
+ * attribute key is a compile error; a custom key is runtime org data with
+ * no literal type to check against, so it can never be a member of that
+ * union without loosening it for every core field too (`attributeSchema.ts`'s
+ * own module comment explains why that guarantee is load-bearing). `apply()`
+ * (`src/engine/deltas.ts`) folds this exactly like `element.update` does —
+ * `row.attributes[delta.attribute] = value` — the fold logic was already
+ * generic over a bare string key; only the wire type needed a new shape.
+ * Legality of `attribute`/shape of `value` against the org's own
+ * `attribute_definitions` is checked client-side only, the same trust
+ * boundary core attributes already have (`validateAttributeValue`'s own
+ * doc comment) — not a new, stricter one.
+ */
+export interface ElementUpdateCustom extends DeltaBase {
+  kind: 'element.update_custom';
+  elementId: UUID;
+  elementType: ElementType;
+  /** An `attribute_definitions.key` for this org — not compiler-checked, it can't be (runtime data). */
+  attribute: string;
+  value: Json | null;
+  previousDeltaId: UUID;
+}
+
 export interface ElementRetract extends DeltaBase {
   kind: 'element.retract';
   elementId: UUID;
@@ -411,6 +447,16 @@ export type RelationshipUpdate<R extends RelationshipType = RelationshipType> = 
     }[RelationshipAttributeKey<R>]
   : never;
 
+/** F1's relationship-side twin of `ElementUpdateCustom` above — same reasoning, same fold shape. */
+export interface RelationshipUpdateCustom extends DeltaBase {
+  kind: 'relationship.update_custom';
+  relationshipId: UUID;
+  relationshipType: RelationshipType;
+  attribute: string;
+  value: Json | null;
+  previousDeltaId: UUID;
+}
+
 export interface RelationshipRetract extends DeltaBase {
   kind: 'relationship.retract';
   relationshipId: UUID;
@@ -429,8 +475,8 @@ export interface RelationshipRestore extends DeltaBase {
 // The union
 // ---------------------------------------------------------------------------
 
-export type ElementDelta = ElementCreate | ElementUpdate | ElementRetract | ElementRestore;
-export type RelationshipDelta = RelationshipCreate | RelationshipUpdate | RelationshipRetract | RelationshipRestore;
+export type ElementDelta = ElementCreate | ElementUpdate | ElementUpdateCustom | ElementRetract | ElementRestore;
+export type RelationshipDelta = RelationshipCreate | RelationshipUpdate | RelationshipUpdateCustom | RelationshipRetract | RelationshipRestore;
 export type Delta = ElementDelta | RelationshipDelta;
 
 export type DeltaKind = Delta['kind'];
@@ -442,11 +488,13 @@ export function subjectOf(d: Delta): { subjectType: SubjectType; subjectId: UUID
   switch (d.kind) {
     case 'element.create':
     case 'element.update':
+    case 'element.update_custom':
     case 'element.retract':
     case 'element.restore':
       return { subjectType: 'element', subjectId: d.elementId };
     case 'relationship.create':
     case 'relationship.update':
+    case 'relationship.update_custom':
     case 'relationship.retract':
     case 'relationship.restore':
       return { subjectType: 'relationship', subjectId: d.relationshipId };
@@ -462,7 +510,9 @@ export function factKeyOf(d: Delta): { subjectId: UUID; attribute: string } {
   const { subjectId } = subjectOf(d);
   switch (d.kind) {
     case 'element.update':
+    case 'element.update_custom':
     case 'relationship.update':
+    case 'relationship.update_custom':
       return { subjectId, attribute: d.attribute };
     default:
       return { subjectId, attribute: EXISTS_ATTRIBUTE };

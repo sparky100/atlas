@@ -235,6 +235,21 @@ const relationshipRestoreArb: fc.Arbitrary<Delta> = fc
   .tuple(provenanceBase, uuid, fc.constantFrom(...RELATIONSHIP_TYPES), uuid)
   .map(([base, relationshipId, relationshipType, previousDeltaId]) => ({ ...base, kind: 'relationship.restore', relationshipId, relationshipType, previousDeltaId }) satisfies Delta);
 
+/** F1's custom-attribute delta kinds — `attribute` is an arbitrary org-chosen key (`attribute_definitions.key`), never one of the closed core literals the arbitraries above use. */
+const elementUpdateCustomArb: fc.Arbitrary<Delta> = fc
+  .tuple(provenanceBase, uuid, fc.constantFrom(...ELEMENT_TYPES), fc.string({ minLength: 1, maxLength: 24 }), uuid, fc.option(fc.string(), { nil: null }))
+  .map(
+    ([base, elementId, elementType, attribute, previousDeltaId, value]) =>
+      ({ ...base, kind: 'element.update_custom', elementId, elementType, attribute, value, previousDeltaId }) satisfies Delta,
+  );
+
+const relationshipUpdateCustomArb: fc.Arbitrary<Delta> = fc
+  .tuple(provenanceBase, uuid, fc.constantFrom(...RELATIONSHIP_TYPES), fc.string({ minLength: 1, maxLength: 24 }), uuid, fc.option(fc.string(), { nil: null }))
+  .map(
+    ([base, relationshipId, relationshipType, attribute, previousDeltaId, value]) =>
+      ({ ...base, kind: 'relationship.update_custom', relationshipId, relationshipType, attribute, value, previousDeltaId }) satisfies Delta,
+  );
+
 /**
  * One generator per `DeltaKind`, typed as `Record<DeltaKind, ...>` on
  * purpose: if `Delta` ever grows a ninth kind, this object literal stops
@@ -247,10 +262,12 @@ const relationshipRestoreArb: fc.Arbitrary<Delta> = fc
 const generatorsByKind: Record<DeltaKind, fc.Arbitrary<Delta>> = {
   'element.create': elementCreateArb,
   'element.update': elementUpdateArb,
+  'element.update_custom': elementUpdateCustomArb,
   'element.retract': elementRetractArb,
   'element.restore': elementRestoreArb,
   'relationship.create': relationshipCreateArb,
   'relationship.update': relationshipUpdateArb,
+  'relationship.update_custom': relationshipUpdateCustomArb,
   'relationship.retract': relationshipRetractArb,
   'relationship.restore': relationshipRestoreArb,
 };

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow, Json } from '../../contracts/rows';
-import { ATTRIBUTE_SCHEMA_BY_TYPE, validateAttributeValue } from '../../contracts/attributeSchema';
+import { ATTRIBUTE_SCHEMA_BY_TYPE, validateAttributeValue, validateCustomAttributeValue, type AttributeFieldSchema } from '../../contracts/attributeSchema';
 import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
@@ -34,10 +34,17 @@ function initialDraftValue(fact: FactsRow | undefined): DraftValue {
   return '';
 }
 
-function initialDraftValues(element: ElementsHeadRow, facts: Map<string, FactsRow>): Record<string, DraftValue> {
+function initialDraftValues(element: ElementsHeadRow, facts: Map<string, FactsRow>, customFields: readonly AttributeFieldSchema[]): Record<string, DraftValue> {
   const values: Record<string, DraftValue> = {};
   for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type]) {
     if (field.editable === false) continue;
+    values[field.key] = initialDraftValue(facts.get(field.key));
+  }
+  // F1 ("custom attributes"): org-defined fields, appended after the core
+  // schema — `customFields` is already filtered to non-deprecated
+  // definitions applying to this element type by the caller
+  // (ElementPage.tsx), so every entry here is legitimately editable.
+  for (const field of customFields) {
     values[field.key] = initialDraftValue(facts.get(field.key));
   }
   return values;
@@ -56,6 +63,15 @@ export interface UseElementEditorInput {
   userId: UUID | null;
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
+  /**
+   * F1 ("custom attributes"): this org's own non-deprecated
+   * `attribute_definitions` that apply to `element.element_type`, already
+   * mapped to `AttributeFieldSchema` via `attributeDefinitionToFieldSchema`
+   * — the caller's job (ElementPage.tsx), since only it knows which
+   * definitions are deprecated and which element type is in view. Defaults
+   * to `[]` for any caller that hasn't been updated yet.
+   */
+  customFields?: readonly AttributeFieldSchema[];
   /**
    * Which branch this edit commits to — `main` (owner/architect,
    * UI-principles §4.2) or a draft change branch (contributor+, ADR-009,
@@ -83,18 +99,18 @@ export interface UseElementEditorInput {
  * which is exactly when this was learned).
  */
 export function useElementEditor(input: UseElementEditorInput): UseElementEditorResult {
-  const { modelId, orgId, userId, element, facts, branch, expectedHeadCommitId, onSaved } = input;
+  const { modelId, orgId, userId, element, facts, customFields = [], branch, expectedHeadCommitId, onSaved } = input;
   const [status, setStatus] = useState<ElementEditorStatus>('idle');
   const [values, setValues] = useState<Record<string, DraftValue>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const startEditing = useCallback(() => {
-    setValues(initialDraftValues(element, facts));
+    setValues(initialDraftValues(element, facts, customFields));
     setFieldErrors({});
     setSubmitError(null);
     setStatus('editing');
-  }, [element, facts]);
+  }, [element, facts, customFields]);
 
   const cancelEditing = useCallback(() => {
     setStatus('idle');
@@ -121,12 +137,23 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
       return;
     }
 
+    // F1 ("custom attributes"): a changed key is either one of this
+    // element type's own core fields (ATTRIBUTE_SCHEMA_BY_TYPE) or one of
+    // this org's own definitions (customFields) — never both, since
+    // `attribute_definitions.key` is unique per org and a custom field is
+    // never given the same key as a core one by convention (nothing
+    // enforces this today, but a core key can't reach here as "custom"
+    // regardless: the value is validated against whichever schema actually
+    // owns the key, so an accidental collision would just validate against
+    // the core field, matching what the read/edit rows already render).
+    const customFieldsByKey = new Map(customFields.map((field) => [field.key, field]));
     const errors: Record<string, string> = {};
-    const validated: { key: string; value: Json }[] = [];
+    const validated: { key: string; value: Json; custom: boolean }[] = [];
     for (const [key, draft] of changed) {
-      const result = validateAttributeValue(element.element_type, key, draft);
+      const customField = customFieldsByKey.get(key);
+      const result = customField ? validateCustomAttributeValue(customField, draft) : validateAttributeValue(element.element_type, key, draft);
       if (!result.ok) errors[key] = result.error;
-      else validated.push({ key, value: result.value });
+      else validated.push({ key, value: result.value, custom: customField !== undefined });
     }
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -145,9 +172,9 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
       // to express statically; this cast is that check's dynamic analogue,
       // the same boundary contracts/rows.ts's `fromDeltaRow` casts at.
       const deltas: Delta[] = validated.map(
-        ({ key, value }) =>
+        ({ key, value, custom }) =>
           ({
-            kind: 'element.update',
+            kind: custom ? 'element.update_custom' : 'element.update',
             id: crypto.randomUUID(),
             elementId: element.element_id,
             elementType: element.element_type,
@@ -191,7 +218,7 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
       setStatus('editing');
       setSubmitError(e instanceof Error ? e.message : 'Could not save.');
     }
-  }, [values, facts, element, modelId, orgId, userId, branch, expectedHeadCommitId, onSaved]);
+  }, [values, facts, customFields, element, modelId, orgId, userId, branch, expectedHeadCommitId, onSaved]);
 
   return { status, values, fieldErrors, submitError, hasChanges, startEditing, cancelEditing, setValue, save };
 }

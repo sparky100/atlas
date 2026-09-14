@@ -18,33 +18,38 @@ import type {
   Delta,
   DeltaKind,
   ElementType,
+  Json,
   RelationshipType,
   SubjectType,
   UUID,
 } from './delta';
 import { EXISTS_ATTRIBUTE, subjectOf } from './delta';
 
-/** A jsonb column's value. */
-export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+/** A jsonb column's value. Moved to `delta.ts` (F1) so its own new custom-attribute delta kinds can use it without a circular import; re-exported here so every existing importer of `Json` from this file keeps working unchanged. */
+export type { Json } from './delta';
 
 /** `deltas.kind` — snake_case, unlike the wire's dot-case `DeltaKind`. */
 export type DeltaRowKind =
   | 'element_create'
   | 'element_update'
+  | 'element_update_custom'
   | 'element_retract'
   | 'element_restore'
   | 'relationship_create'
   | 'relationship_update'
+  | 'relationship_update_custom'
   | 'relationship_retract'
   | 'relationship_restore';
 
 const WIRE_TO_ROW_KIND: Record<DeltaKind, DeltaRowKind> = {
   'element.create': 'element_create',
   'element.update': 'element_update',
+  'element.update_custom': 'element_update_custom',
   'element.retract': 'element_retract',
   'element.restore': 'element_restore',
   'relationship.create': 'relationship_create',
   'relationship.update': 'relationship_update',
+  'relationship.update_custom': 'relationship_update_custom',
   'relationship.retract': 'relationship_retract',
   'relationship.restore': 'relationship_restore',
 };
@@ -52,10 +57,12 @@ const WIRE_TO_ROW_KIND: Record<DeltaKind, DeltaRowKind> = {
 const ROW_TO_WIRE_KIND: Record<DeltaRowKind, DeltaKind> = {
   element_create: 'element.create',
   element_update: 'element.update',
+  element_update_custom: 'element.update_custom',
   element_retract: 'element.retract',
   element_restore: 'element.restore',
   relationship_create: 'relationship.create',
   relationship_update: 'relationship.update',
+  relationship_update_custom: 'relationship.update_custom',
   relationship_retract: 'relationship.retract',
   relationship_restore: 'relationship.restore',
 };
@@ -149,6 +156,19 @@ export function toDeltaRow(delta: Delta, ctx: DeltaRowContext): DeltaRow {
         value: delta.value ?? null,
         previous_delta_id: delta.previousDeltaId,
       };
+    case 'element.update_custom':
+      return {
+        ...base,
+        attribute: delta.attribute,
+        element_type: delta.elementType,
+        relationship_type: null,
+        name: null,
+        parent_id: null,
+        from_element_id: null,
+        to_element_id: null,
+        value: delta.value ?? null,
+        previous_delta_id: delta.previousDeltaId,
+      };
     case 'element.retract':
     case 'element.restore':
       return {
@@ -177,6 +197,19 @@ export function toDeltaRow(delta: Delta, ctx: DeltaRowContext): DeltaRow {
         previous_delta_id: null,
       };
     case 'relationship.update':
+      return {
+        ...base,
+        attribute: delta.attribute,
+        element_type: null,
+        relationship_type: delta.relationshipType,
+        name: null,
+        parent_id: null,
+        from_element_id: null,
+        to_element_id: null,
+        value: delta.value ?? null,
+        previous_delta_id: delta.previousDeltaId,
+      };
+    case 'relationship.update_custom':
       return {
         ...base,
         attribute: delta.attribute,
@@ -246,6 +279,19 @@ export function fromDeltaRow(row: DeltaRow): Delta {
         previousDeltaId,
       };
     }
+    case 'element.update_custom': {
+      const elementType = assertDefined(row.element_type, 'element.update_custom row missing element_type');
+      const previousDeltaId = assertDefined(row.previous_delta_id, 'element.update_custom row missing previous_delta_id');
+      return {
+        ...base,
+        kind,
+        elementId: row.subject_id,
+        elementType,
+        attribute: row.attribute,
+        value: row.value,
+        previousDeltaId,
+      };
+    }
     case 'element.retract':
     case 'element.restore': {
       const elementType = assertDefined(row.element_type, `${kind} row missing element_type`);
@@ -276,6 +322,19 @@ export function fromDeltaRow(row: DeltaRow): Delta {
         relationshipType,
         attribute: row.attribute as never,
         value: row.value as never,
+        previousDeltaId,
+      };
+    }
+    case 'relationship.update_custom': {
+      const relationshipType = assertDefined(row.relationship_type, 'relationship.update_custom row missing relationship_type');
+      const previousDeltaId = assertDefined(row.previous_delta_id, 'relationship.update_custom row missing previous_delta_id');
+      return {
+        ...base,
+        kind,
+        relationshipId: row.subject_id,
+        relationshipType,
+        attribute: row.attribute,
+        value: row.value,
         previousDeltaId,
       };
     }

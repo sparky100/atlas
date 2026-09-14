@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ELEMENT_TYPES } from './delta';
-import { ATTRIBUTE_SCHEMA_BY_TYPE, defaultCreateAttributes, validateAttributeValue } from './attributeSchema';
+import { ATTRIBUTE_SCHEMA_BY_TYPE, attributeDefinitionToFieldSchema, defaultCreateAttributes, validateAttributeValue, validateCustomAttributeValue } from './attributeSchema';
 
 describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
   it('has a schema for every element type', () => {
@@ -111,6 +111,81 @@ describe('validateAttributeValue', () => {
   it('validates enum fields against the declared options', () => {
     expect(validateAttributeValue('system', 'lifecycleStatus', 'active')).toEqual({ ok: true, value: 'active' });
     expect(validateAttributeValue('system', 'lifecycleStatus', 'deprecated')).toMatchObject({ ok: false });
+  });
+});
+
+describe('F1: validateCustomAttributeValue (number/date/link/enum kinds via an ad hoc field schema)', () => {
+  it('validates a number field, accepting both a numeric and a numeric-string raw value and rejecting non-numeric text', () => {
+    const field = { key: 'headcount', label: 'Headcount', required: false, kind: 'number' } as const;
+    expect(validateCustomAttributeValue(field, 42)).toEqual({ ok: true, value: 42 });
+    expect(validateCustomAttributeValue(field, '42')).toEqual({ ok: true, value: 42 });
+    expect(validateCustomAttributeValue(field, 'not-a-number')).toMatchObject({ ok: false });
+    expect(validateCustomAttributeValue(field, true)).toMatchObject({ ok: false });
+  });
+
+  it('rejects clearing a required number field, and normalises clearing an optional one to null', () => {
+    const required = { key: 'headcount', label: 'Headcount', required: true, kind: 'number' } as const;
+    const optional = { key: 'headcount', label: 'Headcount', required: false, kind: 'number' } as const;
+    expect(validateCustomAttributeValue(required, '')).toEqual({ ok: false, error: 'Headcount is required' });
+    expect(validateCustomAttributeValue(optional, undefined)).toEqual({ ok: true, value: null });
+  });
+
+  it('validates a link field, trimming and requiring a parseable absolute URL', () => {
+    const field = { key: 'docsUrl', label: 'Docs URL', required: false, kind: 'link' } as const;
+    expect(validateCustomAttributeValue(field, '  https://example.com/docs  ')).toEqual({ ok: true, value: 'https://example.com/docs' });
+    expect(validateCustomAttributeValue(field, 'not a url')).toMatchObject({ ok: false });
+    expect(validateCustomAttributeValue(field, '')).toEqual({ ok: true, value: null });
+  });
+
+  it('rejects clearing a required link field', () => {
+    const field = { key: 'docsUrl', label: 'Docs URL', required: true, kind: 'link' } as const;
+    expect(validateCustomAttributeValue(field, '')).toEqual({ ok: false, error: 'Docs URL is required' });
+  });
+
+  it('validates a select (enum) custom field against its own options, independent of any core schema', () => {
+    const field = { key: 'region', label: 'Region', required: true, kind: 'enum', options: ['emea', 'amer', 'apac'] } as const;
+    expect(validateCustomAttributeValue(field, 'emea')).toEqual({ ok: true, value: 'emea' });
+    expect(validateCustomAttributeValue(field, 'mars')).toMatchObject({ ok: false });
+  });
+});
+
+describe('F1: attributeDefinitionToFieldSchema', () => {
+  it('maps a definition straight through for text/number/date/boolean/link kinds', () => {
+    expect(attributeDefinitionToFieldSchema({ key: 'note', label: 'Note', kind: 'text', options: null, required: false })).toEqual({
+      key: 'note',
+      label: 'Note',
+      kind: 'text',
+      required: false,
+    });
+    expect(attributeDefinitionToFieldSchema({ key: 'count', label: 'Count', kind: 'number', options: null, required: true })).toEqual({
+      key: 'count',
+      label: 'Count',
+      kind: 'number',
+      required: true,
+    });
+  });
+
+  it("maps F1's own 'select' kind to this file's 'enum' kind, carrying the options through", () => {
+    expect(
+      attributeDefinitionToFieldSchema({ key: 'region', label: 'Region', kind: 'select', options: ['emea', 'amer'], required: true }),
+    ).toEqual({
+      key: 'region',
+      label: 'Region',
+      kind: 'enum',
+      required: true,
+      options: ['emea', 'amer'],
+    });
+  });
+
+  it('omits the options field entirely when the definition has none, rather than carrying a null through', () => {
+    const schema = attributeDefinitionToFieldSchema({ key: 'note', label: 'Note', kind: 'text', options: null, required: false });
+    expect('options' in schema).toBe(false);
+  });
+
+  it('the mapped schema validates through validateCustomAttributeValue exactly like a hand-built field schema', () => {
+    const schema = attributeDefinitionToFieldSchema({ key: 'region', label: 'Region', kind: 'select', options: ['emea', 'amer'], required: true });
+    expect(validateCustomAttributeValue(schema, 'emea')).toEqual({ ok: true, value: 'emea' });
+    expect(validateCustomAttributeValue(schema, 'mars')).toMatchObject({ ok: false });
   });
 });
 

@@ -1,13 +1,20 @@
+import { useId } from 'react';
 import { Link } from 'react-router';
+import type { AttributeDefinitionKind } from '../../../contracts/attributeSchema';
+import { attributeDefinitionToFieldSchema } from '../../../contracts/attributeSchema';
 import type { ElementType, UUID } from '../../../contracts/delta';
+import type { Json } from '../../../contracts/rows';
 import { ELEMENT_TYPE_FILTER_OPTIONS } from '../../../db/elementBrowse';
-import type { BranchRow } from '../../../db/types';
+import type { AttributeDefinitionRow, BranchRow } from '../../../db/types';
 import type { ThreadCount } from '../../comments/useThreadCounts';
+import { attributesRecord } from '../../elements/attributesRecord';
+import type { DraftValue } from '../../elements/useElementEditor';
 import { RelationshipAdd } from '../RelationshipGroup/RelationshipAdd';
+import { AttributeValueInput } from '../AttributeValueInput/AttributeValueInput';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
-import type { ElementBrowseSortKey, ElementBrowseState } from '../../elements/useElementBrowse';
+import { sortKeyEquals, type ElementBrowseState } from '../../elements/useElementBrowse';
 import styles from './ElementBrowseTable.module.css';
 
 /**
@@ -28,6 +35,12 @@ export interface ElementBrowseLinkSupportsConfig {
   onLinked: () => void;
 }
 
+/** F1 ("custom attributes") PR4: which definition the picker has selected (`key`, or `null` for "no custom attribute") and, once chosen, the raw string value typed/picked to filter by (`null` means "shown but not yet filtering" — see this file's own `CustomAttributePicker` comment). Raw strings, not `Json`/`DraftValue`: this is exactly what round-trips through the URL (`ElementsPage.tsx`'s `?customAttr=`/`?customValue=`), which owns the actual parsing. */
+export interface ElementBrowseCustomAttrSelection {
+  key: string | null;
+  value: string | null;
+}
+
 export interface ElementBrowseTableProps {
   state: ElementBrowseState;
   orgSlug: string;
@@ -38,14 +51,102 @@ export interface ElementBrowseTableProps {
   linkSupportsInline?: ElementBrowseLinkSupportsConfig | undefined;
   /** M1 close-out item 4: "unresolved counts on the browse table rows" — the caller's own `useThreadCounts` result, keyed by `element_id`. A row absent from the map (or `open === 0`) shows no badge at all; this is a count, not the hollow/ink marker distinction the landscape/capability map draw (a table row already reads as text, nothing there for a marker to compete with). */
   unresolvedCounts?: ReadonlyMap<UUID, ThreadCount> | undefined;
+  /** F1 PR4: this org's own definitions — narrowed below to the ones applying to the current type filter, non-deprecated (the picker's own options). */
+  attributeDefinitions: readonly AttributeDefinitionRow[];
+  customAttr: ElementBrowseCustomAttrSelection;
+  onCustomAttrChange: (next: ElementBrowseCustomAttrSelection) => void;
 }
 
-const COLUMNS: { key: ElementBrowseSortKey; label: string }[] = [
+// A narrower key type than `ElementBrowseSortKey` — this fixed column list
+// never includes the `{ custom }` variant (that's the one dynamic column,
+// added separately below), and `key={column.key}` needs a valid React key,
+// which an object isn't.
+const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle'; label: string }[] = [
   { key: 'name', label: 'Name' },
   { key: 'type', label: 'Type' },
   { key: 'owner', label: 'Owner' },
   { key: 'lifecycle', label: 'Lifecycle' },
 ];
+
+function formatCustomAttributeValue(value: Json | undefined): string {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  return JSON.stringify(value);
+}
+
+function customAttrValueToDraft(kind: AttributeDefinitionKind, raw: string | null): DraftValue {
+  if (kind === 'boolean') return raw === 'true';
+  return raw ?? '';
+}
+
+/** `null` (not an empty string) means "no filter value yet" — an empty text/number/date/link/select draft clears the filter while leaving the attribute selected (still shown as its own column), matching `AttributeValueInput`'s own "empty means not filled in" convention. */
+function draftToCustomAttrValue(kind: AttributeDefinitionKind, draft: DraftValue): string | null {
+  if (kind === 'boolean') return String(draft);
+  const trimmed = typeof draft === 'string' ? draft.trim() : '';
+  return trimmed === '' ? null : trimmed;
+}
+
+/**
+ * F1 PR4's own facet picker (decision 6): a `<select>` of this org's own
+ * non-deprecated definitions applying to the current type filter, plus —
+ * once one is chosen — a kind-aware value input (`AttributeValueInput`,
+ * reused verbatim, same as the element page's own edit form) that live-
+ * updates the URL as it changes, same instant-filter feel `state.setQuery`
+ * already has. Selecting a definition alone (before any value is typed)
+ * doesn't filter anything yet — it only makes the attribute's own column
+ * appear, sortable like any other column.
+ */
+function CustomAttributePicker({
+  definitions,
+  selection,
+  onChange,
+}: {
+  definitions: readonly AttributeDefinitionRow[];
+  selection: ElementBrowseCustomAttrSelection;
+  onChange: (next: ElementBrowseCustomAttrSelection) => void;
+}) {
+  const selectedDefinition = selection.key ? definitions.find((d) => d.key === selection.key) : undefined;
+  const valueInputId = useId();
+  return (
+    <>
+      <select
+        className={styles.select}
+        aria-label="Custom attribute"
+        value={selection.key ?? ''}
+        onChange={(e) => {
+          const key = e.target.value === '' ? null : e.target.value;
+          onChange({ key, value: null });
+        }}
+      >
+        <option value="">Custom attribute…</option>
+        {definitions.map((definition) => (
+          <option key={definition.id} value={definition.key}>
+            {definition.label}
+          </option>
+        ))}
+      </select>
+      {selectedDefinition && (
+        // A real `<label>`, same as `AttributeEditRow`'s own — without one,
+        // `AttributeValueInput`'s `id` has nothing pointing `for` at it.
+        <label htmlFor={valueInputId}>
+          <Text as="span" size="sm">
+            {selectedDefinition.label}
+          </Text>
+          <AttributeValueInput
+            id={valueInputId}
+            field={attributeDefinitionToFieldSchema(selectedDefinition)}
+            value={customAttrValueToDraft(selectedDefinition.kind, selection.value)}
+            onChange={(draft) => {
+              onChange({ key: selectedDefinition.key, value: draftToCustomAttrValue(selectedDefinition.kind, draft) });
+            }}
+            invalid={false}
+          />
+        </label>
+      )}
+    </>
+  );
+}
 
 /**
  * A system's own "+ Add supports" (RelationshipsSection.tsx's own control,
@@ -79,11 +180,18 @@ function InlineSupportsPicker({ system, config, searchCommitId }: { system: { el
 }
 
 /** Sprint U3b: "filterable, sortable table of elements by type with owner and lifecycle." A real `<table>` — semantic tabular data, not a design-system gap (native `<table>`/`<th>`/`<td>` is the correct element here, the same way `<ul>`/`<li>` already is for plain lists elsewhere in this app). */
-export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInline, unresolvedCounts }: ElementBrowseTableProps) {
+export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange }: ElementBrowseTableProps) {
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 
   const elementHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}`;
+  // F1 PR4: this table's own picker options — non-deprecated, and applying
+  // to whichever type the type filter currently shows (every definition
+  // when it's "All types").
+  const applicableCustomDefinitions = attributeDefinitions.filter(
+    (d) => d.deprecated_at === null && (state.typeFilter === 'all' || d.applies_to.includes(state.typeFilter)),
+  );
+  const selectedCustomDefinition = customAttr.key ? applicableCustomDefinitions.find((d) => d.key === customAttr.key) : undefined;
 
   return (
     <div>
@@ -106,6 +214,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInli
             </option>
           ))}
         </select>
+        <CustomAttributePicker definitions={applicableCustomDefinitions} selection={customAttr} onChange={onCustomAttrChange} />
       </div>
 
       {state.rows.length === 0 ? (
@@ -119,10 +228,18 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInli
                   <th key={column.key}>
                     <button type="button" className={styles.sortButton} onClick={() => { state.setSort(column.key); }}>
                       {column.label}
-                      {state.sortKey === column.key && (state.sortDirection === 'asc' ? ' ▲' : ' ▼')}
+                      {sortKeyEquals(state.sortKey, column.key) && (state.sortDirection === 'asc' ? ' ▲' : ' ▼')}
                     </button>
                   </th>
                 ))}
+                {selectedCustomDefinition && (
+                  <th>
+                    <button type="button" className={styles.sortButton} onClick={() => { state.setSort({ custom: selectedCustomDefinition.key }); }}>
+                      {selectedCustomDefinition.label}
+                      {sortKeyEquals(state.sortKey, { custom: selectedCustomDefinition.key }) && (state.sortDirection === 'asc' ? ' ▲' : ' ▼')}
+                    </button>
+                  </th>
+                )}
                 <th>Comments</th>
                 {linkSupportsInline && <th>Link to a capability</th>}
               </tr>
@@ -167,6 +284,22 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInli
                       </Text>
                     )}
                   </td>
+                  {selectedCustomDefinition && (
+                    <td>
+                      {(() => {
+                        const formatted = formatCustomAttributeValue(attributesRecord(row.element.attributes)[selectedCustomDefinition.key]);
+                        return formatted === '' ? (
+                          <Text as="span" tone="faint" size="sm">
+                            —
+                          </Text>
+                        ) : (
+                          <Text as="span" size="sm">
+                            {formatted}
+                          </Text>
+                        );
+                      })()}
+                    </td>
+                  )}
                   <td>
                     {unresolvedCount > 0 ? (
                       <Text as="span" size="sm" className={styles.unresolvedBadge}>
