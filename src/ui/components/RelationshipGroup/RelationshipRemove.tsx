@@ -105,7 +105,7 @@ export function RelationshipRemove({ relationship, direction, elementName, other
       </button>
       {open && !confirming && (
         <div id={menuId} className={styles.menu}>
-          <button type="button" className={`${styles.menuItem} ${styles.menuItemDanger}`} onClick={() => { setConfirming(true); }}>
+          <button type="button" className={[styles.menuItem, styles.menuItemDanger].join(' ')} onClick={() => { setConfirming(true); }}>
             <Text as="span">Remove</Text>
           </button>
         </div>

@@ -5,6 +5,7 @@ import { attributesRecord } from '../../elements/attributesRecord';
 import { lifecycleToneFor } from '../../elements/lifecycleTone';
 import type { UseElementRenameResult } from '../../elements/useElementRename';
 import { Button } from '../Button/Button';
+import { LinkButton } from '../Button/LinkButton';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { FactBadge } from '../FactBadge/FactBadge';
@@ -85,6 +86,19 @@ export interface ElementHeaderProps {
    * convention as every prop above.
    */
   readOnlyReason?: string | undefined;
+  /**
+   * "Context →" — a system's own context diagram (`/context/:systemId`,
+   * `ContextView.tsx`). Omitted entirely (not shown disabled) for every
+   * non-system element type, same convention as every prop above — a
+   * capability/container/actor has no context diagram of its own to link
+   * to. A real link, not implied by the breadcrumb: the breadcrumb shows
+   * *where this page is*, never *what else you could navigate to* — the
+   * same distinction `ContextView.tsx`'s own "Containers →" link already
+   * draws for its one level down (found in a walkthrough: nothing on this
+   * page linked to Context at all, the breadcrumb was the only, and
+   * wrong, place a reader might have looked for it).
+   */
+  contextHref?: string | undefined;
 }
 
 /**
@@ -120,7 +134,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel, readOnlyReason }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel, readOnlyReason, contextHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
@@ -228,6 +242,11 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onPro
           </Button>
         )}
         {readOnlyReason && <Chip tone="neutral">{readOnlyReason}</Chip>}
+        {contextHref && (
+          <LinkButton to={contextHref} variant="secondary">
+            Context →
+          </LinkButton>
+        )}
         <div className={styles.menuWrapper}>
           <button type="button" className={styles.menuToggle} aria-expanded={menuOpen} aria-controls={menuId} aria-label="Element actions" onClick={() => { setMenuOpen((o) => !o); }}>
             <span aria-hidden="true">⋯</span>
@@ -266,7 +285,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onPro
             {onRemoveFromModel && (
               <button
                 type="button"
-                className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                className={[styles.menuItem, styles.menuItemDanger].join(' ')}
                 onClick={() => {
                   setMenuOpen(false);
                   onRemoveFromModel();

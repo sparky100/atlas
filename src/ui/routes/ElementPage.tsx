@@ -255,6 +255,11 @@ export function ElementPage() {
               rename={canEdit ? rename : undefined}
               onRetire={canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') ? () => { setRetiring(true); } : undefined}
               onRemoveFromModel={canEdit && state.data.children.length === 0 ? () => { setRemovingFromModel(true); } : undefined}
+              contextHref={
+                state.data.element.element_type === 'system'
+                  ? `/o/${orgSlug ?? ''}/m/${model.slug}/context/${state.data.element.element_id}?${refQueryParam(ref, viewing)}`
+                  : undefined
+              }
             />
             {retiring && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') && (
               <RetireAction
