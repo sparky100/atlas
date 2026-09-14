@@ -29,6 +29,10 @@ export interface UpsertUserPreferencesInput {
   landscapeExpandedLaneKeys?: UserPreferencesRow['landscape_expanded_lane_keys'];
   /** V2: pinned lane keys, in display order — same omitted-leaves-untouched convention. */
   landscapePinnedLaneKeys?: UserPreferencesRow['landscape_pinned_lane_keys'];
+  /** Sprint F7 item 3 — same omitted-leaves-untouched convention. */
+  notifyOnMention?: UserPreferencesRow['notify_on_mention'];
+  /** Sprint F7 item 3 — same omitted-leaves-untouched convention. */
+  notifyOnReply?: UserPreferencesRow['notify_on_reply'];
 }
 
 /**
@@ -47,6 +51,8 @@ export async function upsertUserPreferences(supabase: Client, input: UpsertUserP
   if (input.landscapeCollapsedLaneKeys !== undefined) patch.landscape_collapsed_lane_keys = input.landscapeCollapsedLaneKeys;
   if (input.landscapeExpandedLaneKeys !== undefined) patch.landscape_expanded_lane_keys = input.landscapeExpandedLaneKeys;
   if (input.landscapePinnedLaneKeys !== undefined) patch.landscape_pinned_lane_keys = input.landscapePinnedLaneKeys;
+  if (input.notifyOnMention !== undefined) patch.notify_on_mention = input.notifyOnMention;
+  if (input.notifyOnReply !== undefined) patch.notify_on_reply = input.notifyOnReply;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('user_preferences').upsert(patch, { onConflict: 'user_id' }).select('*').single();

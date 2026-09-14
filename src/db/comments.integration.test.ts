@@ -25,6 +25,7 @@ import { listMyNotifications, getUnreadNotificationCount, markNotificationRead }
 import { getProfile } from './profiles';
 import { subscribeToModelChannel } from './realtime';
 import { getOrCreateManualSource } from './sources';
+import { upsertUserPreferences } from './userPreferences';
 
 const env = loadEnv();
 const service = createServiceRoleClient(env);
@@ -617,6 +618,48 @@ describe('comments, mentions, notifications, and realtime against a real local S
       await createComment(alice.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementId, body: `@${aliceProfile.handle} noting this myself`, authorId: alice.id });
       const selfMentionAfter = await getUnreadNotificationCount(alice.client, alice.id);
       expect(selfMentionAfter).toBe(selfMentionBefore);
+    }
+  }, 30_000);
+
+  it('Sprint F7 item 3: an @mention still writes comment_mentions when the recipient has opted out, but no notification', async () => {
+    const main = await getMainBranch(alice.client, modelId);
+    if (!main?.head_commit_id) throw new Error('main branch not found');
+    const elementId = randomUUID();
+    await commitToBranch(alice.client, {
+      modelId,
+      branchId: main.id,
+      expectedHeadCommitId: main.head_commit_id,
+      envelope: {
+        id: randomUUID(),
+        branchId: main.id,
+        parentCommitId: main.head_commit_id,
+        mergedBranchHeadCommitId: null,
+        kind: 'manual',
+        title: 'add a system for the notification-preference test',
+        body: null,
+        deltas: [makeCreateDelta(randomUUID(), elementId, 'Notification Preference Test System', aliceManualSourceId)],
+      },
+    });
+
+    await upsertUserPreferences(bob.client, { userId: bob.id, notifyOnMention: false });
+    try {
+      const before = await getUnreadNotificationCount(bob.client, bob.id);
+      const comment = await createComment(alice.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementId, body: `@${bobHandle} opted out, should not notify`, authorId: alice.id });
+
+      // The factual mention record still exists — opting out of the
+      // notification never erases who was actually @mentioned.
+      const { data: mentionRows, error: mentionError } = await alice.client.from('comment_mentions').select('comment_id, user_id').eq('comment_id', comment.id);
+      if (mentionError) throw new Error(`reading comment_mentions: ${mentionError.message}`);
+      expect(mentionRows).toMatchObject([{ comment_id: comment.id, user_id: bob.id }]);
+
+      // No notification, though — the one thing the preference actually gates.
+      const after = await getUnreadNotificationCount(bob.client, bob.id);
+      expect(after).toBe(before);
+      const notifications = await listMyNotifications(bob.client, bob.id, { unreadOnly: true });
+      expect(notifications.find((n) => n.comment_id === comment.id)).toBeUndefined();
+    } finally {
+      // Leave bob's preferences at their default for every later test in this file.
+      await upsertUserPreferences(bob.client, { userId: bob.id, notifyOnMention: true });
     }
   }, 30_000);
 

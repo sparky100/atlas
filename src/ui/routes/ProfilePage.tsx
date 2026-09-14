@@ -3,6 +3,7 @@ import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useOwnProfile } from '../auth/useOwnProfile';
+import { NotificationPreferencesPanel } from '../profile/NotificationPreferencesPanel';
 import { ProfileView } from '../profile/ProfileView';
 import styles from './ProfilePage.module.css';
 
@@ -30,7 +31,12 @@ export function ProfilePage() {
         {!loading && !profile && (
           <EmptyState>Your profile is created the moment you join or create your first organisation.</EmptyState>
         )}
-        {!loading && profile && userId && <ProfileView profile={profile} userId={userId} onSaved={refresh} />}
+        {!loading && profile && userId && (
+          <>
+            <ProfileView profile={profile} userId={userId} onSaved={refresh} />
+            <NotificationPreferencesPanel userId={userId} />
+          </>
+        )}
       </main>
     </div>
   );
