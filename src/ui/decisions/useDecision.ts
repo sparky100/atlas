@@ -53,6 +53,15 @@ export function useDecision(modelId: UUID, decisionId: UUID): UseDecisionResult 
   useEffect(() => {
     let cancelled = false;
     setState({ status: 'loading' });
+    // `DecisionPage.tsx` calls this hook unconditionally (rules of hooks)
+    // before its own org/model lookup has resolved, passing `''` for
+    // `modelId` on that first render — `getMainBranch`'s own `assertRealId`
+    // guard would throw immediately on that placeholder, posting a real
+    // (but spurious) error banner a moment before the second, real fetch
+    // quietly succeeds and renders the page underneath it. Staying in
+    // `loading` until both ids are real avoids ever attempting that first,
+    // doomed fetch at all.
+    if (!modelId || !decisionId) return;
     loadDecisionPageData(modelId, decisionId)
       .then((result) => {
         if (!cancelled) setState(result);
