@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
-import { ATTRIBUTE_SCHEMA_BY_TYPE } from '../../contracts/attributeSchema';
+import { ATTRIBUTE_SCHEMA_BY_TYPE, attributeDefinitionToFieldSchema, type AttributeFieldSchema } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import type { AliasRow, BranchIntent, BranchRow, SourceRow } from '../../db/types';
@@ -37,6 +37,7 @@ import { isViewingMode } from '../branches/viewingMode';
 import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditBranch, useMembership } from '../orgs/useMembership';
+import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { refLabelOf, refParamOf, refQueryParam } from '../../db/ref';
 import { elementBreadcrumbSegments } from '../nav/elementBreadcrumbSegments';
@@ -121,6 +122,13 @@ export function ElementPage() {
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   // S1 item 15 (A2 remainder): same dedup hint as every other page here.
   const { state, reload } = useElementPage(model?.id ?? '', elementId ?? '', ref, mainBranch?.head_commit_id ?? null);
+  // F1 ("custom attributes") PR3: this org's own definitions — read-only
+  // here (any member, per attribute_definitions_select's RLS), filtered
+  // below to the ones that actually apply to this element's type. Called
+  // unconditionally like every other data hook on this page (Rules of
+  // Hooks); `useAttributeDefinitions` also exposes create/reorder/deprecate,
+  // unused here — this page only ever reads.
+  const { definitions: attributeDefinitions } = useAttributeDefinitions(organisation?.id ?? null, userId);
   const canEdit = !viewing && editingBranch !== null && canEditBranch(role, editingBranch);
   // The complement of `canEdit` at `main`: a contributor who can create a
   // change branch but has no direct main-write path gets this instead of
@@ -156,12 +164,25 @@ export function ElementPage() {
   };
 
   const data = state.status === 'ready' ? state.data : null;
+  // F1 PR3: this element type's own applicable definitions — deprecated
+  // ones are excluded from the editable set entirely (they "disappear from
+  // the create/edit form's field list," the plan's own wording), but stay
+  // visible in the read-only table when this element already has a value
+  // under that key (`customFieldsForDisplay` below) — "a value already set
+  // keeps rendering... unchanged."
+  const elementType = data?.element.element_type;
+  const applicableDefinitions = elementType ? attributeDefinitions.filter((d) => d.applies_to.includes(elementType)) : [];
+  const customFieldsForEditing: AttributeFieldSchema[] = applicableDefinitions.filter((d) => d.deprecated_at === null).map(attributeDefinitionToFieldSchema);
+  const customFieldsForDisplay: AttributeFieldSchema[] = applicableDefinitions
+    .filter((d) => d.deprecated_at === null || data?.facts.has(d.key))
+    .map(attributeDefinitionToFieldSchema);
   const editor = useElementEditor({
     modelId: model?.id ?? '',
     orgId: organisation?.id ?? '',
     userId,
     element: data?.element ?? PLACEHOLDER_ELEMENT,
     facts: data?.facts ?? EMPTY_FACTS,
+    customFields: customFieldsForEditing,
     branch: editingBranch ?? PLACEHOLDER_BRANCH,
     expectedHeadCommitId: data?.commitId ?? '',
     onSaved: reloadAfterCommit,
@@ -327,9 +348,16 @@ export function ElementPage() {
                       sources={state.data.sources}
                       aliases={state.data.aliases}
                       aliasSources={state.data.aliasSources}
+                      customFields={customFieldsForDisplay}
                     />
                   ) : (
-                    <AttributesEditor element={state.data.element} editor={editor} aliases={state.data.aliases} aliasSources={state.data.aliasSources} />
+                    <AttributesEditor
+                      element={state.data.element}
+                      editor={editor}
+                      aliases={state.data.aliases}
+                      aliasSources={state.data.aliasSources}
+                      customFields={customFieldsForEditing}
+                    />
                   )}
                 </CollapsibleSection>
                 <CollapsibleSection title="Relationships" meta={`(${String(state.data.relationships.length)})`}>
@@ -510,12 +538,15 @@ function AttributesTable({
   sources,
   aliases,
   aliasSources,
+  customFields,
 }: {
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
   sources: Map<string, SourceRow>;
   aliases: AliasRow[];
   aliasSources: Map<UUID, SourceRow>;
+  /** F1 ("custom attributes") PR3: this org's own definitions applying to `element.element_type`, already resolved by the caller to whichever set (non-deprecated, plus any deprecated-but-valued) belongs in a read-only view — rendered after the core schema, exactly like a core field. */
+  customFields: AttributeFieldSchema[];
 }) {
   // Sprint U4-1 D2: `hidden` fields (Capability.templateRef) never show
   // in the read-only list either — its own information still surfaces,
@@ -524,7 +555,7 @@ function AttributesTable({
   const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type].filter((field) => field.hidden !== true);
   return (
     <div>
-      {schema.map((field) => {
+      {[...schema, ...customFields].map((field) => {
         const fact = facts.get(field.key);
         // ADR-020: `hideWhenEmpty` (Capability.code/"Reference") omits the
         // row entirely rather than rendering AttributeRow's own bare "—"
@@ -543,16 +574,19 @@ function AttributesEditor({
   editor,
   aliases,
   aliasSources,
+  customFields,
 }: {
   element: ElementsHeadRow;
   editor: ReturnType<typeof useElementEditor>;
   aliases: AliasRow[];
   aliasSources: Map<UUID, SourceRow>;
+  /** F1 PR3: non-deprecated only — a deprecated definition never re-appears in the edit form's own field list, whether or not this element already has a value under it (see this file's own `customFieldsForEditing` comment). */
+  customFields: AttributeFieldSchema[];
 }) {
   const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type].filter((field) => field.editable !== false);
   return (
     <div>
-      {schema.map((field) => (
+      {[...schema, ...customFields].map((field) => (
         <AttributeEditRow
           key={field.key}
           field={field}
