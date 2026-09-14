@@ -6,6 +6,12 @@
  * (S2's own "no seeding beyond org and user" rule) — `add-a-system-flow.spec.ts`
  * seeds both via a raw commit for its own, narrower purpose, which this
  * golden path deliberately does not reuse.
+ *
+ * Also covers the element page's own "Context →" link (found missing in
+ * a walkthrough — nothing on a system's own page linked to its context
+ * diagram at all): the last step, once Northgate's own page has nothing
+ * else this flow still needs, clicks through and confirms it lands on
+ * Context, not just that the link renders.
  */
 import { expect, test } from '@playwright/test';
 import { addCapability, addSystemFromHome, addUsesRelationship, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
@@ -27,4 +33,11 @@ test('add a system with a description, a primary capability, and a verb-labelled
   await addUsesRelationship(page, 'Council Tax System', 'shares address data with');
   await expect(page.getByText('“shares address data with”')).toBeVisible();
   await expect(page.getByRole('link', { name: /Council Tax System/ })).toBeVisible();
+
+  // "Context →" next to the header's own "…" menu — a real link, not
+  // something only the breadcrumb implies. Last, so there's nothing left
+  // on Northgate's own page this flow still needs after following it.
+  await page.getByRole('link', { name: 'Context →' }).click();
+  await expect(page.getByRole('heading', { name: 'Context' })).toBeVisible();
+  await expect(page).toHaveURL(/\/context\//);
 });
