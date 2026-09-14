@@ -932,15 +932,28 @@ export function LandscapeCanvas({
           const screenNodeHeight = NODE_HEIGHT * transform.scale;
           ctx.fillStyle = tokens.text;
           ctx.font = `${(14 * textScale).toFixed(2)}px sans-serif`;
-          ctx.fillText(label.glyph, x + 10 * textScale, y + screenNodeHeight / 2);
+          // Overflow fix (same root cause as ContextDiagramCanvas.tsx's own
+          // "Graphical Design Tool" fix): `textScale` is *quantised*
+          // (`zoom.ts`'s own comment — pinned to one of 8 steps so the font
+          // itself doesn't jitter mid-zoom) and can land above the real,
+          // continuous `transform.scale` at some zoom levels — exactly when
+          // the node's own box on screen (always sized by the true
+          // `transform.scale`, never `textScale`) is smaller than whatever
+          // `textScale` assumes it to be. The glyph offset and the name's
+          // own wrap/truncate width both have to track that same real box
+          // size, or the name is measured and placed against a box that
+          // doesn't match the one actually drawn. Only the font's own
+          // rendered size (`ctx.font`, right above/below) stays pinned to
+          // `textScale` — that's the one thing quantisation is for.
+          ctx.fillText(label.glyph, x + 10 * transform.scale, y + screenNodeHeight / 2);
           ctx.font = `${(12 * textScale).toFixed(2)}px sans-serif`;
           // A node carrying a comment marker reserves the marker's own
           // width (4px inset + 18px box + 4px gap = 26px) so the name
           // never overlaps it (`docs/HANDOFF-M1b-comments.md`'s Canvas
           // section: "truncate to 100px instead").
-          const maxWidth = (label.truncateToNarrow ? NODE_WIDTH - 34 - 26 : NODE_WIDTH - 34) * textScale;
+          const maxWidth = (label.truncateToNarrow ? NODE_WIDTH - 34 - 26 : NODE_WIDTH - 34) * transform.scale;
           const truncated = truncate(ctx, label.name, maxWidth);
-          ctx.fillText(truncated, x + 30 * textScale, y + screenNodeHeight / 2);
+          ctx.fillText(truncated, x + 30 * transform.scale, y + screenNodeHeight / 2);
         }
 
         // S1 item 11a: an actor's own `uses` edge verb phrase, centred on

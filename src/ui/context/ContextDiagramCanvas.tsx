@@ -523,35 +523,56 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
       // to a second rather than truncating hard — `wrapLines` measures
       // against the exact font just set, so it's called here in the
       // screen-space pass, not while building `nodeLabels` above.
+      //
+      // Overflow fix ("Graphical Design Tool" hanging past its own tile,
+      // reproducible at some zoom levels but not others): `textScale` is
+      // *quantised* (`quantizeScale`'s own comment — pinned to one of 8
+      // steps so the font itself doesn't jitter mid-zoom) and can land
+      // above the real, continuous `transform.scale` at some zoom levels —
+      // exactly when the box on screen (always sized by the true
+      // `transform.scale`, never `textScale`) is smaller than whatever
+      // `textScale` assumes it to be. Every width bound and box-relative
+      // offset below (how far the name starts past the glyph, how wide it's
+      // allowed to wrap or truncate against) has to track that same real
+      // box size — `transform.scale`, not `textScale` — or the text is
+      // being measured and placed against a box that doesn't match the one
+      // actually drawn. Only the font's own rendered size (`ctx.font`,
+      // right below) stays pinned to `textScale` — that's the one thing
+      // quantisation is actually for.
       for (const label of nodeLabels) {
         const [x, y] = toScreen(label.worldX, label.worldY);
         ctx.fillStyle = tokens.text;
         ctx.font = `${(14 * textScale).toFixed(2)}px sans-serif`;
-        ctx.fillText(label.glyph, x + 8 * textScale, y);
+        ctx.fillText(label.glyph, x + 8 * transform.scale, y);
         ctx.font = `${(12 * textScale).toFixed(2)}px sans-serif`;
-        const lines = wrapLines(ctx, label.name, label.maxWidth * textScale, 2);
+        const lines = wrapLines(ctx, label.name, label.maxWidth * transform.scale, 2);
         const lineHeight = 13 * textScale;
         const startY = y - ((lines.length - 1) * lineHeight) / 2;
         lines.forEach((line, i) => {
-          ctx.fillText(line, x + 26 * textScale, startY + i * lineHeight);
+          ctx.fillText(line, x + 26 * transform.scale, startY + i * lineHeight);
         });
       }
 
       // V1 fix: the platform tile's own title — name, kind, and one
       // sentence (`docs/prompts/atlas-prompt-pack.md`'s own V1 wording,
       // "Centre: the system as a tile (name, type, one sentence)").
+      // Overflow fix: same `transform.scale`-for-box-bounds rule as
+      // `nodeLabels` above — the width this title's own name/description
+      // are measured and wrapped against, and the offset its name starts
+      // at past the glyph, both have to track the tile's real on-screen
+      // size.
       for (const title of platformTitles) {
         const [x, y] = toScreen(title.worldX, title.worldY);
         ctx.fillStyle = tokens.text;
         ctx.font = `${(14 * textScale).toFixed(2)}px sans-serif`;
         ctx.fillText(title.glyph, x, y);
         ctx.font = `${(12 * textScale).toFixed(2)}px sans-serif`;
-        ctx.fillText(truncate(ctx, title.name, (title.maxWidth - 20) * textScale), x + 18 * textScale, y);
+        ctx.fillText(truncate(ctx, title.name, (title.maxWidth - 20) * transform.scale), x + 18 * transform.scale, y);
         ctx.fillStyle = tokens.textMuted;
         ctx.font = `${(10 * textScale).toFixed(2)}px sans-serif`;
         ctx.fillText(title.kind, x, y + 14 * textScale);
         if (title.description) {
-          const descLines = wrapLines(ctx, title.description, title.maxWidth * textScale, 2);
+          const descLines = wrapLines(ctx, title.description, title.maxWidth * transform.scale, 2);
           descLines.forEach((line, i) => {
             ctx.fillText(line, x, y + (30 + i * 12) * textScale);
           });
@@ -564,7 +585,11 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         const [x, y] = toScreen(label.worldX, label.worldY);
         ctx.fillStyle = tokens.text;
         ctx.font = `${(10 * textScale).toFixed(2)}px sans-serif`;
-        const nameLines = wrapLines(ctx, label.name, label.maxWidth * textScale, 2);
+        // Overflow fix: same `transform.scale`-for-width-bound rule as
+        // `nodeLabels`/`platformTitles` above — this text is centred, so
+        // there's no offset bug to match, but the wrap width still has to
+        // track the module tile's real on-screen size, not `textScale`.
+        const nameLines = wrapLines(ctx, label.name, label.maxWidth * transform.scale, 2);
         nameLines.forEach((line, i) => {
           ctx.fillText(line, x, y + i * 11 * textScale);
         });
@@ -579,7 +604,7 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         if (label.capability) {
           ctx.fillStyle = tokens.textMuted;
           ctx.font = `${(9 * textScale).toFixed(2)}px sans-serif`;
-          capLines = wrapLines(ctx, label.capability, label.maxWidth * textScale, 2);
+          capLines = wrapLines(ctx, label.capability, label.maxWidth * transform.scale, 2);
           capLines.forEach((line, i) => {
             ctx.fillText(line, x, y + (26 + i * 10) * textScale);
           });
