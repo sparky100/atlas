@@ -54,7 +54,18 @@ export async function createChangeBranch(supabase: Client, input: CreateChangeBr
   };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('branches').insert(row).select('*').single();
-  if (error) throw new Error(`createChangeBranch: ${error.message}`);
+  if (error) {
+    // `branches_model_id_name_key` (23505, the same code `invites.ts`'s own
+    // createInvite checks for a different conflict) — a name collision
+    // within this model, not a real failure. The raw Postgres message
+    // ("duplicate key value violates unique constraint ...") is exactly
+    // the kind of thing a user reported as unhelpful; this is the one
+    // constraint violation this insert can realistically hit from normal
+    // use, so it's worth naming specifically rather than only ever
+    // surfacing `error.message` verbatim.
+    if (error.code === '23505') throw new Error(`A change named "${input.name}" already exists in this model — pick a different name.`);
+    throw new Error(`createChangeBranch: ${error.message}`);
+  }
   return data as BranchRow;
 }
 

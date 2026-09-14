@@ -50,6 +50,10 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   // point with no fixed default per `branchIntent.ts`'s own
   // `defaultIntentForEntryPoint` doc comment — the person picks explicitly.
   const [intent, setIntent] = useState<BranchIntent>('propose');
+  // F0: "correct/explore need no date at all" — same per-intent rule the
+  // change page's own edit form already applies; the create form didn't
+  // (a real bug: the date field used to render unconditionally here).
+  const dateFieldLabel = dateFieldLabelForIntent(intent);
   // Changes list unresolved count (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s
   // 6b: "the meta row: branch status chip, Target: YYYY-MM-DD, and the
   // unresolved count") — `anchor_type = 'change'` counts key on the same
@@ -149,7 +153,13 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
                 className={styles.input}
                 value={intent}
                 onChange={(e) => {
-                  setIntent(e.target.value as BranchIntent);
+                  const nextIntent = e.target.value as BranchIntent;
+                  setIntent(nextIntent);
+                  // A hidden field's stale value should never get submitted
+                  // once the reviewer's own choice has hidden it away —
+                  // matches `dateFieldLabelForIntent`'s own "correct/explore
+                  // need no date at all".
+                  if (dateFieldLabelForIntent(nextIntent) === null) setTargetDate('');
                 }}
                 disabled={!mainHeadCommitId}
               >
@@ -160,19 +170,23 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
                 ))}
               </select>
             </div>
+            {dateFieldLabel !== null && (
+              <div className={styles.formRow}>
+                <Text as="label" size="sm" tone="muted">
+                  {dateFieldLabel}
+                </Text>
+                <input
+                  className={styles.input}
+                  type="date"
+                  value={targetDate}
+                  onChange={(e) => {
+                    setTargetDate(e.target.value);
+                  }}
+                  disabled={!mainHeadCommitId}
+                />
+              </div>
+            )}
             <div className={styles.formRow}>
-              <Text as="label" size="sm" tone="muted">
-                Target date
-              </Text>
-              <input
-                className={styles.input}
-                type="date"
-                value={targetDate}
-                onChange={(e) => {
-                  setTargetDate(e.target.value);
-                }}
-                disabled={!mainHeadCommitId}
-              />
               <Button variant="primary" type="submit" disabled={status === 'creating' || !mainHeadCommitId}>
                 {status === 'creating' ? 'Creating…' : 'Create change'}
               </Button>
