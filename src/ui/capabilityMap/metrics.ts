@@ -48,6 +48,12 @@
  *   already uses; silent (no tone/label) at zero, unlike coverage, since
  *   "0 OT systems" is the ordinary case for most capabilities in a
  *   regulated estate and would otherwise be visual noise on every tile.
+ * - **Fit** (`fitForPurpose`, `worstFitForPurpose`): worst-of the
+ *   `fitForPurpose` ratings on a capability's own `supports` edges — a
+ *   leaf-level fact recorded on the relationship, not a computed score
+ *   (ADR-000 preface #6's maturity-scoring objection never applies: this
+ *   is a sourced, per-edge assertion, worst-of'd exactly like criticality).
+ *   Silent when no edge is rated.
  *
  * `isExternal` was considered and dropped: a capability isn't external,
  * only (some of) its supporting systems are, and "any support system is
@@ -56,12 +62,13 @@
  * alongside two metrics that need no such judgment call.
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import type { Criticality, LifecycleStatus, UUID } from '../../contracts/delta';
+import type { Criticality, FitForPurpose, LifecycleStatus, UUID } from '../../contracts/delta';
 import type { HomeMode } from '../../contracts/userPreferences';
 import type { ChipTone } from '../components/Chip/Chip';
 import { monthsUntil, STALE_AFTER_MONTHS } from '../../contracts/thresholds';
 import { attributesRecord } from '../elements/attributesRecord';
 import { CRITICALITY_ORDER, CRITICALITY_TONE } from '../elements/criticalityTone';
+import { FIT_FOR_PURPOSE_ORDER, FIT_FOR_PURPOSE_TONE } from '../elements/fitForPurposeTone';
 import { LIFECYCLE_ORDER, LIFECYCLE_TONE } from '../elements/lifecycleTone';
 import { domainOf } from '../elements/systemDomain';
 
@@ -78,6 +85,7 @@ export const COLOUR_BY_OPTIONS: { value: ColourByMode; label: string }[] = [
   { value: 'metric:lifecycleExposure', label: 'Lifecycle exposure' },
   { value: 'metric:criticality', label: 'Criticality' },
   { value: 'metric:otShare', label: 'OT share' },
+  { value: 'metric:fitForPurpose', label: 'Fit' },
 ];
 
 export interface TileColour {
@@ -120,6 +128,39 @@ export function worstCriticality(capabilityId: UUID, supportsEdges: readonly Rel
     if (!system) continue;
     const criticality = criticalityOf(system);
     if (criticality && (worst === null || CRITICALITY_ORDER[criticality] > CRITICALITY_ORDER[worst])) worst = criticality;
+  }
+  return worst;
+}
+
+function fitForPurposeOf(edge: RelationshipsHeadRow): FitForPurpose | null {
+  const value = attributesRecord(edge.attributes).fitForPurpose;
+  return typeof value === 'string' && value in FIT_FOR_PURPOSE_ORDER ? (value as FitForPurpose) : null;
+}
+
+/**
+ * The worst `fitForPurpose` rating recorded on a capability's own direct
+ * `supports` edges, or `null` if none is rated — `poor` the worst, the same
+ * "worst-of = max" shape `worstCriticality` already gives. Reads the
+ * *edge's* attributes, not the supporting system's (`FitForPurpose` lives
+ * on the relationship, a leaf-level fact), which is why this takes
+ * `supportsEdges` and not `systemsById`.
+ */
+export function worstFitForPurpose(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[]): FitForPurpose | null {
+  let worst: FitForPurpose | null = null;
+  for (const edge of supportsEdges) {
+    if (edge.to_element_id !== capabilityId) continue;
+    const fit = fitForPurposeOf(edge);
+    if (fit !== null && (worst === null || FIT_FOR_PURPOSE_ORDER[fit] > FIT_FOR_PURPOSE_ORDER[worst])) worst = fit;
+  }
+  return worst;
+}
+
+/** `worstFitForPurpose` maximised over a set of descendant capability ids — a poor rating anywhere below makes the group read as poor. */
+export function worstFitForPurposeAcross(descendantCapabilityIds: readonly UUID[], supportsEdges: readonly RelationshipsHeadRow[]): FitForPurpose | null {
+  let worst: FitForPurpose | null = null;
+  for (const id of descendantCapabilityIds) {
+    const fit = worstFitForPurpose(id, supportsEdges);
+    if (fit !== null && (worst === null || FIT_FOR_PURPOSE_ORDER[fit] > FIT_FOR_PURPOSE_ORDER[worst])) worst = fit;
   }
   return worst;
 }
@@ -182,6 +223,10 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
     case 'metric:otShare': {
       const { ot, total } = otShareOf(capabilityId, supportsEdges, systemsById);
       return ot === 0 ? { tone: undefined, label: undefined } : { tone: 'warn', label: `${String(ot)}/${String(total)} systems OT` };
+    }
+    case 'metric:fitForPurpose': {
+      const worst = worstFitForPurpose(capabilityId, supportsEdges);
+      return worst === null ? { tone: undefined, label: undefined } : { tone: FIT_FOR_PURPOSE_TONE[worst], label: worst };
     }
   }
 }
@@ -253,6 +298,10 @@ export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityI
         total += share.total;
       }
       return ot === 0 ? { tone: undefined, label: undefined } : { tone: 'warn', label: `${String(ot)}/${String(total)} systems OT` };
+    }
+    case 'metric:fitForPurpose': {
+      const worst = worstFitForPurposeAcross(descendantCapabilityIds, supportsEdges);
+      return worst === null ? { tone: undefined, label: undefined } : { tone: FIT_FOR_PURPOSE_TONE[worst], label: worst };
     }
   }
 }

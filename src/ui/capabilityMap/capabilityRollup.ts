@@ -32,11 +32,11 @@
  * showing their own direct count only (`metrics.ts`'s
  * `supportingSystemIds`/`tileColourFor`, unrolled).
  */
-import type { UUID } from '../../contracts/delta';
+import type { FitForPurpose, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { isCapabilityOwnedWithAncestry } from '../../db/healthFindings';
 import { capabilitySubtreeIds } from '../elements/capabilityDepth';
-import { supportingSystemIds } from './metrics';
+import { supportingSystemIds, worstFitForPurposeAcross } from './metrics';
 
 export interface CapabilityRollup {
   /** The level-1 capability's own id plus every descendant's, itself included — feed straight into `aggregateTileColourFor`'s own `descendantCapabilityIds` parameter for the worst-of-children exposure/lifecycle/criticality/OT-share tone. */
@@ -51,6 +51,8 @@ export interface CapabilityRollup {
   totalCapabilityCount: number;
   /** `true` when the level-1 capability or any ancestor has an owner — see this module's own top comment for why that's always just the capability's own self-owned flag in practice. */
   isOwned: boolean;
+  /** Worst `fitForPurpose` rating across every subtree `supports` edge — `poor` the worst (`metrics.ts`'s `worstFitForPurposeAcross`, "a poor rating anywhere below makes the parent read as poor"). `null` when nothing in the subtree is rated yet. */
+  fitForPurpose: FitForPurpose | null;
 }
 
 /**
@@ -80,5 +82,6 @@ export function computeCapabilityRollup(
     supportedCapabilityCount,
     totalCapabilityCount: subtreeCapabilityIds.length,
     isOwned: isCapabilityOwnedWithAncestry(capability, selfOwnedIds, capabilitiesById),
+    fitForPurpose: worstFitForPurposeAcross(subtreeCapabilityIds, subtreeSupportsEdges),
   };
 }

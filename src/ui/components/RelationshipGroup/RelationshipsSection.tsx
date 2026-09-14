@@ -6,6 +6,7 @@ import { inboundRelationshipGroups, outboundRelationshipGroups, type Relationshi
 import { RELATIONSHIP_ATTRIBUTE_SCHEMA_BY_TYPE } from '../../../contracts/relationshipAttributeSchema';
 import type { BranchRow, SourceRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
+import { fitForPurposeToneFor, isFitForPurpose } from '../../elements/fitForPurposeTone';
 import { useRelationshipEditor } from '../../elements/useRelationshipEditor';
 import { AttributeEditRow } from '../AttributeEditRow/AttributeEditRow';
 import { AttributeRow } from '../AttributeRow/AttributeRow';
@@ -246,6 +247,12 @@ function RelationshipDirectionGroup({
         // renders on a system's own outbound `supports` group and a
         // capability's inbound one, so one chip here covers both.
         const supportsRole = rel.relationship_type === 'supports' && typeof attrs.role === 'string' ? attrs.role : null;
+        // Fit-for-purpose: the supports edge's own leaf-level rating — shown
+        // on the row itself (never rolled up here; the capability map's own
+        // colour-by is what rolls it up), the same "one chip covers both the
+        // system's outbound and the capability's inbound group" reasoning
+        // `supportsRole` just above already gives.
+        const fitForPurpose = rel.relationship_type === 'supports' && typeof attrs.fitForPurpose === 'string' && isFitForPurpose(attrs.fitForPurpose) ? attrs.fitForPurpose : null;
         // The verb-phrase label (Sprint U4-1 B5: required at creation for
         // uses/flows_to, optional elsewhere) — shown whenever one exists,
         // not gated to those two types, since `description` is the same
@@ -279,6 +286,7 @@ function RelationshipDirectionGroup({
                 </Text>
               )}
               {supportsRole !== null && <Chip tone={supportsRole === 'primary' ? 'info' : 'neutral'}>{supportsRole}</Chip>}
+              {fitForPurpose !== null && <Chip tone={fitForPurposeToneFor(fitForPurpose)}>{fitForPurpose}</Chip>}
               {ownsRole !== null && <Chip tone="neutral">{ownsRole} owner</Chip>}
               {typeof dataClassification === 'string' && dataClassification.length > 0 && <Chip tone="info">{dataClassification}</Chip>}
               {justAdded && <Chip tone="info">just added</Chip>}

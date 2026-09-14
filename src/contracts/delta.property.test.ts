@@ -86,7 +86,12 @@ const actorAttributes: fc.Arbitrary<ActorAttributes> = fc.record(
 );
 
 const supportsAttributes: fc.Arbitrary<SupportsAttributes> = fc.record(
-  { description: fc.string(), role: fc.constantFrom('primary' as const, 'secondary' as const) },
+  {
+    description: fc.string(),
+    role: fc.constantFrom('primary' as const, 'secondary' as const),
+    fitForPurpose: fc.constantFrom('excellent' as const, 'good' as const, 'adequate' as const, 'poor' as const),
+    fitForPurposeNotes: fc.string(),
+  },
   { requiredKeys: ['role'] },
 );
 const usesAttributes: fc.Arbitrary<UsesAttributes> = fc.record({ description: fc.string(), via: uuid }, { requiredKeys: [] });

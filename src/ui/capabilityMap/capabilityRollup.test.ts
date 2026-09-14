@@ -7,9 +7,10 @@ function capability(id: string, parentId: string | null): ElementsHeadRow {
 }
 
 let nextOrdinal = 0;
-function supports(fromId: string, toId: string): RelationshipsHeadRow {
+function supports(fromId: string, toId: string, fitForPurpose?: string): RelationshipsHeadRow {
   nextOrdinal += 1;
-  return { relationship_id: `r-${String(nextOrdinal)}`, relationship_type: 'supports', from_element_id: fromId, to_element_id: toId, attributes: {}, exists_delta_id: `d-r-${String(nextOrdinal)}` };
+  const attrs = fitForPurpose === undefined ? {} : { fitForPurpose };
+  return { relationship_id: `r-${String(nextOrdinal)}`, relationship_type: 'supports', from_element_id: fromId, to_element_id: toId, attributes: attrs, exists_delta_id: `d-r-${String(nextOrdinal)}` };
 }
 
 describe('computeCapabilityRollup', () => {
@@ -61,5 +62,17 @@ describe('computeCapabilityRollup', () => {
     const supportsEdges = [supports('sys-1', 'l2a'), supports('sys-1', 'l3')];
     const rollup = computeCapabilityRollup(l1, allCapabilities, capabilitiesById, supportsEdges, new Set());
     expect(rollup.supportingSystemIds).toEqual(['sys-1']);
+  });
+
+  it('fitForPurpose: a poor rating anywhere in the subtree makes the rollup poor', () => {
+    const supportsEdges = [supports('sys-1', 'l2a', 'good'), supports('sys-2', 'l3', 'poor')];
+    const rollup = computeCapabilityRollup(l1, allCapabilities, capabilitiesById, supportsEdges, new Set());
+    expect(rollup.fitForPurpose).toBe('poor');
+  });
+
+  it('fitForPurpose: null when nothing in the subtree is rated', () => {
+    const supportsEdges = [supports('sys-1', 'l2a')];
+    const rollup = computeCapabilityRollup(l1, allCapabilities, capabilitiesById, supportsEdges, new Set());
+    expect(rollup.fitForPurpose).toBeNull();
   });
 });
