@@ -1,0 +1,86 @@
+/**
+ * F1 ("custom attributes") PR2: org-defined attribute definitions — define,
+ * reorder, deprecate. Thin, typed wrappers — same untyped-client
+ * `eslint-disable` boundary organisations.ts's own module comment names.
+ *
+ * Reorder and deprecate are both plain, owner-gated column writes (no RPC —
+ * see `20260914020000_attribute_definitions.sql`'s own comment on why
+ * neither needs one): `setAttributeDefinitionOrder` is the one primitive
+ * `useAttributeDefinitions.ts`'s `moveUp`/`moveDown` call twice to swap two
+ * rows' `order_index`, mirroring the plan's own "a plain two-step client
+ * update... under the same owner-only RLS/grant" decision, not the
+ * delta/commit engine `useCapabilityReorder.ts` uses for a *model content*
+ * reorder — this table is settings, not versioned model content.
+ */
+import type { AttributeDefinitionKind } from '../contracts/attributeSchema';
+import type { ElementType, UUID } from '../contracts/delta';
+import type { Client } from './client';
+import type { AttributeDefinitionRow } from './types';
+
+/** Every non-deprecated definition first, in display order, then every deprecated one — same "live content first" convention `listArchivedModelsForOrg`'s own split from `listModelsForOrg` uses, but as one list here since the settings panel shows both together (a deprecated row stays visible there, just marked, per the plan's own "define, reorder, deprecate" scope). */
+export async function listAttributeDefinitions(supabase: Client, orgId: UUID): Promise<AttributeDefinitionRow[]> {
+  const { data, error } = await supabase.from('attribute_definitions').select('*').eq('org_id', orgId).order('order_index');
+  if (error) throw new Error(`listAttributeDefinitions: ${error.message}`);
+  return (data as AttributeDefinitionRow[] | null) ?? [];
+}
+
+export interface CreateAttributeDefinitionInput {
+  /** Minted by the caller (S-1) — never generated here. Use `crypto.randomUUID()` at the call site. */
+  id: UUID;
+  orgId: UUID;
+  key: string;
+  label: string;
+  kind: AttributeDefinitionKind;
+  /** `kind: 'select'` only — validated client-side before this is called (`useAttributeDefinitions.ts`'s own `create`). */
+  options: readonly string[] | null;
+  appliesTo: readonly ElementType[];
+  required: boolean;
+  description: string | null;
+  /** Where this definition lands in display order — the caller's own current list length (append at the end), per `useAttributeDefinitions.ts`'s `create`. */
+  orderIndex: number;
+  createdBy: UUID;
+}
+
+export type CreateAttributeDefinitionResult = { status: 'created'; definition: AttributeDefinitionRow } | { status: 'duplicate_key' };
+
+/** Owner only (`attribute_definitions_insert`'s RLS). A second definition with the same key at this org is a duplicate, not a new row — `attribute_definitions_org_id_key_key`'s own unique constraint refuses it (`23505`, the same code `createInvite`'s own module comment names for its own unique-index conflict), returned here as a structured result rather than a raw Postgres error. */
+export async function createAttributeDefinition(supabase: Client, input: CreateAttributeDefinitionInput): Promise<CreateAttributeDefinitionResult> {
+  const row = {
+    id: input.id,
+    org_id: input.orgId,
+    key: input.key.trim(),
+    label: input.label.trim(),
+    kind: input.kind,
+    options: input.options,
+    applies_to: input.appliesTo,
+    required: input.required,
+    description: input.description,
+    order_index: input.orderIndex,
+    created_by: input.createdBy,
+  };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.from('attribute_definitions').insert(row).select('*').single();
+  if (error) {
+    if (error.code === '23505') return { status: 'duplicate_key' };
+    throw new Error(`createAttributeDefinition: ${error.message}`);
+  }
+  return { status: 'created', definition: data as AttributeDefinitionRow };
+}
+
+/** The one reorder primitive — a plain column write, owner-gated by RLS/grant, no guard trigger (no restrictive lifecycle state to gate *when*, per the migration's own comment). */
+export async function setAttributeDefinitionOrder(supabase: Client, id: UUID, orderIndex: number): Promise<void> {
+  const { error } = await supabase.from('attribute_definitions').update({ order_index: orderIndex }).eq('id', id);
+  if (error) throw new Error(`setAttributeDefinitionOrder: ${error.message}`);
+}
+
+/** Soft-disable, mirroring `archiveModel`: hides the definition from future "add a value" pickers; a value already set on an element keeps rendering unchanged. */
+export async function deprecateAttributeDefinition(supabase: Client, id: UUID): Promise<void> {
+  const { error } = await supabase.from('attribute_definitions').update({ deprecated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw new Error(`deprecateAttributeDefinition: ${error.message}`);
+}
+
+/** The reverse of deprecate — same plain column write, mirroring `restoreModel`. */
+export async function restoreAttributeDefinition(supabase: Client, id: UUID): Promise<void> {
+  const { error } = await supabase.from('attribute_definitions').update({ deprecated_at: null }).eq('id', id);
+  if (error) throw new Error(`restoreAttributeDefinition: ${error.message}`);
+}

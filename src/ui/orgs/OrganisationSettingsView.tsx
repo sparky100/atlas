@@ -9,6 +9,7 @@ import { Text } from '../components/Text/Text';
 import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfirm';
 import type { MemberRole, OrganisationRow } from '../../db/types';
 import { formatDate } from '../time';
+import { AttributeDefinitionsPanel } from './AttributeDefinitionsPanel';
 import { canManageOrgSettings } from './roleGates';
 import { useInvites } from './useInvites';
 import { useMembers } from './useMembers';
@@ -255,6 +256,12 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
               ))}
             </ul>
           )}
+        </Panel>
+      )}
+
+      {canManage && (
+        <Panel>
+          <AttributeDefinitionsPanel orgId={organisation.id} userId={userId} />
         </Panel>
       )}
 
