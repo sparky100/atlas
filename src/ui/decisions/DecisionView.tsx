@@ -18,7 +18,7 @@ import { canChooseDecisionOption, canCreateChangeBranch } from '../orgs/useMembe
 import { useMembers } from '../orgs/useMembers';
 import { decisionStatusTone } from './decisionStatus';
 import { exportDecisionAsAdrMarkdown } from './exportDecisionAsAdr';
-import { useDecision } from './useDecision';
+import type { DecisionPageState } from './useDecision';
 import { useDecisionComparison, type DecisionComparisonOption } from './useDecisionComparison';
 import { useDecisionOptions } from './useDecisionOptions';
 import styles from './DecisionView.module.css';
@@ -30,6 +30,9 @@ export interface DecisionViewProps {
   orgSlug: string;
   modelSlug: string;
   role: MemberRole | null;
+  /** Lifted from `DecisionPage.tsx`'s own `useDecision` call, not fetched again here — the two used to each run their own independent copy of the same fetch (one for this view, one `DecisionPage.tsx` only ever read `.title` from), so a transient failure of either one alone could post the "Couldn't load this decision" banner even while the other succeeded and rendered full content underneath it (found in a walkthrough, issue-reported). One fetch, one `reload`, shared. */
+  state: DecisionPageState;
+  reload: () => void;
 }
 
 /**
@@ -47,9 +50,8 @@ export interface DecisionViewProps {
  * this here" (an element's own linked decisions) are also PR6, but live on
  * `DecisionsView.tsx`/`ElementDecisionsSection.tsx` respectively, not here.
  */
-export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role }: DecisionViewProps) {
+export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role, state, reload }: DecisionViewProps) {
   const { userId } = useAuth();
-  const { state, reload } = useDecision(modelId, decisionId);
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
   const optionsState = useDecisionOptions(reload);
