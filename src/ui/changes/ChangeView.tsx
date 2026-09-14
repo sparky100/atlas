@@ -297,7 +297,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           </Text>
           {!cancelling ? (
             <Button
-              variant="ghost"
+              variant="destructive"
               onClick={() => {
                 setCancelReason('');
                 setCancelling(true);
@@ -317,7 +317,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
               />
               <div className={styles.actions}>
                 <Button
-                  variant="primary"
+                  variant="destructive"
                   disabled={cancellation.status === 'cancelling'}
                   onClick={() => {
                     void cancellation.cancel(cancelReason).then((cancelled) => {

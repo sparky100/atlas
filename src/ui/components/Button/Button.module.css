@@ -42,3 +42,16 @@
 .ghost:hover:not(:disabled) {
   background: var(--bg-subtle);
 }
+
+/* UI-principles §8.10: outlined in the warning tone, same shape as
+   `.secondary` (never plain text, never a `ghost`) so a destructive
+   control is visually distinct from a safe one at a glance, not just by
+   its label. */
+.destructive {
+  background: color-mix(in srgb, var(--status-danger) 8%, transparent);
+  color: var(--status-danger);
+  border-color: var(--status-danger);
+}
+.destructive:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--status-danger) 16%, transparent);
+}

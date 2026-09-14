@@ -157,7 +157,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
                         ))}
                       </select>
                       <Button
-                        variant="ghost"
+                        variant="destructive"
                         aria-label={`Remove ${label}`}
                         onClick={() => {
                           void removeMemberRow(member.user_id);
@@ -282,7 +282,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
                         </Button>
                       )}
                       <Button
-                        variant="ghost"
+                        variant="destructive"
                         aria-label={`Revoke invite for ${invite.email}`}
                         onClick={() => {
                           void revokeInviteRow(invite.id);

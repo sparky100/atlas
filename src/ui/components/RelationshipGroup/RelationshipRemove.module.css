@@ -65,6 +65,13 @@
   background: var(--bg-subtle);
 }
 
+/* UI-principles §8.10: a destructive menu row reads in the warning tone,
+   not the same neutral text every other menu item uses — matches
+   `ElementHeader.module.css`'s own `.menuItemDanger`. */
+.menuItemDanger {
+  color: var(--status-danger);
+}
+
 .panel {
   display: flex;
   flex-direction: column;

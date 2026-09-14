@@ -43,7 +43,7 @@ export function TypedNameConfirm({ requiredName, actionLabel, onConfirm, disable
         disabled={disabled}
         aria-label={`Type ${requiredName} to confirm`}
       />
-      <Button variant="primary" disabled={disabled || !matches} onClick={onConfirm}>
+      <Button variant="destructive" disabled={disabled || !matches} onClick={onConfirm}>
         {actionLabel}
       </Button>
     </div>

@@ -23,6 +23,9 @@ export const Variants: Story = {
       <Button {...args} variant="ghost">
         Cancel
       </Button>
+      <Button {...args} variant="destructive">
+        Remove
+      </Button>
     </div>
   ),
 };

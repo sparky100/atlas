@@ -115,3 +115,11 @@
 .menuItem:hover {
   background: var(--bg-subtle);
 }
+
+/* UI-principles §8.10: a destructive menu row ("Remove from model…")
+   reads in the warning tone, not the same neutral text every other menu
+   item uses — matches `RelationshipRemove.module.css`'s own
+   `.menuItemDanger`. */
+.menuItemDanger {
+  color: var(--status-danger);
+}
