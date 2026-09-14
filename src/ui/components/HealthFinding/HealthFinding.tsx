@@ -57,7 +57,13 @@ export function HealthFinding({ summary, items, browseHref, browseLabel, itemAct
   const pageItems = items.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE);
 
   return (
-    <div>
+    // Visual pass (director/architect doors): this only ever renders past
+    // the `items.length === 0` return above, so it's always the "real,
+    // non-zero" case — a tinted background, not just the plate/
+    // BlueprintFrame border the caller (ArchitectHome.tsx's `checkPlate`)
+    // already draws around it, so a finding with something in it reads as
+    // a gap at a glance rather than looking identical to a clean one.
+    <div className={styles.weak}>
       <Text as="p">{summary}</Text>
       {!expanded && (
         <Text as="p" tone="muted" size="sm">

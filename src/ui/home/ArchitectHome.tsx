@@ -387,7 +387,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
     <div className={styles.columns}>
       <div className={styles.main}>
         <Panel>
-          <Text as="h2" size="lg">
+          <Text as="h2" size="xl" className={styles.sectionTitle}>
             Review queue
           </Text>
           <div className={styles.count}>
@@ -408,7 +408,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
         </Panel>
 
         <Panel>
-          <Text as="h2" size="lg">
+          <Text as="h2" size="xl" className={styles.sectionTitle}>
             Health findings
           </Text>
 
@@ -450,7 +450,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
               says nothing about whether Assurance also has nothing to
               show, and vice versa), now a subsection of this one panel
               rather than a standalone Panel of its own. */}
-          <Text as="h3" size="md">
+          <Text as="h3" size="lg" className={styles.subsectionTitle}>
             Assurance
           </Text>
           {activeAssuranceChecks.length > 0 && <div className={styles.findingPlates}>{activeAssuranceChecks.map(checkPlate)}</div>}
@@ -460,7 +460,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
 
       <div className={styles.side}>
         <Panel>
-          <Text as="h2" size="lg">
+          <Text as="h2" size="xl" className={styles.sectionTitle}>
             My changes
           </Text>
           {data.myOpenBranches.length === 0 ? (
@@ -482,7 +482,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
         </Panel>
 
         <Panel>
-          <Text as="h2" size="lg">
+          <Text as="h2" size="xl" className={styles.sectionTitle}>
             Recent activity
           </Text>
           {data.recentCommits.length === 0 ? (

@@ -1,3 +1,14 @@
+/* Visual pass (director/architect doors, item 1): every finding this
+   component renders past its own `items.length === 0` early return is a
+   real, non-zero gap — background tint, not just the plate border already
+   drawn around it by the caller. Padding of its own so the tint doesn't
+   run flush against that outer border. */
+.weak {
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--status-weak-bg);
+}
+
 .actions {
   display: flex;
   align-items: center;
