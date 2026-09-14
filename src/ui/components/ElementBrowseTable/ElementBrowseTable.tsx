@@ -3,19 +3,44 @@ import { Link } from 'react-router';
 import type { AttributeDefinitionKind } from '../../../contracts/attributeSchema';
 import { attributeDefinitionToFieldSchema } from '../../../contracts/attributeSchema';
 import type { ElementType, UUID } from '../../../contracts/delta';
-import type { Json } from '../../../contracts/rows';
 import { ELEMENT_TYPE_FILTER_OPTIONS } from '../../../db/elementBrowse';
 import type { AttributeDefinitionRow, BranchRow } from '../../../db/types';
 import type { ThreadCount } from '../../comments/useThreadCounts';
-import { attributesRecord } from '../../elements/attributesRecord';
+import { attributesRecord, formatCustomAttributeValue } from '../../elements/attributesRecord';
 import type { DraftValue } from '../../elements/useElementEditor';
 import { RelationshipAdd } from '../RelationshipGroup/RelationshipAdd';
 import { AttributeValueInput } from '../AttributeValueInput/AttributeValueInput';
+import { Button } from '../Button/Button';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
+import { elementBrowseRowsToCsv, sanitizeForFilename } from '../../elements/elementBrowseCsv';
 import { sortKeyEquals, type ElementBrowseState } from '../../elements/useElementBrowse';
 import styles from './ElementBrowseTable.module.css';
+
+/**
+ * F8 (issue #162): triggers a real browser download of `csv` as
+ * `filename` — the first file-download mechanism in this app
+ * (`exportDecisionAsAdr.ts`'s own comment notes none existed before this;
+ * that feature copies to the clipboard instead, since a generated markdown
+ * ADR is a paste-elsewhere action — a spreadsheet export is a case where a
+ * real downloaded file *is* the product requirement). Plain
+ * Blob + object URL + a momentary `<a download>` click, revoked
+ * immediately after — no library, no server round trip.
+ */
+function downloadCsv(filename: string, csv: string): void {
+  // A UTF-8 BOM so Excel (which otherwise guesses the system codepage for
+  // a plain .csv) reliably reads non-ASCII names/values as UTF-8.
+  const blob = new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 /**
  * Sprint U4-1 B3: "the browse table filtered to unlinked systems with the
@@ -67,13 +92,6 @@ const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle'; label: string }[]
   { key: 'owner', label: 'Owner' },
   { key: 'lifecycle', label: 'Lifecycle' },
 ];
-
-function formatCustomAttributeValue(value: Json | undefined): string {
-  if (value === undefined || value === null) return '';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'string' || typeof value === 'number') return String(value);
-  return JSON.stringify(value);
-}
 
 function customAttrValueToDraft(kind: AttributeDefinitionKind, raw: string | null): DraftValue {
   if (kind === 'boolean') return raw === 'true';
@@ -205,6 +223,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInli
         />
         <select
           className={styles.select}
+          aria-label="Element type"
           value={state.typeFilter}
           onChange={(e) => { state.setTypeFilter(e.target.value as ElementType | 'all'); }}
         >
@@ -215,6 +234,17 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInli
           ))}
         </select>
         <CustomAttributePicker definitions={applicableCustomDefinitions} selection={customAttr} onChange={onCustomAttrChange} />
+        <Button
+          variant="secondary"
+          disabled={state.rows.length === 0}
+          onClick={() => {
+            const csv = elementBrowseRowsToCsv(state.rows, selectedCustomDefinition);
+            const typePart = state.typeFilter === 'all' ? 'elements' : state.typeFilter;
+            downloadCsv(`${sanitizeForFilename(typePart)}-export.csv`, csv);
+          }}
+        >
+          Export CSV
+        </Button>
       </div>
 
       {state.rows.length === 0 ? (
