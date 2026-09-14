@@ -99,7 +99,7 @@ export function RemoveFromModelAction({
         })}
       </ul>
       <div className={styles.actions}>
-        <Button variant="primary" onClick={() => void remove()} disabled={status === 'removing'}>
+        <Button variant="destructive" onClick={() => void remove()} disabled={status === 'removing'}>
           {status === 'removing' ? 'Removing…' : 'Remove from model'}
         </Button>
         <Button variant="ghost" onClick={onCancel} disabled={status === 'removing'}>

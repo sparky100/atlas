@@ -531,6 +531,20 @@ Three constants, global for v1, defined once in `src/contracts/thresholds.ts` an
 
 If per-model thresholds are ever wanted, they become a settings row plus a lookup that falls back to these constants — not a refactor. There is no evidence yet that organisations want different thresholds, and per-model settings would cost a UI and tests.
 
+### 8.10 Buttons
+
+One component (`src/ui/components/Button/Button.tsx`), three tiers, global — checked once here, not re-litigated per screen. A `LinkButton` (`Link` styled identically, for real navigation) shares the same three.
+
+| Variant | Look | For |
+|---|---|---|
+| `primary` | Solid, `--accent` | The one main forward action per section — `Approve`, `Merge`, `Save`. At most one per section; a section with two equally-weighted forward actions has picked the wrong one to make `primary`, not grown a second. |
+| `secondary` | Outlined, `--border-strong` | Any other safe, reversible action — `Cancel` (closing a form that hasn't committed anything yet), `Back`, `Refresh`, a lifecycle change with an easy way back (`Archive`/`Restore`, `Retire…`). |
+| `destructive` | Outlined in `--status-danger` | An action that removes, retracts, cancels, revokes, or deletes something real — cancelling an already-open change, removing a relationship or an element from the model, revoking an invite, removing a member, deleting a model or organisation. |
+
+`destructive` is never rendered as plain text, a bare link, or `ghost` — found in a walkthrough as "Cancel this change…" rendering `ghost`, indistinguishable from a safe action until read closely. A destructive action inside a non-Button list control (an element header's "⋯" overflow menu, a relationship row's own menu) isn't wrapped in the full outlined pill — that would look wrong in a menu — but still gets the warning tone as text colour (`--status-danger`), never the same neutral colour as the rest of the list.
+
+The test that decides the tier: would picking this by accident or muscle memory lose something a reader can't get back in a click or two? A form's own `Cancel`/`Back` that discards nothing yet-committed is `secondary`; an action whose own effect sentence has to spell out what it retracts (`RemoveFromModelAction.tsx`'s own confirmation panel) is `destructive`. Not every "closes something" action is destructive — reversibility is what's being judged, not the verb alone; `Archive`/`Deprecate` stay `secondary` exactly because a `Restore` sits right next to them.
+
 ---
 
 ## 9. What we will not build

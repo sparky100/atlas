@@ -105,7 +105,7 @@ export function RelationshipRemove({ relationship, direction, elementName, other
       </button>
       {open && !confirming && (
         <div id={menuId} className={styles.menu}>
-          <button type="button" className={styles.menuItem} onClick={() => { setConfirming(true); }}>
+          <button type="button" className={`${styles.menuItem} ${styles.menuItemDanger}`} onClick={() => { setConfirming(true); }}>
             <Text as="span">Remove</Text>
           </button>
         </div>
@@ -129,7 +129,7 @@ export function RelationshipRemove({ relationship, direction, elementName, other
                 {otherCandidates.map((candidate) => {
                   const capability = endpoints.get(candidate.to_element_id);
                   return (
-                    <Button key={candidate.relationship_id} variant="secondary" onClick={() => { removeWithPromotion(candidate); }} disabled={status === 'removing'}>
+                    <Button key={candidate.relationship_id} variant="destructive" onClick={() => { removeWithPromotion(candidate); }} disabled={status === 'removing'}>
                       {status === 'removing' ? 'Removing…' : `Remove and make ${capability?.name ?? UNKNOWN_NAME} primary`}
                     </Button>
                   );
@@ -138,7 +138,7 @@ export function RelationshipRemove({ relationship, direction, elementName, other
             </>
           )}
           <div className={styles.actions}>
-            <Button variant={isPrimarySupports && otherCandidates.length > 0 ? 'ghost' : 'secondary'} onClick={() => { void remove(); }} disabled={status === 'removing'}>
+            <Button variant="destructive" onClick={() => { void remove(); }} disabled={status === 'removing'}>
               {status === 'removing' ? 'Removing…' : 'Remove'}
             </Button>
             <Button variant="ghost" onClick={close} disabled={status === 'removing'}>

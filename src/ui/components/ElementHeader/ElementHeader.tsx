@@ -266,7 +266,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onPro
             {onRemoveFromModel && (
               <button
                 type="button"
-                className={styles.menuItem}
+                className={`${styles.menuItem} ${styles.menuItemDanger}`}
                 onClick={() => {
                   setMenuOpen(false);
                   onRemoveFromModel();
