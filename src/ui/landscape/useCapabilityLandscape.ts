@@ -8,12 +8,21 @@ import { getElementsByIds } from '../../db/elements';
 import { listActorsForLandscape, listLandscapeEdges } from '../../db/landscape';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import type { ViewMode } from '../../db/viewMode';
-import { capabilitySubtreeIds, computeCapabilityLandscapeRows, type CapabilityLandscapeRows } from './capabilityLandscapeRows';
+import { computeCapabilityLandscapeRows, type CapabilityLandscapeRows } from './capabilityLandscapeRows';
+import { capabilitySubtreeIds } from '../elements/capabilityDepth';
+import { computeCapabilityRollup, type CapabilityRollup } from '../capabilityMap/capabilityRollup';
+import { computeSelfOwnedCapabilityIds } from '../../db/healthFindings';
 import { withModuleLabels } from './landscapeModules';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
-export type CapabilityLandscapeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: CapabilityLandscapeRows };
+/** `rollup` is the same shared "capability rollup" every other level-1-tile surface computes (`src/ui/capabilityMap/capabilityRollup.ts`) — `rows` is this surface's own richer, per-system detail (Primary/Also-supports sections, owner-per-row, uses/used-by) the shared rollup doesn't produce. `rollup.supportingSystemIds.length` and `rows.count` are always equal by construction (both derive from the same `subtreeSupportsEdges`), kept as two fields rather than one to avoid `CapabilityLandscapeList`'s own established shape needing to change. */
+export interface CapabilityLandscapeData {
+  rows: CapabilityLandscapeRows;
+  rollup: CapabilityRollup;
+}
+
+export type CapabilityLandscapeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: CapabilityLandscapeData };
 
 export interface UseCapabilityLandscapeResult {
   state: CapabilityLandscapeState;
@@ -62,6 +71,8 @@ export function useCapabilityLandscape(
       let elementsByIds: (ids: readonly UUID[]) => Promise<Map<UUID, ElementsHeadRow>>;
       let landscapeEdges: RelationshipsHeadRow[];
       let ownersByElementId: Map<UUID, ElementsHeadRow>;
+      /** Owner rollup's own input — see the branch-mode assignment's comment. */
+      let allOwnsEdgesForRollup: RelationshipsHeadRow[];
 
       if (ref.kind === 'branch') {
         const branch = await resolveBranchRef(supabase, ref);
@@ -85,6 +96,13 @@ export function useCapabilityLandscape(
         const systemIdSet = new Set(systemIds);
         const ownsEdges = projection.relationshipsHead.filter((r) => r.relationship_type === 'owns' && systemIdSet.has(r.to_element_id));
         ownersByElementId = ownersByElementIdFromOwnsEdges(ownsEdges, actorsById);
+        // Owner rollup (below, after `capabilitiesById` is built) needs a
+        // wider owns-edge set than `ownersByElementId` above does: every
+        // `owns` edge targeting a subtree *capability* directly, in
+        // addition to the per-system ones already gathered — see
+        // `computeSelfOwnedCapabilityIds`'s own doc comment for why both
+        // shapes matter.
+        allOwnsEdgesForRollup = projection.relationshipsHead.filter((r) => r.relationship_type === 'owns' && (systemIdSet.has(r.to_element_id) || subtreeIds.has(r.to_element_id)));
       } else {
         const commitId = ref.kind === 'main' && mainCommitIdHint ? mainCommitIdHint : await resolveRef(supabase, currentModelId, ref);
         if (!commitId) {
@@ -104,6 +122,10 @@ export function useCapabilityLandscape(
           allOwnsEdges.filter((r) => systemIdSet.has(r.to_element_id)),
           actorsById,
         );
+        // `listOwnsEdges` already fetches every `owns` edge in the commit,
+        // unscoped — no further widening needed for the rollup's own
+        // ownership check, unlike the branch-mode arm above.
+        allOwnsEdgesForRollup = allOwnsEdges;
       }
 
       const systemIds = [...new Set(subtreeSupportsEdges.map((e) => e.from_element_id))];
@@ -120,7 +142,23 @@ export function useCapabilityLandscape(
       const capabilitiesById = new Map(capabilities.map((c) => [c.element_id, c]));
 
       const rows = computeCapabilityLandscapeRows(currentCapabilityId, subtreeSupportsEdges, systemsById, capabilitiesById, landscapeEdges, ownersByElementId);
-      if (!cancelled) setState({ status: 'ready', data: rows });
+
+      // The shared rollup (`src/ui/capabilityMap/capabilityRollup.ts`) — same
+      // function the other three level-1-tile surfaces call. Passing
+      // `subtreeSupportsEdges` (already scoped to this capability's own
+      // subtree by the query above) as its `supportsEdges` input, rather
+      // than every supports edge in the commit, keeps this hook's own
+      // query shape unchanged (CLAUDE.md rule 8: no reason to fetch a
+      // model-wide edge set just to re-derive a subset this hook already
+      // has); `computeCapabilityRollup`'s internal filter is then a no-op,
+      // not a narrowing.
+      const rootCapability = capabilitiesById.get(currentCapabilityId);
+      const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, subtreeSupportsEdges, allOwnsEdgesForRollup);
+      const rollup = rootCapability
+        ? computeCapabilityRollup(rootCapability, capabilities, capabilitiesById, subtreeSupportsEdges, selfOwnedIds)
+        : { subtreeCapabilityIds: [], subtreeSupportsEdges: [], supportingSystemIds: [], supportedCapabilityCount: 0, totalCapabilityCount: 0, isOwned: false };
+
+      if (!cancelled) setState({ status: 'ready', data: { rows, rollup } });
     }
 
     load().catch((e: unknown) => {

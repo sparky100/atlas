@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import { capabilitySubtreeIds, computeCapabilityLandscapeRows } from './capabilityLandscapeRows';
+import { computeCapabilityLandscapeRows } from './capabilityLandscapeRows';
 
 function capability(id: string, name: string, parentId: string | null = null): ElementsHeadRow {
   return { element_id: id, element_type: 'capability', name, parent_id: parentId, attributes: {}, exists_delta_id: `d-${id}` };
@@ -25,32 +25,11 @@ function landscapeEdge(type: 'uses' | 'flows_to', fromId: string, toId: string):
   return { relationship_id: `e-${String(nextOrdinal)}`, relationship_type: type, from_element_id: fromId, to_element_id: toId, attributes: {}, exists_delta_id: `d-e-${String(nextOrdinal)}` };
 }
 
-describe('capabilitySubtreeIds', () => {
-  it('includes the root and every descendant, across more than one level', () => {
-    const root = capability('root', 'Root');
-    const child = capability('child', 'Child', 'root');
-    const grandchild = capability('grandchild', 'Grandchild', 'child');
-    const unrelated = capability('unrelated', 'Unrelated');
-    const ids = capabilitySubtreeIds('root', [root, child, grandchild, unrelated]);
-    expect(ids).toEqual(new Set(['root', 'child', 'grandchild']));
-  });
-
-  it('never includes a sibling or an unrelated capability', () => {
-    const root = capability('root', 'Root');
-    const sibling = capability('sibling', 'Sibling');
-    const ids = capabilitySubtreeIds('root', [root, sibling]);
-    expect(ids).toEqual(new Set(['root']));
-  });
-
-  it('is order-independent (CLAUDE.md rule 6: deterministic given the same inputs)', () => {
-    const root = capability('root', 'Root');
-    const child = capability('child', 'Child', 'root');
-    const grandchild = capability('grandchild', 'Grandchild', 'child');
-    const a = capabilitySubtreeIds('root', [root, child, grandchild]);
-    const b = capabilitySubtreeIds('root', [grandchild, child, root]);
-    expect(a).toEqual(b);
-  });
-});
+// `capabilitySubtreeIds` itself moved to `src/ui/elements/capabilityDepth.ts`
+// (Sprint U4-2, "capability rollup") — its tests moved with it, to
+// `capabilityDepth.test.ts`. This file still re-exports the function (see
+// `capabilityLandscapeRows.ts`'s own top import) for its one remaining
+// direct caller, `useCapabilityLandscape.ts`.
 
 describe('computeCapabilityLandscapeRows', () => {
   it('sections a direct-to-root primary edge as Primary, with no viaCapability', () => {

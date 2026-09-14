@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
+import { Chip } from '../components/Chip/Chip';
 import { CommentsPanel } from '../components/CommentsPanel/CommentsPanel';
 import { DiffLegend } from '../components/DiffBadge/DiffLegend';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
@@ -252,7 +253,7 @@ export function LandscapePage() {
   // comment above), so its own `anchorIds`/`threadCounts` above are always
   // empty in that mode; this is `CapabilityLandscapeList`'s own separate
   // system-id set, fetched the same way, not a second mechanism.
-  const capabilitySystemIds = capabilityLandscapeState.status === 'ready' ? [...capabilityLandscapeState.data.primary, ...capabilityLandscapeState.data.secondary].map((row) => row.system.element_id) : [];
+  const capabilitySystemIds = capabilityLandscapeState.status === 'ready' ? [...capabilityLandscapeState.data.rows.primary, ...capabilityLandscapeState.data.rows.secondary].map((row) => row.system.element_id) : [];
   const capabilityThreadCountsState = useThreadCounts(model?.id ?? null, capabilitySystemIds);
   const capabilityThreadCounts = capabilityThreadCountsState.status === 'ready' ? capabilityThreadCountsState.counts : undefined;
   // M1 close-out item 1's own "per-session 'comments on this view' filter"
@@ -398,8 +399,17 @@ export function LandscapePage() {
         <div className={styles.header}>
           {/* Sprint U4-2c item 2: "Title 'Systems supporting X (N)'" — replaces the ordinary "Landscape" title outright while a capability filter is active, rather than appending to it, the same way this whole header's controls below (colour-by, comments-only, route-via-platforms) don't apply to the flat list either. `(N)` only once the count is actually known. */}
           <Text as="h1" size="2xl" className={styles.title}>
-            {capability ? `Systems supporting ${capability.name}${capabilityLandscapeState.status === 'ready' ? ` (${String(capabilityLandscapeState.data.count)})` : ''}` : 'Landscape'}
+            {capability ? `Systems supporting ${capability.name}${capabilityLandscapeState.status === 'ready' ? ` (${String(capabilityLandscapeState.data.rows.count)})` : ''}` : 'Landscape'}
           </Text>
+          {/* Capability rollup: the same "N/M supported" fraction and owner-coverage badge every level-1 tile surface shows — see `capabilityRollup.ts`'s own module comment. Shown only once the rollup is known and only while genuinely scoped to a real capability (never for the ordinary lane-based Landscape). */}
+          {capability && capabilityLandscapeState.status === 'ready' && (
+            <div className={styles.actions}>
+              <Chip tone={capabilityLandscapeState.data.rollup.supportedCapabilityCount === 0 ? 'warn' : 'neutral'}>
+                {capabilityLandscapeState.data.rollup.supportedCapabilityCount}/{capabilityLandscapeState.data.rollup.totalCapabilityCount} capabilities supported
+              </Chip>
+              <Chip tone={capabilityLandscapeState.data.rollup.isOwned ? 'ok' : 'warn'}>{capabilityLandscapeState.data.rollup.isOwned ? 'owned' : 'no owner recorded'}</Chip>
+            </div>
+          )}
           {/* Prompt 7k item 1: the landscape's own colour-by mode — desktop canvas only, same scoping as the comments-only filter beside it. */}
           {state.status === 'ready' && showCanvas && (
             <div className={styles.actions}>
@@ -503,7 +513,7 @@ export function LandscapePage() {
             {capabilityLandscapeState.status === 'ready' && (
               <>
                 <CapabilityLandscapeList
-                  rows={capabilityLandscapeState.data}
+                  rows={capabilityLandscapeState.data.rows}
                   elementHref={elementHref}
                   contextHref={nodeHref}
                   threadCounts={capabilityThreadCounts}
@@ -520,7 +530,7 @@ export function LandscapePage() {
                     role={role}
                     anchorType="element"
                     anchorId={commentsPanelElementId}
-                    subjectName={[...capabilityLandscapeState.data.primary, ...capabilityLandscapeState.data.secondary].find((row) => row.system.element_id === commentsPanelElementId)?.system.name ?? ''}
+                    subjectName={[...capabilityLandscapeState.data.rows.primary, ...capabilityLandscapeState.data.rows.secondary].find((row) => row.system.element_id === commentsPanelElementId)?.system.name ?? ''}
                     unresolvedCount={capabilityThreadCounts?.get(commentsPanelElementId)?.open ?? 0}
                     branchId={ref.kind === 'branch' ? (editingBranch?.id ?? null) : null}
                     viewKind="landscape"

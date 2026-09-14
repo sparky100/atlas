@@ -49,6 +49,46 @@ export function l1AncestorOf(capabilityId: UUID, allCapabilities: ReadonlyMap<UU
 }
 
 /**
+ * `rootId`'s own subtree, `rootId` itself included — a capability's parent
+ * is always another capability or null (V2), and nesting is capped at 3
+ * levels (ADR-016), but this walk doesn't lean on that cap: it's a plain
+ * breadth-first walk over `parent_id`, guarded against ever revisiting an
+ * id, so it terminates cleanly regardless of depth.
+ *
+ * Moved here (Sprint U4-2, "capability rollup") from
+ * `src/ui/landscape/capabilityLandscapeRows.ts`, its original home — this
+ * file is the established "capability tree structure, consumed
+ * cross-feature" home (`l1AncestorOf`'s own ancestor walk is already used
+ * by landscape code from here), and the new shared capability-rollup module
+ * (`src/ui/capabilityMap/capabilityRollup.ts`) needed the same descendant
+ * walk without taking a dependency on `src/ui/landscape/`.
+ */
+export function capabilitySubtreeIds(rootId: UUID, allCapabilities: readonly ElementsHeadRow[]): Set<UUID> {
+  const childrenByParentId = new Map<UUID, UUID[]>();
+  for (const capability of allCapabilities) {
+    if (capability.parent_id === null) continue;
+    const children = childrenByParentId.get(capability.parent_id) ?? [];
+    children.push(capability.element_id);
+    childrenByParentId.set(capability.parent_id, children);
+  }
+  const ids = new Set<UUID>([rootId]);
+  let frontier = [rootId];
+  while (frontier.length > 0) {
+    const next: UUID[] = [];
+    for (const id of frontier) {
+      for (const childId of childrenByParentId.get(id) ?? []) {
+        if (!ids.has(childId)) {
+          ids.add(childId);
+          next.push(childId);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return ids;
+}
+
+/**
  * Fetches whatever `l1AncestorOf` needs beyond `leafCapabilities` itself —
  * each one's parent, then grandparent, stopping as soon as a level's worth
  * of ids all resolve to root capabilities (`parent_id === null`) or two

@@ -9,6 +9,7 @@ import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
+import { computeCapabilityRollup } from './capabilityRollup';
 import { COLOUR_BY_OPTIONS, aggregateTileColourFor, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
 import type { CapabilityMapTree, L1Column, L2Card } from './layout';
 import { useCapabilityReorder } from './useCapabilityReorder';
@@ -43,6 +44,10 @@ export interface CapabilityMapViewProps {
   systemsById: Map<UUID, ElementsHeadRow>;
   /** Sprint U4-1 C4: the model-wide "does this model have any systems at all" answer — see `useCapabilityMap.ts`'s own `hasSystems` comment for why this isn't derived from `systemsById` above. Drives the "link systems to capabilities to see coverage" hint. */
   hasSystems: boolean;
+  /** Capability rollup: every capability at this ref, every level — the input `capabilityRollup.ts`'s subtree walk needs; `tree` is the same set already nested, kept flat here too since a tree shape isn't what that walk wants. */
+  capabilities: ElementsHeadRow[];
+  /** Capability rollup's owner-coverage input — `src/db/healthFindings.ts`'s `computeSelfOwnedCapabilityIds` result, computed once by the caller. */
+  selfOwnedIds: ReadonlySet<UUID>;
   /** Sprint U4-1 C4: resolved and persisted by the caller (`useColourByPreference`) — this component no longer owns colour-by as local state, so its default (director→exposure, architect→coverage, none-until-systems-exist) and "remember last choice per user" both live in one place. */
   colourBy: ColourByMode;
   onColourByChange: (mode: ColourByMode) => void;
@@ -173,7 +178,7 @@ export interface CapabilityMapViewProps {
  * already has. See `L1ColumnView`'s own comment for why this branches on
  * a JS `narrow` flag rather than a CSS media query.
  */
-export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, colourBy, onColourByChange, orgSlug, modelSlug, refParam, reorderCapability, reorderMode, onReorderModeChange, expanded, onToggleExpand, threadCounts, onCommentMarkerClick }: CapabilityMapViewProps) {
+export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, colourBy, onColourByChange, orgSlug, modelSlug, refParam, reorderCapability, reorderMode, onReorderModeChange, expanded, onToggleExpand, threadCounts, onCommentMarkerClick }: CapabilityMapViewProps) {
   const colourById = useId();
   const reorderModeId = useId();
   // Check B6: "Mobile (<768px): L1 groups as a collapsed list [...] one
@@ -213,6 +218,9 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
   if (tree.l1.length === 0 && tree.orphans.length === 0) {
     return <EmptyState>No capabilities yet. A capability map has nothing to show until at least one Capability element exists.</EmptyState>;
   }
+
+  // Capability rollup's own ancestor-walk input (`isCapabilityOwnedWithAncestry`) — built once per render rather than inside each L1 tile.
+  const capabilitiesById = new Map(capabilities.map((c) => [c.element_id, c]));
 
   return (
     <div>
@@ -258,6 +266,9 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
               colourBy={colourBy}
               supportsEdges={supportsEdges}
               systemsById={systemsById}
+              capabilities={capabilities}
+              capabilitiesById={capabilitiesById}
+              selfOwnedIds={selfOwnedIds}
               orgSlug={orgSlug}
               modelSlug={modelSlug}
               refParam={refParam}
@@ -374,6 +385,9 @@ function L1ColumnView({
   colourBy,
   supportsEdges,
   systemsById,
+  capabilities,
+  capabilitiesById,
+  selfOwnedIds,
   orgSlug,
   modelSlug,
   refParam,
@@ -393,6 +407,9 @@ function L1ColumnView({
   colourBy: ColourByMode;
   supportsEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
+  capabilities: ElementsHeadRow[];
+  capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>;
+  selfOwnedIds: ReadonlySet<UUID>;
   orgSlug: string;
   modelSlug: string;
   refParam: string;
@@ -411,18 +428,17 @@ function L1ColumnView({
   onCommentMarkerClick: ((capabilityId: UUID) => void) | undefined;
 }) {
   const panelId = useId();
-  const count = supportingSystemIds(column.capability.element_id, supportsEdges).length;
-  // Every L2 *and* L3 descendant, *and* the L1 capability itself (Sprint
-  // U4-2a item 3: "L1-level supports counted in coverage") — a `supports`
-  // edge can land directly on an L1 capability (nothing stops a system
-  // supporting a top-level capability with no children of its own yet, or
-  // in addition to its descendants), and the group-level Chip above used
-  // to only ever look at `column.l2`'s own descendants, silently dropping
-  // that edge from the aggregate even though `count`/the zoom link right
-  // next to it (both keyed on `column.capability.element_id` directly)
-  // already accounted for it correctly.
-  const descendantIds = [column.capability.element_id, ...column.l2.flatMap((card) => [card.capability.element_id, ...card.l3.map((leaf) => leaf.element_id)])];
-  const aggregateColour = aggregateTileColourFor(colourBy, descendantIds, supportsEdges, systemsById);
+  // Capability rollup (Sprint U4-2, "capability rollup", decided): a level-1
+  // tile's own system count and "N/M supported" fraction are always a
+  // rollup over its subtree (itself plus every L2/L3 descendant), deduped
+  // by system — the shared `computeCapabilityRollup` also supplies this
+  // Chip's own `descendantCapabilityIds` input, replacing the inline
+  // flattened-id-list builder that used to live here (it hand-rolled the
+  // exact same "L1 itself + every L2 + every L3" set `capabilityRollup.ts`
+  // now computes once, shared across every level-1-tile surface).
+  const rollup = computeCapabilityRollup(column.capability, capabilities, capabilitiesById, supportsEdges, selfOwnedIds);
+  const count = rollup.supportingSystemIds.length;
+  const aggregateColour = aggregateTileColourFor(colourBy, rollup.subtreeCapabilityIds, supportsEdges, systemsById);
   const l2Count = column.l2.length;
 
   const l2Content = column.l2.map((card, index) =>
@@ -492,8 +508,9 @@ function L1ColumnView({
             </Text>
             <span className={styles.mobileGroupMeta}>
               {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <Chip tone={aggregateColour.tone}>{aggregateColour.label}</Chip>}
+              <Chip tone={rollup.isOwned ? 'ok' : 'warn'}>{rollup.isOwned ? 'owned' : 'no owner'}</Chip>
               <Text as="span" size="sm" tone="muted">
-                {l2Count} capabilit{l2Count === 1 ? 'y' : 'ies'} · {count} system{count === 1 ? '' : 's'}
+                {l2Count} capabilit{l2Count === 1 ? 'y' : 'ies'} · {count} system{count === 1 ? '' : 's'} · {rollup.supportedCapabilityCount}/{rollup.totalCapabilityCount} supported
               </Text>
             </span>
           </span>
@@ -540,6 +557,10 @@ function L1ColumnView({
           </Text>
         </Link>
         {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <Chip tone={aggregateColour.tone}>{aggregateColour.label}</Chip>}
+        <Chip tone={rollup.isOwned ? 'ok' : 'warn'}>{rollup.isOwned ? 'owned' : 'no owner'}</Chip>
+        <Text as="span" size="sm" tone="muted">
+          {rollup.supportedCapabilityCount}/{rollup.totalCapabilityCount} supported
+        </Text>
         <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
         {reorderCapability && (
           <ReorderButtons

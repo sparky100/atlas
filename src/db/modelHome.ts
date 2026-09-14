@@ -13,6 +13,7 @@
 import type { UUID } from '../contracts/delta';
 import type { CommitRow, DeltaRow, ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
 import { attributesRecord } from '../ui/elements/attributesRecord';
+import { computeCapabilityRollup } from '../ui/capabilityMap/capabilityRollup';
 import type { Client } from './client';
 import { assertInFilterSize } from './inFilterLimit';
 import { selectAll } from './selectAll';
@@ -204,13 +205,35 @@ export async function loadPlannedReplacements(supabase: Client, modelId: UUID): 
   return replacements;
 }
 
-/** One capability tile's worth of Handoff 7d's "Where are we weak" grid — everything a tile needs to render, already resolved. `tone` is `'neutral'` for a capability with zero supporting systems ("nothing recorded", §3.1's Coverage gap, distinct from Lifecycle Exposure — `computeExposureTone` is never called for that case, since it has nothing to evaluate). */
+/**
+ * One capability tile's worth of Handoff 7d's "Where are we weak" grid —
+ * everything a tile needs to render, already resolved. `tone` is
+ * `'neutral'` for a capability with zero supporting systems ("nothing
+ * recorded", §3.1's Coverage gap, distinct from Lifecycle Exposure —
+ * `computeExposureTone` is never called for that case, since it has
+ * nothing to evaluate).
+ *
+ * Capability rollup (Sprint U4-2, "capability rollup", decided):
+ * `supportingSystems`/`exposedSystems`/`tone` are all rolled up over the
+ * capability's own subtree (itself plus every descendant), not just its
+ * direct `supports` edges — see `buildCapabilityTiles`'s own comment.
+ * `supportedCapabilityCount`/`totalCapabilityCount`/`isOwned` are the same
+ * shared rollup's own fraction/owner fields, exposed here so the director
+ * door's tile can show them the same way the capability map and
+ * capability-scoped landscape do.
+ */
 export interface CapabilityTileData {
   capability: ElementsHeadRow;
   supportingSystems: ElementsHeadRow[];
   /** The subset of `supportingSystems` that's `retiring`/`retired` — empty unless `tone` is `warn` or `info`. */
   exposedSystems: ElementsHeadRow[];
   tone: ExposureTone | 'neutral';
+  /** `src/ui/capabilityMap/capabilityRollup.ts`'s own `supportedCapabilityCount` — the "N/M supported" fraction's numerator across this level-1 capability's subtree. */
+  supportedCapabilityCount: number;
+  /** Same rollup's `totalCapabilityCount` — the fraction's denominator. */
+  totalCapabilityCount: number;
+  /** Same rollup's `isOwned` — this capability or any ancestor has an owner. */
+  isOwned: boolean;
 }
 
 /**
@@ -220,20 +243,30 @@ export interface CapabilityTileData {
  * is the whole model's list from `loadPlannedReplacements`; this function
  * does the per-capability filtering `computeExposureTone` itself expects
  * its caller to have already done.
+ *
+ * Capability rollup: `supportingSystems`/`exposedSystems`/the tone
+ * computed from them are now rolled up across each level-1 capability's
+ * own subtree (via `computeCapabilityRollup`, the same shared function the
+ * capability map and capability-scoped landscape call), not just its
+ * direct `supports` edges — a supporting system on an L2/L3 descendant
+ * used to be invisible here even though the same edge already counted on
+ * the capability map's own aggregate Chip. `computeExposureTone` itself is
+ * untouched (this decision's own "exposure/lifecycle tone stay
+ * worst-of-children, already built") — only the edge scope handed to it
+ * widens, from the capability's own direct edges to its whole subtree's.
  */
 export function buildCapabilityTiles(
-  capabilities: readonly ElementsHeadRow[],
+  level1Capabilities: readonly ElementsHeadRow[],
+  /** Every capability at this ref, every level — `computeCapabilityRollup`'s own subtree-walk input. */
+  allCapabilities: readonly ElementsHeadRow[],
   supportsEdges: readonly RelationshipsHeadRow[],
   /** Same "systems and container-supporters both" map `computeExposureTone` expects — see that function's own doc comment. */
   systemsById: ReadonlyMap<UUID, ElementsHeadRow>,
   plannedReplacements: readonly PlannedReplacement[],
+  /** `src/db/healthFindings.ts`'s `computeSelfOwnedCapabilityIds` result — the rollup's own owner-coverage input. */
+  selfOwnedIds: ReadonlySet<UUID>,
 ): CapabilityTileData[] {
-  const edgesByCapability = new Map<UUID, RelationshipsHeadRow[]>();
-  for (const edge of supportsEdges) {
-    const list = edgesByCapability.get(edge.to_element_id) ?? [];
-    list.push(edge);
-    edgesByCapability.set(edge.to_element_id, list);
-  }
+  const capabilitiesById = new Map(allCapabilities.map((c) => [c.element_id, c]));
   const replacementsByCapability = new Map<UUID, Set<UUID>>();
   for (const replacement of plannedReplacements) {
     const set = replacementsByCapability.get(replacement.capabilityId) ?? new Set<UUID>();
@@ -241,11 +274,11 @@ export function buildCapabilityTiles(
     replacementsByCapability.set(replacement.capabilityId, set);
   }
 
-  return capabilities.map((capability): CapabilityTileData => {
-    const edges = edgesByCapability.get(capability.element_id) ?? [];
+  return level1Capabilities.map((capability): CapabilityTileData => {
+    const rollup = computeCapabilityRollup(capability, allCapabilities, capabilitiesById, supportsEdges, selfOwnedIds);
     const supportingSystems: ElementsHeadRow[] = [];
-    for (const edge of edges) {
-      const system = systemsById.get(edge.from_element_id);
+    for (const id of rollup.supportingSystemIds) {
+      const system = systemsById.get(id);
       if (system) supportingSystems.push(system);
     }
     const exposedSystems = supportingSystems.filter((system) => {
@@ -253,8 +286,16 @@ export function buildCapabilityTiles(
       return lifecycleStatus === 'retiring' || lifecycleStatus === 'retired';
     });
     const tone: ExposureTone | 'neutral' =
-      supportingSystems.length === 0 ? 'neutral' : computeExposureTone(edges, systemsById, replacementsByCapability.get(capability.element_id) ?? new Set());
-    return { capability, supportingSystems, exposedSystems, tone };
+      supportingSystems.length === 0 ? 'neutral' : computeExposureTone(rollup.subtreeSupportsEdges, systemsById, replacementsByCapability.get(capability.element_id) ?? new Set());
+    return {
+      capability,
+      supportingSystems,
+      exposedSystems,
+      tone,
+      supportedCapabilityCount: rollup.supportedCapabilityCount,
+      totalCapabilityCount: rollup.totalCapabilityCount,
+      isOwned: rollup.isOwned,
+    };
   });
 }
 

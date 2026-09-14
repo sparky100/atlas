@@ -3,6 +3,8 @@ import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows
 import type { UUID } from '../../contracts/delta';
 import { hasAnySystem, listSupportsEdgesForCapabilities, listCapabilitiesForMap } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
+import { listOwnsEdges } from '../../db/elementBrowse';
+import { computeSelfOwnedCapabilityIds } from '../../db/healthFindings';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
 import { getOrCreateModelView } from '../../db/views';
 import type { ViewRow } from '../../db/types';
@@ -19,6 +21,10 @@ export interface CapabilityMapData {
   systemsById: Map<UUID, ElementsHeadRow>;
   /** Sprint U4-1 C4: the model-wide answer, not derived from `systemsById` above — see `hasAnySystem`'s own comment for why those are different facts. */
   hasSystems: boolean;
+  /** Every capability at this ref, every level — `tree` is the same set already nested into L1/L2/L3; kept flat here too since the capability rollup (`capabilityRollup.ts`) needs a plain list/map to walk subtrees and resolve ancestors, not the tree shape. */
+  capabilities: ElementsHeadRow[];
+  /** `src/db/healthFindings.ts`'s `computeSelfOwnedCapabilityIds` result — the capability rollup's own owner-coverage input, computed once here rather than per tile. */
+  selfOwnedIds: ReadonlySet<UUID>;
 }
 
 export type CapabilityMapState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: CapabilityMapData };
@@ -104,8 +110,10 @@ export function useCapabilityMap(
 
       const view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'capability_map', name: 'Capability map', createdBy: currentUserId });
       const tree = computeCapabilityMapTree(capabilities);
+      const ownsEdges = await listOwnsEdges(supabase, commitId);
+      const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsEdges, ownsEdges);
 
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds } });
     }
 
     load().catch((e: unknown) => {
