@@ -20,10 +20,12 @@ export interface CreateOrganisationInput {
   name: string;
   slug: string;
   createdBy: UUID;
+  /** F3a: a "just me" personal organisation — skips the invite step and reads as personal in settings. Defaults to false. */
+  isPersonal?: boolean;
 }
 
 export async function createOrganisation(supabase: Client, input: CreateOrganisationInput): Promise<OrganisationRow> {
-  const row = { id: input.id, name: input.name, slug: input.slug, created_by: input.createdBy };
+  const row = { id: input.id, name: input.name, slug: input.slug, created_by: input.createdBy, is_personal: input.isPersonal ?? false };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('organisations').insert(row).select('*').single();
   if (error) throw new Error(`createOrganisation: ${error.message}`);
@@ -62,12 +64,18 @@ export async function getMyMembership(supabase: Client, orgId: UUID, userId: UUI
 export interface UpdateOrganisationInput {
   name?: string;
   slug?: string;
+  /** F3a: owner-editable review policy — the minimum number of architect members the required reviewer set must include. */
+  reviewMinRequiredArchitects?: number;
 }
 
-/** Sprint 7j item 2: rename/slug — gated by `organisations_update`'s RLS (owner) and the column-restricted grant `20260911050000_organisation_settings.sql` adds (name/slug only). */
+/** Sprint 7j item 2: rename/slug — gated by `organisations_update`'s RLS (owner) and the column-restricted grant `20260911050000_organisation_settings.sql` adds (name/slug only). F3a adds `review_min_required_architects` to that grant (20260914060000). */
 export async function updateOrganisation(supabase: Client, id: UUID, input: UpdateOrganisationInput): Promise<OrganisationRow> {
+  const patch: Record<string, unknown> = {};
+  if (input.name !== undefined) patch.name = input.name;
+  if (input.slug !== undefined) patch.slug = input.slug;
+  if (input.reviewMinRequiredArchitects !== undefined) patch.review_min_required_architects = input.reviewMinRequiredArchitects;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
-  const { data, error } = await supabase.from('organisations').update(input).eq('id', id).select('*').single();
+  const { data, error } = await supabase.from('organisations').update(patch).eq('id', id).select('*').single();
   if (error) throw new Error(`updateOrganisation: ${error.message}`);
   return data as OrganisationRow;
 }

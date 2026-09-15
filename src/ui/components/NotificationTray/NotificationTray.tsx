@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { useAuth } from '../../auth/useAuth';
 import { useNotificationTray } from '../../comments/useNotificationTray';
 import { notificationAnchorWords, notificationKindWording, truncateNotificationBody } from '../../comments/notificationFormat';
+import { formatRelativeTime } from '../../time';
 import { Avatar } from '../Avatar/Avatar';
 import { Button } from '../Button/Button';
 import { EmptyState } from '../EmptyState/EmptyState';
@@ -75,6 +76,11 @@ export function NotificationTray() {
                     {comment && (
                       <Text as="p" tone="faint" size="xs">
                         {notificationAnchorWords(subjectName, comment.anchor_type, comment.view_kind, now, notification.created_at)}
+                      </Text>
+                    )}
+                    {notification.kind === 'review_assigned' && (
+                      <Text as="p" tone="faint" size="xs">
+                        {subjectName ?? 'a change'} · {formatRelativeTime(notification.created_at, now)}
                       </Text>
                     )}
                   </div>

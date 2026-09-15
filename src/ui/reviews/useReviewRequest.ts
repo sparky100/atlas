@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getBranch } from '../../db/branches';
 import { getSourcesByIds } from '../../db/elements';
-import { getProfile } from '../../db/profiles';
+import { getProfile, listProfilesByIds } from '../../db/profiles';
 import {
   approveMergeRequest,
   computeMergeReviewForBranch,
@@ -15,7 +15,9 @@ import {
   resubmitMergeRequest,
   type MergeApprovedResult,
 } from '../../db/mergeRequests';
-import type { BranchRow, MergeRequestRow, ProfileRow, SourceRow } from '../../db/types';
+import type { BranchRow, MergeRequestRow, ProfileRow, ReviewVerdictRow, SourceRow } from '../../db/types';
+import { listReviewVerdictsForRequest, setReviewVerdict, setReviewers, type ReviewerInput } from '../../db/reviewVerdicts';
+import type { ReviewVerdict } from '../../db/types';
 import type { MergeReview } from '../../engine/merge';
 import type { FieldConflictChoice, StructuralChoice } from '../../engine/mergeResolution';
 import { reportError } from '../errors/errorBannerStore';
@@ -34,6 +36,10 @@ export interface ReviewRequestData {
   sourcesById: Map<UUID, SourceRow>;
   /** S1 item 3: "requester by display name" — `null` only if the profile row itself is somehow missing (never in practice past first membership, `getProfile`'s own comment); the view falls back to a short id fragment in that case rather than erroring. */
   requesterProfile: ProfileRow | null;
+  /** F3a: every assigned reviewer's verdict row (empty for a single-approver record/correct request, which never writes them). */
+  verdicts: ReviewVerdictRow[];
+  /** F3a: each verdict's reviewer profile, keyed by `user_id` (also covers `request.requested_by` when they are themselves a reviewer). */
+  reviewerProfiles: Map<UUID, ProfileRow>;
 }
 
 export type ReviewRequestState = { status: 'loading' } | { status: 'error'; message: string } | ({ status: 'ready' } & ReviewRequestData);
@@ -62,8 +68,20 @@ async function loadReviewRequestData(modelId: UUID, mergeRequestId: UUID): Promi
   }
   const sourcesById = await getSourcesByIds(supabase, [...sourceIds]);
   const requesterProfile = await getProfile(supabase, request.requested_by);
+  const verdicts = await listReviewVerdictsForRequest(supabase, request.id);
+  const reviewerProfiles = await listProfilesByIds(supabase, verdicts.map((v) => v.user_id));
 
-  return { status: 'ready', request, branch, mainHeadCommitId: computed.mainHeadCommitId, review: computed.review, sourcesById, requesterProfile };
+  return {
+    status: 'ready',
+    request,
+    branch,
+    mainHeadCommitId: computed.mainHeadCommitId,
+    review: computed.review,
+    sourcesById,
+    requesterProfile,
+    verdicts,
+    reviewerProfiles: new Map(reviewerProfiles.map((p) => [p.user_id, p])),
+  };
 }
 
 /**
@@ -243,6 +261,42 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
     }
   }, [state, reload]);
 
+  /** F3a: casts (or changes) the caller's own review verdict — `atlas.set_review_verdict`, which recomputes the gate transactionally. */
+  const castVerdict = useCallback(
+    async (verdict: ReviewVerdict, comment?: string) => {
+      if (state.status !== 'ready') return;
+      setActionError(null);
+      setActionStatus('working');
+      try {
+        await setReviewVerdict(supabase, state.request.id, verdict, comment);
+        reload();
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : 'Could not record your review.');
+      } finally {
+        setActionStatus('idle');
+      }
+    },
+    [state, reload],
+  );
+
+  /** F3a: the proposer (or an owner/architect) replaces the reviewer set while pending — `atlas.set_reviewers`. */
+  const updateReviewers = useCallback(
+    async (reviewers: readonly ReviewerInput[]) => {
+      if (state.status !== 'ready') return;
+      setActionError(null);
+      setActionStatus('working');
+      try {
+        await setReviewers(supabase, state.request.id, reviewers);
+        reload();
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : 'Could not update reviewers.');
+      } finally {
+        setActionStatus('idle');
+      }
+    },
+    [state, reload],
+  );
+
   const reject = useCallback(
     async (reviewNotes?: string) => {
       if (state.status !== 'ready') return;
@@ -309,6 +363,8 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
     reopenForEdits,
     pushRefreshAndResubmit,
     approve,
+    castVerdict,
+    updateReviewers,
     reject,
     merge,
   };

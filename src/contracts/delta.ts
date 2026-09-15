@@ -261,6 +261,18 @@ export interface ActorAttributes {
   orgUnit?: string;
   isExternal: boolean;
   externalOrganisation?: string;
+  /**
+   * F3a: the member this actor represents, when one exists — the link that
+   * lets a review's derived reviewer set resolve an owner *actor* to an
+   * actual *member* (`src/db/deriveReviewers.ts`). A `uuid` reference into
+   * `auth.users`, not an element ref (an actor's own `element_id` is its
+   * identity as a model subject; this is the person/team behind it, if the
+   * org has one on record). Optional and unset by default — an actor that
+   * never maps to a member simply contributes nothing to a derived reviewer
+   * set, the same "absent is silent" stance every other optional attribute
+   * here takes.
+   */
+  memberId?: UUID;
 }
 
 export interface ElementAttributesByType {

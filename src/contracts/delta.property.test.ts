@@ -81,7 +81,7 @@ const containerAttributes: fc.Arbitrary<ContainerAttributes> = fc.record(
 );
 const actorAttributes: fc.Arbitrary<ActorAttributes> = fc.record(
   // S1 item 11a: 'organisation' — see ActorSubtype's own doc comment (delta.ts).
-  { subtype: fc.constantFrom('person' as const, 'team' as const, 'organisation' as const), email: fc.string(), orgUnit: fc.string(), isExternal: fc.boolean(), externalOrganisation: fc.string() },
+  { subtype: fc.constantFrom('person' as const, 'team' as const, 'organisation' as const), email: fc.string(), orgUnit: fc.string(), isExternal: fc.boolean(), externalOrganisation: fc.string(), memberId: uuid },
   { requiredKeys: ['subtype', 'isExternal'] },
 );
 

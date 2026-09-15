@@ -9,9 +9,11 @@ export function truncateNotificationBody(body: string): string {
   return trimmed.length <= BODY_TRUNCATE_LENGTH ? trimmed : `${trimmed.slice(0, BODY_TRUNCATE_LENGTH)}…`;
 }
 
-/** "X mentioned you" / "X replied to your thread" — kind-dependent (the handoff's own 6c), now that `notification_kind` has both values (Sprint M1b step 1). */
+/** "X mentioned you" / "X replied to your thread" / "X asked you to review" — kind-dependent (the handoff's own 6c, extended for F3a's `review_assigned`). */
 export function notificationKindWording(kind: NotificationKind, authorName: string): string {
-  return kind === 'mention' ? `${authorName} mentioned you` : `${authorName} replied to your thread`;
+  if (kind === 'mention') return `${authorName} mentioned you`;
+  if (kind === 'review_assigned') return `${authorName} asked you to review`;
+  return `${authorName} replied to your thread`;
 }
 
 /**

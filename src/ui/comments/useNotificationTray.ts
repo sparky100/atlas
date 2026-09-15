@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
-import { getMainBranch } from '../../db/branches';
+import { getMainBranch, getBranch } from '../../db/branches';
 import { listCommentsByIds } from '../../db/comments';
 import { getDecision } from '../../db/decisions';
 import { getElementsByIds } from '../../db/elements';
 import { getModelById } from '../../db/models';
+import { getMergeRequestById } from '../../db/mergeRequests';
 import { getUnreadNotificationCount, listMyNotifications, markAllNotificationsRead, markNotificationRead } from '../../db/notifications';
 import { getOrganisationById } from '../../db/organisations';
 import { listProfilesByIds } from '../../db/profiles';
@@ -78,6 +79,25 @@ export function useNotificationTray(userId: UUID | null) {
         const profiles = await listProfilesByIds(supabase, authorIds);
         const profilesById = new Map(profiles.map((p) => [p.user_id, p]));
 
+        // F3a: review-assignment notifications name a merge request, not a
+        // comment — resolved to a review-page link, the branch title, and the
+        // requester's profile (the "who asked you to review").
+        const reviewMergeRequestIds = [...new Set(notifications.map((n) => n.merge_request_id).filter((id): id is UUID => id !== null))];
+        const reviewRows = new Map<UUID, { href: string; title: string; requesterId: UUID }>();
+        for (const mergeRequestId of reviewMergeRequestIds) {
+          const mr = await getMergeRequestById(supabase, mergeRequestId);
+          if (!mr) continue;
+          const [model, org, branch] = await Promise.all([getModelById(supabase, mr.model_id), getOrganisationById(supabase, mr.org_id), getBranch(supabase, mr.branch_id)]);
+          if (!model || !org) continue;
+          reviewRows.set(mergeRequestId, {
+            href: `/o/${org.slug}/m/${model.slug}/review/${mergeRequestId}`,
+            title: branch?.title ?? branch?.name ?? 'a change',
+            requesterId: mr.requested_by,
+          });
+        }
+        const requesterProfiles = await listProfilesByIds(supabase, [...reviewRows.values()].map((r) => r.requesterId));
+        const requesterProfilesById = new Map(requesterProfiles.map((p) => [p.user_id, p]));
+
         // One model/org/element-name resolution per distinct model, not
         // per notification — bounded by how many models this user's
         // recent notifications actually touch, typically one or two.
@@ -116,17 +136,21 @@ export function useNotificationTray(userId: UUID | null) {
         }
 
         const rows: NotificationTrayRow[] = notifications.map((notification) => {
+          const review = notification.merge_request_id ? reviewRows.get(notification.merge_request_id) : undefined;
           const comment = notification.comment_id ? commentsById.get(notification.comment_id) : undefined;
-          const authorProfile = comment ? profilesById.get(comment.author_id) : undefined;
+          const authorProfile = comment ? profilesById.get(comment.author_id) : review ? requesterProfilesById.get(review.requesterId) : undefined;
           const link = comment ? linkInfoByModel.get(comment.model_id) : undefined;
           const subjectName =
-            comment?.anchor_type === 'element'
-              ? elementNamesByModel.get(comment.model_id)?.get(comment.anchor_id)
-              : comment?.anchor_type === 'decision'
-                ? decisionTitlesByModel.get(comment.model_id)?.get(comment.anchor_id)
-                : undefined;
+            review !== undefined
+              ? review.title
+              : comment?.anchor_type === 'element'
+                ? elementNamesByModel.get(comment.model_id)?.get(comment.anchor_id)
+                : comment?.anchor_type === 'decision'
+                  ? decisionTitlesByModel.get(comment.model_id)?.get(comment.anchor_id)
+                  : undefined;
           let href: string | undefined;
-          if (comment && link) {
+          if (review) href = review.href;
+          else if (comment && link) {
             if (comment.anchor_type === 'element') href = `/o/${link.orgSlug}/m/${link.modelSlug}/e/${comment.anchor_id}#c=${comment.id}`;
             else if (comment.anchor_type === 'change') href = `/o/${link.orgSlug}/m/${link.modelSlug}/changes/${comment.anchor_id}#c=${comment.id}`;
             else if (comment.anchor_type === 'decision') href = `/o/${link.orgSlug}/m/${link.modelSlug}/decisions/${comment.anchor_id}#c=${comment.id}`;

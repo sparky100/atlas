@@ -29,6 +29,7 @@ import { useChange } from './useChange';
 import { useChangeSummary } from './useChangeSummary';
 import { useOpenMergeRequest } from './useOpenMergeRequest';
 import { useSubmitForReview } from './useSubmitForReview';
+import { ReviewerPicker } from './ReviewerPicker';
 import styles from './ChangeView.module.css';
 
 export interface ChangeViewProps {
@@ -97,6 +98,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   const [cancelReason, setCancelReason] = useState('');
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [pickingReviewers, setPickingReviewers] = useState(false);
 
   if (status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (status === 'not_found' || !branch) return <Text as="p">No change found for this id.</Text>;
@@ -108,6 +110,21 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   // below handle a `null` it should never actually see.
   const intent = branch.intent ?? 'propose';
   const dateFieldLabel = dateFieldLabelForIntent(intent);
+  // F3a: propose/explore carry a reviewer set at submit; record/correct stay
+  // on the single-approver path (no picker).
+  const isMultiReviewerIntent = intent === 'propose' || intent === 'explore';
+
+  const afterSubmitted = (mergeRequestId: UUID) => {
+    // Leaving vs finishing: "Back to main" leaves a still-editable Draft;
+    // "Submit for review" finishes it — the branch becomes read-only for the
+    // proposer the moment it's Proposed (canEditBranch's own
+    // `status === 'draft'` gate), so there is nothing left to be "in." Only
+    // clear the session's active ref if this branch was actually it — a
+    // reviewer or bystander submitting from a change page they weren't
+    // editing in has nothing to reset.
+    if (ref.kind === 'branch' && ref.branchId === branchId) clearRef();
+    void navigate(`/o/${orgSlug}/m/${modelSlug}/review/${mergeRequestId}`);
+  };
 
   const duplicateIntoNewDraft = async () => {
     setDuplicateError(null);
@@ -226,23 +243,36 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
                   variant="primary"
                   disabled={submission.status === 'submitting'}
                   onClick={() => {
-                    void submission.submit().then((mergeRequestId) => {
-                      if (!mergeRequestId) return;
-                      // Leaving vs finishing: "Back to main" leaves a still-
-                      // editable Draft; "Submit for review" finishes it — the
-                      // branch becomes read-only for the proposer the moment
-                      // it's Proposed (canEditBranch's own `status === 'draft'`
-                      // gate), so there is nothing left to be "in." Only clear
-                      // the session's active ref if this branch was actually
-                      // it — a reviewer or bystander submitting from a change
-                      // page they weren't editing in has nothing to reset.
-                      if (ref.kind === 'branch' && ref.branchId === branchId) clearRef();
-                      void navigate(`/o/${orgSlug}/m/${modelSlug}/review/${mergeRequestId}`);
-                    });
+                    if (isMultiReviewerIntent) {
+                      setPickingReviewers(true);
+                    } else {
+                      void submission.submit(null).then((mergeRequestId) => {
+                        if (!mergeRequestId) return;
+                        afterSubmitted(mergeRequestId);
+                      });
+                    }
                   }}
                 >
                   {submission.status === 'submitting' ? 'Submitting…' : 'Submit for review'}
                 </Button>
+              )}
+              {pickingReviewers && (
+                <ReviewerPicker
+                  orgId={orgId}
+                  modelId={modelId}
+                  branch={branch}
+                  submitting={submission.status === 'submitting'}
+                  onCancel={() => {
+                    setPickingReviewers(false);
+                  }}
+                  onSubmit={(reviewers) => {
+                    void submission.submit(reviewers).then((mergeRequestId) => {
+                      if (!mergeRequestId) return;
+                      setPickingReviewers(false);
+                      afterSubmitted(mergeRequestId);
+                    });
+                  }}
+                />
               )}
               {submission.error !== null && <Text as="p">{submission.error}</Text>}
             </>

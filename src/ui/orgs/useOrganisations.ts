@@ -10,7 +10,7 @@ export interface UseOrganisationsResult {
   error: string | null;
   /** Re-fetches the list — call after creating an organisation. */
   refresh: () => void;
-  createOrganisation: (name: string, slug: string, createdBy: string) => Promise<OrganisationRow>;
+  createOrganisation: (name: string, slug: string, createdBy: string, isPersonal?: boolean) => Promise<OrganisationRow>;
 }
 
 /** Organisations the signed-in user belongs to (RLS scopes the query — see organisations.ts's module comment). */
@@ -43,8 +43,8 @@ export function useOrganisations(): UseOrganisationsResult {
     setGeneration((g) => g + 1);
   }, []);
 
-  const create = useCallback(async (name: string, slug: string, createdBy: string) => {
-    const org = await createOrganisation(supabase, { id: crypto.randomUUID(), name, slug, createdBy });
+  const create = useCallback(async (name: string, slug: string, createdBy: string, isPersonal = false) => {
+    const org = await createOrganisation(supabase, { id: crypto.randomUUID(), name, slug, createdBy, isPersonal });
     setOrganisations((prev) => [...prev, org].sort((a, b) => a.name.localeCompare(b.name)));
     return org;
   }, []);

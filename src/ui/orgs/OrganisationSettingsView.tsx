@@ -42,6 +42,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
   const { invites, loading: invitesLoading, error: invitesError, create: createInviteRow, revoke: revokeInviteRow, resend: resendInviteRow } = useInvites(organisation.id, userId);
   const [name, setName] = useState(organisation.name);
   const [slug, setSlug] = useState(organisation.slug);
+  const [minArchitects, setMinArchitects] = useState(organisation.review_min_required_architects);
   const [deleteResult, setDeleteResult] = useState<'has_models' | 'not_found' | null>(null);
   const [deleteModelCount, setDeleteModelCount] = useState(0);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -59,6 +60,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
   // isn't programmatically associated with anything).
   const nameId = useId();
   const slugId = useId();
+  const minArchitectsId = useId();
   const inviteEmailId = useId();
   const inviteRoleId = useId();
 
@@ -68,11 +70,12 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
         <Text as="h2" size="lg">
           Organisation
         </Text>
+        {organisation.is_personal && <Chip tone="neutral">Personal</Chip>}
         <form
           className={styles.form}
           onSubmit={(e) => {
             e.preventDefault();
-            void update({ name, slug });
+            void update({ name, slug, reviewMinRequiredArchitects: minArchitects });
           }}
         >
           <label htmlFor={nameId}>
@@ -105,6 +108,26 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
               setSlug(e.target.value);
             }}
           />
+          <label htmlFor={minArchitectsId}>
+            <Text as="span" size="sm">
+              Minimum required architects
+            </Text>
+          </label>
+          <input
+            id={minArchitectsId}
+            className={styles.input}
+            type="number"
+            min={0}
+            value={minArchitects}
+            disabled={!canManage}
+            onChange={(e) => {
+              const parsed = Number.parseInt(e.target.value, 10);
+              setMinArchitects(Number.isNaN(parsed) ? 0 : parsed);
+            }}
+          />
+          <Text as="span" tone="muted" size="sm">
+            The fewest architect approvals a change review must have before it can merge.
+          </Text>
           {canManage && (
             <Button variant="primary" type="submit" disabled={status === 'saving'}>
               {status === 'saving' ? 'Saving…' : 'Save'}

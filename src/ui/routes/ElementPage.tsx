@@ -45,6 +45,7 @@ import { ALIAS_TYPE_LABELS, aliasAsFact } from '../elements/aliasLabels';
 import { useElementPage } from '../elements/useElementPage';
 import { useElementEditor, type DraftValue } from '../elements/useElementEditor';
 import { useElementRename } from '../elements/useElementRename';
+import { ActorMemberPicker } from '../elements/ActorMemberPicker';
 import { isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import styles from './ElementPage.module.css';
 
@@ -362,6 +363,18 @@ export function ElementPage() {
                       aliases={state.data.aliases}
                       aliasSources={state.data.aliasSources}
                       customFields={customFieldsForEditing}
+                    />
+                  )}
+                  {canEdit && state.data.element.element_type === 'actor' && userId && (
+                    <ActorMemberPicker
+                      modelId={model.id}
+                      orgId={organisation?.id ?? ''}
+                      userId={userId}
+                      element={state.data.element}
+                      facts={state.data.facts}
+                      branch={editingBranch}
+                      expectedHeadCommitId={state.data.commitId}
+                      onSaved={reloadAfterCommit}
                     />
                   )}
                 </CollapsibleSection>

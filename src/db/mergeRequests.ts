@@ -94,9 +94,14 @@ function classificationJson(review: MergeReview): Record<string, unknown> {
   return review.classification as unknown as Record<string, unknown>;
 }
 
-export async function submitMergeRequest(supabase: Client, id: UUID, branchId: UUID, review: MergeReview): Promise<MergeRequestRow> {
+export async function submitMergeRequest(supabase: Client, id: UUID, branchId: UUID, review: MergeReview, reviewers: readonly { userId: UUID; required: boolean }[] | null = null): Promise<MergeRequestRow> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.schema('atlas').rpc('submit_merge_request', { p_id: id, p_branch_id: branchId, p_classification: classificationJson(review) });
+  const { data, error } = await supabase.schema('atlas').rpc('submit_merge_request', {
+    p_id: id,
+    p_branch_id: branchId,
+    p_classification: classificationJson(review),
+    p_reviewers: reviewers ? reviewers.map((r) => ({ user_id: r.userId, required: r.required })) : null,
+  });
   if (error) throw new Error(`submitMergeRequest: ${error.message}`);
   return data as MergeRequestRow;
 }

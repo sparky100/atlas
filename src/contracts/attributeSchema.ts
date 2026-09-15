@@ -193,8 +193,13 @@ const ACTOR_META: Record<keyof ActorAttributes, AttributeFieldMeta> = {
   orgUnit: { label: 'Org unit', required: false, kind: 'text' },
   isExternal: { label: 'External', required: true, kind: 'boolean' },
   externalOrganisation: { label: 'External organisation', required: false, kind: 'text' },
+  // F3a: an actor's member link is a uuid reference into auth.users, not a
+  // free-text/selected attribute — excluded from the generic Attributes
+  // display/edit form (the same `templateRef` pattern) and handled by the
+  // actor page's own dedicated member picker instead.
+  memberId: { label: 'Member', required: false, kind: 'text', editable: false, hidden: true },
 };
-const ACTOR_ORDER: (keyof ActorAttributes)[] = ['subtype', 'email', 'orgUnit', 'isExternal', 'externalOrganisation'];
+const ACTOR_ORDER: (keyof ActorAttributes)[] = ['subtype', 'email', 'orgUnit', 'isExternal', 'externalOrganisation', 'memberId'];
 
 export const ATTRIBUTE_SCHEMA_BY_TYPE: Record<ElementType, readonly AttributeFieldSchema[]> = {
   capability: schemaOf(CAPABILITY_ORDER, CAPABILITY_META),

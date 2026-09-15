@@ -1,9 +1,10 @@
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { refQueryParam } from '../../db/ref';
+import type { ReviewVerdict } from '../../db/types';
 import { Button } from '../components/Button/Button';
 import { CardComments } from '../components/CardComments/CardComments';
-import { Chip } from '../components/Chip/Chip';
+import { Chip, type ChipTone } from '../components/Chip/Chip';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { profileLabel } from '../comments/profileLabel';
@@ -18,6 +19,8 @@ import { mergeRequestStatusTone } from './mergeRequestStatus';
 import { SplitReviewPanel } from './SplitReviewPanel';
 import { useReviewRequest } from './useReviewRequest';
 import styles from './ReviewRequestView.module.css';
+
+const VERDICT_TONE: Record<ReviewVerdict, ChipTone> = { approve: 'ok', request_changes: 'danger', abstain: 'neutral', pending: 'neutral' };
 
 export interface ReviewRequestViewProps {
   modelId: UUID;
@@ -72,13 +75,19 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
   if (rr.state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (rr.state.status === 'error') return <Text as="p">{rr.state.message}</Text>;
 
-  const { request, branch, review, mainHeadCommitId, requesterProfile } = rr.state;
+  const { request, branch, review, mainHeadCommitId, requesterProfile, verdicts, reviewerProfiles } = rr.state;
   const { classification, threeWay } = review;
   const blockingFindings = classification.findings.filter((f) => f.blocking);
   const identityFindings = classification.findings.filter((f) => !f.blocking);
   const fieldConflictFindings = blockingFindings.filter((f) => f.class === 'field-conflict');
   const { retractions, duplicates, cardinalities } = groupStructuralFindings(review);
   const structuralCardCount = retractions.length + duplicates.length + cardinalities.length;
+  // F3a: propose/explore carry a reviewer set; record/correct stay on the
+  // single-approver path (the change page's own "Approve & merge").
+  const isMultiReviewer = branch.intent === 'propose' || branch.intent === 'explore';
+  const requiredVerdicts = verdicts.filter((v) => v.required);
+  const approvedRequiredCount = requiredVerdicts.filter((v) => v.verdict === 'approve').length;
+  const myVerdict = userId ? verdicts.find((v) => v.user_id === userId) : undefined;
   // S1 item 3: "counts of things, not facts" — `classification.findings` is
   // flat and per-attribute (two conflicting attributes on one element are
   // two entries), so counting it directly counts conflicting *facts*, not
@@ -142,6 +151,34 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
 
         {rr.actionError !== null && <Text as="p">{rr.actionError}</Text>}
       </Panel>
+
+      {isMultiReviewer && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Reviewers
+          </Text>
+          <Text as="p" tone="muted" size="sm">
+            {approvedRequiredCount} of {requiredVerdicts.length} required approver{requiredVerdicts.length === 1 ? '' : 's'}
+          </Text>
+          <ul className={styles.cardList}>
+            {verdicts.map((v) => {
+              const profile = reviewerProfiles.get(v.user_id);
+              return (
+                <li key={v.user_id}>
+                  <Text as="span">{profile ? profileLabel(profile) : v.user_id}</Text>
+                  <Chip tone={VERDICT_TONE[v.verdict]}>{v.verdict.replace('_', ' ')}</Chip>
+                  <Chip tone="neutral">{v.required ? 'required' : 'optional'}</Chip>
+                  {v.comment && v.comment.trim().length > 0 && (
+                    <Text as="span" tone="muted" size="sm">
+                      {v.comment}
+                    </Text>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
+      )}
 
       {request.status === 'pending' && threeWay.upToDateWithMain && (
         <SplitReviewPanel modelId={modelId} branch={branch} mainHeadCommitId={mainHeadCommitId} review={review} canSplit={canApproveOrMerge} onSplit={rr.reload} />
@@ -285,7 +322,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
               Reject
             </Button>
           )}
-          {canApproveOrMerge && (
+          {!isMultiReviewer && canApproveOrMerge && (
             <Button
               variant="primary"
               disabled={!canApproveNow || rr.actionStatus === 'working'}
@@ -296,6 +333,22 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
             >
               Approve
             </Button>
+          )}
+          {isMultiReviewer && myVerdict !== undefined && request.status === 'pending' && (
+            <div className={styles.verdictControls}>
+              <Text as="span" size="sm" tone="muted">
+                Your review:
+              </Text>
+              <Button variant="primary" disabled={rr.actionStatus === 'working' || myVerdict.verdict === 'approve'} onClick={() => void rr.castVerdict('approve')}>
+                Approve
+              </Button>
+              <Button variant="secondary" disabled={rr.actionStatus === 'working'} onClick={() => void rr.castVerdict('request_changes')}>
+                Request changes
+              </Button>
+              <Button variant="ghost" disabled={rr.actionStatus === 'working' || myVerdict.verdict === 'abstain'} onClick={() => void rr.castVerdict('abstain')}>
+                Abstain
+              </Button>
+            </div>
           )}
           {canApproveOrMerge && request.status === 'approved' && (
             <Button

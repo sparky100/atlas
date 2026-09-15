@@ -20,6 +20,10 @@ export interface OrganisationRow {
   slug: string;
   created_by: UUID;
   created_at: string;
+  /** F3a: a personal ("just me") organisation — reads as such in settings, and skips the invite step. */
+  is_personal: boolean;
+  /** F3a: the minimum number of architect members the required reviewer set must include (org review policy), default 1. */
+  review_min_required_architects: number;
 }
 
 /** The literal shape of a row in `members`. */
@@ -112,6 +116,9 @@ export interface BranchRow {
 
 export type MergeRequestStatus = 'pending' | 'changes_requested' | 'approved' | 'merged' | 'rejected';
 
+/** F3a: one assigned reviewer's verdict on a merge request (`review_verdicts`). */
+export type ReviewVerdict = 'approve' | 'request_changes' | 'abstain' | 'pending';
+
 /** The literal shape of a row in `merge_requests` (SPEC §3.7, ADR-006) — written only by the atlas.* review-queue functions in supabase/migrations/20260906161000_merge_review_queue.sql, never a raw insert/update. */
 export interface MergeRequestRow {
   id: UUID;
@@ -131,6 +138,21 @@ export interface MergeRequestRow {
   /** SPEC §10.2 P-18: identity-warning pairs ("keep both") dismissed for this request — sorted "<idA> <idB>" pair keys, the same shape `useReviewRequest.ts` already derives. Survives `classification` being wholly recomputed on every refresh/resubmit (a separate column for exactly that reason — Sprint C2 step 7). */
   dismissed_identity_pairs: string[];
   created_at: string;
+}
+
+/** The literal shape of a row in `review_verdicts` (F3a) — written only by `atlas.submit_merge_request`/`set_reviewers`/`set_review_verdict`, never a raw client insert/update. */
+export interface ReviewVerdictRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  merge_request_id: UUID;
+  user_id: UUID;
+  /** Whether this reviewer's approval is required for the merge gate. */
+  required: boolean;
+  verdict: ReviewVerdict;
+  comment: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 /** The literal shape of a row in `resolved_conflicts` (SPEC §3.6, ADR-007) — a human's choice between two disagreeing facts, written only by atlas.commit_deltas alongside the resolving commit. */
@@ -240,13 +262,15 @@ export interface CommentMentionRow {
   user_id: UUID;
 }
 
-/** The literal shape of a row in `notifications` — written only by `atlas.process_comment_mentions`. In-app only, no email delivery. */
+/** The literal shape of a row in `notifications` — written only by `atlas.process_comment_mentions` and (F3a) `atlas.submit_merge_request`/`atlas.set_reviewers`. In-app only, no email delivery. */
 export interface NotificationRow {
   id: UUID;
   org_id: UUID;
   user_id: UUID;
   kind: NotificationKind;
   comment_id: UUID | null;
+  /** F3a: set only for `review_assigned` notifications, null for comment mention/reply notifications. */
+  merge_request_id: UUID | null;
   read_at: string | null;
   created_at: string;
 }
