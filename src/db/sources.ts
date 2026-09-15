@@ -83,6 +83,6 @@ export async function createMergeResolutionSource(supabase: Client, input: Creat
  * sources, and the list grows with the model.
  */
 export async function listSourcesForModel(supabase: Client, modelId: UUID): Promise<SourceRow[]> {
-  const query = supabase.from('sources').select('*').eq('model_id', modelId).order('name');
+  const query = supabase.from('sources').select('*', { count: 'exact' }).eq('model_id', modelId).order('name');
   return selectAll<SourceRow>(query);
 }
