@@ -169,6 +169,8 @@ export function ElementsPage() {
             state={state}
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}
+            modelId={model.id}
+            filenameBase={model.name}
             unresolvedCounts={threadCounts}
             attributeDefinitions={attributeDefinitions}
             customAttr={{ key: customAttrKey, value: customValueRaw }}

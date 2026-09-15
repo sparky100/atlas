@@ -14,33 +14,9 @@ import { Button } from '../Button/Button';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
-import { elementBrowseRowsToCsv, sanitizeForFilename } from '../../elements/elementBrowseCsv';
+import { useElementExport } from '../../elements/useElementExport';
 import { sortKeyEquals, type ElementBrowseState } from '../../elements/useElementBrowse';
 import styles from './ElementBrowseTable.module.css';
-
-/**
- * F8 (issue #162): triggers a real browser download of `csv` as
- * `filename` — the first file-download mechanism in this app
- * (`exportDecisionAsAdr.ts`'s own comment notes none existed before this;
- * that feature copies to the clipboard instead, since a generated markdown
- * ADR is a paste-elsewhere action — a spreadsheet export is a case where a
- * real downloaded file *is* the product requirement). Plain
- * Blob + object URL + a momentary `<a download>` click, revoked
- * immediately after — no library, no server round trip.
- */
-function downloadCsv(filename: string, csv: string): void {
-  // A UTF-8 BOM so Excel (which otherwise guesses the system codepage for
-  // a plain .csv) reliably reads non-ASCII names/values as UTF-8.
-  const blob = new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
 
 /**
  * Sprint U4-1 B3: "the browse table filtered to unlinked systems with the
@@ -70,6 +46,10 @@ export interface ElementBrowseTableProps {
   state: ElementBrowseState;
   orgSlug: string;
   modelSlug: string;
+  /** F8: the export loader reads facts/relationships/sources against this model — the one id the browse state doesn't already carry. */
+  modelId: UUID;
+  /** F8: the export filename's base fragment (the model name). */
+  filenameBase: string;
   // `| undefined` explicitly, not just `?:` — exactOptionalPropertyTypes
   // treats "optional" and "may be undefined" as different things (same
   // convention `Text.tsx`'s own `className` prop documents).
@@ -198,7 +178,12 @@ function InlineSupportsPicker({ system, config, searchCommitId }: { system: { el
 }
 
 /** Sprint U3b: "filterable, sortable table of elements by type with owner and lifecycle." A real `<table>` — semantic tabular data, not a design-system gap (native `<table>`/`<th>`/`<td>` is the correct element here, the same way `<ul>`/`<li>` already is for plain lists elsewhere in this app). */
-export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange }: ElementBrowseTableProps) {
+export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenameBase, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange }: ElementBrowseTableProps) {
+  // Called unconditionally (Rules of Hooks) — `commitId`/`rows` are only real
+  // once `state.status === 'ready'`, and the export loader refuses to run on
+  // the null/empty fallbacks until then.
+  const exportState = useElementExport({ modelId, commitId: state.status === 'ready' ? state.commitId : null, definitions: attributeDefinitions, rows: state.status === 'ready' ? state.rows : [], filenameBase });
+
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 
@@ -236,16 +221,24 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, linkSupportsInli
         <CustomAttributePicker definitions={applicableCustomDefinitions} selection={customAttr} onChange={onCustomAttrChange} />
         <Button
           variant="secondary"
-          disabled={state.rows.length === 0}
+          disabled={state.rows.length === 0 || exportState.status === 'working'}
           onClick={() => {
-            const csv = elementBrowseRowsToCsv(state.rows, selectedCustomDefinition);
-            const typePart = state.typeFilter === 'all' ? 'elements' : state.typeFilter;
-            downloadCsv(`${sanitizeForFilename(typePart)}-export.csv`, csv);
+            void exportState.exportCsv();
           }}
         >
           Export CSV
         </Button>
+        <Button
+          variant="secondary"
+          disabled={state.rows.length === 0 || exportState.status === 'working'}
+          onClick={() => {
+            void exportState.exportXlsx();
+          }}
+        >
+          Export XLSX
+        </Button>
       </div>
+      {exportState.error !== null && <Text as="p">{exportState.error}</Text>}
 
       {state.rows.length === 0 ? (
         <EmptyState>No elements match this filter.</EmptyState>

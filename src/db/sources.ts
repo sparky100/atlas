@@ -6,6 +6,7 @@
 import type { Client } from './client';
 import type { SourceRow } from './types';
 import type { UUID } from '../contracts/delta';
+import { selectAll } from './selectAll';
 
 export interface GetOrCreateManualSourceInput {
   /** Minted by the caller if a new row turns out to be needed. */
@@ -72,4 +73,16 @@ export async function createMergeResolutionSource(supabase: Client, input: Creat
   const { data, error } = await supabase.from('sources').insert(row).select('*').single();
   if (error) throw new Error(`createMergeResolutionSource: ${error.message}`);
   return data as SourceRow;
+}
+
+/**
+ * Every `sources` row for a model — the model-scoped provenance-name lookup
+ * an export's "Source" column needs. Deliberately a whole-model `selectAll`
+ * (CLAUDE.md rule 8's own shape), not `getSourcesByIds`'s 50-capped `.in()`
+ * over a per-element source-id list: an export can name far more than 50
+ * sources, and the list grows with the model.
+ */
+export async function listSourcesForModel(supabase: Client, modelId: UUID): Promise<SourceRow[]> {
+  const query = supabase.from('sources').select('*').eq('model_id', modelId).order('name');
+  return selectAll<SourceRow>(query);
 }

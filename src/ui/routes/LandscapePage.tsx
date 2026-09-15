@@ -4,6 +4,7 @@ import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
 import { Chip } from '../components/Chip/Chip';
+import { Button } from '../components/Button/Button';
 import { CommentsPanel } from '../components/CommentsPanel/CommentsPanel';
 import { DiffLegend } from '../components/DiffBadge/DiffLegend';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
@@ -42,6 +43,9 @@ import { useLandscapeColourByPreference } from '../landscape/useLandscapeColourB
 import { useLandscapeDisplay } from '../landscape/useLandscapeDisplay';
 import { useLandscapeLaneDisplayPreference } from '../landscape/useLandscapeLaneDisplayPreference';
 import { fitForPurposeToneFor } from '../elements/fitForPurposeTone';
+import { useElementExport } from '../elements/useElementExport';
+import { lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
+import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import { parseCapabilityParam, zoomQueryString } from '../nav/zoomParams';
 import styles from './LandscapePage.module.css';
@@ -257,6 +261,25 @@ export function LandscapePage() {
   const capabilitySystemIds = capabilityLandscapeState.status === 'ready' ? [...capabilityLandscapeState.data.rows.primary, ...capabilityLandscapeState.data.rows.secondary].map((row) => row.system.element_id) : [];
   const capabilityThreadCountsState = useThreadCounts(model?.id ?? null, capabilitySystemIds);
   const capabilityThreadCounts = capabilityThreadCountsState.status === 'ready' ? capabilityThreadCountsState.counts : undefined;
+  // F8: the capability-scoped list's own export — the visible systems of one
+  // capability, mapped to the same `BrowseRow` shape the browse table's
+  // export uses, so CSV/XLSX share the one builder.
+  const { definitions: attributeDefinitions } = useAttributeDefinitions(organisation?.id ?? null, userId);
+  const capabilityExportRows = useMemo<BrowseRow[]>(() => {
+    if (capabilityLandscapeState.status !== 'ready') return [];
+    return [...capabilityLandscapeState.data.rows.primary, ...capabilityLandscapeState.data.rows.secondary].map((row) => ({
+      element: row.system,
+      owner: row.owner,
+      lifecycleStatus: lifecycleStatusOf(row.system),
+    }));
+  }, [capabilityLandscapeState]);
+  const capabilityExport = useElementExport({
+    modelId: model?.id ?? '',
+    commitId: searchCommitId,
+    definitions: attributeDefinitions,
+    rows: capabilityExportRows,
+    filenameBase: capability?.name ?? 'capability',
+  });
   // M1 close-out item 1's own "per-session 'comments on this view' filter"
   // — plain component state, not `user_preferences` or anything else
   // persisted server-side: it resets on every fresh visit to this page
@@ -414,8 +437,27 @@ export function LandscapePage() {
                   fit · {capabilityLandscapeState.data.rollup.fitForPurpose}
                 </Chip>
               )}
+              <Button
+                variant="secondary"
+                disabled={capabilityExportRows.length === 0 || capabilityExport.status === 'working'}
+                onClick={() => {
+                  void capabilityExport.exportCsv();
+                }}
+              >
+                Export CSV
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={capabilityExportRows.length === 0 || capabilityExport.status === 'working'}
+                onClick={() => {
+                  void capabilityExport.exportXlsx();
+                }}
+              >
+                Export XLSX
+              </Button>
             </div>
           )}
+          {capabilityExport.error !== null && <Text as="p">{capabilityExport.error}</Text>}
           {/* Prompt 7k item 1: the landscape's own colour-by mode — desktop canvas only, same scoping as the comments-only filter beside it. */}
           {state.status === 'ready' && showCanvas && (
             <div className={styles.actions}>

@@ -91,10 +91,21 @@ test('Export CSV on the browse table downloads exactly the visible rows and colu
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export CSV' }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe('system-export.csv');
+  expect(download.suggestedFilename()).toBe('Browse CSV Test Model-export.csv');
 
   const csvPath = await download.path();
   if (!csvPath) throw new Error('download produced no local file path');
-  const csv = (await readFile(csvPath, 'utf8')).replace(/^\uFEFF/, ''); // strip the UTF-8 BOM downloadCsv() writes for Excel's benefit
-  expect(csv).toBe(['Name,Type,Owner,Lifecycle', 'Field Sensor Gateway,system,,active'].join('\r\n'));
+  const csv = (await readFile(csvPath, 'utf8')).replace(/^\uFEFF/, ''); // strip the UTF-8 BOM the exporter writes for Excel's benefit
+  // F8's full column set: fixed columns, the union of every type's core
+  // attributes, custom attributes, then Source + Age. Asserting the whole
+  // ~26-column header would be brittle against schema additions; check the
+  // shape instead — fixed columns first, provenance last, the visible row's
+  // own name/source/lifecycle present, and the filtered-out capability absent.
+  const [header = '', dataRow = ''] = csv.split('\r\n');
+  expect(header.startsWith('Name,Type,Owner')).toBe(true);
+  expect(header.endsWith('Source,Age')).toBe(true);
+  expect(dataRow).toContain('Field Sensor Gateway');
+  expect(dataRow).toContain('active');
+  expect(dataRow).toContain('Seed');
+  expect(csv).not.toContain('Asset Management');
 });
