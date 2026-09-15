@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchIntent } from '../../db/types';
-import { INTENT_LABEL, INTENT_OPTIONS, dateFieldLabelForIntent, defaultIntentForEntryPoint, intentHeaderLine, intentReviewWeight, isDateRequiredForIntent } from './branchIntent';
+import { INTENT_LABEL, INTENT_OPTIONS, NEW_CHANGE_INTENT_OPTIONS, dateFieldLabelForIntent, defaultIntentForEntryPoint, intentHeaderLine, intentReviewWeight, isDateRequiredForIntent } from './branchIntent';
 
 const ALL_INTENTS: readonly BranchIntent[] = ['record', 'propose', 'correct', 'explore'];
 
@@ -27,6 +27,10 @@ describe('INTENT_OPTIONS / INTENT_LABEL', () => {
     const labels = ALL_INTENTS.map((intent) => INTENT_LABEL[intent]);
     expect(new Set(labels).size).toBe(labels.length);
     for (const label of labels) expect(label.length).toBeGreaterThan(0);
+  });
+
+  it('NEW_CHANGE_INTENT_OPTIONS is every intent except explore, in the same order', () => {
+    expect(NEW_CHANGE_INTENT_OPTIONS.map((o) => o.value)).toEqual(['record', 'propose', 'correct']);
   });
 });
 

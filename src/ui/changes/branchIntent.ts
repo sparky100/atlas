@@ -43,6 +43,19 @@ export const INTENT_OPTIONS: readonly { value: BranchIntent; label: string }[] =
   { value: 'explore', label: 'Explore — a candidate future' },
 ];
 
+/**
+ * The intents the Changes page's own "New change" form offers — `INTENT_OPTIONS`
+ * minus `explore`. An explore change is a *candidate option inside a decision*
+ * (F0/F3: "expected to have siblings; decisions attach here"), so it is born
+ * on the decision page ("Add an option", which creates the branch and links it
+ * in one go) — a free-standing explore change created here would be an orphan
+ * with no decision to be compared, chosen, or merged against. The full
+ * `INTENT_OPTIONS` list stays in use for the list's per-intent grouping, so an
+ * explore change created from a decision still shows under its own "Explore"
+ * section there.
+ */
+export const NEW_CHANGE_INTENT_OPTIONS = INTENT_OPTIONS.filter((option) => option.value !== 'explore');
+
 /** A short, one-word label per intent — the chip on a `ChangeRow`/the "Changes" list's own per-intent `CollapsibleSection` title, where `INTENT_OPTIONS`' full descriptive labels would be too verbose. */
 export const INTENT_LABEL: Readonly<Record<BranchIntent, string>> = {
   record: 'Record',

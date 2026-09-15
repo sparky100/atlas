@@ -14,7 +14,7 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import { useThreadCounts } from '../comments/useThreadCounts';
 import type { BranchIntent, BranchRow } from '../../db/types';
 import { branchStatusTone } from './branchStatus';
-import { dateFieldLabelForIntent, INTENT_LABEL, INTENT_OPTIONS } from './branchIntent';
+import { dateFieldLabelForIntent, INTENT_LABEL, INTENT_OPTIONS, NEW_CHANGE_INTENT_OPTIONS } from './branchIntent';
 import { useChangeSummaries } from './useChangeSummaries';
 import { useChanges } from './useChanges';
 import styles from './ChangesView.module.css';
@@ -163,13 +163,20 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
                 }}
                 disabled={!mainHeadCommitId}
               >
-                {INTENT_OPTIONS.map((option) => (
+                {NEW_CHANGE_INTENT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
               </select>
             </div>
+            {/* `explore` isn't offered above — see `NEW_CHANGE_INTENT_OPTIONS`'s
+                own doc comment: a candidate future is an option on a decision,
+                not a free-standing change. The hint names the real home rather
+                than silently hiding the fourth choice. */}
+            <Text as="p" tone="muted" size="xs">
+              Exploring candidate futures? Start a decision and add options there.
+            </Text>
             {dateFieldLabel !== null && (
               <div className={styles.formRow}>
                 <Text as="label" size="sm" tone="muted">
