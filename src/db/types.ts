@@ -49,6 +49,21 @@ export interface InviteRow {
   last_sent_at: string | null;
 }
 
+export type MemberEventType = 'invited' | 'invite_revoked' | 'joined' | 'role_changed' | 'removed' | 'left';
+
+/** The literal shape of a row in `member_events` (F7 item 5, `20260916030000_member_events.sql`) — an append-only membership-lifecycle audit trail, written only by that migration's five triggers, never a client write. */
+export interface MemberEventRow {
+  id: UUID;
+  org_id: UUID;
+  event_type: MemberEventType;
+  target_user_id: UUID | null;
+  target_email: string | null;
+  actor_id: UUID | null;
+  role: MemberRole | null;
+  previous_role: MemberRole | null;
+  created_at: string;
+}
+
 /** The literal shape of a row in `models`. */
 export interface ModelRow {
   id: UUID;

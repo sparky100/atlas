@@ -10,8 +10,10 @@ import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfir
 import type { MemberRole, OrganisationRow } from '../../db/types';
 import { formatDate, formatRelativeTime } from '../time';
 import { AttributeDefinitionsPanel } from './AttributeDefinitionsPanel';
+import { memberEventSentence } from './memberEventFormat';
 import { canManageOrgSettings } from './roleGates';
 import { useInvites } from './useInvites';
+import { useMemberEvents } from './useMemberEvents';
 import { useMembers } from './useMembers';
 import { useOrganisationSettings } from './useOrganisationSettings';
 import styles from './OrganisationSettingsView.module.css';
@@ -40,6 +42,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
   const { status, error, update, remove } = useOrganisationSettings(organisation.id, onChanged);
   const { members, loading: membersLoading, error: membersError, changeRole, remove: removeMemberRow } = useMembers(organisation.id);
   const { invites, loading: invitesLoading, error: invitesError, create: createInviteRow, revoke: revokeInviteRow, resend: resendInviteRow } = useInvites(organisation.id, userId);
+  const { events: memberEvents, profilesById: memberEventProfiles, loading: memberEventsLoading, error: memberEventsError } = useMemberEvents(canManage ? organisation.id : null);
   const [name, setName] = useState(organisation.name);
   const [slug, setSlug] = useState(organisation.slug);
   const [minArchitects, setMinArchitects] = useState(organisation.review_min_required_architects);
@@ -325,6 +328,36 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
       {canManage && (
         <Panel>
           <AttributeDefinitionsPanel orgId={organisation.id} userId={userId} />
+        </Panel>
+      )}
+
+      {canManage && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Membership audit
+          </Text>
+          {memberEventsError !== null && <Text as="p">{memberEventsError}</Text>}
+          {!memberEventsLoading && memberEvents.length === 0 && <EmptyState>No membership activity yet.</EmptyState>}
+          {memberEvents.length > 0 && (
+            <ul className={styles.memberList}>
+              {memberEvents.map((event) => {
+                const nameFor = (userId: UUID | null) => {
+                  if (userId === null) return 'Someone';
+                  const profile = memberEventProfiles.get(userId);
+                  if (!profile) return 'Unknown member';
+                  return profile.display_name ?? `@${profile.handle}`;
+                };
+                return (
+                  <li key={event.id} className={styles.memberRow}>
+                    <Text as="span">{memberEventSentence(event, nameFor)}</Text>
+                    <Text as="span" tone="muted" size="sm">
+                      {formatDate(event.created_at)}
+                    </Text>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Panel>
       )}
 
