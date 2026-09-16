@@ -1,6 +1,6 @@
 /**
  * V1's own platform/module data assembly for the Context diagram
- * (`useSystemContext.ts`'s own caller) — grouping every candidate
+ * (`useElementContext.ts`'s own caller) — grouping every candidate
  * platform's own modules and resolving each module's own capability chip,
  * the same "a platform's Container children are its modules" fact
  * `src/db/healthFindings.ts`'s `groupModulesByPlatformId` and
@@ -35,7 +35,7 @@ export interface ContextModule {
  * Every candidate system that is itself a platform with at least one
  * module, mapped to its own modules — a platform with no modules at all is
  * simply absent from the returned map, same "nothing to show" convention
- * `groupModulesByPlatformId` already uses. `useSystemContext.ts`'s own
+ * `groupModulesByPlatformId` already uses. `useElementContext.ts`'s own
  * caller only ever passes `[hub]` — see that hook's own comment for why
  * this deliberately doesn't extend to a platform *neighbour* too — but
  * this function itself stays candidate-list-shaped rather than

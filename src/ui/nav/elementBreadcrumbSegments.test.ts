@@ -17,18 +17,18 @@ describe('elementBreadcrumbSegments', () => {
     expect(elementBreadcrumbSegments(sys, null, 'acme', 'model1', 'ref=main')).toEqual([{ label: 'CRM', href: '/o/acme/m/model1/context/sys1?ref=main' }]);
   });
 
-  it('gives a container two segments: its parent system (Context), then itself (Container view scoped by the system)', () => {
+  it('gives a container two segments: its parent system (Context), then its own Context view', () => {
     const sys = element('sys1', 'system', 'CRM', null);
     const container = element('c1', 'container', 'API', 'sys1');
     expect(elementBreadcrumbSegments(container, sys, 'acme', 'model1', 'ref=main')).toEqual([
       { label: 'CRM', href: '/o/acme/m/model1/context/sys1?ref=main' },
-      { label: 'API', href: '/o/acme/m/model1/container/sys1?ref=main' },
+      { label: 'API', href: '/o/acme/m/model1/context/c1?ref=main' },
     ]);
   });
 
   it('omits the parent segment for a container whose parent did not resolve, but still gives itself a segment', () => {
     const container = element('c1', 'container', 'API', 'sys1');
-    expect(elementBreadcrumbSegments(container, null, 'acme', 'model1', 'ref=main')).toEqual([{ label: 'API', href: '/o/acme/m/model1/container/?ref=main' }]);
+    expect(elementBreadcrumbSegments(container, null, 'acme', 'model1', 'ref=main')).toEqual([{ label: 'API', href: '/o/acme/m/model1/context/c1?ref=main' }]);
   });
 
   it('gives an actor no segments at all', () => {

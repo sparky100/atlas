@@ -87,16 +87,18 @@ export interface ElementHeaderProps {
    */
   readOnlyReason?: string | undefined;
   /**
-   * "Context →" — a system's own context diagram (`/context/:systemId`,
-   * `ContextView.tsx`). Omitted entirely (not shown disabled) for every
-   * non-system element type, same convention as every prop above — a
-   * capability/container/actor has no context diagram of its own to link
-   * to. A real link, not implied by the breadcrumb: the breadcrumb shows
-   * *where this page is*, never *what else you could navigate to* — the
-   * same distinction `ContextView.tsx`'s own "Containers →" link already
-   * draws for its one level down (found in a walkthrough: nothing on this
-   * page linked to Context at all, the breadcrumb was the only, and
-   * wrong, place a reader might have looked for it).
+   * "Context →" — a system or container's own context diagram
+   * (`/context/:elementId`, `ContextPage.tsx`). Omitted entirely (not
+   * shown disabled) for a capability or actor, same convention as every
+   * prop above — neither has a context diagram of its own to link to (V3
+   * extended this from systems-only to containers too, once "component"'s
+   * removal, S1 item 18, left a container structurally terminal). A real
+   * link, not implied by the breadcrumb: the breadcrumb shows *where this
+   * page is*, never *what else you could navigate to* — the same
+   * distinction `ContextView.tsx`'s own "Containers →" link already draws
+   * for its one level down (found in a walkthrough: nothing on this page
+   * linked to Context at all, the breadcrumb was the only, and wrong,
+   * place a reader might have looked for it).
    */
   contextHref?: string | undefined;
 }

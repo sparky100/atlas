@@ -109,7 +109,7 @@ test('capability map, context and container all escape the page\'s usual centred
   expect(await mainWidth(page)).toBeGreaterThan(ESCAPED_WIDTH_FLOOR);
 
   // Each route's own heading renders as soon as the *page* (org/model)
-  // resolves, before the route's own content fetch (`useSystemContext`/
+  // resolves, before the route's own content fetch (`useElementContext`/
   // `useStructureView`) necessarily reaches `'ready'` — `.mainWithView`
   // only applies once it does, so each check waits for a piece of real
   // *content* (the hub/child element's own name), not just the heading,

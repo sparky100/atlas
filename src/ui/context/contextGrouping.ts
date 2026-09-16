@@ -29,6 +29,21 @@
  * Context node and never a drawn edge — the first rule above still holds,
  * `supports` just isn't silently dropped on the floor any more the way it
  * was before this item.
+ *
+ * V3 ("container context pages, platform context simplified to structure
+ * only"): a platform-with-modules hub no longer reaches this function at
+ * all — `useElementContext.ts` routes it to its own separate structure-only
+ * data shape instead (`PlatformStructureData`, that hook's own doc
+ * comment), so `hub` here is always a plain system, a container (which may
+ * itself be one module, viewed on its own), or a platform with zero
+ * modules. This drops the old `hubModuleIds` parameter entirely — the
+ * "an edge can attach to one of the hub's own modules rather than the hub
+ * itself" case it existed for cannot occur any more, since a platform's
+ * own modules are never grouped alongside neighbours on the same diagram.
+ * `computePlatformConnections`, below, is the platform-structure page's own
+ * analogue of this function's `supports`/`owners` buckets — a hub's own
+ * direct `uses`/`flows_to` edges, listed as plain text rather than grouped
+ * for a canvas that no longer exists at that level.
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
@@ -100,35 +115,25 @@ function byNameThenId(a: ElementsHeadRow, b: ElementsHeadRow): number {
 }
 
 /**
- * @param hub The system this Context view is scoped to.
- * @param relationships Every relationship touching `hub` — `src/db/elements.ts`'s `listRelationshipsForElement`, unfiltered — plus, since V1, every `uses`/`flows_to` edge touching one of `hub`'s own modules directly (`useSystemContext.ts`'s own caller widens the query for exactly this reason: "Platforms and modules" lets a flow attach to a specific module rather than the platform itself). This function does the type filtering itself so the query stays the same one every other "everything touching this element" reader already uses.
+ * @param hub The system or container this Context view is scoped to (V3: a container is now a real hub of its own, not just a system — see this module's own comment).
+ * @param relationships Every relationship touching `hub` — `src/db/elements.ts`'s `listRelationshipsForElement`, unfiltered. This function does the type filtering itself so the query stays the same one every other "everything touching this element" reader already uses.
  * @param elementsById Every other endpoint named by `relationships`, by id — batch-loaded via `getElementsByIds`.
- * @param hubModuleIds V1's own addition — `hub`'s own module (container) ids, when `hub` is a platform with modules; empty otherwise. A `uses`/`flows_to` edge naming one of these as an endpoint is treated as touching the hub itself (the *other* side is the real neighbour), the same way an edge naming `hub.element_id` directly always has been — without this, an edge attaching to a module rather than the platform would be misread as a neighbour named by the module's own id, which is never what it means.
  */
-export function computeContextGroup(
-  hub: ElementsHeadRow,
-  relationships: readonly RelationshipsHeadRow[],
-  elementsById: ReadonlyMap<UUID, ElementsHeadRow>,
-  hubModuleIds: ReadonlySet<UUID> = new Set(),
-): ContextGroup {
+export function computeContextGroup(hub: ElementsHeadRow, relationships: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): ContextGroup {
   const neighbourEdges = new Map<UUID, RelationshipsHeadRow[]>();
   const ownerEntries: { actorId: UUID; role: string }[] = [];
   // Keyed by capability id, not a list: at most one supports edge is ever
   // expected between one system and one capability, so the last one seen
   // (there should only ever be one) simply wins.
   const supportsEdgeByCapabilityId = new Map<UUID, RelationshipsHeadRow>();
-  const isHubSide = (id: UUID) => id === hub.element_id || hubModuleIds.has(id);
 
   for (const rel of relationships) {
     if (rel.relationship_type === 'uses' || rel.relationship_type === 'flows_to') {
-      // V1: either endpoint may be the hub's own module rather than the hub
-      // itself — `otherId` is whichever side is *not* hub-or-module, not
-      // simply "whichever side isn't `hub.element_id`" any more.
-      const fromIsHubSide = isHubSide(rel.from_element_id);
-      const toIsHubSide = isHubSide(rel.to_element_id);
-      if (!fromIsHubSide && !toIsHubSide) continue; // neither end touches the hub or one of its modules — not this hub's edge at all (shouldn't reach here given how the caller scopes the query, but never assumed).
-      if (fromIsHubSide && toIsHubSide) continue; // both ends are the hub/its own modules — not a real neighbour edge.
-      const otherId = fromIsHubSide ? rel.to_element_id : rel.from_element_id;
+      const fromIsHub = rel.from_element_id === hub.element_id;
+      const toIsHub = rel.to_element_id === hub.element_id;
+      if (!fromIsHub && !toIsHub) continue; // neither end touches the hub at all — shouldn't reach here given how the caller scopes the query, but never assumed.
+      if (fromIsHub && toIsHub) continue; // a self-relationship shouldn't exist, but this function never assumes it can't.
+      const otherId = fromIsHub ? rel.to_element_id : rel.from_element_id;
       const list = neighbourEdges.get(otherId) ?? [];
       list.push(rel);
       neighbourEdges.set(otherId, list);
@@ -186,4 +191,47 @@ export function computeContextGroup(
     .sort((a, b) => (a.primary === b.primary ? byNameThenId(a.capability, b.capability) : a.primary ? -1 : 1));
 
   return { hub, internal, external, owners, supports };
+}
+
+/** One of a platform's own genuine direct relationships — item 2's "Platform-level connections" plain-text line, never a canvas node or a drawn edge (there is no canvas at this level any more). */
+export interface PlatformConnection {
+  relationshipId: UUID;
+  otherElementId: UUID;
+  otherName: string;
+  /** `edgeLabel`'s own formatted verb phrase, direction arrow included. */
+  label: string;
+}
+
+/**
+ * V3's own platform-structure page: a platform's `uses`/`flows_to` edges
+ * naming the platform *itself* directly, not one of its modules — rare (a
+ * platform's own modules are where a real integration almost always
+ * attaches, per "Platforms and modules"), but a genuine fact the model can
+ * still hold, and CLAUDE.md rule 7 rules out silently dropping it just
+ * because the structure page has nowhere to draw it. Listed as plain text
+ * below the module grid, each one still a real link to the other element —
+ * "plain text" here means "not a canvas edge with its own routing," not
+ * "unlinked."
+ *
+ * `relationships` is expected to already be scoped to the hub's own direct
+ * edges (`useElementContext.ts`'s own platform branch never fetches
+ * module-attached edges at all — V3's whole point is that a module's own
+ * neighbours live on the module's own context page instead), but this
+ * function filters by type and hub-membership itself regardless, the same
+ * defensive shape `computeContextGroup` above already takes.
+ */
+export function computePlatformConnections(hub: ElementsHeadRow, relationships: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): PlatformConnection[] {
+  const result: PlatformConnection[] = [];
+  for (const rel of relationships) {
+    if (rel.relationship_type !== 'uses' && rel.relationship_type !== 'flows_to') continue;
+    const fromIsHub = rel.from_element_id === hub.element_id;
+    const toIsHub = rel.to_element_id === hub.element_id;
+    if (!fromIsHub && !toIsHub) continue;
+    if (fromIsHub && toIsHub) continue;
+    const otherId = fromIsHub ? rel.to_element_id : rel.from_element_id;
+    const other = elementsById.get(otherId);
+    if (!other) continue; // named by a relationship but not resolved (e.g. retracted since) — never render a row for data that isn't there.
+    result.push({ relationshipId: rel.relationship_id, otherElementId: otherId, otherName: other.name, label: edgeLabel(rel, hub.element_id) });
+  }
+  return result.sort((a, b) => a.otherName.localeCompare(b.otherName) || a.otherElementId.localeCompare(b.otherElementId));
 }

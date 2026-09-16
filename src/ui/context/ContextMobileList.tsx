@@ -8,15 +8,13 @@ import { Text } from '../components/Text/Text';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { edgeLabel, type ContextGroup, type ContextNeighbour } from './contextGrouping';
-import type { ContextModule } from './contextDiagramData';
 import styles from './ContextMobileList.module.css';
 
 export interface ContextMobileListProps {
   group: ContextGroup;
-  platformModulesById: ReadonlyMap<UUID, ContextModule[]>;
   elementHref: (elementId: UUID) => string;
-  /** Systems only — a container/actor neighbour has no Context view of its own (same reasoning `ContextDiagramCanvas.tsx`'s own prop comment gives). */
-  neighbourContextHref: (systemId: UUID) => string;
+  /** Systems and containers only — an actor neighbour has no Context view of its own (same reasoning `ContextDiagramCanvas.tsx`'s own prop comment gives). */
+  neighbourContextHref: (elementId: UUID) => string;
 }
 
 type DirectionKey = 'uses' | 'used-by' | 'flows-out' | 'flows-in' | 'people';
@@ -42,7 +40,7 @@ interface DirectionRow {
  * uses/used-by split would just be noise for the one group that's already
  * distinguished by icon.
  */
-export function ContextMobileList({ group, platformModulesById, elementHref, neighbourContextHref }: ContextMobileListProps) {
+export function ContextMobileList({ group, elementHref, neighbourContextHref }: ContextMobileListProps) {
   const [expandedKey, setExpandedKey] = useState<DirectionKey | null>(null);
 
   const rowsByDirection = new Map<DirectionKey, DirectionRow[]>();
@@ -73,7 +71,6 @@ export function ContextMobileList({ group, platformModulesById, elementHref, nei
                   neighbour={neighbour}
                   edge={edge}
                   hubId={group.hub.element_id}
-                  modules={platformModulesById.get(neighbour.element.element_id)}
                   elementHref={elementHref}
                   neighbourContextHref={neighbourContextHref}
                 />
@@ -121,14 +118,12 @@ function NeighbourRow({
   neighbour,
   edge,
   hubId,
-  modules,
   elementHref,
   neighbourContextHref,
 }: {
   neighbour: ContextNeighbour;
   edge: RelationshipsHeadRow;
   hubId: UUID;
-  modules: ContextModule[] | undefined;
   elementHref: (id: UUID) => string;
   neighbourContextHref: (id: UUID) => string;
 }) {
@@ -136,11 +131,11 @@ function NeighbourRow({
   const attrs = attributesRecord(element.attributes);
   const external = attrs.isExternal === true;
   const actorSubtype = element.element_type === 'actor' && typeof attrs.subtype === 'string' ? (attrs.subtype as ActorSubtype) : undefined;
-  const lifecycleStatus = element.element_type === 'system' && typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
+  const lifecycleStatus = (element.element_type === 'system' || element.element_type === 'container') && typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
-  // A system has no Context view of its own only when it's not actually a
-  // system (a container or actor reached this row directly, S1 items 20/11a).
-  const href = element.element_type === 'system' ? neighbourContextHref(element.element_id) : elementHref(element.element_id);
+  // Only an actor neighbour has no Context view of its own (S1 item 11a) —
+  // a container gets one just like a system does, per V3.
+  const href = element.element_type === 'system' || element.element_type === 'container' ? neighbourContextHref(element.element_id) : elementHref(element.element_id);
 
   return (
     <li className={styles.row}>
@@ -159,24 +154,6 @@ function NeighbourRow({
       <Text as="span" size="sm" tone="muted" className={styles.rowVerb}>
         {edgeLabel(edge, hubId)}
       </Text>
-      {modules && modules.length > 0 && (
-        <ul className={styles.moduleRows}>
-          {modules.map((module) => (
-            <li key={module.elementId}>
-              <Link to={elementHref(module.elementId)} className={styles.moduleRow}>
-                <Text as="span" size="sm">
-                  {module.name}
-                </Text>
-                {module.capabilityName && (
-                  <Text as="span" size="xs" tone="faint">
-                    {module.capabilityName}
-                  </Text>
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
     </li>
   );
 }

@@ -385,12 +385,16 @@ export interface PlatformFlowEndpoint {
  * actually sends or receives the flow. Legal either way — this is purely a
  * "did you mean the module?" visibility check, same informational shape as
  * item 19's finding — and, per that same reasoning, vacuous for a platform
- * with no modules (nowhere lower to point the edge at). This is also the
- * "which module?" marker the V1 sprint's own context-diagram prompt
- * describes from the rendering side (`docs/prompts/atlas-prompt-pack.md`'s
- * "### V1" section): "flows attach to the module when the relationship's
- * endpoint is a container, else to the platform edge with a 'which
- * module?' marker (health finding)" — this is that health finding.
+ * with no modules (nowhere lower to point the edge at). V1's own
+ * context-diagram prompt (`docs/prompts/atlas-prompt-pack.md`'s "### V1"
+ * section) originally paired this finding with a "which module?" marker
+ * drawn right on the platform's own edge; V3 ("container context pages,
+ * platform context simplified to structure only") replaced that
+ * rendering with `computePlatformConnections`'s plain-text "Platform-level
+ * connections" line on the platform's own structure page instead — this
+ * finding itself is unchanged, still the same "did you mean the module?"
+ * data-quality nudge, independent of how the Context view happens to
+ * render it.
  */
 export function findFlowsToPlatformInsteadOfModule(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): PlatformFlowEndpoint[] {
   const containers = [...elementsById.values()].filter((el) => el.element_type === 'container');
