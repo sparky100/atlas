@@ -79,8 +79,12 @@ export interface ContextGroup {
  * data this function never assumes can't exist) — the exact same fallback
  * text `ContextView.tsx` always showed before this item, per direction.
  */
-export function edgeLabel(edge: RelationshipsHeadRow, hubId: UUID): string {
-  const outbound = edge.from_element_id === hubId;
+export function edgeLabel(edge: RelationshipsHeadRow, hubId: UUID, hubModuleIds: ReadonlySet<UUID> = new Set()): string {
+  // Label routing rework (SAP fixture): an edge leaving one of the hub's own
+  // modules (PM → PowerON) is outbound from the hub side exactly like one
+  // leaving the platform itself — before this, only `from === hubId` counted,
+  // so every module-outbound flow wore the inbound arrow.
+  const outbound = edge.from_element_id === hubId || hubModuleIds.has(edge.from_element_id);
   const description = attributesRecord(edge.attributes).description;
   const verb = typeof description === 'string' && description.trim().length > 0 ? description : null;
   if (edge.relationship_type === 'flows_to') {

@@ -233,7 +233,7 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
           neighbourId: neighbour.element.element_id,
           hubEndpointId: fromIsHub ? edge.from_element_id : edge.to_element_id,
           arrowAtHub: !fromIsHub,
-          label: edgeLabel(edge, group.hub.element_id),
+          label: edgeLabel(edge, group.hub.element_id, hubModuleIds),
         });
       }
     }

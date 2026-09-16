@@ -68,18 +68,28 @@ test('the same fixture on mobile lists every neighbour under its direction with 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/context/${sapId}`);
   await expect(page.getByRole('link', { name: 'SAP' }).first()).toBeVisible();
 
-  const groups = ['Uses', 'Used by', 'Flows in', 'Flows out', 'People'] as const;
-  for (const group of groups) {
-    const button = page.getByRole('button', { name: new RegExp(`^${group}`) });
-    if ((await button.count()) === 0) continue;
-    await button.first().click();
-  }
-
+  // The list is an accordion with one group open at a time (`ContextMobileList.tsx`'s own `expandedKey`), so each direction is opened and checked in turn. A flow's group follows `directionOf` there: actors under People; otherwise by type and direction relative to the hub side — a flow leaving a hub *module* counts as outbound (the bug this fixture first exposed).
+  const groupOf = (neighbour: (typeof scenario.neighbours)[number], flow: (typeof neighbour.flows)[number]): string => {
+    if (neighbour.elementType === 'actor') return 'People';
+    if (flow.relationshipType === 'flows_to') return flow.direction === 'out' ? 'Flows out' : 'Flows in';
+    return flow.direction === 'out' ? 'Uses' : 'Used by';
+  };
+  const expected = new Map<string, { name: string; label: string }[]>();
   for (const neighbour of scenario.neighbours) {
-    await expect(page.getByText(neighbour.name, { exact: true }).first()).toBeVisible();
     for (const flow of neighbour.flows) {
-      await expect(page.getByText(scenarioEdgeLabel(flow), { exact: false }).first()).toBeVisible();
+      const group = groupOf(neighbour, flow);
+      expected.set(group, [...(expected.get(group) ?? []), { name: neighbour.name, label: scenarioEdgeLabel(flow) }]);
     }
   }
-  await expect(page.getByText('external', { exact: true }).first()).toBeVisible();
+  for (const [group, rows] of expected) {
+    const button = page.getByRole('button', { name: new RegExp(`^${group} ${String(rows.length)} connection`) });
+    await expect(button).toBeVisible();
+    await button.click();
+    await expect(button).toHaveAttribute('aria-expanded', 'true');
+    for (const row of rows) {
+      await expect(page.getByText(row.name, { exact: true }).first()).toBeVisible();
+      await expect(page.getByText(row.label, { exact: false }).first()).toBeVisible();
+    }
+    if (group === 'People') await expect(page.getByText('external', { exact: true }).first()).toBeVisible();
+  }
 });

@@ -240,4 +240,13 @@ describe('edgeLabel (Sprint U4-2c item 1: "edit a verb ... and see it on the con
     expect(edgeLabel(flowsToEdge('hub', 'n1'), 'hub')).toBe('flows to ⇢');
     expect(edgeLabel(flowsToEdge('n1', 'hub'), 'hub')).toBe('⇢ flows from');
   });
+
+  it('label routing rework (SAP fixture): an edge leaving one of the hub\'s own modules is outbound — the same arrow as one leaving the platform itself, not the inbound arrow', () => {
+    const hubModules = new Set(['pm']);
+    expect(edgeLabel(flowsToEdge('pm', 'poweron', 'sends maintenance outage requests to'), 'sap', hubModules)).toBe('sends maintenance outage requests to ⇢');
+    expect(edgeLabel(flowsToEdge('poweron', 'pm', 'returns switching schedules to'), 'sap', hubModules)).toBe('⇢ returns switching schedules to');
+    expect(edgeLabel(usesEdge('pm', 'poweron', 'dispatches to'), 'sap', hubModules)).toBe('dispatches to →');
+    // Without the module set, the old (wrong) reading — kept only to show what the parameter changes.
+    expect(edgeLabel(flowsToEdge('pm', 'poweron', 'sends maintenance outage requests to'), 'sap')).toBe('⇢ sends maintenance outage requests to');
+  });
 });
