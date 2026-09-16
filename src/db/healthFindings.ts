@@ -28,6 +28,7 @@ import { isStale, monthsSince, monthsUntil, STALE_AFTER_MONTHS } from '../contra
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { SystemDomain, UUID } from '../contracts/delta';
 import { attributesRecord } from '../ui/elements/attributesRecord';
+import { isFitForPurpose } from '../ui/elements/fitForPurposeTone';
 import { isPlatform } from '../ui/elements/systemKind';
 import { resolveElementDomain } from '../ui/elements/systemDomain';
 import type { Client } from './client';
@@ -601,6 +602,58 @@ export function findCriticalSystemsPastOrNearSupportEnd(systems: readonly Elemen
     if (Number.isNaN(supportEndsAt.getTime())) return false;
     return monthsUntil(supportEndsAt, now) <= STALE_AFTER_MONTHS;
   });
+}
+
+/**
+ * The minimal fit-for-purpose finding: capabilities whose *primary*
+ * supporter (`SupportsAttributes.role === 'primary'`, `SupportsRole`'s own
+ * doc comment) is rated `poor` or `adequate`
+ * (`src/ui/elements/fitForPurposeTone.ts`'s `isFitForPurpose`), with no
+ * planned replacement recorded for that supporter — a third "Start a
+ * decision" trigger alongside `findCriticalSystemsPastOrNearSupportEnd` (a
+ * system's own vendor support horizon) and the director door's
+ * weak-capability tile (`DirectorHome.tsx`'s "no known supporters" case,
+ * `prefillFromWeakCapability`).
+ *
+ * `role: 'primary'` is a per-*system* cardinality rule (`SupportsRole`'s
+ * own doc comment: at most one live primary edge per system, "which
+ * capability lane a system's landscape tile sits in"), not a per-capability
+ * one — nothing in `relationship_type_rules` stops two different systems
+ * from each naming `primary` toward the *same* capability, so every
+ * matching edge is checked here, not just the first found; a capability is
+ * flagged the moment any one of them qualifies.
+ *
+ * `plannedReplacementSystemIdsByCapability` is
+ * `src/db/modelHome.ts`'s `groupPlannedReplacementsByCapability` result —
+ * the same real "no planned replacement" evidence `computeExposureTone`
+ * already consults for Lifecycle Exposure, not a second, weaker
+ * approximation of it.
+ */
+export function findCapabilitiesWithPoorFitPrimarySupporter(
+  capabilities: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  plannedReplacementSystemIdsByCapability: ReadonlyMap<UUID, ReadonlySet<UUID>>,
+): ElementsHeadRow[] {
+  const capabilitiesById = new Map(capabilities.map((c) => [c.element_id, c]));
+  const flaggedIds = new Set<UUID>();
+
+  for (const edge of supportsEdges) {
+    if (edge.relationship_type !== 'supports') continue;
+    const attrs = attributesRecord(edge.attributes);
+    if (attrs.role !== 'primary') continue;
+    if (typeof attrs.fitForPurpose !== 'string' || !isFitForPurpose(attrs.fitForPurpose)) continue;
+    if (attrs.fitForPurpose !== 'poor' && attrs.fitForPurpose !== 'adequate') continue;
+    const capability = capabilitiesById.get(edge.to_element_id);
+    if (!capability) continue;
+    const replacedSystemIds = plannedReplacementSystemIdsByCapability.get(capability.element_id);
+    if (replacedSystemIds?.has(edge.from_element_id)) continue;
+    flaggedIds.add(capability.element_id);
+  }
+
+  return [...flaggedIds]
+    .map((id) => capabilitiesById.get(id))
+    .filter((c): c is ElementsHeadRow => c !== undefined)
+    .sort((a, b) => a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id));
 }
 
 export { STALE_AFTER_MONTHS };

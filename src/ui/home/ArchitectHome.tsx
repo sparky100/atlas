@@ -12,7 +12,7 @@ import type { MemberRole } from '../../db/types';
 import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, PlatformFlowEndpoint, UnlabeledVerbRelationship } from '../../db/healthFindings';
 import { formatRelativeTime } from '../time';
 import { branchStatusTone } from '../changes/branchStatus';
-import { decisionPrefillToSearchParams, prefillFromCriticalSupportEndFinding } from '../decisions/decisionPrefill';
+import { decisionPrefillToSearchParams, prefillFromCriticalSupportEndFinding, prefillFromPoorFitCapabilityFinding } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { canStartDecision } from '../orgs/useMembership';
 import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
@@ -233,6 +233,19 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       summary: `${String(data.unusedIntegrationPlatforms.length)} unused integration ${plural(data.unusedIntegrationPlatforms.length, 'platform', 'platforms')} (nothing flows via it)`,
       items: elementItems(data.unusedIntegrationPlatforms),
       browseHref: browseHref('unused-integration-platform'),
+    },
+    {
+      // The minimal fit-for-purpose finding: a third "Start a decision"
+      // trigger, alongside `critical-support-end` below and the director
+      // door's own weak-capability tile — see
+      // `findCapabilitiesWithPoorFitPrimarySupporter`'s own doc comment.
+      key: 'poor-fit-no-replacement',
+      count: data.capabilitiesWithPoorFitPrimarySupporter.length,
+      summary: `${String(data.capabilitiesWithPoorFitPrimarySupporter.length)} ${plural(data.capabilitiesWithPoorFitPrimarySupporter.length, 'capability', 'capabilities')} whose primary supporter is rated a poor or adequate fit, with no planned replacement`,
+      items: elementItems(data.capabilitiesWithPoorFitPrimarySupporter),
+      ...(canStartDecision(role)
+        ? { itemAction: (item: HealthFindingItem) => <StartDecisionLink href={startDecisionHref(prefillFromPoorFitCapabilityFinding({ id: item.id, name: item.label }))} /> }
+        : {}),
     },
   ];
   const { active: activeHealthChecks, clear: clearHealthChecks } = partitionHealthChecks(healthChecks);

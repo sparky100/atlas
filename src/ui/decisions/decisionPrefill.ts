@@ -56,6 +56,17 @@ export function prefillFromWeakCapability(capability: { id: UUID; name: string }
   };
 }
 
+/** `findCapabilitiesWithPoorFitPrimarySupporter`'s own finding (`ArchitectHome.tsx`'s `poor-fit-no-replacement` check) — a third "Start a decision" trigger alongside `critical-support-end` above and the director door's weak-capability tile. */
+export function prefillFromPoorFitCapabilityFinding(capability: { id: UUID; name: string }): DecisionPrefill {
+  return {
+    title: `What replaces ${capability.name}'s primary supporter?`,
+    statement: `${capability.name}'s primary supporter is rated a poor or adequate fit, with no planned replacement — a decision is needed on what to do about it.`,
+    sourceFindingKey: 'poor-fit-no-replacement',
+    linkedElementId: capability.id,
+    linkedElementName: capability.name,
+  };
+}
+
 /** Appended to a `/decisions` href — `URLSearchParams` handles the encoding, so callers never need to. */
 export function decisionPrefillToSearchParams(prefill: DecisionPrefill): URLSearchParams {
   const params = new URLSearchParams();
