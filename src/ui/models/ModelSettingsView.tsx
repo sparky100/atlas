@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
+import { useAuth } from '../auth/useAuth';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { Panel } from '../components/Panel/Panel';
@@ -9,6 +10,7 @@ import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfir
 import type { ModelRow, MemberRole } from '../../db/types';
 import { canArchiveModel, canDeleteModel, canRestoreModel } from '../orgs/roleGates';
 import { useModelSettings } from './useModelSettings';
+import { useModelSharing } from './useModelSharing';
 import styles from './ModelSettingsView.module.css';
 
 export interface ModelSettingsViewProps {
@@ -26,11 +28,17 @@ export interface ModelSettingsViewProps {
  * own wording — only Restore and Delete remain live then.
  */
 export function ModelSettingsView({ model, role, orgSlug, onChanged }: ModelSettingsViewProps) {
+  const { userId } = useAuth();
   const { status, error, update, archive, restore, remove } = useModelSettings(model.id, onChanged);
+  const canShare = canDeleteModel(role);
+  const sharing = useModelSharing(canShare ? model.id : null, userId);
   const [name, setName] = useState(model.name);
   const [slug, setSlug] = useState(model.slug);
   const [description, setDescription] = useState(model.description ?? '');
   const [deleteResult, setDeleteResult] = useState<'not_archived' | 'not_found' | null>(null);
+  const [targetOrgSlug, setTargetOrgSlug] = useState('');
+  const [targetTagId, setTargetTagId] = useState('');
+  const [shareResult, setShareResult] = useState<'org_not_found' | 'already_shared' | null>(null);
   const navigate = useNavigate();
   const isArchived = model.archived_at !== null;
   const canEdit = canArchiveModel(role) && !isArchived;
@@ -42,6 +50,8 @@ export function ModelSettingsView({ model, role, orgSlug, onChanged }: ModelSett
   const nameId = useId();
   const slugId = useId();
   const descriptionId = useId();
+  const targetOrgSlugId = useId();
+  const tagSelectId = useId();
 
   return (
     <div>
@@ -182,6 +192,93 @@ export function ModelSettingsView({ model, role, orgSlug, onChanged }: ModelSett
           />
           {deleteResult === 'not_archived' && <Text as="p">Archive this model first.</Text>}
           {deleteResult === 'not_found' && <Text as="p">This model no longer exists.</Text>}
+        </Panel>
+      )}
+
+      {canShare && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Share with another organisation
+          </Text>
+          <Text as="p" tone="muted" size="sm">
+            Grants read-only access to this model's current main, or to one specific tagged version — never edit access, and never visible to the other organisation unless you share it here.
+          </Text>
+          <form
+            className={styles.form}
+            onSubmit={(e) => {
+              e.preventDefault();
+              setShareResult(null);
+              void sharing.create(targetOrgSlug.trim(), targetTagId.length > 0 ? targetTagId : null).then((result) => {
+                if (!result) return;
+                if (result.status === 'created') {
+                  setTargetOrgSlug('');
+                  setTargetTagId('');
+                } else {
+                  setShareResult(result.status);
+                }
+              });
+            }}
+          >
+            <label htmlFor={targetOrgSlugId}>
+              <Text as="span" size="sm">
+                Organisation slug
+              </Text>
+            </label>
+            <input
+              id={targetOrgSlugId}
+              className={styles.input}
+              type="text"
+              value={targetOrgSlug}
+              onChange={(e) => {
+                setTargetOrgSlug(e.target.value);
+              }}
+            />
+            <label htmlFor={tagSelectId}>
+              <Text as="span" size="sm">
+                Version
+              </Text>
+            </label>
+            <select
+              id={tagSelectId}
+              className={styles.input}
+              value={targetTagId}
+              onChange={(e) => {
+                setTargetTagId(e.target.value);
+              }}
+            >
+              <option value="">Current main</option>
+              {sharing.tags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
+            <Button variant="primary" type="submit" disabled={targetOrgSlug.trim().length === 0}>
+              Share
+            </Button>
+          </form>
+          {shareResult === 'org_not_found' && <Text as="p">No organisation found for that slug.</Text>}
+          {shareResult === 'already_shared' && <Text as="p">Already shared with that organisation at this version.</Text>}
+          {sharing.error !== null && <Text as="p">{sharing.error}</Text>}
+
+          {sharing.shares.length > 0 && (
+            <ul className={styles.shareList}>
+              {sharing.shares.map((share) => (
+                <li key={share.id} className={styles.shareRow}>
+                  <Text as="span">{sharing.orgNames.get(share.shared_with_org_id) ?? share.shared_with_org_id}</Text>
+                  <Chip tone="neutral">{share.tag_id ? (sharing.tags.find((t) => t.id === share.tag_id)?.name ?? 'tagged version') : 'current main'}</Chip>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      void sharing.revoke(share.id);
+                    }}
+                  >
+                    Revoke
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
         </Panel>
       )}
     </div>

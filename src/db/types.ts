@@ -63,6 +63,19 @@ export interface ModelRow {
   archived_at: string | null;
 }
 
+/** F7 item 4: a cross-org, read-only grant on a model, optionally pinned to one tag (ADR-009, SPEC §3.2). */
+export interface ModelShareRow {
+  id: UUID;
+  model_id: UUID;
+  /** Null = "current main"; set = "this version only". */
+  tag_id: UUID | null;
+  shared_with_org_id: UUID;
+  permission: 'view_only';
+  expires_at: string | null;
+  created_by: UUID;
+  created_at: string;
+}
+
 export type BranchKind = 'main' | 'change' | 'capture_draft';
 /** S1 item 4: `cancelled` — a proposer or owner/architect calling it off from `draft`/`proposed`, via `atlas.cancel_change`; terminal, like `merged`/`rejected`. */
 export type BranchStatus = 'draft' | 'proposed' | 'in_review' | 'approved' | 'merged' | 'rejected' | 'archived' | 'cancelled';

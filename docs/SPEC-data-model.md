@@ -1261,15 +1261,13 @@ create policy members_delete on members
 alter table models enable row level security;
 alter table models force row level security;
 
--- The `or atlas.model_shared_with_me(id)` clause below is not migrated
--- (Sprint H1 note — docs/AUDIT-2026-09-U2.md §2.E.3 item 3): `model_shares`
--- (§3.6) and `atlas.model_shared_with_me` don't exist yet. The migrated
--- policy is `using (atlas.is_member(org_id))` alone — no cross-org sharing
--- is possible until `model_shares` is built; no target sprint named. (This
--- is unrelated to ADR-014/ADR-017's identity/tenancy question, which is
--- about whether Atlas shares its *identity tables* with a different
--- product entirely — `model_shares.shared_with_org_id` only ever
--- references another organisation inside this same product.)
+-- The `or atlas.model_shared_with_me(id)` clause below is migrated in
+-- Sprint F7 item 4 (`supabase/migrations/20260916020000_model_shares.sql`),
+-- which also adds `model_shares` (§3.6) and `atlas.model_shared_with_me`
+-- itself. (This is unrelated to ADR-014/ADR-017's identity/tenancy
+-- question, which is about whether Atlas shares its *identity tables* with
+-- a different product entirely — `model_shares.shared_with_org_id` only
+-- ever references another organisation inside this same product.)
 create policy models_select on models
   for select to authenticated
   using (atlas.is_member(org_id) or atlas.model_shared_with_me(id));
@@ -1294,9 +1292,9 @@ create policy models_delete on models
 alter table commits enable row level security;
 alter table commits force row level security;
 
--- Same gap as models_select above (Sprint H1 note — item 4): the migrated
--- policy has no `or atlas.commit_shared_with_me(id)` clause — that function
--- and the `model_shares` table it would query don't exist yet.
+-- Same migration as models_select above: the `or atlas.commit_shared_with_me(id)`
+-- clause and `atlas.commit_shared_with_me` itself both land in Sprint F7
+-- item 4 (`supabase/migrations/20260916020000_model_shares.sql`).
 create policy commits_select on commits
   for select to authenticated
   using (
@@ -1379,7 +1377,7 @@ Every remaining table uses one of three templates, chosen per table:
 
 **`merge_requests`' insert/update is function-only, not a plain `has_role`/contributor+ policy (Sprint C1 amendment):** submitting a request has to move `branches.status` to `proposed` in the same transaction, and approving/rejecting/merging both a request and its branch's status together — two separate RLS-gated client writes could partially fail and leave the two disagreeing about whether a branch is under review. `atlas.submit_merge_request`/`request_changes`/`approve_merge_request`/`reject_merge_request`/`merge_branch` (§7.4, §7.5) are the only writers, each still deriving its own role check from `auth.uid()` rather than trusting a client-supplied one — the same reasoning, and the same precedent, as `atlas.commit_deltas` superseding a plain RLS-gated insert for `commits` (S-17). `merge_requests` therefore has a select policy only; no insert/update policy or grant exists for `authenticated`.
 
-**`tags`' select policy is exactly `using (atlas.is_member(org_id))`** (Sprint H1 note — docs/AUDIT-2026-09-U2.md §2.E.3 item 5), not yet the cross-org, tag-pinned sharing P-24 describes — the migration's own comment says as much: "Cross-org visibility of a specifically shared tag is added once model_shares lands." P-24 names the target behaviour once `model_shares` (§3.6) exists; until then it is not a passing test, it is a recorded intention, same as the `models_select`/`commits_select` gaps above.
+**`tags`' select policy gains its cross-org, tag-pinned clause in Sprint F7 item 4** (`supabase/migrations/20260916020000_model_shares.sql`), matching P-24's own wording exactly: only a *specifically shared* tag becomes visible to a shared-with org, never every tag on a model with any share — an unpinned (main-only) share grants no tag visibility at all. Before this migration the policy was exactly `using (atlas.is_member(org_id))` (Sprint H1 note — docs/AUDIT-2026-09-U2.md §2.E.3 item 5); P-24 is now a passing test (`src/db/modelShares.integration.test.ts`), not a recorded intention.
 
 `user_preferences`: **user-scoped** — `user_id = auth.uid()` on select/insert/update, no delete. The only table not scoped by `org_id`.
 
@@ -1501,4 +1499,4 @@ Sprint H1 item 12 (docs/AUDIT-2026-09-U2.md's own deferred-items review, §7.2):
 | ~~Canvas "hollow" (all-resolved) comment marker, and the "Comments on this view" toolbar filter~~ | **Closed, M1 close-out item 1.** `atlas.thread_counts` (§9.4, `20260911010000_thread_counts.sql`) replaces `atlas.unresolved_comment_counts` with `(open_count, total_count)` per anchor, which is all the hollow marker ever needed — "has threads, all resolved" (`open_count = 0, total_count > 0`) is now told apart from "no threads at all" (still simply absent from the result). The toolbar filter ("comments on this view") shipped without the per-`view_kind` count this row originally assumed it would need: it dims any node with `total_count === 0` on the *current* view's own already-loaded anchor set, regardless of which `view_kind` a thread was originally raised from, rather than filtering to threads raised specifically in this view — a simpler, real behaviour ("does this system have any comment thread at all"), not the narrower one this row anticipated, and not worth a second RPC variant to build the narrower one instead. | — | — |
 | True drag-and-drop for capability map sibling reordering (Sprint U4-1 C1) | "Tailoring allows drag-to-reorder among siblings" ships as move buttons — left/right at L1, up/down at L2 — swapping `attributes.order` with an adjacent sibling, not a mouse drag gesture (`src/ui/capabilityMap/useCapabilityReorder.ts`'s own module comment: no drag-and-drop anywhere else in this codebase, no DnD library, and buttons stay keyboard-/screen-reader-operable, which a bare `draggable` element wouldn't be) | **U4-2** | Reviewed and accepted as the shipped behaviour for U4-1, not a gap to close before the item counts as done — the *effect* (a capability swaps places with an adjacent sibling) is identical either way. A real drag gesture is a genuine interaction upgrade once tailoring sees more day-to-day use, worth its own sprint rather than folded into C1 unreviewed. |
 
-Everything else this document defers is named at its point of use, not repeated here: SPEC §2's `created_at` exceptions, §9's `model_shares`-dependent RLS clauses (§9.2/§9.3/§9.5, all three annotated "pending `model_shares`, no target sprint named"), and §3.6's `capture_job_id` FK (pending `capture_jobs`, Sprint K1) are documentation of an absent dependency, not a scheduled follow-up in the sense this section means.
+Everything else this document defers is named at its point of use, not repeated here: SPEC §2's `created_at` exceptions and §3.6's `capture_job_id` FK (pending `capture_jobs`, Sprint K1) are documentation of an absent dependency, not a scheduled follow-up in the sense this section means. §9's three `model_shares`-dependent RLS clauses (§9.2/§9.3/§9.5) are no longer in this category — Sprint F7 item 4 migrated all three (`supabase/migrations/20260916020000_model_shares.sql`).
