@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
-import { buildCapabilityTiles, commitsSincePreviousTag, computeExposureTone, type PlannedReplacement } from './modelHome';
+import { buildCapabilityTiles, commitsSincePreviousTag, computeExposureTone, groupPlannedReplacementsByCapability, type PlannedReplacement } from './modelHome';
 
 function system(id: string, lifecycleStatus: string | undefined): ElementsHeadRow {
   return {
@@ -191,5 +191,22 @@ describe('commitsSincePreviousTag', () => {
 
   it('is null when there is no previous tag to compare against', () => {
     expect(commitsSincePreviousTag(5, null)).toBeNull();
+  });
+});
+
+describe('groupPlannedReplacementsByCapability', () => {
+  it('groups exposed system ids by capability', () => {
+    const replacements: PlannedReplacement[] = [
+      { capabilityId: 'cap-1', exposedSystemId: 'sys-1', replacementSystemId: 'sys-2', branchId: 'branch-1' },
+      { capabilityId: 'cap-1', exposedSystemId: 'sys-3', replacementSystemId: 'sys-4', branchId: 'branch-2' },
+      { capabilityId: 'cap-2', exposedSystemId: 'sys-5', replacementSystemId: 'sys-6', branchId: 'branch-3' },
+    ];
+    const grouped = groupPlannedReplacementsByCapability(replacements);
+    expect(grouped.get('cap-1')).toEqual(new Set(['sys-1', 'sys-3']));
+    expect(grouped.get('cap-2')).toEqual(new Set(['sys-5']));
+  });
+
+  it('is empty for an empty input', () => {
+    expect(groupPlannedReplacementsByCapability([]).size).toBe(0);
   });
 });

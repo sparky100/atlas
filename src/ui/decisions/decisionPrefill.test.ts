@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decisionPrefillToSearchParams, parseDecisionPrefillFromSearchParams, prefillFromCriticalSupportEndFinding, prefillFromWeakCapability } from './decisionPrefill';
+import { decisionPrefillToSearchParams, parseDecisionPrefillFromSearchParams, prefillFromCriticalSupportEndFinding, prefillFromPoorFitCapabilityFinding, prefillFromWeakCapability } from './decisionPrefill';
 
 describe('decisionPrefill', () => {
   it('builds a critical-support-end prefill naming the system in both title and statement', () => {
@@ -17,6 +17,16 @@ describe('decisionPrefill', () => {
     expect(prefill.statement).toContain('Finance');
     expect(prefill.statement).toContain('lifecycle exposure');
     expect(prefill.sourceFindingKey).toBe('weak-capability');
+  });
+
+  it('builds a poor-fit-no-replacement prefill naming the capability', () => {
+    const prefill = prefillFromPoorFitCapabilityFinding({ id: 'cap-1', name: 'Claims Intake' });
+    expect(prefill.title).toContain('Claims Intake');
+    expect(prefill.statement).toContain('Claims Intake');
+    expect(prefill.statement).toContain('poor or adequate fit');
+    expect(prefill.sourceFindingKey).toBe('poor-fit-no-replacement');
+    expect(prefill.linkedElementId).toBe('cap-1');
+    expect(prefill.linkedElementName).toBe('Claims Intake');
   });
 
   it('round-trips through URLSearchParams unchanged', () => {

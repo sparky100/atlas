@@ -255,6 +255,25 @@ export interface CapabilityTileData {
  * worst-of-children, already built") — only the edge scope handed to it
  * widens, from the capability's own direct edges to its whole subtree's.
  */
+/**
+ * `PlannedReplacement[]` grouped by `capabilityId` — every exposed system
+ * id it names a replacement candidate for, keyed by the capability that
+ * candidate is evidence for. Extracted here once a second caller
+ * (`src/db/healthFindings.ts`'s `findCapabilitiesWithPoorFitPrimarySupporter`)
+ * needed the exact same "no planned replacement for this exposed system"
+ * lookup `buildCapabilityTiles` already built inline for
+ * `computeExposureTone`.
+ */
+export function groupPlannedReplacementsByCapability(plannedReplacements: readonly PlannedReplacement[]): Map<UUID, Set<UUID>> {
+  const result = new Map<UUID, Set<UUID>>();
+  for (const replacement of plannedReplacements) {
+    const set = result.get(replacement.capabilityId) ?? new Set<UUID>();
+    set.add(replacement.exposedSystemId);
+    result.set(replacement.capabilityId, set);
+  }
+  return result;
+}
+
 export function buildCapabilityTiles(
   level1Capabilities: readonly ElementsHeadRow[],
   /** Every capability at this ref, every level — `computeCapabilityRollup`'s own subtree-walk input. */
@@ -267,12 +286,7 @@ export function buildCapabilityTiles(
   selfOwnedIds: ReadonlySet<UUID>,
 ): CapabilityTileData[] {
   const capabilitiesById = new Map(allCapabilities.map((c) => [c.element_id, c]));
-  const replacementsByCapability = new Map<UUID, Set<UUID>>();
-  for (const replacement of plannedReplacements) {
-    const set = replacementsByCapability.get(replacement.capabilityId) ?? new Set<UUID>();
-    set.add(replacement.exposedSystemId);
-    replacementsByCapability.set(replacement.capabilityId, set);
-  }
+  const replacementsByCapability = groupPlannedReplacementsByCapability(plannedReplacements);
 
   return level1Capabilities.map((capability): CapabilityTileData => {
     const rollup = computeCapabilityRollup(capability, allCapabilities, capabilitiesById, supportsEdges, selfOwnedIds);

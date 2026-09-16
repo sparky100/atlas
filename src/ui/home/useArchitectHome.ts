@@ -11,6 +11,7 @@ import {
   findBoundaryCrossingsMissingClassification,
   findBoundaryCrossingsMissingVerb,
   findCapabilitiesWithoutOwner,
+  findCapabilitiesWithPoorFitPrimarySupporter,
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
@@ -36,7 +37,7 @@ import {
 } from '../../db/healthFindings';
 import { listActorsForLandscape, listSystemsForLandscape } from '../../db/landscape';
 import { listOpenMergeRequestsForModel } from '../../db/mergeRequests';
-import { listAllSupportsEdges, listDeltasForCommits, listRecentCommits } from '../../db/modelHome';
+import { groupPlannedReplacementsByCapability, listAllSupportsEdges, loadPlannedReplacements, listDeltasForCommits, listRecentCommits } from '../../db/modelHome';
 import { listProfilesByIds } from '../../db/profiles';
 import type { BranchRow, MergeRequestRow, ProfileRow } from '../../db/types';
 import { envelopeSubjects } from '../../engine/describeEnvelope';
@@ -93,6 +94,8 @@ export interface ArchitectHomeData {
   externalInterfacesMissingClassification: ExternalInterfaceCrossing[];
   /** S1 item 11a's own second Assurance row: purely informational — every external actor `uses` edge, naming the organisation and which system it reaches. No classification requirement (see that finding's own doc comment for why). */
   externalOrganisationAccess: ExternalOrganisationAccess[];
+  /** The minimal fit-for-purpose finding: capabilities whose primary supporter is rated poor/adequate, with no planned replacement recorded (`findCapabilitiesWithPoorFitPrimarySupporter`'s own doc comment). */
+  capabilitiesWithPoorFitPrimarySupporter: ElementsHeadRow[];
 }
 
 export type ArchitectHomeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeData };
@@ -127,7 +130,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
         return;
       }
 
-      const [commits, reviewQueue, changeBranches, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors] = await Promise.all([
+      const [commits, reviewQueue, changeBranches, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, plannedReplacements] = await Promise.all([
         // S1 item 6: "recent activity" now groups consecutive same-subject
         // commits into one line and prefers others' activity when trimming
         // to five displayed items (groupRecentActivity.ts) — both can
@@ -152,6 +155,12 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
         // resolving an actor endpoint needs this separate fetch merged in
         // below, not a widened filter on that one.
         listActorsForLandscape(supabase, main.head_commit_id),
+        // The "poor fit, no planned replacement" finding's own evidence —
+        // the same real "planned replacement" signal `useDirectorHome.ts`
+        // already loads for Lifecycle Exposure, not a second, weaker
+        // approximation of it (`findCapabilitiesWithPoorFitPrimarySupporter`'s
+        // own doc comment).
+        loadPlannedReplacements(supabase, modelId),
       ]);
 
       const myOpenBranches = changeBranches.filter((b) => b.created_by === userId && MY_OPEN_STATUSES.includes(b.status));
@@ -222,6 +231,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
             criticalSystemsPastOrNearSupportEnd: findCriticalSystemsPastOrNearSupportEnd(systems),
             externalInterfacesMissingClassification: findExternalInterfacesMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             externalOrganisationAccess: findExternalOrganisationAccess(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
+            capabilitiesWithPoorFitPrimarySupporter: findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supportsEdges, groupPlannedReplacementsByCapability(plannedReplacements)),
           },
         });
       }
