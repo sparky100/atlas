@@ -19,6 +19,7 @@ import { OrganisationSettingsPage } from './routes/OrganisationSettingsPage';
 import { OrgHome } from './routes/OrgHome';
 import { ProfilePage } from './routes/ProfilePage';
 import { RequireAuth } from './routes/RequireAuth';
+import { ResetPasswordPage } from './routes/ResetPasswordPage';
 import { ReviewQueuePage } from './routes/ReviewQueuePage';
 import { ReviewRequestPage } from './routes/ReviewRequestPage';
 import { SignIn } from './routes/SignIn';
@@ -47,6 +48,8 @@ export function App() {
             <Route path="/" element={<Home />} />
             {/* Sprint F7 item 2: top-level, not org-scoped — a profile follows the person across every org (ADR-009), same reasoning user_preferences is user-scoped rather than org-scoped. */}
             <Route path="/profile" element={<ProfilePage />} />
+            {/* Sprint F7 item 3: reachable only via a real recovery-link session — see ResetPasswordPage.tsx's own comment for why this sits inside RequireAuth rather than needing its own guard. */}
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/o/:orgSlug" element={<OrgHome />} />
             <Route path="/o/:orgSlug/settings" element={<OrganisationSettingsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug" element={<ModelHome />} />

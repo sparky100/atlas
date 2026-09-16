@@ -71,10 +71,11 @@ describe('landscape lane collapse/pin wire <-> row (V2)', () => {
 });
 
 describe('notification preferences wire <-> row (Sprint F7 item 3)', () => {
-  it('defaults both to true — notify is the sensible default until a user says otherwise', () => {
+  it('defaults all three to true — notify is the sensible default until a user says otherwise', () => {
     const prefs = defaultUserPreferences('u1', false);
     expect(prefs.notifyOnMention).toBe(true);
     expect(prefs.notifyOnReply).toBe(true);
+    expect(prefs.notifyOnReviewAssigned).toBe(true);
   });
 
   it('carries false through toUserPreferencesRow/fromUserPreferencesRow unchanged, for each field independently', () => {
@@ -82,8 +83,19 @@ describe('notification preferences wire <-> row (Sprint F7 item 3)', () => {
     const row = toUserPreferencesRow(prefs);
     expect(row.notify_on_mention).toBe(false);
     expect(row.notify_on_reply).toBe(true);
+    expect(row.notify_on_review_assigned).toBe(true);
     const back = fromUserPreferencesRow(row);
     expect(back.notifyOnMention).toBe(false);
     expect(back.notifyOnReply).toBe(true);
+    expect(back.notifyOnReviewAssigned).toBe(true);
+  });
+
+  it('notifyOnReviewAssigned (F3a follow-up) carries false through independently of the other two', () => {
+    const prefs = { ...defaultUserPreferences('u1', true), notifyOnReviewAssigned: false };
+    const row = toUserPreferencesRow(prefs);
+    expect(row.notify_on_review_assigned).toBe(false);
+    expect(row.notify_on_mention).toBe(true);
+    expect(row.notify_on_reply).toBe(true);
+    expect(fromUserPreferencesRow(row).notifyOnReviewAssigned).toBe(false);
   });
 });

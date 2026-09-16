@@ -1211,9 +1211,15 @@ alter table organisations force row level security;
 -- this SELECT policy at RETURNING time, before that trigger has run
 -- (Sprint C1-H item 1; the RETURNING-time check raises the same "new row
 -- violates row-level security policy" error a failed WITH CHECK would).
+-- `or atlas.org_shares_a_model_with_me(id)`: Sprint F7 item 7
+-- (`20260916040000_shared_model_access_fixes.sql`) — a member of an org a
+-- model has been shared into needs to resolve the *owning* organisation's
+-- name (OrgHome's "Shared with us" section, `listModelsSharedWithOrg`'s own
+-- second query); without this clause that read silently returns nothing
+-- and the shared model drops out of the list entirely.
 create policy organisations_select on organisations
   for select to authenticated
-  using (atlas.is_member(id) or created_by = auth.uid());
+  using (atlas.is_member(id) or created_by = auth.uid() or atlas.org_shares_a_model_with_me(id));
 
 -- Anyone signed in may create an org; a trigger makes them its owner.
 create policy organisations_insert on organisations
@@ -1261,15 +1267,13 @@ create policy members_delete on members
 alter table models enable row level security;
 alter table models force row level security;
 
--- The `or atlas.model_shared_with_me(id)` clause below is not migrated
--- (Sprint H1 note — docs/AUDIT-2026-09-U2.md §2.E.3 item 3): `model_shares`
--- (§3.6) and `atlas.model_shared_with_me` don't exist yet. The migrated
--- policy is `using (atlas.is_member(org_id))` alone — no cross-org sharing
--- is possible until `model_shares` is built; no target sprint named. (This
--- is unrelated to ADR-014/ADR-017's identity/tenancy question, which is
--- about whether Atlas shares its *identity tables* with a different
--- product entirely — `model_shares.shared_with_org_id` only ever
--- references another organisation inside this same product.)
+-- The `or atlas.model_shared_with_me(id)` clause below is migrated in
+-- Sprint F7 item 4 (`supabase/migrations/20260916020000_model_shares.sql`),
+-- which also adds `model_shares` (§3.6) and `atlas.model_shared_with_me`
+-- itself. (This is unrelated to ADR-014/ADR-017's identity/tenancy
+-- question, which is about whether Atlas shares its *identity tables* with
+-- a different product entirely — `model_shares.shared_with_org_id` only
+-- ever references another organisation inside this same product.)
 create policy models_select on models
   for select to authenticated
   using (atlas.is_member(org_id) or atlas.model_shared_with_me(id));
@@ -1294,9 +1298,9 @@ create policy models_delete on models
 alter table commits enable row level security;
 alter table commits force row level security;
 
--- Same gap as models_select above (Sprint H1 note — item 4): the migrated
--- policy has no `or atlas.commit_shared_with_me(id)` clause — that function
--- and the `model_shares` table it would query don't exist yet.
+-- Same migration as models_select above: the `or atlas.commit_shared_with_me(id)`
+-- clause and `atlas.commit_shared_with_me` itself both land in Sprint F7
+-- item 4 (`supabase/migrations/20260916020000_model_shares.sql`).
 create policy commits_select on commits
   for select to authenticated
   using (
@@ -1371,7 +1375,7 @@ Every remaining table uses one of three templates, chosen per table:
 
 | Template | Select | Insert/Update | Tables |
 |---|---|---|---|
-| **Member-scoped** | `is_member(org_id)` (+ viewer restriction where the row can reveal draft content) | `has_role(org_id, 'owner','architect')` or contributor+ per table | `branches`, `tags`, `sources`, `aliases`, `views`, `view_annotations` (all five: insert-only, no update/delete policy or grant — Sprint H1 note, docs/AUDIT-2026-09-U2.md §2.E.3 item 19: this table originally called the carve-out out for `tags` alone, but the migrations apply it identically to `sources`/`aliases`/`views`/`view_annotations` too; only `view_layouts`, below, genuinely has an update policy, since a position hint is meant to change), `view_layouts` (update allowed — position hints are mutable), `merge_requests`, `capture_jobs`, `decisions*`, `assumptions`, `evidence`, `validation_results` |
+| **Member-scoped** | `is_member(org_id)` (+ viewer restriction where the row can reveal draft content) | `has_role(org_id, 'owner','architect')` or contributor+ per table | `branches` (Sprint F7 item 7 exception: `atlas.get_shared_main_branch`, a narrow RPC — not a `branches_select` clause — returns the real main-branch row to a shared-with viewer holding an unpinned share; `branches_select`'s own RLS is otherwise unchanged, so a change branch, `capture_draft`, and everything else on this table stay exactly as invisible to a non-member as before), `tags`, `sources`, `aliases`, `views`, `view_annotations` (all five: insert-only, no update/delete policy or grant — Sprint H1 note, docs/AUDIT-2026-09-U2.md §2.E.3 item 19: this table originally called the carve-out out for `tags` alone, but the migrations apply it identically to `sources`/`aliases`/`views`/`view_annotations` too; only `view_layouts`, below, genuinely has an update policy, since a position hint is meant to change), `view_layouts` (update allowed — position hints are mutable), `merge_requests`, `capture_jobs`, `decisions*`, `assumptions`, `evidence`, `validation_results` |
 | **Commit-scoped** | visible iff `commits_select` would pass for `commit_id` | service role only | `elements_head`, `relationships_head`, `facts`, `deltas` |
 | **Product content** | `to authenticated using (true)` | service role only | `type_schemas`, `relationship_type_rules`, `capability_maps`, `capability_map_items`, `capability_map_sources` |
 
@@ -1379,7 +1383,7 @@ Every remaining table uses one of three templates, chosen per table:
 
 **`merge_requests`' insert/update is function-only, not a plain `has_role`/contributor+ policy (Sprint C1 amendment):** submitting a request has to move `branches.status` to `proposed` in the same transaction, and approving/rejecting/merging both a request and its branch's status together — two separate RLS-gated client writes could partially fail and leave the two disagreeing about whether a branch is under review. `atlas.submit_merge_request`/`request_changes`/`approve_merge_request`/`reject_merge_request`/`merge_branch` (§7.4, §7.5) are the only writers, each still deriving its own role check from `auth.uid()` rather than trusting a client-supplied one — the same reasoning, and the same precedent, as `atlas.commit_deltas` superseding a plain RLS-gated insert for `commits` (S-17). `merge_requests` therefore has a select policy only; no insert/update policy or grant exists for `authenticated`.
 
-**`tags`' select policy is exactly `using (atlas.is_member(org_id))`** (Sprint H1 note — docs/AUDIT-2026-09-U2.md §2.E.3 item 5), not yet the cross-org, tag-pinned sharing P-24 describes — the migration's own comment says as much: "Cross-org visibility of a specifically shared tag is added once model_shares lands." P-24 names the target behaviour once `model_shares` (§3.6) exists; until then it is not a passing test, it is a recorded intention, same as the `models_select`/`commits_select` gaps above.
+**`tags`' select policy gains its cross-org, tag-pinned clause in Sprint F7 item 4** (`supabase/migrations/20260916020000_model_shares.sql`), matching P-24's own wording exactly: only a *specifically shared* tag becomes visible to a shared-with org, never every tag on a model with any share — an unpinned (main-only) share grants no tag visibility at all. Before this migration the policy was exactly `using (atlas.is_member(org_id))` (Sprint H1 note — docs/AUDIT-2026-09-U2.md §2.E.3 item 5); P-24 is now a passing test (`src/db/modelShares.integration.test.ts`), not a recorded intention.
 
 `user_preferences`: **user-scoped** — `user_id = auth.uid()` on select/insert/update, no delete. The only table not scoped by `org_id`.
 
@@ -1498,7 +1502,9 @@ Sprint H1 item 12 (docs/AUDIT-2026-09-U2.md's own deferred-items review, §7.2):
 | A generated (typed) Supabase client, replacing the untyped `Client` (src/db/branches.ts's own module comment: "no generated `Database` schema") | Every `src/db` function casts `data`/`error` by hand at its own return point instead of getting the row shape from a generated schema | **H2** | A real correctness/maintenance improvement (a schema drift would surface as a type error, not a runtime surprise) with no urgency today — regenerating on every migration is upkeep work worth taking on deliberately, not mid-sprint, and Sprint H2 is the first point named for revisiting this project's own H1/H2 numbering scheme. |
 | `relationship_type_rules` as a migrated table (§3.3) | A real `relationship_type_rules` table, as originally specified below | **Superseded — never.** | Sprint H1's `RELATIONSHIP_TYPE_RULES` constant (`src/contracts/relationshipTypeRules.ts`) already fully enforces C9/V3 — see §3.3's own note on this table. A migrated table would only ever be worth building if the ruleset needed to become live-editable product content without a code change (e.g. an admin screen for adjusting rules) — nothing today requires that, and none is planned. This is not "not yet"; it is a permanent design choice, recorded so a future request to migrate it has to argue against this decision rather than treat the gap as an oversight. |
 | Landscape p5 fps, 30 → 45 (UI-principles §8.6, ADR-015) | Closing the gap between the measured p5 frame rate (~30fps, three clean runs — `e2e/landscape-perf.spec.ts`) and §8.6's actual ≥45fps target; the CI gate itself is 28, a no-regression baseline, not this target | **R-perf** | Sprint C1-H item 1d got this test running end to end for the first time (previously blocked by an `.in()`-filter-size bug, then a `max_rows` truncation bug — both fixed); the ~30fps p5 number it then produced is real and reproducible, not an artifact of either fix. Closing it is a rendering-performance investigation, not a read-path one — profile the worst frames first (which ones miss budget, and why) rather than guessing at a fix. |
+| Single sign-on (SSO) | No SAML/OIDC identity-provider integration exists or is planned for this sprint — auth is Supabase's own email/password and magic-link flows only (Sprint F7 item 3) | **Pilot feedback** | The F7 prompt's own explicit call: "SSO recorded as a pilot-feedback item, not built." This product's stated scale (one or two architects, occasional external sharing via `model_shares`) doesn't need it yet; worth building once a pilot customer's own IT policy actually requires it, not speculatively ahead of that. |
+| ~~Assigned-review notification preference~~ | **Closed, Sprint F7 (follow-up commit, ahead of prompt pack F3a landing the underlying `review_assigned` notification kind mid-sprint).** Sprint F7 PR3 shipped `notify_on_mention`/`notify_on_reply` but named "assigned reviews" as inert — no `review_assigned` notification kind existed yet, so a toggle for it would have had nothing to control (CLAUDE.md rule 7). F3a's own `atlas.submit_merge_request`/`atlas.set_reviewers` landed that kind days later; `20260916010000_notify_on_review_assigned.sql` added `notify_on_review_assigned` (same default-`true`, gate-the-notification-not-the-record shape as the other two) and redefined both RPCs to check it before each `review_assigned` insert. The profile page's notification-preferences panel dropped its "not available yet" copy for a real third checkbox in the same commit. | — | — |
 | ~~Canvas "hollow" (all-resolved) comment marker, and the "Comments on this view" toolbar filter~~ | **Closed, M1 close-out item 1.** `atlas.thread_counts` (§9.4, `20260911010000_thread_counts.sql`) replaces `atlas.unresolved_comment_counts` with `(open_count, total_count)` per anchor, which is all the hollow marker ever needed — "has threads, all resolved" (`open_count = 0, total_count > 0`) is now told apart from "no threads at all" (still simply absent from the result). The toolbar filter ("comments on this view") shipped without the per-`view_kind` count this row originally assumed it would need: it dims any node with `total_count === 0` on the *current* view's own already-loaded anchor set, regardless of which `view_kind` a thread was originally raised from, rather than filtering to threads raised specifically in this view — a simpler, real behaviour ("does this system have any comment thread at all"), not the narrower one this row anticipated, and not worth a second RPC variant to build the narrower one instead. | — | — |
 | True drag-and-drop for capability map sibling reordering (Sprint U4-1 C1) | "Tailoring allows drag-to-reorder among siblings" ships as move buttons — left/right at L1, up/down at L2 — swapping `attributes.order` with an adjacent sibling, not a mouse drag gesture (`src/ui/capabilityMap/useCapabilityReorder.ts`'s own module comment: no drag-and-drop anywhere else in this codebase, no DnD library, and buttons stay keyboard-/screen-reader-operable, which a bare `draggable` element wouldn't be) | **U4-2** | Reviewed and accepted as the shipped behaviour for U4-1, not a gap to close before the item counts as done — the *effect* (a capability swaps places with an adjacent sibling) is identical either way. A real drag gesture is a genuine interaction upgrade once tailoring sees more day-to-day use, worth its own sprint rather than folded into C1 unreviewed. |
 
-Everything else this document defers is named at its point of use, not repeated here: SPEC §2's `created_at` exceptions, §9's `model_shares`-dependent RLS clauses (§9.2/§9.3/§9.5, all three annotated "pending `model_shares`, no target sprint named"), and §3.6's `capture_job_id` FK (pending `capture_jobs`, Sprint K1) are documentation of an absent dependency, not a scheduled follow-up in the sense this section means.
+Everything else this document defers is named at its point of use, not repeated here: SPEC §2's `created_at` exceptions and §3.6's `capture_job_id` FK (pending `capture_jobs`, Sprint K1) are documentation of an absent dependency, not a scheduled follow-up in the sense this section means. §9's three `model_shares`-dependent RLS clauses (§9.2/§9.3/§9.5) are no longer in this category — Sprint F7 item 4 migrated all three (`supabase/migrations/20260916020000_model_shares.sql`).

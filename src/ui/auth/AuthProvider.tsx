@@ -55,9 +55,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut({ scope });
   }, []);
 
+  const sendMagicLink = useCallback(async (emailInput: string) => {
+    const { error } = await supabase.auth.signInWithOtp({ email: emailInput, options: { emailRedirectTo: window.location.origin } });
+    return { error: error?.message ?? null };
+  }, []);
+
+  const sendPasswordResetEmail = useCallback(async (emailInput: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(emailInput, { redirectTo: `${window.location.origin}/reset-password` });
+    return { error: error?.message ?? null };
+  }, []);
+
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    return { error: error?.message ?? null };
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, userId, email, signInWithPassword, signUpWithPassword, signOut }),
-    [status, userId, email, signInWithPassword, signUpWithPassword, signOut],
+    () => ({ status, userId, email, signInWithPassword, signUpWithPassword, signOut, sendMagicLink, sendPasswordResetEmail, updatePassword }),
+    [status, userId, email, signInWithPassword, signUpWithPassword, signOut, sendMagicLink, sendPasswordResetEmail, updatePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

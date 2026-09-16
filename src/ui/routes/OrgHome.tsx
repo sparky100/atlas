@@ -7,6 +7,7 @@ import { ModelList } from '../components/ModelList/ModelList';
 import { OrgSwitcher } from '../components/OrgSwitcher/OrgSwitcher';
 import { Text } from '../components/Text/Text';
 import { canCreateModel, canManageOrgSettings, useMembership } from '../orgs/useMembership';
+import { useModelsSharedWithOrg } from '../orgs/useModelsSharedWithOrg';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { useOrganisations } from '../orgs/useOrganisations';
 import { useModels } from '../models/useModels';
@@ -20,6 +21,7 @@ export function OrgHome() {
   const { organisation, loading: orgLoading, error: orgError } = useOrganisationBySlug(orgSlug ?? '');
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { models, loading: modelsLoading, createModel } = useModels(organisation?.id ?? null);
+  const { sharedModels } = useModelsSharedWithOrg(organisation?.id ?? null);
   // Sprint 7j item 1/3: "hidden from lists" plus item 3's own collapsed
   // "Archived" section — one fetch (`listModelsForOrg`, deliberately
   // unfiltered so every route can still resolve an archived model
@@ -85,6 +87,28 @@ export function OrgHome() {
             await createModel(name, slug, userId);
           }}
         />
+        {sharedModels.length > 0 && (
+          // F7 item 4: "Shared with us" — every model another organisation
+          // has granted this org read-only access to, view-only, resolving
+          // to the pinned tag if the share is pinned, main otherwise (SPEC
+          // §9's own P-24 visibility matrix — the link never grants more
+          // than what the target page's own RLS already allows once opened).
+          <CollapsibleSection title="Shared with us" meta={`(${String(sharedModels.length)})`} defaultOpen={true}>
+            <ul className={styles.archivedList}>
+              {sharedModels.map((shared) => (
+                <li key={shared.share.id}>
+                  <Link to={`/o/${shared.ownerOrgSlug}/m/${shared.modelSlug}${shared.tagName ? `?ref=tag:${shared.tagName}` : ''}`} className={styles.archivedRow}>
+                    <Text as="span">{shared.modelName}</Text>
+                    <Text as="span" tone="muted" size="sm">
+                      from {shared.ownerOrgName}
+                    </Text>
+                    <Chip tone="neutral">{shared.tagName ?? 'current main'}</Chip>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CollapsibleSection>
+        )}
         {archivedModels.length > 0 && (
           <CollapsibleSection title="Archived" meta={`(${String(archivedModels.length)})`} defaultOpen={false}>
             <ul className={styles.archivedList}>
