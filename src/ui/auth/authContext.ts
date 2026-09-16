@@ -8,6 +8,12 @@ export interface AuthContextValue {
   email: string | null;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signUpWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
+  /** Sprint F7 item 3: `supabase.auth.signInWithOtp` — emails a one-click sign-in link, no password involved. */
+  sendMagicLink: (email: string) => Promise<{ error: string | null }>;
+  /** Sprint F7 item 3: `supabase.auth.resetPasswordForEmail`, redirecting to this app's own `/reset-password` (Supabase's own built-in auth email — separate from the Resend-backed invite email, F7 item 1). */
+  sendPasswordResetEmail: (email: string) => Promise<{ error: string | null }>;
+  /** Sprint F7 item 3: `supabase.auth.updateUser({password})` — called from `/reset-password` once the recovery link has established a temporary session. */
+  updatePassword: (password: string) => Promise<{ error: string | null }>;
   /**
    * Sprint F7 item 2: two meaningfully distinct actions, not one. `'local'`
    * (the default, and what `UserMenu.tsx`'s ordinary "Sign out" now uses)
