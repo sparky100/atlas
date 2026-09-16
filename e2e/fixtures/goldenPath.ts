@@ -53,7 +53,13 @@ export async function signUpCreateOrgAndModel(page: Page, prefix: string): Promi
   const orgName = `${prefix} Org ${randomUUID().slice(0, 8)}`;
   const modelName = `${prefix} Model ${randomUUID().slice(0, 8)}`;
 
-  await page.getByRole('button', { name: 'New organisation' }).click();
+  // F3a's sign-up shape: a brand-new user with zero orgs is offered "Just
+  // me" (a personal org) or "My organisation" (named, with an invite
+  // step) — "New organisation" only exists once at least one org already
+  // exists (Home.tsx's own two separate creation sections). This fixture
+  // always wants a real, named org (most golden paths need to invite a
+  // second member into it later), so "My organisation" is the one to click.
+  await page.getByRole('button', { name: 'My organisation' }).click();
   await page.getByPlaceholder('Organisation name').fill(orgName);
   await page.getByRole('button', { name: 'Create' }).click();
 

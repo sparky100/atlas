@@ -104,15 +104,18 @@ export interface UserPreferences {
    * for this user — always a real boolean (`not null default true`),
    * never nullable like the colour-by/lane-key fields above, since there's
    * no context-dependent default to compute: "notify" is the sensible
-   * default for everyone until they say otherwise. "Assigned reviews" is
-   * named in the prompt this item comes from but ships no preference of
-   * its own — no `notification_kind` for it exists yet (F3a's
-   * review-verdict mechanism, which would produce that kind, was paused,
-   * not built).
+   * default for everyone until they say otherwise.
    */
   notifyOnMention: boolean;
   /** Sprint F7 item 3: same as `notifyOnMention`, for a reply-to-a-thread notification. */
   notifyOnReply: boolean;
+  /**
+   * Sprint F7 item 3 follow-up: same shape, for F3a's `review_assigned`
+   * notification kind — added once F3a's review-verdict mechanism actually
+   * shipped (it hadn't yet when `notifyOnMention`/`notifyOnReply` were
+   * first added, hence the separate migration).
+   */
+  notifyOnReviewAssigned: boolean;
   /** ISO 8601 timestamp; DB-assigned, never client-chosen. */
   updatedAt: string;
 }
@@ -130,6 +133,7 @@ export interface UserPreferencesRow {
   landscape_pinned_lane_keys: LandscapeLaneKeyList | null;
   notify_on_mention: boolean;
   notify_on_reply: boolean;
+  notify_on_review_assigned: boolean;
   updated_at: string;
 }
 
@@ -146,6 +150,7 @@ export function toUserPreferencesRow(prefs: UserPreferences): UserPreferencesRow
     landscape_pinned_lane_keys: prefs.landscapePinnedLaneKeys,
     notify_on_mention: prefs.notifyOnMention,
     notify_on_reply: prefs.notifyOnReply,
+    notify_on_review_assigned: prefs.notifyOnReviewAssigned,
     updated_at: prefs.updatedAt,
   };
 }
@@ -163,6 +168,7 @@ export function fromUserPreferencesRow(row: UserPreferencesRow): UserPreferences
     landscapePinnedLaneKeys: row.landscape_pinned_lane_keys,
     notifyOnMention: row.notify_on_mention,
     notifyOnReply: row.notify_on_reply,
+    notifyOnReviewAssigned: row.notify_on_review_assigned,
     updatedAt: row.updated_at,
   };
 }
@@ -190,6 +196,7 @@ export function defaultUserPreferences(userId: UUID, isOwnerOrArchitect: boolean
     landscapePinnedLaneKeys: null,
     notifyOnMention: true,
     notifyOnReply: true,
+    notifyOnReviewAssigned: true,
     updatedAt: new Date(0).toISOString(),
   };
 }

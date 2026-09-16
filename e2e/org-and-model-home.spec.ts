@@ -33,7 +33,11 @@ test('sign-up through org and model creation to ModelHome\'s front doors', async
   await expect(page.getByRole('heading', { name: 'Your organisations' })).toBeVisible();
   await expect(page.getByText("You're not a member of any organisation yet")).toBeVisible();
 
-  await page.getByRole('button', { name: 'New organisation' }).click();
+  // F3a's sign-up shape: a brand-new user with zero orgs picks "Just me"
+  // or "My organisation" — "New organisation" only appears once an org
+  // already exists. This spec wants a real, named org (it goes on to
+  // exercise the owner role chip and model creation), so "My organisation".
+  await page.getByRole('button', { name: 'My organisation' }).click();
   await page.getByPlaceholder('Organisation name').fill(orgName);
   await page.getByRole('button', { name: 'Create' }).click();
 

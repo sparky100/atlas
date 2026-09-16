@@ -33,6 +33,8 @@ export interface UpsertUserPreferencesInput {
   notifyOnMention?: UserPreferencesRow['notify_on_mention'];
   /** Sprint F7 item 3 — same omitted-leaves-untouched convention. */
   notifyOnReply?: UserPreferencesRow['notify_on_reply'];
+  /** Sprint F7 item 3 follow-up (F3a's `review_assigned` kind) — same omitted-leaves-untouched convention. */
+  notifyOnReviewAssigned?: UserPreferencesRow['notify_on_review_assigned'];
 }
 
 /**
@@ -53,6 +55,7 @@ export async function upsertUserPreferences(supabase: Client, input: UpsertUserP
   if (input.landscapePinnedLaneKeys !== undefined) patch.landscape_pinned_lane_keys = input.landscapePinnedLaneKeys;
   if (input.notifyOnMention !== undefined) patch.notify_on_mention = input.notifyOnMention;
   if (input.notifyOnReply !== undefined) patch.notify_on_reply = input.notifyOnReply;
+  if (input.notifyOnReviewAssigned !== undefined) patch.notify_on_review_assigned = input.notifyOnReviewAssigned;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('user_preferences').upsert(patch, { onConflict: 'user_id' }).select('*').single();

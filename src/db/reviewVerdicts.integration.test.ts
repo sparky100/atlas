@@ -15,9 +15,11 @@ import { commitToBranch } from './commits';
 import { loadEnv } from './env';
 import { computeMergeReviewForBranch, getMergeRequestById, submitMergeRequest } from './mergeRequests';
 import { createModel } from './models';
+import { getUnreadNotificationCount, listMyNotifications } from './notifications';
 import { createOrganisation } from './organisations';
 import { getOrCreateManualSource } from './sources';
 import { listReviewVerdictsForRequest, setReviewVerdict } from './reviewVerdicts';
+import { upsertUserPreferences } from './userPreferences';
 
 const env = loadEnv();
 const service = createServiceRoleClient(env);
@@ -118,6 +120,25 @@ describe('F3a review verdicts against a real local Supabase', () => {
     await setReviewVerdict(architect.client, requestId, 'request_changes', 'needs more work');
     expect((await getMergeRequestById(owner.client, requestId))?.status).toBe('changes_requested');
     expect((await getBranch(owner.client, branchId))?.status).toBe('draft');
+  });
+
+  it('F7 item 3 follow-up: an assigned reviewer who opted out gets no review_assigned notification, but the verdict row still exists', async () => {
+    await upsertUserPreferences(architect.client, { userId: architect.id, notifyOnReviewAssigned: false });
+    try {
+      const before = await getUnreadNotificationCount(architect.client, architect.id);
+      const { requestId } = await proposeChange('notify-opt-out');
+
+      // The assignment itself is unconditional — the preference only gates the notification.
+      const verdicts = await listReviewVerdictsForRequest(owner.client, requestId);
+      expect(verdicts.find((v) => v.user_id === architect.id)).toMatchObject({ verdict: 'pending' });
+
+      const after = await getUnreadNotificationCount(architect.client, architect.id);
+      expect(after).toBe(before);
+      const notifications = await listMyNotifications(architect.client, architect.id, { unreadOnly: true });
+      expect(notifications.find((n) => n.merge_request_id === requestId)).toBeUndefined();
+    } finally {
+      await upsertUserPreferences(architect.client, { userId: architect.id, notifyOnReviewAssigned: true });
+    }
   });
 
   it('a non-reviewer member cannot cast a verdict', async () => {

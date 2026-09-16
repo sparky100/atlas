@@ -39,6 +39,7 @@ const userPreferencesArb: fc.Arbitrary<UserPreferences> = fc.record({
   // compute.
   notifyOnMention: fc.boolean(),
   notifyOnReply: fc.boolean(),
+  notifyOnReviewAssigned: fc.boolean(),
   updatedAt: fc.date({ noInvalidDate: true }).map((d) => d.toISOString()),
 });
 

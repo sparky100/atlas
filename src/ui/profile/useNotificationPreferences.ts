@@ -7,6 +7,8 @@ import { supabase } from '../supabaseClient';
 export interface NotificationPreferences {
   notifyOnMention: boolean;
   notifyOnReply: boolean;
+  /** F7 item 3 follow-up: added once F3a's `review_assigned` notification kind actually shipped. */
+  notifyOnReviewAssigned: boolean;
 }
 
 export interface UseNotificationPreferencesResult {
@@ -14,9 +16,10 @@ export interface UseNotificationPreferencesResult {
   loading: boolean;
   setNotifyOnMention: (value: boolean) => void;
   setNotifyOnReply: (value: boolean) => void;
+  setNotifyOnReviewAssigned: (value: boolean) => void;
 }
 
-const DEFAULTS: NotificationPreferences = { notifyOnMention: true, notifyOnReply: true };
+const DEFAULTS: NotificationPreferences = { notifyOnMention: true, notifyOnReply: true, notifyOnReviewAssigned: true };
 
 /**
  * Sprint F7 item 3 — same load-then-write shape `useLandscapeColourByPreference.ts`
@@ -24,11 +27,12 @@ const DEFAULTS: NotificationPreferences = { notifyOnMention: true, notifyOnReply
  * toggle, best-effort write (a failed save just leaves the saved value
  * stale until the next successful toggle — the same stance every other
  * preference hook in this codebase already takes, since a preference
- * miss is never data loss). `true`/`true` — matching
- * `atlas.process_comment_mentions`'s own `coalesce(..., true)` — is what
- * a user with no saved row at all sees, same "no row means no saved
- * override... but this one has a fixed default" reasoning
- * `UserPreferences.notifyOnMention`'s own doc comment gives.
+ * miss is never data loss). `true`/`true`/`true` — matching
+ * `atlas.process_comment_mentions`'s/`atlas.submit_merge_request`'s own
+ * `coalesce(..., true)` — is what a user with no saved row at all sees,
+ * same "no row means no saved override... but this one has a fixed
+ * default" reasoning `UserPreferences.notifyOnMention`'s own doc comment
+ * gives.
  */
 export function useNotificationPreferences(userId: UUID | null): UseNotificationPreferencesResult {
   const [saved, setSaved] = useState<NotificationPreferences | undefined>(undefined);
@@ -42,7 +46,7 @@ export function useNotificationPreferences(userId: UUID | null): UseNotification
     getUserPreferences(supabase, userId)
       .then((row) => {
         if (cancelled) return;
-        setSaved(row ? { notifyOnMention: row.notify_on_mention, notifyOnReply: row.notify_on_reply } : DEFAULTS);
+        setSaved(row ? { notifyOnMention: row.notify_on_mention, notifyOnReply: row.notify_on_reply, notifyOnReviewAssigned: row.notify_on_review_assigned } : DEFAULTS);
       })
       .catch((e: unknown) => {
         reportError("Couldn't load your notification preferences.", e);
@@ -80,5 +84,17 @@ export function useNotificationPreferences(userId: UUID | null): UseNotification
     [userId],
   );
 
-  return { preferences, loading, setNotifyOnMention, setNotifyOnReply };
+  const setNotifyOnReviewAssigned = useCallback(
+    (value: boolean) => {
+      setSaved((prev) => ({ ...(prev ?? DEFAULTS), notifyOnReviewAssigned: value }));
+      if (userId) {
+        upsertUserPreferences(supabase, { userId, notifyOnReviewAssigned: value }).catch((e: unknown) => {
+          reportError("Couldn't save your notification preference.", e);
+        });
+      }
+    },
+    [userId],
+  );
+
+  return { preferences, loading, setNotifyOnMention, setNotifyOnReply, setNotifyOnReviewAssigned };
 }
