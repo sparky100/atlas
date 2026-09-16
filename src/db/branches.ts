@@ -90,12 +90,30 @@ export async function getBranch(supabase: Client, branchId: UUID): Promise<Branc
   return data as BranchRow | null;
 }
 
+/**
+ * F7 item 4: `branches_select` is member-scoped only (SPEC §9.5) — a
+ * shared-with org member holding an *unpinned* `model_shares` grant has no
+ * RLS path to this row at all, even though `models_select`/`commits_select`
+ * already let them read everything downstream of its head commit. The
+ * fallback below is the one, narrow exception: `atlas.get_shared_main_branch`
+ * (`20260916040000_shared_model_access_fixes.sql`) returns this same real
+ * row, gated on holding a genuinely unpinned share — never a tag-pinned
+ * one, which must never see main's live head move out from under the
+ * version it pinned. Only tried once the plain RLS-gated read already came
+ * back empty, so an ordinary member's read path is unchanged.
+ */
 export async function getMainBranch(supabase: Client, modelId: UUID): Promise<BranchRow | null> {
   assertRealId('getMainBranch', 'model_id', modelId);
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('branches').select('*').eq('model_id', modelId).eq('kind', 'main').maybeSingle();
   if (error) throw new Error(`getMainBranch: ${error.message}`);
-  return data as BranchRow | null;
+  if (data) return data as BranchRow;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data: sharedRows, error: sharedError } = await supabase.schema('atlas').rpc('get_shared_main_branch', { p_model_id: modelId });
+  if (sharedError) throw new Error(`getMainBranch (shared): ${sharedError.message}`);
+  const rows = sharedRows as BranchRow[] | null;
+  return rows?.[0] ?? null;
 }
 
 export async function listBranchesForModel(supabase: Client, modelId: UUID): Promise<BranchRow[]> {

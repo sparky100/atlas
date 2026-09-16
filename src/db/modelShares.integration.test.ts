@@ -21,7 +21,7 @@ import { createDecision } from './decisions';
 import { loadEnv } from './env';
 import { createModel, getModelById } from './models';
 import { createModelShare, listModelsSharedWithOrg, resolveOrganisationForSharing, revokeModelShare } from './modelShares';
-import { createOrganisation } from './organisations';
+import { createOrganisation, getOrganisationById } from './organisations';
 import { getOrCreateManualSource } from './sources';
 import { createTag } from './tags';
 
@@ -205,6 +205,20 @@ describe('model_shares against a real local Supabase (P-24)', () => {
       expect(entry?.ownerOrgId).toBe(ownerOrgId);
       expect(entry?.tagName).toBeNull();
     });
+
+    // F7 item 4 follow-up (20260916040000_shared_model_access_fixes.sql):
+    // two real gaps found exercising the golden path end to end, both
+    // fixed as part of PR7, not PR5's original scope.
+    it("resolves the owning organisation's name via organisations_select's new model_shares-aware clause — the read listModelsSharedWithOrg's own second query depends on", async () => {
+      const org = await getOrganisationById(unpinnedOrg.member.client, ownerOrgId);
+      expect(org?.name).toBe('Model Shares Owner Org');
+    });
+
+    it("getMainBranch resolves the real, live main branch row via atlas.get_shared_main_branch's fallback — never frozen at the commit the share was created at", async () => {
+      const main = await getMainBranch(unpinnedOrg.member.client, modelId);
+      expect(main?.kind).toBe('main');
+      expect(main?.head_commit_id).toBe(commit3Id);
+    });
   });
 
   describe('tag-pinned share', () => {
@@ -249,6 +263,10 @@ describe('model_shares against a real local Supabase (P-24)', () => {
       const [entry] = shared;
       expect(entry?.tagName).toBe(tagName);
     });
+
+    it("getMainBranch stays invisible — a pinned share must never see main's live head move out from under the version it pinned", async () => {
+      expect(await getMainBranch(pinnedOrg.member.client, modelId)).toBeNull();
+    });
   });
 
   describe('expired share', () => {
@@ -258,6 +276,11 @@ describe('model_shares against a real local Supabase (P-24)', () => {
       const { data: commitRow } = await expiredOrg.member.client.from('commits').select('id').eq('id', commit1Id).maybeSingle();
       expect(commitRow).toBeNull();
     });
+
+    it('never resolves the owning organisation or the main branch either', async () => {
+      expect(await getOrganisationById(expiredOrg.member.client, ownerOrgId)).toBeNull();
+      expect(await getMainBranch(expiredOrg.member.client, modelId)).toBeNull();
+    });
   });
 
   describe('no share at all', () => {
@@ -265,6 +288,11 @@ describe('model_shares against a real local Supabase (P-24)', () => {
       expect(await getModelById(outsiderOrg.member.client, modelId)).toBeNull();
       const { data: commitRow } = await outsiderOrg.member.client.from('commits').select('id').eq('id', commit1Id).maybeSingle();
       expect(commitRow).toBeNull();
+    });
+
+    it('never resolves the owning organisation or the main branch either', async () => {
+      expect(await getOrganisationById(outsiderOrg.member.client, ownerOrgId)).toBeNull();
+      expect(await getMainBranch(outsiderOrg.member.client, modelId)).toBeNull();
     });
   });
 
