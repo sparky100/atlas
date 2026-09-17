@@ -83,9 +83,11 @@ create or replace function atlas.record_element_merge(
   p_model_id uuid,
   p_surviving_element_id uuid,
   p_merged_element_id uuid,
+  p_merged_element_name text,
   p_rationale text,
   p_commit_id uuid,
   p_alias_id uuid,
+  p_name_alias_id uuid,
   p_source_id uuid,
   p_evidence_id uuid default null
 )
@@ -118,9 +120,27 @@ begin
   insert into aliases (id, org_id, model_id, element_id, alias_value, alias_type, source_id, confidence, created_by)
   values (p_alias_id, v_org_id, p_model_id, p_surviving_element_id, p_merged_element_id::text, 'merged_id', p_source_id, 1, auth.uid());
 
+  -- E7's own golden path — "old name found by search, undo" — needs more
+  -- than the merged_id alias above: that one stores the loser's *id*, not
+  -- its name (by SPEC §3.6's own explicit design, for resolving a stale
+  -- permalink to the survivor), so it can never match a person typing the
+  -- loser's old name into search, and `loadSearchPool` deliberately
+  -- excludes merged_id aliases from its pool regardless. This ordinary
+  -- `name`-type alias is the thing that actually makes the old name
+  -- searchable again — no different from any other name alias an element
+  -- can carry. A name collision with an existing alias elsewhere in the
+  -- model (the same unique (model_id, alias_type, lower(alias_value))
+  -- constraint every other name alias is already held to) fails this
+  -- insert and rolls back both alias rows and the `element_merges` row
+  -- above — the merge commit itself has already succeeded and stays live
+  -- either way (this function's own leading comment), the same accepted
+  -- rough edge as any other reason this recording step can fail.
+  insert into aliases (id, org_id, model_id, element_id, alias_value, alias_type, source_id, confidence, created_by)
+  values (p_name_alias_id, v_org_id, p_model_id, p_surviving_element_id, p_merged_element_name, 'name', p_source_id, 1, auth.uid());
+
   return v_row;
 end;
 $$;
 
-revoke all on function atlas.record_element_merge(uuid, uuid, uuid, uuid, text, uuid, uuid, uuid, uuid) from public;
-grant execute on function atlas.record_element_merge(uuid, uuid, uuid, uuid, text, uuid, uuid, uuid, uuid) to authenticated;
+revoke all on function atlas.record_element_merge(uuid, uuid, uuid, uuid, text, text, uuid, uuid, uuid, uuid, uuid) from public;
+grant execute on function atlas.record_element_merge(uuid, uuid, uuid, uuid, text, text, uuid, uuid, uuid, uuid, uuid) to authenticated;

@@ -112,7 +112,7 @@ describe('mergeElements / undoElementMerge against a real local Supabase', () =>
     expect(result.status).not.toBe('merged');
   });
 
-  it('merges the loser into the survivor: retracts it, re-points its relationship and child, records element_merges and the merged_id alias', async () => {
+  it('merges the loser into the survivor: retracts it, re-points its relationship and child, records element_merges and both aliases (merged_id, name)', async () => {
     const main = await getMainBranch(owner.client, modelId);
     if (!main) throw new Error('main branch missing');
 
@@ -142,6 +142,13 @@ describe('mergeElements / undoElementMerge against a real local Supabase', () =>
 
     const { data: aliasRows } = await owner.client.from('aliases').select('element_id, alias_type, alias_value').eq('model_id', modelId).eq('alias_type', 'merged_id').eq('alias_value', loserId);
     expect(aliasRows).toEqual([expect.objectContaining({ element_id: survivorId })]);
+
+    // E7's golden path: "old name found by search" — the loser's old name
+    // ("Loser") is now a real, ordinary `name` alias of the survivor, not
+    // just the id-shaped `merged_id` one above — `loadSearchPool` (search
+    // pool this feeds) includes every alias_type except `merged_id`.
+    const { data: nameAliasRows } = await owner.client.from('aliases').select('element_id, alias_type, alias_value').eq('model_id', modelId).eq('alias_type', 'name').eq('alias_value', 'Loser');
+    expect(nameAliasRows).toEqual([expect.objectContaining({ element_id: survivorId })]);
 
     // A non-owner, non-member org sees none of this — element_merges_select
     // is member-scoped, same as every other table this schema treats that way.

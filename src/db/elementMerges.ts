@@ -9,8 +9,12 @@
  * role/branch-status checks every other edit already goes through.
  * `atlas.record_element_merge` (`.schema('atlas').rpc`, same convention
  * `mergeRequests.ts`'s own module comment names) then records
- * `element_merges` and the `merged_id` alias atomically, for a commit that
- * has already fully succeeded and is real, permanent history either way.
+ * `element_merges` and two aliases atomically — `merged_id` (the loser's
+ * old id, for a stale permalink) and `name` (the loser's old name, so the
+ * golden path's "old name found by search" is real — `merged_id`'s own
+ * value is an id, never a name, and `loadSearchPool` excludes it from
+ * search regardless) — for a commit that has already fully succeeded and
+ * is real, permanent history either way.
  *
  * Undo needs no RPC at all: it's the exact same `commitToBranch` path,
  * carrying `buildUndoMergeElementsDeltas`'s own computed inverse.
@@ -85,14 +89,17 @@ export async function mergeElements(supabase: Client, input: MergeElementsInput)
 
   const elementMergeId = crypto.randomUUID();
   const aliasId = crypto.randomUUID();
+  const nameAliasId = crypto.randomUUID();
   const { error } = await supabase.schema('atlas').rpc('record_element_merge', {
     p_id: elementMergeId,
     p_model_id: modelId,
     p_surviving_element_id: survivorId,
     p_merged_element_id: loserId,
+    p_merged_element_name: loserName,
     p_rationale: rationale,
     p_commit_id: commitResult.commitId,
     p_alias_id: aliasId,
+    p_name_alias_id: nameAliasId,
     p_source_id: sourceId,
     p_evidence_id: evidenceId ?? null,
   });

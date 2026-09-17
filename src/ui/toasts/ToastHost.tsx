@@ -25,6 +25,18 @@ export function ToastHost() {
           <Text as="p" size="sm" className={styles.message}>
             {m.text}
           </Text>
+          {m.action && (
+            <button
+              type="button"
+              className={styles.dismiss}
+              onClick={() => {
+                m.action?.onClick();
+                dismissToast(m.id);
+              }}
+            >
+              {m.action.label}
+            </button>
+          )}
           <button
             type="button"
             className={styles.dismiss}
