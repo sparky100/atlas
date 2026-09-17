@@ -66,4 +66,50 @@ describe('matchImportRows', () => {
     const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgate', supportsCapabilityName: 'Billing' })], [], capabilities);
     expect(result?.supports.kind).toBe('ambiguous');
   });
+
+  describe('fuzzy tier (Phase 2) — only reached on a clean exact-name miss', () => {
+    it('confidently matches a name that only differs by a typo (trigram similarity above the 0.6 threshold)', () => {
+      // trigramSimilarity(normalizeName('Northgatte'), normalizeName('Northgate')) = 0.750
+      const systems = [system('sys-1', 'Northgate')];
+      const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgatte' })], systems, []);
+      expect(result?.match).toEqual({ kind: 'matched', element: { elementId: 'sys-1', name: 'Northgate' } });
+    });
+
+    it('stays new when the best fuzzy score is still below the 0.6 threshold', () => {
+      // trigramSimilarity('council tax system', 'council tax servicing') = 0.464 — real overlap, still not a match.
+      const systems = [system('sys-1', 'Council Tax Servicing')];
+      const [result] = matchImportRows([row({ rowNumber: 2, name: 'Council Tax System' })], systems, []);
+      expect(result?.match).toEqual({ kind: 'new' });
+    });
+
+    it('flags an ambiguous fuzzy match when two candidates score within the 0.05 margin of each other', () => {
+      // trigramSimilarity('riverside payments', 'riverside payment') = 0.850
+      // trigramSimilarity('riverside payments', 'riverside paymentss') = 0.857 — 0.007 apart, both real hits.
+      const systems = [system('sys-1', 'Riverside Payment'), system('sys-2', 'Riverside Paymentss')];
+      const [result] = matchImportRows([row({ rowNumber: 2, name: 'Riverside Payments' })], systems, []);
+      expect(result?.match.kind).toBe('ambiguous');
+      if (result?.match.kind === 'ambiguous') {
+        expect(result.match.candidates.map((c) => c.elementId).sort()).toEqual(['sys-1', 'sys-2']);
+      }
+    });
+
+    it('never falls through to the fuzzy tier when the exact tier already found an ambiguous tie', () => {
+      // Two exact matches for "Northgate" — a real, if rare, exact tie that
+      // must be surfaced as-is, never re-scored (and possibly narrowed to
+      // one "clear winner") by the fuzzy tier underneath it.
+      const systems = [system('sys-1', 'Northgate'), system('sys-2', 'northgate'), system('sys-3', 'Northgatte')];
+      const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgate' })], systems, []);
+      expect(result?.match.kind).toBe('ambiguous');
+      if (result?.match.kind === 'ambiguous') {
+        expect(result.match.candidates.map((c) => c.elementId).sort()).toEqual(['sys-1', 'sys-2']);
+      }
+    });
+
+    it('applies the same fuzzy cascade to the supports column', () => {
+      // trigramSimilarity('billing', 'biling') = 0.667
+      const capabilities = [capability('cap-1', 'Biling')];
+      const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgate', supportsCapabilityName: 'Billing' })], [], capabilities);
+      expect(result?.supports).toEqual({ kind: 'matched', capability: { elementId: 'cap-1', name: 'Biling' } });
+    });
+  });
 });
