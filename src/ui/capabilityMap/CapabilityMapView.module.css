@@ -87,48 +87,43 @@
 }
 
 /**
- * Sprint U4-2a item 3's "L1 header on one row" (`nowrap` + `.columnLink`'s
- * own ellipsis) turned out to be the wrong fix for the real complaint —
- * Sprint U4-2b item 1: "L1 names never truncate; the chip and 'N systems
- * →' wrap under the name". `flex-wrap: wrap` here is what actually
- * satisfies that: the name link (`flex: 1 1 auto`, still `min-width: 0`,
- * still shrinkable) takes the row on its own when it's short enough to
- * fit alongside the chip/zoom-link/reorder-toggle, and wraps them onto
- * their own line below it, at their natural width, the moment it can't —
- * never cutting the name itself short to make room.
- *
- * S1 item 13's "explicit shared L1 header height": `min-height`, not
- * `height` — a fixed `height` would clip a name long enough to need the
- * wrap above, reintroducing the truncation item 1 deliberately removed.
- * `min-height` gives every column the same floor (two `--row-height` rows'
- * worth, matching `ChangeView.module.css`/`ModelSettingsView.module.css`'s
- * own "room for a short row plus a wrapped one" convention) so a short L1
- * name's header lines up with a sibling's wrapped one instead of looking
- * shorter, while a name needing more than two lines still grows past it
- * rather than being cut off.
+ * Layout consistency pass: two guaranteed-single-line rows (the title
+ * row, the summary line below it) rather than the old "wrap whatever
+ * doesn't fit onto a second line" shape (Sprint U4-2a item 3, then
+ * Sprint U4-2b item 1's own revision of it) — see `.columnName`'s own
+ * comment for why truncation is back. No explicit `height` here: once
+ * both children are forced to exactly one line each (fixed font size,
+ * fixed line-height, `nowrap` + ellipsis), the header's total height is
+ * already identical across every column by construction, which is more
+ * robust than a hardcoded number that could drift out of sync with the
+ * real text metrics at a given density.
  */
 .columnHeader {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  min-height: calc(var(--row-height) * 2);
+  flex-direction: column;
+  gap: var(--space-1);
   padding-bottom: var(--space-1);
   border-bottom: var(--border-width-emphasis) solid var(--border-strong);
+}
+
+/* The title row: name, colour-by's own aggregate chip, reorder buttons —
+   one line, `flex-wrap: nowrap` (the default) relying on `.columnName`'s
+   own ellipsis rather than `.columnHeader`'s old `flex-wrap: wrap` to
+   keep this row from ever growing past one line. */
+.columnHeaderTitleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 /**
  * Sprint U4-1 C3 review note: the L1 header's own name link, unlike its
  * L2/L3 children, is plain text-in-a-header, not a whole-tile click
  * target — just the underline removal `CapabilityTile`'s primary link
- * gets for the same reason (plain-text name).
- *
- * Sprint U4-2b item 1: no truncation at all now — a long name wraps onto
- * as many lines as it needs, full stop, rather than ellipsizing. `flex: 1
- * 1 auto` + `min-width: 0` still matter here: without them a long
- * unbroken word (or `white-space` fighting the wrap) could still force
- * the row wider than the column before `.columnHeader`'s own `flex-wrap`
- * gets a chance to push the chip/zoom-link onto their own line.
+ * gets for the same reason (plain-text name). `flex: 1 1 auto` +
+ * `min-width: 0` are what let `.columnName`'s own ellipsis actually
+ * engage instead of forcing the row wider than the column.
  */
 .columnLink {
   color: inherit;
@@ -139,19 +134,27 @@
 }
 
 /**
- * Sprint U4-1 C3: the L2 card's own box (border, background, click
- * target) is now `CapabilityTile` (src/ui/components/CapabilityTile/) —
- * this row is just its secondary controls (reorder buttons, the zoom
- * link, the expand toggle), rendered as `CapabilityTile`'s `children`
- * (that component's own comment explains why they stay independently
- * clickable despite the tile's own whole-tile link).
+ * Layout consistency pass: single-line, ellipsis-truncated — the same
+ * treatment `.mobileGroupName` below already gives this exact header at
+ * <768px, now applied at every width so every column's title sits on the
+ * same baseline regardless of name length (`title` attribute on the
+ * link itself carries the full name for a hover/long-press). Supersedes
+ * Sprint U4-2b item 1's "never truncate, wrap instead" — see
+ * `.columnHeader`'s own comment for the trade this sprint made instead.
  */
-.cardSecondaryRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-top: var(--space-1);
+.columnName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The summary line: "7/8 supported · 8 systems →[ · no owner]" — one
+   line, same ellipsis safety net as the title row above in case a very
+   narrow column (the 2-column tablet tier) can't fit it all. */
+.columnSummary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .expandButton {

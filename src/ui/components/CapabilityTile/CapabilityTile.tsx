@@ -13,15 +13,27 @@ export interface CapabilityTileProps {
   /** `'card'` (default) — the capability map's L2 cards. `'compact'` — the smaller inline pill L3 uses, revealed only when its parent card expands. */
   size?: 'card' | 'compact';
   /**
-   * Secondary controls, and any further nested content (a zoom link,
-   * reorder buttons, an expand toggle, a list of child tiles) — rendered
-   * as ordinary DOM content *after* the tile's own primary link, not
-   * inside it. See this component's own module comment for why: the
-   * primary link is a "stretched link" (a full-tile `::after` overlay),
-   * specifically so real interactive descendants passed here stay
-   * independently clickable rather than nesting inside an `<a>` — which
-   * HTML disallows for another link, and which browsers and screen
-   * readers handle unreliably even for a `<button>`.
+   * Density pass: reorder buttons, the zoom link, the expand toggle —
+   * rendered inline in the same flex row as the tone chip ("one compact
+   * row" rather than the chip sitting above a second row of its own).
+   * Split out from `children` below specifically so this component can
+   * lay it out next to the chip without also trying to flex-row a nested
+   * tile list — see `children`'s own doc comment for why that has to stay
+   * a separate slot.
+   */
+  secondaryRow?: ReactNode;
+  /**
+   * Anything nested *below* the secondary row — today, only L2's own
+   * expanded L3 tile list. Deliberately not merged into `secondaryRow`'s
+   * flex row: a list of further `CapabilityTile`s is a block of its own,
+   * not one more inline item alongside a chip and a zoom link. Both this
+   * and `secondaryRow` render as ordinary DOM content *after* the tile's
+   * own primary link, not inside it. See this component's own module
+   * comment for why: the primary link is a "stretched link" (a full-tile
+   * `::after` overlay), specifically so real interactive descendants
+   * passed here stay independently clickable rather than nesting inside
+   * an `<a>` — which HTML disallows for another link, and which browsers
+   * and screen readers handle unreliably even for a `<button>`.
    */
   children?: ReactNode;
   /**
@@ -49,15 +61,15 @@ export interface CapabilityTileProps {
  * both themes, never the same as a diff marker") so the tile's own fill
  * and its Chip read as one consistent tone, not two.
  *
- * "Whole tile is the click target" without breaking `children`'s own
- * interactive content: `.primaryLink` (module CSS) is a "stretched
- * link" — its `::after` is absolutely positioned to cover the whole
- * frame, rather than the link literally wrapping the tile's content. A
- * `.secondary` wrapper around `children` is explicitly `position:
+ * "Whole tile is the click target" without breaking `secondaryRow`/
+ * `children`'s own interactive content: `.primaryLink` (module CSS) is a
+ * "stretched link" — its `::after` is absolutely positioned to cover the
+ * whole frame, rather than the link literally wrapping the tile's
+ * content. A `.secondary` wrapper around both is explicitly `position:
  * relative` so it paints (and hit-tests) above that overlay regardless of
  * DOM order — CSS's own painting order puts positioned elements above
  * plain in-flow content, not the reverse, so without this any button or
- * link passed as `children` would be visually present but unclickable,
+ * link passed as either would be visually present but unclickable,
  * covered by the overlay. This is the standard accessible "clickable
  * card" pattern (colloquially "stretched link"): one real link for
  * keyboard/screen-reader navigation, real secondary controls that stay
@@ -74,10 +86,10 @@ export interface CapabilityTileProps {
  * tile is the click target" doesn't apply to it the same way, and L1
  * doesn't participate in colour-by today either.
  */
-export function CapabilityTile({ href, name, tone, toneLabel, size = 'card', children, commentMarker, onCommentMarkerClick }: CapabilityTileProps) {
+export function CapabilityTile({ href, name, tone, toneLabel, size = 'card', secondaryRow, children, commentMarker, onCommentMarkerClick }: CapabilityTileProps) {
   const hasChip = tone !== undefined && toneLabel !== undefined;
   return (
-    <BlueprintFrame interactive>
+    <BlueprintFrame interactive padding={size === 'card' ? 'compact' : 'default'}>
       <div className={size === 'compact' ? styles.tileCompact : styles.tile} data-tone={tone ?? 'none'}>
         <Link to={href} className={styles.primaryLink}>
           <Text as="span" size={size === 'compact' ? 'sm' : 'md'} className={styles.name}>
@@ -104,23 +116,34 @@ export function CapabilityTile({ href, name, tone, toneLabel, size = 'card', chi
           </button>
         )}
         {/*
-         * Sprint U4-2b item 3: "every tile reserves the chip row so tiles
-         * in a column are equal height" — a tile whose colour-by mode has
-         * nothing to say about it (`tone`/`toneLabel` both undefined)
-         * used to skip the chip row entirely, so it sat shorter than its
-         * siblings that did have one. Always rendering the Chip and
-         * hiding it with `visibility: hidden` (not `display: none`, which
-         * would collapse the row back to nothing) keeps every tile's own
-         * chip-row height identical regardless of whether this one has
-         * something to show — a plain, non-`aria-hidden` invisible
-         * element is already unreachable to assistive tech via
-         * `visibility: hidden` on its own, so no extra `aria-hidden` is
-         * needed for the placeholder case.
+         * `.secondary` lifts everything below above the primary link's
+         * overlay (this component's own module comment) — both
+         * `.secondaryRow` and `children` (a nested tile list, when
+         * present) live inside it, since either can carry real
+         * interactive content.
+         *
+         * Density pass: `.secondaryRow` is the tone chip and the caller's
+         * own `secondaryRow` prop sharing one flex row — "one compact
+         * row" rather than the chip sitting above a row of its own.
+         * Sprint U4-2b item 3's own "every tile reserves the chip's own
+         * space so a column stays equal-height" still holds exactly as
+         * before: the chip is always rendered, hidden via `visibility:
+         * hidden` (not `display: none`) when this tile's colour-by mode
+         * has nothing to say about it, so this row's height never
+         * collapses just because one tile lacks a tone. `children` (L2's
+         * own expanded L3 list) stays a separate block below this row,
+         * not one more flex item in it — that prop's own doc comment
+         * explains why.
          */}
-        <span className={hasChip ? undefined : styles.chipPlaceholder}>
-          <Chip tone={tone ?? 'neutral'}>{toneLabel ?? ' '}</Chip>
+        <span className={styles.secondary}>
+          <span className={styles.secondaryRow}>
+            <span className={hasChip ? undefined : styles.chipPlaceholder}>
+              <Chip tone={tone ?? 'neutral'}>{toneLabel ?? ' '}</Chip>
+            </span>
+            {secondaryRow}
+          </span>
+          {children}
         </span>
-        {children !== undefined && <span className={styles.secondary}>{children}</span>}
       </div>
     </BlueprintFrame>
   );
