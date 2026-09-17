@@ -270,6 +270,69 @@ describe('identity (weak: name + type + context)', () => {
     const result = classifyMerge(input);
     expect(result.findings.filter((f) => f.class === 'identity')).toEqual([]);
   });
+
+  it('a close typo in the name (E7: trigram similarity, not exact equality) is a match once context corroborates', () => {
+    const input = scenario(
+      [],
+      [createEl('d-ours', 'x1', 'Billing Service', { lifecycleStatus: 'active', isExternal: false, vendor: 'Acme' })],
+      [createEl('d-theirs', 'x2', 'Billing Servcie', { lifecycleStatus: 'active', isExternal: false, vendor: 'Acme' })],
+    );
+    const result = classifyMerge(input);
+    expect(result.findings).toContainEqual(expect.objectContaining({ class: 'identity', blocking: false, subjectId: 'x1', relatedSubjectId: 'x2' }));
+  });
+
+  it('a name too far from any match (below the trigram threshold) is never an identity finding, even with matching context', () => {
+    const input = scenario(
+      [],
+      [createEl('d-ours', 'x1', 'Billing Service', { lifecycleStatus: 'active', isExternal: false, vendor: 'Acme' })],
+      [createEl('d-theirs', 'x2', 'Customer Portal', { lifecycleStatus: 'active', isExternal: false, vendor: 'Acme' })],
+    );
+    const result = classifyMerge(input);
+    expect(result.findings.filter((f) => f.class === 'identity')).toEqual([]);
+  });
+
+  it('a fuzzy name match with different parents (or none) still matches when vendor agrees (E7 context: vendor)', () => {
+    const input = scenario(
+      [],
+      [createEl('d-ours', 'x1', 'Billing Service', { lifecycleStatus: 'active', isExternal: false, vendor: 'Acme Corp' })],
+      [createEl('d-theirs', 'x2', 'Billing Servicee', { lifecycleStatus: 'active', isExternal: false, vendor: 'acme corp' })],
+    );
+    const result = classifyMerge(input);
+    expect(result.findings).toContainEqual(expect.objectContaining({ class: 'identity', subjectId: 'x1', relatedSubjectId: 'x2' }));
+  });
+
+  it('a fuzzy name match with a different vendor but matching description still matches (E7 context: description)', () => {
+    const input = scenario(
+      [],
+      [createEl('d-ours', 'x1', 'Billing Service', { lifecycleStatus: 'active', isExternal: false, vendor: 'Acme', description: 'Handles customer invoicing' })],
+      [createEl('d-theirs', 'x2', 'Billing Servicee', { lifecycleStatus: 'active', isExternal: false, vendor: 'Globex', description: 'Handles customer invoicing' })],
+    );
+    const result = classifyMerge(input);
+    expect(result.findings).toContainEqual(expect.objectContaining({ class: 'identity', subjectId: 'x1', relatedSubjectId: 'x2' }));
+  });
+
+  it('a fuzzy name match with a shared owning actor still matches, with no vendor/description overlap at all (E7 context: owner)', () => {
+    const owner = createActor('d-owner', 'team1', 'Platform Team');
+    const input = scenario(
+      [owner],
+      [createEl('d-ours', 'x1', 'Billing Service'), createRel('d-ours-owns', 'r-ours', 'owns', 'team1', 'x1', { role: 'business' })],
+      [createEl('d-theirs', 'x2', 'Billing Servicee'), createRel('d-theirs-owns', 'r-theirs', 'owns', 'team1', 'x2', { role: 'business' })],
+    );
+    const result = classifyMerge(input);
+    expect(result.findings).toContainEqual(expect.objectContaining({ class: 'identity', subjectId: 'x1', relatedSubjectId: 'x2' }));
+  });
+
+  it('a fuzzy name match with no parent, vendor, description or owner overlap at all is not a match', () => {
+    const ownerOurs = createActor('d-owner-ours', 'teamA', 'Team A');
+    const ownerTheirs = createActor('d-owner-theirs', 'teamB', 'Team B');
+    const input = scenario(
+      [ownerOurs, ownerTheirs],
+      [createEl('d-ours', 'x1', 'Billing Service', { lifecycleStatus: 'active', isExternal: false, vendor: 'Acme' }), createRel('d-ours-owns', 'r-ours', 'owns', 'teamA', 'x1', { role: 'business' })],
+      [createEl('d-theirs', 'x2', 'Billing Servicee', { lifecycleStatus: 'active', isExternal: false, vendor: 'Globex' }), createRel('d-theirs-owns', 'r-theirs', 'owns', 'teamB', 'x2', { role: 'business' })],
+    );
+    const result = classifyMerge(input);
+    expect(result.findings.filter((f) => f.class === 'identity')).toEqual([]);
+  });
 });
 
 describe('identity (strong: matching alias)', () => {

@@ -1,26 +1,96 @@
 import { describe, expect, it } from 'vitest';
-import { allTilesOf, computeContextDiagramLayout, curveBetween, hubBottomAnchor, MIN_DIAGRAM_WIDTH, resolveEdgeLabelOverlaps, tileTopAnchor, type DiagramTile, type EdgeLabelPlacement, type ResolvedEdgeLabel } from './contextDiagramLayout';
+import {
+  allTilesOf,
+  computeContextDiagramLayout,
+  edgeLabelsCollide,
+  edgeNear,
+  fanGapFor,
+  LANE_PITCH,
+  MIN_DIAGRAM_WIDTH,
+  placeEdgeLabels,
+  spreadAlong,
+  tileTopAnchor,
+  truncateToWidth,
+  type ContextDiagramLayout,
+  type DiagramTile,
+  type EdgeLabelPill,
+  type Point,
+  type RoutedEdge,
+} from './contextDiagramLayout';
 import { NODE_HEIGHT, NODE_WIDTH } from '../landscape/layout';
+import { PM_CONTEXT_SCENARIO, scenarioLayoutInputs } from './fixtures/sapContext';
 
-/** A fixed-width-per-character stand-in for `ctx.measureText(text).width` — deterministic and easy to reason about (e.g. "reads customer records from" at 7px/char is 196px), unlike a real font's own kerning-dependent metrics. */
+/** A fixed-width-per-character stand-in for `ctx.measureText(text).width / scale` — deterministic, unlike a real font's kerning. 6px/char is close to an 11px sans-serif at scale 1. */
 function fixedWidthMeasurer(pxPerChar: number): (text: string) => number {
   return (text) => text.length * pxPerChar;
 }
 
-/** Two axis-aligned rects (pill bounding boxes, centre + size) overlap on both axes at once. */
-function pillsOverlap(a: ResolvedEdgeLabel, b: ResolvedEdgeLabel): boolean {
-  const aLeft = a.x - a.width / 2;
-  const aRight = a.x + a.width / 2;
-  const bLeft = b.x - b.width / 2;
-  const bRight = b.x + b.width / 2;
-  const aTop = a.y - a.height / 2;
-  const aBottom = a.y + a.height / 2;
-  const bTop = b.y - b.height / 2;
-  const bBottom = b.y + b.height / 2;
-  return aLeft < bRight && bLeft < aRight && aTop < bBottom && bTop < aBottom;
+interface Rect {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
 }
 
-describe('computeContextDiagramLayout', () => {
+function tileRect(t: DiagramTile): Rect {
+  return { left: t.x, right: t.x + t.w, top: t.y, bottom: t.y + t.h };
+}
+
+function pillRect(p: EdgeLabelPill): Rect {
+  return { left: p.x - p.width / 2, right: p.x + p.width / 2, top: p.y - p.height / 2, bottom: p.y + p.height / 2 };
+}
+
+function rectsOverlap(a: Rect, b: Rect): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+function tilesOverlap(a: DiagramTile | undefined, b: DiagramTile | undefined): boolean {
+  if (!a || !b) throw new Error('expected both tiles to exist');
+  return rectsOverlap(tileRect(a), tileRect(b));
+}
+
+/** True when the axis-aligned segment `a`–`b` passes through the *interior* of `rect` (touching its border, as an anchor does, doesn't count). */
+function segmentCrossesInterior(a: Point, b: Point, rect: Rect): boolean {
+  const eps = 0.001;
+  if (a.x === b.x) {
+    const x = a.x;
+    if (x <= rect.left + eps || x >= rect.right - eps) return false;
+    const y1 = Math.min(a.y, b.y);
+    const y2 = Math.max(a.y, b.y);
+    return y1 < rect.bottom - eps && y2 > rect.top + eps;
+  }
+  if (a.y === b.y) {
+    const y = a.y;
+    if (y <= rect.top + eps || y >= rect.bottom - eps) return false;
+    const x1 = Math.min(a.x, b.x);
+    const x2 = Math.max(a.x, b.x);
+    return x1 < rect.right - eps && x2 > rect.left + eps;
+  }
+  throw new Error('expected an axis-aligned segment');
+}
+
+function segmentsOf(edge: RoutedEdge): [Point, Point][] {
+  const result: [Point, Point][] = [];
+  for (let i = 1; i < edge.points.length; i += 1) {
+    const a = edge.points[i - 1];
+    const b = edge.points[i];
+    if (a && b) result.push([a, b]);
+  }
+  return result;
+}
+
+/** Every obstacle rect a routed edge must never cross the interior of: the hub tile, and every neighbour tile. */
+function allRects(layout: ContextDiagramLayout): Rect[] {
+  return [tileRect(layout.hub), ...[...layout.internalNeighbours, ...layout.externalNeighbours].map(tileRect)];
+}
+
+/** The standing fixture (`fixtures/sapContext.ts`), laid out at a given width. */
+function pmLayout(widthHint = 1280): ContextDiagramLayout {
+  const inputs = scenarioLayoutInputs();
+  return computeContextDiagramLayout(inputs.hubId, inputs.internal, inputs.external, widthHint, inputs.edges);
+}
+
+describe('computeContextDiagramLayout — tiles', () => {
   it('the hub always gets the standard node size — V3 dropped the one case that widened it, a platform\'s own module row (PlatformStructureView.tsx has that now)', () => {
     const layout = computeContextDiagramLayout('hub', [], []);
     expect(layout.hub.w).toBe(NODE_WIDTH);
@@ -29,55 +99,48 @@ describe('computeContextDiagramLayout', () => {
 
   it('the hub is horizontally centred within the diagram width', () => {
     const layout = computeContextDiagramLayout('hub', [], []);
-    const hubCentre = layout.hub.x + layout.hub.w / 2;
-    expect(hubCentre).toBeCloseTo(layout.width / 2, 0);
+    expect(layout.hub.x + layout.hub.w / 2).toBeCloseTo(layout.width / 2, 0);
   });
 
-  it('the boundary encloses the hub and internal neighbours, external neighbours sit below it', () => {
+  it('the boundary encloses the hub and internal neighbours; external neighbours sit below it', () => {
     const layout = computeContextDiagramLayout('hub', ['internal-1'], ['external-1']);
     expect(layout.boundary.top).toBeLessThanOrEqual(layout.hub.y);
     expect(layout.boundary.bottom).toBeGreaterThanOrEqual((layout.internalNeighbours[0]?.y ?? 0) + NODE_HEIGHT);
     expect(layout.externalNeighbours[0]?.y ?? 0).toBeGreaterThan(layout.boundary.bottom);
   });
 
-  it('wraps a row onto a second line when tiles would overflow the available width', () => {
+  it('wraps onto a second row only when even the minimum gutter cannot fit every tile', () => {
     const many = Array.from({ length: 20 }, (_, i) => `n${String(i)}`);
     const layout = computeContextDiagramLayout('hub', many, [], 960);
-    const rowYs = new Set(layout.internalNeighbours.map((t) => t.y));
-    expect(rowYs.size).toBeGreaterThan(1);
+    const rowsUsed = new Set(layout.internalNeighbours.map((t) => t.y));
+    expect(rowsUsed.size).toBeGreaterThan(1);
+    expect(layout.rows.filter((r) => !r.external)).toHaveLength(rowsUsed.size);
   });
 
-  it('a wider diagram width fits more tiles per row than the minimum floor', () => {
+  it('a wider diagram fits more tiles per row than the minimum floor', () => {
     const many = Array.from({ length: 20 }, (_, i) => `n${String(i)}`);
     const narrow = computeContextDiagramLayout('hub', many, [], 960);
     const wide = computeContextDiagramLayout('hub', many, [], 2400);
-    const narrowRows = new Set(narrow.internalNeighbours.map((t) => t.y)).size;
-    const wideRows = new Set(wide.internalNeighbours.map((t) => t.y)).size;
-    expect(wideRows).toBeLessThan(narrowRows);
+    expect(new Set(wide.internalNeighbours.map((t) => t.y)).size).toBeLessThan(new Set(narrow.internalNeighbours.map((t) => t.y)).size);
   });
 
-  it('is deterministic — the same inputs always produce the same layout', () => {
-    const a = computeContextDiagramLayout('hub', ['n1', 'n2'], []);
-    const b = computeContextDiagramLayout('hub', ['n1', 'n2'], []);
-    expect(a).toEqual(b);
+  it('is deterministic — the same inputs always produce the same layout, routes included', () => {
+    const inputs = scenarioLayoutInputs();
+    const a = computeContextDiagramLayout(inputs.hubId, inputs.internal, inputs.external, 1280, inputs.edges);
+    const b = computeContextDiagramLayout(inputs.hubId, inputs.internal, inputs.external, 1280, inputs.edges);
+    expect(b).toEqual(a);
   });
 
   it('has no minimum floor smaller than MIN_DIAGRAM_WIDTH even with a narrower hint', () => {
     const layout = computeContextDiagramLayout('hub', [], [], 400);
-    expect(layout.width).toBeGreaterThanOrEqual(MIN_DIAGRAM_WIDTH);
+    expect(layout.width).toBe(MIN_DIAGRAM_WIDTH);
   });
 
-  it('V1 fix, "centre-weighted layout": a short row of neighbours is centred within the diagram width, not left-hugging', () => {
-    // Three plain tiles: nowhere near enough to fill a 960px-wide row, so
-    // the old left-packed behaviour would start them flush at PADDING.
+  it('a short row of neighbours is centred within the diagram width, not left-hugging', () => {
     const layout = computeContextDiagramLayout('hub', ['n1', 'n2', 'n3'], []);
-    const row = layout.internalNeighbours;
-    const leftEdge = Math.min(...row.map((t) => t.x));
-    const rightEdge = Math.max(...row.map((t) => t.x + t.w));
-    const rowCentre = (leftEdge + rightEdge) / 2;
-    expect(rowCentre).toBeCloseTo(layout.width / 2, 0);
-    // The old behaviour: left-hugging at PADDING (32) — confirm this isn't it.
-    expect(leftEdge).toBeGreaterThan(32);
+    const left = Math.min(...layout.internalNeighbours.map((t) => t.x));
+    const right = Math.max(...layout.internalNeighbours.map((t) => t.x + t.w));
+    expect((left + right) / 2).toBeCloseTo(layout.width / 2, 0);
   });
 
   it('centre-weighted layout still wraps and centres each row independently when neighbours overflow one row', () => {
@@ -106,142 +169,242 @@ describe('allTilesOf', () => {
   });
 });
 
-describe('hubBottomAnchor', () => {
-  it("anchors at the hub tile's own bottom-centre — every neighbour this diagram places sits below it", () => {
-    const layout = computeContextDiagramLayout('hub', ['n1'], []);
-    const anchor = hubBottomAnchor(layout.hub);
-    expect(anchor).toEqual({ x: layout.hub.x + layout.hub.w / 2, y: layout.hub.y + layout.hub.h });
-  });
-});
-
 describe('tileTopAnchor', () => {
   it("V1 polish, \"leaving neighbours from above\": anchors at a tile's own top-centre", () => {
     const layout = computeContextDiagramLayout('hub', ['n1'], []);
     const neighbour = layout.internalNeighbours[0];
     if (!neighbour) throw new Error('expected a neighbour tile');
-    const anchor = tileTopAnchor(neighbour);
-    expect(anchor).toEqual({ x: neighbour.x + neighbour.w / 2, y: neighbour.y });
+    expect(tileTopAnchor(neighbour)).toEqual({ x: neighbour.x + neighbour.w / 2, y: neighbour.y });
   });
 });
 
-describe('curveBetween', () => {
-  it("has vertical tangents at both ends (cp1 shares lower's x, cp2 shares upper's x)", () => {
-    const lower = { x: 100, y: 300 };
-    const upper = { x: 160, y: 200 };
-    const curve = curveBetween(lower, upper);
-    expect(curve.cp1.x).toBe(lower.x);
-    expect(curve.cp2.x).toBe(upper.x);
-    expect(curve.cp1.y).toBe(curve.cp2.y);
+describe('fan (rework item 1)', () => {
+  it('the gap between neighbours grows with their count, capped', () => {
+    expect(fanGapFor(1)).toBe(24);
+    expect(fanGapFor(2)).toBe(44);
+    expect(fanGapFor(5)).toBe(104);
+    expect(fanGapFor(50)).toBe(120);
   });
 
-  it("V1 polish, \"label pill on the free segment\": the midpoint always sits exactly halfway between lower.y and upper.y, regardless of x offset", () => {
-    const lower = { x: 40, y: 400 };
-    const upper = { x: 260, y: 120 };
-    const curve = curveBetween(lower, upper);
-    expect(curve.mid.y).toBeCloseTo((lower.y + upper.y) / 2);
-    expect(curve.mid.x).toBeCloseTo((lower.x + upper.x) / 2);
+  it('five neighbours spread wider than two — not the same layout compressed', () => {
+    const two = computeContextDiagramLayout('hub', ['a', 'b'], [], 1280);
+    const five = computeContextDiagramLayout('hub', ['a', 'b', 'c', 'd', 'e'], [], 1280);
+    const gapOf = (layout: ContextDiagramLayout) => {
+      const xs = [...layout.internalNeighbours].sort((p, q) => p.x - q.x);
+      return (xs[1]?.x ?? 0) - ((xs[0]?.x ?? 0) + (xs[0]?.w ?? 0));
+    };
+    expect(gapOf(two)).toBe(fanGapFor(2));
+    expect(gapOf(five)).toBe(fanGapFor(5));
+    expect(gapOf(five)).toBeGreaterThan(gapOf(two));
+    expect(five.rows[0]?.gap).toBe(fanGapFor(5));
   });
 
-  it('collapses to a dead-straight vertical line when lower and upper already share an x', () => {
-    const lower = { x: 150, y: 400 };
-    const upper = { x: 150, y: 200 };
-    const curve = curveBetween(lower, upper);
-    expect(curve.cp1.x).toBe(150);
-    expect(curve.cp2.x).toBe(150);
-    expect(curve.mid.x).toBe(150);
+  it('shrinks the gap toward the minimum gutter before wrapping when the fan would overflow', () => {
+    // Five NODE_WIDTH tiles fit the minimum width only at the minimum gutter (5 × 160 + 4 × 24 = 896 = 960 − 2 × 32) — the fan gap for five (104) would overflow, so the gap shrinks rather than the row wrapping.
+    const five = Array.from({ length: 5 }, (_, i) => `n${String(i)}`);
+    const layout = computeContextDiagramLayout('hub', five, [], MIN_DIAGRAM_WIDTH);
+    expect(new Set(layout.internalNeighbours.map((t) => t.y)).size).toBe(1);
+    expect(layout.rows[0]?.gap).toBeLessThan(fanGapFor(5));
+    expect(layout.rows[0]?.gap).toBeGreaterThanOrEqual(24);
+    for (const tile of layout.internalNeighbours) {
+      expect(tile.x).toBeGreaterThanOrEqual(0);
+      expect(tile.x + tile.w).toBeLessThanOrEqual(layout.width);
+    }
+  });
+
+  it('with no edges at all, every neighbour still lands in one plain fanned row, sorted by id', () => {
+    const layout = computeContextDiagramLayout('hub', ['n3', 'n1', 'n2'], []);
+    expect(layout.internalNeighbours).toHaveLength(3);
+    expect(new Set(layout.internalNeighbours.map((t) => t.y)).size).toBe(1);
+    expect([...layout.internalNeighbours].sort((a, b) => a.x - b.x).map((t) => t.elementId)).toEqual(['n1', 'n2', 'n3']);
   });
 });
 
-describe('resolveEdgeLabelOverlaps', () => {
-  const measure = fixedWidthMeasurer(7);
+describe('spreadAlong', () => {
+  it('places count attach points evenly inside a span, never on its ends', () => {
+    expect(spreadAlong(0, 100, 0, 1)).toBe(50);
+    expect([0, 1, 2].map((i) => spreadAlong(0, 100, i, 3))).toEqual([25, 50, 75]);
+  });
+});
 
-  it('leaves a single label exactly where it started', () => {
-    const [label] = resolveEdgeLabelOverlaps([{ text: 'reads customer records from', x: 100, y: 200, targetY: 260 }], measure, 1);
-    expect(label?.x).toBe(100);
-    expect(label?.y).toBe(200);
-    expect(label?.lines).toEqual(['reads customer records from']);
+describe('SAP PM context fixture — the standing density case (fixtures/sapContext.ts)', () => {
+  const inputs = scenarioLayoutInputs();
+  const layout = pmLayout(1280);
+  const measure = fixedWidthMeasurer(6);
+
+  it('is the scenario the fixture describes: 4 internal neighbours with 1–2 flows each, 1 external actor', () => {
+    expect(inputs.internal).toHaveLength(4);
+    expect(inputs.external).toHaveLength(1);
+    for (const neighbour of PM_CONTEXT_SCENARIO.neighbours.filter((n) => !n.isExternal)) {
+      expect(neighbour.flows.length).toBeGreaterThanOrEqual(1);
+      expect(neighbour.flows.length).toBeLessThanOrEqual(2);
+    }
+    expect(layout.edges).toHaveLength(inputs.edges.length);
   });
 
-  it('leaves two labels alone when they are already far enough apart, in either axis', () => {
-    const [a, b] = resolveEdgeLabelOverlaps(
-      [
-        { text: 'uses', x: 100, y: 200, targetY: 260 },
-        { text: 'uses', x: 400, y: 200, targetY: 260 }, // same y band, far apart in x
-      ],
-      measure,
-      1,
-    );
-    expect(a && b && pillsOverlap(a, b)).toBe(false);
+  it('places all four internal neighbours in one fanned row at the four-neighbour gap, with no two tiles overlapping', () => {
+    expect(new Set(layout.internalNeighbours.map((t) => t.y)).size).toBe(1);
+    expect(layout.rows[0]?.gap).toBe(fanGapFor(4));
+    const tiles = allTilesOf(layout);
+    for (let i = 0; i < tiles.length; i++) {
+      for (let j = i + 1; j < tiles.length; j++) expect(tilesOverlap(tiles[i], tiles[j])).toBe(false);
+    }
   });
 
-  it("bug fix, \"two neighbours with 25+ character verbs\": two labels starting at the same y, close together in x, push apart and never overlap", () => {
-    const placements: EdgeLabelPlacement[] = [
-      { text: 'sends billing events across the network to', x: 100, y: 200, targetY: 260 },
-      { text: 'submits meter readings and settlement data to', x: 180, y: 200, targetY: 140 }, // pushes the opposite way (its own target is above)
-    ];
-    const resolved = resolveEdgeLabelOverlaps(placements, measure, 1);
-    expect(resolved).toHaveLength(2);
-    const [a, b] = resolved as [ResolvedEdgeLabel, ResolvedEdgeLabel];
-    expect(pillsOverlap(a, b)).toBe(false);
-    // The first label is never moved (nothing placed before it to collide
-    // with) — only the second, later one in the caller's own array order.
-    expect(a.x).toBe(100);
-    expect(a.y).toBe(200);
+  it('routes every edge with axis-aligned segments only, neighbour end first, hub end last', () => {
+    for (const edge of layout.edges) {
+      expect(edge.points.length).toBeGreaterThanOrEqual(2);
+      expect(edge.points[0]).toEqual(edge.neighbourAnchor);
+      const last = edge.points[edge.points.length - 1];
+      expect(last).toEqual({ x: edge.hubAnchor.x, y: edge.hubAnchor.y });
+      for (const [a, b] of segmentsOf(edge)) expect(a.x === b.x || a.y === b.y).toBe(true);
+    }
   });
 
-  it('pushes the later label vertically, toward its own target, before ever wrapping it', () => {
-    const placements: EdgeLabelPlacement[] = [
-      { text: 'uses', x: 100, y: 200, targetY: 260 },
-      { text: 'uses', x: 106, y: 200, targetY: 260 }, // 6px apart in x — well under the 16px min gap, so this is a real collision
-    ];
-    const resolved = resolveEdgeLabelOverlaps(placements, measure, 1);
-    const [a, b] = resolved as [ResolvedEdgeLabel, ResolvedEdgeLabel];
-    expect(pillsOverlap(a, b)).toBe(false);
-    expect(b.lines).toEqual(['uses']); // still one line — a short label always clears via push alone
-    expect(b.y).toBeGreaterThan(200); // pushed down, toward its own targetY (260)
+  it('gives every laned edge its own lane, LANE_PITCH apart, and every edge its own attach point at both ends (rework item 2: no two edges share a segment)', () => {
+    const laned = layout.edges.filter((e) => e.lane !== null);
+    expect(laned.length).toBeGreaterThan(0);
+    expect(new Set(laned.map((e) => e.lane)).size).toBe(laned.length);
+    // The top-channel horizontal is always the segment that ends at the hub attach point — its y is the lane, whichever row the edge started from.
+    const laneYs = laned.map((e) => e.points[e.points.length - 2]?.y ?? NaN).sort((a, b) => a - b);
+    for (let i = 1; i < laneYs.length; i++) expect((laneYs[i] ?? 0) - (laneYs[i - 1] ?? 0)).toBeCloseTo(LANE_PITCH);
+    const hubAttach = layout.edges.map((e) => `${String(e.hubAnchor.x)} ${String(e.hubAnchor.y)}`);
+    expect(new Set(hubAttach).size).toBe(hubAttach.length);
+    const neighbourAttach = layout.edges.map((e) => `${String(e.neighbourAnchor.x)} ${String(e.neighbourAnchor.y)}`);
+    expect(new Set(neighbourAttach).size).toBe(neighbourAttach.length);
   });
 
-  it('pushes toward a target above, not below, when the edge points the other way', () => {
-    const placements: EdgeLabelPlacement[] = [
-      { text: 'uses', x: 100, y: 200, targetY: 140 },
-      { text: 'uses', x: 106, y: 200, targetY: 140 },
-    ];
-    const [, b] = resolveEdgeLabelOverlaps(placements, measure, 1);
-    expect(b?.y).toBeLessThan(200);
+  it('no edge segment passes through the interior of any tile (the external actor rises outside the internal row)', () => {
+    const rects = allRects(layout);
+    for (const edge of layout.edges) {
+      for (const [a, b] of segmentsOf(edge)) {
+        for (const rect of rects) expect(segmentCrossesInterior(a, b, rect)).toBe(false);
+      }
+    }
+    const ofgem = layout.edges.find((e) => e.neighbourId === 'ofgem');
+    expect(ofgem?.points.length).toBe(6);
   });
 
-  it('wraps to two lines when two push attempts still leave a genuine collision — a label squeezed between two already-resolved ones directly above and below it, at the same x, so no amount of vertical pushing alone can clear both at once', () => {
-    // A (fixed) and B (pushed down twice to clear A) end up
-    // `LABEL_PUSH_STEP * 2` apart — exactly the gap two more push attempts
-    // can close from either side, so C, starting between them, can clear
-    // one but never both within its own two-attempt budget. Its wrap is
-    // real (a shorter box than an unwrapped one would be); this
-    // deliberately doesn't also assert C ends up clear of both neighbours
-    // — `resolveEdgeLabelOverlaps`'s own doc comment is explicit that a
-    // genuine vertical squeeze like this "isn't something more width can
-    // fix anyway."
-    const placements: EdgeLabelPlacement[] = [
-      { text: 'uses', x: 100, y: 200, targetY: 260 },
-      { text: 'uses', x: 100, y: 200, targetY: 260 },
-      { text: 'submits settlement and reconciliation data to', x: 100, y: 200, targetY: 260 },
-    ];
-    const resolved = resolveEdgeLabelOverlaps(placements, measure, 1);
-    const [, , c] = resolved as [ResolvedEdgeLabel, ResolvedEdgeLabel, ResolvedEdgeLabel];
-    expect(c.lines.length).toBe(2);
-    // Wrapping narrows the box (roughly half the one-line width) rather
-    // than widening it.
-    const oneLineWidth = measure(placements[2]?.text ?? '') + 12;
-    expect(c.width).toBeLessThan(oneLineWidth);
+  it("every edge's lanes sit above its own neighbour's label stack, never through it", () => {
+    for (const edge of layout.edges) {
+      const row = layout.rows.find((r) => r.tileIds.includes(edge.neighbourId));
+      const stackTop = Math.min(...layout.edges.filter((e) => e.neighbourId === edge.neighbourId).map((e) => e.labelAnchor.y)) - 15;
+      for (const p of edge.points.slice(1, -1)) {
+        if (p.x !== edge.neighbourAnchor.x || p.y !== edge.labelAnchor.y) expect(p.y).toBeLessThanOrEqual(stackTop);
+      }
+      expect(row).toBeDefined();
+    }
   });
 
-  it('is deterministic — the same inputs always produce the same result', () => {
-    const placements: EdgeLabelPlacement[] = [
-      { text: 'reads customer records from', x: 100, y: 200, targetY: 260 },
-      { text: 'writes billing updates to', x: 130, y: 200, targetY: 260 },
-      { text: 'flags overdue accounts to', x: 160, y: 200, targetY: 140 },
-    ];
-    const first = resolveEdgeLabelOverlaps(placements, measure, 1);
-    const second = resolveEdgeLabelOverlaps(placements, measure, 1);
-    expect(second).toEqual(first);
+  it('places every label on its own edge, inside its own tile span, with no two pills and no pill/tile colliding at 1280 (rework item 3)', () => {
+    const pills = placeEdgeLabels(layout.edges, measure);
+    expect(pills).toHaveLength(layout.edges.length);
+    for (const pill of pills) {
+      const edge = layout.edges.find((e) => e.id === pill.edgeId);
+      if (!edge) throw new Error('pill without an edge');
+      const rect = pillRect(pill);
+      // The leader (the edge's own drop) passes through the pill.
+      expect(rect.left).toBeLessThanOrEqual(edge.neighbourAnchor.x);
+      expect(rect.right).toBeGreaterThanOrEqual(edge.neighbourAnchor.x);
+      expect(rect.left).toBeGreaterThanOrEqual(edge.labelAnchor.minX - 0.001);
+      expect(rect.right).toBeLessThanOrEqual(edge.labelAnchor.maxX + 0.001);
+      // Just above the neighbour tile it leaves.
+      const tile = allTilesOf(layout).find((t) => t.elementId === edge.neighbourId);
+      expect(rect.bottom).toBeLessThanOrEqual(tile?.y ?? 0);
+    }
+    for (let i = 0; i < pills.length; i++) {
+      for (let j = i + 1; j < pills.length; j++) {
+        const a = pills[i];
+        const b = pills[j];
+        if (a && b) expect(rectsOverlap(pillRect(a), pillRect(b))).toBe(false);
+      }
+    }
+    expect(edgeLabelsCollide(pills, allTilesOf(layout))).toBe(false);
+  });
+
+  it('still routes cleanly at the minimum width, with labels wrapping rather than the layout degrading', () => {
+    const narrow = pmLayout(MIN_DIAGRAM_WIDTH);
+    const rects = allRects(narrow);
+    for (const edge of narrow.edges) {
+      for (const [a, b] of segmentsOf(edge)) {
+        for (const rect of rects) expect(segmentCrossesInterior(a, b, rect)).toBe(false);
+      }
+    }
+    const pills = placeEdgeLabels(narrow.edges, measure);
+    expect(pills.some((p) => p.lines.length === 2)).toBe(true);
+    expect(edgeLabelsCollide(pills, allTilesOf(narrow))).toBe(false);
+  });
+
+  it('keeps every routed point inside the diagram bounds', () => {
+    for (const edge of layout.edges) {
+      for (const p of edge.points) {
+        expect(p.x).toBeGreaterThanOrEqual(0);
+        expect(p.x).toBeLessThanOrEqual(layout.width);
+        expect(p.y).toBeGreaterThanOrEqual(0);
+        expect(p.y).toBeLessThanOrEqual(layout.height);
+      }
+    }
+  });
+});
+
+describe('placeEdgeLabels / edgeLabelsCollide', () => {
+  const measure = fixedWidthMeasurer(6);
+
+  it('wraps a label to two lines when it does not fit its span on one, and ellipsizes a line that still does not fit', () => {
+    const layout = computeContextDiagramLayout('hub', ['n1'], [], 1280, [{ id: 'e', neighbourId: 'n1', arrowAtHub: true, label: '⇢ submits reconciliation and payroll adjustment records to the central ledger' }]);
+    const [pill] = placeEdgeLabels(layout.edges, measure);
+    expect(pill?.lines).toHaveLength(2);
+    expect(pill?.width).toBeLessThanOrEqual((layout.edges[0]?.labelAnchor.maxX ?? 0) - (layout.edges[0]?.labelAnchor.minX ?? 0) + 0.001);
+    const wide = fixedWidthMeasurer(40);
+    const [big] = placeEdgeLabels(layout.edges, wide);
+    expect(big?.lines.every((l) => l.length > 0)).toBe(true);
+    expect(big?.lines.some((l) => l.endsWith('…'))).toBe(true);
+  });
+
+  it('skips an edge with a blank label', () => {
+    const layout = computeContextDiagramLayout('hub', ['n1'], [], 1280, [{ id: 'e', neighbourId: 'n1', arrowAtHub: true, label: '   ' }]);
+    expect(placeEdgeLabels(layout.edges, measure)).toEqual([]);
+  });
+
+  it('reports a collision when two pills crowd each other, and when a pill overlaps a tile', () => {
+    const a: EdgeLabelPill = { edgeId: 'a', lines: ['x'], x: 100, y: 100, width: 60, height: 18 };
+    const b: EdgeLabelPill = { edgeId: 'b', lines: ['y'], x: 162, y: 100, width: 60, height: 18 }; // 2px apart — crowded
+    const far: EdgeLabelPill = { edgeId: 'c', lines: ['z'], x: 300, y: 100, width: 60, height: 18 };
+    expect(edgeLabelsCollide([a, b], [])).toBe(true);
+    expect(edgeLabelsCollide([a, far], [])).toBe(false);
+    const tile: DiagramTile = { elementId: 't', x: 90, y: 95, w: 50, h: 50 };
+    expect(edgeLabelsCollide([far], [tile])).toBe(false);
+    expect(edgeLabelsCollide([a], [tile])).toBe(true);
+  });
+
+  it('truncateToWidth ellipsizes deterministically and leaves fitting text alone', () => {
+    expect(truncateToWidth('short', measure, 100)).toBe('short');
+    const cut = truncateToWidth('a much longer label than fits', measure, 60);
+    expect(cut.endsWith('…')).toBe(true);
+    expect(measure(cut)).toBeLessThanOrEqual(60);
+  });
+});
+
+describe('edgeNear (hover/tap-to-reveal, rework item 4)', () => {
+  const layout = pmLayout(1280);
+
+  it('finds the edge whose polyline passes within tolerance of a point, and nothing for a point in open space', () => {
+    const edge = layout.edges[0];
+    if (!edge) throw new Error('expected an edge');
+    const [a, b] = segmentsOf(edge)[0] ?? [];
+    if (!a || !b) throw new Error('expected a segment');
+    const mid = { x: (a.x + b.x) / 2 + 2, y: (a.y + b.y) / 2 };
+    expect(edgeNear(layout.edges, mid, 6)?.id).toBe(edge.id);
+    expect(edgeNear(layout.edges, { x: -500, y: -500 }, 6)).toBeNull();
+  });
+
+  it('prefers the nearest edge when two are within tolerance', () => {
+    const laned = layout.edges.filter((e) => e.lane !== null).sort((p, q) => (p.lane ?? 0) - (q.lane ?? 0));
+    const first = laned[0];
+    const second = laned[1];
+    if (!first || !second) throw new Error('expected two laned edges');
+    const y0 = first.points[1]?.y ?? 0;
+    const x = Math.max(Math.min(first.points[1]?.x ?? 0, first.points[2]?.x ?? 0), Math.min(second.points[1]?.x ?? 0, second.points[2]?.x ?? 0)) + 1;
+    expect(edgeNear(layout.edges, { x, y: y0 + 1 }, LANE_PITCH)?.id).toBe(first.id);
   });
 });

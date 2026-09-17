@@ -246,6 +246,22 @@ export async function removeElementFromModel(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Remove from model', exact: true }).click();
 }
 
+/**
+ * Merge the element on the currently-open element page into another
+ * (existing) element by name — E7's own "Merge into…". The current element
+ * becomes the loser (retracted, its relationships/children move to the
+ * target, its old name kept searchable via a new alias); lands on the
+ * target (survivor)'s own page once the commit succeeds.
+ */
+export async function mergeElementInto(page: Page, targetNameMatch: string, rationale: string): Promise<void> {
+  await page.getByRole('button', { name: 'Element actions' }).click();
+  await page.getByRole('button', { name: 'Merge into…' }).click();
+  await page.getByPlaceholder('Search for the element to merge into…').fill(targetNameMatch);
+  await page.getByRole('button', { name: new RegExp(targetNameMatch) }).click();
+  await page.getByLabel('Why are these the same real thing?').fill(rationale);
+  await page.getByRole('button', { name: 'Merge', exact: true }).click();
+}
+
 /** From ModelHome (or anywhere `ModelNav` renders), click into the Capability map and add a capability by hand via the empty-state's own "+ Add capability" control. */
 export async function addCapability(page: Page, name: string): Promise<void> {
   await page.getByRole('link', { name: 'Capability map' }).click();

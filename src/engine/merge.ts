@@ -21,8 +21,9 @@
 
 import { EXISTS_ATTRIBUTE, type UUID } from '../contracts/delta';
 import { threeWayDiff, type FieldDiff, type ThreeWayDiff } from './branch';
-import type { Head } from './deltas';
+import type { ElementRow, Head } from './deltas';
 import type { CommitLoader } from './head';
+import { IDENTITY_TRIGRAM_THRESHOLD, trigramSimilarity } from './trigram';
 
 export type ConflictClass =
   | 'field-conflict'
@@ -100,6 +101,56 @@ function newEntriesOf<T>(head: ReadonlyMap<UUID, T>, base: Head): [UUID, T][] {
 }
 
 const normalizeName = (name: string): string => name.trim().toLowerCase();
+
+/** A non-empty, trimmed, lower-cased string, or `undefined` for anything else (absent, blank, or not a string at all — `attributes` is loosely typed `Json`). */
+function normalizedContextString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim().toLowerCase();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/** Every actor with a live `owns` relationship into `elementId` — E7's "owner" context signal; ownership in this schema is a relationship, not an attribute, so this reads `head.relationships` rather than `head.elements`. */
+function ownerActorIds(head: Head, elementId: UUID): Set<UUID> {
+  const ids = new Set<UUID>();
+  for (const rel of head.relationships.values()) {
+    if (rel.relationshipType === 'owns' && rel.toElementId === elementId) ids.add(rel.fromElementId);
+  }
+  return ids;
+}
+
+/**
+ * E7's own "name + context: owner, vendor, description" — corroboration
+ * for a fuzzy name match, additive over the pre-E7 baseline (same
+ * `parentId`) rather than a replacement for it: capabilities/containers
+ * keep matching exactly as before (SPEC §8 point 3's own "the proposed
+ * parent resolves to the same parent," reused here); systems and actors
+ * (SPEC §8's own "the context is the type alone" — no parent worth
+ * comparing) get a real signal from `vendor`/`description`/a shared owning
+ * actor instead of falling back to name-and-type alone. Any one signal
+ * agreeing is enough — this is corroboration for an already-fuzzy name
+ * match, not a second independent gate.
+ */
+function identityContextCorroborates(ours: Head, theirs: Head, oid: UUID, tid: UUID, orow: ElementRow, trow: ElementRow): boolean {
+  // `!== null` matters: most systems/actors have no parent at all, so
+  // `null === null` would trivially "corroborate" every one of them,
+  // defeating the point of requiring context for exactly the element
+  // types SPEC §8 itself says have none worth comparing.
+  if (orow.parentId !== null && orow.parentId === trow.parentId) return true;
+
+  const oVendor = normalizedContextString((orow.attributes as Record<string, unknown>).vendor);
+  const tVendor = normalizedContextString((trow.attributes as Record<string, unknown>).vendor);
+  if (oVendor !== undefined && oVendor === tVendor) return true;
+
+  const oDescription = normalizedContextString((orow.attributes as Record<string, unknown>).description);
+  const tDescription = normalizedContextString((trow.attributes as Record<string, unknown>).description);
+  if (oDescription !== undefined && oDescription === tDescription) return true;
+
+  const oOwners = ownerActorIds(ours, oid);
+  const tOwners = ownerActorIds(theirs, tid);
+  for (const id of oOwners) if (tOwners.has(id)) return true;
+
+  return false;
+}
 
 export function classifyMerge(input: MergeClassifyInput, options: MergeClassifyOptions = {}): MergeClassification {
   const { base, ours, theirs, fields } = input;
@@ -285,17 +336,27 @@ export function classifyMerge(input: MergeClassifyInput, options: MergeClassifyO
     }
   }
 
-  // ---- identity (weak): both sides created an element of the same type, same normalised name, same parent. ----
+  // ---- identity (weak): both sides created an element of the same type, with a fuzzy-matching name and corroborating context (E7 — trigram similarity ≥ IDENTITY_TRIGRAM_THRESHOLD, replacing the exact-name-equality this check used before). ----
   const newElsOurs = newEntriesOf(ours.elements, base);
   const newElsTheirs = newEntriesOf(theirs.elements, base);
   for (const [oid, orow] of newElsOurs) {
     for (const [tid, trow] of newElsTheirs) {
       if (oid === tid) continue;
-      if (orow.elementType === trow.elementType && normalizeName(orow.name) === normalizeName(trow.name) && orow.parentId === trow.parentId) {
-        findings.push(finding('identity', false, oid, `both sides created a ${orow.elementType} named "${orow.name}"`, { relatedSubjectId: tid }));
-        identitySubjects.add(oid);
-        identitySubjects.add(tid);
+      if (orow.elementType !== trow.elementType) continue;
+      const nameSimilarity = trigramSimilarity(normalizeName(orow.name), normalizeName(trow.name));
+      if (nameSimilarity < IDENTITY_TRIGRAM_THRESHOLD) continue;
+      // An exact name match keeps the pre-E7 rule unchanged (same parentId,
+      // including the trivial null-vs-null case for systems/actors) — only a
+      // genuinely fuzzy match needs identityContextCorroborates's stronger bar.
+      if (nameSimilarity === 1) {
+        if (orow.parentId !== trow.parentId) continue;
+      } else if (!identityContextCorroborates(ours, theirs, oid, tid, orow, trow)) {
+        continue;
       }
+      const detail = orow.name === trow.name ? `both sides created a ${orow.elementType} named "${orow.name}"` : `both sides created a similarly-named ${orow.elementType} ("${orow.name}" / "${trow.name}")`;
+      findings.push(finding('identity', false, oid, detail, { relatedSubjectId: tid }));
+      identitySubjects.add(oid);
+      identitySubjects.add(tid);
     }
   }
 

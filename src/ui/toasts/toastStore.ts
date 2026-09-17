@@ -9,9 +9,16 @@
  * component tree, same reasoning `errorBannerStore.ts`'s own module
  * comment gives), but each toast schedules its own dismissal.
  */
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface ToastMessage {
   id: string;
   text: string;
+  /** E7's own "merge completed — Undo": an optional second button next to Dismiss. Never required — every existing plain `reportToast(text)` caller is unaffected. */
+  action?: ToastAction;
 }
 
 const TOAST_DURATION_MS = 4000;
@@ -24,10 +31,10 @@ function notify(): void {
   for (const listener of listeners) listener();
 }
 
-/** Reports a toast; auto-dismisses after ~4s. Unlike `reportError`, no de-duplication — a second identical save is a second real event worth its own toast. */
-export function reportToast(text: string): string {
+/** Reports a toast; auto-dismisses after ~4s. Unlike `reportError`, no de-duplication — a second identical save is a second real event worth its own toast. `action` (optional) adds a second button (e.g. "Undo") alongside Dismiss — `ToastHost.tsx` calls it and then dismisses the toast itself. */
+export function reportToast(text: string, action?: ToastAction): string {
   const id = crypto.randomUUID();
-  messages = [...messages, { id, text }];
+  messages = [...messages, action ? { id, text, action } : { id, text }];
   notify();
   const timer = setTimeout(() => {
     dismissToast(id);

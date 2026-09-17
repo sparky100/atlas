@@ -24,6 +24,19 @@ describe('reportToast / getToastSnapshot', () => {
   });
 });
 
+describe('reportToast with an action', () => {
+  it('carries the action through to the snapshot', () => {
+    const onClick = vi.fn();
+    const id = reportToast('Merged "Loser" into "Survivor"', { label: 'Undo', onClick });
+    expect(getToastSnapshot()).toEqual([{ id, text: 'Merged "Loser" into "Survivor"', action: { label: 'Undo', onClick } }]);
+  });
+
+  it('has no action field at all for a plain reportToast call — every existing caller is unaffected', () => {
+    reportToast('Saved to change: A');
+    expect(getToastSnapshot()[0]?.action).toBeUndefined();
+  });
+});
+
 describe('dismissToast', () => {
   it('removes exactly the dismissed message', () => {
     const keepId = reportToast('Saved to change: A');
