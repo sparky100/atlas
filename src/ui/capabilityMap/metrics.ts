@@ -16,9 +16,17 @@
  * - **Coverage** (`supportingSystemCount`): §3.1's own gap — a capability
  *   with no `supports` edge at all reads `warn`; any real count reads
  *   plain `neutral` regardless of magnitude, since a *larger* count is not
- *   "worse" (or "better") in any sense this product can source. The
- *   literal number is always shown as text alongside the colour either
- *   way (Chip's own rule: status is never colour-only, §6.3, §8.4, §8.7).
+ *   "worse" (or "better") in any sense this product can source. Never
+ *   colour-only (§6.3, §8.4, §8.7) — but the literal count sits in an
+ *   adjacent, mode-independent count/fraction that's always on screen
+ *   regardless of colour-by (`tileColourFor`'s own "N supporting systems"
+ *   label sits beside `LandscapeZoomLink`'s "N systems →";
+ *   `aggregateTileColourFor`'s own L1 chip sits beside the capability
+ *   rollup's own always-shown "N/M supported" line, `capabilityRollup.ts`'s
+ *   module comment) — so this metric's own label states the tone in words
+ *   without repeating a number that's already right there (found as a
+ *   literal on-screen duplicate at the L1 aggregate level: "3/6
+ *   capabilities supported" showing twice in the same group header).
  * - **Oldest lifecycle stage** (`oldestLifecycleStage`): the most-advanced
  *   `lifecycleStatus` among supporting systems, using the exact tone
  *   mapping lifecycle chips already use everywhere else.
@@ -206,7 +214,13 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
       return { tone: undefined, label: undefined };
     case 'metric:supportingSystemCount': {
       const count = supportingSystemIds(capabilityId, supportsEdges).length;
-      return { tone: count === 0 ? 'warn' : 'neutral', label: `${String(count)} supporting system${count === 1 ? '' : 's'}` };
+      // The literal count is never this label's own job — it's already
+      // shown unconditionally right beside this chip, via `LandscapeZoomLink`'s
+      // "N systems →" (both L2 cards and L3 tiles render one next to the
+      // other, `L2CardView`/its own L3 map below) — this module's own top
+      // comment on Coverage explains why repeating it here used to double
+      // it up on screen.
+      return { tone: count === 0 ? 'warn' : 'neutral', label: count === 0 ? 'no supporting systems' : 'supporting systems' };
     }
     case 'metric:oldestLifecycleStage': {
       const stage = oldestLifecycleStage(capabilityId, supportsEdges, systemsById);
@@ -252,7 +266,14 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
  *   from "1 of 3", and averaging away *how many* would lose it. `warn`
  *   only when literally none of the group's descendants have a
  *   supporting system (mirrors the per-tile rule: a count of zero is the
- *   one coverage value that's ever `warn`).
+ *   one coverage value that's ever `warn`). The fraction itself is never
+ *   this chip's own label (bug found live: "3/6 capabilities supported"
+ *   rendered twice in the same L1 header) — `computeCapabilityRollup`'s
+ *   own `supportedCapabilityCount`/`totalCapabilityCount` already put the
+ *   identical fraction, unconditionally, in the group header's own "N
+ *   capabilities · M systems · X/Y supported" line
+ *   (`capabilityRollup.ts`'s module comment), so this label states the
+ *   tone in words instead.
  *
  * `descendantCapabilityIds` is the caller's own flattened L2+L3 id list
  * (`L1ColumnView` already has `column.l2`/each card's `l3`) — kept a
@@ -266,8 +287,7 @@ export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityI
       return { tone: undefined, label: undefined };
     case 'metric:supportingSystemCount': {
       const supportedCount = descendantCapabilityIds.filter((id) => supportingSystemIds(id, supportsEdges).length > 0).length;
-      const total = descendantCapabilityIds.length;
-      return { tone: supportedCount === 0 ? 'warn' : 'neutral', label: `${String(supportedCount)}/${String(total)} capabilities supported` };
+      return { tone: supportedCount === 0 ? 'warn' : 'neutral', label: supportedCount === 0 ? 'no capabilities supported' : 'capabilities supported' };
     }
     case 'metric:oldestLifecycleStage': {
       let worst: LifecycleStatus | null = null;

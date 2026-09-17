@@ -85,7 +85,12 @@ test('capability map tiles: no underlined link, whole tile is the click target, 
   // Colour-by on: the tile's own tone fill needs a real mode selected to
   // have anything to check.
   await page.getByLabel('Colour by').selectOption({ label: 'Coverage (supporting-system count)' });
-  await expect(page.getByText('1 supporting system')).toBeVisible();
+  // The chip states the tone in words, not the count — the count itself
+  // is `LandscapeZoomLink`'s own "1 system →" text below, checked
+  // separately (line ~112); repeating it here used to duplicate it on
+  // screen (the bug this test's own click-target check now exercises via
+  // this label instead).
+  await expect(page.getByText('supporting systems')).toBeVisible();
 
   // "Plain-text name" / "no underlined links": the primary link is the
   // capability's own name.
@@ -102,7 +107,7 @@ test('capability map tiles: no underlined link, whole tile is the click target, 
   // exactly the thing Playwright's own actionability check would
   // otherwise refuse to click through (correctly, for an accidental
   // overlap; deliberately, here).
-  await page.getByText('1 supporting system').click({ force: true });
+  await page.getByText('supporting systems').click({ force: true });
   await expect(page).toHaveURL(new RegExp(`/e/${housingId}$`));
 
   // Secondary controls stay independently clickable, not swallowed by
