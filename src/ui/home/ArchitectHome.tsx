@@ -18,6 +18,7 @@ import {
   prefillFromCriticalExposedFinding,
   prefillFromCriticalSupportEndFinding,
   prefillFromPoorFitCapabilityFinding,
+  type DecisionPrefill,
 } from '../decisions/decisionPrefill';
 import { canStartDecision } from '../orgs/useMembership';
 import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
@@ -73,22 +74,21 @@ function truncateTitle(title: string, max = 60): string {
 }
 
 /**
- * Architect-door layout prompt: a check's one inline action — a direct
- * "Start a decision" when it's a decision-shaped finding with exactly one
- * item (`check.decisionBuilder`, only ever set when `canStartDecision`
- * already gated it), otherwise `browseHref` (housekeeping findings, and a
- * *multi*-item decision-shaped finding's own filtered list — where every
- * row carries its own pre-filled "Start a decision",
- * `ElementBrowseTable.tsx`'s `decisionRowAction`). `null` when a check has
- * neither (a relationship-shaped finding with no browse-table home, e.g.
+ * Architect-door layout prompt: a check's one inline action — its own
+ * `singleItemAction` when there's exactly one item to act on directly
+ * (a decision-shaped finding's "Start a decision", or
+ * `unused-integration-platform`'s "View context →" — see that field's own
+ * doc comment, `healthChecks.ts`), otherwise `browseHref` (housekeeping
+ * findings, and a *multi*-item single-item-actionable finding's own
+ * filtered list — where a decision-shaped finding's rows each carry their
+ * own pre-filled "Start a decision", `ElementBrowseTable.tsx`'s
+ * `decisionRowAction`). `null` when a check has neither (a
+ * relationship-shaped finding with no browse-table home, e.g.
  * `flows-to-platform-instead-of-module`).
  */
-function resolveCardAction(check: HealthCheck, orgSlug: string, modelSlug: string): FindingCardAction | null {
+function resolveCardAction(check: HealthCheck): FindingCardAction | null {
   const firstItem = check.items[0];
-  if (check.decisionBuilder && check.count === 1 && firstItem) {
-    const prefill = check.decisionBuilder(firstItem);
-    return { href: `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefill).toString()}`, label: 'Start a decision →' };
-  }
+  if (check.singleItemAction && check.count === 1 && firstItem) return check.singleItemAction(firstItem);
   if (check.browseHref !== undefined) return { href: check.browseHref, label: check.browseLabel ?? 'Review →' };
   return null;
 }
@@ -152,6 +152,15 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
   // S1 item 11a: both new Assurance rows share the one "View all" page —
   // see `useExternalInterfaces.ts`'s own doc comment for why.
   const externalInterfacesHref = `/o/${orgSlug}/m/${modelSlug}/external-interfaces`;
+  // Integration platform context prompt: "health finding 'integration
+  // platform with nothing via it' links here" — a single unused platform's
+  // own `singleItemAction` below sends someone straight to its (empty)
+  // Context diagram rather than the browse table.
+  const contextHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/context/${elementId}`;
+  const startDecisionAction = (prefill: DecisionPrefill): FindingCardAction => ({
+    href: `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefill).toString()}`,
+    label: 'Start a decision →',
+  });
 
   // `duplicatesCount` is typed as the literal `0` (still wired to 0 until
   // Q1, ADR-019) — a placeholder notice, not a real check yet, so it's
@@ -252,7 +261,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       items: elementItems(data.criticalExposedSystems),
       severity: 'high',
       browseHref: browseHref('critical-exposed'),
-      ...(canStartDecision(role) ? { decisionBuilder: (item: HealthFindingItem) => prefillFromCriticalExposedFinding({ id: item.id, name: item.label }) } : {}),
+      ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromCriticalExposedFinding({ id: item.id, name: item.label })) } : {}),
     },
     {
       // Labelling only — a crossing missing its *data classification* is
@@ -275,6 +284,12 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       items: elementItems(data.unusedIntegrationPlatforms),
       severity: 'medium',
       browseHref: browseHref('unused-integration-platform'),
+      // Integration platform context prompt: "health finding 'integration
+      // platform with nothing via it' links here" — a single unused
+      // platform's own card goes straight to its (empty) Context diagram
+      // rather than the browse table; more than one still falls through to
+      // `browseHref` above, since a single link can only point at one page.
+      singleItemAction: (item: HealthFindingItem) => ({ href: contextHref(item.id), label: 'View context →' }),
     },
     {
       // The minimal fit-for-purpose finding: structurally close to
@@ -292,7 +307,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       // either); a multi-item finding here gets no card action at all,
       // only the single-item "Start a decision" case below.
       severity: 'medium',
-      ...(canStartDecision(role) ? { decisionBuilder: (item: HealthFindingItem) => prefillFromPoorFitCapabilityFinding({ id: item.id, name: item.label }) } : {}),
+      ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromPoorFitCapabilityFinding({ id: item.id, name: item.label })) } : {}),
     },
     {
       // The architect door's third decision-shaped finding
@@ -309,7 +324,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       items: elementItems(data.capabilitiesWithNoSupporters),
       severity: 'medium',
       browseHref: browseHref('capability-no-supporters'),
-      ...(canStartDecision(role) ? { decisionBuilder: (item: HealthFindingItem) => prefillFromCapabilityNoSupportersFinding({ id: item.id, name: item.label }) } : {}),
+      ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromCapabilityNoSupportersFinding({ id: item.id, name: item.label })) } : {}),
     },
   ];
   const { active: activeHealthChecks, clear: clearHealthChecks } = partitionHealthChecks(healthChecks);
@@ -348,7 +363,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       items: elementItems(data.criticalSystemsPastOrNearSupportEnd),
       severity: 'high',
       browseHref: browseHref('critical-support-end'),
-      ...(canStartDecision(role) ? { decisionBuilder: (item: HealthFindingItem) => prefillFromCriticalSupportEndFinding({ id: item.id, name: item.label }) } : {}),
+      ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromCriticalSupportEndFinding({ id: item.id, name: item.label })) } : {}),
     },
     {
       key: 'external-interfaces-missing-classification',
@@ -392,7 +407,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
     return (
       <div className={styles.findingGrid}>
         {checks.map((check) => (
-          <FindingCard key={check.key} count={check.count} summary={check.summary} items={check.items} severity={check.severity} action={resolveCardAction(check, orgSlug, modelSlug)} />
+          <FindingCard key={check.key} count={check.count} summary={check.summary} items={check.items} severity={check.severity} action={resolveCardAction(check)} />
         ))}
       </div>
     );

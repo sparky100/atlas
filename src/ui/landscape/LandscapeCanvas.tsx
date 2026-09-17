@@ -8,6 +8,7 @@ import type { ChipTone } from '../components/Chip/Chip';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff, VersionDiffState } from '../../engine/versionDiff';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
+import { isIntegrationPlatform } from '../elements/systemKind';
 import { BOUNDARY_MARGIN, computeLandscapeChannels, laneAt, laneLabelLeftInset, NODE_HEIGHT, NODE_WIDTH, REFERENCE_CHIP_HEIGHT, REFERENCE_CHIP_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
 import { landscapeTileColourFor } from './landscapeColour';
 import { quantizeScale, wheelZoomFactor } from './zoom';
@@ -371,29 +372,45 @@ export function LandscapeCanvas({
   const diffByElementId = useMemo(() => new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []), [diff]);
   const diffByRelationshipId = useMemo(() => new Map<UUID, RelationshipVersionDiff>(diff?.relationships.map((r) => [r.relationshipId, r]) ?? []), [diff]);
 
+  // Integration platform context prompt: "with 'Route via platforms' on, a
+  // focused integration platform highlights every via-flow through it" —
+  // such a flow's own endpoints are the source/target, never the platform
+  // (`via` names it as a third party, `useElementContext.ts`'s own
+  // `IntegrationPlatformContextData` doc comment), so it would otherwise
+  // never match the ordinary "touches the focused element" test below.
+  const focusedSystem = focusedElementId != null ? systemsById.get(focusedElementId) : undefined;
+  const focusedIsIntegrationPlatform = routeViaPlatforms && focusedSystem !== undefined && isIntegrationPlatform(focusedSystem);
+  const isViaFlowThroughFocus = useCallback((edge: RelationshipsHeadRow): boolean => focusedIsIntegrationPlatform && attributesRecord(edge.attributes).via === focusedElementId, [focusedIsIntegrationPlatform, focusedElementId]);
+
   // V2 "landscape focus and filters": "edges hidden by default; 'Show
   // connections' toggle" — off (and no focus active) means no edge draws
   // at all. Focus overrides `showConnections` entirely rather than
   // combining with it: the whole point of focus is "show me this one
   // subject's own connections regardless of the global toggle."
   const visibleEdges = useMemo(() => {
-    if (focusedElementId != null) return edges.filter((e) => e.from_element_id === focusedElementId || e.to_element_id === focusedElementId);
+    if (focusedElementId != null) return edges.filter((e) => e.from_element_id === focusedElementId || e.to_element_id === focusedElementId || isViaFlowThroughFocus(e));
     return showConnections ? edges : [];
-  }, [edges, focusedElementId, showConnections]);
+  }, [edges, focusedElementId, showConnections, isViaFlowThroughFocus]);
 
   // V2: every element one `uses`/`flows_to` hop from the focused element,
   // either direction — computed off the real edge graph, never the routed
   // (possibly via-adjusted) one, so a "route via platforms" leg doesn't
-  // itself count as a neighbour hop.
+  // itself count as a neighbour hop. A via-flow through a focused platform
+  // is the one exception: both its own endpoints are exactly what the
+  // prompt's own "highlights every via-flow through it" means to surface.
   const focusNeighbourIds = useMemo(() => {
     const result = new Set<UUID>();
     if (focusedElementId == null) return result;
     for (const edge of edges) {
       if (edge.from_element_id === focusedElementId) result.add(edge.to_element_id);
       else if (edge.to_element_id === focusedElementId) result.add(edge.from_element_id);
+      else if (isViaFlowThroughFocus(edge)) {
+        result.add(edge.from_element_id);
+        result.add(edge.to_element_id);
+      }
     }
     return result;
-  }, [edges, focusedElementId]);
+  }, [edges, focusedElementId, isViaFlowThroughFocus]);
 
   // Item 9: routed once per `layout`/`visibleEdges` change, not per draw —
   // a straight line when nothing's in the way (the common case), an

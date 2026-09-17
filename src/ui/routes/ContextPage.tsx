@@ -24,6 +24,7 @@ import { isViewingMode } from '../branches/viewingMode';
 import { ContextInspectorContent } from '../context/ContextInspectorContent';
 import { contextInspectorFocusedNeighbour } from '../context/contextInspectorSelection';
 import { ContextView } from '../context/ContextView';
+import { IntegrationPlatformContextView } from '../context/IntegrationPlatformContextView';
 import { PlatformStructureView } from '../context/PlatformStructureView';
 import { useElementContext } from '../context/useElementContext';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
@@ -69,7 +70,7 @@ export function ContextPage() {
 
   const state = useElementContext(model?.id ?? '', organisation?.id ?? '', userId, elementId ?? '', ref, mode);
 
-  const hub = state.status === 'ready' ? (state.data.kind === 'platform-structure' ? state.data.hub : state.data.group.hub) : null;
+  const hub = state.status === 'ready' ? (state.data.kind === 'group' ? state.data.group.hub : state.data.hub) : null;
   // V3 item 1's own breadcrumb example ("DNO > Base > main > SAP > SAP FI"):
   // a container hub's own platform parent, resolved the same "just omit
   // that one segment" way every other breadcrumb lookup here already
@@ -167,6 +168,16 @@ export function ContextPage() {
             modelSlug={model.slug}
             refParam={refParam}
             diff={state.data.diff}
+          />
+        )}
+        {state.status === 'ready' && state.data.kind === 'integration-platform' && (
+          <IntegrationPlatformContextView
+            hub={state.data.hub}
+            flows={state.data.flows}
+            endpoints={state.data.endpoints}
+            orgSlug={organisation?.slug ?? ''}
+            modelSlug={model.slug}
+            refParam={refParam}
           />
         )}
         {state.status === 'ready' && state.data.kind === 'group' && (

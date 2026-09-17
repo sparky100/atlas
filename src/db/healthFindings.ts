@@ -123,8 +123,17 @@ export interface BoundaryCrossing {
   missingDataClassification: boolean;
 }
 
-/** One domain is `'it'` and the other `'ot'` — `'hybrid'` never participates on either side (ambiguous by construction: a hybrid endpoint isn't clearly on one side of the boundary or the other), Prompt 7k item 3's own judgment call for what counts as a "crossing" at all. */
-function isBoundaryCrossingPair(a: SystemDomain, b: SystemDomain): boolean {
+/**
+ * One domain is `'it'` and the other `'ot'` — `'hybrid'` never
+ * participates on either side (ambiguous by construction: a hybrid
+ * endpoint isn't clearly on one side of the boundary or the other),
+ * Prompt 7k item 3's own judgment call for what counts as a "crossing" at
+ * all. Exported so a second surface that needs the identical predicate —
+ * the integration platform context diagram's own "IT/OT boundary
+ * crossings highlighted" — reuses this single definition rather than
+ * re-deriving it.
+ */
+export function isBoundaryCrossingPair(a: SystemDomain, b: SystemDomain): boolean {
   return (a === 'it' && b === 'ot') || (a === 'ot' && b === 'it');
 }
 
