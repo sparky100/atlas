@@ -18,7 +18,17 @@ export interface SpreadsheetImportPanelProps {
   modelSlug: string;
 }
 
-/** One row's own match summary — "New", "Matched: <name>", or a picker for the rare exact-name tie (`matchImportRows.ts`'s own `ambiguous` outcome). */
+/**
+ * One row's own match summary — "New", "Matched: <name>", or a picker for
+ * the rare exact-name tie (`matchImportRows.ts`'s own `ambiguous` outcome).
+ *
+ * `onPick`'s own `'new' | UUID` union looks redundant to the type checker
+ * (`UUID` is a plain `string` alias, `contracts/delta.ts`) even though
+ * `'new'` is a real, distinct sentinel at runtime, never an actual id —
+ * same reasoning `buildImportCommit.ts`'s `MatchResolution` type suppresses
+ * this exact rule for.
+ */
+// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
 function MatchCell({ matched, onPick }: { matched: MatchedImportRow; onPick: (choice: 'new' | UUID) => void }) {
   if (matched.match.kind === 'new') return <Chip tone="info">New</Chip>;
   if (matched.match.kind === 'matched') return <Chip tone="ok">Matched: {matched.match.element.name}</Chip>;
@@ -28,7 +38,7 @@ function MatchCell({ matched, onPick }: { matched: MatchedImportRow; onPick: (ch
       aria-label={`Which existing system does row ${String(matched.row.rowNumber)} match?`}
       defaultValue=""
       onChange={(e) => {
-        onPick(e.target.value === 'new' ? 'new' : (e.target.value as UUID));
+        onPick(e.target.value === 'new' ? 'new' : e.target.value);
       }}
     >
       <option value="" disabled>
@@ -135,7 +145,7 @@ export function SpreadsheetImportPanel({ modelId, orgId, userId, orgSlug, modelS
                 });
               }}
             >
-              {status === 'committing' ? 'Importing…' : unresolvedCount > 0 ? `Resolve ${unresolvedCount} row(s) first` : 'Import'}
+              {status === 'committing' ? 'Importing…' : unresolvedCount > 0 ? `Resolve ${String(unresolvedCount)} row(s) first` : 'Import'}
             </Button>
             <Button variant="ghost" disabled={status === 'committing'} onClick={reset}>
               Cancel

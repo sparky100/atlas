@@ -35,9 +35,21 @@ export type ImportRowResult = { ok: true; row: ImportRow } | { ok: false; rowNum
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** One raw parsed cell → its string form, or `undefined` for a genuinely blank cell — `sheet_to_json`'s own `defval: null` convention plus XLSX sometimes handing back a number/boolean for a cell that looks like one (a `lifecycleStatus` of `active` never does, but a stray numeric-looking name shouldn't silently become a JS number). */
+/**
+ * One raw parsed cell → its string form, or `undefined` for a genuinely
+ * blank cell — `sheet_to_json`'s own `defval: null` convention plus XLSX
+ * sometimes handing back a number/boolean for a cell that looks like one
+ * (a `lifecycleStatus` of `active` never does, but a stray numeric-looking
+ * name shouldn't silently become a JS number). A spreadsheet cell is
+ * never an object (SheetJS's own cell types are string/number/boolean/
+ * date/null) — the explicit `typeof` narrowing below is what lets
+ * `String(raw)` past the type checker's "never `String()` an arbitrary
+ * `unknown`, it might be an object with no real `toString`" rule, rather
+ * than a blanket suppression.
+ */
 function cellToString(raw: unknown): string | undefined {
   if (raw === null || raw === undefined) return undefined;
+  if (typeof raw !== 'string' && typeof raw !== 'number' && typeof raw !== 'boolean') return undefined;
   const str = String(raw).trim();
   return str.length > 0 ? str : undefined;
 }

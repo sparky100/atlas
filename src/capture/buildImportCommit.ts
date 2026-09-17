@@ -12,7 +12,19 @@ import { defaultCreateAttributes } from '../contracts/attributeSchema';
 import type { ImportRow } from './importRowSchema';
 import type { MatchedImportRow } from './matchImportRows';
 
-/** The reviewer's own pick for one row's `ambiguous` system match — required for every such row before this module will build anything (`buildImportDeltas` throws listing whichever rows are still unresolved, rather than guessing). Supports-column ambiguity is never resolved this way in v1 — see `matchImportRows.ts`'s own module comment on why it's always treated as unresolved instead. */
+/**
+ * The reviewer's own pick for one row's `ambiguous` system match —
+ * required for every such row before this module will build anything
+ * (`buildImportDeltas` throws listing whichever rows are still
+ * unresolved, rather than guessing). Supports-column ambiguity is never
+ * resolved this way in v1 — see `matchImportRows.ts`'s own module comment
+ * on why it's always treated as unresolved instead.
+ *
+ * `UUID` is a plain `string` alias (`contracts/delta.ts`), so this union
+ * looks redundant to the type checker even though `'new'` is a real,
+ * distinct sentinel value at runtime, never an actual id.
+ */
+// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
 export type MatchResolution = 'new' | UUID;
 
 export interface BuildImportDeltasInput {
@@ -48,7 +60,7 @@ const UPDATE_KEYS = ['description', 'lifecycleStatus', 'criticality', 'vendor', 
 export function buildImportDeltas(input: BuildImportDeltasInput): BuildImportDeltasResult {
   const { matchedRows, resolutions, sourceId, factsByElementId, existsDeltaIdByElementId } = input;
 
-  const unresolved = matchedRows.filter((m) => m.match.kind === 'ambiguous' && !resolutions.has(m.row.rowNumber)).map((m) => m.row.rowNumber);
+  const unresolved = matchedRows.filter((m) => m.match.kind === 'ambiguous' && !resolutions.has(m.row.rowNumber)).map((m) => String(m.row.rowNumber));
   if (unresolved.length > 0) {
     throw new Error(`Row${unresolved.length === 1 ? '' : 's'} ${unresolved.join(', ')} still need${unresolved.length === 1 ? 's' : ''} a pick before this import can commit.`);
   }
@@ -96,9 +108,9 @@ export function buildImportDeltas(input: BuildImportDeltasInput): BuildImportDel
           confidence: 1,
         });
       } else if (matched.supports.kind === 'unresolved') {
-        warnings.push(`Row ${row.rowNumber} ("${row.name}"): capability "${matched.supports.name}" was not found — created without a supports link.`);
+        warnings.push(`Row ${String(row.rowNumber)} ("${row.name}"): capability "${matched.supports.name}" was not found — created without a supports link.`);
       } else if (matched.supports.kind === 'ambiguous') {
-        warnings.push(`Row ${row.rowNumber} ("${row.name}"): capability "${row.supportsCapabilityName}" matched more than one existing capability — created without a supports link.`);
+        warnings.push(`Row ${String(row.rowNumber)} ("${row.name}"): capability "${row.supportsCapabilityName ?? ''}" matched more than one existing capability — created without a supports link.`);
       }
       continue;
     }
@@ -118,7 +130,7 @@ export function buildImportDeltas(input: BuildImportDeltasInput): BuildImportDel
     const facts = factsByElementId.get(elementId) ?? new Map<string, FactsRow>();
     const existsDeltaId = existsDeltaIdByElementId.get(elementId);
     if (existsDeltaId === undefined) {
-      warnings.push(`Row ${row.rowNumber} ("${row.name}"): the matched element's current state could not be read — skipped.`);
+      warnings.push(`Row ${String(row.rowNumber)} ("${row.name}"): the matched element's current state could not be read — skipped.`);
       continue;
     }
 
@@ -141,7 +153,7 @@ export function buildImportDeltas(input: BuildImportDeltasInput): BuildImportDel
     }
 
     if (matched.supports.kind === 'matched' || matched.supports.kind === 'unresolved' || matched.supports.kind === 'ambiguous') {
-      warnings.push(`Row ${row.rowNumber} ("${row.name}") matched an existing system — its supports link was left unchanged (not re-linked by this import).`);
+      warnings.push(`Row ${String(row.rowNumber)} ("${row.name}") matched an existing system — its supports link was left unchanged (not re-linked by this import).`);
     }
   }
 
