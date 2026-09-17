@@ -71,9 +71,12 @@ function platformFlowEndpointItems(endpoints: readonly PlatformFlowEndpoint[]): 
  *
  * S1 item 6: "Architect door order: review queue, health findings
  * (boundary crossings and Assurance inside), my changes, recent
- * activity." Boundary crossings' own count-and-link block (Prompt 7k
- * item 3, the full list still lives at `BoundaryCrossingsPage.tsx`) and
- * the Assurance sub-group (Prompt 7k item 5's three regulatory-alignment
+ * activity." Boundary crossings' own link (Prompt 7k item 3, the full list
+ * still lives at `BoundaryCrossingsPage.tsx` — Sprint U4-1 findings
+ * follow-up dropped this block's own count, which named one specific
+ * finding as if it summarised the whole panel; each finding below already
+ * states its own count) and the Assurance sub-group (Prompt 7k item 5's
+ * three regulatory-alignment
  * findings) now render *inside* the one "Health findings" panel, in that
  * order, rather than as three separate side-by-side panels each gating
  * "No findings" independently. "Recent commits" is renamed "Recent
@@ -146,6 +149,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       count: data.systemsWithoutCapability.length,
       summary: `${String(data.systemsWithoutCapability.length)} ${plural(data.systemsWithoutCapability.length, 'system', 'systems')} not linked to a capability`,
       items: elementItems(data.systemsWithoutCapability),
+      severity: 'medium',
       browseHref: browseHref('unlinked-systems'),
       browseLabel: 'Review and link →',
     },
@@ -159,6 +163,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       count: data.platformSupportsThatShouldMoveToModule.length,
       summary: `${String(data.platformSupportsThatShouldMoveToModule.length)} platform supports edge${data.platformSupportsThatShouldMoveToModule.length === 1 ? '' : 's'} that could move to a module`,
       items: elementItems(data.platformSupportsThatShouldMoveToModule),
+      severity: 'medium',
       browseHref: browseHref('platform-supports-move-to-module'),
       browseLabel: 'Review and move →',
     },
@@ -171,12 +176,17 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       count: data.flowsToPlatformInsteadOfModule.length,
       summary: `${String(data.flowsToPlatformInsteadOfModule.length)} flow${data.flowsToPlatformInsteadOfModule.length === 1 ? '' : 's'} that could point at a module instead of the platform`,
       items: platformFlowEndpointItems(data.flowsToPlatformInsteadOfModule),
+      severity: 'medium',
     },
     {
       key: 'unowned-capabilities',
       count: data.capabilitiesWithoutOwner.length,
       summary: `${String(data.capabilitiesWithoutOwner.length)} ${plural(data.capabilitiesWithoutOwner.length, 'capability', 'capabilities')} with no owner`,
       items: elementItems(data.capabilitiesWithoutOwner),
+      // Informational: every capability without an owner, not just a
+      // critical/essential one — that stricter, higher-stakes case is
+      // Assurance's own `essential-no-technical-owner` finding below.
+      severity: 'informational',
       browseHref: browseHref('unowned-capabilities'),
     },
     {
@@ -187,6 +197,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
           ? `${String(data.staleAttributes.staleFactCount)} ${plural(data.staleAttributes.staleFactCount, 'attribute', 'attributes')} stale over 12 months — across ${String(data.staleAttributes.staleSystems.length)} ${plural(data.staleAttributes.staleSystems.length, 'system', 'systems')} · oldest ${String(data.staleAttributes.oldestAgeYears)}y`
           : '0 attributes stale over 12 months',
       items: elementItems(data.staleAttributes.staleSystems),
+      severity: 'medium',
       browseHref: browseHref('stale-attributes'),
     },
     {
@@ -194,12 +205,17 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       count: data.unlabeledVerbRelationships.length,
       summary: `${String(data.unlabeledVerbRelationships.length)} ${plural(data.unlabeledVerbRelationships.length, 'relationship', 'relationships')} missing a label`,
       items: unlabeledRelationshipItems(data.unlabeledVerbRelationships),
+      severity: 'medium',
     },
     {
       key: 'no-technical-owner',
       count: data.systemsWithoutTechnicalOwner.length,
       summary: `${String(data.systemsWithoutTechnicalOwner.length)} ${plural(data.systemsWithoutTechnicalOwner.length, 'system', 'systems')} with no technical owner`,
       items: elementItems(data.systemsWithoutTechnicalOwner),
+      // Informational: every system, not just one supporting an essential
+      // function — that stricter case is `essential-no-technical-owner`
+      // below (Assurance), which is high-severity.
+      severity: 'informational',
       browseHref: browseHref('no-technical-owner'),
     },
     {
@@ -207,6 +223,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       count: data.criticalSystemsWithoutBusinessOwner.length,
       summary: `${String(data.criticalSystemsWithoutBusinessOwner.length)} critical ${plural(data.criticalSystemsWithoutBusinessOwner.length, 'system', 'systems')} with no business owner`,
       items: elementItems(data.criticalSystemsWithoutBusinessOwner),
+      severity: 'high',
       browseHref: browseHref('critical-no-business-owner'),
     },
     {
@@ -214,6 +231,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       count: data.criticalExposedSystems.length,
       summary: `${String(data.criticalExposedSystems.length)} critical ${plural(data.criticalExposedSystems.length, 'system', 'systems')} exposed with no planned replacement`,
       items: elementItems(data.criticalExposedSystems),
+      severity: 'high',
       browseHref: browseHref('critical-exposed'),
     },
     {
@@ -221,17 +239,21 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       // Assurance's own finding below, not this one too (found during a
       // walkthrough: the same crossing showed up twice, once in each
       // section, with near-identical wording — see
-      // `findBoundaryCrossingsMissingVerb`'s own doc comment).
+      // `findBoundaryCrossingsMissingVerb`'s own doc comment). A missing
+      // verb label is a lesser gap than a missing classification, so this
+      // stays medium even though both concern the same boundary.
       key: 'boundary-crossings-missing-verb',
       count: data.boundaryCrossingsMissingVerb.length,
       summary: `${String(data.boundaryCrossingsMissingVerb.length)} boundary crossing${data.boundaryCrossingsMissingVerb.length === 1 ? '' : 's'} with no verb label`,
       items: boundaryCrossingItems(data.boundaryCrossingsMissingVerb),
+      severity: 'medium',
     },
     {
       key: 'unused-integration-platform',
       count: data.unusedIntegrationPlatforms.length,
       summary: `${String(data.unusedIntegrationPlatforms.length)} unused integration ${plural(data.unusedIntegrationPlatforms.length, 'platform', 'platforms')} (nothing flows via it)`,
       items: elementItems(data.unusedIntegrationPlatforms),
+      severity: 'medium',
       browseHref: browseHref('unused-integration-platform'),
     },
   ];
@@ -248,6 +270,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       count: data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length,
       summary: `${String(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length)} ${plural(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length, 'system', 'systems')} supporting an essential function with no technical owner`,
       items: elementItems(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner),
+      severity: 'high',
       browseHref: browseHref('essential-no-technical-owner'),
     },
     {
@@ -255,12 +278,14 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       count: data.boundaryCrossingsMissingClassification.length,
       summary: `${String(data.boundaryCrossingsMissingClassification.length)} boundary crossing${data.boundaryCrossingsMissingClassification.length === 1 ? '' : 's'} with no data classification`,
       items: boundaryCrossingItems(data.boundaryCrossingsMissingClassification),
+      severity: 'high',
     },
     {
       key: 'critical-support-end',
       count: data.criticalSystemsPastOrNearSupportEnd.length,
       summary: `${String(data.criticalSystemsPastOrNearSupportEnd.length)} critical ${plural(data.criticalSystemsPastOrNearSupportEnd.length, 'system', 'systems')} past or near vendor support end`,
       items: elementItems(data.criticalSystemsPastOrNearSupportEnd),
+      severity: 'high',
       browseHref: browseHref('critical-support-end'),
       // Prompt pack F3 PR6: "Start a decision" from a health finding —
       // F3's own named "SAP PM" golden path. `item.label` is exactly the
@@ -279,6 +304,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       count: data.externalInterfacesMissingClassification.length,
       summary: `${String(data.externalInterfacesMissingClassification.length)} external interface${data.externalInterfacesMissingClassification.length === 1 ? '' : 's'} with no data classification`,
       items: externalInterfaceItems(data.externalInterfacesMissingClassification),
+      severity: 'high',
       browseHref: externalInterfacesHref,
       browseLabel: 'View all →',
     },
@@ -287,11 +313,13 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       // comment, healthFindings.ts) — still one of the nine/twelve checks
       // for "N checks clear" purposes when nothing external has access at
       // all, the same as every other check here; nothing about it being
-      // informational rather than a problem changes how it collapses.
+      // informational rather than a problem changes how it collapses. Now
+      // also its own severity tier, for the same reason — informational.
       key: 'external-organisation-access',
       count: data.externalOrganisationAccess.length,
       summary: `${String(data.externalOrganisationAccess.length)} external ${plural(data.externalOrganisationAccess.length, 'organisation', 'organisations')} with access`,
       items: externalOrganisationAccessItems(data.externalOrganisationAccess),
+      severity: 'informational',
       browseHref: externalInterfacesHref,
       browseLabel: 'View all →',
     },
@@ -301,7 +329,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
   function checkPlate(check: HealthCheck, index: number) {
     const browseProps = check.browseHref !== undefined ? { browseHref: check.browseHref, ...(check.browseLabel !== undefined && { browseLabel: check.browseLabel }) } : {};
     const itemActionProps = check.itemAction !== undefined ? { itemAction: check.itemAction } : {};
-    const finding = <HealthFinding summary={check.summary} items={check.items} {...browseProps} {...itemActionProps} />;
+    const finding = <HealthFinding summary={check.summary} items={check.items} severity={check.severity} {...browseProps} {...itemActionProps} />;
     // Item 6's convention: the first *real* (non-zero) finding in a group
     // is blueprint-framed — preserved here now that zero-count checks no
     // longer take a plate of their own to be "first".
@@ -412,19 +440,18 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
             Health findings
           </Text>
 
-          {/* Prompt 7k item 3's own count-and-link line — every IT/OT
-              crossing, not just the ones a finding below flags as missing
-              metadata; the full list still lives at BoundaryCrossingsPage.tsx.
-              S1 item 6 moves this from its own standalone panel to inside
-              Health findings, first. Deliberately *not* the same big `.count`
-              headline treatment Review queue uses above (found during a
-              walkthrough: styled that way, it read as this whole panel's
-              total finding count, which it never was — it's one specific
-              metric among several findings below it). */}
-          <Text as="p" tone="muted" size="sm">
-            {data.boundaryCrossingsCount} IT/OT crossing{data.boundaryCrossingsCount === 1 ? '' : 's'} in this model —{' '}
-            <Link to={`/o/${orgSlug}/m/${modelSlug}/boundary-crossings`}>view all →</Link>
-          </Text>
+          {/* Prompt 7k item 3's own link into BoundaryCrossingsPage.tsx's
+              full list. Sprint U4-1 findings follow-up: this used to also
+              carry its own "N IT/OT crossings in this model" count, which
+              named one specific finding as if it summarised every finding
+              in this panel — dropped entirely (each finding below already
+              states its own count inline); a bare link to the full list is
+              all that's left of Prompt 7k item 3's original block. */}
+          <Link to={`/o/${orgSlug}/m/${modelSlug}/boundary-crossings`}>
+            <Text as="span" tone="muted" size="sm">
+              View boundary crossings →
+            </Text>
+          </Link>
 
           {activeHealthChecks.length > 0 && (
             <div className={styles.findingPlates}>

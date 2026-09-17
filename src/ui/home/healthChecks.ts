@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { HealthFindingItem } from '../components/HealthFinding/HealthFinding';
+import type { HealthFindingItem, HealthFindingSeverity } from '../components/HealthFinding/HealthFinding';
 
 /**
  * S1 item 7: "Zero-count findings collapse to one line ('N checks clear')
@@ -15,6 +15,8 @@ export interface HealthCheck {
   count: number;
   summary: string;
   items: readonly HealthFindingItem[];
+  /** Sprint U4-1 findings follow-up: passed straight through to `HealthFinding`'s own tint — see `HealthFindingSeverity`'s doc comment (`healthFindingFormat.ts`) for the tier definitions and `ArchitectHome.tsx`'s own check list for which finding gets which tier and why. */
+  severity: HealthFindingSeverity;
   browseHref?: string;
   browseLabel?: string;
   /** Prompt pack F3 PR6: `HealthFinding`'s own new per-row action slot, passed straight through — see that component's own doc comment. */
@@ -29,12 +31,19 @@ export interface PartitionedHealthChecks {
   clear: HealthCheck[];
 }
 
+/** High first, then medium, then informational — `Array#sort` is stable, so checks within the same tier keep the order the caller listed them in. */
+const SEVERITY_RANK: Record<HealthFindingSeverity, number> = { high: 0, medium: 1, informational: 2 };
+
 export function partitionHealthChecks(checks: readonly HealthCheck[]): PartitionedHealthChecks {
   const active: HealthCheck[] = [];
   const clear: HealthCheck[] = [];
   for (const check of checks) {
     (check.count === 0 ? clear : active).push(check);
   }
+  // Sprint U4-1 findings follow-up: only `active` is severity-ordered —
+  // `clear` is already de-prioritised (collapsed behind "N checks clear"),
+  // so reordering it would just churn that list for no visible benefit.
+  active.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
   return { active, clear };
 }
 

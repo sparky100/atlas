@@ -2,15 +2,17 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Button } from '../Button/Button';
 import { Text } from '../Text/Text';
-import { joinWithMore, type HealthFindingItem } from './healthFindingFormat';
+import { joinWithMore, type HealthFindingItem, type HealthFindingSeverity } from './healthFindingFormat';
 import styles from './HealthFinding.module.css';
 
-export type { HealthFindingItem } from './healthFindingFormat';
+export type { HealthFindingItem, HealthFindingSeverity } from './healthFindingFormat';
 
 export interface HealthFindingProps {
   /** "N systems not linked to a capability" etc — count and one-line description already combined, pluralised by the caller. */
   summary: string;
   items: readonly HealthFindingItem[];
+  /** Sprint U4-1 findings follow-up: drives this plate's own tint — see `HealthFindingSeverity`'s own doc comment (`healthFindingFormat.ts`). Ignored when `items.length === 0` (that early return renders plain text, no tint of any kind, same as before this existed). */
+  severity: HealthFindingSeverity;
   /** Where "Review →" (or `browseLabel`) sends someone — the browse table, pre-filtered to this finding. Omitted entirely (not a disabled link) when there's nowhere useful to send someone — Sprint U4-1 B5's own relationship finding has no element to browse to. */
   browseHref?: string;
   browseLabel?: string;
@@ -44,7 +46,7 @@ const PAGE_SIZE = 20;
  * single line (all findings zero at once) is that component's own job,
  * not this one's.
  */
-export function HealthFinding({ summary, items, browseHref, browseLabel, itemAction }: HealthFindingProps) {
+export function HealthFinding({ summary, items, severity, browseHref, browseLabel, itemAction }: HealthFindingProps) {
   const [expanded, setExpanded] = useState(false);
   const [page, setPage] = useState(0);
 
@@ -56,14 +58,19 @@ export function HealthFinding({ summary, items, browseHref, browseLabel, itemAct
   const currentPage = Math.min(page, pageCount - 1);
   const pageItems = items.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE);
 
+  const severityClass = severity === 'high' ? styles.high : severity === 'medium' ? styles.medium : '';
+
   return (
     // Visual pass (director/architect doors): this only ever renders past
     // the `items.length === 0` return above, so it's always the "real,
-    // non-zero" case — a tinted background, not just the plate/
-    // BlueprintFrame border the caller (ArchitectHome.tsx's `checkPlate`)
-    // already draws around it, so a finding with something in it reads as
-    // a gap at a glance rather than looking identical to a clean one.
-    <div className={styles.weak}>
+    // non-zero" case — `.plate`'s own padding keeps it from running flush
+    // against the plate/BlueprintFrame border the caller (ArchitectHome.tsx's
+    // `checkPlate`) already draws around it. Sprint U4-1 findings follow-up:
+    // the background tint itself now depends on `severity` rather than
+    // being flat for every non-zero finding — `informational` gets no
+    // colour class at all, reading the same as a clean finding but still
+    // expandable, so it doesn't compete visually with a real gap.
+    <div className={[styles.plate, severityClass].filter(Boolean).join(' ')}>
       <Text as="p">{summary}</Text>
       {!expanded && (
         <Text as="p" tone="muted" size="sm">

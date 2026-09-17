@@ -1,11 +1,21 @@
 /* Visual pass (director/architect doors, item 1): every finding this
    component renders past its own `items.length === 0` early return is a
-   real, non-zero gap — background tint, not just the plate border already
-   drawn around it by the caller. Padding of its own so the tint doesn't
-   run flush against that outer border. */
-.weak {
+   real, non-zero gap. Padding of its own so a tint (or just the row
+   content, for an informational finding) doesn't run flush against the
+   plate/BlueprintFrame border already drawn around it by the caller.
+   Sprint U4-1 findings follow-up: the background itself moved to `.high`/
+   `.medium` below, tint-by-severity rather than flat — this class alone
+   (an informational finding's own case) carries no background at all. */
+.plate {
   padding: var(--space-2);
   border-radius: var(--radius-sm);
+}
+
+.high {
+  background: var(--status-strong-bg);
+}
+
+.medium {
   background: var(--status-weak-bg);
 }
 
