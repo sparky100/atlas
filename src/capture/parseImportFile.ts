@@ -49,7 +49,6 @@ export async function parseImportFile(file: File): Promise<ParsedImportFile> {
     throw new ImportFileParseError(`"${file.name}"'s first sheet could not be read.`);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- sheet_to_json's return type is genuinely `any[]` in SheetJS's own types; each entry is validated immediately below via validateImportRow, the actual trust boundary.
   const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: null });
 
   const rows: ImportRow[] = [];
