@@ -32,13 +32,36 @@ The incumbents fail most of these: Sparx has no provenance and hand-drawn diagra
 
 ### 2.0 Persistent model navigation
 
-Every model-scoped route (home, capability map, landscape and the zoom chain beneath it, changes, versions, review) renders the same six-item navigation alongside the page: **Home, Capability map, Landscape, Changes, Versions, Review queue**. It is chrome, not a per-page affordance — a page never grows its own "back to X" link, or any other hand-rolled equivalent, to stand in for it: one shared component (`ModelNav`), everywhere, not a per-route re-implementation of the same nav (**amended, S1 item 17 — see §10 item 10: this is not a ban on `<ul>`/`<li>` markup itself, which §8 has never actually prohibited**).
+Every model-scoped route (home, capability map, landscape and the zoom chain beneath it, changes, decisions, versions, review) renders the same seven-item navigation alongside the page, grouped into three named clusters:
 
-- **Desktop**: a left rail, 200px wide, between the app header and the page content.
-- **Mobile** (< 768px): a bottom bar, fixed to the viewport, below the page content (which gains bottom padding so nothing sits underneath it).
-- The item for the current route is highlighted (`aria-current="page"`).
-- The `[ref]` chip (§2.2) sits alongside the nav items — same `main` / tag / branch-title rendering as the breadcrumb's chip — so which state you're looking at travels with you across a jump, not just within one page's breadcrumb. Home, Changes, and Review queue aren't ref-scoped, so their links carry no `?ref=`; Capability map, Landscape, and Versions preserve the current ref.
+| Group | Items |
+| --- | --- |
+| **Model** | Home, Capability map, Landscape |
+| **Work** | Changes, Decisions, Review queue |
+| **Record** | Versions |
+
+It is chrome, not a per-page affordance — a page never grows its own "back to X" link, or any other hand-rolled equivalent, to stand in for it: one shared component (`ModelNav`), everywhere, not a per-route re-implementation of the same nav (**amended, S1 item 17 — see §10 item 10: this is not a ban on `<ul>`/`<li>` markup itself, which §8 has never actually prohibited**).
+
+- **Desktop (≥ 1024px)**: a left rail, 200px wide, between the app header and the page content — icon and label side by side for every item.
+- **Narrow desktop (768–1023px)**: the same left rail, but icon-only — the label is still present for assistive tech (visually hidden, not removed) and available as a native tooltip (`title`) on hover/focus.
+- **Mobile** (< 768px): a bottom bar, fixed to the viewport, below the page content (which gains bottom padding so nothing sits underneath it) — icon-only, same as the narrow-desktop tier.
+- Each group is visually separated by a 1px divider and a small uppercase caption naming it (**"Model" / "Work" / "Record"**, table above) — on the bottom bar (mobile), captions are omitted (no room) and the dividers alone still separate the groups.
+- The item for the current route is highlighted: a filled background (`--accent-surface`, a low-opacity tint of `--accent` — the same "tinted, not solid" formula `--status-weak-bg` already uses off `--status-warn`) with accent-coloured text, plus `aria-current="page"`. There is no separate edge-bar treatment — the fill alone (with the colour-contrasted text, never colour-only per §8.4/§8.7) carries the active state.
+- The `[ref]` chip (§2.2) sits alongside the nav items — same `main` / tag / branch-title rendering as the breadcrumb's chip — so which state you're looking at travels with you across a jump, not just within one page's breadcrumb. Home, Changes, Decisions, and Review queue aren't ref-scoped, so their links carry no `?ref=`; Capability map, Landscape, and Versions preserve the current ref.
 - Because every section is one tap away from every other on the bottom bar, any model route is reachable from any other within two taps on a mobile viewport (one to leave the current section, at most one more to land on an element within it).
+
+**Icons** (added alongside this grouping, V2b): one icon library, one weight — [lucide-react](https://lucide.dev/), stroke icons, imported directly (no wrapper/abstraction layer). This is a deliberate amendment to this repo's earlier "no icon library" stance (still true for *element-type* glyphs — `ElementTypeGlyph`'s own module comment, §9's "what we will not build," is unchanged): lucide is for **chrome only** — navigation, panel controls, view actions — never a per-element or per-type icon, and never used interchangeably with `ElementTypeGlyph`. The curated set, and the only icons in use anywhere in the product — extend this list here before using anything not on it:
+
+| Name (`lucide-react` export) | Used for |
+| --- | --- |
+| `Home` | Nav: Home |
+| `Grid` | Nav: Capability map |
+| `Map` | Nav: Landscape |
+| `GitBranch` | Nav: Changes |
+| `Scale` | Nav: Decisions |
+| `History` | Nav: Versions |
+| `Inbox` | Nav: Review queue |
+| `SlidersHorizontal` | Reserved for the inspector panel's own Filters section — not built yet (V2b, this item still in progress); named here now so its icon is picked once, not decided again when that lands. |
 
 Implementation: `src/ui/components/ModelNav/ModelNav.tsx`, section membership resolved by path in `src/ui/nav/modelNavSection.ts`.
 

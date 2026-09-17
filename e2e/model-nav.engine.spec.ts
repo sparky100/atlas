@@ -148,3 +148,77 @@ test('model nav: every model route reachable from every other within two taps on
   await page.getByRole('navigation', { name: 'Model navigation' }).getByRole('link', { name: 'Versions' }).click();
   await expect(page.getByRole('heading', { name: 'Versions', level: 1 })).toBeVisible();
 });
+
+/**
+ * V2b: icons + grouping (UI-principles §2.0). Desktop (≥1024px) shows an
+ * icon and a visible label per item, grouped under three visible captions
+ * (Model/Work/Record); the narrow-desktop tier (768–1023px, the same rail,
+ * just narrower — not the mobile bottom bar) drops to icon-only, the label
+ * surviving only as the link's own accessible name (`getByRole` still
+ * finds it — nothing here depends on the visible text) and as a native
+ * `title` tooltip.
+ */
+test('model nav: icons and groups at desktop width, icon-only with tooltips below 1024px', async ({ page }) => {
+  const env = loadEnv();
+
+  const email = `modelnav-icons-${randomUUID()}@example.test`;
+  const password = `${randomUUID()}Aa1!`;
+
+  await page.goto('/sign-in');
+  await page.getByText("Don't have an account? Create one").click();
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('heading', { name: 'Your organisations' })).toBeVisible();
+
+  const signedIn = createSupabaseClient(env);
+  const { error: signInError } = await signedIn.auth.signInWithPassword({ email, password });
+  if (signInError) throw new Error(`model-nav-icons fixture sign-in: ${signInError.message}`);
+  const { data: userData, error: getUserError } = await signedIn.auth.getUser();
+  if (getUserError) throw new Error(`model-nav-icons fixture: could not read the signed-in user: ${getUserError.message}`);
+  const userId = userData.user.id;
+
+  const orgId = randomUUID();
+  const orgSlug = `modelnav-icons-${orgId.slice(0, 8)}`;
+  await createOrganisation(signedIn, { id: orgId, name: 'Model Nav Icons Test Org', slug: orgSlug, createdBy: userId });
+
+  const modelId = randomUUID();
+  const modelSlug = `modelnav-icons-model-${modelId.slice(0, 8)}`;
+  await createModel(signedIn, { id: modelId, orgId, name: 'Model Nav Icons Test Model', slug: modelSlug, createdBy: userId });
+
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
+  const nav = page.getByRole('navigation', { name: 'Model navigation' });
+  await expect(nav).toBeVisible();
+
+  // Desktop (≥1024px): labels visible, groups captioned.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(nav.getByText('Capability map', { exact: true })).toBeVisible();
+  await expect(nav.getByText('Landscape', { exact: true })).toBeVisible();
+  await expect(nav.getByText('Model', { exact: true })).toBeVisible();
+  await expect(nav.getByText('Work', { exact: true })).toBeVisible();
+  await expect(nav.getByText('Record', { exact: true })).toBeVisible();
+
+  // Narrow desktop (below 1024px, still the rail — not the <768px bottom
+  // bar): icon-only. The label is still in the accessible tree (the same
+  // link, found by its accessible name) but no longer visible on screen,
+  // and carries a `title` tooltip with the full label instead.
+  await page.setViewportSize({ width: 1000, height: 900 });
+  const capabilityMapLink = nav.getByRole('link', { name: 'Capability map' });
+  await expect(capabilityMapLink).toBeVisible();
+  await expect(nav.getByText('Capability map', { exact: true })).not.toBeVisible();
+  await expect(capabilityMapLink).toHaveAttribute('title', 'Capability map');
+
+  const landscapeLink = nav.getByRole('link', { name: 'Landscape' });
+  await expect(nav.getByText('Landscape', { exact: true })).not.toBeVisible();
+  await expect(landscapeLink).toHaveAttribute('title', 'Landscape');
+
+  // The rail is still tall enough at this width for a group caption above
+  // each cluster — only the mobile bottom bar drops those (module CSS's
+  // own `.groupCaption { display: none }`, scoped to max-width: 768px).
+  await expect(nav.getByText('Model', { exact: true })).toBeVisible();
+
+  // Clicking still works with no visible label — the icon (or its
+  // stretched link area) is still the real click target.
+  await capabilityMapLink.click();
+  await expect(page.getByRole('heading', { name: 'Capability map' })).toBeVisible();
+});

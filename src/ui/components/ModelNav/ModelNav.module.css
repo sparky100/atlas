@@ -63,6 +63,44 @@
   border-right: var(--border-width) solid var(--border-strong);
 }
 
+/* V2b: the single wrapper `.nav`'s mobile `column-reverse` (below) needs
+   around every group — ModelNav.tsx's own comment on this div explains
+   why three separate group elements as `.nav`'s own direct children
+   would reverse Model/Work/Record into Record/Work/Model on mobile. */
+.groupsWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* V2b: one group (Model/Work/Record, ModelNav.tsx's own `NAV_GROUPS`) —
+   its own caption, then its own `<ul>`. `.group` itself carries no
+   visual styling beyond stacking its two children; `.divider` (a sibling
+   `.group` renders before itself, not part of this class) is what
+   actually separates one from the next. */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.divider {
+  height: var(--border-width);
+  background: var(--border);
+  margin: var(--space-2) var(--space-2);
+}
+
+/* Small, uppercase, muted — a caption, not a label competing with the
+   items below it. Hidden entirely on the mobile bottom bar (below), the
+   same "no room" reasoning the icon-only breakpoint below 1024px uses
+   for `.linkLabel` — a bottom bar has no room for a heading above each
+   cluster of items the way a vertical rail does. */
+.groupCaption {
+  padding: 0 var(--space-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .list {
   list-style: none;
   margin: 0;
@@ -72,21 +110,68 @@
   gap: var(--space-1);
 }
 
+/* V2b: icon + label side by side (`display: flex`, was `display: block`
+   with the label as the link's only content) — `.icon`'s own
+   `flex-shrink: 0` keeps a long label from squeezing the icon instead of
+   wrapping/truncating itself first (labels don't wrap here in practice,
+   but the same defensive reasoning `.columnLink`'s own `min-width: 0`
+   comments elsewhere in this codebase give). */
 .link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--text);
+}
+
+.icon {
+  flex-shrink: 0;
 }
 
 .link:hover {
   background: var(--surface-raised);
 }
 
+/* V2b: a filled background (UI-principles §2.0) replaces the old
+   edge-bar (`box-shadow: inset 3px 0 0 var(--accent)`) — `--accent-surface`
+   is the same low-opacity "tinted, not solid" derivation `--status-weak-bg`
+   uses off `--status-warn` (tokens.css's own comment), just off `--accent`,
+   so accent-coloured text reads clearly on top of it without needing
+   `--accent-fg`'s full white-on-solid contrast. The icon inherits the
+   same accent colour for free — lucide icons default to `currentColor`,
+   and nothing here overrides it. */
 .active {
-  background: var(--surface-raised);
+  background: var(--accent-surface);
+  color: var(--accent);
   font-weight: 600;
-  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* V2b: icon-only below 1024px (UI-principles §2.0) — the label stays in
+   the DOM (this rail's own accessible name, and every existing
+   `getByRole('link', { name })` Playwright assertion, both keep working
+   unchanged regardless of viewport) but is visually clipped the same
+   "sr-only" way `UserMenu.module.css`'s own `.srOnly` already does,
+   scoped to this one breakpoint band rather than always-on. The link's
+   own `title` attribute (ModelNav.tsx) is the tooltip that band relies
+   on instead. Below 768px too (not just 768-1023px) — "icon-only below
+   1024px" reads as every narrower tier, not just the tablet one, and the
+   mobile bottom bar already had no room for seven full labels even
+   before this — `title` itself does nothing on a touch device with no
+   hover, but the sr-only label is still there for a screen reader
+   either way. */
+@media (max-width: 1023px) {
+  .linkLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 }
 
 .refChip {
@@ -109,20 +194,50 @@
     z-index: 10;
   }
 
-  .list {
+  /* V2b: the three groups sit in one row instead of stacked — takes over
+     `.list`'s old role of spreading every item edge-to-edge
+     (`justify-content: space-between`) at the *group* level now, since
+     items are one level deeper (each group's own `.list`) than before. */
+  .groupsWrapper {
     flex-direction: row;
+    align-items: center;
     justify-content: space-between;
     gap: 0;
     overflow-x: auto;
   }
 
+  /* Each group's own caption/divider/list, inline instead of stacked —
+     the caption itself is hidden just below (no room for a heading above
+     a cluster of icons this narrow), so what's left is the divider and
+     the list sitting side by side. */
+  .group {
+    flex-direction: row;
+    align-items: center;
+    gap: 0;
+    flex-shrink: 0;
+  }
+
+  .groupCaption {
+    display: none;
+  }
+
+  /* A vertical rule instead of the desktop horizontal one — the groups
+     now sit side by side, not stacked, so the divider between them turns
+     90 degrees with them. */
+  .divider {
+    width: var(--border-width);
+    height: 24px;
+    margin: 0 var(--space-2);
+  }
+
+  .list {
+    flex-direction: row;
+    gap: 0;
+  }
+
   .link {
     padding: var(--space-1) var(--space-2);
     white-space: nowrap;
-  }
-
-  .active {
-    box-shadow: inset 0 3px 0 var(--accent);
   }
 
   /* `.nav` is `position: fixed; left: 0; right: 0`, so nothing clips a
