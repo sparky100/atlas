@@ -25,6 +25,10 @@ export interface CapabilityMapData {
   capabilities: ElementsHeadRow[];
   /** `src/db/healthFindings.ts`'s `computeSelfOwnedCapabilityIds` result — the capability rollup's own owner-coverage input, computed once here rather than per tile. */
   selfOwnedIds: ReadonlySet<UUID>;
+  /** V2b's Inspector, Selection section's own "owners by role" — every live `owns` edge in the model (already fetched below for `selfOwnedIds`, previously discarded once that boolean set was computed). */
+  ownsEdges: RelationshipsHeadRow[];
+  /** Every actor referenced as an `owns` edge's own `from` (`relationshipTypeRules.ts`: an owner is always an actor) — resolved once here so the Inspector's Selection section can show owner *names*, not just `selfOwnedIds`' own boolean. */
+  actorsById: Map<UUID, ElementsHeadRow>;
 }
 
 export type CapabilityMapState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: CapabilityMapData };
@@ -112,8 +116,14 @@ export function useCapabilityMap(
       const tree = computeCapabilityMapTree(capabilities);
       const ownsEdges = await listOwnsEdges(supabase, commitId);
       const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsEdges, ownsEdges);
+      // V2b's Inspector, Selection section: owner *names*, not just
+      // `selfOwnedIds`' own boolean — an `owns` edge's own `from` is
+      // always an actor (`relationshipTypeRules.ts`), so a second small
+      // lookup for just those ids, same shape as `missingPlatformIds` above.
+      const ownerActorIds = [...new Set(ownsEdges.map((edge) => edge.from_element_id))];
+      const actorsById = ownerActorIds.length > 0 ? await getElementsByIds(supabase, commitId, ownerActorIds) : new Map<UUID, ElementsHeadRow>();
 
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById } });
     }
 
     load().catch((e: unknown) => {

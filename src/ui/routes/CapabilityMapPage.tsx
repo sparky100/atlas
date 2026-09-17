@@ -21,12 +21,16 @@ import { refLabelOf, refQueryParam } from '../../db/ref';
 import { BackfillCapabilityOrderAction } from '../capabilityMap/BackfillCapabilityOrderAction';
 import { CapabilityMapAddForm } from '../capabilityMap/CapabilityMapAddForm';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
+import { CapabilityMapInspectorContent } from '../capabilityMap/CapabilityMapInspectorContent';
+import { capabilityMapLevelOf } from '../capabilityMap/capabilityMapInspectorSelection';
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
 import { ExportCapabilityMapAction } from '../capabilityMap/ExportCapabilityMapAction';
 import { tileCapabilityIds } from '../capabilityMap/layout';
 import { useBackfillCapabilityOrder } from '../capabilityMap/useBackfillCapabilityOrder';
 import { useCapabilityMap } from '../capabilityMap/useCapabilityMap';
 import { useColourByPreference } from '../capabilityMap/useColourByPreference';
+import { Inspector } from '../components/Inspector/Inspector';
+import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
 import { useHomeMode } from '../home/useHomeMode';
 import styles from './CapabilityMapPage.module.css';
 
@@ -171,6 +175,15 @@ export function CapabilityMapPage() {
       ? (state.data.tree.l1.flatMap((column) => column.l2.flatMap((card) => [card.capability, ...card.l3])).find((c) => c.element_id === commentsPanelCapabilityId)?.name ?? '')
       : '';
 
+  // V2b: the shared Inspector's own "which tile is inspected" state — same
+  // single-open-id shape `commentsPanelCapabilityId` above already uses,
+  // opened via `CapabilityMapView`'s own new `onInspectClick` (the small
+  // corner button `CapabilityTile.tsx` now renders, since this view has no
+  // click-to-focus concept of its own to repurpose — every tile's primary
+  // link still navigates, unchanged).
+  const [selectedCapabilityId, setSelectedCapabilityId] = useState<UUID | null>(null);
+  const { collapsed: inspectorCollapsed, setCollapsed: setInspectorCollapsed } = useInspectorCollapsedPreference(userId);
+
   if (orgLoading || modelsLoading || !model) {
     return (
       <div>
@@ -191,6 +204,12 @@ export function CapabilityMapPage() {
   // state keeps the ordinary centred column, since there's no map yet to
   // give the width to.
   const hasContent = state.status === 'ready' && (state.data.tree.l1.length > 0 || state.data.tree.orphans.length > 0);
+  // V2b Inspector: the selected tile's own row and level — looked up fresh
+  // from this render's own `state.data` rather than cached alongside the
+  // id, so a reload (an import, an add, a reorder) that changes the tree
+  // never leaves the Inspector pointing at a stale row.
+  const selectedCapability = state.status === 'ready' && selectedCapabilityId ? (state.data.capabilities.find((c) => c.element_id === selectedCapabilityId) ?? null) : null;
+  const selectedLevel = state.status === 'ready' && selectedCapabilityId ? capabilityMapLevelOf(selectedCapabilityId, state.data.tree) : null;
 
   return (
     <div>
@@ -260,30 +279,61 @@ export function CapabilityMapPage() {
         {state.status === 'ready' && state.data.tree.l1.length === 0 && state.data.tree.orphans.length === 0 && canEdit && (
           <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reloadAll} />
         )}
-        {state.status === 'ready' && (
-          <CapabilityMapView
-            tree={state.data.tree}
-            supportsEdges={state.data.supportsEdges}
-            systemsById={state.data.systemsById}
-            hasSystems={state.data.hasSystems}
-            capabilities={state.data.capabilities}
-            selfOwnedIds={state.data.selfOwnedIds}
-            colourBy={colourBy}
-            onColourByChange={setColourBy}
-            orgSlug={organisation?.slug ?? ''}
-            modelSlug={model.slug}
-            refParam={refParam}
-            reorderCapability={
-              canEdit && mainBranch ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: mainBranch, expectedHeadCommitId: state.data.commitId, onReordered: reloadAll } : undefined
-            }
-            reorderMode={reorderMode}
-            onReorderModeChange={setReorderMode}
-            expanded={expanded}
-            onToggleExpand={toggleExpanded}
-            threadCounts={threadCounts}
-            onCommentMarkerClick={setCommentsPanelCapabilityId}
-          />
-        )}
+        {state.status === 'ready' && (() => {
+          const reorderCapability = canEdit && mainBranch ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: mainBranch, expectedHeadCommitId: state.data.commitId, onReordered: reloadAll } : undefined;
+          return (
+            <div className={hasContent ? styles.mapRow : undefined}>
+              <CapabilityMapView
+                tree={state.data.tree}
+                supportsEdges={state.data.supportsEdges}
+                systemsById={state.data.systemsById}
+                capabilities={state.data.capabilities}
+                selfOwnedIds={state.data.selfOwnedIds}
+                colourBy={colourBy}
+                orgSlug={organisation?.slug ?? ''}
+                modelSlug={model.slug}
+                refParam={refParam}
+                reorderCapability={reorderCapability}
+                reorderMode={reorderMode}
+                expanded={expanded}
+                onToggleExpand={toggleExpanded}
+                threadCounts={threadCounts}
+                onCommentMarkerClick={setCommentsPanelCapabilityId}
+                onInspectClick={setSelectedCapabilityId}
+              />
+              {/* V2b: net-new on this view (no prior focus/filter panel to replace) — gated on `hasContent` the same way colour-by's own control used to be (`capability-map-actions.engine.spec.ts`'s own "no view content for it to control yet"), since an empty map has nothing to inspect or filter either. */}
+              {hasContent && (
+                <Inspector
+                  collapsed={inspectorCollapsed}
+                  onToggleCollapsed={() => {
+                    setInspectorCollapsed(!inspectorCollapsed);
+                  }}
+                  hasSelection={selectedCapabilityId !== null}
+                >
+                  <CapabilityMapInspectorContent
+                    selectedCapability={selectedCapability}
+                    selectedLevel={selectedLevel}
+                    supportsEdges={state.data.supportsEdges}
+                    systemsById={state.data.systemsById}
+                    ownsEdges={state.data.ownsEdges}
+                    actorsById={state.data.actorsById}
+                    selfOwnedIds={state.data.selfOwnedIds}
+                    elementHref={(elementId) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${elementId}?${refParam}`}
+                    orgSlug={organisation?.slug ?? ''}
+                    modelSlug={model.slug}
+                    refParam={refParam}
+                    colourBy={colourBy}
+                    onColourByChange={setColourBy}
+                    hasSystems={state.data.hasSystems}
+                    reorderMode={reorderMode}
+                    onReorderModeChange={setReorderMode}
+                    canReorder={reorderCapability !== undefined}
+                  />
+                </Inspector>
+              )}
+            </div>
+          );
+        })()}
         {commentsPanelCapabilityId && (
           <CommentsPanel
             orgId={organisation?.id ?? ''}

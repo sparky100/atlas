@@ -142,3 +142,26 @@ export async function listSupportsEdgesForSystems(supabase: Client, commitId: UU
   const rows = await selectAll<RelationshipsHeadRow>(query);
   return rows.filter((r) => ids.has(r.from_element_id));
 }
+
+/**
+ * V2b's Inspector panel, Selection section: "owners by role" for a
+ * focused system — `owns` edges pointing *at* a system, the mirror shape
+ * of `listSupportsEdgesForSystems` above (which filters on `from_element_id`
+ * since a system is the *source* of its own `supports` edge; here the
+ * system is the *target*). Same "fetch the commit's own edges of this
+ * type, narrow to the id set in memory" shape as every other query in
+ * this file (CLAUDE.md rule 8) — `systemIds` can grow with the model, so
+ * this never becomes an `.in()` filter.
+ */
+export async function listOwnsEdgesForSystems(supabase: Client, commitId: UUID, systemIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
+  if (systemIds.length === 0) return [];
+  const ids = new Set(systemIds);
+  const query = supabase
+    .from('relationships_head')
+    .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
+    .eq('commit_id', commitId)
+    .eq('relationship_type', 'owns')
+    .order('relationship_id');
+  const rows = await selectAll<RelationshipsHeadRow>(query);
+  return rows.filter((r) => ids.has(r.to_element_id));
+}

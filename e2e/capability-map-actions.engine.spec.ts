@@ -3,9 +3,17 @@
  * colour-by stays left as a view control." "+ Add capability" is now
  * CapabilityMapPage.tsx's own header action (visible whenever the viewer
  * can edit, even on a completely empty map, since CapabilityMapView.tsx
- * no longer renders a fallback add form of its own); "Colour by" stays
- * inside CapabilityMapView's own toolbar, which only exists alongside a
- * real, non-empty map.
+ * no longer renders a fallback add form of its own).
+ *
+ * V2b: "Colour by" moved out of CapabilityMapView's own toolbar (gone
+ * entirely now) into the shared Inspector's Filters section
+ * (CapabilityMapPage.tsx), which only renders alongside real, non-empty
+ * map content (`hasContent`, the same condition the toolbar's own
+ * existence used to key off) — so this spec's own assertion still holds
+ * unchanged: absent on an empty map, visible once the map has content.
+ * The Inspector is open by default with nothing selected (no saved
+ * `inspector_collapsed` preference in a fresh session), so no extra click
+ * is needed to reach it.
  *
  * Same "needs a real Supabase" limitation as e2e/capability-map.spec.ts.
  */
@@ -62,9 +70,10 @@ test('capability map actions: "+ Add capability" is a page action, available eve
   await page.getByPlaceholder('Capability name').fill('Finance');
   await page.getByRole('button', { name: 'Add' }).click();
 
-  // Once the map has real content, the view's own toolbar (and its
-  // colour-by control) appears alongside it — a view control, not a page
-  // action, so it only exists together with the view it controls.
+  // Once the map has real content, the Inspector (and its Filters
+  // section's colour-by control) appears alongside it — a view control,
+  // not a page action, so it only exists together with the view it
+  // controls.
   await expect(page.getByText('Finance')).toBeVisible();
   await expect(page.getByLabel('Colour by')).toBeVisible();
 

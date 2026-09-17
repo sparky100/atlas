@@ -1,0 +1,69 @@
+.selection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.selectionName {
+  font-weight: 600;
+}
+
+.attributeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.subsection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: var(--border-width) solid var(--border);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.select {
+  height: var(--row-height);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.reorderModeToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* §2.0's curated icon set reserves `SlidersHorizontal` for the Filters section's own title — a plain inline flex so the icon sits baseline-aligned with the text next to it. */
+.filtersTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}

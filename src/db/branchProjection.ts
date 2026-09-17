@@ -156,6 +156,12 @@ export function projectionSupportsEdgesForSystems(projection: HeadProjection, sy
   return projection.relationshipsHead.filter((r) => r.relationship_type === 'supports' && ids.has(r.from_element_id));
 }
 
+/** Mirrors src/db/landscape.ts's `listOwnsEdgesForSystems`. */
+export function projectionOwnsEdgesForSystems(projection: HeadProjection, systemIds: readonly UUID[]): RelationshipsHeadRow[] {
+  const ids = new Set(systemIds);
+  return projection.relationshipsHead.filter((r) => r.relationship_type === 'owns' && ids.has(r.to_element_id));
+}
+
 /** Mirrors src/db/structureView.ts's `listRelationshipsTouchingAny` — either endpoint in `subjectIds`. */
 export function projectionRelationshipsTouchingAny(projection: HeadProjection, subjectIds: readonly UUID[], relationshipTypes: readonly RelationshipType[]): RelationshipsHeadRow[] {
   const ids = new Set(subjectIds);

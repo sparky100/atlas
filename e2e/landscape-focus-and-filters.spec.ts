@@ -3,11 +3,16 @@
  * the plan — focus mode (click-to-focus/click-again-to-navigate/re-focus/
  * clear), filtering to one capability, and the three lane collapse/pin
  * scenarios from decision 1 (UI-principles.md §10), each proven to persist
- * across a reload. `e2e/integration-platforms.spec.ts`'s own "Route via
- * platforms" checkbox locator needs no change here — the relocated focus
- * panel is a plain, always-rendered sibling of the canvas (never behind its
- * own disclosure), so that spec's existing `getByRole('checkbox', { name:
- * 'Route via platforms' })` still resolves exactly as it did before.
+ * across a reload.
+ *
+ * V2b: the focus panel and the top filter strip are both gone now — folded
+ * into the shared Inspector (`src/ui/components/Inspector`), open by
+ * default with nothing focused yet (a fresh session has no saved
+ * `inspector_collapsed` preference), so `e2e/integration-platforms.spec.ts`'s
+ * own "Route via platforms" checkbox locator (now inside the Inspector's
+ * Connections section, itself open by default) and this spec's own
+ * `Capability` facet locator still resolve without any extra click to open
+ * anything first.
  *
  * Same "Canvas 2D, not DOM" technique every other landscape e2e spec here
  * uses: `computeLandscapeLayout` (the real, deterministic layout function
@@ -89,7 +94,11 @@ test('landscape focus: click focuses (neighbours full opacity via data attribute
   await canvas.click({ position: coreBillingScreen });
   await expect(wrapper).toHaveAttribute('data-focused-element-id', coreBillingId);
   await expect(wrapper).toHaveAttribute('data-focus-neighbour-ids', paymentGatewayId);
-  await expect(page.getByText(`Focused: Core Billing · 1 neighbour`, { exact: false })).toBeVisible();
+  // V2b: the Inspector's own Selection/Connections sections replace the old
+  // focus panel's "Focused: {name} · {N} neighbours" summary line.
+  const inspector = page.getByRole('complementary', { name: 'Inspector' });
+  await expect(inspector.getByText('Core Billing', { exact: true })).toBeVisible();
+  await expect(inspector.getByRole('link', { name: 'Payment Gateway' })).toBeVisible();
 
   // 2. Clicking the *same*, already-focused tile again navigates — today's
   // exact pre-V2 behaviour, unchanged in that one case (decision 2).

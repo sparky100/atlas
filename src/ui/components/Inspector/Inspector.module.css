@@ -1,0 +1,61 @@
+/* Fixed width — resizable is explicitly deferred (Inspector.tsx's own
+   module comment). Matches the old LandscapeFocusPanel's own bordered-
+   surface treatment (border/radius/background), widened from its
+   220px min-width to fit a Selection section's own attribute rows and
+   the Filters facets it now also hosts. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 300px;
+  flex-shrink: 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Collapsed: a slim strip with one toggle — "collapsed to an icon strip
+   when nothing is focused" (the prompt's own words). Same border/surface
+   treatment as `.panel` so it still reads as the same panel, just closed. */
+.strip {
+  display: flex;
+  flex-shrink: 0;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.toggleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.toggleButton:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}

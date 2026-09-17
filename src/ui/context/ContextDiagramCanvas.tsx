@@ -24,10 +24,24 @@ import styles from './ContextDiagramCanvas.module.css';
 export interface ContextDiagramCanvasProps {
   group: ContextGroup;
   layoutWidthHint?: number;
-  /** Tapping a system or container neighbour re-centres the diagram — V1's own wording, V3 extended to containers now that a container has a Context view of its own too. */
+  /** Tapping an already-focused system or container neighbour re-centres the diagram — V1's own wording, V3 extended to containers now that a container has a Context view of its own too. */
   neighbourContextHref: (elementId: UUID) => string;
-  /** Every other click target (the hub tile itself, or an actor neighbour) — an element page, the same "next best thing" `LandscapeCanvas.tsx`'s own `actorHref` already is for a node with no Context view of its own. */
+  /** Every other click target once already focused (an actor neighbour) — an element page, the same "next best thing" `LandscapeCanvas.tsx`'s own `actorHref` already is for a node with no Context view of its own. The hub tile itself always uses this too — see `handlePointerUp`'s own comment for why the hub never goes through the focus step at all. */
   elementHref: (elementId: UUID) => string;
+  /**
+   * V2b: click-to-focus, the same two-step model `LandscapeCanvas.tsx`
+   * already uses — a first click on a neighbour tile opens the shared
+   * Inspector scoped to it (no navigation); a second click on the
+   * already-focused tile navigates (`neighbourContextHref`/`elementHref`
+   * above, unchanged). Never the hub tile itself: it already has a
+   * permanent header describing it (`ContextView.tsx`'s own "Supports"/
+   * "Owned by" lines), so focusing it in the Inspector too would just
+   * duplicate that — the hub tile keeps navigating on a single click, same
+   * as before this rollout.
+   */
+  focusedElementId: UUID | null;
+  onFocusElement: (elementId: UUID) => void;
+  onClearFocus: () => void;
 }
 
 interface Transform {
@@ -171,7 +185,7 @@ function computeFitTransform(worldWidth: number, worldHeight: number, displayWid
  * module?" marker and per-module tooltip this file used to carry are gone
  * along with `contextDiagramLayout.ts`'s own support for them.
  */
-export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextHref, elementHref }: ContextDiagramCanvasProps) {
+export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextHref, elementHref, focusedElementId, onFocusElement, onClearFocus }: ContextDiagramCanvasProps) {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -321,14 +335,19 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
         if (!element) return;
         const external = attributesRecord(element.attributes).isExternal === true;
         const isHovered = hover?.label === element.name;
+        // V2b: the focused neighbour reads the same as the hub itself
+        // (thicker, full-strength border) — a real, visible "this is what
+        // the Inspector is showing" cue, never colour-only (§6.3/§8.4/§8.7)
+        // since the Inspector's own Selection heading names it too.
+        const isFocused = tile.elementId === focusedElementId;
 
         ctx.save();
         roundRectPath(ctx, tile.x, tile.y, tile.w, tile.h, 8);
         const tone = toneColour(element, tokens);
         ctx.fillStyle = tone ? `color-mix(in srgb, ${tone} 16%, ${tokens.surfaceRaised})` : tokens.surfaceRaised;
         ctx.fill();
-        ctx.strokeStyle = isHub ? tokens.text : isHovered ? tokens.borderStrong : tokens.border;
-        ctx.lineWidth = isHub ? 2 : 1;
+        ctx.strokeStyle = isHub || isFocused ? tokens.text : isHovered ? tokens.borderStrong : tokens.border;
+        ctx.lineWidth = isHub || isFocused ? 2 : 1;
         if (external) ctx.setLineDash([4, 3]);
         ctx.stroke();
         ctx.setLineDash([]);
@@ -405,7 +424,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
     return () => {
       observer.disconnect();
     };
-  }, [layout, elementsById, transform, hover, hoveredEdgeId, labelMode, labelsWouldCollide, zoomShowsText]);
+  }, [layout, elementsById, transform, hover, hoveredEdgeId, labelMode, labelsWouldCollide, zoomShowsText, focusedElementId]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -457,10 +476,22 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
       setHoveredEdgeId(next);
       const label = next ? labelById.get(next) : undefined;
       setHover(next && label && !edgeLabelsVisible ? { label, screenX, screenY } : null);
+      // V2b: a background tap (not on a tile, not on an edge) clears the
+      // current focus — same "empty canvas clears focus" convention
+      // `LandscapeCanvas.tsx` already uses.
+      if (!next && focusedElementId !== null) onClearFocus();
       return;
     }
     if (tile.elementId === group.hub.element_id) {
       void navigate(elementHref(tile.elementId));
+      return;
+    }
+    // V2b: click-to-focus — the first tap on a neighbour opens the
+    // Inspector without navigating; tapping the *already*-focused tile
+    // again navigates, exactly `ContextDiagramCanvasProps`' own
+    // `focusedElementId` doc comment.
+    if (tile.elementId !== focusedElementId) {
+      onFocusElement(tile.elementId);
       return;
     }
     const element = elementsById.get(tile.elementId);
@@ -493,10 +524,20 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
     else if (e.key === '-') zoomBy(1 / 1.2);
     else if (e.key === '0') fitToView();
     else if (e.key === 'l') setLabelMode(edgeLabelsVisible ? 'hide' : 'show');
+    else if (e.key === 'Escape' && focusedElementId !== null) onClearFocus();
   }
 
   return (
-    <div ref={wrapperRef} className={styles.wrapper} data-scale={transform.scale} data-tx={transform.tx} data-ty={transform.ty} data-edge-labels={edgeLabelsVisible ? 'visible' : 'hidden'} data-edge-labels-collide={labelsWouldCollide ? 'true' : 'false'}>
+    <div
+      ref={wrapperRef}
+      className={styles.wrapper}
+      data-scale={transform.scale}
+      data-tx={transform.tx}
+      data-ty={transform.ty}
+      data-edge-labels={edgeLabelsVisible ? 'visible' : 'hidden'}
+      data-edge-labels-collide={labelsWouldCollide ? 'true' : 'false'}
+      data-focused-element-id={focusedElementId ?? ''}
+    >
       <canvas
         ref={canvasRef}
         className={styles.canvas}

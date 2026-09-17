@@ -36,6 +36,10 @@ export interface ContextViewProps {
   refParam: string;
   /** UI-principles §6.2/§6.3 — present only when a branch's Diff mode is active. Kept for the hub's own header badge only — V1's new canvas/mobile-list body has no diff treatment of its own (see this component's own module comment for why). */
   diff?: VersionDiff | null;
+  /** V2b's click-to-focus, forwarded to `ContextDiagramCanvas` only — the mobile list has no Inspector of its own (`ContextPage.tsx`'s own comment: its rows already show everything Selection/Connections would). */
+  focusedElementId: UUID | null;
+  onFocusElement: (elementId: UUID) => void;
+  onClearFocus: () => void;
 }
 
 const MOBILE_BREAKPOINT_PX = 768;
@@ -70,7 +74,7 @@ const MOBILE_BREAKPOINT_PX = 768;
  * unlike the landscape, and this view's own diff support stays scoped to
  * the hub's header badge, unchanged from before this sprint.
  */
-export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }: ContextViewProps) {
+export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null, focusedElementId, onFocusElement, onClearFocus }: ContextViewProps) {
   const narrow = useIsNarrowViewport(MOBILE_BREAKPOINT_PX);
   const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?${refParam}`;
   const neighbourContextHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/context/${elementId}?${refParam}`;
@@ -217,7 +221,14 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }
           {narrow ? (
             <ContextMobileList group={group} elementHref={elementHref} neighbourContextHref={neighbourContextHref} />
           ) : (
-            <ContextDiagramCanvas group={group} elementHref={elementHref} neighbourContextHref={neighbourContextHref} />
+            <ContextDiagramCanvas
+              group={group}
+              elementHref={elementHref}
+              neighbourContextHref={neighbourContextHref}
+              focusedElementId={focusedElementId}
+              onFocusElement={onFocusElement}
+              onClearFocus={onClearFocus}
+            />
           )}
         </div>
       )}

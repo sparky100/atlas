@@ -1,6 +1,7 @@
-import { useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
+import type { ElementsHeadRow } from '../../contracts/rows';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
 import { Chip } from '../components/Chip/Chip';
@@ -28,9 +29,12 @@ import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { CapabilityLandscapeList } from '../landscape/CapabilityLandscapeList';
+import { Inspector } from '../components/Inspector/Inspector';
+import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
-import { LandscapeFilterBar } from '../landscape/LandscapeFilterBar';
-import { LandscapeFocusPanel } from '../landscape/LandscapeFocusPanel';
+import { LandscapeInspectorContent } from '../landscape/LandscapeInspectorContent';
+import { landscapeInspectorNeighbours, landscapeInspectorSupports } from '../landscape/landscapeInspectorSelection';
+import { ownersByRole } from '../elements/ownersByRole';
 import { parseLandscapeFilters, landscapeFiltersToSearchParams } from '../landscape/landscapeFilterParams';
 import { LANDSCAPE_COLOUR_BY_OPTIONS } from '../landscape/landscapeColour';
 import { LandscapeMobileList } from '../landscape/LandscapeMobileList';
@@ -214,29 +218,53 @@ export function LandscapePage() {
     for (const capability of state.data.l1AncestorByCapabilityId.values()) byId.set(capability.element_id, capability.name);
     return [...byId.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
   }, [state]);
-  // The active-focus summary (`LandscapeFocusPanel`'s own "Focused: {name}
-  // · {N} neighbours") — the same one-hop neighbour computation
-  // `LandscapeCanvas.tsx`'s own `focusNeighbourIds` does internally,
-  // duplicated here at page level rather than lifted into a shared prop:
-  // this is the only other place that needs it, and it's cheap (a handful
-  // of Set operations over already-loaded edges).
-  const focusedElementName =
-    focusedElementId && state.status === 'ready' ? (state.data.systemsById.get(focusedElementId)?.name ?? state.data.actorsById.get(focusedElementId)?.name ?? null) : null;
-  const focusNeighbourCount =
-    focusedElementId && state.status === 'ready'
-      ? new Set(state.data.edges.flatMap((e) => (e.from_element_id === focusedElementId ? [e.to_element_id] : e.to_element_id === focusedElementId ? [e.from_element_id] : []))).size
-      : 0;
-  // §8.8's canvas `f` shortcut — its first real binding (V2): open every
-  // facet's `<details>` in the filter bar and move focus to the first one.
-  const filterBarRef = useRef<HTMLDivElement>(null);
+  // V2b: the shared Inspector's own collapsed/expanded resting state — see
+  // `useInspectorCollapsedPreference.ts`'s own module comment. A current
+  // selection always forces it open regardless of this value
+  // (`Inspector.tsx`'s own `open` derivation), so this only governs the
+  // resting state with nothing focused.
+  const { collapsed: inspectorCollapsed, setCollapsed: setInspectorCollapsed } = useInspectorCollapsedPreference(userId);
+  const focusedElement = focusedElementId && state.status === 'ready' ? (state.data.systemsById.get(focusedElementId) ?? state.data.actorsById.get(focusedElementId) ?? null) : null;
+  // Every system/actor/module node this landscape can draw, by id — the
+  // Inspector's Connections section needs to resolve a neighbour's name
+  // regardless of which of the three it is. Memoised on `state` (a new
+  // object only on an actual reload) rather than rebuilt on every render
+  // while a selection is active.
+  const allNodesById = useMemo(() => (state.status === 'ready' ? new Map([...state.data.systemsById, ...state.data.actorsById]) : new Map<UUID, ElementsHeadRow>()), [state]);
+  const inspectorNeighbours = useMemo(
+    () => (focusedElement && state.status === 'ready' ? landscapeInspectorNeighbours(focusedElement.element_id, state.data.edges, allNodesById) : []),
+    [focusedElement, state, allNodesById],
+  );
+  const inspectorOwnersByRole = useMemo(
+    () => (focusedElement && state.status === 'ready' ? ownersByRole(focusedElement.element_id, state.data.ownsEdges, state.data.actorsById) : new Map<string, ElementsHeadRow[]>()),
+    [focusedElement, state],
+  );
+  const inspectorSupports = useMemo(
+    () => (focusedElement && state.status === 'ready' ? landscapeInspectorSupports(focusedElement.element_id, state.data.supportsEdges, state.data.l1AncestorByCapabilityId) : []),
+    [focusedElement, state],
+  );
+
+  // §8.8's canvas `f` shortcut — its first real binding (V2), now the
+  // Inspector's own Filters section (item 2: the top filter strip is gone):
+  // force the panel open (a collapsed strip has nothing to focus into),
+  // then — once that's committed and the section's own DOM exists — open
+  // every facet's `<details>` and move focus to the first one.
+  const filtersSectionRef = useRef<HTMLDivElement>(null);
+  const [pendingOpenFilterBar, setPendingOpenFilterBar] = useState(false);
   const openFilterBar = () => {
-    const container = filterBarRef.current;
+    setInspectorCollapsed(false);
+    setPendingOpenFilterBar(true);
+  };
+  useEffect(() => {
+    if (!pendingOpenFilterBar) return;
+    const container = filtersSectionRef.current;
     if (!container) return;
     container.querySelectorAll('details').forEach((details) => {
       details.open = true;
     });
     container.querySelector('summary')?.focus();
-  };
+    setPendingOpenFilterBar(false);
+  }, [pendingOpenFilterBar, inspectorCollapsed]);
 
   // Sprint U4-1 E1: see this component's own module comment.
   const narrow = useIsNarrowViewport(768);
@@ -518,19 +546,6 @@ export function LandscapePage() {
           )}
         </div>
 
-        {/* V2 "landscape focus and filters": desktop canvas only, same gate as colour-by/comments-only/route-via-platforms above (this plan's own PR3 grouping note: "gated on `showCanvas` like every other canvas-only control"). Wrapped in a plain ref'd div so the canvas's own `f` shortcut (§8.8) can open every facet's `<details>` and move focus there — the filter bar has no imperative API of its own, and doesn't need one just for this. */}
-        {state.status === 'ready' && showCanvas && (
-          <div ref={filterBarRef}>
-            <LandscapeFilterBar
-              filters={filters}
-              capabilityOptions={capabilityOptions}
-              onChange={(next) => {
-                setSearchParams((prev) => landscapeFiltersToSearchParams(next, prev));
-              }}
-            />
-          </div>
-        )}
-
         {ref.kind === 'branch' && (
           <BranchViewModeControl
             mode={mode}
@@ -688,22 +703,40 @@ export function LandscapePage() {
                     setAutoFocusComposer(true);
                   }}
                 />
-                <LandscapeFocusPanel
-                  routeViaPlatforms={routeViaPlatforms}
-                  onRouteViaPlatformsChange={setRouteViaPlatforms}
-                  showConnections={showConnections}
-                  onShowConnectionsChange={setShowConnections}
-                  lanes={displayState.display.layout.lanes}
-                  pinnedLaneKeys={pinnedLaneKeys}
-                  onSetLaneCollapsed={setLaneCollapsed}
-                  onSetLanePinned={setLanePinned}
-                  onReorderPinnedLane={reorderPinnedLane}
-                  focusedElementName={focusedElementName}
-                  focusNeighbourCount={focusNeighbourCount}
-                  onClearFocus={() => {
-                    setFocusedElementId(null);
+                <Inspector
+                  collapsed={inspectorCollapsed}
+                  onToggleCollapsed={() => {
+                    setInspectorCollapsed(!inspectorCollapsed);
                   }}
-                />
+                  hasSelection={focusedElementId !== null}
+                >
+                  <LandscapeInspectorContent
+                    focusedElement={focusedElement}
+                    neighbours={inspectorNeighbours}
+                    ownersByRole={inspectorOwnersByRole}
+                    supports={inspectorSupports}
+                    elementHref={elementHref}
+                    contextHref={focusedElement && focusedElement.element_type !== 'actor' ? nodeHref : undefined}
+                    onClearFocus={() => {
+                      setFocusedElementId(null);
+                    }}
+                    routeViaPlatforms={routeViaPlatforms}
+                    onRouteViaPlatformsChange={setRouteViaPlatforms}
+                    showConnections={showConnections}
+                    onShowConnectionsChange={setShowConnections}
+                    lanes={displayState.display.layout.lanes}
+                    pinnedLaneKeys={pinnedLaneKeys}
+                    onSetLaneCollapsed={setLaneCollapsed}
+                    onSetLanePinned={setLanePinned}
+                    onReorderPinnedLane={reorderPinnedLane}
+                    filters={filters}
+                    onFiltersChange={(next) => {
+                      setSearchParams((prev) => landscapeFiltersToSearchParams(next, prev));
+                    }}
+                    capabilityOptions={capabilityOptions}
+                    filtersSectionRef={filtersSectionRef}
+                  />
+                </Inspector>
                 {commentsPanelElementId && (
                   <CommentsPanel
                     orgId={organisation?.id ?? ''}

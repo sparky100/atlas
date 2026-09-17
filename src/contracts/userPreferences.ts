@@ -116,6 +116,15 @@ export interface UserPreferences {
    * first added, hence the separate migration).
    */
   notifyOnReviewAssigned: boolean;
+  /**
+   * V2b: the shared Inspector panel's (`src/ui/components/Inspector`)
+   * resting collapse state — see the migration's own column comment
+   * (`20260917040000_inspector_collapsed_preference.sql`) for why this is
+   * a plain `not null default false` rather than nullable like the
+   * colour-by fields: there's no model-aware default to compute, "open"
+   * is simply the sensible starting point for everyone.
+   */
+  inspectorCollapsed: boolean;
   /** ISO 8601 timestamp; DB-assigned, never client-chosen. */
   updatedAt: string;
 }
@@ -134,6 +143,7 @@ export interface UserPreferencesRow {
   notify_on_mention: boolean;
   notify_on_reply: boolean;
   notify_on_review_assigned: boolean;
+  inspector_collapsed: boolean;
   updated_at: string;
 }
 
@@ -151,6 +161,7 @@ export function toUserPreferencesRow(prefs: UserPreferences): UserPreferencesRow
     notify_on_mention: prefs.notifyOnMention,
     notify_on_reply: prefs.notifyOnReply,
     notify_on_review_assigned: prefs.notifyOnReviewAssigned,
+    inspector_collapsed: prefs.inspectorCollapsed,
     updated_at: prefs.updatedAt,
   };
 }
@@ -169,6 +180,7 @@ export function fromUserPreferencesRow(row: UserPreferencesRow): UserPreferences
     notifyOnMention: row.notify_on_mention,
     notifyOnReply: row.notify_on_reply,
     notifyOnReviewAssigned: row.notify_on_review_assigned,
+    inspectorCollapsed: row.inspector_collapsed,
     updatedAt: row.updated_at,
   };
 }
@@ -197,6 +209,7 @@ export function defaultUserPreferences(userId: UUID, isOwnerOrArchitect: boolean
     notifyOnMention: true,
     notifyOnReply: true,
     notifyOnReviewAssigned: true,
+    inspectorCollapsed: false,
     updatedAt: new Date(0).toISOString(),
   };
 }

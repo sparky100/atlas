@@ -33,6 +33,22 @@
   margin-bottom: var(--space-4);
 }
 
+/* V2b: ContextPage.tsx's own diagram-plus-Inspector row, desktop only (the
+   mobile list has no Inspector — see ContextPage.tsx's own comment) — same
+   flex-row/first-child-grows shape LandscapePage.module.css's `.canvasRow`
+   and CapabilityMapPage.module.css's `.mapRow` already use for the
+   identical pairing. */
+.contextRow {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.contextRow > *:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
 /** ChangePage.tsx's own header: the title plus "Edit in this change" — every other consumer of `.header` above is a bare `<h1>` alone, so this is additive, not a change to their own layout. */
 .headerRow {
   margin-bottom: var(--space-4);

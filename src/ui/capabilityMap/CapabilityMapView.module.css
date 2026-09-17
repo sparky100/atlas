@@ -1,41 +1,4 @@
 /**
- * Pre-existing gap found while verifying check B6's own 390px Playwright
- * coverage (e2e/capability-map-mobile-accordion.spec.ts): no `flex-wrap`
- * here at all, predating and unrelated to B6 — "Colour by" + the select +
- * the "Link systems to capabilities to see coverage." hint (shown
- * whenever `colourBy === 'none' && !hasSystems`, CapabilityMapView.tsx's
- * own comment) + "Reorder mode" packed into one un-wrapping row overflowed
- * a 390px viewport regardless of B6's own accordion markup below it —
- * e2e/capability-map-layout.spec.ts (Sprint U4-1 C2, untouched by any of
- * B5/B6/this check) hits the exact same failure, confirming it. `flex-
- * wrap: wrap` lets these controls stack instead of forcing `.main` open.
- */
-.toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-}
-
-.select {
-  height: var(--row-height);
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-sm);
-  border: var(--border-width) solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-}
-
-/* Sprint U4-2a item 3's "Reorder mode" toggle — a plain labelled checkbox, same left-margin-via-gap spacing as every other .toolbar control, not a bespoke switch. */
-.reorderModeToggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-/**
  * Sprint U4-1 C2: a responsive grid of L1 groups, replacing the old
  * horizontally-scrolling row — the item's own text is "whole map visible
  * without horizontal scroll". Column count narrows with viewport width;
@@ -387,4 +350,28 @@
   gap: var(--space-2);
   flex-wrap: wrap;
   padding: var(--space-1) 0;
+}
+
+/* V2b: L1's own inline Inspector trigger — `CapabilityTile.module.css`'s
+   own `.inspectButton` is this same idea for a tile that already has a
+   frame to pin a corner button to; L1 has no frame (it isn't a
+   `CapabilityTile`), so this is a plain inline button instead, sized to
+   match the row of small icon-only controls it sits beside. */
+.inspectButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.inspectButton:hover {
+  background: var(--surface-raised);
+  color: var(--text);
 }

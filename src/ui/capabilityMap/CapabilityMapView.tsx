@@ -1,3 +1,4 @@
+import { Info } from 'lucide-react';
 import { useId, useState } from 'react';
 import { Link } from 'react-router';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
@@ -10,7 +11,7 @@ import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { computeCapabilityRollup } from './capabilityRollup';
-import { COLOUR_BY_OPTIONS, aggregateTileColourFor, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
+import { aggregateTileColourFor, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
 import type { CapabilityMapTree, L1Column, L2Card } from './layout';
 import { useCapabilityReorder } from './useCapabilityReorder';
 import styles from './CapabilityMapView.module.css';
@@ -42,15 +43,20 @@ export interface CapabilityMapViewProps {
   tree: CapabilityMapTree;
   supportsEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
-  /** Sprint U4-1 C4: the model-wide "does this model have any systems at all" answer — see `useCapabilityMap.ts`'s own `hasSystems` comment for why this isn't derived from `systemsById` above. Drives the "link systems to capabilities to see coverage" hint. */
-  hasSystems: boolean;
   /** Capability rollup: every capability at this ref, every level — the input `capabilityRollup.ts`'s subtree walk needs; `tree` is the same set already nested, kept flat here too since a tree shape isn't what that walk wants. */
   capabilities: ElementsHeadRow[];
   /** Capability rollup's owner-coverage input — `src/db/healthFindings.ts`'s `computeSelfOwnedCapabilityIds` result, computed once by the caller. */
   selfOwnedIds: ReadonlySet<UUID>;
-  /** Sprint U4-1 C4: resolved and persisted by the caller (`useColourByPreference`) — this component no longer owns colour-by as local state, so its default (director→exposure, architect→coverage, none-until-systems-exist) and "remember last choice per user" both live in one place. */
+  /**
+   * Sprint U4-1 C4: resolved and persisted by the caller
+   * (`useColourByPreference`) — this component only reads it to tint
+   * tiles now. V2b: the `<select>` control itself (and the "link systems"
+   * hint, `hasSystems`) moved into the shared Inspector's own Filters
+   * section (`CapabilityMapInspectorContent.tsx`, owned by
+   * `CapabilityMapPage.tsx`) — this component no longer renders a toolbar
+   * or takes an `onColourByChange`/`hasSystems` prop of its own.
+   */
   colourBy: ColourByMode;
-  onColourByChange: (mode: ColourByMode) => void;
   orgSlug: string;
   modelSlug: string;
   /**
@@ -85,10 +91,12 @@ export interface CapabilityMapViewProps {
    * local state here would silently reset to `false` after literally
    * every successful move, found live via this session's own e2e run
    * (the spec's second move failed because the toggle it had just turned
-   * on was already gone again).
+   * on was already gone again). V2b: the checkbox control itself moved
+   * into the Inspector's Filters section alongside colour-by's own
+   * `<select>` — this component only reads the resolved boolean now, no
+   * `onReorderModeChange` setter of its own.
    */
   reorderMode: boolean;
-  onReorderModeChange: (mode: boolean) => void;
   /**
    * S1 item 13: which L2 cards have their L3 children expanded — lifted
    * to the caller for the same reason `reorderMode` already is (this
@@ -104,6 +112,8 @@ export interface CapabilityMapViewProps {
   threadCounts?: ReadonlyMap<UUID, ThreadCount> | undefined;
   /** Opens the comments panel scoped to the clicked capability — omitted entirely (same convention as `reorderCapability`) wherever the caller hasn't wired a panel at all. */
   onCommentMarkerClick?: ((capabilityId: UUID) => void) | undefined;
+  /** V2b: opens the shared Inspector panel scoped to the clicked capability, at every level (L1 header, L2 card, L3 tile, desktop and mobile) — same omitted-entirely convention as `onCommentMarkerClick`. `CapabilityTile.tsx`'s own `onInspectClick` prop comment explains why this is a second small corner button rather than repurposing the tile's own primary link. */
+  onInspectClick?: ((capabilityId: UUID) => void) | undefined;
 }
 
 /**
@@ -178,9 +188,7 @@ export interface CapabilityMapViewProps {
  * already has. See `L1ColumnView`'s own comment for why this branches on
  * a JS `narrow` flag rather than a CSS media query.
  */
-export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, colourBy, onColourByChange, orgSlug, modelSlug, refParam, reorderCapability, reorderMode, onReorderModeChange, expanded, onToggleExpand, threadCounts, onCommentMarkerClick }: CapabilityMapViewProps) {
-  const colourById = useId();
-  const reorderModeId = useId();
+export function CapabilityMapView({ tree, supportsEdges, systemsById, capabilities, selfOwnedIds, colourBy, orgSlug, modelSlug, refParam, reorderCapability, reorderMode, expanded, onToggleExpand, threadCounts, onCommentMarkerClick, onInspectClick }: CapabilityMapViewProps) {
   // Check B6: "Mobile (<768px): L1 groups as a collapsed list [...] one
   // expanded at a time; L2 dense rows, no blueprint frame; L3 on tap" —
   // the same JS-driven breakpoint LandscapePage.tsx's own E1 disclosures
@@ -224,39 +232,6 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
 
   return (
     <div>
-      <div className={styles.toolbar}>
-        <label htmlFor={colourById}>
-          <Text as="span" size="sm" tone="muted">
-            Colour by
-          </Text>
-        </label>
-        <select id={colourById} className={styles.select} value={colourBy} onChange={(e) => { onColourByChange(e.target.value as ColourByMode); }}>
-          <option value="none">None</option>
-          {COLOUR_BY_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        {/* Sprint U4-1 C4: "'None' only while the model has no systems, with hint..." — shown for that specific state, not every time someone happens to have colour-by off (a user who manually picks None on a populated model doesn't need a nudge to link systems that are already linked). */}
-        {colourBy === 'none' && !hasSystems && (
-          <Text as="span" size="sm" tone="muted">
-            Link systems to capabilities to see coverage.
-          </Text>
-        )}
-        {/* Sprint U4-2a item 3 — omitted entirely (not shown disabled) when the caller has no edit rights, same convention as `reorderCapability` itself. */}
-        {reorderCapability && (
-          <span className={styles.reorderModeToggle}>
-            <input id={reorderModeId} type="checkbox" checked={reorderMode} onChange={(e) => { onReorderModeChange(e.target.checked); }} />
-            <label htmlFor={reorderModeId}>
-              <Text as="span" size="sm" tone="muted">
-                Reorder mode
-              </Text>
-            </label>
-          </span>
-        )}
-      </div>
-
       {tree.l1.length > 0 && (
         <div className={styles.columns} role="list" aria-label="Level 1 capabilities">
           {tree.l1.map((column, index) => (
@@ -283,6 +258,7 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
               onToggleL1={toggleExpandedL1}
               threadCounts={threadCounts}
               onCommentMarkerClick={onCommentMarkerClick}
+              onInspectClick={onInspectClick}
             />
           ))}
         </div>
@@ -317,7 +293,7 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
  * problem, the same "plain, not hidden" stance CLAUDE.md rule 7 takes
  * everywhere else a count can legitimately be zero.
  */
-function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, refParam }: { capabilityId: UUID; count: number; orgSlug: string; modelSlug: string; refParam: string }) {
+export function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, refParam }: { capabilityId: UUID; count: number; orgSlug: string; modelSlug: string; refParam: string }) {
   if (count === 0) {
     return (
       <Text as="span" tone="faint" size="sm">
@@ -332,6 +308,23 @@ function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, refParam }
         {count} system{count === 1 ? '' : 's'} →
       </Text>
     </Link>
+  );
+}
+
+/**
+ * V2b: the L1 header's own way into the shared Inspector — L1 doesn't use
+ * `CapabilityTile` (that component's own module comment: "an L1 column
+ * holds several independently-clickable L2 cards, not one clickable
+ * unit"), so it gets a plain inline button here instead of
+ * `CapabilityTile.tsx`'s own corner-positioned one, same icon
+ * (`UI-principles.md §2.0`'s curated set) and same non-navigating-click
+ * pattern.
+ */
+function InspectButton({ name, onClick }: { name: string; onClick: () => void }) {
+  return (
+    <button type="button" className={styles.inspectButton} aria-label={`Inspect ${name}`} title="Inspect" onClick={onClick}>
+      <Info size={14} aria-hidden="true" />
+    </button>
   );
 }
 
@@ -418,6 +411,7 @@ function L1ColumnView({
   onToggleL1,
   threadCounts,
   onCommentMarkerClick,
+  onInspectClick,
 }: {
   column: L1Column;
   colourBy: ColourByMode;
@@ -442,6 +436,7 @@ function L1ColumnView({
   onToggleL1: (id: UUID) => void;
   threadCounts: ReadonlyMap<UUID, ThreadCount> | undefined;
   onCommentMarkerClick: ((capabilityId: UUID) => void) | undefined;
+  onInspectClick: ((capabilityId: UUID) => void) | undefined;
 }) {
   const panelId = useId();
   // Capability rollup (Sprint U4-2, "capability rollup", decided): a level-1
@@ -474,6 +469,7 @@ function L1ColumnView({
         nextSibling={column.l2[index + 1]?.capability}
         siblings={column.l2.map((c) => c.capability)}
         reorderCapability={reorderCapability}
+        onInspectClick={onInspectClick}
       />
     ) : (
       <L2CardView
@@ -493,6 +489,7 @@ function L1ColumnView({
         reorderCapability={reorderCapability}
         threadCounts={threadCounts}
         onCommentMarkerClick={onCommentMarkerClick}
+        onInspectClick={onInspectClick}
       />
     ),
   );
@@ -543,6 +540,7 @@ function L1ColumnView({
                 </Text>
               </Link>
               <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+              {onInspectClick && <InspectButton name={column.capability.name} onClick={() => { onInspectClick(column.capability.element_id); }} />}
               {reorderCapability && (
                 <ReorderButtons
                   capability={column.capability}
@@ -603,6 +601,7 @@ function L1ColumnView({
             </Text>
           </Link>
           {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <Chip tone={aggregateColour.tone}>{aggregateColour.label}</Chip>}
+          {onInspectClick && <InspectButton name={column.capability.name} onClick={() => { onInspectClick(column.capability.element_id); }} />}
           {reorderCapability && (
             <ReorderButtons
               capability={column.capability}
@@ -653,6 +652,7 @@ function MobileL2Row({
   nextSibling,
   siblings,
   reorderCapability,
+  onInspectClick,
 }: {
   card: L2Card;
   colourBy: ColourByMode;
@@ -668,6 +668,7 @@ function MobileL2Row({
   /** S1 item 13: every L2 sibling under this L1, in display order — `ReorderButtons`' own `siblings` prop comment. */
   siblings: readonly ElementsHeadRow[];
   reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
+  onInspectClick: ((capabilityId: UUID) => void) | undefined;
 }) {
   const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById);
   const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
@@ -705,6 +706,7 @@ function MobileL2Row({
             {expanded ? '▾' : '▸'} {card.l3.length}
           </button>
         )}
+        {onInspectClick && <InspectButton name={card.capability.name} onClick={() => { onInspectClick(card.capability.element_id); }} />}
       </div>
       {expanded && card.l3.length > 0 && (
         <div className={styles.mobileL3List}>
@@ -734,6 +736,7 @@ function MobileL2Row({
                   />
                 )}
                 <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+                {onInspectClick && <InspectButton name={leaf.name} onClick={() => { onInspectClick(leaf.element_id); }} />}
               </div>
             );
           })}
@@ -759,6 +762,7 @@ function L2CardView({
   reorderCapability,
   threadCounts,
   onCommentMarkerClick,
+  onInspectClick,
 }: {
   card: L2Card;
   colourBy: ColourByMode;
@@ -776,6 +780,7 @@ function L2CardView({
   reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
   threadCounts: ReadonlyMap<UUID, ThreadCount> | undefined;
   onCommentMarkerClick: ((capabilityId: UUID) => void) | undefined;
+  onInspectClick: ((capabilityId: UUID) => void) | undefined;
 }) {
   const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById);
   const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
@@ -788,6 +793,7 @@ function L2CardView({
       toneLabel={colour.label}
       commentMarker={commentMarkerFor(threadCounts, card.capability.element_id)}
       onCommentMarkerClick={onCommentMarkerClick ? () => { onCommentMarkerClick(card.capability.element_id); } : undefined}
+      onInspectClick={onInspectClick ? () => { onInspectClick(card.capability.element_id); } : undefined}
       // Density pass: the count/zoom-link sits right after the chip — the
       // pairing the tile density spec actually asked for — with the
       // expand toggle next to it (also always-relevant browsing UI) and
@@ -832,6 +838,7 @@ function L2CardView({
                 size="compact"
                 commentMarker={commentMarkerFor(threadCounts, leaf.element_id)}
                 onCommentMarkerClick={onCommentMarkerClick ? () => { onCommentMarkerClick(leaf.element_id); } : undefined}
+                onInspectClick={onInspectClick ? () => { onInspectClick(leaf.element_id); } : undefined}
                 secondaryRow={
                   <>
                     <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />

@@ -151,3 +151,29 @@
   background: transparent;
   border: 1px solid var(--text-muted);
 }
+
+/* V2b: the Inspector's own per-tile trigger — top-right, the opposite
+   corner from `.commentMarker` so the two never collide; same
+   `position: absolute` + later-in-markup technique that lifts it above
+   `.primaryLink`'s own stretched-link overlay. */
+.inspectButton {
+  position: absolute;
+  right: var(--space-1);
+  top: var(--space-1);
+  width: 18px;
+  height: 16px;
+  padding: 0;
+  border-radius: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inspectButton:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}

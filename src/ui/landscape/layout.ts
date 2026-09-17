@@ -165,7 +165,7 @@ export interface LandscapeLane {
   region: LandscapeLaneRegion;
   y: number;
   height: number;
-  /** V2 "landscape focus and filters": this lane's own resolved collapse state (`isLaneCollapsed`'s own result, computed once here rather than re-derived by every consumer) — `LandscapeFocusPanel.tsx`'s per-lane list reads this directly instead of re-implementing the override/emptiness tie-break itself. */
+  /** V2 "landscape focus and filters": this lane's own resolved collapse state (`isLaneCollapsed`'s own result, computed once here rather than re-derived by every consumer) — `LandscapeInspectorContent.tsx`'s per-lane list (V2b: moved here from the old `LandscapeFocusPanel.tsx`) reads this directly instead of re-implementing the override/emptiness tie-break itself. */
   collapsed: boolean;
 }
 

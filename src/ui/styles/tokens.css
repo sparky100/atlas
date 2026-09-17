@@ -90,6 +90,15 @@
   --accent: #0b5fff;
   --accent-fg: #ffffff;
   --focus: #0b5fff;
+  /* Nav rail active-item fill (V2b, UI-principles §2.0) — the same
+     "tinted, not solid" derivation --status-weak-bg already uses off
+     --status-warn, just off --accent instead: low-opacity enough that
+     accent-coloured text (not --accent-fg's white-on-solid) still reads
+     clearly on top of it. Recomputes with --accent automatically in dark
+     mode and the data-theme override, same reasoning --diff-none/
+     --status-weak-bg's own comments give for deriving rather than
+     redeclaring per theme. */
+  --accent-surface: rgb(from var(--accent) r g b / 12%);
 
   /* ---- Colour: diff (Okabe-Ito derived, §6.3/§8.4) ---- */
   --diff-added: #0072b2;

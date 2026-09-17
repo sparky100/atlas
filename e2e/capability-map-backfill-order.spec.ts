@@ -120,7 +120,7 @@ test('Backfill capability order: an owner sees and can run it; an architect on t
   // move buttons work immediately, with no on-the-fly fallback needed any
   // more (a plain swap of two already-ordered siblings).
   // Close the overflow menu (its own toggle again) before it can overlap
-  // the "Reorder mode" toggle in CapabilityMapView's own toolbar below.
+  // the "Reorder mode" toggle, now in the Inspector's own Filters section.
   await ownerPage.getByRole('button', { name: 'Capability map actions' }).click();
   await ownerPage.getByLabel('Reorder mode').check();
   // Alphabetical tiebreak among the order-less pair (findOrderBackfillCandidates'

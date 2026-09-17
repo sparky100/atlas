@@ -7,11 +7,12 @@ import {
   projectionContainersForLandscape,
   projectionElementsByIds,
   projectionLandscapeEdges,
+  projectionOwnsEdgesForSystems,
   projectionSupportsEdgesForSystems,
   projectionSystemsForLandscape,
 } from '../../db/branchProjection';
 import { getElementsByIds } from '../../db/elements';
-import { listActorsForLandscape, listContainersForLandscape, listLandscapeEdges, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
+import { listActorsForLandscape, listContainersForLandscape, listLandscapeEdges, listOwnsEdgesForSystems, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import { getOrCreateModelView } from '../../db/views';
 import type { ViewMode } from '../../db/viewMode';
@@ -41,6 +42,8 @@ export interface LandscapeData {
    * stays exactly as it was, deliberately unaware any of that exists.
    */
   supportsEdges: RelationshipsHeadRow[];
+  /** V2b's Inspector panel, Selection section's own "owners by role" — `owns` edges targeting a system at this commit, same "raw input, fetched once here" shape as `supportsEdges` above. */
+  ownsEdges: RelationshipsHeadRow[];
   l1AncestorByCapabilityId: Map<UUID, ElementsHeadRow>;
   /** Populated only when `ref` is a branch and `mode === 'diff'` (UI-principles §6.2/§6.3) — `null` for `main`/`tag`, and for `asIs`/`toBe`, where there's nothing to highlight against. */
   diff: VersionDiff | null;
@@ -179,7 +182,9 @@ export function useLandscape(
       // Populated only for a branch ref, closed over below so every
       // downstream query (edges, supports, capability lookups) reads the
       // same folded state instead of re-resolving it per call.
-      let systemsSource: { edges: (systemIds: UUID[], actorIds: UUID[]) => RelationshipsHeadRow[]; supports: (systemIds: UUID[]) => RelationshipsHeadRow[]; byIds: (ids: UUID[]) => Map<UUID, ElementsHeadRow> } | undefined;
+      let systemsSource:
+        | { edges: (systemIds: UUID[], actorIds: UUID[]) => RelationshipsHeadRow[]; supports: (systemIds: UUID[]) => RelationshipsHeadRow[]; owns: (systemIds: UUID[]) => RelationshipsHeadRow[]; byIds: (ids: UUID[]) => Map<UUID, ElementsHeadRow> }
+        | undefined;
 
       if (ref.kind === 'branch') {
         const branch = await resolveBranchRef(supabase, ref);
@@ -201,6 +206,7 @@ export function useLandscape(
         systemsSource = {
           edges: (systemIds, actorIds) => projectionLandscapeEdges(resolved.projection, systemIds, actorIds),
           supports: (systemIds) => projectionSupportsEdgesForSystems(resolved.projection, systemIds),
+          owns: (systemIds) => projectionOwnsEdgesForSystems(resolved.projection, systemIds),
           byIds: (ids) => projectionElementsByIds(resolved.projection, ids),
         };
       } else if (ref.kind === 'main' && mainCommitIdHint) {
@@ -251,9 +257,13 @@ export function useLandscape(
       // actor's id in this fetch's own endpoint set too, or it's silently
       // dropped the way a systems-only fetch always used to.
       const actorIds = allActors.map((a) => a.element_id);
-      const [edges, supportsEdges] = systemsSource
-        ? [systemsSource.edges(systemIds, actorIds), systemsSource.supports(systemIds)]
-        : await Promise.all([listLandscapeEdges(supabase, commitId, systemIds, actorIds), listSupportsEdgesForSystems(supabase, commitId, systemIds)]);
+      const [edges, supportsEdges, ownsEdges] = systemsSource
+        ? [systemsSource.edges(systemIds, actorIds), systemsSource.supports(systemIds), systemsSource.owns(systemIds)]
+        : await Promise.all([
+            listLandscapeEdges(supabase, commitId, systemIds, actorIds),
+            listSupportsEdgesForSystems(supabase, commitId, systemIds),
+            listOwnsEdgesForSystems(supabase, commitId, systemIds),
+          ]);
       const byIds: (ids: readonly UUID[]) => Promise<Map<UUID, ElementsHeadRow>> = systemsSource ? (ids) => Promise.resolve(systemsSource.byIds([...ids])) : (ids) => getElementsByIds(supabase, commitId, ids);
       const l1AncestorByCapabilityId = await loadL1AncestorByCapabilityId(byIds, supportsEdges);
 
@@ -264,7 +274,7 @@ export function useLandscape(
 
       const systemsById = new Map(allSystems.map((s) => [s.element_id, s]));
       const actorsById = new Map(allActors.map((a) => [a.element_id, a]));
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, actorsById, edges, supportsEdges, l1AncestorByCapabilityId, diff } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, actorsById, edges, supportsEdges, ownsEdges, l1AncestorByCapabilityId, diff } });
     }
 
     load().catch((e: unknown) => {

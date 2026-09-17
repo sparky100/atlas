@@ -99,3 +99,22 @@ describe('notification preferences wire <-> row (Sprint F7 item 3)', () => {
     expect(fromUserPreferencesRow(row).notifyOnReviewAssigned).toBe(false);
   });
 });
+
+describe('inspectorCollapsed wire <-> row (V2b)', () => {
+  it('defaults to false — open is the sensible starting point for everyone', () => {
+    expect(defaultUserPreferences('u1', false).inspectorCollapsed).toBe(false);
+  });
+
+  it('carries true through toUserPreferencesRow/fromUserPreferencesRow unchanged', () => {
+    const prefs = { ...defaultUserPreferences('u1', true), inspectorCollapsed: true };
+    const row = toUserPreferencesRow(prefs);
+    expect(row.inspector_collapsed).toBe(true);
+    expect(fromUserPreferencesRow(row).inspectorCollapsed).toBe(true);
+  });
+
+  it('carries false through unchanged', () => {
+    const row = toUserPreferencesRow(defaultUserPreferences('u1', true));
+    expect(row.inspector_collapsed).toBe(false);
+    expect(fromUserPreferencesRow(row).inspectorCollapsed).toBe(false);
+  });
+});

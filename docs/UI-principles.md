@@ -32,13 +32,38 @@ The incumbents fail most of these: Sparx has no provenance and hand-drawn diagra
 
 ### 2.0 Persistent model navigation
 
-Every model-scoped route (home, capability map, landscape and the zoom chain beneath it, changes, versions, review) renders the same six-item navigation alongside the page: **Home, Capability map, Landscape, Changes, Versions, Review queue**. It is chrome, not a per-page affordance — a page never grows its own "back to X" link, or any other hand-rolled equivalent, to stand in for it: one shared component (`ModelNav`), everywhere, not a per-route re-implementation of the same nav (**amended, S1 item 17 — see §10 item 10: this is not a ban on `<ul>`/`<li>` markup itself, which §8 has never actually prohibited**).
+Every model-scoped route (home, capability map, landscape and the zoom chain beneath it, changes, decisions, versions, review) renders the same seven-item navigation alongside the page, grouped into three named clusters:
 
-- **Desktop**: a left rail, 200px wide, between the app header and the page content.
-- **Mobile** (< 768px): a bottom bar, fixed to the viewport, below the page content (which gains bottom padding so nothing sits underneath it).
-- The item for the current route is highlighted (`aria-current="page"`).
-- The `[ref]` chip (§2.2) sits alongside the nav items — same `main` / tag / branch-title rendering as the breadcrumb's chip — so which state you're looking at travels with you across a jump, not just within one page's breadcrumb. Home, Changes, and Review queue aren't ref-scoped, so their links carry no `?ref=`; Capability map, Landscape, and Versions preserve the current ref.
+| Group | Items |
+| --- | --- |
+| **Model** | Home, Capability map, Landscape |
+| **Work** | Changes, Decisions, Review queue |
+| **Record** | Versions |
+
+It is chrome, not a per-page affordance — a page never grows its own "back to X" link, or any other hand-rolled equivalent, to stand in for it: one shared component (`ModelNav`), everywhere, not a per-route re-implementation of the same nav (**amended, S1 item 17 — see §10 item 10: this is not a ban on `<ul>`/`<li>` markup itself, which §8 has never actually prohibited**).
+
+- **Desktop (≥ 1024px)**: a left rail, 200px wide, between the app header and the page content — icon and label side by side for every item.
+- **Narrow desktop (768–1023px)**: the same left rail, but icon-only — the label is still present for assistive tech (visually hidden, not removed) and available as a native tooltip (`title`) on hover/focus.
+- **Mobile** (< 768px): a bottom bar, fixed to the viewport, below the page content (which gains bottom padding so nothing sits underneath it) — icon-only, same as the narrow-desktop tier.
+- Each group is visually separated by a 1px divider and a small uppercase caption naming it (**"Model" / "Work" / "Record"**, table above) — on the bottom bar (mobile), captions are omitted (no room) and the dividers alone still separate the groups.
+- The item for the current route is highlighted: a filled background (`--accent-surface`, a low-opacity tint of `--accent` — the same "tinted, not solid" formula `--status-weak-bg` already uses off `--status-warn`) with accent-coloured text, plus `aria-current="page"`. There is no separate edge-bar treatment — the fill alone (with the colour-contrasted text, never colour-only per §8.4/§8.7) carries the active state.
+- The `[ref]` chip (§2.2) sits alongside the nav items — same `main` / tag / branch-title rendering as the breadcrumb's chip — so which state you're looking at travels with you across a jump, not just within one page's breadcrumb. Home, Changes, Decisions, and Review queue aren't ref-scoped, so their links carry no `?ref=`; Capability map, Landscape, and Versions preserve the current ref.
 - Because every section is one tap away from every other on the bottom bar, any model route is reachable from any other within two taps on a mobile viewport (one to leave the current section, at most one more to land on an element within it).
+
+**Icons** (added alongside this grouping, V2b): one icon library, one weight — [lucide-react](https://lucide.dev/), stroke icons, imported directly (no wrapper/abstraction layer). This is a deliberate amendment to this repo's earlier "no icon library" stance (still true for *element-type* glyphs — `ElementTypeGlyph`'s own module comment, §9's "what we will not build," is unchanged): lucide is for **chrome only** — navigation, panel controls, view actions — never a per-element or per-type icon, and never used interchangeably with `ElementTypeGlyph`. The curated set, and the only icons in use anywhere in the product — extend this list here before using anything not on it:
+
+| Name (`lucide-react` export) | Used for |
+| --- | --- |
+| `Home` | Nav: Home |
+| `Grid` | Nav: Capability map |
+| `Map` | Nav: Landscape |
+| `GitBranch` | Nav: Changes |
+| `Scale` | Nav: Decisions |
+| `History` | Nav: Versions |
+| `Inbox` | Nav: Review queue |
+| `SlidersHorizontal` | Inspector panel (§6.5): the Filters section |
+| `ChevronLeft` / `ChevronRight` | Inspector panel (§6.5): collapse/expand toggle |
+| `Info` | Capability map (§6.5): each tile's own small "Inspect" corner button — the view's only way into the Inspector, since it has no click-to-focus concept of its own (every tile's primary link still navigates) |
 
 Implementation: `src/ui/components/ModelNav/ModelNav.tsx`, section membership resolved by path in `src/ui/nav/modelNavSection.ts`.
 
@@ -346,6 +371,35 @@ Hover on any marker shows the changed attributes with base → new and both badg
 Positions are hints (ADR-011). No view kind reads or writes `view_layouts` any more — the landscape (Sprint U1's own auto-layout target) was the only one that ever did, and Sprint U4-2b item 6 removed that: it now recomputes its layout fresh on every open, with no saved-position round trip, no staleness after the model itself changes shape, and no `Reset layout` action left to need (there's nothing to reset). Auto-layout is deterministic for the same query result and the same canvas width (§6.1's own width note, item 7), so two people looking at the same model, at the same window size, still see the same picture — "two people see the same picture until one of them drags" no longer needs a saved drag to be true; determinism alone gives it. There is no per-node drag-to-reposition gesture built for the landscape (only the canvas-wide pan `LandscapeCanvas.tsx` has) — if one is ever added, it is session-only state in that component, never written back to `view_layouts`.
 
 `view_layouts` itself stays in the schema (`src/db/views.ts`'s own module comment) — a future feature may yet want per-user saved positions on some view kind — but nothing in the app currently writes to it.
+
+### 6.5 Inspector panel
+
+V2b's shared right-side panel — one component (`src/ui/components/Inspector`), not a per-view reimplementation, on any view that needs to show detail about a selection, the connections around it, and how the view is filtered. Landscape was the first view it landed on, replacing that view's own `LandscapeFocusPanel` (view options, per-lane collapse/pin) and `LandscapeFilterBar` (the capability/lifecycle/criticality/kind/domain filter strip that used to sit above the canvas). Capability map was the second. Context is the third and last, closing out the rollout — inheriting the shell the first two proved, with no further view currently planned to adopt it.
+
+- **Collapsible, fixed width — not resizable.** Resizable was the original ask; deferred deliberately (a scope correction made when this was planned) to "collapsible at a fixed width first, drag-to-resize as a later refinement" — there is no drag handle anywhere in the product yet, and this isn't where one starts.
+- **Collapses to a slim icon strip when nothing is focused; opens on focus.** Visibility is the union of two things: a saved per-user resting preference (`user_preferences.inspector_collapsed`, `useInspectorCollapsedPreference.ts` — one column, shared across every view the Inspector appears on, not per-view) and whether the calling view currently has something selected — a selection always forces the panel open, regardless of the saved preference; collapsing while something is selected updates the saved preference invisibly, taking visible effect once the selection clears. Read-only throughout (no editing affordance in the panel itself — every action opens the element's own page instead).
+- **Sections**, each an ordinary `CollapsibleSection` (§4's own disclosure pattern — no tabs, consistent with every other multi-part surface in this product): Selection, Connections, Filters, Actions — a view omits any section it has nothing to offer rather than showing it empty (Capability map's own Selection/Connections/Actions below are absent with nothing inspected; a view with no filters at all would omit that section entirely, though neither Landscape nor Capability map is that view).
+- Icons: `SlidersHorizontal` for Filters, `ChevronLeft`/`ChevronRight` for the collapse toggle (§2.0's own curated set).
+
+**Landscape's own content:**
+  - **Selection** — the focused element's name, type, lifecycle, criticality, domain, owners by role, and what it supports (with role).
+  - **Connections** — neighbours with their verb and direction, plus the view's own edge-display options ("Show connections", "Route via platforms") and the per-lane collapse/pin controls carried over from the old focus panel (not named in the original ask, but dropping them would have been a real regression — no other section was given a home for them).
+  - **Filters** — capability/lifecycle/criticality/kind/domain (unchanged in substance from the old filter strip, just relocated).
+  - **Actions** — "Open element →" and "Context →", the same navigation every zoom-chain link elsewhere in this product already uses (§2.1), never a bespoke edit control.
+
+**Capability map's own content** — genuinely new on this view (there was no existing focus/filter panel here to replace), so two things needed a fresh decision rather than a straight port:
+
+- **Getting a tile into the Inspector.** Every tile (L1 header, L2 card, L3 leaf; desktop and the <768px accordion/dense-row layouts alike) is already a full stretched-link that navigates straight to the element page — there was no click-to-select precedent to repurpose the way Landscape's own canvas focus already worked, and intercepting the tile's own primary click (first click selects, second navigates) would have been a new interaction mode to learn on this view alone. Decided instead: a second small corner button per tile (`Info`, §2.0's curated set) — the same non-navigating-click pattern the comment-marker button already established on this exact tile — opens the Inspector scoped to that capability; the tile's own primary link keeps navigating on a direct click, unchanged.
+- **Selection** — name, level (L1/L2/L3, read off the already-built tree rather than re-derived from `parent_id`), and the capability's own *direct* facts: oldest lifecycle stage, worst criticality, worst fit-for-purpose, OT share (`metrics.ts`'s per-tile functions — the same ones an L2/L3 tile's own tone already uses), and owners by role (an `owns` edge can target a capability directly, not just a system — the same `ownersByRole` helper Landscape uses, extracted to `src/ui/elements/ownersByRole.ts` once this became its second caller). A capability covered only via a supporting system's own owner (`selfOwnedIds`, the ancestor-aware definition L1 tiles already use for "no owner" gating) shows as "Owned (via a supporting system)" rather than a resolved name — resolving *that* owner would need new plumbing not worth it for this rollout. Deliberately **not** rolled up the way an L1 tile's own tone chip is (`aggregateTileColourFor`/`capabilityRollup.ts` — worst-of the whole subtree): Selection always shows this one capability's own direct facts, so an L1's Selection panel can read narrower than its own tile's aggregate tone. Both are true, just at different scopes.
+- **Connections** — every system with a direct `supports` edge into this exact capability, plus the same "→ Landscape" zoom link every tile already shows next to its own count.
+- **Filters** — colour-by (the `<select>` that used to sit in `CapabilityMapView`'s own toolbar) and Reorder mode (the checkbox from the same toolbar) — this view's whole filter/view-option surface, so nothing else moved in. Both keep controlling `CapabilityMapView` exactly as before (the view still reads `colourBy`/`reorderMode` to tint tiles and show move buttons); only the controls themselves relocated.
+- **Actions** — "Open element →" only; a capability has no Context view of its own to link to.
+
+**Context's own content** — the "hub + direct neighbours" diagram (`ContextView.tsx`'s `group` kind) only; the platform-structure page (a platform with modules, `PlatformStructureView.tsx`) is a plain module grid with no diagram or selection concept at all and does not get an Inspector. Two more decisions, both asked and resolved before building this one:
+
+- **Getting a neighbour into the Inspector.** Context's diagram is Canvas 2D, the same renderer Landscape's own canvas already uses (`ContextDiagramCanvas.tsx`'s own module comment: "reusing its zoom/pan/fit shape verbatim") — unlike Capability map's DOM tiles, there was a real click-to-focus precedent one component over to follow, not just a comment-marker-style button to copy. Decided: click-to-focus, the same two-step model as Landscape — a first click on a neighbour tile opens the Inspector (no navigation); a second click on the already-focused tile navigates (to the neighbour's own Context page for a system/container, its element page for an actor), unchanged from before this rollout. The **hub tile itself never enters focus** — it already has a permanent header (`ContextView.tsx`'s own "Supports"/"Owned by" lines) describing it, so a single click on the hub still navigates straight to its own element page, same as always; focusing it in the Inspector too would just duplicate the header. A background click, or Escape, clears focus — same convention Landscape's canvas already uses. The focused tile reads with the same thicker, full-strength border the hub tile already gets — never colour-only, since the Inspector's own Selection heading names it too.
+- **Desktop-canvas only, no Filters section.** Unlike Capability map (whose Inspector appears on both its desktop and mobile layouts), Context's Inspector only appears alongside the desktop canvas — `ContextMobileList.tsx`'s own rows already show a neighbour's name, type, lifecycle, external flag and edge verb inline, so there's little the Inspector would add on mobile, and no click-to-focus mechanism exists there either. There's also no Filters section: the diagram's existing Zoom/Fit/Labels toolbar stays exactly where it is (on-canvas viewport chrome, not a content-filtering view option the way Landscape's "Show connections"/"Route via platforms" were) — a view with nothing to filter omits the section entirely, per this subsection's own general rule above.
+- **Selection** — the focused neighbour's name, type, lifecycle (system/container only) and an `external` chip when set. **Connections** — that neighbour's own edge(s) to the hub, via `contextGrouping.ts`'s existing `edgeLabel` (already the exact verb/direction text `ContextMobileList.tsx`'s own rows show) — never re-derived, since `useElementContext.ts` already hands the page a fully-grouped `ContextGroup` with each neighbour's edges resolved, unlike Landscape/Capability map's raw-edges-plus-a-by-id-map shape. **Actions** — "Open element →" always, "Context →" for a system/container neighbour only (an actor has none).
 
 ---
 
