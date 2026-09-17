@@ -10,7 +10,7 @@ import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { BOUNDARY_MARGIN, computeLandscapeChannels, laneAt, laneLabelLeftInset, NODE_HEIGHT, NODE_WIDTH, REFERENCE_CHIP_HEIGHT, REFERENCE_CHIP_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
 import { landscapeTileColourFor } from './landscapeColour';
-import { quantizeScale } from './zoom';
+import { quantizeScale, wheelZoomFactor } from './zoom';
 import styles from './LandscapeCanvas.module.css';
 
 const DIFF_MARKER: Record<VersionDiffState, string> = { unchanged: '', added: '+', removed: '−', changed: '~', moved: '⤴' };
@@ -1133,7 +1133,13 @@ export function LandscapeCanvas({
   function handleWheel(e: React.WheelEvent<HTMLCanvasElement>): void {
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
-    zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1, { x: e.clientX - rect.left, y: e.clientY - rect.top });
+    // `wheelZoomFactor` (zoom.ts) scales the step by how much of a single
+    // wheel "notch" this event's own deltaY represents — see its own
+    // comment for the bug this fixes (a burst of small-delta events, from
+    // a trackpad or a high-resolution mouse, used to each get the same
+    // full step as one real notch and could compound to MIN/MAX_SCALE, and
+    // therefore off-screen, in a fraction of a second).
+    zoomBy(wheelZoomFactor(e.deltaY, e.deltaMode), { x: e.clientX - rect.left, y: e.clientY - rect.top });
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLCanvasElement>): void {

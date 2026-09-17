@@ -123,6 +123,86 @@ test('landscape zoom: wheel out ten times never drops the scale below the 0.25 f
   expect(ty).toBeLessThanOrEqual(wrapperHeight);
 });
 
+test('landscape zoom: a burst of small-delta wheel events (trackpad/high-resolution-mouse simulation) after a button zoom never blanks the canvas', async ({ page }) => {
+  // Regression for the reported bug: Fit, then the on-canvas "+" button
+  // (fine on its own), then the wheel — the canvas ended up completely
+  // blank. Root cause (`zoom.ts`'s own `wheelZoomFactor` comment):
+  // `handleWheel` used to apply a flat 1.1x step per native `wheel` event
+  // regardless of that event's own `deltaY`, so a burst of many
+  // small-delta events (what a trackpad or a high-resolution mouse sends
+  // for a single physical gesture — simulated here as many small
+  // `mouse.wheel` calls rather than one call with a large delta) compounded
+  // to MAX_SCALE almost instantly and, since zoom is about the cursor,
+  // could pan the diagram clean off screen if the cursor wasn't sitting
+  // exactly over the content.
+  const { signedIn, modelId, orgSlug, modelSlug, main, genesisCommitId, seedSourceId } = await signUpAndCreateModel(page, 'landscape-wheel-burst');
+
+  const systemId = randomUUID();
+  const envelope: CommitEnvelope = {
+    id: randomUUID(),
+    branchId: main.id,
+    parentCommitId: genesisCommitId,
+    mergedBranchHeadCommitId: null,
+    kind: 'manual',
+    title: 'seed one system',
+    body: null,
+    deltas: [
+      { kind: 'element.create', id: randomUUID(), elementId: systemId, elementType: 'system', name: 'Billing Service', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
+    ],
+  };
+  const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });
+  if (!seedResult.ok) throw new Error(`seeding landscape-wheel-burst fixture: ${seedResult.message}`);
+
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/landscape`);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('aria-label', /1 systems/, { timeout: 30_000 });
+  const wrapper = page.locator('[data-scale]');
+
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('landscape canvas has no bounding box');
+
+  // The on-canvas "+" button (item 1's own control), same as the reported
+  // repro's step 2 — this moves the cursor away from the diagram's own
+  // centre to the toolbar's corner, exactly where the reported repro's
+  // wheel events then landed.
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+
+  // A burst of many small-delta wheel events near that same corner —
+  // standing in for a trackpad/high-resolution mouse's many small `wheel`
+  // events per physical gesture (the fixed-factor code used to treat each
+  // one as a full notch).
+  const cornerX = box.x + box.width - 20;
+  const cornerY = box.y + 20;
+  await page.mouse.move(cornerX, cornerY);
+  for (let i = 0; i < 40; i++) {
+    await page.mouse.wheel(0, 5);
+  }
+
+  const scale = Number(await wrapper.getAttribute('data-scale'));
+  const tx = Number(await wrapper.getAttribute('data-tx'));
+  const ty = Number(await wrapper.getAttribute('data-ty'));
+  expect(scale).toBeGreaterThanOrEqual(0.25);
+  expect(scale).toBeLessThanOrEqual(4);
+
+  // The one seeded system's own layout position (same deterministic pure
+  // layout function the app itself calls) must still land inside the
+  // wrapper's own visible bounds once mapped through the live transform —
+  // "not blank" made concrete, the same way the existing Fit test above
+  // proves "fully visible" without reaching into drawn pixels.
+  const systemRow: ElementsHeadRow = { element_id: systemId, element_type: 'system', name: 'Billing Service', parent_id: null, attributes: { lifecycleStatus: 'active', isExternal: false }, exists_delta_id: randomUUID() };
+  const layout = computeLandscapeLayout([systemRow], [], new Map(), []);
+  const node = layout.nodes.find((n) => n.elementId === systemId);
+  if (!node) throw new Error('computeLandscapeLayout did not place the seeded system');
+  const wrapperWidth = await wrapper.evaluate((el) => el.clientWidth);
+  const wrapperHeight = await wrapper.evaluate((el) => el.clientHeight);
+  const nodeScreenCentreX = (node.x + NODE_WIDTH / 2) * scale + tx;
+  const nodeScreenCentreY = (node.y + NODE_HEIGHT / 2) * scale + ty;
+  expect(nodeScreenCentreX).toBeGreaterThanOrEqual(0);
+  expect(nodeScreenCentreX).toBeLessThanOrEqual(wrapperWidth);
+  expect(nodeScreenCentreY).toBeGreaterThanOrEqual(0);
+  expect(nodeScreenCentreY).toBeLessThanOrEqual(wrapperHeight);
+});
+
 test('landscape bands: four systems across four level-1 lanes fill the canvas width at 1280px with no page-level horizontal scrollbar', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const { signedIn, modelId, orgSlug, modelSlug, main, genesisCommitId, seedSourceId } = await signUpAndCreateModel(page, 'landscape-bands');
