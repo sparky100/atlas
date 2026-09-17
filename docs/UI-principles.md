@@ -61,7 +61,8 @@ It is chrome, not a per-page affordance — a page never grows its own "back to 
 | `Scale` | Nav: Decisions |
 | `History` | Nav: Versions |
 | `Inbox` | Nav: Review queue |
-| `SlidersHorizontal` | Reserved for the inspector panel's own Filters section — not built yet (V2b, this item still in progress); named here now so its icon is picked once, not decided again when that lands. |
+| `SlidersHorizontal` | Inspector panel (§6.5): the Filters section |
+| `ChevronLeft` / `ChevronRight` | Inspector panel (§6.5): collapse/expand toggle |
 
 Implementation: `src/ui/components/ModelNav/ModelNav.tsx`, section membership resolved by path in `src/ui/nav/modelNavSection.ts`.
 
@@ -369,6 +370,19 @@ Hover on any marker shows the changed attributes with base → new and both badg
 Positions are hints (ADR-011). No view kind reads or writes `view_layouts` any more — the landscape (Sprint U1's own auto-layout target) was the only one that ever did, and Sprint U4-2b item 6 removed that: it now recomputes its layout fresh on every open, with no saved-position round trip, no staleness after the model itself changes shape, and no `Reset layout` action left to need (there's nothing to reset). Auto-layout is deterministic for the same query result and the same canvas width (§6.1's own width note, item 7), so two people looking at the same model, at the same window size, still see the same picture — "two people see the same picture until one of them drags" no longer needs a saved drag to be true; determinism alone gives it. There is no per-node drag-to-reposition gesture built for the landscape (only the canvas-wide pan `LandscapeCanvas.tsx` has) — if one is ever added, it is session-only state in that component, never written back to `view_layouts`.
 
 `view_layouts` itself stays in the schema (`src/db/views.ts`'s own module comment) — a future feature may yet want per-user saved positions on some view kind — but nothing in the app currently writes to it.
+
+### 6.5 Inspector panel
+
+V2b's shared right-side panel — one component (`src/ui/components/Inspector`), not a per-view reimplementation, on any view that needs to show detail about a selection, the connections around it, and how the view is filtered. Landscape is the first view it landed on, replacing that view's own `LandscapeFocusPanel` (view options, per-lane collapse/pin) and `LandscapeFilterBar` (the capability/lifecycle/criticality/kind/domain filter strip that used to sit above the canvas); Capability map and Context are expected to adopt the same shell next, each supplying their own section content.
+
+- **Collapsible, fixed width — not resizable.** Resizable was the original ask; deferred deliberately (a scope correction made when this was planned) to "collapsible at a fixed width first, drag-to-resize as a later refinement" — there is no drag handle anywhere in the product yet, and this isn't where one starts.
+- **Collapses to a slim icon strip when nothing is focused; opens on focus.** Visibility is the union of two things: a saved per-user resting preference (`user_preferences.inspector_collapsed`, `useInspectorCollapsedPreference.ts`) and whether the calling view currently has something selected — a selection always forces the panel open, regardless of the saved preference; collapsing while something is selected updates the saved preference invisibly, taking visible effect once the selection clears. Read-only throughout (no editing affordance in the panel itself — every action opens the element's own page instead).
+- **Sections**, each an ordinary `CollapsibleSection` (§4's own disclosure pattern — no tabs, consistent with every other multi-part surface in this product):
+  - **Selection** — the focused element's name, type, lifecycle, criticality, domain, owners by role, and what it supports (with role).
+  - **Connections** — neighbours with their verb and direction, plus the view's own edge-display options (Landscape: "Show connections", "Route via platforms") and, for Landscape specifically, the per-lane collapse/pin controls carried over from the old focus panel (not named in the original ask, but dropping them would have been a real regression — no other section was given a home for them).
+  - **Filters** — capability/lifecycle/criticality/kind/domain (Landscape's own facets, unchanged in substance from the old filter strip, just relocated). Not every view has filters to offer; a view omits the section entirely rather than showing it empty.
+  - **Actions** — "Open element →" and "Context →", the same navigation every zoom-chain link elsewhere in this product already uses (§2.1), never a bespoke edit control.
+- Icons: `SlidersHorizontal` for Filters, `ChevronLeft`/`ChevronRight` for the collapse toggle (§2.0's own curated set).
 
 ---
 

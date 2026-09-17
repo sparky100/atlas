@@ -160,7 +160,10 @@ Per-person UI preferences. Keyed on the user, not the membership: preferences fo
 | `density` | text | not null default `'comfortable'`, `check (density in ('comfortable','compact'))` |
 | `theme` | text | not null default `'system'`, `check (theme in ('system','light','dark'))` |
 | `capability_map_colour_by` | text | nullable, no default, `check (capability_map_colour_by in ('none','metric:supportingSystemCount','metric:oldestLifecycleStage','metric:lifecycleExposure'))` — Sprint U4-1 C4 |
+| `inspector_collapsed` | boolean | not null default false — V2b, `20260917040000_inspector_collapsed_preference.sql`; the shared Inspector panel's resting collapse state (overridden live by focus — see that migration's own column comment) |
 | `updated_at` | timestamptz | not null default now() |
+
+(This table has grown further columns than this list currently shows in full — `landscape_colour_by`, the three `landscape_*_lane_keys` arrays, and the three `notify_on_*` booleans, each added by its own later migration and documented in that migration's own comment; `src/contracts/userPreferences.ts` is the up-to-date wire shape.)
 
 No `org_id` (exception to S-20: the row is not org-bearing). RLS: `user_id = auth.uid()` for select, insert, update; no delete policy (a row is reset, not removed). Defaults in the UI when no row exists: architect door for `owner`/`architect` members, director door otherwise; the row is created on first change, not on sign-up. `capability_map_colour_by` is the one column here without a fixed default — unlike its three siblings, null (no override ever saved) resolves in the UI, not the schema: exposure for director home mode, coverage for architect, "none" while the model has no systems at all (`src/ui/capabilityMap/metrics.ts`'s `resolveDefaultColourBy`) — a saved value always wins over that computed default ("remember last choice per user").
 

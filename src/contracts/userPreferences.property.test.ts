@@ -40,6 +40,9 @@ const userPreferencesArb: fc.Arbitrary<UserPreferences> = fc.record({
   notifyOnMention: fc.boolean(),
   notifyOnReply: fc.boolean(),
   notifyOnReviewAssigned: fc.boolean(),
+  // V2b: same "always a real boolean, never nullable" shape as the notify
+  // fields above.
+  inspectorCollapsed: fc.boolean(),
   updatedAt: fc.date({ noInvalidDate: true }).map((d) => d.toISOString()),
 });
 
