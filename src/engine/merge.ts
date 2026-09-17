@@ -100,7 +100,16 @@ function newEntriesOf<T>(head: ReadonlyMap<UUID, T>, base: Head): [UUID, T][] {
   return [...head].filter(([id]) => !existsIn(base, id));
 }
 
-const normalizeName = (name: string): string => name.trim().toLowerCase();
+/**
+ * Trim + lower-case, no fancier normalisation than that — the identity
+ * check this module's own `classifyMerge` uses is deliberately exact,
+ * not fuzzy (see `trigramSimilarity`'s own call site below for where
+ * fuzziness enters instead). Exported (F2, narrowed capture pipeline —
+ * `src/capture/matchImportRows.ts`) so a second module comparing names
+ * for exact equality reuses this exact definition rather than drifting
+ * from it with a second, slightly-different one.
+ */
+export const normalizeName = (name: string): string => name.trim().toLowerCase();
 
 /** A non-empty, trimmed, lower-cased string, or `undefined` for anything else (absent, blank, or not a string at all — `attributes` is loosely typed `Json`). */
 function normalizedContextString(value: unknown): string | undefined {
