@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
+import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
+import { Inspector } from '../components/Inspector/Inspector';
+import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Panel } from '../components/Panel/Panel';
@@ -17,9 +21,12 @@ import { useBranchLabel } from '../branches/useBranchLabel';
 import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
+import { ContextInspectorContent } from '../context/ContextInspectorContent';
+import { contextInspectorFocusedNeighbour } from '../context/contextInspectorSelection';
 import { ContextView } from '../context/ContextView';
 import { PlatformStructureView } from '../context/PlatformStructureView';
 import { useElementContext } from '../context/useElementContext';
+import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { parseCapabilityParam } from '../nav/zoomParams';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import styles from './ViewPage.module.css';
@@ -70,6 +77,24 @@ export function ContextPage() {
   // which simply means no extra segment, not an error.
   const platformParentId = hub?.element_type === 'container' ? hub.parent_id : null;
   const platformParent = useBreadcrumbElement(model?.id ?? null, ref, platformParentId, mainBranch?.head_commit_id ?? null);
+
+  // V2b's Inspector, Context rollout: click-to-focus on the diagram's own
+  // desktop canvas (`ContextDiagramCanvas.tsx`'s own doc comment) — the
+  // hub never enters focus (it already has a permanent header), so this
+  // only ever names a neighbour. `narrow` is computed here too, not just
+  // inside `ContextView.tsx` — the Inspector is desktop-canvas only (like
+  // Landscape's own, never Capability map's, since the mobile list's own
+  // rows already show everything Selection/Connections would add).
+  const [rawFocusedElementId, setRawFocusedElementId] = useState<UUID | null>(null);
+  const { collapsed: inspectorCollapsed, setCollapsed: setInspectorCollapsed } = useInspectorCollapsedPreference(userId);
+  const narrow = useIsNarrowViewport(768);
+  const group = state.status === 'ready' && state.data.kind === 'group' ? state.data.group : null;
+  const focusedNeighbour = group ? contextInspectorFocusedNeighbour(rawFocusedElementId, group) : null;
+  // A stale id (the group reloaded and no longer names this neighbour)
+  // reads as unfocused instead of holding onto a dangling id — same
+  // "derived, never written back" shape `LandscapePage.tsx`'s own
+  // `focusedElementId` uses.
+  const focusedElementId = focusedNeighbour ? rawFocusedElementId : null;
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -145,7 +170,40 @@ export function ContextPage() {
           />
         )}
         {state.status === 'ready' && state.data.kind === 'group' && (
-          <ContextView group={state.data.group} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} refParam={refParam} diff={state.data.diff} />
+          <div className={narrow ? undefined : styles.contextRow}>
+            <ContextView
+              group={state.data.group}
+              orgSlug={organisation?.slug ?? ''}
+              modelSlug={model.slug}
+              refParam={refParam}
+              diff={state.data.diff}
+              focusedElementId={focusedElementId}
+              onFocusElement={setRawFocusedElementId}
+              onClearFocus={() => {
+                setRawFocusedElementId(null);
+              }}
+            />
+            {/* V2b: desktop-canvas only — see this component's own comment above `narrow`. */}
+            {!narrow && (
+              <Inspector
+                collapsed={inspectorCollapsed}
+                onToggleCollapsed={() => {
+                  setInspectorCollapsed(!inspectorCollapsed);
+                }}
+                hasSelection={focusedElementId !== null}
+              >
+                <ContextInspectorContent
+                  focusedNeighbour={focusedNeighbour}
+                  hubId={state.data.group.hub.element_id}
+                  elementHref={(id) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${id}?${refParam}`}
+                  neighbourContextHref={(id) => `/o/${orgSlug ?? ''}/m/${model.slug}/context/${id}?${refParam}`}
+                  onClearFocus={() => {
+                    setRawFocusedElementId(null);
+                  }}
+                />
+              </Inspector>
+            )}
+          </div>
         )}
         </main>
       </div>
