@@ -247,7 +247,6 @@ Prerequisites: S2. Profile the worst 5% of frames on the 2,000-system fixture be
 | Item | Why | Before |
 |---|---|---|
 | Delta-apply in SQL | 8.45 MB per edit at 2,000 elements; capture commits are large | F2 |
-| LLM proxy edge function extracted to the shared package, deployed to Architecture | F2 needs it | F2 |
 | Typed Supabase client | H2 | any time |
 | Landscape p5 fps 30 → 45: profile worst frames first | R-perf | after S2 |
 
@@ -281,8 +280,6 @@ Every row has (or gets, in P1) a SPEC §11 row and an issue. A row leaves only w
 | Custom attributes | F1 | create |
 | Starter-map upgrade flow | F2 | create |
 | Delta-apply in SQL | before F2 | create |
-| LLM proxy edge function | before F2 | create |
-| merge_elements + trigram matching | E7 (before F2) | create |
 | Roadmap | F5 | create |
 | Notification tray deep links (decision, version anchors) | F3 / F5 | create |
 | Value streams | F6 | create |

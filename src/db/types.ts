@@ -254,6 +254,20 @@ export interface ElementMergeRow {
   created_at: string;
 }
 
+export type LlmProxyRequestStatus = 'ok' | 'error' | 'rate_limited';
+
+/** The literal shape of a row in `llm_proxy_requests` (ADR-014, E4 — `20260917010000_llm_proxy_requests.sql`) — a per-org LLM proxy call log, append-only, no prompt/response payload column at all (deliberate: "request logging without payload retention"). */
+export interface LlmProxyRequestRow {
+  id: UUID;
+  org_id: UUID;
+  model: string;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  status: LlmProxyRequestStatus;
+  latency_ms: number | null;
+  created_at: string;
+}
+
 /**
  * Landscape and capability_map are whole-model queries; context/container
  * scope to one element (SPEC §3.9). Sprint U1 step 4 only ever creates
