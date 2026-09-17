@@ -115,8 +115,19 @@
      value the tone system needs a variant for. Derived from --status-warn
      the same way --diff-none derives from --border above, so light/dark
      and the data-theme override all recompute for free with no separate
-     block per theme. */
+     block per theme.
+
+     Sprint U4-1 findings follow-up: Health findings now tint by severity
+     rather than flatly for every non-zero count — this token is the
+     medium tier's own (lighter) tint; --status-strong-bg below is the
+     high tier's. Informational findings get no tint at all. */
   --status-weak-bg: rgb(from var(--status-warn) r g b / 14%);
+  /* High-severity Health findings (e.g. a critical system with no business
+     owner, a boundary crossing with no data classification) — derived from
+     --status-danger the same way --status-weak-bg derives from
+     --status-warn, at a higher opacity so it reads as more urgent without
+     needing a second colour ramp. */
+  --status-strong-bg: rgb(from var(--status-danger) r g b / 22%);
 }
 
 @media (prefers-color-scheme: dark) {

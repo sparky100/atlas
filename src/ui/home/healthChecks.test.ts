@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import type { HealthFindingSeverity } from '../components/HealthFinding/HealthFinding';
 import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
 
-function check(key: string, count: number): HealthCheck {
-  return { key, count, summary: `${String(count)} things`, items: [] };
+function check(key: string, count: number, severity: HealthFindingSeverity = 'medium'): HealthCheck {
+  return { key, count, summary: `${String(count)} things`, items: [], severity };
 }
 
 describe('partitionHealthChecks', () => {
@@ -25,6 +26,24 @@ describe('partitionHealthChecks', () => {
     const { active, clear } = partitionHealthChecks(checks);
     expect(active).toHaveLength(2);
     expect(clear).toHaveLength(0);
+  });
+
+  it('orders active checks high, then medium, then informational, regardless of input order', () => {
+    const checks = [check('a', 1, 'informational'), check('b', 1, 'high'), check('c', 1, 'medium')];
+    const { active } = partitionHealthChecks(checks);
+    expect(active.map((c) => c.key)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('keeps input order for checks in the same severity tier (stable sort)', () => {
+    const checks = [check('a', 1, 'high'), check('b', 1, 'medium'), check('c', 1, 'high'), check('d', 1, 'medium')];
+    const { active } = partitionHealthChecks(checks);
+    expect(active.map((c) => c.key)).toEqual(['a', 'c', 'b', 'd']);
+  });
+
+  it('leaves `clear` in original order regardless of severity', () => {
+    const checks = [check('a', 0, 'informational'), check('b', 0, 'high')];
+    const { clear } = partitionHealthChecks(checks);
+    expect(clear.map((c) => c.key)).toEqual(['a', 'b']);
   });
 });
 
