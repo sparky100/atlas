@@ -9,11 +9,9 @@ import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyp
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { attributesRecord } from '../elements/attributesRecord';
-import { isPlatform } from '../elements/systemKind';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { ContextDiagramCanvas } from './ContextDiagramCanvas';
 import { ContextMobileList } from './ContextMobileList';
-import type { ContextModule } from './contextDiagramData';
 import type { ContextGroup } from './contextGrouping';
 import styles from './ContextView.module.css';
 
@@ -32,8 +30,6 @@ function ownsRoleLabel(role: string): string {
 
 export interface ContextViewProps {
   group: ContextGroup;
-  /** V1's own platform/module data — `useSystemContext.ts`'s own doc comment explains the shape; empty when nothing in view is a platform with modules. */
-  platformModulesById: ReadonlyMap<UUID, ContextModule[]>;
   orgSlug: string;
   modelSlug: string;
   /** The full `ref=...` query fragment (`refQueryParam`), not a bare token — see `CapabilityMapView.tsx`'s identical `refParam` doc comment for why. */
@@ -55,24 +51,29 @@ const MOBILE_BREAKPOINT_PX = 768;
  * layout preset") that the DOM/CSS departure this view took before V1 was
  * itself recorded as a deviation from (§10 decision 7).
  *
+ * V3 ("container context pages, platform context simplified to structure
+ * only"): this component now only ever renders the "hub + its own direct
+ * neighbours" case — a plain system, a container (item 1: a real hub in its
+ * own right now), or a platform with zero modules. A platform with at least
+ * one module never reaches here at all; `useElementContext.ts` routes it to
+ * `PlatformStructureView.tsx` instead, so the module-grouped "Supports:"
+ * line and the diagram's own module-tile handling this component used to
+ * carry are gone — every neighbour/flow rendering below now only ever
+ * handles one hub's own relationships, never a nested module's.
+ *
  * The hub block's own "Supports: ..."/"Owned by: ..." header lines
  * (`.headerSummary` below) are kept exactly as V1's own wording asks
  * ("Header keeps Supports ... and Owned by") — real header content, never
- * a diagram node or a drawn edge, same as before this sprint. V1 adds one
- * change to the "Supports:" line specifically: a platform hub with modules
- * shows each module's own capability ("FI → Finance, PM → Asset
- * Management") instead of the hub's own (usually empty, per "Platforms and
- * modules") direct `supports` edges — "grouped by module for platforms,"
- * V1's own wording.
+ * a diagram node or a drawn edge, same as before this sprint.
  *
- * No diff highlighting on the new canvas/mobile body — V1 doesn't ask for
- * it, unlike the landscape, and this view's own diff support stays scoped
- * to the hub's header badge, unchanged from before this sprint.
+ * No diff highlighting on the canvas/mobile body — V1 doesn't ask for it,
+ * unlike the landscape, and this view's own diff support stays scoped to
+ * the hub's header badge, unchanged from before this sprint.
  */
-export function ContextView({ group, platformModulesById, orgSlug, modelSlug, refParam, diff = null }: ContextViewProps) {
+export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null }: ContextViewProps) {
   const narrow = useIsNarrowViewport(MOBILE_BREAKPOINT_PX);
   const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?${refParam}`;
-  const neighbourContextHref = (systemId: UUID) => `/o/${orgSlug}/m/${modelSlug}/context/${systemId}?${refParam}`;
+  const neighbourContextHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/context/${elementId}?${refParam}`;
   const containersHref = `/o/${orgSlug}/m/${modelSlug}/container/${group.hub.element_id}?${refParam}`;
   const hubExternal = attributesRecord(group.hub.attributes).isExternal === true;
   const diffById = new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []);
@@ -80,8 +81,6 @@ export function ContextView({ group, platformModulesById, orgSlug, modelSlug, re
   // S1 item 11a — see the "Owned by" line's own comment below.
   const internalOwners = group.owners.filter((o) => !o.isExternal);
   const externalOwners = group.owners.filter((o) => o.isExternal);
-  const hubModules = platformModulesById.get(group.hub.element_id) ?? [];
-  const showModuleGroupedSupports = isPlatform(group.hub) && hubModules.length > 0;
   // V1 polish, "header collapses to a one-line summary when the diagram
   // renders": the same condition that decides whether the diagram body
   // mounts below (`(group.internal.length > 0 || group.external.length >
@@ -91,19 +90,6 @@ export function ContextView({ group, platformModulesById, orgSlug, modelSlug, re
   // (no diagram at all) keeps the fuller, multi-line summary unchanged —
   // there's no canvas competing for space there.
   const hasDiagram = group.internal.length > 0 || group.external.length > 0;
-
-  const supportsModulesPart = showModuleGroupedSupports ? (
-    <>
-      Supports:{' '}
-      {hubModules.map((module, i) => (
-        <span key={module.elementId}>
-          {i > 0 && ', '}
-          <Link to={elementHref(module.elementId)}>{module.name}</Link>
-          {module.capabilityName && ` → ${module.capabilityName}`}
-        </span>
-      ))}
-    </>
-  ) : null;
 
   const supportsDirectPart =
     group.supports.length > 0 ? (
@@ -150,13 +136,13 @@ export function ContextView({ group, platformModulesById, orgSlug, modelSlug, re
       </>
     ) : null;
 
-  const collapsedSummaryParts = [supportsModulesPart, supportsDirectPart, ownersPart].filter((p): p is ReactElement => p !== null);
+  const collapsedSummaryParts = [supportsDirectPart, ownersPart].filter((p): p is ReactElement => p !== null);
 
   return (
     <div>
       <div className={styles.hub}>
         <div className={styles.hubTitle}>
-          <ElementTypeGlyph type="system" external={hubExternal} />
+          <ElementTypeGlyph type={group.hub.element_type} external={hubExternal} />
           <Link to={elementHref(group.hub.element_id)}>
             <Text as="span" size="lg">
               {group.hub.name}
@@ -165,13 +151,15 @@ export function ContextView({ group, platformModulesById, orgSlug, modelSlug, re
           {hubExternal && <Chip tone="neutral">external</Chip>}
           {diff && hubDiff && <DiffBadge state={hubDiff.state} changedCount={hubDiff.state === 'changed' ? hubDiff.changedAttributes.length : undefined} />}
         </div>
-        {/* The one "descend a level" affordance this view offers (UI-principles §2.1's semantic zoom, as a discrete link rather than a continuous gesture this sprint doesn't build — see CapabilityMapView's own "→ Landscape" link for the same pattern one level up). */}
-        <LinkButton to={containersHref} variant="secondary">
-          Containers →
-        </LinkButton>
+        {/* The one "descend a level" affordance this view offers (UI-principles §2.1's semantic zoom, as a discrete link rather than a continuous gesture this sprint doesn't build — see CapabilityMapView's own "→ Landscape" link for the same pattern one level up). A container is structurally terminal since "component" was removed (S1 item 18) — it has no containers of its own to descend into. */}
+        {group.hub.element_type === 'system' && (
+          <LinkButton to={containersHref} variant="secondary">
+            Containers →
+          </LinkButton>
+        )}
       </div>
 
-      {(group.supports.length > 0 || showModuleGroupedSupports || group.owners.length > 0) &&
+      {(group.supports.length > 0 || group.owners.length > 0) &&
         (hasDiagram ? (
           // V1 polish: one compact line once the diagram is rendering
           // below — same content as the fuller block, just not competing
@@ -186,25 +174,11 @@ export function ContextView({ group, platformModulesById, orgSlug, modelSlug, re
           </Text>
         ) : (
           <div className={styles.headerSummary}>
-            {/* V1: a platform hub's own modules, each with its own capability
-                chip — "Platforms and modules" put the real `supports` edge on
-                the module, not the platform, so the hub's own `group.supports`
-                is normally empty for a real platform; this reads the same
-                module data the diagram itself draws instead. */}
-            {supportsModulesPart && (
-              <Text as="p" tone="muted" size="sm">
-                {supportsModulesPart}
-              </Text>
-            )}
             {/* Item 12: "Supports: <capabilities, primary first>", each one a
                 link — computeContextGroup already sorted the list; this just
                 renders it, and the capability's own element page is the link
                 target (the same page every other Context/element-page link in
-                this view already points at). Still shown for a platform hub
-                too if it somehow also carries a direct edge of its own (S1
-                item 19's own "move to module" nudge case) — nothing here is
-                ever silently hidden just because the module-grouped line above
-                also rendered. */}
+                this view already points at). */}
             {supportsDirectPart && (
               <Text as="p" tone="muted" size="sm">
                 {supportsDirectPart}
@@ -241,9 +215,9 @@ export function ContextView({ group, platformModulesById, orgSlug, modelSlug, re
       {(group.internal.length > 0 || group.external.length > 0) && (
         <div className={styles.diagram}>
           {narrow ? (
-            <ContextMobileList group={group} platformModulesById={platformModulesById} elementHref={elementHref} neighbourContextHref={neighbourContextHref} />
+            <ContextMobileList group={group} elementHref={elementHref} neighbourContextHref={neighbourContextHref} />
           ) : (
-            <ContextDiagramCanvas group={group} platformModulesById={platformModulesById} elementHref={elementHref} neighbourContextHref={neighbourContextHref} />
+            <ContextDiagramCanvas group={group} elementHref={elementHref} neighbourContextHref={neighbourContextHref} />
           )}
         </div>
       )}

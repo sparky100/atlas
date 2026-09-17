@@ -45,7 +45,19 @@ export interface CapabilityRollup {
   subtreeSupportsEdges: readonly RelationshipsHeadRow[];
   /** Distinct systems with a live `supports` edge into the level-1 capability or any descendant — a system supporting two children of the same parent counts once. This is the rolled-up number every surface now shows in place of its old direct-only count. */
   supportingSystemIds: readonly UUID[];
-  /** `subtreeCapabilityIds.filter(id => it has >=1 direct supporter).length` — the "N/M supported" fraction's numerator (same computation `metrics.ts`'s `aggregateTileColourFor` already does for its `metric:supportingSystemCount` mode, exposed here so every caller of this module shares it too, not just the capability map's own colour-by chip). */
+  /**
+   * `subtreeCapabilityIds.filter(id => it has >=1 direct supporter).length`
+   * — the "N/M supported" fraction's numerator. This is the *only* place
+   * that fraction is ever rendered as a number now: `metrics.ts`'s
+   * `aggregateTileColourFor` used to independently compute and print the
+   * identical fraction as its own `metric:supportingSystemCount` chip
+   * label, which — once every L1 header started showing this rollup's own
+   * "N capabilities · M systems · X/Y supported" line unconditionally —
+   * put the same "X/Y" on screen twice at once. That chip's own label is
+   * now a plain tone word instead (`aggregateTileColourFor`'s own doc
+   * comment on Coverage); this field stays the one real source of the
+   * number itself.
+   */
   supportedCapabilityCount: number;
   /** `subtreeCapabilityIds.length` — the fraction's denominator. */
   totalCapabilityCount: number;

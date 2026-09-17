@@ -3,12 +3,12 @@
  * visible at top-left of any canvas or element page"). Each element type
  * maps onto whichever level of the zoom chain (§2.1) it's the scope of —
  * Capability → the capability map, System → its Context view, Container →
- * its Container view (scoped by its own parent system) — with `parent`
- * contributing one extra segment where the element page already has it
- * loaded (System, for a Container), never an extra fetch just for the
- * breadcrumb. An Actor has no view of its own in the chain, so it gets no
- * segment beyond `[ref]`. S1 item 18 removed Component (and its own
- * `case`, one level deeper than Container) from this taxonomy entirely.
+ * its own Context view too (V3: a container is a real hub in its own
+ * right now, since "component"'s removal, S1 item 18, left it structurally
+ * terminal) — with `parent` contributing one extra segment naming the
+ * container's own platform, where the element page already has it loaded,
+ * never an extra fetch just for the breadcrumb. An Actor has no view of
+ * its own in the chain, so it gets no segment beyond `[ref]`.
  */
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
@@ -26,7 +26,12 @@ export function elementBreadcrumbSegments(element: ElementsHeadRow, parent: Elem
     case 'container': {
       const segments: BreadcrumbSegment[] = [];
       if (parent) segments.push({ label: parent.name, href: `${base}/context/${parent.element_id}${query}` });
-      segments.push({ label: element.name, href: `${base}/container/${parent?.element_id ?? ''}${query}` });
+      // V3 item 1: a container's own segment now points at its own Context
+      // page, not the old `/container/:parentId` structure list — that
+      // page still exists (linked from the Context view's own "Containers
+      // →"), but is no longer where a container's own breadcrumb segment
+      // lands.
+      segments.push({ label: element.name, href: `${base}/context/${element.element_id}${query}` });
       return segments;
     }
     case 'actor':

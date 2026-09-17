@@ -10,19 +10,19 @@
  * §6.1).
  *
  * The first V1 build was designed and tested against a two-neighbour case.
- * The real stress case — the standing fixture in `fixtures/sapContext.ts` —
- * is a platform with eight modules and five neighbours carrying two or
- * three flows each. Four things changed for it, each its own section below:
+ * The real stress case — a single hub with several real neighbours, several
+ * flows each (the standing fixture in `fixtures/sapContext.ts`) — needed
+ * four things, each its own section below:
  *
- *  1. **Fan.** Neighbours sit in one row, ordered by the centre of the hub
- *     modules they attach to, with a gap that *grows* with neighbour count
- *     (`fanGapFor`) rather than the same packed row compressed. The row only
- *     wraps when even the minimum gap won't fit the canvas.
+ *  1. **Fan.** Neighbours sit in one row, with a gap that *grows* with
+ *     neighbour count (`fanGapFor`) rather than the same packed row
+ *     compressed. The row only wraps when even the minimum gap won't fit
+ *     the canvas.
  *  2. **Lanes.** Every edge is an orthogonal route with its own horizontal
  *     lane in the channel between the hub and the neighbour row, its own
- *     attach point on the module's bottom edge and its own attach point on
- *     the neighbour's top edge (`spreadAlong`) — so no two edges ever share
- *     a segment. An edge from a row further down (externals below the
+ *     attach point on the hub's bottom edge and its own attach point on the
+ *     neighbour's top edge (`spreadAlong`) — so no two edges ever share a
+ *     segment. An edge from a row further down (externals below the
  *     boundary, or a wrapped second row) rises *outside* the rows above it
  *     (`riser`), never through a tile.
  *  3. **Leader labels.** A label sits on its own edge's vertical drop, just
@@ -38,25 +38,23 @@
  * Coordinates are world units; the canvas scales them. Label pills are
  * sized by an injected `measureWorld` (text width already divided by the
  * current scale) so this stays a pure, unit-testable module.
+ *
+ * V3 ("container context pages, platform context simplified to structure
+ * only"): every module/platform-tile-nesting concept this file used to
+ * carry — a widened hub tile, module sub-tiles, "which hub module does this
+ * edge attach to," the "which module?" fallback anchor — is gone. A
+ * platform-with-modules hub is no longer laid out here at all; it gets its
+ * own separate, much simpler structure-only page (`PlatformStructureView.tsx`)
+ * with no neighbours and no edges to route. Every hub this file lays out
+ * now is a plain tile — a system, or one container viewed on its own — so
+ * the fan/lane/riser/label engine above (rework items 1–4) is unchanged,
+ * but every "which of the hub's several endpoints does this edge attach
+ * to" question collapses to "the hub tile itself, always" — a single hub
+ * can still have enough neighbours to need fan spread and lane routing,
+ * but never a second endpoint to route between.
  */
 import type { UUID } from '../../contracts/delta';
 import { NODE_HEIGHT, NODE_WIDTH } from '../landscape/layout';
-
-/**
- * V1 fix: was 72. A tile-text review against the longest real content label
- * ("Regulatory Compliance & Price-Control Reporting", the `utility`/
- * `electricity_network` maps' own level-1 name) at 8-module width found the
- * capability line still hard-pressed at 72px, even with the two-line wrap
- * `ContextDiagramCanvas.tsx` already gives it. Widened using exactly the
- * width `MODULE_GUTTER_X`'s own cut below frees per module.
- */
-export const MODULE_WIDTH = 76;
-/** V1 fix: was 40 — room for two short lines of name and two of capability, not one each (`ModuleTile`'s own wrap in `ContextDiagramCanvas.tsx`). */
-export const MODULE_HEIGHT = 68;
-const MODULE_GUTTER_X = 4;
-const MODULE_PADDING = 8;
-/** Height of a platform tile's own title bar (name + glyph, kind, and a one-sentence description) above its row of module sub-tiles. */
-const PLATFORM_TITLE_HEIGHT = 68;
 
 /** The minimum gap between two neighbour tiles in a row — also the gap a row shrinks to before it wraps. */
 const TILE_GUTTER_X = 24;
@@ -91,8 +89,6 @@ const OUTER_RISER_MARGIN = 20;
 const RISER_PITCH = 10;
 /** How far a label pill may extend past its own tile's edges into the gap — capped below `OUTER_RISER_MARGIN` so a pill on an outermost tile never reaches a riser. */
 const LABEL_OVERHANG_MAX = 16;
-/** Anchors nearer than this (world units) are drawn as one straight vertical, with no lane. */
-const STRAIGHT_EPSILON = 1;
 
 export const LABEL_PILL_PADDING_X = 12;
 export const LABEL_PILL_HEIGHT_1_LINE = 18;
@@ -100,25 +96,12 @@ export const LABEL_PILL_HEIGHT_2_LINE = 30;
 /** Two pills closer than this in x, sharing a y band, count as colliding (`edgeLabelsCollide`) — crowded, not just touching. */
 const LABEL_MIN_GAP_X = 6;
 
-export interface ModuleTile {
-  /** The module (container) element id. */
-  elementId: UUID;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  /** The capability this module supports, if any — the module's own capability chip (V1's own wording). `null` when this module supports nothing yet. */
-  capabilityName: string | null;
-}
-
 export interface DiagramTile {
   elementId: UUID;
   x: number;
   y: number;
   w: number;
   h: number;
-  /** Present only when this tile is a platform with at least one module — the tile's own module sub-tiles, positioned in world coordinates (not relative to the parent tile). */
-  modules?: ModuleTile[];
 }
 
 export interface DiagramBoundary {
@@ -129,11 +112,6 @@ export interface DiagramBoundary {
 export interface Point {
   x: number;
   y: number;
-}
-
-export interface DiagramAnchor extends Point {
-  /** True when this anchor is the platform tile's own edge rather than a specific module's sub-tile — V1's own "which module?" marker case. */
-  isPlatformFallback: boolean;
 }
 
 /** One neighbour row (rework item 1's fan) — the internal band is row 0 and, if it wrapped, row 1…; every external row follows. */
@@ -167,15 +145,15 @@ export interface RoutedEdge {
   id: UUID;
   neighbourId: UUID;
   label: string;
-  /** True when the edge's own `to` side is the hub/module — the arrowhead belongs at `hubAnchor`; false when it belongs at `neighbourAnchor`. */
+  /** True when the edge's own `to` side is the hub — the arrowhead belongs at `hubAnchor`; false when it belongs at `neighbourAnchor`. */
   arrowAtHub: boolean;
   /** The polyline, neighbour end first, hub end last — every segment is axis-aligned. Two points for a dead-straight vertical; four for one lane; six for a riser route. */
   points: Point[];
   neighbourAnchor: Point;
-  hubAnchor: DiagramAnchor;
-  labelAnchor: EdgeLabelAnchor;
+  hubAnchor: Point;
   /** The lane this edge's horizontal segment in the top channel occupies (0 = nearest the hub), or `null` for a dead-straight vertical. */
   lane: number | null;
+  labelAnchor: EdgeLabelAnchor;
 }
 
 export interface ContextDiagramLayout {
@@ -189,51 +167,12 @@ export interface ContextDiagramLayout {
   edges: RoutedEdge[];
 }
 
-export interface DiagramUnitInput {
-  elementId: UUID;
-  /** This unit's own modules (empty for a plain system/actor/container, or a platform with none yet). */
-  modules: readonly { elementId: UUID; capabilityName: string | null }[];
-  /**
-   * Rework item 1: every hub module this neighbour's edges attach to (any
-   * order; deduplicated here). The fan orders neighbours by the centre of
-   * these modules, so a neighbour attached only to FI sits under FI and
-   * one attached to PM and PS sits between them. Empty (or absent) for a
-   * plain hub, or a neighbour whose edges all attach to the platform itself.
-   * Meaningless on the hub's own unit; ignored there.
-   */
-  attachedModuleIds?: readonly UUID[];
-}
-
-/** One `uses`/`flows_to` edge to draw — the neighbour side and the hub side (the hub itself, or one of its modules), the arrow's direction, and the verb label. */
+/** One `uses`/`flows_to` edge to draw — always neighbour ↔ hub (V3: there is no other endpoint to name any more), the arrow's direction, and the verb label. */
 export interface ContextEdgeInput {
   id: UUID;
   neighbourId: UUID;
-  /** The hub's own element id, or one of its module ids. */
-  hubEndpointId: UUID;
   arrowAtHub: boolean;
   label: string;
-}
-
-/** One tile's own size, before it's placed — a plain system/actor/container tile is always `NODE_WIDTH`×`NODE_HEIGHT`; a platform-with-modules tile widens to fit its own row of module sub-tiles and grows a title bar above them. */
-function tileSize(moduleCount: number): { w: number; h: number } {
-  if (moduleCount === 0) return { w: NODE_WIDTH, h: NODE_HEIGHT };
-  const modulesWidth = moduleCount * MODULE_WIDTH + (moduleCount - 1) * MODULE_GUTTER_X + MODULE_PADDING * 2;
-  return { w: Math.max(NODE_WIDTH, modulesWidth), h: PLATFORM_TITLE_HEIGHT + MODULE_HEIGHT + MODULE_PADDING * 2 };
-}
-
-function placeModules(unitX: number, unitY: number, unitW: number, moduleIds: readonly { elementId: UUID; capabilityName: string | null }[]): ModuleTile[] {
-  if (moduleIds.length === 0) return [];
-  const modulesWidth = moduleIds.length * MODULE_WIDTH + (moduleIds.length - 1) * MODULE_GUTTER_X;
-  const startX = unitX + (unitW - modulesWidth) / 2;
-  const y = unitY + PLATFORM_TITLE_HEIGHT + MODULE_PADDING;
-  return moduleIds.map((module, index) => ({
-    elementId: module.elementId,
-    x: startX + index * (MODULE_WIDTH + MODULE_GUTTER_X),
-    y,
-    w: MODULE_WIDTH,
-    h: MODULE_HEIGHT,
-    capabilityName: module.capabilityName,
-  }));
 }
 
 function compareIds(a: string, b: string): number {
@@ -245,60 +184,50 @@ export function fanGapFor(count: number): number {
   return Math.min(FAN_GAP_MAX, TILE_GUTTER_X + FAN_GAP_STEP * Math.max(0, count - 1));
 }
 
-interface SizedUnit {
-  unit: DiagramUnitInput;
-  w: number;
-  h: number;
-  /** Where this neighbour would ideally sit — the mean centre of the hub modules it attaches to, or the hub's own centre. */
-  desiredX: number;
-}
-
 interface PlannedRow {
-  entries: SizedUnit[];
+  ids: UUID[];
   gap: number;
   width: number;
   height: number;
 }
 
 /**
- * Rework item 1, the fan: sort by desired x (ties by id), then try one row
- * at `fanGapFor(n)`; if that overflows, shrink the gap down to
- * `TILE_GUTTER_X`; if it still overflows, wrap into rows of as many tiles
- * as fit at the fan gap for that row size. Each row is centred by the
- * caller.
+ * Rework item 1, the fan: sorted by id (every tile is the same fixed
+ * `NODE_WIDTH`×`NODE_HEIGHT` size now that a hub never widens for modules,
+ * so there's no attach-point-based ordering left to sort by — id order is
+ * simply a deterministic tie-break, CLAUDE.md rule 6), then try one row at
+ * `fanGapFor(n)`; if that overflows, shrink the gap down to `TILE_GUTTER_X`;
+ * if it still overflows, wrap into rows of as many tiles as fit at the fan
+ * gap for that row size. Each row is centred by the caller.
  */
-function planFanRows(sized: readonly SizedUnit[], availableWidth: number): PlannedRow[] {
-  if (sized.length === 0) return [];
-  const sorted = [...sized].sort((a, b) => a.desiredX - b.desiredX || compareIds(a.unit.elementId, b.unit.elementId));
-  const widthOf = (entries: readonly SizedUnit[], gap: number) => entries.reduce((sum, e) => sum + e.w, 0) + (entries.length - 1) * gap;
-  const heightOf = (entries: readonly SizedUnit[]) => Math.max(...entries.map((e) => e.h));
+function planFanRows(ids: readonly UUID[], availableWidth: number): PlannedRow[] {
+  if (ids.length === 0) return [];
+  const sorted = [...ids].sort(compareIds);
+  const widthOf = (count: number, gap: number) => count * NODE_WIDTH + (count - 1) * gap;
 
   const fanGap = fanGapFor(sorted.length);
-  if (widthOf(sorted, fanGap) <= availableWidth) return [{ entries: sorted, gap: fanGap, width: widthOf(sorted, fanGap), height: heightOf(sorted) }];
-  const tilesWidth = widthOf(sorted, 0);
-  if (sorted.length > 1 && tilesWidth + (sorted.length - 1) * TILE_GUTTER_X <= availableWidth) {
-    const gap = Math.floor((availableWidth - tilesWidth) / (sorted.length - 1));
-    return [{ entries: sorted, gap, width: widthOf(sorted, gap), height: heightOf(sorted) }];
+  if (widthOf(sorted.length, fanGap) <= availableWidth) return [{ ids: sorted, gap: fanGap, width: widthOf(sorted.length, fanGap), height: NODE_HEIGHT }];
+  if (sorted.length > 1 && widthOf(sorted.length, TILE_GUTTER_X) <= availableWidth) {
+    const gap = Math.floor((availableWidth - sorted.length * NODE_WIDTH) / (sorted.length - 1));
+    return [{ ids: sorted, gap, width: widthOf(sorted.length, gap), height: NODE_HEIGHT }];
   }
 
-  // Wrap: greedy by width at the minimum gutter, then re-fan each row to
-  // the widest gap that still fits it.
-  const rows: SizedUnit[][] = [];
-  let current: SizedUnit[] = [];
-  for (const entry of sorted) {
-    if (current.length > 0 && widthOf([...current, entry], TILE_GUTTER_X) > availableWidth) {
+  // Wrap: greedy by width at the minimum gutter, then re-fan each row to the widest gap that still fits it.
+  const rows: UUID[][] = [];
+  let current: UUID[] = [];
+  for (const id of sorted) {
+    if (current.length > 0 && widthOf(current.length + 1, TILE_GUTTER_X) > availableWidth) {
       rows.push(current);
-      current = [entry];
+      current = [id];
     } else {
-      current.push(entry);
+      current.push(id);
     }
   }
   if (current.length > 0) rows.push(current);
-  return rows.map((entries) => {
-    const rowTilesWidth = widthOf(entries, 0);
-    const maxGap = entries.length > 1 ? Math.floor((availableWidth - rowTilesWidth) / (entries.length - 1)) : 0;
-    const gap = Math.min(fanGapFor(entries.length), Math.max(TILE_GUTTER_X, maxGap));
-    return { entries, gap, width: widthOf(entries, gap), height: heightOf(entries) };
+  return rows.map((row) => {
+    const maxGap = row.length > 1 ? Math.floor((availableWidth - row.length * NODE_WIDTH) / (row.length - 1)) : 0;
+    const gap = Math.min(fanGapFor(row.length), Math.max(TILE_GUTTER_X, maxGap));
+    return { ids: row, gap, width: widthOf(row.length, gap), height: NODE_HEIGHT };
   });
 }
 
@@ -308,60 +237,44 @@ export function spreadAlong(from: number, width: number, index: number, count: n
 }
 
 /**
- * @param hub The system this Context view is scoped to, plus its own module list (empty unless it's a platform with modules).
- * @param internalNeighbours Non-external `uses`/`flows_to` neighbours — systems, containers and actors alike.
- * @param externalNeighbours Same shape, for `isExternal` neighbours — placed below the boundary.
+ * @param hubId The system or container this Context view is scoped to.
+ * @param internalNeighbourIds Non-external `uses`/`flows_to` neighbours — systems, containers (S1 item 20) and actors (S1 item 11a) alike.
+ * @param externalNeighbourIds Same, for `isExternal` neighbours — placed below the boundary, same as the landscape's own external band.
  * @param widthHint The canvas's own on-screen width at layout time — same `MIN_DIAGRAM_WIDTH` floor shape `layout.ts`'s own `layoutWidthHint` uses.
  * @param edges Every drawn edge (rework items 2–3) — sizes the channels and is routed into `ContextDiagramLayout.edges`. Empty is a valid (edgeless) layout.
  */
 export function computeContextDiagramLayout(
-  hub: DiagramUnitInput,
-  internalNeighbours: readonly DiagramUnitInput[],
-  externalNeighbours: readonly DiagramUnitInput[],
+  hubId: UUID,
+  internalNeighbourIds: readonly UUID[],
+  externalNeighbourIds: readonly UUID[],
   widthHint: number = MIN_DIAGRAM_WIDTH,
   edges: readonly ContextEdgeInput[] = [],
 ): ContextDiagramLayout {
   const width = Math.max(MIN_DIAGRAM_WIDTH, widthHint);
   const availableWidth = width - 2 * PADDING;
 
-  // ---- The hub: centred, at the top. ----
+  // ---- The hub: centred, at the top. Always a plain NODE_WIDTH×NODE_HEIGHT tile — a platform with modules never reaches this layout (module comment above). ----
   const boundaryTop = PADDING;
-  const hubSize = tileSize(hub.modules.length);
-  const hubX = PADDING + (availableWidth - hubSize.w) / 2;
-  const hubTile: DiagramTile = { elementId: hub.elementId, x: hubX, y: boundaryTop, w: hubSize.w, h: hubSize.h, ...(hub.modules.length > 0 ? { modules: placeModules(hubX, boundaryTop, hubSize.w, hub.modules) } : {}) };
-  const hubModules = hubTile.modules ?? [];
-  const moduleById = new Map(hubModules.map((m) => [m.elementId, m]));
-  const hubCentreX = hubTile.x + hubTile.w / 2;
+  const hubX = PADDING + (availableWidth - NODE_WIDTH) / 2;
+  const hubTile: DiagramTile = { elementId: hubId, x: hubX, y: boundaryTop, w: NODE_WIDTH, h: NODE_HEIGHT };
 
-  // ---- x-phase: plan every row's tiles and x positions (independent of channel heights). ----
-  const sizeUnit = (unit: DiagramUnitInput): SizedUnit => {
-    const size = tileSize(unit.modules.length);
-    const attached = [...new Set(unit.attachedModuleIds ?? [])].map((id) => moduleById.get(id)).filter((m): m is ModuleTile => m !== undefined);
-    const desiredX = attached.length > 0 ? attached.reduce((sum, m) => sum + m.x + m.w / 2, 0) / attached.length : hubCentreX;
-    return { unit, w: size.w, h: size.h, desiredX };
-  };
-  const internalPlan = planFanRows(internalNeighbours.map(sizeUnit), availableWidth);
-  const externalPlan = planFanRows(externalNeighbours.map(sizeUnit), availableWidth);
+  // ---- x-phase: plan every row's tiles and x positions. ----
+  const internalPlan = planFanRows(internalNeighbourIds, availableWidth);
+  const externalPlan = planFanRows(externalNeighbourIds, availableWidth);
   const plannedRows: { plan: PlannedRow; external: boolean }[] = [...internalPlan.map((plan) => ({ plan, external: false })), ...externalPlan.map((plan) => ({ plan, external: true }))];
 
-  interface PlacedTile {
-    tile: DiagramTile;
-    rowIndex: number;
-  }
-  const placed = new Map<UUID, PlacedTile>();
   const rowXs: { left: number; right: number; xs: number[] }[] = plannedRows.map(({ plan }) => {
     let x = PADDING + (availableWidth - plan.width) / 2;
     const xs: number[] = [];
-    for (const entry of plan.entries) {
+    plan.ids.forEach(() => {
       xs.push(x);
-      x += entry.w + plan.gap;
-    }
+      x += NODE_WIDTH + plan.gap;
+    });
     const first = xs[0] ?? PADDING;
-    const last = plan.entries[plan.entries.length - 1];
-    return { left: first, right: (xs[xs.length - 1] ?? PADDING) + (last?.w ?? 0), xs };
+    return { left: first, right: (xs[xs.length - 1] ?? PADDING) + NODE_WIDTH, xs };
   });
 
-  // ---- Edge planning that needs only x: which side each edge attaches on, its attach x's, and whether it needs a lane. ----
+  // ---- Edge planning that needs only x: attach x's on each side, and whether an edge needs a lane. ----
   const edgesByNeighbour = new Map<UUID, ContextEdgeInput[]>();
   for (const edge of edges) {
     const list = edgesByNeighbour.get(edge.neighbourId) ?? [];
@@ -370,47 +283,32 @@ export function computeContextDiagramLayout(
   }
   const rowIndexOf = new Map<UUID, number>();
   plannedRows.forEach(({ plan }, rowIndex) => {
-    for (const entry of plan.entries) rowIndexOf.set(entry.unit.elementId, rowIndex);
+    for (const id of plan.ids) rowIndexOf.set(id, rowIndex);
   });
   const tileXOf = new Map<UUID, { x: number; w: number }>();
   plannedRows.forEach(({ plan }, rowIndex) => {
-    plan.entries.forEach((entry, i) => {
-      tileXOf.set(entry.unit.elementId, { x: rowXs[rowIndex]?.xs[i] ?? PADDING, w: entry.w });
+    plan.ids.forEach((id, i) => {
+      tileXOf.set(id, { x: rowXs[rowIndex]?.xs[i] ?? PADDING, w: NODE_WIDTH });
     });
   });
-  const hubEndpointBox = (endpointId: UUID): { x: number; w: number } => {
-    const module = moduleById.get(endpointId);
-    return module ? { x: module.x, w: module.w } : { x: hubTile.x, w: hubTile.w };
-  };
-  const hubEndpointCentre = (endpointId: UUID): number => {
-    const box = hubEndpointBox(endpointId);
-    return box.x + box.w / 2;
-  };
 
-  // Attach order at a neighbour: by the hub endpoint's centre x (left to right), ties by id — so a neighbour's own drops never cross each other on the way up.
+  // Attach order at a neighbour: by edge id (there's only ever one hub endpoint to order against now) — so a neighbour's own drops never cross each other on the way up.
   const neighbourAttachX = new Map<UUID, number>();
   for (const [neighbourId, list] of edgesByNeighbour) {
     const box = tileXOf.get(neighbourId);
     if (!box) continue;
-    const ordered = [...list].sort((a, b) => hubEndpointCentre(a.hubEndpointId) - hubEndpointCentre(b.hubEndpointId) || compareIds(a.id, b.id));
+    const ordered = [...list].sort((a, b) => compareIds(a.id, b.id));
     ordered.forEach((edge, i) => {
       neighbourAttachX.set(edge.id, spreadAlong(box.x, box.w, i, ordered.length));
     });
   }
-  // Attach order at a hub endpoint: by the neighbour's own attach x, ties by id.
-  const edgesByHubEndpoint = new Map<UUID, ContextEdgeInput[]>();
-  for (const edge of edges) {
-    if (!tileXOf.has(edge.neighbourId)) continue;
-    const list = edgesByHubEndpoint.get(edge.hubEndpointId) ?? [];
-    list.push(edge);
-    edgesByHubEndpoint.set(edge.hubEndpointId, list);
-  }
+  // Attach order at the hub: every edge that touches a placed neighbour, ordered by the neighbour's own attach x, spread along the hub tile's own bottom edge — so several edges converging on the one hub tile don't all run through the same point.
+  const hubEdges = edges.filter((e) => tileXOf.has(e.neighbourId));
   const hubAttachX = new Map<UUID, number>();
-  for (const [endpointId, list] of edgesByHubEndpoint) {
-    const box = hubEndpointBox(endpointId);
-    const ordered = [...list].sort((a, b) => (neighbourAttachX.get(a.id) ?? 0) - (neighbourAttachX.get(b.id) ?? 0) || compareIds(a.id, b.id));
+  {
+    const ordered = [...hubEdges].sort((a, b) => (neighbourAttachX.get(a.id) ?? 0) - (neighbourAttachX.get(b.id) ?? 0) || compareIds(a.id, b.id));
     ordered.forEach((edge, i) => {
-      hubAttachX.set(edge.id, spreadAlong(box.x, box.w, i, ordered.length));
+      hubAttachX.set(edge.id, spreadAlong(hubTile.x, hubTile.w, i, ordered.length));
     });
   }
 
@@ -429,7 +327,7 @@ export function computeContextDiagramLayout(
     provisionalRiserX: number | null;
   }
   const plans: EdgePlan[] = [];
-  for (const edge of edges) {
+  for (const edge of hubEdges) {
     const rowIndex = rowIndexOf.get(edge.neighbourId);
     const fromX = neighbourAttachX.get(edge.id);
     const toX = hubAttachX.get(edge.id);
@@ -445,7 +343,7 @@ export function computeContextDiagramLayout(
 
   // Top-channel lanes: every edge whose top-channel horizontal has a real span. Widest span nearest the hub (lane 0) — its long run then sits farthest from the label stacks.
   const topSpanOf = (p: EdgePlan): number => Math.abs(p.toX - (p.provisionalRiserX ?? p.fromX));
-  const topLaneEdges = plans.filter((p) => topSpanOf(p) >= STRAIGHT_EPSILON).sort((a, b) => topSpanOf(b) - topSpanOf(a) || compareIds(a.edge.id, b.edge.id));
+  const topLaneEdges = plans.filter((p) => topSpanOf(p) >= 1).sort((a, b) => topSpanOf(b) - topSpanOf(a) || compareIds(a.edge.id, b.edge.id));
   const topLane = new Map<UUID, number>(topLaneEdges.map((p, i) => [p.edge.id, i]));
 
   // Own-row lanes for deeper rows (the horizontal from the neighbour's drop out to its riser): per row, widest span first.
@@ -473,10 +371,11 @@ export function computeContextDiagramLayout(
   // ---- y-phase: channel heights from label stacks and lane counts, then place rows. ----
   const rows: DiagramRow[] = [];
   const tiles: DiagramTile[] = [];
+  const placed = new Map<UUID, DiagramTile>();
   let y = hubTile.y + hubTile.h;
   let boundaryBottom = y;
   plannedRows.forEach(({ plan, external }, rowIndex) => {
-    const maxEdgesPerNeighbour = Math.max(0, ...plan.entries.map((e) => edgesByNeighbour.get(e.unit.elementId)?.length ?? 0));
+    const maxEdgesPerNeighbour = Math.max(0, ...plan.ids.map((id) => edgesByNeighbour.get(id)?.length ?? 0));
     const laneCount = rowIndex === 0 ? topLaneEdges.length : (ownLaneCount.get(rowIndex) ?? 0);
     const labelBand = maxEdgesPerNeighbour > 0 ? LABEL_MARGIN + maxEdgesPerNeighbour * LABEL_PITCH : 0;
     const laneBand = laneCount > 0 ? LANE_MARGIN + laneCount * LANE_PITCH : 0;
@@ -490,34 +389,28 @@ export function computeContextDiagramLayout(
     const top = y + channelHeight;
     const xs = rowXs[rowIndex]?.xs ?? [];
     const tileIds: UUID[] = [];
-    plan.entries.forEach((entry, i) => {
+    plan.ids.forEach((id, i) => {
       const x = xs[i] ?? PADDING;
-      const tile: DiagramTile = { elementId: entry.unit.elementId, x, y: top, w: entry.w, h: entry.h, ...(entry.unit.modules.length > 0 ? { modules: placeModules(x, top, entry.w, entry.unit.modules) } : {}) };
+      const tile: DiagramTile = { elementId: id, x, y: top, w: NODE_WIDTH, h: NODE_HEIGHT };
       tiles.push(tile);
-      placed.set(tile.elementId, { tile, rowIndex });
-      tileIds.push(tile.elementId);
+      placed.set(id, tile);
+      tileIds.push(id);
     });
-    const bottom = top + plan.height;
+    const bottom = top + NODE_HEIGHT;
     rows.push({ index: rowIndex, external, tileIds, top, bottom, left: rowXs[rowIndex]?.left ?? PADDING, right: rowXs[rowIndex]?.right ?? PADDING, gap: plan.gap, channelTop, channelBottom: top });
     y = bottom;
     if (!external) boundaryBottom = bottom;
   });
 
   // ---- Routes. ----
-  const laneY = (row: DiagramRow, laneIndex: number): number => {
-    // Lanes hang from the channel's top (nearest the hub / the row above): lane 0 highest.
-    return row.channelTop + LANE_MARGIN + laneIndex * LANE_PITCH;
-  };
+  const laneY = (row: DiagramRow, laneIndex: number): number => row.channelTop + LANE_MARGIN + laneIndex * LANE_PITCH;
   const topRow = rows[0];
   const routed: RoutedEdge[] = [];
   for (const plan of plans) {
     const row = rows[plan.rowIndex];
-    const neighbourTile = placed.get(plan.edge.neighbourId)?.tile;
+    const neighbourTile = placed.get(plan.edge.neighbourId);
     if (!row || !neighbourTile || !topRow) continue;
-    const module = moduleById.get(plan.edge.hubEndpointId);
-    const hubAnchor: DiagramAnchor = module
-      ? { x: plan.toX, y: module.y + module.h, isPlatformFallback: false }
-      : { x: plan.toX, y: hubTile.y + hubTile.h, isPlatformFallback: hubModules.length > 0 && plan.edge.hubEndpointId === hubTile.elementId };
+    const hubAnchor: Point = { x: plan.toX, y: hubTile.y + hubTile.h };
     const neighbourAnchor: Point = { x: plan.fromX, y: neighbourTile.y };
 
     const points: Point[] = [neighbourAnchor];
@@ -563,7 +456,7 @@ export function computeContextDiagramLayout(
   const shift = leftmost < PADDING ? PADDING - leftmost : 0;
   if (shift > 0) {
     // A left-side riser ran past the left padding: translate everything right by the shortfall (a pure offset — order and spacing unchanged).
-    const shiftTile = (t: DiagramTile): DiagramTile => ({ ...t, x: t.x + shift, ...(t.modules ? { modules: t.modules.map((m) => ({ ...m, x: m.x + shift })) } : {}) });
+    const shiftTile = (t: DiagramTile): DiagramTile => ({ ...t, x: t.x + shift });
     const shiftedHub = shiftTile(hubTile);
     const shiftedTiles = tiles.map(shiftTile);
     const shiftedRows = rows.map((r) => ({ ...r, left: r.left + shift, right: r.right + shift }));
@@ -571,7 +464,7 @@ export function computeContextDiagramLayout(
       ...e,
       points: e.points.map((p) => ({ x: p.x + shift, y: p.y })),
       neighbourAnchor: { x: e.neighbourAnchor.x + shift, y: e.neighbourAnchor.y },
-      hubAnchor: { ...e.hubAnchor, x: e.hubAnchor.x + shift },
+      hubAnchor: { x: e.hubAnchor.x + shift, y: e.hubAnchor.y },
       labelAnchor: { ...e.labelAnchor, x: e.labelAnchor.x + shift, minX: e.labelAnchor.minX + shift, maxX: e.labelAnchor.maxX + shift },
     }));
     const internalIds = new Set(rows.filter((r) => !r.external).flatMap((r) => r.tileIds));
@@ -604,24 +497,7 @@ export function allTilesOf(layout: ContextDiagramLayout): DiagramTile[] {
   return [layout.hub, ...layout.internalNeighbours, ...layout.externalNeighbours];
 }
 
-/**
- * The hub side of an edge, before attach-point spreading: the bottom-centre
- * of whichever box `endpointElementId` names — a specific module's own
- * sub-tile, or the hub tile itself (flagged `isPlatformFallback` when the
- * hub has modules but the edge names the platform — V1's "which module?"
- * marker). `computeContextDiagramLayout` spreads several edges along that
- * bottom edge (`spreadAlong`); this is the single-edge centre the spread
- * is relative to, kept for callers that only need "where does this box
- * end."
- */
-export function anchorFor(tile: DiagramTile, endpointElementId: UUID): DiagramAnchor {
-  const module = tile.modules?.find((m) => m.elementId === endpointElementId);
-  if (module) return { x: module.x + module.w / 2, y: module.y + module.h, isPlatformFallback: false };
-  const isFallback = (tile.modules?.length ?? 0) > 0 && endpointElementId === tile.elementId;
-  return { x: tile.x + tile.w / 2, y: tile.y + tile.h, isPlatformFallback: isFallback };
-}
-
-/** The neighbour side of an edge, before spreading: top-centre of its own tile. A neighbour tile is always one plain box (decision 11, `docs/UI-principles.md` §10 — a neighbour platform's own modules are never nested). */
+/** The neighbour side of an edge, before spreading: top-centre of its own tile. */
 export function tileTopAnchor(tile: DiagramTile): Point {
   return { x: tile.x + tile.w / 2, y: tile.y };
 }

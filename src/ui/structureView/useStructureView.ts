@@ -48,7 +48,7 @@ const CONFIG: StructureViewKindConfig = { viewKind: 'container', parentType: 'sy
 
 /**
  * Loads the Container view. No `view_layouts` — same reason as
- * useSystemContext.ts: DOM/CSS grouping, no pixel position to persist.
+ * useElementContext.ts: DOM/CSS grouping, no pixel position to persist.
  *
  * Sprint C1: a branch ref folds via src/db/branchProjection.ts instead of
  * querying `elements_head`/`relationships_head` — same reasoning as

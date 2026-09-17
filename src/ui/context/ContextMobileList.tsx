@@ -8,15 +8,13 @@ import { Text } from '../components/Text/Text';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { edgeLabel, type ContextGroup, type ContextNeighbour } from './contextGrouping';
-import type { ContextModule } from './contextDiagramData';
 import styles from './ContextMobileList.module.css';
 
 export interface ContextMobileListProps {
   group: ContextGroup;
-  platformModulesById: ReadonlyMap<UUID, ContextModule[]>;
   elementHref: (elementId: UUID) => string;
-  /** Systems only — a container/actor neighbour has no Context view of its own (same reasoning `ContextDiagramCanvas.tsx`'s own prop comment gives). */
-  neighbourContextHref: (systemId: UUID) => string;
+  /** Systems and containers only — an actor neighbour has no Context view of its own (same reasoning `ContextDiagramCanvas.tsx`'s own prop comment gives). */
+  neighbourContextHref: (elementId: UUID) => string;
 }
 
 type DirectionKey = 'uses' | 'used-by' | 'flows-out' | 'flows-in' | 'people';
@@ -42,15 +40,13 @@ interface DirectionRow {
  * uses/used-by split would just be noise for the one group that's already
  * distinguished by icon.
  */
-export function ContextMobileList({ group, platformModulesById, elementHref, neighbourContextHref }: ContextMobileListProps) {
+export function ContextMobileList({ group, elementHref, neighbourContextHref }: ContextMobileListProps) {
   const [expandedKey, setExpandedKey] = useState<DirectionKey | null>(null);
-  // Label routing rework (SAP fixture): the hub's own module ids — an edge leaving a module (PM → PowerON) is outbound from the hub side, same as one leaving the platform itself. Before this, every module-outbound flow was filed under "Flows in" with the inbound arrow.
-  const hubModuleIds = new Set((platformModulesById.get(group.hub.element_id) ?? []).map((m) => m.elementId));
 
   const rowsByDirection = new Map<DirectionKey, DirectionRow[]>();
   for (const neighbour of [...group.internal, ...group.external]) {
     for (const edge of neighbour.edges) {
-      const key = directionOf(neighbour, edge, group.hub.element_id, hubModuleIds);
+      const key = directionOf(neighbour, edge, group.hub.element_id);
       const list = rowsByDirection.get(key) ?? [];
       list.push({ neighbour, edge });
       rowsByDirection.set(key, list);
@@ -75,8 +71,6 @@ export function ContextMobileList({ group, platformModulesById, elementHref, nei
                   neighbour={neighbour}
                   edge={edge}
                   hubId={group.hub.element_id}
-                  hubModuleIds={hubModuleIds}
-                  modules={platformModulesById.get(neighbour.element.element_id)}
                   elementHref={elementHref}
                   neighbourContextHref={neighbourContextHref}
                 />
@@ -89,9 +83,9 @@ export function ContextMobileList({ group, platformModulesById, elementHref, nei
   );
 }
 
-function directionOf(neighbour: ContextNeighbour, edge: RelationshipsHeadRow, hubId: UUID, hubModuleIds: ReadonlySet<UUID>): DirectionKey {
+function directionOf(neighbour: ContextNeighbour, edge: RelationshipsHeadRow, hubId: UUID): DirectionKey {
   if (neighbour.element.element_type === 'actor') return 'people';
-  const outbound = edge.from_element_id === hubId || hubModuleIds.has(edge.from_element_id);
+  const outbound = edge.from_element_id === hubId;
   if (edge.relationship_type === 'flows_to') return outbound ? 'flows-out' : 'flows-in';
   return outbound ? 'uses' : 'used-by';
 }
@@ -124,16 +118,12 @@ function NeighbourRow({
   neighbour,
   edge,
   hubId,
-  hubModuleIds,
-  modules,
   elementHref,
   neighbourContextHref,
 }: {
   neighbour: ContextNeighbour;
   edge: RelationshipsHeadRow;
   hubId: UUID;
-  hubModuleIds: ReadonlySet<UUID>;
-  modules: ContextModule[] | undefined;
   elementHref: (id: UUID) => string;
   neighbourContextHref: (id: UUID) => string;
 }) {
@@ -141,11 +131,11 @@ function NeighbourRow({
   const attrs = attributesRecord(element.attributes);
   const external = attrs.isExternal === true;
   const actorSubtype = element.element_type === 'actor' && typeof attrs.subtype === 'string' ? (attrs.subtype as ActorSubtype) : undefined;
-  const lifecycleStatus = element.element_type === 'system' && typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
+  const lifecycleStatus = (element.element_type === 'system' || element.element_type === 'container') && typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
-  // A system has no Context view of its own only when it's not actually a
-  // system (a container or actor reached this row directly, S1 items 20/11a).
-  const href = element.element_type === 'system' ? neighbourContextHref(element.element_id) : elementHref(element.element_id);
+  // Only an actor neighbour has no Context view of its own (S1 item 11a) —
+  // a container gets one just like a system does, per V3.
+  const href = element.element_type === 'system' || element.element_type === 'container' ? neighbourContextHref(element.element_id) : elementHref(element.element_id);
 
   return (
     <li className={styles.row}>
@@ -162,26 +152,8 @@ function NeighbourRow({
         {external && <Chip tone="neutral">external</Chip>}
       </Link>
       <Text as="span" size="sm" tone="muted" className={styles.rowVerb}>
-        {edgeLabel(edge, hubId, hubModuleIds)}
+        {edgeLabel(edge, hubId)}
       </Text>
-      {modules && modules.length > 0 && (
-        <ul className={styles.moduleRows}>
-          {modules.map((module) => (
-            <li key={module.elementId}>
-              <Link to={elementHref(module.elementId)} className={styles.moduleRow}>
-                <Text as="span" size="sm">
-                  {module.name}
-                </Text>
-                {module.capabilityName && (
-                  <Text as="span" size="xs" tone="faint">
-                    {module.capabilityName}
-                  </Text>
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
     </li>
   );
 }

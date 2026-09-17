@@ -132,10 +132,10 @@ describe('tileColourFor', () => {
     expect(tileColourFor('none', 'cap-1', [supports('sys-1', 'cap-1')], new Map([['sys-1', system('sys-1', 'retired')]]))).toEqual({ tone: undefined, label: undefined });
   });
 
-  it('flags zero supporting systems as a coverage gap (warn), any real count as plain neutral', () => {
-    expect(tileColourFor('metric:supportingSystemCount', 'cap-1', [], new Map())).toEqual({ tone: 'warn', label: '0 supporting systems' });
+  it('flags zero supporting systems as a coverage gap (warn), any real count as plain neutral — the label states the tone in words, never the count, since LandscapeZoomLink already shows that unconditionally right beside it', () => {
+    expect(tileColourFor('metric:supportingSystemCount', 'cap-1', [], new Map())).toEqual({ tone: 'warn', label: 'no supporting systems' });
     const edges = [supports('sys-1', 'cap-1')];
-    expect(tileColourFor('metric:supportingSystemCount', 'cap-1', edges, new Map([['sys-1', system('sys-1')]]))).toEqual({ tone: 'neutral', label: '1 supporting system' });
+    expect(tileColourFor('metric:supportingSystemCount', 'cap-1', edges, new Map([['sys-1', system('sys-1')]]))).toEqual({ tone: 'neutral', label: 'supporting systems' });
   });
 
   it('never uses a status/danger tone for a merely-large supporting-system count', () => {
@@ -238,14 +238,14 @@ describe('aggregateTileColourFor (Sprint U4-1 C3 review note: L1 group header)',
     expect(aggregateTileColourFor('metric:oldestLifecycleStage', ['cap-1', 'cap-2'], edges, systemsById)).toEqual({ tone: 'neutral', label: 'retired' });
   });
 
-  it('coverage: fraction-supported, not worst-of-children — the label names the real fraction', () => {
+  it('coverage: fraction-supported, not worst-of-children — the tone reflects the real fraction, but the label states it in words, never the digits (`computeCapabilityRollup`\'s own supportedCapabilityCount/totalCapabilityCount is the one place that fraction is printed as a number, in the always-on group header line — this chip used to duplicate it)', () => {
     const systemsById = new Map([['sys-1', system('sys-1')]]);
     const edges = [supports('sys-1', 'cap-1')];
-    expect(aggregateTileColourFor('metric:supportingSystemCount', ['cap-1', 'cap-2', 'cap-3'], edges, systemsById)).toEqual({ tone: 'neutral', label: '1/3 capabilities supported' });
+    expect(aggregateTileColourFor('metric:supportingSystemCount', ['cap-1', 'cap-2', 'cap-3'], edges, systemsById)).toEqual({ tone: 'neutral', label: 'capabilities supported' });
   });
 
   it('coverage: warn only when literally none of the group\'s descendants have a supporting system', () => {
-    expect(aggregateTileColourFor('metric:supportingSystemCount', ['cap-1', 'cap-2'], [], new Map())).toEqual({ tone: 'warn', label: '0/2 capabilities supported' });
+    expect(aggregateTileColourFor('metric:supportingSystemCount', ['cap-1', 'cap-2'], [], new Map())).toEqual({ tone: 'warn', label: 'no capabilities supported' });
   });
 
   it('criticality: worst-of-children, same shape as oldest lifecycle stage (Prompt 7k item 1)', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import { computeContextGroup, edgeLabel } from './contextGrouping';
+import { computeContextGroup, computePlatformConnections, edgeLabel } from './contextGrouping';
 
 function system(id: string, name: string, external = false): ElementsHeadRow {
   return { element_id: id, element_type: 'system', name, parent_id: null, attributes: { lifecycleStatus: 'active', isExternal: external }, exists_delta_id: `d-${id}` };
@@ -173,49 +173,40 @@ describe('computeContextGroup', () => {
     expect(byId.get('owner2')).toMatchObject({ isExternal: true, externalOrganisation: 'Ofgem' });
   });
 
-  // V1 (the context diagram): a `flows_to`/`uses` edge can now attach to
-  // one of the hub's own modules directly (S1 item 20's container↔system
-  // rules) rather than the hub itself — `hubModuleIds` is how the caller
-  // tells this function which ids count as "the hub side" for exactly
-  // that reason.
-  describe('V1: hubModuleIds — an edge attached to one of the hub\'s own modules', () => {
-    it('resolves the *other* endpoint as the neighbour, not the module itself, when the module is the "to" side', () => {
-      const hub = system('sap', 'SAP');
-      const salesforce = system('salesforce', 'Salesforce');
-      const group = computeContextGroup(hub, [flowsToEdge('salesforce', 'fi', 'sends billing events to')], new Map([['salesforce', salesforce]]), new Set(['fi']));
-      expect(group.internal.map((n) => n.element.element_id)).toEqual(['salesforce']);
-      // The edge itself is untouched — its own `to_element_id` still names
-      // the module directly, for the diagram's own module-anchor lookup.
-      expect(group.internal[0]?.edges[0]?.to_element_id).toBe('fi');
-    });
+});
 
-    it('resolves the *other* endpoint as the neighbour when the module is the "from" side', () => {
-      const hub = system('sap', 'SAP');
-      const consumerPortal = system('consumer-portal', 'Consumer Portal');
-      const group = computeContextGroup(hub, [usesEdge('consumer-portal', 'fi', 'reads balances from')], new Map([['consumer-portal', consumerPortal]]), new Set(['fi']));
-      expect(group.internal.map((n) => n.element.element_id)).toEqual(['consumer-portal']);
-    });
+describe('computePlatformConnections', () => {
+  it('lists a genuine direct uses/flows_to edge on the platform itself, not one of its modules', () => {
+    const hub = system('sap', 'SAP');
+    const other = system('other', 'Regulator Portal');
+    const connections = computePlatformConnections(hub, [usesEdge('sap', 'other', 'submits filings to')], new Map([['other', other]]));
+    expect(connections).toEqual([{ relationshipId: 'r1', otherElementId: 'other', otherName: 'Regulator Portal', label: 'submits filings to →' }]);
+  });
 
-    it('still resolves the neighbour correctly for an edge that names the hub itself, not a module', () => {
-      const hub = system('sap', 'SAP');
-      const ofgem = actor('ofgem', 'Ofgem', true, 'Ofgem');
-      const group = computeContextGroup(hub, [usesEdge('ofgem', 'sap', 'submits RIIO returns to')], new Map([['ofgem', ofgem]]), new Set(['fi', 'pm']));
-      expect(group.external.map((n) => n.element.element_id)).toEqual(['ofgem']);
-    });
+  it('is empty when the platform has no direct edge of its own', () => {
+    const hub = system('sap', 'SAP');
+    expect(computePlatformConnections(hub, [], new Map())).toEqual([]);
+  });
 
-    it('drops an edge between two of the hub\'s own modules — never a real neighbour edge', () => {
-      const hub = system('sap', 'SAP');
-      const group = computeContextGroup(hub, [usesEdge('fi', 'pm', 'internal transfer')], new Map(), new Set(['fi', 'pm']));
-      expect(group.internal).toEqual([]);
-      expect(group.external).toEqual([]);
-    });
+  it('ignores an owns/supports edge — never a Context node or drawn edge, same restriction computeContextGroup applies', () => {
+    const hub = system('sap', 'SAP');
+    const actorRow = actor('owner1', 'Platform Team');
+    const capability: ElementsHeadRow = { element_id: 'cap1', element_type: 'capability', name: 'Cap', parent_id: null, attributes: {}, exists_delta_id: 'd-cap1' };
+    const connections = computePlatformConnections(hub, [ownsRel('r1', 'owner1', 'sap', 'business'), rel('r2', 'supports', 'sap', 'cap1')], new Map([['owner1', actorRow], ['cap1', capability]]));
+    expect(connections).toEqual([]);
+  });
 
-    it('with no hubModuleIds given (the default), an edge naming a would-be module id is simply not recognised as touching the hub at all', () => {
-      const hub = system('sap', 'SAP');
-      const salesforce = system('salesforce', 'Salesforce');
-      const group = computeContextGroup(hub, [flowsToEdge('salesforce', 'fi', 'sends billing events to')], new Map([['salesforce', salesforce]]));
-      expect(group.internal).toEqual([]);
-    });
+  it('drops a relationship whose other endpoint never resolved, rather than rendering a row for it', () => {
+    const hub = system('sap', 'SAP');
+    expect(computePlatformConnections(hub, [usesEdge('sap', 'missing', 'integrates with')], new Map())).toEqual([]);
+  });
+
+  it('sorts by the other element\'s name, then id', () => {
+    const hub = system('sap', 'SAP');
+    const b = system('b', 'Beta');
+    const a = system('a', 'Alpha');
+    const connections = computePlatformConnections(hub, [rel('r1', 'uses', 'sap', 'b'), rel('r2', 'uses', 'sap', 'a')], new Map([['a', a], ['b', b]]));
+    expect(connections.map((c) => c.otherElementId)).toEqual(['a', 'b']);
   });
 });
 
@@ -239,14 +230,5 @@ describe('edgeLabel (Sprint U4-2c item 1: "edit a verb ... and see it on the con
     expect(edgeLabel(usesEdge('hub', 'n1', '   '), 'hub')).toBe('uses →');
     expect(edgeLabel(flowsToEdge('hub', 'n1'), 'hub')).toBe('flows to ⇢');
     expect(edgeLabel(flowsToEdge('n1', 'hub'), 'hub')).toBe('⇢ flows from');
-  });
-
-  it('label routing rework (SAP fixture): an edge leaving one of the hub\'s own modules is outbound — the same arrow as one leaving the platform itself, not the inbound arrow', () => {
-    const hubModules = new Set(['pm']);
-    expect(edgeLabel(flowsToEdge('pm', 'poweron', 'sends maintenance outage requests to'), 'sap', hubModules)).toBe('sends maintenance outage requests to ⇢');
-    expect(edgeLabel(flowsToEdge('poweron', 'pm', 'returns switching schedules to'), 'sap', hubModules)).toBe('⇢ returns switching schedules to');
-    expect(edgeLabel(usesEdge('pm', 'poweron', 'dispatches to'), 'sap', hubModules)).toBe('dispatches to →');
-    // Without the module set, the old (wrong) reading — kept only to show what the parameter changes.
-    expect(edgeLabel(flowsToEdge('pm', 'poweron', 'sends maintenance outage requests to'), 'sap')).toBe('⇢ sends maintenance outage requests to');
   });
 });

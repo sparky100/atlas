@@ -18,7 +18,7 @@ export interface LandscapeMobileListProps {
   groups: LandscapeGroups;
   /** Tap target for both system and actor rows — their own element page (item 13's own words: "tap → element page"). */
   elementHref: (elementId: UUID) => string;
-  /** The row's own separate "Context →" link — systems only (an actor has no Context view of its own, same reasoning `LandscapeCanvas.tsx`'s `actorHref` doc comment already gives). */
+  /** The row's own separate "Context →" link — every row but an actor (V3: a container has a Context view of its own too now; an actor still has none, same reasoning `LandscapeCanvas.tsx`'s `actorHref` doc comment already gives). */
   contextHref: (systemId: UUID) => string;
   /**
    * S1 item 12: "markers ... on the mobile landscape list" — the same
@@ -202,12 +202,11 @@ function SystemRow({
   // subtype glyph (person/team/organisation), not the bare actor glyph.
   const actorSubtype = system.element_type === 'actor' && typeof attrs.subtype === 'string' ? (attrs.subtype as ActorSubtype) : undefined;
 
-  // "Platforms and modules": a module tile's own element is a Container
-  // (`system` here is really "the lane member," not always a System) —
-  // it has no Context view of its own, same reasoning `contextHref`'s own
-  // doc comment already gives for an actor — extended here (S1 item 11a)
-  // since an actor can now genuinely reach this row, not just a module.
-  const hasNoContextView = system.element_type === 'container' || system.element_type === 'actor';
+  // V3 ("container context pages"): a module tile's own element is a
+  // Container (`system` here is really "the lane member," not always a
+  // System), and now has a Context view of its own too, the same as an
+  // ordinary system — only an actor still has no Context view to link to.
+  const hasNoContextView = system.element_type === 'actor';
 
   return (
     <li className={styles.row}>

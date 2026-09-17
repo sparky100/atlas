@@ -58,7 +58,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/elements" element={<ElementsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/landscape" element={<LandscapePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/capability-map" element={<CapabilityMapPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/context/:systemId" element={<ContextPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/context/:elementId" element={<ContextPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/container/:systemId" element={<ContainerPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/versions" element={<VersionsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/changes" element={<ChangesPage />} />

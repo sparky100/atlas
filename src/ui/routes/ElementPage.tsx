@@ -262,7 +262,7 @@ export function ElementPage() {
               onRemoveFromModel={canEdit && state.data.children.length === 0 ? () => { setRemovingFromModel(true); } : undefined}
               onMerge={canEdit ? () => { setMerging(true); } : undefined}
               contextHref={
-                state.data.element.element_type === 'system'
+                state.data.element.element_type === 'system' || state.data.element.element_type === 'container'
                   ? `/o/${orgSlug ?? ''}/m/${model.slug}/context/${state.data.element.element_id}?${refQueryParam(ref, viewing)}`
                   : undefined
               }

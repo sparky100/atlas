@@ -1,26 +1,37 @@
 /**
  * The standing test fixture for the Context diagram: a real-density
- * scenario, not a synthetic two-neighbour one. SAP as a platform with eight
- * modules, five internal neighbours each carrying two to four flows (to
- * different modules, in both directions), and one external organisation
- * using the platform directly (so the boundary, the external band and the
- * "which module?" marker are all exercised too).
+ * scenario, not a synthetic two-neighbour one — SAP PM (Asset Maintenance),
+ * one of SAP's own modules, with four internal neighbours carrying one to
+ * two flows each, and one external organisation auditing it directly (so
+ * the boundary, the external band and a real multi-edge fan are all
+ * exercised together).
+ *
+ * V3 ("container context pages, platform context simplified to structure
+ * only") moved the Context diagram's own crowding case from the platform
+ * level down to a single container's own page — a platform with modules
+ * never draws a diagram at all any more (`PlatformStructureView.tsx`
+ * instead), and a module (a container in its own right) is exactly the
+ * kind of hub this file's own density case now belongs to. `SAP_MODULES`
+ * is kept alongside it — the same 8-module set, reused by the platform's
+ * own structure-page fixture — so both surfaces describe the same SAP
+ * without drifting apart.
  *
  * Two consumers share this one description so they can never drift:
  *
- *  - `contextDiagramLayout.test.ts` feeds `sapContextLayoutInputs()` (stable
+ *  - `contextDiagramLayout.test.ts` feeds `scenarioLayoutInputs()` (stable
  *    string ids, no database) into `computeContextDiagramLayout` and
  *    `placeEdgeLabels`, and asserts the geometry — fan spread, distinct
  *    lanes, no edge through a tile, no label collision at 1280.
- *  - `e2e/fixtures/sapContextFixture.ts` seeds `SAP_CONTEXT_SCENARIO` into a
- *    real model (fresh UUIDs) for `e2e/context-diagram.engine.spec.ts`.
+ *  - `e2e/fixtures/sapContextFixture.ts` seeds `SAP_MODULES` and
+ *    `PM_CONTEXT_SCENARIO` into a real model (fresh UUIDs) for
+ *    `e2e/context-diagram.engine.spec.ts`.
  *
  * Any future change to the Context diagram's layout, routing or labels is
  * checked against this density first. Add neighbours or flows here rather
  * than inventing a smaller case in a test.
  */
 import type { UUID } from '../../../contracts/delta';
-import type { ContextEdgeInput, DiagramUnitInput } from '../contextDiagramLayout';
+import type { ContextEdgeInput } from '../contextDiagramLayout';
 
 export interface ScenarioModule {
   code: string;
@@ -28,12 +39,25 @@ export interface ScenarioModule {
   capability: string;
 }
 
+/** SAP's own 8 modules — the platform-structure page's own fixture (structure only, no neighbours, no diagram). */
+export const SAP_MODULES: readonly ScenarioModule[] = [
+  { code: 'FI', name: 'FI', capability: 'Finance' },
+  { code: 'CO', name: 'CO', capability: 'Management Accounting' },
+  { code: 'MM', name: 'MM', capability: 'Procurement' },
+  { code: 'SD', name: 'SD', capability: 'Customer Billing' },
+  { code: 'PM', name: 'PM', capability: 'Asset Maintenance' },
+  { code: 'PS', name: 'PS', capability: 'Capital Projects' },
+  { code: 'HR', name: 'HR', capability: 'People' },
+  { code: 'BW', name: 'BW', capability: 'Reporting & Analytics' },
+];
+
+export const SAP_HUB_NAME = 'SAP';
+export const SAP_HUB_DESCRIPTION = 'Core ERP platform for finance, procurement, asset maintenance and people.';
+
 export interface ScenarioFlow {
   relationshipType: 'uses' | 'flows_to';
   /** `in`: neighbour → hub side (arrow at the hub); `out`: hub side → neighbour. */
   direction: 'in' | 'out';
-  /** The hub module this flow attaches to, by `ScenarioModule.code`; `null` attaches to the platform itself (the "which module?" marker case). */
-  module: string | null;
   verb: string;
 }
 
@@ -46,47 +70,22 @@ export interface ScenarioNeighbour {
   flows: ScenarioFlow[];
 }
 
-export interface ContextScenario {
-  hubName: string;
-  hubDescription: string;
-  modules: ScenarioModule[];
+export interface ContainerContextScenario {
+  /** Which of `SAP_MODULES` this scenario's own hub is — PM (Asset Maintenance), the module with the most real connections in the source data. */
+  hubModuleCode: string;
   neighbours: ScenarioNeighbour[];
 }
 
-export const SAP_CONTEXT_SCENARIO: ContextScenario = {
-  hubName: 'SAP',
-  hubDescription: 'Core ERP platform for finance, procurement, asset maintenance and people.',
-  modules: [
-    { code: 'FI', name: 'FI', capability: 'Finance' },
-    { code: 'CO', name: 'CO', capability: 'Management Accounting' },
-    { code: 'MM', name: 'MM', capability: 'Procurement' },
-    { code: 'SD', name: 'SD', capability: 'Customer Billing' },
-    { code: 'PM', name: 'PM', capability: 'Asset Maintenance' },
-    { code: 'PS', name: 'PS', capability: 'Capital Projects' },
-    { code: 'HR', name: 'HR', capability: 'People' },
-    { code: 'BW', name: 'BW', capability: 'Reporting & Analytics' },
-  ],
+/** SAP PM's own real neighbours — the Context diagram's density case, moved down to a single module's own page (V3). Every flow here named PM directly in the pre-V3 combined diagram this fixture originally modelled; nothing invented. */
+export const PM_CONTEXT_SCENARIO: ContainerContextScenario = {
+  hubModuleCode: 'PM',
   neighbours: [
     {
       key: 'gdt',
       name: 'Graphical Design Tool',
       elementType: 'system',
       isExternal: false,
-      flows: [
-        { relationshipType: 'flows_to', direction: 'in', module: 'PS', verb: 'submits approved design packs to' },
-        { relationshipType: 'flows_to', direction: 'in', module: 'PM', verb: 'publishes as-built drawings to' },
-      ],
-    },
-    {
-      key: 'crm',
-      name: 'CRM',
-      elementType: 'system',
-      isExternal: false,
-      flows: [
-        { relationshipType: 'flows_to', direction: 'in', module: 'SD', verb: 'raises connection quotations in' },
-        { relationshipType: 'uses', direction: 'in', module: 'FI', verb: 'checks customer credit status in' },
-        { relationshipType: 'flows_to', direction: 'out', module: 'SD', verb: 'returns invoice and payment status to' },
-      ],
+      flows: [{ relationshipType: 'flows_to', direction: 'in', verb: 'publishes as-built drawings to' }],
     },
     {
       key: 'escoms',
@@ -94,9 +93,8 @@ export const SAP_CONTEXT_SCENARIO: ContextScenario = {
       elementType: 'system',
       isExternal: false,
       flows: [
-        { relationshipType: 'flows_to', direction: 'in', module: 'MM', verb: 'requests spares and materials from' },
-        { relationshipType: 'flows_to', direction: 'out', module: 'PM', verb: 'issues planned outage work orders to' },
-        { relationshipType: 'flows_to', direction: 'in', module: 'PM', verb: 'reports fault and switching events to' },
+        { relationshipType: 'flows_to', direction: 'out', verb: 'issues planned outage work orders to' },
+        { relationshipType: 'flows_to', direction: 'in', verb: 'reports fault and switching events to' },
       ],
     },
     {
@@ -105,9 +103,8 @@ export const SAP_CONTEXT_SCENARIO: ContextScenario = {
       elementType: 'system',
       isExternal: false,
       flows: [
-        { relationshipType: 'flows_to', direction: 'out', module: 'PM', verb: 'sends maintenance outage requests to' },
-        { relationshipType: 'flows_to', direction: 'in', module: 'PM', verb: 'returns switching schedules and completion to' },
-        { relationshipType: 'flows_to', direction: 'in', module: 'BW', verb: 'feeds network event history to' },
+        { relationshipType: 'flows_to', direction: 'out', verb: 'sends maintenance outage requests to' },
+        { relationshipType: 'flows_to', direction: 'in', verb: 'returns switching schedules and completion to' },
       ],
     },
     {
@@ -116,10 +113,8 @@ export const SAP_CONTEXT_SCENARIO: ContextScenario = {
       elementType: 'system',
       isExternal: false,
       flows: [
-        { relationshipType: 'flows_to', direction: 'out', module: 'PM', verb: 'dispatches work orders to' },
-        { relationshipType: 'flows_to', direction: 'in', module: 'PM', verb: 'returns job completion and timesheets to' },
-        { relationshipType: 'flows_to', direction: 'in', module: 'HR', verb: 'submits crew timesheets to' },
-        { relationshipType: 'uses', direction: 'in', module: 'MM', verb: 'draws stock from' },
+        { relationshipType: 'flows_to', direction: 'out', verb: 'dispatches work orders to' },
+        { relationshipType: 'flows_to', direction: 'in', verb: 'returns job completion and timesheets to' },
       ],
     },
     {
@@ -128,7 +123,7 @@ export const SAP_CONTEXT_SCENARIO: ContextScenario = {
       elementType: 'actor',
       isExternal: true,
       externalOrganisation: 'Ofgem',
-      flows: [{ relationshipType: 'uses', direction: 'in', module: null, verb: 'submits RIIO returns to' }],
+      flows: [{ relationshipType: 'uses', direction: 'in', verb: 'audits maintenance compliance for' }],
     },
   ],
 };
@@ -140,35 +135,23 @@ export function scenarioEdgeLabel(flow: ScenarioFlow): string {
 }
 
 export interface ScenarioLayoutInputs {
-  hub: DiagramUnitInput;
-  internal: DiagramUnitInput[];
-  external: DiagramUnitInput[];
+  hubId: UUID;
+  internal: UUID[];
+  external: UUID[];
   edges: ContextEdgeInput[];
-  /** Module code → the stable module id used in `hub.modules`. */
-  moduleIdByCode: Map<string, UUID>;
 }
 
-/** The scenario as `computeContextDiagramLayout` inputs, with stable, readable ids (`sap`, `fi`, `crm`, `crm-1`…) — no database, no randomness. */
-export function scenarioLayoutInputs(scenario: ContextScenario = SAP_CONTEXT_SCENARIO): ScenarioLayoutInputs {
-  const hubId = 'sap';
-  const moduleIdByCode = new Map(scenario.modules.map((m) => [m.code, m.code.toLowerCase()]));
-  const hub: DiagramUnitInput = { elementId: hubId, modules: scenario.modules.map((m) => ({ elementId: moduleIdByCode.get(m.code) ?? m.code, capabilityName: m.capability })) };
-  const internal: DiagramUnitInput[] = [];
-  const external: DiagramUnitInput[] = [];
+/** The scenario as `computeContextDiagramLayout` inputs, with stable, readable ids (`pm`, `gdt`, `escoms`…) — no database, no randomness. */
+export function scenarioLayoutInputs(scenario: ContainerContextScenario = PM_CONTEXT_SCENARIO): ScenarioLayoutInputs {
+  const hubId = scenario.hubModuleCode.toLowerCase();
+  const internal: UUID[] = [];
+  const external: UUID[] = [];
   const edges: ContextEdgeInput[] = [];
   for (const neighbour of scenario.neighbours) {
-    const attachedModuleIds = [...new Set(neighbour.flows.map((f) => (f.module ? (moduleIdByCode.get(f.module) ?? f.module) : null)).filter((id): id is string => id !== null))];
-    const unit: DiagramUnitInput = { elementId: neighbour.key, modules: [], attachedModuleIds };
-    (neighbour.isExternal ? external : internal).push(unit);
+    (neighbour.isExternal ? external : internal).push(neighbour.key);
     neighbour.flows.forEach((flow, i) => {
-      edges.push({
-        id: `${neighbour.key}-${String(i)}`,
-        neighbourId: neighbour.key,
-        hubEndpointId: flow.module ? (moduleIdByCode.get(flow.module) ?? flow.module) : hubId,
-        arrowAtHub: flow.direction === 'in',
-        label: scenarioEdgeLabel(flow),
-      });
+      edges.push({ id: `${neighbour.key}-${String(i)}`, neighbourId: neighbour.key, arrowAtHub: flow.direction === 'in', label: scenarioEdgeLabel(flow) });
     });
   }
-  return { hub, internal, external, edges, moduleIdByCode };
+  return { hubId, internal, external, edges };
 }

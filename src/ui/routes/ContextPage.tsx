@@ -14,25 +14,38 @@ import { BranchViewModeControl } from '../branches/BranchViewModeControl';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
+import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { ContextView } from '../context/ContextView';
-import { useSystemContext } from '../context/useSystemContext';
+import { PlatformStructureView } from '../context/PlatformStructureView';
+import { useElementContext } from '../context/useElementContext';
 import { parseCapabilityParam } from '../nav/zoomParams';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import styles from './ViewPage.module.css';
 
 /**
  * The Context view route (UI-principles §6.1/§2.1 — Sprint U2 step 3): one
- * system, everything it connects to. The zoom chain's third stop
- * (capability → landscape → **context** → containers → components).
+ * system or container, everything it connects to. The zoom chain's third
+ * stop (capability → landscape → **context** → containers).
+ *
+ * V3 ("container context pages, platform context simplified to structure
+ * only") extends this route from systems-only to any container too (item
+ * 1 — a container is structurally terminal since "component" was removed,
+ * S1 item 18, so it needs its own Context page rather than none at all),
+ * and branches a platform-with-modules hub to `PlatformStructureView.tsx`
+ * instead of the ordinary neighbour diagram (item 2). The breadcrumb grows
+ * one segment for a container hub — its own platform parent, resolved via
+ * `useBreadcrumbElement.ts` the same way the old Component page once
+ * resolved a container's own parent system (that hook's own doc comment) —
+ * giving the user's own named example, "DNO > Base > main > SAP > SAP FI".
  *
  * Check D1: `<main>` escapes the page's usual centred max-width once
  * there's real content (`ViewPage.module.css`'s own `.mainWithView`
- * comment has the full reasoning, shared with Container/Component).
+ * comment has the full reasoning, shared with Container).
  */
 export function ContextPage() {
-  const { orgSlug, modelSlug, systemId } = useParams<{ orgSlug: string; modelSlug: string; systemId: string }>();
+  const { orgSlug, modelSlug, elementId } = useParams<{ orgSlug: string; modelSlug: string; elementId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { ref } = useSelectedRef();
   const viewing = isViewingMode(searchParams);
@@ -45,8 +58,18 @@ export function ContextPage() {
   const model = models.find((m) => m.slug === modelSlug);
   const capability = useBreadcrumbElement(model?.id ?? null, ref, capabilityId);
   const { label: branchLabel } = useBranchLabel(ref);
+  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
 
-  const state = useSystemContext(model?.id ?? '', organisation?.id ?? '', userId, systemId ?? '', ref, mode);
+  const state = useElementContext(model?.id ?? '', organisation?.id ?? '', userId, elementId ?? '', ref, mode);
+
+  const hub = state.status === 'ready' ? (state.data.kind === 'platform-structure' ? state.data.hub : state.data.group.hub) : null;
+  // V3 item 1's own breadcrumb example ("DNO > Base > main > SAP > SAP FI"):
+  // a container hub's own platform parent, resolved the same "just omit
+  // that one segment" way every other breadcrumb lookup here already
+  // works — `hub.parent_id` is `null` for a standalone solution container,
+  // which simply means no extra segment, not an error.
+  const platformParentId = hub?.element_type === 'container' ? hub.parent_id : null;
+  const platformParent = useBreadcrumbElement(model?.id ?? null, ref, platformParentId, mainBranch?.head_commit_id ?? null);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -65,7 +88,8 @@ export function ContextPage() {
   const refParam = refQueryParam(ref, viewing);
   const segments: BreadcrumbSegment[] = [];
   if (capability) segments.push({ label: capability.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/capability-map?${refParam}` });
-  if (state.status === 'ready') segments.push({ label: state.data.group.hub.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/context/${systemId ?? ''}?${refParam}` });
+  if (platformParent) segments.push({ label: platformParent.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/context/${platformParent.element_id}?${refParam}` });
+  if (hub) segments.push({ label: hub.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}/context/${elementId ?? ''}?${refParam}` });
 
   return (
     <div>
@@ -105,19 +129,23 @@ export function ContextPage() {
         {state.status === 'notPresentAtRef' && (
           <Panel>
             <Text as="p" tone="muted">
-              This system is not present here. It may have been retracted, or never existed at this point.
+              This isn't a system or container here. It may have been retracted, or never existed at this point.
             </Text>
           </Panel>
         )}
-        {state.status === 'ready' && (
-          <ContextView
-            group={state.data.group}
-            platformModulesById={state.data.platformModulesById}
+        {state.status === 'ready' && state.data.kind === 'platform-structure' && (
+          <PlatformStructureView
+            hub={state.data.hub}
+            modules={state.data.modules}
+            connections={state.data.connections}
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}
             refParam={refParam}
             diff={state.data.diff}
           />
+        )}
+        {state.status === 'ready' && state.data.kind === 'group' && (
+          <ContextView group={state.data.group} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} refParam={refParam} diff={state.data.diff} />
         )}
         </main>
       </div>

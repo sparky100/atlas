@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { ElementType, UUID } from '../../contracts/delta';
+import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import { hasExactMatch, loadSearchPoolForTypes, matchElements, type SearchPoolElement } from '../../db/elementSearch';
+import { loadSearchPoolForTypes, matchElements, type SearchPoolElement } from '../../db/elementSearch';
 import { enrichElementMatches, type MatchEnrichment } from '../elements/enrichElementMatches';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
-
-/** Top-level-only element types (ADR-001: `parentId` required non-null for container/component) — the only kinds a home-page search-and-create, with nowhere to pick a parent, can sensibly offer. */
-export const HOME_SEARCH_CREATABLE_TYPES: readonly ElementType[] = ['capability', 'system', 'actor'];
+import { HOME_SEARCH_TYPES, hasCreatableExactMatch } from './homeSearchTypes';
 
 export type HomeSearchStatus = 'loading' | 'ready' | 'error';
 
@@ -15,6 +13,8 @@ export interface HomeSearchResultRow {
   element: ElementsHeadRow;
   relationshipCount: number;
   owner: ElementsHeadRow | null;
+  /** A container's own parent platform/system, for disambiguating a short, commonly-reused module name — `null` for every other type (`enrichElementMatches.ts`'s own `parent` field). */
+  parent: ElementsHeadRow | null;
 }
 
 export interface UseHomeSearchResult {
@@ -36,10 +36,12 @@ export interface UseHomeSearchResult {
 /**
  * Both front doors' search box (UI-principles §3 + the U3b brief: "search
  * box (search-first) that opens or creates an element") — a multi-type
- * generalisation of `useElementSearchAdd.ts`, searching every top-level-
- * creatable type at once rather than one `ElementSearchAdd` control's own
- * single type. Creation itself (`HomeSearch.tsx`) still asks which of
- * those types once nothing matches — this hook only searches.
+ * generalisation of `useElementSearchAdd.ts`, searching every
+ * `HOME_SEARCH_TYPES` type at once rather than one `ElementSearchAdd`
+ * control's own single type. Creation itself (`HomeSearch.tsx`) still asks
+ * which of `HOME_SEARCH_CREATABLE_TYPES` once nothing matches — a strict
+ * subset of what's searched, since a container has nowhere to pick a
+ * parent from Home but is still a real element worth finding by name.
  *
  * Handoff — Flow: Add a system, step 2: near-match rows carry owner and
  * relationship count, same enrichment `useElementSearchAdd` already used
@@ -55,7 +57,7 @@ export function useHomeSearch(commitId: UUID, modelId: UUID): UseHomeSearchResul
     let cancelled = false;
     setPool(null);
     setError(null);
-    loadSearchPoolForTypes(supabase, commitId, modelId, HOME_SEARCH_CREATABLE_TYPES)
+    loadSearchPoolForTypes(supabase, commitId, modelId, HOME_SEARCH_TYPES)
       .then((loaded) => {
         if (!cancelled) setPool(loaded);
       })
@@ -90,15 +92,22 @@ export function useHomeSearch(commitId: UUID, modelId: UUID): UseHomeSearchResul
 
   const results: HomeSearchResultRow[] = matches.map((element) => {
     const entry = enriched.get(element.element_id);
-    return { element, relationshipCount: entry?.relationshipCount ?? 0, owner: entry?.owner ?? null };
+    return { element, relationshipCount: entry?.relationshipCount ?? 0, owner: entry?.owner ?? null, parent: entry?.parent ?? null };
   });
 
   const status: HomeSearchStatus = error !== null ? 'error' : pool === null ? 'loading' : 'ready';
   // Prompt 7h bug fix: "Create..." is always the last row unless there's
   // an exact, case-insensitive match on a name or alias — a near-match
   // (any of `results` above) never hides it on its own. See
-  // src/db/elementSearch.ts's own `hasExactMatch` comment.
-  const showCreate = status === 'ready' && query.trim().length > 0 && pool !== null && !hasExactMatch(pool, query);
+  // src/db/elementSearch.ts's own `hasExactMatch` comment. Restricted to
+  // `HOME_SEARCH_CREATABLE_TYPES` (`homeSearchTypes.ts`'s own
+  // `hasCreatableExactMatch`): a container was added to search but never
+  // to what this control can
+  // create, so an exact hit on a module's own name must not suppress
+  // creating a same-named top-level capability/system/actor — the two are
+  // legitimately different things, and a container was never a candidate
+  // this "Create..." row offers in the first place.
+  const showCreate = status === 'ready' && query.trim().length > 0 && pool !== null && !hasCreatableExactMatch(pool, query);
 
   return { query, setQuery, status, error, results, showCreate };
 }

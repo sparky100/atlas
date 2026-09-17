@@ -1,0 +1,92 @@
+/** Same hub-header shape as `ContextView.module.css`'s own `.hub`/`.hubTitle` — kept as a sibling copy rather than a shared import since the two views' bodies diverge completely below the header (V3 item 2's whole point). */
+.hub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: var(--border-width-emphasis) solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  margin-bottom: var(--space-6);
+}
+
+.hubTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/** The platform tile "containing" its own module tiles — a single bordered surface the module grid sits inside, visually nesting the modules within their platform the way V3 item 2's own wording ("the platform tile containing its module tiles") asks for. */
+.platformTile {
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.moduleGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+
+.moduleTile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.moduleTile:hover {
+  border-color: var(--text);
+}
+
+.moduleName {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/** Lifecycle tone per module (V3 item 2's own wording) — a tinted top border, same colour vocabulary `Chip`'s own tones use, never the same hue vocabulary as diff (§8.4). */
+.moduleTile[data-tone='ok'] {
+  border-top: 3px solid var(--status-ok);
+}
+.moduleTile[data-tone='warn'] {
+  border-top: 3px solid var(--status-warn);
+}
+.moduleTile[data-tone='danger'] {
+  border-top: 3px solid var(--status-danger);
+}
+.moduleTile[data-tone='info'] {
+  border-top: 3px solid var(--status-info);
+}
+.moduleTile[data-tone='neutral'] {
+  border-top: 3px solid var(--status-neutral);
+}
+
+/** Item 2's own "Platform-level connections: ..." escape hatch — plain text, never a canvas node or a drawn edge (there is no canvas at this level any more). */
+.connections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+
+.connectionsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
