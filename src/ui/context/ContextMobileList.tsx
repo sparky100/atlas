@@ -44,11 +44,13 @@ interface DirectionRow {
  */
 export function ContextMobileList({ group, platformModulesById, elementHref, neighbourContextHref }: ContextMobileListProps) {
   const [expandedKey, setExpandedKey] = useState<DirectionKey | null>(null);
+  // Label routing rework (SAP fixture): the hub's own module ids — an edge leaving a module (PM → PowerON) is outbound from the hub side, same as one leaving the platform itself. Before this, every module-outbound flow was filed under "Flows in" with the inbound arrow.
+  const hubModuleIds = new Set((platformModulesById.get(group.hub.element_id) ?? []).map((m) => m.elementId));
 
   const rowsByDirection = new Map<DirectionKey, DirectionRow[]>();
   for (const neighbour of [...group.internal, ...group.external]) {
     for (const edge of neighbour.edges) {
-      const key = directionOf(neighbour, edge, group.hub.element_id);
+      const key = directionOf(neighbour, edge, group.hub.element_id, hubModuleIds);
       const list = rowsByDirection.get(key) ?? [];
       list.push({ neighbour, edge });
       rowsByDirection.set(key, list);
@@ -73,6 +75,7 @@ export function ContextMobileList({ group, platformModulesById, elementHref, nei
                   neighbour={neighbour}
                   edge={edge}
                   hubId={group.hub.element_id}
+                  hubModuleIds={hubModuleIds}
                   modules={platformModulesById.get(neighbour.element.element_id)}
                   elementHref={elementHref}
                   neighbourContextHref={neighbourContextHref}
@@ -86,9 +89,9 @@ export function ContextMobileList({ group, platformModulesById, elementHref, nei
   );
 }
 
-function directionOf(neighbour: ContextNeighbour, edge: RelationshipsHeadRow, hubId: UUID): DirectionKey {
+function directionOf(neighbour: ContextNeighbour, edge: RelationshipsHeadRow, hubId: UUID, hubModuleIds: ReadonlySet<UUID>): DirectionKey {
   if (neighbour.element.element_type === 'actor') return 'people';
-  const outbound = edge.from_element_id === hubId;
+  const outbound = edge.from_element_id === hubId || hubModuleIds.has(edge.from_element_id);
   if (edge.relationship_type === 'flows_to') return outbound ? 'flows-out' : 'flows-in';
   return outbound ? 'uses' : 'used-by';
 }
@@ -121,6 +124,7 @@ function NeighbourRow({
   neighbour,
   edge,
   hubId,
+  hubModuleIds,
   modules,
   elementHref,
   neighbourContextHref,
@@ -128,6 +132,7 @@ function NeighbourRow({
   neighbour: ContextNeighbour;
   edge: RelationshipsHeadRow;
   hubId: UUID;
+  hubModuleIds: ReadonlySet<UUID>;
   modules: ContextModule[] | undefined;
   elementHref: (id: UUID) => string;
   neighbourContextHref: (id: UUID) => string;
@@ -157,7 +162,7 @@ function NeighbourRow({
         {external && <Chip tone="neutral">external</Chip>}
       </Link>
       <Text as="span" size="sm" tone="muted" className={styles.rowVerb}>
-        {edgeLabel(edge, hubId)}
+        {edgeLabel(edge, hubId, hubModuleIds)}
       </Text>
       {modules && modules.length > 0 && (
         <ul className={styles.moduleRows}>

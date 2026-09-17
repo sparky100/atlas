@@ -7,7 +7,18 @@ import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { quantizeScale } from '../landscape/zoom';
 import { NODE_WIDTH } from '../landscape/layout';
-import { allTilesOf, anchorFor, computeContextDiagramLayout, curveBetween, resolveEdgeLabelOverlaps, tileTopAnchor, type ContextDiagramLayout, type DiagramTile, type DiagramUnitInput, type EdgeLabelPlacement } from './contextDiagramLayout';
+import {
+  allTilesOf,
+  computeContextDiagramLayout,
+  edgeLabelsCollide,
+  edgeNear,
+  placeEdgeLabels,
+  type ContextDiagramLayout,
+  type ContextEdgeInput,
+  type DiagramTile,
+  type DiagramUnitInput,
+  type EdgeLabelPill,
+} from './contextDiagramLayout';
 import { kindOf, SYSTEM_KIND_LABEL } from '../elements/systemKind';
 import { edgeLabel, type ContextGroup, type ContextNeighbour } from './contextGrouping';
 import type { ContextModule } from './contextDiagramData';
@@ -35,10 +46,15 @@ interface HoverState {
   screenY: number;
 }
 
+/** Rework item 4: `auto` follows the collision audit (labels shown unless `edgeLabelsCollide` says they'd stack); `show`/`hide` are the reviewer's own override from the toolbar. */
+type LabelMode = 'auto' | 'show' | 'hide';
+
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 4;
 const CLICK_DRAG_THRESHOLD_PX = 4;
 const FIT_MARGIN_PX = 24;
+/** Screen-pixel distance within which a pointer counts as "on" an edge (hover/tap-to-reveal, rework item 4). */
+const EDGE_HIT_TOLERANCE_PX = 6;
 
 interface CanvasTokens {
   border: string;
@@ -70,7 +86,7 @@ function readTokens(el: HTMLElement): CanvasTokens {
   };
 }
 
-/** The shared status→fill-colour lookup both a top-level tile (`toneColour`, below) and a module sub-tile use — factored out once a second caller (the module fix, V1 fix) needed the exact same mapping from a plain status string rather than a whole element row. */
+/** The shared status→fill-colour lookup both a top-level tile (`toneColour`, below) and a module sub-tile use. */
 function toneColourForStatus(status: string | null | undefined, tokens: CanvasTokens): string | undefined {
   if (typeof status !== 'string') return undefined;
   const tone = lifecycleToneFor(status);
@@ -78,7 +94,7 @@ function toneColourForStatus(status: string | null | undefined, tokens: CanvasTo
   return { ok: tokens.statusOk, warn: tokens.statusWarn, danger: tokens.statusDanger, info: tokens.statusInfo, neutral: tokens.statusNeutral }[tone];
 }
 
-/** V1's own "Tone: lifecycle ... only" — a system tile's fill tint comes from its own recorded lifecycle status, the same `lifecycleToneFor` mapping `ElementHeader.tsx`'s own status chip already uses; nothing else (criticality, hosting model, exposure) is read here. An actor carries no `lifecycleStatus` of its own, so this naturally returns no tone for it — the same "silent when the fact doesn't apply" shape `landscapeTileColourFor` uses for its own colour-by modes. A module (container) sub-tile's own tone is computed separately, from `ContextModule.lifecycleStatus` (V1 fix — see `drawTile`'s own module loop), since a module's data never reaches this function's own `elementsById`-keyed lookup. */
+/** V1's own "Tone: lifecycle ... only" — a system tile's fill tint comes from its own recorded lifecycle status; nothing else is read here. An actor carries no `lifecycleStatus`, so this returns no tone for it. A module sub-tile's tone is computed separately from `ContextModule.lifecycleStatus`. */
 function toneColour(element: ElementsHeadRow, tokens: CanvasTokens): string | undefined {
   if (element.element_type !== 'system') return undefined;
   return toneColourForStatus(attributesRecord(element.attributes).lifecycleStatus as string | undefined, tokens);
@@ -106,15 +122,7 @@ function truncate(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return low === 0 ? '' : text.slice(0, low) + '…';
 }
 
-/**
- * V1 fix, "two-line wrap": greedily fills each line with as many whole
- * words as fit `maxWidth` (the current `ctx.font`'s own metrics), up to
- * `maxLines` lines; whatever's left over after the last allowed line is
- * ellipsized onto it via `truncate` above, rather than silently dropped.
- * Module names/capabilities and a platform's own one-sentence description
- * are all narrow, fixed-width canvas text with no CSS wrapping to fall back
- * on — this is this file's own equivalent.
- */
+/** Greedily fills each line with as many whole words as fit `maxWidth` (the current `ctx.font`'s own metrics), up to `maxLines`; whatever's left after the last allowed line is ellipsized onto it via `truncate` rather than silently dropped. */
 function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
   const words = text.split(/\s+/).filter((w) => w.length > 0);
   if (words.length === 0 || maxLines <= 0) return [];
@@ -135,18 +143,7 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
   return lines;
 }
 
-/**
- * V1 polish, "fit uses width up to 1.5×": was `Math.min(width-ratio,
- * height-ratio, 1.5)` — on the column-per-module layout (`layoutNeighbourBand`,
- * `contextDiagramLayout.ts`), a platform with several stacked neighbours
- * under one module reads as genuinely *tall*, so the height ratio was
- * usually the smaller, binding term and the diagram rarely reached anywhere
- * near 1.5× however wide the canvas was. Driven by width alone (still
- * capped at 1.5× so a tiny diagram in a very wide window doesn't blow up
- * absurdly), a wide canvas now actually fills with the diagram — a tall
- * result is scrolled/panned into view via the existing drag/zoom controls,
- * same as the landscape's own canvas already relies on for a dense model.
- */
+/** Fit is driven by width alone, capped at 1.5× — a dense diagram reads as tall (channels full of lanes and label stacks) and is panned into view, same as the landscape's own canvas. */
 const FIT_MAX_SCALE = 1.5;
 
 function computeFitTransform(worldWidth: number, worldHeight: number, displayWidth: number, displayHeight: number): Transform {
@@ -159,64 +156,40 @@ function computeFitTransform(worldWidth: number, worldHeight: number, displayWid
   return { scale, tx, ty };
 }
 
-/**
- * V1 polish: named by which side is the hub-side and which is the
- * neighbour-side, rather than by logical `from`/`to` — every edge in this
- * diagram anchors the same physical way regardless of its own direction
- * (hub/module side at its own tile's bottom edge, neighbour side at its own
- * tile's top edge; `curveBetween`'s own comment), so the drawing code needs
- * "which is which side," not "which is from/to." `arrowAtHub` alone still
- * carries the edge's real direction (the arrowhead is the only place it
- * shows up visually).
- */
-interface DrawEdge {
-  hubTile: DiagramTile;
-  hubEndpoint: UUID;
-  neighbourTile: DiagramTile;
-  neighbourEndpoint: UUID;
-  /** True when this edge's own `to_element_id` is the hub/module side (the arrowhead belongs there); false when it's the neighbour side. */
-  arrowAtHub: boolean;
-  label: string;
-}
-
 function unitOf(element: ElementsHeadRow, platformModulesById: ReadonlyMap<UUID, ContextModule[]>): DiagramUnitInput {
   const modules = platformModulesById.get(element.element_id) ?? [];
   return { elementId: element.element_id, modules: modules.map((m) => ({ elementId: m.elementId, capabilityName: m.capabilityName })) };
 }
 
-/**
- * V1 polish, "neighbour columns spaced beneath the module they connect to":
- * a neighbour's own `attachedToModuleId` hint (`DiagramUnitInput`'s own doc
- * comment) — the one hub module every one of this neighbour's edges names,
- * when they all agree, else `null`. Reads `hubModuleIds` alone (not the
- * placed `layout.hub.modules` — computing that hint has to happen *before*
- * layout, not after) so there's no circularity between "which column does
- * this neighbour belong to" and "where did layout put the modules."
- */
-function attachedModuleIdFor(neighbour: ContextNeighbour, hubModuleIds: ReadonlySet<UUID>): UUID | null {
-  const moduleIds = new Set<UUID>();
+/** Rework item 1: every hub module this neighbour's edges attach to — the fan orders the neighbour by their mean centre. Reads `hubModuleIds` alone (computed before layout), not the placed `layout.hub.modules`, so there's no circularity between "where does this neighbour belong" and "where did layout put the modules." */
+function attachedModuleIdsFor(neighbour: ContextNeighbour, hubModuleIds: ReadonlySet<UUID>): UUID[] {
+  const ids = new Set<UUID>();
   for (const edge of neighbour.edges) {
-    if (hubModuleIds.has(edge.from_element_id)) moduleIds.add(edge.from_element_id);
-    else if (hubModuleIds.has(edge.to_element_id)) moduleIds.add(edge.to_element_id);
+    if (hubModuleIds.has(edge.from_element_id)) ids.add(edge.from_element_id);
+    else if (hubModuleIds.has(edge.to_element_id)) ids.add(edge.to_element_id);
   }
-  return moduleIds.size === 1 ? ([...moduleIds][0] ?? null) : null;
+  return [...ids].sort();
 }
 
 function neighbourUnitOf(neighbour: ContextNeighbour, platformModulesById: ReadonlyMap<UUID, ContextModule[]>, hubModuleIds: ReadonlySet<UUID>): DiagramUnitInput {
-  return { ...unitOf(neighbour.element, platformModulesById), attachedToModuleId: attachedModuleIdFor(neighbour, hubModuleIds) };
+  return { ...unitOf(neighbour.element, platformModulesById), attachedModuleIds: attachedModuleIdsFor(neighbour, hubModuleIds) };
 }
 
 /**
  * V1's own canvas renderer — the Context view's diagram, on the same
  * technology (`<canvas>` 2D, DOM only for the toolbar/tooltip) as
- * `LandscapeCanvas.tsx`, reusing its zoom/pan/fit shape verbatim (there is
- * no shared hook to import — that component's own investigation note: the
- * zoom/pan state lives inline there too). Deliberately narrower in scope
- * than that component: no diff highlighting, no colour-by beyond the one
- * lifecycle tone V1 itself asks for, no comment markers, no obstacle-routed
- * edges — none of those are named by V1's own wording, and a system's own
- * immediate neighbours are always a small, bounded set, never landscape
- * scale.
+ * `LandscapeCanvas.tsx`, reusing its zoom/pan/fit shape verbatim. Narrower
+ * in scope than that component (no diff highlighting, no colour-by beyond
+ * the one lifecycle tone V1 asks for, no comment markers — decision 11,
+ * UI-principles §10).
+ *
+ * Label routing rework (five-neighbour stress case, `fixtures/sapContext.ts`):
+ * every edge is an orthogonal route from `contextDiagramLayout.ts` with
+ * its own lane and attach points; its label is a pill on its own drop just
+ * above the neighbour it leaves (`placeEdgeLabels`); when the audit
+ * (`edgeLabelsCollide`) finds pills that would still stack, labels default
+ * to hidden and the pointer reveals one edge's label at a time — the
+ * "Labels" toolbar toggle overrides either way.
  */
 export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHint, neighbourContextHref, elementHref }: ContextDiagramCanvasProps) {
   const navigate = useNavigate();
@@ -224,20 +197,12 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [transform, setTransform] = useState<Transform>({ scale: 1, tx: 0, ty: 0 });
   const [hover, setHover] = useState<HoverState | null>(null);
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<UUID | null>(null);
+  const [labelMode, setLabelMode] = useState<LabelMode>('auto');
+  /** Rework item 4: what the collision audit found on the last draw — `true` means labels would collide if all shown. Set from inside `draw()` only when it changes, so it never loops the render. */
+  const [labelsWouldCollide, setLabelsWouldCollide] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; startTransform: Transform; moved: boolean } | null>(null);
-  /**
-   * Tile-text fix: "ellipsis with title-attribute tooltip only past two
-   * lines" — a module has no DOM node of its own to carry a real `title`
-   * attribute (this is a `<canvas>`, `LandscapeCanvas.tsx`'s own reasoning),
-   * so this is the same overlay `.tooltip` div the top-level hover state
-   * already renders, keyed by module id instead of by tile. Populated by
-   * `draw()` below (the one place `nameLines`/`capLines` — and therefore
-   * whether either actually got ellipsized — are already computed), read by
-   * `handlePointerMove`'s own hit-test. A ref, not state: it changes every
-   * `draw()` call (i.e. every render), and re-deriving it there is free —
-   * turning it into state would just add a render this component doesn't
-   * need.
-   */
+  /** A module has no DOM node to carry a `title` attribute (this is a `<canvas>`), so its ellipsized full text is kept here for the overlay tooltip, keyed by module id, populated by `draw()`. */
   const moduleTooltipsRef = useRef<Map<UUID, string>>(new Map());
 
   const elementsById = useMemo(() => {
@@ -246,16 +211,7 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
     return map;
   }, [group]);
 
-  // V1 fix: a module (container) never lands in `elementsById` above — by
-  // design, `useSystemContext.ts` excludes a platform's own module ids from
-  // the neighbour query (its own doc comment explains why: an edge attaching
-  // to a module still means "this neighbour touches the hub", not "here's a
-  // second, separate neighbour named by the module's own id"). `platformModulesById`
-  // (V1's own module-name/capability/lifecycle data, `contextDiagramData.ts`)
-  // is the *only* source of a module's own name/tone — this flattens every
-  // platform's own module list into one lookup by module id, the same shape
-  // `elementsById` gives every other tile. Without this, a module tile's own
-  // name/tone silently read as blank (this fix's own root cause).
+  // A module (container) never lands in `elementsById` — `useSystemContext.ts` excludes a platform's own module ids from the neighbour query by design — so `platformModulesById` is the only source of a module's own name/tone; flattened here by module id.
   const moduleByElementId = useMemo(() => {
     const map = new Map<UUID, ContextModule>();
     for (const modules of platformModulesById.values()) {
@@ -264,11 +220,25 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
     return map;
   }, [platformModulesById]);
 
-  // V1 polish: the hub's own module ids, needed *before* layout runs to
-  // compute each neighbour's own `attachedToModuleId` hint — see
-  // `attachedModuleIdFor`'s own comment for why this reads `platformModulesById`
-  // directly rather than the layout's already-placed `layout.hub.modules`.
   const hubModuleIds = useMemo(() => new Set((platformModulesById.get(group.hub.element_id) ?? []).map((m) => m.elementId)), [platformModulesById, group.hub.element_id]);
+
+  /** Every drawn edge, in the layout's own input shape — the hub side is the hub itself or one of its modules; the arrow belongs at the logical `to` side. */
+  const edgeInputs = useMemo<ContextEdgeInput[]>(() => {
+    const result: ContextEdgeInput[] = [];
+    for (const neighbour of [...group.internal, ...group.external]) {
+      for (const edge of neighbour.edges) {
+        const fromIsHub = edge.from_element_id === group.hub.element_id || hubModuleIds.has(edge.from_element_id);
+        result.push({
+          id: edge.relationship_id,
+          neighbourId: neighbour.element.element_id,
+          hubEndpointId: fromIsHub ? edge.from_element_id : edge.to_element_id,
+          arrowAtHub: !fromIsHub,
+          label: edgeLabel(edge, group.hub.element_id, hubModuleIds),
+        });
+      }
+    }
+    return result;
+  }, [group, hubModuleIds]);
 
   const layout = useMemo<ContextDiagramLayout>(
     () =>
@@ -277,29 +247,12 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         group.internal.map((n) => neighbourUnitOf(n, platformModulesById, hubModuleIds)),
         group.external.map((n) => neighbourUnitOf(n, platformModulesById, hubModuleIds)),
         layoutWidthHint,
+        edgeInputs,
       ),
-    [group, platformModulesById, hubModuleIds, layoutWidthHint],
+    [group, platformModulesById, hubModuleIds, layoutWidthHint, edgeInputs],
   );
 
-  const tileByElementId = useMemo(() => new Map(allTilesOf(layout).map((t) => [t.elementId, t])), [layout]);
-
-  const edges = useMemo<DrawEdge[]>(() => {
-    const result: DrawEdge[] = [];
-    for (const neighbour of [...group.internal, ...group.external]) {
-      const neighbourTile = tileByElementId.get(neighbour.element.element_id);
-      if (!neighbourTile) continue;
-      for (const edge of neighbour.edges) {
-        const fromIsHub = edge.from_element_id === group.hub.element_id || (layout.hub.modules?.some((m) => m.elementId === edge.from_element_id) ?? false);
-        const hubEndpoint = fromIsHub ? edge.from_element_id : edge.to_element_id;
-        const neighbourEndpoint = fromIsHub ? edge.to_element_id : edge.from_element_id;
-        // The arrow belongs at the logical `to` side — `arrowAtHub` is true
-        // exactly when the hub/module side is that `to` side, i.e. the edge
-        // does *not* run hub → neighbour.
-        result.push({ hubTile: layout.hub, hubEndpoint, neighbourTile, neighbourEndpoint, arrowAtHub: !fromIsHub, label: edgeLabel(edge, group.hub.element_id) });
-      }
-    }
-    return result;
-  }, [group, layout, tileByElementId]);
+  const labelById = useMemo(() => new Map(layout.edges.map((e) => [e.id, e.label])), [layout]);
 
   const fitToView = useCallback(() => {
     const wrapper = wrapperRef.current;
@@ -312,22 +265,22 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout]);
 
+  const toWorld = useCallback((screenX: number, screenY: number): { x: number; y: number } => ({ x: (screenX - transform.tx) / transform.scale, y: (screenY - transform.ty) / transform.scale }), [transform]);
+
   const tileAt = useCallback(
     (screenX: number, screenY: number): DiagramTile | null => {
-      const worldX = (screenX - transform.tx) / transform.scale;
-      const worldY = (screenY - transform.ty) / transform.scale;
+      const { x: worldX, y: worldY } = toWorld(screenX, screenY);
       for (const tile of allTilesOf(layout)) {
         if (worldX >= tile.x && worldX <= tile.x + tile.w && worldY >= tile.y && worldY <= tile.y + tile.h) return tile;
       }
       return null;
     },
-    [layout, transform],
+    [layout, toWorld],
   );
 
   const moduleAt = useCallback(
     (screenX: number, screenY: number): UUID | null => {
-      const worldX = (screenX - transform.tx) / transform.scale;
-      const worldY = (screenY - transform.ty) / transform.scale;
+      const { x: worldX, y: worldY } = toWorld(screenX, screenY);
       for (const tile of allTilesOf(layout)) {
         for (const module of tile.modules ?? []) {
           if (worldX >= module.x && worldX <= module.x + module.w && worldY >= module.y && worldY <= module.y + module.h) return module.elementId;
@@ -335,8 +288,13 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
       }
       return null;
     },
-    [layout, transform],
+    [layout, toWorld],
   );
+
+  const edgeAt = useCallback((screenX: number, screenY: number): UUID | null => edgeNear(layout.edges, toWorld(screenX, screenY), EDGE_HIT_TOLERANCE_PX / transform.scale)?.id ?? null, [layout, toWorld, transform.scale]);
+
+  const zoomShowsText = NODE_WIDTH * transform.scale >= 64;
+  const edgeLabelsVisible = zoomShowsText && (labelMode === 'show' || (labelMode === 'auto' && !labelsWouldCollide));
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -361,11 +319,9 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
       ctx.translate(transform.tx, transform.ty);
       ctx.scale(transform.scale, transform.scale);
 
-      const showLabels = NODE_WIDTH * transform.scale >= 64;
+      const showLabels = zoomShowsText;
 
-      // The dotted enterprise boundary — around the hub and internal
-      // neighbours only, same convention `LandscapeCanvas.tsx`'s own
-      // boundary uses, drawn first so tiles/edges layer on top.
+      // The dotted enterprise boundary — around the hub and internal neighbours only, drawn first so tiles/edges layer on top.
       if (layout.boundary.bottom > layout.boundary.top) {
         ctx.save();
         ctx.strokeStyle = tokens.borderStrong;
@@ -377,54 +333,24 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         ctx.restore();
       }
 
-      const edgeLabels: { text: string; worldX: number; worldY: number; worldTargetY: number }[] = [];
+      // Rework item 2: every edge is an axis-aligned polyline from the layout — its own lane, its own attach points. The hovered edge draws last and heavier so it reads on top of its neighbours.
       const platformMarkers: { worldX: number; worldY: number }[] = [];
-      for (const edge of edges) {
-        // V1 polish: the hub/module side always anchors at its own tile's
-        // bottom edge, the neighbour side at its own tile's top edge
-        // (`anchorFor`/`tileTopAnchor`'s own comments) — every neighbour
-        // this diagram places sits below its hub, so this is always "lower
-        // anchor = neighbour, upper anchor = hub/module," never the other
-        // way round, regardless of the edge's own logical direction.
-        const hubAnchor = anchorFor(edge.hubTile, edge.hubEndpoint);
-        const neighbourAnchor = tileTopAnchor(edge.neighbourTile);
-        if (hubAnchor.isPlatformFallback) platformMarkers.push({ worldX: hubAnchor.x, worldY: hubAnchor.y });
-
-        // V1 polish, "orthogonal/curved edge routing entering module tiles
-        // from below and leaving neighbours from above": a Bézier curve,
-        // vertical at both ends, rather than a straight line — see
-        // `curveBetween`'s own comment for why this is a dead-straight
-        // vertical run whenever a neighbour sits in its own module's column
-        // (the common case), and only bows sideways for an unattached
-        // neighbour placed elsewhere in the band.
-        const curve = curveBetween(neighbourAnchor, hubAnchor);
+      const drawEdge = (edge: (typeof layout.edges)[number], highlighted: boolean): void => {
+        if (edge.hubAnchor.isPlatformFallback) platformMarkers.push({ worldX: edge.hubAnchor.x, worldY: edge.hubAnchor.y });
         ctx.save();
-        ctx.strokeStyle = tokens.borderStrong;
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = highlighted ? tokens.text : tokens.borderStrong;
+        ctx.lineWidth = highlighted ? 2.5 : 1.5;
+        ctx.lineJoin = 'round';
         ctx.beginPath();
-        ctx.moveTo(neighbourAnchor.x, neighbourAnchor.y);
-        ctx.bezierCurveTo(curve.cp1.x, curve.cp1.y, curve.cp2.x, curve.cp2.y, hubAnchor.x, hubAnchor.y);
+        edge.points.forEach((p, i) => {
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        });
         ctx.stroke();
         ctx.restore();
 
-        // V1 polish, "label pill on the free segment, never over a tile":
-        // the curve's own midpoint always falls in the open gutter between
-        // the two rows (`curveBetween`'s own comment) — drawn as a filled
-        // pill in the screen-space pass below, not here (needs the actual
-        // font metrics to size itself).
-        if (showLabels && edge.label.trim().length > 0) {
-          // V1 fix, "push toward the target": the same anchor the
-          // arrowhead below points at — pushing toward the source instead
-          // would walk an overlap-resolved label back over the tile its
-          // own edge just left.
-          edgeLabels.push({ text: edge.label, worldX: curve.mid.x, worldY: curve.mid.y, worldTargetY: edge.arrowAtHub ? hubAnchor.y : neighbourAnchor.y });
-        }
-
-        // One arrowhead, at the target only (UI-principles §9) — always
-        // vertical now (both anchors are a tile's own top/bottom edge), so
-        // no angle computation is needed: `arrowAtHub` alone says whether it
-        // points up into the hub/module or down into the neighbour.
-        const targetAnchor = edge.arrowAtHub ? hubAnchor : neighbourAnchor;
+        // One arrowhead, at the target only (UI-principles §9) — both ends are vertical runs into a tile's top/bottom edge, so no angle computation.
+        const targetAnchor = edge.arrowAtHub ? edge.hubAnchor : edge.neighbourAnchor;
         const arrowSign = edge.arrowAtHub ? -1 : 1; // up into the hub/module, or down into the neighbour
         ctx.save();
         ctx.translate(targetAnchor.x, targetAnchor.y);
@@ -434,17 +360,15 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         ctx.lineTo(-8, -4);
         ctx.lineTo(-8, 4);
         ctx.closePath();
-        ctx.fillStyle = tokens.borderStrong;
+        ctx.fillStyle = highlighted ? tokens.text : tokens.borderStrong;
         ctx.fill();
         ctx.restore();
-      }
+      };
+      for (const edge of layout.edges) if (edge.id !== hoveredEdgeId) drawEdge(edge, false);
+      const hoveredEdge = layout.edges.find((e) => e.id === hoveredEdgeId);
+      if (hoveredEdge) drawEdge(hoveredEdge, true);
 
       const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; maxWidth: number }[] = [];
-      // V1 fix: "the platform tile shows the platform's name, kind and one
-      // sentence" — a separate list from `nodeLabels` above (a plain tile
-      // never has `tile.modules`, so never contributes here), since a
-      // platform's own title bar needs three lines' worth of content, not
-      // one.
       const platformTitles: { glyph: string; name: string; kind: string; description: string | null; worldX: number; worldY: number; maxWidth: number }[] = [];
       const moduleLabels: { elementId: UUID; name: string; capability: string | null; worldX: number; worldY: number; maxWidth: number }[] = [];
 
@@ -485,12 +409,6 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         }
 
         for (const module of tile.modules ?? []) {
-          // V1 fix: a module's own name/capability/tone come from
-          // `moduleByElementId` (this component's own flattening of
-          // `platformModulesById`, above) — `elementsById` never contains a
-          // module (`useSystemContext.ts`'s own deliberate exclusion), which
-          // is exactly why a module tile's name silently rendered blank
-          // before this fix.
           const moduleData = moduleByElementId.get(module.elementId);
           const moduleTone = toneColourForStatus(moduleData?.lifecycleStatus, tokens);
           ctx.save();
@@ -511,34 +429,12 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
 
       ctx.restore();
 
-      // Text, screen-space (dpr only), same reasoning LandscapeCanvas.tsx's
-      // own second pass gives: quantised zoom keeps text a fixed on-screen
-      // size within a zoom step rather than scaling continuously.
+      // Text, screen-space (dpr only): quantised zoom keeps text a fixed on-screen size within a zoom step rather than scaling continuously. Every box-relative bound below tracks the real `transform.scale`, not the quantised `textScale` — only the font itself is pinned to `textScale`.
       const textScale = quantizeScale(transform.scale, MIN_SCALE, MAX_SCALE);
       const toScreen = (worldX: number, worldY: number): [number, number] => [worldX * transform.scale + transform.tx, worldY * transform.scale + transform.ty];
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'left';
 
-      // V1 fix, "two-line wrap": a name that doesn't fit on one line wraps
-      // to a second rather than truncating hard — `wrapLines` measures
-      // against the exact font just set, so it's called here in the
-      // screen-space pass, not while building `nodeLabels` above.
-      //
-      // Overflow fix ("Graphical Design Tool" hanging past its own tile,
-      // reproducible at some zoom levels but not others): `textScale` is
-      // *quantised* (`quantizeScale`'s own comment — pinned to one of 8
-      // steps so the font itself doesn't jitter mid-zoom) and can land
-      // above the real, continuous `transform.scale` at some zoom levels —
-      // exactly when the box on screen (always sized by the true
-      // `transform.scale`, never `textScale`) is smaller than whatever
-      // `textScale` assumes it to be. Every width bound and box-relative
-      // offset below (how far the name starts past the glyph, how wide it's
-      // allowed to wrap or truncate against) has to track that same real
-      // box size — `transform.scale`, not `textScale` — or the text is
-      // being measured and placed against a box that doesn't match the one
-      // actually drawn. Only the font's own rendered size (`ctx.font`,
-      // right below) stays pinned to `textScale` — that's the one thing
-      // quantisation is actually for.
       for (const label of nodeLabels) {
         const [x, y] = toScreen(label.worldX, label.worldY);
         ctx.fillStyle = tokens.text;
@@ -553,14 +449,6 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         });
       }
 
-      // V1 fix: the platform tile's own title — name, kind, and one
-      // sentence (`docs/prompts/atlas-prompt-pack.md`'s own V1 wording,
-      // "Centre: the system as a tile (name, type, one sentence)").
-      // Overflow fix: same `transform.scale`-for-box-bounds rule as
-      // `nodeLabels` above — the width this title's own name/description
-      // are measured and wrapped against, and the offset its name starts
-      // at past the glyph, both have to track the tile's real on-screen
-      // size.
       for (const title of platformTitles) {
         const [x, y] = toScreen(title.worldX, title.worldY);
         ctx.fillStyle = tokens.text;
@@ -585,21 +473,10 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         const [x, y] = toScreen(label.worldX, label.worldY);
         ctx.fillStyle = tokens.text;
         ctx.font = `${(10 * textScale).toFixed(2)}px sans-serif`;
-        // Overflow fix: same `transform.scale`-for-width-bound rule as
-        // `nodeLabels`/`platformTitles` above — this text is centred, so
-        // there's no offset bug to match, but the wrap width still has to
-        // track the module tile's real on-screen size, not `textScale`.
         const nameLines = wrapLines(ctx, label.name, label.maxWidth * transform.scale, 2);
         nameLines.forEach((line, i) => {
           ctx.fillText(line, x, y + i * 11 * textScale);
         });
-        // Tile-text fix: "module code stays at current size; capability
-        // label below renders one size smaller" — 10px name, 9px capability,
-        // already the case before this fix; unchanged here.
-        //
-        // V1 fix: absent entirely (never a placeholder/blank second line)
-        // when this module supports nothing yet — the capability chip only
-        // ever draws when there's a real capability name to show.
         let capLines: string[] = [];
         if (label.capability) {
           ctx.fillStyle = tokens.textMuted;
@@ -609,14 +486,6 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
             ctx.fillText(line, x, y + (26 + i * 10) * textScale);
           });
         }
-        // Tile-text fix: "ellipsis with title-attribute tooltip only past
-        // two lines" — `wrapLines` only ever appends "…" (via `truncate`)
-        // on its own last allowed line, and only when the real text didn't
-        // fit; checking the last rendered line for it is a reliable,
-        // reasoning-free signal, cheaper than re-deriving "did this
-        // overflow" a second way. Keyed by module id, not tile position, so
-        // `handlePointerMove`'s own `moduleAt()` hit-test (already computed
-        // for click navigation) can look it up directly.
         const nameTruncated = nameLines.at(-1)?.endsWith('…') ?? false;
         const capabilityTruncated = capLines.at(-1)?.endsWith('…') ?? false;
         if (nameTruncated || capabilityTruncated) {
@@ -625,57 +494,43 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         }
       }
 
-      // V1 polish, "label pill on the free segment, never over a tile": a
-      // filled rounded pill sized to the text, centred on the curve's own
-      // midpoint (`curveBetween`'s own comment on why that point is always
-      // in the clear gutter between rows). The vertical routing above means
-      // this text no longer needs to follow a line's own angle — it's
-      // always sitting on the open horizontal band between two rows, so
-      // plain centred text reads cleanly without rotation.
-      //
-      // V1 fix, "two adjacent-module labels never render on top of each
-      // other": that "always in the clear gutter" guarantee is a tile
-      // collision guarantee, not a label-vs-label one — resolved here via
-      // `resolveEdgeLabelOverlaps` (`contextDiagramLayout.ts`'s own doc
-      // comment has the full algorithm). Each placement's own text is
-      // still hard-capped at the same single-line width as before
-      // (`truncate`) *before* overlap resolution ever sees it — a wildly
-      // long single label was never this fix's own problem to solve, and
-      // capping it first keeps `resolveEdgeLabelOverlaps`'s own two-line
-      // wrap working from a bounded starting width.
+      // Rework items 3–4: label pills, placed in world units by the pure layout module (widths measured at the current font and divided back to world), audited for collisions, then drawn — all of them when labels are visible, only the hovered edge's when they're hidden.
       ctx.font = `${(11 * textScale).toFixed(2)}px sans-serif`;
       ctx.textAlign = 'center';
-      const placements: EdgeLabelPlacement[] = edgeLabels.map((label) => {
-        const [x, y] = toScreen(label.worldX, label.worldY);
-        const [, targetY] = toScreen(label.worldX, label.worldTargetY);
-        return { text: truncate(ctx, label.text, NODE_WIDTH * 1.5 * textScale), x, y, targetY };
-      });
-      const resolvedLabels = resolveEdgeLabelOverlaps(placements, (text) => ctx.measureText(text).width, textScale);
+      const measureWorld = (text: string): number => ctx.measureText(text).width / transform.scale;
+      const pills = placeEdgeLabels(layout.edges, measureWorld);
+      const collide = edgeLabelsCollide(pills, allTilesOf(layout));
+      if (collide !== labelsWouldCollide) setLabelsWouldCollide(collide);
+      const labelsShown = showLabels && (labelMode === 'show' || (labelMode === 'auto' && !collide));
+      const pillsToDraw: EdgeLabelPill[] = labelsShown ? pills : pills.filter((p) => p.edgeId === hoveredEdgeId);
+      const hoveredLast = [...pillsToDraw.filter((p) => p.edgeId !== hoveredEdgeId), ...pillsToDraw.filter((p) => p.edgeId === hoveredEdgeId)];
       const edgeLabelLineHeight = 12 * textScale;
-      for (const pill of resolvedLabels) {
-        // Opaque, and drawn after every edge/tile above (z-order) — a
-        // pushed-apart pair no longer needs this, but a pair still sharing
-        // a y band by design (the min-gap check, not a genuine collision)
-        // must never let one's edge line or the other's own pill show
-        // through the gap between them.
-        roundRectPath(ctx, pill.x - pill.width / 2, pill.y - pill.height / 2, pill.width, pill.height, pill.height / 2);
+      for (const pill of hoveredLast) {
+        const highlighted = pill.edgeId === hoveredEdgeId;
+        const [left, top] = toScreen(pill.x - pill.width / 2, pill.y - pill.height / 2);
+        const w = pill.width * transform.scale;
+        const h = pill.height * transform.scale;
+        // Opaque, drawn after every edge and tile (z-order) — the leader passes behind it, never through the text.
+        roundRectPath(ctx, left, top, w, h, h / 2);
         ctx.fillStyle = tokens.surfaceRaised;
         ctx.fill();
-        ctx.strokeStyle = tokens.border;
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = highlighted ? tokens.text : tokens.border;
+        ctx.lineWidth = highlighted ? 1.5 : 1;
         ctx.stroke();
-        ctx.fillStyle = tokens.textMuted;
-        const startY = pill.y - ((pill.lines.length - 1) * edgeLabelLineHeight) / 2;
+        ctx.fillStyle = highlighted ? tokens.text : tokens.textMuted;
+        const [cx, cy] = toScreen(pill.x, pill.y);
+        const startY = cy - ((pill.lines.length - 1) * edgeLabelLineHeight) / 2;
         pill.lines.forEach((line, i) => {
-          ctx.fillText(line, pill.x, startY + i * edgeLabelLineHeight);
+          ctx.fillText(line, cx, startY + i * edgeLabelLineHeight);
         });
       }
 
-      // V1's own "which module?" marker — a small filled "?" badge at the
-      // platform tile's own edge, exactly where S1 item 20's
-      // `findFlowsToPlatformInsteadOfModule` health finding already flags
-      // the same fact from the architect door's own list.
+      // V1's own "which module?" marker — a small filled "?" badge at the platform tile's own edge, where S1 item 20's `findFlowsToPlatformInsteadOfModule` health finding already flags the same fact.
+      const seenMarkers = new Set<string>();
       for (const marker of platformMarkers) {
+        const key = `${String(marker.worldX)} ${String(marker.worldY)}`;
+        if (seenMarkers.has(key)) continue;
+        seenMarkers.add(key);
         const [x, y] = toScreen(marker.worldX, marker.worldY);
         ctx.beginPath();
         ctx.arc(x, y, 8 * textScale, 0, Math.PI * 2);
@@ -693,7 +548,7 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
     return () => {
       observer.disconnect();
     };
-  }, [layout, edges, elementsById, moduleByElementId, transform, hover]);
+  }, [layout, elementsById, moduleByElementId, transform, hover, hoveredEdgeId, labelMode, labelsWouldCollide, zoomShowsText]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -715,21 +570,26 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         return;
       }
     }
-    // Tile-text fix: a module tile only ever shows a tooltip when its own
-    // text actually truncated (`moduleTooltipsRef`'s own comment) — checked
-    // before the plain tile hover below so hovering a module reveals its
-    // own full text rather than the platform tile's name underneath it;
-    // hovering a module with nothing truncated shows no tooltip at all,
-    // rather than falling back to the platform's.
+    // A module tile only ever shows a tooltip when its own text actually truncated — checked before the plain tile hover so hovering a module reveals its own full text rather than the platform tile's name underneath it.
     const moduleId = moduleAt(screenX, screenY);
     if (moduleId) {
       const tooltip = moduleTooltipsRef.current.get(moduleId);
       setHover(tooltip ? { label: tooltip, screenX, screenY } : null);
+      setHoveredEdgeId(null);
       return;
     }
     const tile = tileAt(screenX, screenY);
-    const element = tile ? elementsById.get(tile.elementId) : undefined;
-    setHover(element ? { label: element.name, screenX, screenY } : null);
+    if (tile) {
+      const element = elementsById.get(tile.elementId);
+      setHover(element ? { label: element.name, screenX, screenY } : null);
+      setHoveredEdgeId(null);
+      return;
+    }
+    // Rework item 4: pointer on an edge highlights it and, when labels are hidden, reveals its verb in the tooltip.
+    const edgeId = edgeAt(screenX, screenY);
+    setHoveredEdgeId(edgeId);
+    const label = edgeId ? labelById.get(edgeId) : undefined;
+    setHover(edgeId && label && !edgeLabelsVisible ? { label, screenX, screenY } : null);
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>): void {
@@ -746,7 +606,15 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
       return;
     }
     const tile = tileAt(screenX, screenY);
-    if (!tile) return;
+    if (!tile) {
+      // Touch has no hover: a tap on an edge toggles that edge's label (rework item 4's "show on hover/tap").
+      const edgeId = edgeAt(screenX, screenY);
+      const next = edgeId && edgeId !== hoveredEdgeId ? edgeId : null;
+      setHoveredEdgeId(next);
+      const label = next ? labelById.get(next) : undefined;
+      setHover(next && label && !edgeLabelsVisible ? { label, screenX, screenY } : null);
+      return;
+    }
     if (tile.elementId === group.hub.element_id) {
       void navigate(elementHref(tile.elementId));
       return;
@@ -778,10 +646,11 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
     if (e.key === '+' || e.key === '=') zoomBy(1.2);
     else if (e.key === '-') zoomBy(1 / 1.2);
     else if (e.key === '0') fitToView();
+    else if (e.key === 'l') setLabelMode(edgeLabelsVisible ? 'hide' : 'show');
   }
 
   return (
-    <div ref={wrapperRef} className={styles.wrapper} data-scale={transform.scale} data-tx={transform.tx} data-ty={transform.ty}>
+    <div ref={wrapperRef} className={styles.wrapper} data-scale={transform.scale} data-tx={transform.tx} data-ty={transform.ty} data-edge-labels={edgeLabelsVisible ? 'visible' : 'hidden'} data-edge-labels-collide={labelsWouldCollide ? 'true' : 'false'}>
       <canvas
         ref={canvasRef}
         className={styles.canvas}
@@ -793,6 +662,7 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         onPointerUp={handlePointerUp}
         onPointerLeave={() => {
           setHover(null);
+          setHoveredEdgeId(null);
         }}
         onWheel={handleWheel}
         onKeyDown={handleKeyDown}
@@ -806,6 +676,19 @@ export function ContextDiagramCanvas({ group, platformModulesById, layoutWidthHi
         </button>
         <button type="button" className={styles.toolbarButton} aria-label="Fit to view" onClick={fitToView}>
           Fit
+        </button>
+        {/* Rework item 4: the override. `aria-pressed` reports the labels' *effective* state, so a reviewer (and Playwright) can read whether the audit hid them. */}
+        <button
+          type="button"
+          className={styles.toolbarButton}
+          aria-label="Show edge labels"
+          aria-pressed={edgeLabelsVisible}
+          title={labelMode === 'auto' && labelsWouldCollide ? 'Labels hidden automatically: they would overlap at this density. Hover or tap an edge to see its label, or switch them on.' : 'Show or hide the verb label on every edge'}
+          onClick={() => {
+            setLabelMode(edgeLabelsVisible ? 'hide' : 'show');
+          }}
+        >
+          Labels
         </button>
       </div>
       {hover && (
