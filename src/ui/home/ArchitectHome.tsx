@@ -265,6 +265,9 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       count: data.capabilitiesWithPoorFitPrimarySupporter.length,
       summary: `${String(data.capabilitiesWithPoorFitPrimarySupporter.length)} ${plural(data.capabilitiesWithPoorFitPrimarySupporter.length, 'capability', 'capabilities')} whose primary supporter is rated a poor or adequate fit, with no planned replacement`,
       items: elementItems(data.capabilitiesWithPoorFitPrimarySupporter),
+      // Same tier as `critical-support-end` below — both are "Start a
+      // decision" triggers over a capability with no planned remedy yet.
+      severity: 'high',
       ...(canStartDecision(role)
         ? { itemAction: (item: HealthFindingItem) => <StartDecisionLink href={startDecisionHref(prefillFromPoorFitCapabilityFinding({ id: item.id, name: item.label }))} /> }
         : {}),
