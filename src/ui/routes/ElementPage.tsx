@@ -16,6 +16,7 @@ import { ElementDecisionsSection } from '../components/ElementDecisionsSection/E
 import { ElementHeader } from '../components/ElementHeader/ElementHeader';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
 import { HistoryTimeline } from '../components/HistoryTimeline/HistoryTimeline';
+import { MergeIntoAction } from '../components/MergeIntoAction/MergeIntoAction';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { ModulesSection } from '../components/ModulesSection/ModulesSection';
@@ -112,6 +113,9 @@ export function ElementPage() {
   // closes the other, same as `editor`'s own idle/editing exclusivity).
   const [retiring, setRetiring] = useState(false);
   const [removingFromModel, setRemovingFromModel] = useState(false);
+  // E7's own "Merge into…" — same inline-panel convention as `retiring`/
+  // `removingFromModel` above.
+  const [merging, setMerging] = useState(false);
   const navigate = useNavigate();
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
@@ -256,6 +260,7 @@ export function ElementPage() {
               rename={canEdit ? rename : undefined}
               onRetire={canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') ? () => { setRetiring(true); } : undefined}
               onRemoveFromModel={canEdit && state.data.children.length === 0 ? () => { setRemovingFromModel(true); } : undefined}
+              onMerge={canEdit ? () => { setMerging(true); } : undefined}
               contextHref={
                 state.data.element.element_type === 'system'
                   ? `/o/${orgSlug ?? ''}/m/${model.slug}/context/${state.data.element.element_id}?${refQueryParam(ref, viewing)}`
@@ -298,6 +303,27 @@ export function ElementPage() {
                   reloadAfterCommit();
                 }}
                 onCancel={() => { setRemovingFromModel(false); }}
+              />
+            )}
+            {merging && (
+              <MergeIntoAction
+                modelId={model.id}
+                orgId={organisation?.id ?? ''}
+                userId={userId}
+                element={state.data.element}
+                relationshipEndpoints={state.data.relationshipEndpoints}
+                elementChildren={state.data.children}
+                searchCommitId={searchCommitId ?? state.data.commitId}
+                branch={editingBranch ?? PLACEHOLDER_BRANCH}
+                expectedHeadCommitId={state.data.commitId}
+                onMerged={(survivorId) => {
+                  setMerging(false);
+                  // The current element no longer exists at this ref once
+                  // merged — navigate straight to the survivor rather than
+                  // reloading into `notPresentAtRef`'s own empty state.
+                  void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/e/${survivorId}?${refQueryParam(ref, viewing)}`);
+                }}
+                onCancel={() => { setMerging(false); }}
               />
             )}
             {proposingChange && (

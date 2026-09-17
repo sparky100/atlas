@@ -1,23 +1,11 @@
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../../contracts/rows';
-import type { RelationshipType, UUID } from '../../../contracts/delta';
+import type { UUID } from '../../../contracts/delta';
 import type { BranchRow } from '../../../db/types';
 import { useElementRemoveFromModel } from '../../elements/useElementRemoveFromModel';
+import { INBOUND_VERB, OUTBOUND_VERB } from '../../elements/relationshipVerbs';
 import { Button } from '../Button/Button';
 import { Text } from '../Text/Text';
 import styles from './RemoveFromModelAction.module.css';
-
-const OUTBOUND_VERB: Record<RelationshipType, string> = {
-  supports: 'supports',
-  owns: 'owns',
-  uses: 'uses',
-  flows_to: 'flows to',
-};
-const INBOUND_VERB: Record<RelationshipType, string> = {
-  supports: 'supported by',
-  owns: 'owned by',
-  uses: 'used by',
-  flows_to: 'receives from',
-};
 
 export interface RemoveFromModelActionProps {
   modelId: UUID;

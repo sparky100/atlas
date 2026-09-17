@@ -73,6 +73,15 @@ export interface ElementHeaderProps {
    */
   onRemoveFromModel?: (() => void) | undefined;
   /**
+   * E7's own "Merge into…" (docs/prompts/atlas-prompt-pack.md, ADR-019) —
+   * every element type. Same omitted-not-disabled convention, gated on the
+   * same `canEditBranch` check as `onEdit`/`onRetire`/`onRemoveFromModel` —
+   * a merge is, mechanically, exactly the edit a person would make by hand
+   * (`src/db/elementMerges.ts`'s own module comment), so it needs no
+   * separate role gate of its own.
+   */
+  onMerge?: (() => void) | undefined;
+  /**
    * Sticky ref close-out: "Contributors see 'read-only: under review' on
    * elements of a Proposed change." — the explanation `onEdit`'s own
    * omitted-not-disabled convention never gave: neither `onEdit` nor
@@ -134,7 +143,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel, readOnlyReason, contextHref }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, readOnlyReason, contextHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
@@ -280,6 +289,18 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onPro
                 }}
               >
                 <Text as="span">Retire…</Text>
+              </button>
+            )}
+            {onMerge && (
+              <button
+                type="button"
+                className={styles.menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onMerge();
+                }}
+              >
+                <Text as="span">Merge into…</Text>
               </button>
             )}
             {onRemoveFromModel && (

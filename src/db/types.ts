@@ -240,6 +240,20 @@ export interface AliasRow {
   created_at: string;
 }
 
+/** The literal shape of a row in `element_merges` (ADR-019, SPEC §3.6, E7 — `20260916050000_element_merges.sql`) — a reversible identity merge, append-only (CLAUDE.md rule 5). `commit_id` is the ordinary `manual` commit that actually retracted `merged_element_id` and re-pointed its relationships/children. */
+export interface ElementMergeRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  surviving_element_id: UUID;
+  merged_element_id: UUID;
+  decided_by: UUID;
+  rationale: string;
+  evidence_id: UUID | null;
+  commit_id: UUID;
+  created_at: string;
+}
+
 /**
  * Landscape and capability_map are whole-model queries; context/container
  * scope to one element (SPEC §3.9). Sprint U1 step 4 only ever creates
