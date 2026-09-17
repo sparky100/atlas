@@ -15,7 +15,8 @@ import { canCreateChangeBranch, canEditOnMain } from '../orgs/useMembership';
 import { defaultIntentForEntryPoint } from '../changes/branchIntent';
 import { CapabilitySupportsPicker } from './CapabilitySupportsPicker';
 import { ProposeChangePicker } from './ProposeChangePicker';
-import { HOME_SEARCH_CREATABLE_TYPES, useHomeSearch } from './useHomeSearch';
+import { HOME_SEARCH_CREATABLE_TYPES } from './homeSearchTypes';
+import { useHomeSearch } from './useHomeSearch';
 import styles from './HomeSearch.module.css';
 
 export interface HomeSearchProps {
@@ -152,6 +153,8 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
                   <Text as="span">{result.element.name}</Text>
                   <Text as="span" tone="muted" size="sm">
                     {result.element.element_type}
+                    {/* A container's own parent platform/system — a short, commonly-reused module name ("FI", "API Gateway") is ambiguous without it, same "Parent: Finance" wording StructureSection.tsx's own structure line already uses. */}
+                    {result.parent ? ` · Parent: ${result.parent.name}` : ''}
                     {result.owner ? ` · ${result.owner.name}` : ''} · {result.relationshipCount} relationship{result.relationshipCount === 1 ? '' : 's'}
                   </Text>
                   {tone && typeof lifecycleStatus === 'string' && <Chip tone={tone}>{lifecycleStatus}</Chip>}

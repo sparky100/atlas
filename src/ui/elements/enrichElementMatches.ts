@@ -8,6 +8,18 @@ export interface MatchEnrichment {
   relationshipCount: number;
   /** The `owns` relationship's owning actor into this element, if any (only ever populated for a `system`, per `RELATIONSHIP_TYPE_RULES` — null for every other type, not specially cased). Prompt 7k item 2: a target can have up to three owners at once (one per role); this compact row picks the `business` owner when there is one, else whichever other role is present — same preference `elementBrowse.ts`'s own `loadOwnersByElementId` uses. */
   owner: ElementsHeadRow | null;
+  /**
+   * A container's own parent platform/system, resolved for display — a
+   * short, commonly-reused module name ("FI", "API Gateway") is ambiguous
+   * on its own, so a result row needs this to disambiguate the same way
+   * `StructureSection.tsx`'s own "Parent: Finance" line already does.
+   * `null` for every other type, not specially cased (same convention
+   * `owner` above already uses) — deliberately gated on `element_type`
+   * rather than a bare `parent_id !== null` check, since a nested (L2/L3)
+   * capability also carries a `parent_id` today and this enrichment isn't
+   * extending to that case.
+   */
+  parent: ElementsHeadRow | null;
 }
 
 /**
@@ -26,7 +38,8 @@ export async function enrichElementMatches(commitId: UUID, matches: readonly Ele
       const ownerRelationship =
         relationships.find((r) => isOwnsEdge(r) && attributesRecord(r.attributes).role === 'business') ?? relationships.find((r) => isOwnsEdge(r));
       const owner = ownerRelationship ? await getElementHead(supabase, commitId, ownerRelationship.from_element_id) : null;
-      return [element.element_id, { relationshipCount: relationships.length, owner }] as const;
+      const parent = element.element_type === 'container' && element.parent_id ? await getElementHead(supabase, commitId, element.parent_id) : null;
+      return [element.element_id, { relationshipCount: relationships.length, owner, parent }] as const;
     }),
   );
   return new Map(entries);
