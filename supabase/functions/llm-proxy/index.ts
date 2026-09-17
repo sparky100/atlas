@@ -25,20 +25,31 @@
  *   handler echoes the first 12 characters of the configured API key back
  *   to any caller who can reach it — not repeated here.
  *
- * `orgId` is required on every call (there is no single-tenant
- * `platform_config` row the way Des-Studio has — Atlas is genuinely
- * multi-org, ADR-017): the caller's own forwarded session must be a real
- * member of that org (`members_select`'s RLS is the actual authorization
- * check, re-derived here exactly like every other edge function/RPC in
- * this codebase, never trusted from the request body). Every call — 'ok',
- * 'error', or 'rate_limited' — is logged to `llm_proxy_requests`
- * (org, model, token counts, latency, status; never the prompt or
- * response content itself) via the service-role key, which this function
- * holds unlike `send-invite-email` (see that function's own module
- * comment) specifically because nothing in this schema lets an ordinary
- * member insert their own audit rows — the per-org rate limit is simply a
- * count of that same table's own rows in the last hour, so there is
- * nothing else to keep in sync.
+ * `orgId` is required on every call: Atlas is genuinely multi-org
+ * (ADR-017), so unlike Des-Studio's own single-tenant config, config
+ * overrides here are never per-org — the caller's own forwarded session
+ * must be a real member of the named org (`members_select`'s RLS is the
+ * actual authorization check, re-derived here exactly like every other
+ * edge function/RPC in this codebase, never trusted from the request
+ * body); the org exists only so the call can be logged and rate-limited
+ * against it. Every call — 'ok', 'error', or 'rate_limited' — is logged to
+ * `llm_proxy_requests` (org, model, token counts, latency, status; never
+ * the prompt or response content itself) via the service-role key, which
+ * this function holds unlike `send-invite-email` (see that function's own
+ * module comment) specifically because nothing in this schema lets an
+ * ordinary member insert their own audit rows — the per-org rate limit is
+ * simply a count of that same table's own rows in the last hour, so there
+ * is nothing else to keep in sync.
+ *
+ * Resolved with the human directly (E4 follow-up): "LLM settings are
+ * controlled at an application level" — model, rate-limit cap, and
+ * optionally the API key itself are read from `platform_config`'s own
+ * `key = 'llm'` row (`loadConfig` below), the same table/shape Des-Studio's
+ * own `llm-proxy` already uses, before falling back field-by-field to this
+ * function's own env-var secrets. Changing them is now an ordinary table
+ * update (service-role/SQL — `platform_config` has no client access at
+ * all, since a row here may hold a live secret), not `supabase secrets
+ * set` + redeploy.
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.115.0';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -124,6 +135,52 @@ async function callAnthropic(request: ProxyRequestBody, apiKey: string, model: s
   return { ok: true, status: upstream.status, text, inputTokens, outputTokens };
 }
 
+interface LlmProxyConfig {
+  model: string;
+  apiKey: string;
+  rateLimitPerHour: number;
+}
+
+/**
+ * Application-level config (E4 follow-up) — reads `platform_config`'s own
+ * `key = 'llm'` row via a plain REST call under the service-role key (the
+ * same shape Des-Studio's own `loadConfig()` uses), falling back
+ * field-by-field to this function's own env-var secrets when the table has
+ * no row, the fetch fails, or a given field isn't set on the row it does
+ * have. A config-table value always wins over the env var when both are
+ * present; the env var is the last resort, not a second source of truth to
+ * reconcile.
+ */
+async function loadConfig(supabaseUrl: string, serviceRoleKey: string): Promise<LlmProxyConfig> {
+  const envDefaults: LlmProxyConfig = {
+    model: Deno.env.get('LLM_PROXY_MODEL') || DEFAULT_MODEL,
+    apiKey: Deno.env.get('ANTHROPIC_API_KEY') || '',
+    rateLimitPerHour: Number(Deno.env.get('LLM_PROXY_RATE_LIMIT_PER_HOUR')) || DEFAULT_RATE_LIMIT_PER_HOUR,
+  };
+
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/platform_config?key=eq.llm&select=value`, {
+      headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
+    });
+    if (!res.ok) {
+      console.error('[llm-proxy] loadConfig: platform_config fetch failed', res.status);
+      return envDefaults;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Deno runtime, no shared type-checking with src/.
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length === 0) return envDefaults;
+    const cfg: Record<string, unknown> = (rows[0] as { value?: Record<string, unknown> })?.value ?? {};
+    return {
+      model: typeof cfg.model === 'string' && cfg.model !== '' ? cfg.model : envDefaults.model,
+      apiKey: typeof cfg.apiKey === 'string' && cfg.apiKey !== '' ? cfg.apiKey : envDefaults.apiKey,
+      rateLimitPerHour: typeof cfg.rateLimitPerHour === 'number' && cfg.rateLimitPerHour > 0 ? cfg.rateLimitPerHour : envDefaults.rateLimitPerHour,
+    };
+  } catch (e) {
+    console.error('[llm-proxy] loadConfig exception', e);
+    return envDefaults;
+  }
+}
+
 interface LogRequestInput {
   serviceClient: ReturnType<typeof createClient>;
   orgId: string;
@@ -189,8 +246,8 @@ Deno.serve(async (req: Request) => {
     const proxyRequest = normalizeRequest(body);
     if (proxyRequest instanceof Response) return proxyRequest;
 
-    const model = Deno.env.get('LLM_PROXY_MODEL') || DEFAULT_MODEL;
-    const rateLimitPerHour = Number(Deno.env.get('LLM_PROXY_RATE_LIMIT_PER_HOUR')) || DEFAULT_RATE_LIMIT_PER_HOUR;
+    const config = await loadConfig(supabaseUrl, serviceRoleKey);
+    const { model, rateLimitPerHour } = config;
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { count, error: countError } = await serviceClient
       .from('llm_proxy_requests')
@@ -203,13 +260,12 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ status: 'error', message: `Rate limit exceeded for this organisation (${String(rateLimitPerHour)} requests/hour).` }, 429);
     }
 
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!apiKey) {
+    if (!config.apiKey) {
       await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs: Date.now() - startedAt });
-      return jsonResponse({ status: 'error', message: 'LLM proxy is not configured for this project — ANTHROPIC_API_KEY is not set. See docs/EDGE-FUNCTIONS.md.' }, 503);
+      return jsonResponse({ status: 'error', message: 'LLM proxy is not configured — no API key in platform_config\'s "llm" row or ANTHROPIC_API_KEY. See docs/EDGE-FUNCTIONS.md.' }, 503);
     }
 
-    const result = await callAnthropic(proxyRequest, apiKey, model);
+    const result = await callAnthropic(proxyRequest, config.apiKey, model);
     const latencyMs = Date.now() - startedAt;
 
     if (!result.ok) {

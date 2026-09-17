@@ -269,6 +269,22 @@ export interface LlmProxyRequestRow {
 }
 
 /**
+ * The literal shape of a row in `platform_config` (E4 follow-up —
+ * `20260917020000_platform_config.sql`) — application-level configuration
+ * overrides, e.g. `key = 'llm'`'s `{model, apiKey, rateLimitPerHour}`.
+ * `value` is loosely typed (`Record<string, unknown>`, not a per-key
+ * discriminated shape) since this table has no client reader at all today
+ * (`llm-proxy`'s own `loadConfig` reads it via a raw REST call under the
+ * service-role key, not through this type) — nothing in `src/` constructs
+ * or consumes this row yet.
+ */
+export interface PlatformConfigRow {
+  key: string;
+  value: Record<string, unknown>;
+  updated_at: string;
+}
+
+/**
  * Landscape and capability_map are whole-model queries; context/container
  * scope to one element (SPEC §3.9). Sprint U1 step 4 only ever creates
  * `landscape` rows — the other three are real schema, not yet a built
