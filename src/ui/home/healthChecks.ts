@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import type { HealthFindingItem, HealthFindingSeverity } from '../components/HealthFinding/HealthFinding';
+import type { HealthFindingItem, HealthFindingSeverity } from '../components/HealthFinding/healthFindingFormat';
+import type { DecisionPrefill } from '../decisions/decisionPrefill';
 
 /**
  * S1 item 7: "Zero-count findings collapse to one line ('N checks clear')
@@ -19,8 +19,19 @@ export interface HealthCheck {
   severity: HealthFindingSeverity;
   browseHref?: string;
   browseLabel?: string;
-  /** Prompt pack F3 PR6: `HealthFinding`'s own new per-row action slot, passed straight through — see that component's own doc comment. */
-  itemAction?: (item: HealthFindingItem) => ReactNode;
+  /**
+   * Architect-door layout prompt's per-item-actions answer: a
+   * decision-shaped finding's own single-item "Start a decision" builder.
+   * `ArchitectHome.tsx`'s `resolveCardAction` only ever calls this when
+   * `count === 1` (`items[0]` is the one and only finding) — a multi-item
+   * decision-shaped finding falls through to `browseHref` instead, so its
+   * card's one action opens the filtered browse list, where every row
+   * carries its own pre-filled "Start a decision" (`ElementBrowseTable.tsx`'s
+   * `decisionRowAction`). Replaces the old `itemAction` (a per-row action
+   * inside `HealthFinding`'s now-removed expand/paginate list — no room for
+   * that in the compact 2-line card this field renders into).
+   */
+  decisionBuilder?: (item: HealthFindingItem) => DecisionPrefill;
 }
 
 export interface PartitionedHealthChecks {

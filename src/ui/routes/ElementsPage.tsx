@@ -16,10 +16,13 @@ import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { refLabelOf } from '../../db/ref';
 import { useModels } from '../models/useModels';
-import { canEditOnMain, useMembership } from '../orgs/useMembership';
+import { canEditOnMain, canStartDecision, useMembership } from '../orgs/useMembership';
 import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { useElementBrowse, type ElementBrowseFilter } from '../elements/useElementBrowse';
+import type { BrowseRow } from '../../db/elementBrowse';
+import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromCriticalExposedFinding, prefillFromCriticalSupportEndFinding } from '../decisions/decisionPrefill';
+import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import styles from './ElementsPage.module.css';
 
 const VALID_FILTERS: readonly ElementBrowseFilter[] = [
@@ -31,6 +34,14 @@ const VALID_FILTERS: readonly ElementBrowseFilter[] = [
   'critical-no-business-owner',
   'critical-exposed',
   'unused-integration-platform',
+  // Bug fix (per-item-actions prompt): these two were reachable already
+  // (ArchitectHome.tsx's own `browseHref('essential-no-technical-owner')`/
+  // `browseHref('critical-support-end')`) but missing here, so
+  // `parseFilterParam` silently discarded them back to `null` and both
+  // links landed on the *unfiltered* browse table.
+  'essential-no-technical-owner',
+  'critical-support-end',
+  'capability-no-supporters',
 ];
 
 function parseFilterParam(value: string | null): ElementBrowseFilter {
@@ -150,6 +161,27 @@ export function ElementsPage() {
     );
   }
 
+  // Per-item-actions prompt: "each row [in a decision-shaped finding's
+  // filtered list] carries its own pre-filled Start a decision" — only the
+  // three decision-shaped filters get this column at all (a housekeeping
+  // filter like `unlinked-systems` keeps its own `linkSupportsInline`
+  // action instead, never both), and only for a viewer who could actually
+  // start one (`canStartDecision`, the same role floor every other "Start
+  // a decision" entry point already uses).
+  const decisionRowAction =
+    canStartDecision(role) && (filter === 'critical-support-end' || filter === 'critical-exposed' || filter === 'capability-no-supporters')
+      ? (row: BrowseRow) => {
+          const element = { id: row.element.element_id, name: row.element.name };
+          const prefill =
+            filter === 'critical-support-end'
+              ? prefillFromCriticalSupportEndFinding(element)
+              : filter === 'critical-exposed'
+                ? prefillFromCriticalExposedFinding(element)
+                : prefillFromCapabilityNoSupportersFinding(element);
+          return <StartDecisionLink href={`/o/${orgSlug ?? ''}/m/${model.slug}/decisions?${decisionPrefillToSearchParams(prefill).toString()}`} />;
+        }
+      : undefined;
+
   return (
     <div>
       <AppHeader />
@@ -187,6 +219,7 @@ export function ElementsPage() {
                   }
                 : undefined
             }
+            decisionRowAction={decisionRowAction}
           />
         </main>
       </div>

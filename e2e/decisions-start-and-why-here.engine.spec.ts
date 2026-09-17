@@ -37,17 +37,17 @@ test('start a decision from a critical-support-end health finding, choose the on
   const seedResult = await commitToBranch(owner, { modelId, branchId: main.id, expectedHeadCommitId: main.head_commit_id, envelope });
   if (!seedResult.ok) throw new Error(`startdecision fixture: seeding criticality/support end: ${seedResult.message}`);
 
-  // 1. The architect door's own Assurance panel names it, with a "Start a
-  // decision →" row action — scoped to this one finding's own plate, since
-  // "systems not linked to a capability" (this fixture's system has no
-  // capability link either) has its own unrelated "Show all" button too.
+  // 1. The architect door's own Assurance panel names it — a single-item
+  // decision-shaped finding gets a direct "Start a decision →" right on
+  // its own card (architect-door layout prompt's per-item-actions answer:
+  // only a *multi*-item decision-shaped finding opens the browse table
+  // instead — see the separate `browse-table-decision-row-action.engine.spec.ts`
+  // for that case).
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
   await expect(page.getByText('1 critical system past or near vendor support end')).toBeVisible();
-  const findingPlate = page.locator('div', { hasText: '1 critical system past or near vendor support end' }).last();
-  await findingPlate.getByRole('button', { name: 'Show all' }).click();
-  await expect(findingPlate.getByText('SAP PM', { exact: true })).toBeVisible();
-  await findingPlate.getByRole('link', { name: 'Start a decision →' }).click();
+  await expect(page.getByText('SAP PM', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Start a decision →' }).click();
 
   // 2. Lands on /decisions with title/context/link pre-filled.
   await expect(page).toHaveURL(/\/decisions\?/);

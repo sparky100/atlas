@@ -1,10 +1,10 @@
 import { Fragment } from 'react';
 import { Link } from 'react-router';
-import { BlueprintFrame } from '../components/BlueprintFrame/BlueprintFrame';
 import { Chip } from '../components/Chip/Chip';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { EmptyState } from '../components/EmptyState/EmptyState';
-import { HealthFinding, type HealthFindingItem } from '../components/HealthFinding/HealthFinding';
+import { FindingCard, type FindingCardAction } from '../components/HealthFinding/FindingCard';
+import { joinWithMore, type HealthFindingItem } from '../components/HealthFinding/healthFindingFormat';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { ElementsHeadRow } from '../../contracts/rows';
@@ -12,8 +12,13 @@ import type { MemberRole } from '../../db/types';
 import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, PlatformFlowEndpoint, UnlabeledVerbRelationship } from '../../db/healthFindings';
 import { formatRelativeTime } from '../time';
 import { branchStatusTone } from '../changes/branchStatus';
-import { decisionPrefillToSearchParams, prefillFromCriticalSupportEndFinding, prefillFromPoorFitCapabilityFinding } from '../decisions/decisionPrefill';
-import { StartDecisionLink } from '../decisions/StartDecisionLink';
+import {
+  decisionPrefillToSearchParams,
+  prefillFromCapabilityNoSupportersFinding,
+  prefillFromCriticalExposedFinding,
+  prefillFromCriticalSupportEndFinding,
+  prefillFromPoorFitCapabilityFinding,
+} from '../decisions/decisionPrefill';
 import { canStartDecision } from '../orgs/useMembership';
 import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
 import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
@@ -22,7 +27,7 @@ import styles from './DoorHome.module.css';
 
 export interface ArchitectHomeProps {
   data: ArchitectHomeData;
-  /** Prompt pack F3 PR6: gates the "Start a decision →" row action on the `critical-support-end` finding below (`canStartDecision`) — omitted entirely, not shown disabled, for a viewer. */
+  /** Gates every "Start a decision →" card action below (`canStartDecision`) — omitted entirely, not shown disabled, for a viewer. */
   role: MemberRole | null;
   orgSlug: string;
   modelSlug: string;
@@ -32,7 +37,7 @@ function plural(count: number, singular: string, pluralForm: string): string {
   return count === 1 ? singular : pluralForm;
 }
 
-/** `ElementsHeadRow[]` → `HealthFindingItem[]` — every element-shaped finding's items are just names linking nowhere special (the row itself isn't a link; `HealthFinding`'s own browse link is the actionable part now, Sprint U4-1 B3). */
+/** `ElementsHeadRow[]` → `HealthFindingItem[]` — every element-shaped finding's items are just names (the browse-table/decision link is the actionable part, per-item actions having moved to the browse table's own rows). */
 function elementItems(elements: readonly ElementsHeadRow[]): HealthFindingItem[] {
   return elements.map((el) => ({ id: el.element_id, label: el.name }));
 }
@@ -62,6 +67,32 @@ function platformFlowEndpointItems(endpoints: readonly PlatformFlowEndpoint[]): 
   return endpoints.map((endpoint) => ({ id: endpoint.relationshipId, label: `${endpoint.fromName} → ${endpoint.toName}` }));
 }
 
+/** Item 4's own "titles truncated at ~60 chars" — an ellipsis, not a hard cut, and only ever applied to the display string (diff links/subjects below are built from the untruncated title). */
+function truncateTitle(title: string, max = 60): string {
+  return title.length > max ? `${title.slice(0, max - 1).trimEnd()}…` : title;
+}
+
+/**
+ * Architect-door layout prompt: a check's one inline action — a direct
+ * "Start a decision" when it's a decision-shaped finding with exactly one
+ * item (`check.decisionBuilder`, only ever set when `canStartDecision`
+ * already gated it), otherwise `browseHref` (housekeeping findings, and a
+ * *multi*-item decision-shaped finding's own filtered list — where every
+ * row carries its own pre-filled "Start a decision",
+ * `ElementBrowseTable.tsx`'s `decisionRowAction`). `null` when a check has
+ * neither (a relationship-shaped finding with no browse-table home, e.g.
+ * `flows-to-platform-instead-of-module`).
+ */
+function resolveCardAction(check: HealthCheck, orgSlug: string, modelSlug: string): FindingCardAction | null {
+  const firstItem = check.items[0];
+  if (check.decisionBuilder && check.count === 1 && firstItem) {
+    const prefill = check.decisionBuilder(firstItem);
+    return { href: `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefill).toString()}`, label: 'Start a decision →' };
+  }
+  if (check.browseHref !== undefined) return { href: check.browseHref, label: check.browseLabel ?? 'Review →' };
+  return null;
+}
+
 /**
  * The architect's door (UI-principles §3.2, built to Handoff 7d's
  * architect-door amendment for Health findings —
@@ -69,62 +100,45 @@ function platformFlowEndpointItems(endpoints: readonly PlatformFlowEndpoint[]): 
  * three-column dashboard otherwise, see `useArchitectHome.ts`'s own
  * comment for exactly what's deferred).
  *
- * S1 item 6: "Architect door order: review queue, health findings
- * (boundary crossings and Assurance inside), my changes, recent
- * activity." Boundary crossings' own link (Prompt 7k item 3, the full list
- * still lives at `BoundaryCrossingsPage.tsx` — Sprint U4-1 findings
- * follow-up dropped this block's own count, which named one specific
- * finding as if it summarised the whole panel; each finding below already
- * states its own count) and the Assurance sub-group (Prompt 7k item 5's
- * three regulatory-alignment
- * findings) now render *inside* the one "Health findings" panel, in that
- * order, rather than as three separate side-by-side panels each gating
- * "No findings" independently. "Recent commits" is renamed "Recent
- * activity" and moved after "My changes" — see `groupRecentActivity.ts`
- * for the "five items, others' activity preferred, runs on one subject
- * collapsed" behaviour that panel now has.
+ * Architect-door layout prompt (per-item-actions follow-up): five changes
+ * from the door's previous "collapsed row → expand to a paginated list"
+ * shape (Sprint U4-1 B3), all in service of one goal — the whole door
+ * visible at 1080p without scrolling for a realistically-sized model.
  *
- * The two-column layout itself (`.main`/`.side`, `DoorHome.module.css`)
- * is unchanged, but which content each div holds has swapped: the first
- * div (2fr, wider) now holds Review queue + Health findings; the second
- * (1fr) holds My changes + Recent activity. Below the 768px breakpoint
- * the grid collapses to one column with no `order` overrides anywhere, so
- * this is also what makes the *mobile* stacking order match the prompt's
- * own sequence exactly — the actual reason this swap was worth making,
- * not just a cosmetic desktop rearrangement.
- *
- * Every real finding is still rendered through `HealthFinding` (Sprint
- * U4-1 B3: collapsed row → expand, paginated at 20, a link into the browse
- * table pre-filtered to the finding where one applies). S1 item 7: "zero-
- * count findings collapse to one line ('N checks clear') with expand" —
- * `healthChecks.ts`'s `partitionHealthChecks` splits each group's checks
- * into `active` (its own plate, as before) and `clear` (rolled into one
- * `checksClearLabel` line via `CollapsibleSection`, expanding to each
- * cleared check's own one-line summary). This also replaces the old
- * "No findings" line: when every check in a group is zero, `active` is
- * empty and only the "N checks clear" line renders — the same shape,
- * naturally, rather than a separate special case.
- *
- * S1 item 8: "Review queue and every other user-facing time use the one
- * time helper" — the Review queue's own "Oldest: opened…" line and every
- * commit row in Recent activity now go through `formatRelativeTime`
- * (`src/ui/time.ts`, moved and renamed from this file's old local import
- * of `commitActivityTime.ts`'s `formatCommitActivityTime`), not a local
- * reimplementation. This also swaps Review queue's own vocabulary: it
- * used the coarse provenance staleness bucket before ("< 1mo ago" for
- * anything under a month, which is most review items) —
- * `formatRelativeTime`'s precise minutes/hours answer is what "how old is
- * the oldest item" actually wants. See `src/ui/time.ts`'s own doc comment
- * for why its three vocabularies stay distinct rather than collapsing
- * into one literal format string.
+ * 1. A headline stat row (Review queue / findings needing attention /
+ *    assurance items / my open changes), the same big-number/muted-label
+ *    style the director door's own `.statsRow` already uses — this
+ *    replaces the standalone "Review queue" panel's own oversized count,
+ *    which now duplicates into one of these four numbers instead.
+ *    "Findings needing attention" counts active *checks* (high+medium),
+ *    not raw item counts — the same unit "N checks clear" already uses
+ *    elsewhere on this door, and the only one that stays meaningful across
+ *    checks whose items are systems, relationships, and capabilities all
+ *    at once (a judgment call: summing heterogeneous item counts into one
+ *    number would answer a different, less useful question).
+ * 2. Every active high/medium check renders as a compact 2-line
+ *    `FindingCard` in a responsive grid (`FindingCard.tsx`'s own doc
+ *    comment has the full shape) instead of `HealthFinding`'s old
+ *    expand/paginate plate — `HealthFinding.tsx` is retired entirely, its
+ *    per-item action slot's one real use (a decision-shaped finding's
+ *    per-item "Start a decision") having moved to the browse table's own
+ *    rows (`resolveCardAction`'s own doc comment, `ElementBrowseTable.tsx`'s
+ *    `decisionRowAction`).
+ * 3. Active *informational* checks are excluded from the grid — they
+ *    render as single-line rows beneath it instead (`infoRows` below),
+ *    same as before never competing visually with a real gap. "N checks
+ *    clear" (`partitionHealthChecks`/`checksClearLabel`) is unchanged.
+ * 4. Recent activity keeps its one-line-per-item shape and inline subject
+ *    links, now with `truncateTitle` capping a raw commit title at ~60
+ *    characters — a collapsed-run synthetic title ("N edits to X") is
+ *    already short and untouched by this in practice.
+ * 5. Assurance keeps its own `<h3>` but renders through the identical grid
+ *    (`gridAssuranceChecks`/`infoAssuranceChecks` below) rather than a
+ *    second, parallel layout.
  */
 export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeProps) {
   const now = new Date();
   const elementHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}`;
-  // Prompt pack F3 PR6: "Start a decision" — the finding's own click hands
-  // the Decisions list a pre-filled form (`decisionPrefill.ts`), carried as
-  // ordinary URL search params on the `/decisions` link itself.
-  const startDecisionHref = (prefill: ReturnType<typeof prefillFromCriticalSupportEndFinding>) => `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefill).toString()}`;
   // A commit's diff against its own parent (Sprint U4-1 B2) — main's genesis
   // commit has no parent to diff against, so it stays plain text below
   // rather than linking anywhere.
@@ -142,7 +156,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
   // `duplicatesCount` is typed as the literal `0` (still wired to 0 until
   // Q1, ADR-019) — a placeholder notice, not a real check yet, so it's
   // left out of this list and rendered as its own permanent line below
-  // rather than something item 7's "N checks clear" could ever roll it into.
+  // rather than something "N checks clear" could ever roll it into.
   const healthChecks: HealthCheck[] = [
     {
       key: 'unlinked-systems',
@@ -227,12 +241,18 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       browseHref: browseHref('critical-no-business-owner'),
     },
     {
+      // One of the architect door's three decision-shaped findings
+      // (per-item-actions prompt) — a single exposed system gets a direct
+      // "Start a decision" on its own card; more than one opens this
+      // filtered list instead, where each row carries its own pre-filled
+      // action (`resolveCardAction`'s own doc comment).
       key: 'critical-exposed',
       count: data.criticalExposedSystems.length,
       summary: `${String(data.criticalExposedSystems.length)} critical ${plural(data.criticalExposedSystems.length, 'system', 'systems')} exposed with no planned replacement`,
       items: elementItems(data.criticalExposedSystems),
       severity: 'high',
       browseHref: browseHref('critical-exposed'),
+      ...(canStartDecision(role) ? { decisionBuilder: (item: HealthFindingItem) => prefillFromCriticalExposedFinding({ id: item.id, name: item.label }) } : {}),
     },
     {
       // Labelling only — a crossing missing its *data classification* is
@@ -257,29 +277,46 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       browseHref: browseHref('unused-integration-platform'),
     },
     {
-      // The minimal fit-for-purpose finding: a third "Start a decision"
-      // trigger, alongside `critical-support-end` below and the director
-      // door's own weak-capability tile — see
-      // `findCapabilitiesWithPoorFitPrimarySupporter`'s own doc comment.
+      // The minimal fit-for-purpose finding: structurally close to
+      // `critical-exposed` above (a real gap, nothing lined up to replace
+      // it, the same "Start a decision" action) but not gated on
+      // `criticality: 'critical'`, so it stays medium rather than high — a
+      // judgment call, not named in the agreed severity tiers (this check
+      // didn't exist when those were agreed).
       key: 'poor-fit-no-replacement',
       count: data.capabilitiesWithPoorFitPrimarySupporter.length,
       summary: `${String(data.capabilitiesWithPoorFitPrimarySupporter.length)} ${plural(data.capabilitiesWithPoorFitPrimarySupporter.length, 'capability', 'capabilities')} whose primary supporter is rated a poor or adequate fit, with no planned replacement`,
       items: elementItems(data.capabilitiesWithPoorFitPrimarySupporter),
-      // Medium, not high: structurally close to `critical-exposed` above
-      // (a real gap — a system rated poor/adequate fit, nothing lined up
-      // to replace it — with the same "Start a decision" action), but that
-      // one is high specifically because it's gated on `criticality:
-      // 'critical'`; this finding isn't, so it stays in the same tier as
-      // the other genuine-but-not-urgent nudges (a judgment call, not
-      // named in the agreed tiers — this check didn't exist when those
-      // were agreed).
+      // No `browseHref` — this filter has no browse-table home (same as
+      // before this redesign, `itemAction`'s own predecessor never had one
+      // either); a multi-item finding here gets no card action at all,
+      // only the single-item "Start a decision" case below.
       severity: 'medium',
-      ...(canStartDecision(role)
-        ? { itemAction: (item: HealthFindingItem) => <StartDecisionLink href={startDecisionHref(prefillFromPoorFitCapabilityFinding({ id: item.id, name: item.label }))} /> }
-        : {}),
+      ...(canStartDecision(role) ? { decisionBuilder: (item: HealthFindingItem) => prefillFromPoorFitCapabilityFinding({ id: item.id, name: item.label }) } : {}),
+    },
+    {
+      // The architect door's third decision-shaped finding
+      // (per-item-actions prompt): a level-1 capability with nothing
+      // recorded at all — the same classification the director door's own
+      // weak-capability grid already flags (`findCapabilitiesWithNoSupporters`'s
+      // own doc comment). Medium, not high, for the same reason
+      // `poor-fit-no-replacement` above is medium: a real gap, but not tied
+      // to an explicit `criticality: 'critical'` attribute the way
+      // `critical-exposed`/`critical-support-end` are.
+      key: 'capability-no-supporters',
+      count: data.capabilitiesWithNoSupporters.length,
+      summary: `${String(data.capabilitiesWithNoSupporters.length)} ${plural(data.capabilitiesWithNoSupporters.length, 'capability', 'capabilities')} with no known supporters`,
+      items: elementItems(data.capabilitiesWithNoSupporters),
+      severity: 'medium',
+      browseHref: browseHref('capability-no-supporters'),
+      ...(canStartDecision(role) ? { decisionBuilder: (item: HealthFindingItem) => prefillFromCapabilityNoSupportersFinding({ id: item.id, name: item.label }) } : {}),
     },
   ];
   const { active: activeHealthChecks, clear: clearHealthChecks } = partitionHealthChecks(healthChecks);
+  // Item 3: informational findings never sit in the grid — they render as
+  // single-line rows beneath it instead (`infoRows` below).
+  const gridHealthChecks = activeHealthChecks.filter((c) => c.severity !== 'informational');
+  const infoHealthChecks = activeHealthChecks.filter((c) => c.severity === 'informational');
 
   // Prompt 7k item 5's own three regulatory-alignment checks, plus S1
   // item 11a's own two external-boundary checks — five in all, grouped
@@ -303,23 +340,15 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       severity: 'high',
     },
     {
+      // One of the architect door's three decision-shaped findings — F3's
+      // own named "SAP PM" golden path.
       key: 'critical-support-end',
       count: data.criticalSystemsPastOrNearSupportEnd.length,
       summary: `${String(data.criticalSystemsPastOrNearSupportEnd.length)} critical ${plural(data.criticalSystemsPastOrNearSupportEnd.length, 'system', 'systems')} past or near vendor support end`,
       items: elementItems(data.criticalSystemsPastOrNearSupportEnd),
       severity: 'high',
       browseHref: browseHref('critical-support-end'),
-      // Prompt pack F3 PR6: "Start a decision" from a health finding —
-      // F3's own named "SAP PM" golden path. `item.label` is exactly the
-      // system's own name for this finding (`elementItems`, above), so no
-      // second lookup is needed to build the prefill. Conditionally spread,
-      // not `undefined` — `exactOptionalPropertyTypes` (tsconfig.json)
-      // treats an explicit `itemAction: undefined` differently from the
-      // key being absent, the same reason `browseProps` below already
-      // spreads rather than sets its own optional fields to `undefined`.
-      ...(canStartDecision(role)
-        ? { itemAction: (item: HealthFindingItem) => <StartDecisionLink href={startDecisionHref(prefillFromCriticalSupportEndFinding({ id: item.id, name: item.label }))} /> }
-        : {}),
+      ...(canStartDecision(role) ? { decisionBuilder: (item: HealthFindingItem) => prefillFromCriticalSupportEndFinding({ id: item.id, name: item.label }) } : {}),
     },
     {
       key: 'external-interfaces-missing-classification',
@@ -332,11 +361,8 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
     },
     {
       // S1 item 11a: purely informational (see this finding's own doc
-      // comment, healthFindings.ts) — still one of the nine/twelve checks
-      // for "N checks clear" purposes when nothing external has access at
-      // all, the same as every other check here; nothing about it being
-      // informational rather than a problem changes how it collapses. Now
-      // also its own severity tier, for the same reason — informational.
+      // comment, healthFindings.ts) — still one of the checks for "N
+      // checks clear" purposes when nothing external has access at all.
       key: 'external-organisation-access',
       count: data.externalOrganisationAccess.length,
       summary: `${String(data.externalOrganisationAccess.length)} external ${plural(data.externalOrganisationAccess.length, 'organisation', 'organisations')} with access`,
@@ -347,19 +373,57 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
     },
   ];
   const { active: activeAssuranceChecks, clear: clearAssuranceChecks } = partitionHealthChecks(assuranceChecks);
+  const gridAssuranceChecks = activeAssuranceChecks.filter((c) => c.severity !== 'informational');
+  const infoAssuranceChecks = activeAssuranceChecks.filter((c) => c.severity === 'informational');
 
-  function checkPlate(check: HealthCheck, index: number) {
-    const browseProps = check.browseHref !== undefined ? { browseHref: check.browseHref, ...(check.browseLabel !== undefined && { browseLabel: check.browseLabel }) } : {};
-    const itemActionProps = check.itemAction !== undefined ? { itemAction: check.itemAction } : {};
-    const finding = <HealthFinding summary={check.summary} items={check.items} severity={check.severity} {...browseProps} {...itemActionProps} />;
-    // Item 6's convention: the first *real* (non-zero) finding in a group
-    // is blueprint-framed — preserved here now that zero-count checks no
-    // longer take a plate of their own to be "first".
-    return index === 0 ? (
-      <BlueprintFrame key={check.key}>{finding}</BlueprintFrame>
-    ) : (
-      <div key={check.key} className={styles.findingPlate}>
-        {finding}
+  // Item 1's own stat row: "findings needing attention" counts active
+  // *checks* at high/medium severity — the same unit "N checks clear"
+  // already uses (see this component's own module comment for why this,
+  // not a sum of raw item counts, is the right number here). Assurance
+  // counts every active assurance check regardless of severity — its own
+  // informational row (external-organisation-access) is still something
+  // worth a director-adjacent glance, unlike Health findings' own
+  // informational checks which are folded out of "needing attention".
+  const findingsNeedingAttentionCount = gridHealthChecks.length;
+  const assuranceItemsCount = activeAssuranceChecks.length;
+
+  function findingGrid(checks: readonly HealthCheck[]) {
+    if (checks.length === 0) return null;
+    return (
+      <div className={styles.findingGrid}>
+        {checks.map((check) => (
+          <FindingCard key={check.key} count={check.count} summary={check.summary} items={check.items} severity={check.severity} action={resolveCardAction(check, orgSlug, modelSlug)} />
+        ))}
+      </div>
+    );
+  }
+
+  // Item 3: "informational findings as single-line rows beneath the
+  // grid" — one line each, no card box or tint, but still naming the
+  // affected items (truncated the same "and N more" way a grid card's own
+  // names line does) and carrying the same inline action a grid card
+  // would — the only thing that changes for an informational finding is
+  // the chrome, not whether its own names/action are one click away.
+  function infoRows(checks: readonly HealthCheck[]) {
+    if (checks.length === 0) return null;
+    return (
+      <div className={styles.infoRows}>
+        {checks.map((check) => (
+          <Text key={check.key} as="p" size="sm" tone="muted">
+            {check.summary}
+            {check.items.length > 0 && ` — ${joinWithMore(check.items)}`}
+            {check.browseHref !== undefined && (
+              <>
+                {' · '}
+                <Link to={check.browseHref}>
+                  <Text as="span" size="sm">
+                    {check.browseLabel ?? 'Review →'}
+                  </Text>
+                </Link>
+              </>
+            )}
+          </Text>
+        ))}
       </div>
     );
   }
@@ -368,7 +432,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
     if (checks.length === 0) return null;
     return (
       <CollapsibleSection title={checksClearLabel(checks.length)} defaultOpen={false}>
-        <div className={styles.findingPlates}>
+        <div className={styles.infoRows}>
           {checks.map((check) => (
             <Text key={check.key} as="p" tone="muted">
               {check.summary}
@@ -390,7 +454,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
     // a group of one (`count > 1` is the only condition that matters here,
     // `subject` is already guaranteed non-null whenever `count > 1` —
     // `groupRecentActivity.ts`'s own collapsing rule).
-    const title = count > 1 && subject ? `${String(count)} edits to ${subject.name}` : latest.commit.title;
+    const title = truncateTitle(count > 1 && subject ? `${String(count)} edits to ${subject.name}` : latest.commit.title);
     return (
       <li key={group.key} className={styles.commitRow}>
         <div className={styles.commitMain}>
@@ -434,119 +498,144 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
   }
 
   return (
-    <div className={styles.columns}>
-      <div className={styles.main}>
-        <Panel>
-          <Text as="h2" size="xl" className={styles.sectionTitle}>
-            Review queue
+    <div>
+      {/* Item 1: the same big-number/muted-label stat style the director
+          door's own `.statsRow` uses — see this component's own module
+          comment for what each of the four numbers counts and why. */}
+      <div className={styles.statsRow}>
+        <div className={styles.stat}>
+          <Text as="span" size="2xl">
+            {data.reviewQueueCount}
           </Text>
-          <div className={styles.count}>
-            <Text as="span" size="2xl">
-              {data.reviewQueueCount}
-            </Text>
-            <Text as="span" tone="muted" size="sm">
-              open request{data.reviewQueueCount === 1 ? '' : 's'}
-            </Text>
-          </div>
-          {data.oldestReviewItem && (
-            <Link to={`/o/${orgSlug}/m/${modelSlug}/review/${data.oldestReviewItem.id}`}>
-              <Text as="span" size="sm">
-                Oldest: opened {formatRelativeTime(data.oldestReviewItem.created_at, now)} →
-              </Text>
-            </Link>
-          )}
-        </Panel>
-
-        <Panel>
-          <Text as="h2" size="xl" className={styles.sectionTitle}>
-            Health findings
+          <Text as="span" tone="muted" size="sm">
+            review queue
           </Text>
-
-          {/* Prompt 7k item 3's own link into BoundaryCrossingsPage.tsx's
-              full list. Sprint U4-1 findings follow-up: this used to also
-              carry its own "N IT/OT crossings in this model" count, which
-              named one specific finding as if it summarised every finding
-              in this panel — dropped entirely (each finding below already
-              states its own count inline); a bare link to the full list is
-              all that's left of Prompt 7k item 3's original block. */}
-          <Link to={`/o/${orgSlug}/m/${modelSlug}/boundary-crossings`}>
-            <Text as="span" tone="muted" size="sm">
-              View boundary crossings →
-            </Text>
-          </Link>
-
-          {activeHealthChecks.length > 0 && (
-            <div className={styles.findingPlates}>
-              {activeHealthChecks.map(checkPlate)}
-              {/* Not a real check (always 0 until Q1, ADR-019) — never part
-                  of `healthChecks` or its "N checks clear" collapse, but
-                  kept alongside the other plates rather than shown when
-                  every real check is already clean (Sprint U4-1 B3's own
-                  "No findings" behaviour, unchanged by S1 item 7). */}
-              <div className={styles.findingPlate}>
-                <Text as="p">{data.duplicatesCount} duplicates flagged</Text>
-                <Text as="p" tone="faint" size="sm">
-                  Wired to 0 until Q1&rsquo;s matching pipeline can populate the standing duplicates report (ADR-019).
-                </Text>
-              </div>
-            </div>
-          )}
-          {clearChecksSection(clearHealthChecks)}
-
-          {/* S1 item 6: "Assurance inside" — Prompt 7k item 5's own three
-              regulatory-alignment findings, still gated by their own
-              independent zero-check (a clean Health findings panel above
-              says nothing about whether Assurance also has nothing to
-              show, and vice versa), now a subsection of this one panel
-              rather than a standalone Panel of its own. */}
-          <Text as="h3" size="lg" className={styles.subsectionTitle}>
-            Assurance
+        </div>
+        <div className={styles.stat}>
+          <Text as="span" size="2xl" className={findingsNeedingAttentionCount > 0 ? styles.statWarn : undefined}>
+            {findingsNeedingAttentionCount}
           </Text>
-          {activeAssuranceChecks.length > 0 && <div className={styles.findingPlates}>{activeAssuranceChecks.map(checkPlate)}</div>}
-          {clearChecksSection(clearAssuranceChecks)}
-        </Panel>
+          <Text as="span" tone="muted" size="sm">
+            finding{findingsNeedingAttentionCount === 1 ? '' : 's'} needing attention
+          </Text>
+        </div>
+        <div className={styles.stat}>
+          <Text as="span" size="2xl" className={assuranceItemsCount > 0 ? styles.statWarn : undefined}>
+            {assuranceItemsCount}
+          </Text>
+          <Text as="span" tone="muted" size="sm">
+            assurance item{assuranceItemsCount === 1 ? '' : 's'}
+          </Text>
+        </div>
+        <div className={styles.stat}>
+          <Text as="span" size="2xl">
+            {data.myOpenBranches.length}
+          </Text>
+          <Text as="span" tone="muted" size="sm">
+            open change{data.myOpenBranches.length === 1 ? '' : 's'} of mine
+          </Text>
+        </div>
       </div>
 
-      <div className={styles.side}>
-        <Panel>
-          <Text as="h2" size="xl" className={styles.sectionTitle}>
-            My changes
-          </Text>
-          {data.myOpenBranches.length === 0 ? (
-            <EmptyState>No open changes of your own right now.</EmptyState>
-          ) : (
-            <ul className={styles.branchList}>
-              {data.myOpenBranches.map((branch) => (
-                <li key={branch.id} className={styles.branchRow}>
-                  <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`}>
-                    <Text as="span" size="sm">
-                      {branch.title ?? branch.name}
-                    </Text>
-                  </Link>
-                  <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
+      <div className={styles.columns}>
+        <div className={styles.main}>
+          <Panel>
+            <Text as="h2" size="xl" className={styles.sectionTitle}>
+              Review queue
+            </Text>
+            {data.oldestReviewItem ? (
+              <Link to={`/o/${orgSlug}/m/${modelSlug}/review/${data.oldestReviewItem.id}`}>
+                <Text as="span" size="sm">
+                  Oldest: opened {formatRelativeTime(data.oldestReviewItem.created_at, now)} →
+                </Text>
+              </Link>
+            ) : (
+              <EmptyState>Nothing in review right now.</EmptyState>
+            )}
+          </Panel>
 
-        <Panel>
-          <Text as="h2" size="xl" className={styles.sectionTitle}>
-            Recent activity
-          </Text>
-          {data.recentCommits.length === 0 ? (
-            <EmptyState>No activity on main yet.</EmptyState>
-          ) : (
-            <>
-              <ul className={styles.commitList}>{shownActivity.map(activityRow)}</ul>
-              {restActivity.length > 0 && (
-                <CollapsibleSection title="View all" meta={`(${String(restActivity.length)} more)`} defaultOpen={false}>
-                  <ul className={styles.commitList}>{restActivity.map(activityRow)}</ul>
-                </CollapsibleSection>
-              )}
-            </>
-          )}
-        </Panel>
+          <Panel>
+            <Text as="h2" size="xl" className={styles.sectionTitle}>
+              Health findings
+            </Text>
+
+            {/* Prompt 7k item 3's own link into BoundaryCrossingsPage.tsx's
+                full list. */}
+            <Link to={`/o/${orgSlug}/m/${modelSlug}/boundary-crossings`}>
+              <Text as="span" tone="muted" size="sm">
+                View boundary crossings →
+              </Text>
+            </Link>
+
+            {findingGrid(gridHealthChecks)}
+            {(infoHealthChecks.length > 0 || activeHealthChecks.length > 0) && (
+              <div className={styles.infoRows}>
+                {infoRows(infoHealthChecks)}
+                {/* Not a real check (always 0 until Q1, ADR-019) — never
+                    part of `healthChecks` or its "N checks clear" collapse,
+                    but kept alongside the other findings rather than shown
+                    when every real check is already clean. */}
+                {activeHealthChecks.length > 0 && (
+                  <Text as="p" tone="faint" size="sm">
+                    {data.duplicatesCount} duplicates flagged — wired to 0 until Q1&rsquo;s matching pipeline can populate the standing duplicates report (ADR-019).
+                  </Text>
+                )}
+              </div>
+            )}
+            {clearChecksSection(clearHealthChecks)}
+
+            {/* Item 5: Assurance keeps its own heading but uses the same
+                grid/info-rows shape as Health findings above. */}
+            <Text as="h3" size="lg" className={styles.subsectionTitle}>
+              Assurance
+            </Text>
+            {findingGrid(gridAssuranceChecks)}
+            {infoRows(infoAssuranceChecks)}
+            {clearChecksSection(clearAssuranceChecks)}
+          </Panel>
+        </div>
+
+        <div className={styles.side}>
+          <Panel>
+            <Text as="h2" size="xl" className={styles.sectionTitle}>
+              My changes
+            </Text>
+            {data.myOpenBranches.length === 0 ? (
+              <EmptyState>No open changes of your own right now.</EmptyState>
+            ) : (
+              <ul className={styles.branchList}>
+                {data.myOpenBranches.map((branch) => (
+                  <li key={branch.id} className={styles.branchRow}>
+                    <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`}>
+                      <Text as="span" size="sm">
+                        {branch.title ?? branch.name}
+                      </Text>
+                    </Link>
+                    <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <Panel>
+            <Text as="h2" size="xl" className={styles.sectionTitle}>
+              Recent activity
+            </Text>
+            {data.recentCommits.length === 0 ? (
+              <EmptyState>No activity on main yet.</EmptyState>
+            ) : (
+              <>
+                <ul className={styles.commitList}>{shownActivity.map(activityRow)}</ul>
+                {restActivity.length > 0 && (
+                  <CollapsibleSection title="View all" meta={`(${String(restActivity.length)} more)`} defaultOpen={false}>
+                    <ul className={styles.commitList}>{restActivity.map(activityRow)}</ul>
+                  </CollapsibleSection>
+                )}
+              </>
+            )}
+          </Panel>
+        </div>
       </div>
     </div>
   );

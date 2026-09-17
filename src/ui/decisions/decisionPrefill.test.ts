@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { decisionPrefillToSearchParams, parseDecisionPrefillFromSearchParams, prefillFromCriticalSupportEndFinding, prefillFromPoorFitCapabilityFinding, prefillFromWeakCapability } from './decisionPrefill';
+import {
+  decisionPrefillToSearchParams,
+  parseDecisionPrefillFromSearchParams,
+  prefillFromCapabilityNoSupportersFinding,
+  prefillFromCriticalExposedFinding,
+  prefillFromCriticalSupportEndFinding,
+  prefillFromPoorFitCapabilityFinding,
+  prefillFromWeakCapability,
+} from './decisionPrefill';
 
 describe('decisionPrefill', () => {
   it('builds a critical-support-end prefill naming the system in both title and statement', () => {
@@ -27,6 +35,25 @@ describe('decisionPrefill', () => {
     expect(prefill.sourceFindingKey).toBe('poor-fit-no-replacement');
     expect(prefill.linkedElementId).toBe('cap-1');
     expect(prefill.linkedElementName).toBe('Claims Intake');
+  });
+
+  it('builds a critical-exposed prefill naming the system', () => {
+    const prefill = prefillFromCriticalExposedFinding({ id: 'sys-2', name: 'Legacy Case System' });
+    expect(prefill.title).toContain('Legacy Case System');
+    expect(prefill.statement).toContain('Legacy Case System');
+    expect(prefill.sourceFindingKey).toBe('critical-exposed');
+    expect(prefill.linkedElementId).toBe('sys-2');
+    expect(prefill.linkedElementName).toBe('Legacy Case System');
+  });
+
+  it('builds a capability-no-supporters prefill naming the capability', () => {
+    const prefill = prefillFromCapabilityNoSupportersFinding({ id: 'cap-2', name: 'Adult Social Care' });
+    expect(prefill.title).toContain('Adult Social Care');
+    expect(prefill.statement).toContain('Adult Social Care');
+    expect(prefill.statement).toContain('no known supporting system');
+    expect(prefill.sourceFindingKey).toBe('capability-no-supporters');
+    expect(prefill.linkedElementId).toBe('cap-2');
+    expect(prefill.linkedElementName).toBe('Adult Social Care');
   });
 
   it('round-trips through URLSearchParams unchanged', () => {

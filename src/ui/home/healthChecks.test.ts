@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { HealthFindingSeverity } from '../components/HealthFinding/HealthFinding';
+import type { HealthFindingSeverity } from '../components/HealthFinding/healthFindingFormat';
 import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
 
 function check(key: string, count: number, severity: HealthFindingSeverity = 'medium'): HealthCheck {

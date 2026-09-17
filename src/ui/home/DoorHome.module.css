@@ -36,15 +36,46 @@
   font-weight: 700;
 }
 
-.counts {
+/* Architect-door layout prompt item 1: the same big-number/muted-label
+   stat treatment the director door's own `.statsRow`/`.stat`
+   (`DirectorHome.module.css`) already uses — kept as its own copy here
+   rather than a shared import, matching that file's own note that the two
+   doors' CSS modules are deliberately independent. */
+.statsRow {
   display: flex;
   gap: var(--space-6);
+  margin-bottom: var(--space-4);
 }
 
-.count {
+.stat {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+}
+
+.statWarn {
+  color: var(--status-warn);
+}
+
+/* Item 2/5: the responsive finding-card grid — 3-4 columns at desktop,
+   collapsing to 1 by the time the container is as narrow as a 390px
+   viewport (this door's own `.main` column is full-width below the
+   768px breakpoint above, so `auto-fill` alone reaches single-column
+   there with no extra media query needed). */
+.findingGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+/* Item 3: informational findings, single-line rows beneath the grid
+   rather than their own cards. */
+.infoRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
 }
 
 .changeGroups {
@@ -99,20 +130,4 @@
   align-items: baseline;
   gap: var(--space-2);
   flex-shrink: 0;
-}
-
-/* Handoff 7d's architect-door Health findings: four plates, the first
-   blueprint-framed (rendered via <BlueprintFrame>, not this class). */
-.findingPlates {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.findingPlate {
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-sm);
-  /* Visual pass item 2: was --space-2, matching DirectorHome.module.css's
-     own `.tile` padding bump for the same reason. */
-  padding: var(--space-3);
 }

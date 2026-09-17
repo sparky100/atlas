@@ -6,6 +6,7 @@ import { attributesRecord } from './attributesRecord';
 import { compareCustomAttributeValues, sortKeyEquals, type ElementBrowseSortKey } from './elementBrowseSort';
 import {
   computeStaleAttributesFinding,
+  findCapabilitiesWithNoSupporters,
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
@@ -20,6 +21,7 @@ import {
   listFactsForCommit,
 } from '../../db/healthFindings';
 import { listAllSupportsEdges } from '../../db/modelHome';
+import { computeCapabilityMapTree } from '../capabilityMap/layout';
 import { resolveRef } from '../../db/ref';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -59,6 +61,8 @@ export type ElementBrowseFilter =
   | 'unused-integration-platform'
   | 'essential-no-technical-owner'
   | 'critical-support-end'
+  /** Per-item-actions prompt: the third decision-shaped finding, `findCapabilitiesWithNoSupporters`'s own filter key (`ArchitectHome.tsx`'s `capability-no-supporters` check). */
+  | 'capability-no-supporters'
   | CustomAttributeBrowseFilter
   | null;
 
@@ -193,6 +197,10 @@ export function useElementBrowse(
       } else if (filter === 'critical-support-end') {
         const systems = elements.filter((e) => e.element_type === 'system');
         ids = new Set(findCriticalSystemsPastOrNearSupportEnd(systems).map((e) => e.element_id));
+      } else if (filter === 'capability-no-supporters') {
+        const capabilities = elements.filter((e) => e.element_type === 'capability');
+        const level1Capabilities = computeCapabilityMapTree(capabilities).l1.map((column) => column.capability);
+        ids = new Set(findCapabilitiesWithNoSupporters(level1Capabilities, capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
       } else if (filter !== null && typeof filter === 'object') {
         // F1 PR4: an org-defined attribute's own equality filter — `value`
         // arrives already parsed to the definition's `kind` by the caller,
