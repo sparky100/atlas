@@ -75,6 +75,31 @@ export async function createMergeResolutionSource(supabase: Client, input: Creat
   return data as SourceRow;
 }
 
+export interface CreateSpreadsheetSourceInput {
+  /** Minted by the caller — a fresh row every import run, not a per-user singleton (an import's provenance is naturally scoped to the one file it came from, same reasoning `createMergeResolutionSource`'s own doc comment gives for its own per-refresh row). */
+  id: UUID;
+  orgId: UUID;
+  modelId: UUID;
+  createdBy: UUID;
+  /** The imported file's own name — shown in a provenance badge's hover card the same way `createMergeResolutionSource`'s branch title is, so "where did this come from" names the actual file, not just "a spreadsheet". */
+  fileName: string;
+}
+
+/**
+ * One `spreadsheet` source per import run (F2, narrowed capture pipeline,
+ * Phase 1) — every delta that run's own commit writes shares it.
+ * `sources_insert`'s RLS already allows an ordinary contributor+ to
+ * insert `kind: 'spreadsheet'` (`supabase/migrations/20260906071500_sources_and_aliases.sql`)
+ * — no migration needed for this function to exist.
+ */
+export async function createSpreadsheetSource(supabase: Client, input: CreateSpreadsheetSourceInput): Promise<SourceRow> {
+  const row = { id: input.id, org_id: input.orgId, model_id: input.modelId, kind: 'spreadsheet' as const, name: input.fileName, created_by: input.createdBy };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.from('sources').insert(row).select('*').single();
+  if (error) throw new Error(`createSpreadsheetSource: ${error.message}`);
+  return data as SourceRow;
+}
+
 /**
  * Every `sources` row for a model — the model-scoped provenance-name lookup
  * an export's "Source" column needs. Deliberately a whole-model `selectAll`
