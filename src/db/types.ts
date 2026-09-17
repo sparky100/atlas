@@ -254,6 +254,36 @@ export interface ElementMergeRow {
   created_at: string;
 }
 
+export type LlmProxyRequestStatus = 'ok' | 'error' | 'rate_limited';
+
+/** The literal shape of a row in `llm_proxy_requests` (ADR-014, E4 — `20260917010000_llm_proxy_requests.sql`) — a per-org LLM proxy call log, append-only, no prompt/response payload column at all (deliberate: "request logging without payload retention"). */
+export interface LlmProxyRequestRow {
+  id: UUID;
+  org_id: UUID;
+  model: string;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  status: LlmProxyRequestStatus;
+  latency_ms: number | null;
+  created_at: string;
+}
+
+/**
+ * The literal shape of a row in `platform_config` (E4 follow-up —
+ * `20260917020000_platform_config.sql`) — application-level configuration
+ * overrides, e.g. `key = 'llm'`'s `{model, apiKey, rateLimitPerHour}`.
+ * `value` is loosely typed (`Record<string, unknown>`, not a per-key
+ * discriminated shape) since this table has no client reader at all today
+ * (`llm-proxy`'s own `loadConfig` reads it via a raw REST call under the
+ * service-role key, not through this type) — nothing in `src/` constructs
+ * or consumes this row yet.
+ */
+export interface PlatformConfigRow {
+  key: string;
+  value: Record<string, unknown>;
+  updated_at: string;
+}
+
 /**
  * Landscape and capability_map are whole-model queries; context/container
  * scope to one element (SPEC §3.9). Sprint U1 step 4 only ever creates
