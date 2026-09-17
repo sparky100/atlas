@@ -135,7 +135,7 @@ test('architect door: health findings name systems with no capability, capabilit
   await expect(page.getByText('0 duplicates flagged')).toBeVisible();
 });
 
-test('Sprint U4-1 B3: a finding with more than three items collapses to "and N more", expands to the full list, and paginates at 20', async ({ page }) => {
+test('architect-door layout prompt: a finding with more than three items collapses to "and N more" on its own card, with a browse-table link to the full list', async ({ page }) => {
   const env = loadEnv();
 
   const email = `healthfindings-page-${randomUUID()}@example.test`;
@@ -205,27 +205,21 @@ test('Sprint U4-1 B3: a finding with more than three items collapses to "and N m
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await expect(page.getByText('22 systems not linked to a capability')).toBeVisible();
 
-  // Collapsed: only the first three, "and 19 more" — not the rest, and no
-  // pagination controls yet.
+  // The card's own names line: only the first three, "and 19 more" — the
+  // architect-door layout prompt's own compact card has no expand/paginate
+  // mechanism at all (Sprint U4-1 B3's old "Show all" accordion is
+  // retired); the rest are only ever reachable via the card's own browse
+  // link into the full, unfiltered-by-count element table.
   await expect(page.getByText('System 01, System 02, System 03, and 19 more')).toBeVisible();
   await expect(page.getByText('System 22', { exact: true })).toHaveCount(0);
-  await expect(page.getByText(/Page \d of \d/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Show all' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Show all' }).click();
+  await page.getByRole('link', { name: 'Review and link →' }).click();
 
-  // Expanded, page 1: every name up to System 20, not System 21/22 yet.
-  await expect(page.getByText('System 01', { exact: true })).toBeVisible();
-  await expect(page.getByText('System 20', { exact: true })).toBeVisible();
-  await expect(page.getByText('System 21', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('Page 1 of 2')).toBeVisible();
-
-  await page.getByRole('button', { name: 'Next →' }).click();
-
-  // Page 2: the remaining 2, page 1's own System 01 no longer shown.
-  await expect(page.getByText('System 21', { exact: true })).toBeVisible();
-  await expect(page.getByText('System 22', { exact: true })).toBeVisible();
-  await expect(page.getByText('System 01', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('Page 2 of 2')).toBeVisible();
+  // The browse table itself shows every one of the 22, unpaginated.
+  await expect(page).toHaveURL(/\/elements\?filter=unlinked-systems/);
+  await expect(page.getByRole('link', { name: 'System 01', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'System 22', exact: true })).toBeVisible();
 });
 
 test('Sprint U4-1 B3: capability ownership inherits from an owned ancestor; an unowned subtree lists only its highest unowned ancestor', async ({ page }) => {
@@ -339,13 +333,15 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // comment, ArchitectHome.tsx) — a genuinely clean model collapses each
   // group to its own "N checks clear" line (S1 item 7), not one combined
   // line, mirroring the old "No findings." x2 behaviour it replaces.
-  // Assurance is 5, not 3, as of S1 item 11a's own two new checks
-  // (external interfaces missing classification, external organisation
-  // access) — both zero on an element-less model.
+  // Assurance is 5, as of S1 item 11a's own two new checks (external
+  // interfaces missing classification, external organisation access) —
+  // both zero on an element-less model. Health findings is 13, as of the
+  // architect-door layout prompt's own `capability-no-supporters` check
+  // (the third decision-shaped finding) — also zero here.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await expect(page.getByRole('heading', { name: 'Health findings' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
-  const healthClear = page.getByRole('button', { name: '9 checks clear' });
+  const healthClear = page.getByRole('button', { name: '13 checks clear' });
   const assuranceClear = page.getByRole('button', { name: '5 checks clear' });
   await expect(healthClear).toBeVisible();
   await expect(assuranceClear).toBeVisible();
@@ -358,7 +354,7 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   await expect(page.getByText(/duplicates flagged/)).toHaveCount(0);
 
   // Expanding the Health findings group's own line reveals each of its
-  // nine checks' own "0 X" summary — including ones the panel above never
+  // 13 checks' own "0 X" summary — including ones the panel above never
   // showed a live example of.
   await healthClear.click();
   await expect(page.getByText('0 systems not linked to a capability', { exact: true })).toBeVisible();

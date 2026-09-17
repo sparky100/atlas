@@ -27,6 +27,7 @@
 import { isStale, monthsSince, monthsUntil, STALE_AFTER_MONTHS } from '../contracts/thresholds';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { SystemDomain, UUID } from '../contracts/delta';
+import { computeCapabilityRollup } from '../ui/capabilityMap/capabilityRollup';
 import { attributesRecord } from '../ui/elements/attributesRecord';
 import { isFitForPurpose } from '../ui/elements/fitForPurposeTone';
 import { isPlatform } from '../ui/elements/systemKind';
@@ -658,6 +659,31 @@ export function findCapabilitiesWithPoorFitPrimarySupporter(
     .map((id) => capabilitiesById.get(id))
     .filter((c): c is ElementsHeadRow => c !== undefined)
     .sort((a, b) => a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id));
+}
+
+/**
+ * A decision-shaped finding (architect-door per-item-action prompt):
+ * level-1 capabilities with zero supporting systems anywhere in their own
+ * subtree. Reuses `computeCapabilityRollup` (`src/ui/capabilityMap/
+ * capabilityRollup.ts`) rather than a bare "no direct supports edge" check
+ * — a parent capability routinely carries no *direct* edge of its own
+ * because everything attaches to its children, so a direct-edge-only
+ * check would misname most well-supported parents as unsupported. This is
+ * the exact same classification the director door's own weak-capability
+ * grid already flags as "nothing recorded" (`buildCapabilityTiles`,
+ * `src/db/modelHome.ts`, `tone: 'neutral'` when `supportingSystems.length
+ * === 0`) — named here as its own architect-door finding rather than a
+ * second, driftable definition of the same gap.
+ */
+export function findCapabilitiesWithNoSupporters(
+  level1Capabilities: readonly ElementsHeadRow[],
+  allCapabilities: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  ownsEdges: readonly RelationshipsHeadRow[],
+): ElementsHeadRow[] {
+  const capabilitiesById = new Map(allCapabilities.map((c) => [c.element_id, c]));
+  const selfOwnedIds = computeSelfOwnedCapabilityIds(allCapabilities, supportsEdges, ownsEdges);
+  return level1Capabilities.filter((capability) => computeCapabilityRollup(capability, allCapabilities, capabilitiesById, supportsEdges, selfOwnedIds).supportingSystemIds.length === 0);
 }
 
 export { STALE_AFTER_MONTHS };

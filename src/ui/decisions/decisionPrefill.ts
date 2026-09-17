@@ -67,6 +67,28 @@ export function prefillFromPoorFitCapabilityFinding(capability: { id: UUID; name
   };
 }
 
+/** `findCriticalExposedSystems`'s own finding (`ArchitectHome.tsx`'s `critical-exposed` check) — the architect door's three named decision-shaped findings' first member. */
+export function prefillFromCriticalExposedFinding(system: { id: UUID; name: string }): DecisionPrefill {
+  return {
+    title: `Replace ${system.name}?`,
+    statement: `${system.name} is critical and exposed with no planned replacement — a decision is needed on what replaces it.`,
+    sourceFindingKey: 'critical-exposed',
+    linkedElementId: system.id,
+    linkedElementName: system.name,
+  };
+}
+
+/** `findCapabilitiesWithNoSupporters`'s own finding (`ArchitectHome.tsx`'s `capability-no-supporters` check) — the third of the architect door's three named decision-shaped findings. */
+export function prefillFromCapabilityNoSupportersFinding(capability: { id: UUID; name: string }): DecisionPrefill {
+  return {
+    title: `Who supports ${capability.name}?`,
+    statement: `${capability.name} has no known supporting system — a decision is needed on how it should be supported.`,
+    sourceFindingKey: 'capability-no-supporters',
+    linkedElementId: capability.id,
+    linkedElementName: capability.name,
+  };
+}
+
 /** Appended to a `/decisions` href — `URLSearchParams` handles the encoding, so callers never need to. */
 export function decisionPrefillToSearchParams(prefill: DecisionPrefill): URLSearchParams {
   const params = new URLSearchParams();

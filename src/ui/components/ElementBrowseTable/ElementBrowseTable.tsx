@@ -1,9 +1,9 @@
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { AttributeDefinitionKind } from '../../../contracts/attributeSchema';
 import { attributeDefinitionToFieldSchema } from '../../../contracts/attributeSchema';
 import type { ElementType, UUID } from '../../../contracts/delta';
-import { ELEMENT_TYPE_FILTER_OPTIONS } from '../../../db/elementBrowse';
+import { ELEMENT_TYPE_FILTER_OPTIONS, type BrowseRow } from '../../../db/elementBrowse';
 import type { AttributeDefinitionRow, BranchRow } from '../../../db/types';
 import type { ThreadCount } from '../../comments/useThreadCounts';
 import { attributesRecord, formatCustomAttributeValue } from '../../elements/attributesRecord';
@@ -60,6 +60,20 @@ export interface ElementBrowseTableProps {
   attributeDefinitions: readonly AttributeDefinitionRow[];
   customAttr: ElementBrowseCustomAttrSelection;
   onCustomAttrChange: (next: ElementBrowseCustomAttrSelection) => void;
+  /**
+   * Per-item-actions prompt: "each row [in a decision-shaped finding's
+   * filtered list] carries its own pre-filled Start a decision" — the same
+   * "one more filter-gated action column" shape `linkSupportsInline` above
+   * already established (a new `<th>`/`<td>` pair, rendered only when this
+   * is present). `ElementsPage.tsx` builds it from whichever `?filter=` is
+   * active, since that's what decides which `decisionPrefill.ts` builder
+   * (and therefore which element shape — system or capability) applies to
+   * every row in this particular table. `null` for a row this filter's own
+   * action doesn't apply to (never expected in practice — a decision-
+   * shaped filter's own rows are already narrowed to the right element
+   * type — but typed to allow it rather than assuming).
+   */
+  decisionRowAction?: ((row: BrowseRow) => ReactNode | null) | undefined;
 }
 
 // A narrower key type than `ElementBrowseSortKey` — this fixed column list
@@ -178,7 +192,7 @@ function InlineSupportsPicker({ system, config, searchCommitId }: { system: { el
 }
 
 /** Sprint U3b: "filterable, sortable table of elements by type with owner and lifecycle." A real `<table>` — semantic tabular data, not a design-system gap (native `<table>`/`<th>`/`<td>` is the correct element here, the same way `<ul>`/`<li>` already is for plain lists elsewhere in this app). */
-export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenameBase, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange }: ElementBrowseTableProps) {
+export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenameBase, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange, decisionRowAction }: ElementBrowseTableProps) {
   // Called unconditionally (Rules of Hooks) — `commitId`/`rows` are only real
   // once `state.status === 'ready'`, and the export loader refuses to run on
   // the null/empty fallbacks until then.
@@ -265,6 +279,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                 )}
                 <th>Comments</th>
                 {linkSupportsInline && <th>Link to a capability</th>}
+                {decisionRowAction && <th>Decision</th>}
               </tr>
             </thead>
             <tbody>
@@ -341,6 +356,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                       )}
                     </td>
                   )}
+                  {decisionRowAction && <td>{decisionRowAction(row)}</td>}
                 </tr>
                 );
               })}

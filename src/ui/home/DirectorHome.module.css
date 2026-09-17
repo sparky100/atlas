@@ -60,16 +60,21 @@
   gap: var(--space-3);
 }
 
-/* Prompt pack F3 PR6: the grid item is now this wrapper, not the tile's
-   own `<Link>` directly — "Start a decision" renders as a sibling after
-   the link (never nested inside it), only on a weak tile. */
+/* Per-item-actions prompt: the grid item is still this wrapper, not the
+   tile's own `<Link>` directly, but "Start a decision" now renders
+   *inline* within the card's own content (the wrapper's bottom-right
+   corner) rather than trailing below it as its own block — still a DOM
+   sibling rendered after the link, never nested inside it (an `<a>` can't
+   legally contain another `<a>`), just positioned over the tile instead of
+   stacked under it. */
 .tileWrapper {
-  display: flex;
-  flex-direction: column;
+  position: relative;
 }
 
 .tileAction {
-  margin-top: var(--space-1);
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
 }
 
 .tile,
@@ -77,11 +82,6 @@
   display: block;
   color: inherit;
   text-decoration: none;
-  /* `flex` is a no-op outside `.tileWrapper`'s flex context — harmless
-     everywhere this was already used before this file's own PR6 wrapper;
-     inside it, it's what keeps the tile itself filling the grid row's
-     stretched height instead of leaving a gap above "Start a decision". */
-  flex: 1 1 auto;
 }
 
 .tile {
@@ -97,6 +97,12 @@
 
 .tileEmphasised {
   min-height: var(--tile-min-height-emphasised);
+  /* Room for the inline "Start a decision" action in the corner above —
+     every emphasised tile reserves it, whether or not this particular one
+     ends up showing an action (only a *weak* emphasised tile does,
+     `CapabilityTile`'s own `isWeak`/`canStartDecision` gate), so every
+     tile in the emphasised row keeps the same height. */
+  padding-bottom: calc(var(--space-3) * 2 + 1em);
 }
 
 /* Visual pass item 1: "no known supporters" specifically (DirectorHome.tsx's

@@ -1,0 +1,34 @@
+/* Architect-door layout prompt item 2: a compact 2-line finding card,
+   replacing `HealthFinding.module.css`'s old expand/paginate plate. Same
+   severity tints as before (moved here verbatim) — `informational`
+   findings never render through this component at all (they're single-
+   line rows beneath the grid instead, `ArchitectHome.tsx`'s own
+   `infoChecks`), so there's no "no tint" case to style here. */
+.card {
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.high {
+  background: var(--status-strong-bg);
+}
+
+.medium {
+  background: var(--status-weak-bg);
+}
+
+.titleLine {
+  overflow-wrap: break-word;
+}
+
+.count {
+  font-weight: 700;
+}
+
+.namesLine {
+  overflow-wrap: break-word;
+}

@@ -6,6 +6,7 @@ import {
   findBoundaryCrossings,
   findBoundaryCrossingsMissingClassification,
   findBoundaryCrossingsMissingVerb,
+  findCapabilitiesWithNoSupporters,
   findCapabilitiesWithoutOwner,
   findCapabilitiesWithPoorFitPrimarySupporter,
   findCriticalExposedSystems,
@@ -888,5 +889,40 @@ describe('findCapabilitiesWithPoorFitPrimarySupporter', () => {
       relationship('r2', 'supports', 'sys-2', 'cap-1', { role: 'primary', fitForPurpose: 'adequate' }),
     ];
     expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, new Map())).toEqual([capability('cap-1')]);
+  });
+});
+
+describe('findCapabilitiesWithNoSupporters (per-item-actions prompt)', () => {
+  it('flags a level-1 capability with zero supports edges anywhere', () => {
+    const capabilities = [capability('cap-1')];
+    expect(findCapabilitiesWithNoSupporters(capabilities, capabilities, [], [])).toEqual([capability('cap-1')]);
+  });
+
+  it('does not flag a level-1 capability with a direct supporter', () => {
+    const capabilities = [capability('cap-1')];
+    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'secondary' })];
+    expect(findCapabilitiesWithNoSupporters(capabilities, capabilities, supports, [])).toEqual([]);
+  });
+
+  it('does not flag a level-1 capability whose child (not itself) is directly supported — subtree rollup, not a direct-edge check', () => {
+    const root = capability('cap-root');
+    const child = capability('cap-child', 'cap-root');
+    const allCapabilities = [root, child];
+    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-child', { role: 'secondary' })];
+    expect(findCapabilitiesWithNoSupporters([root], allCapabilities, supports, [])).toEqual([]);
+  });
+
+  it('flags a level-1 capability whose whole subtree has no supporter', () => {
+    const root = capability('cap-root');
+    const child = capability('cap-child', 'cap-root');
+    const allCapabilities = [root, child];
+    expect(findCapabilitiesWithNoSupporters([root], allCapabilities, [], [])).toEqual([root]);
+  });
+
+  it('only ever considers the level-1 capabilities passed in, not every capability in the model', () => {
+    const root = capability('cap-root');
+    const other = capability('cap-other');
+    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-other', { role: 'secondary' })];
+    expect(findCapabilitiesWithNoSupporters([root], [root, other], supports, []).map((c) => c.element_id)).toEqual(['cap-root']);
   });
 });
