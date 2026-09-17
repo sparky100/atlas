@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { Link } from 'react-router';
+import { usePlatformAdmin } from '../../admin/usePlatformAdmin';
 import { useAuth } from '../../auth/useAuth';
 import { Button } from '../Button/Button';
 import { Text } from '../Text/Text';
@@ -26,7 +27,8 @@ function monogramFor(email: string | null): string {
  * — is no longer conditional on viewport at all.
  */
 export function UserMenu() {
-  const { email, signOut } = useAuth();
+  const { userId, email, signOut } = useAuth();
+  const { isPlatformAdmin } = usePlatformAdmin(userId);
   const [open, setOpen] = useState(false);
   const menuId = useId();
 
@@ -48,6 +50,14 @@ export function UserMenu() {
             Profile
           </Text>
         </Link>
+        {/* Atlas's first cross-org role — omitted entirely for a non-admin, the same "not shown disabled" convention every other conditional affordance in this codebase uses (e.g. ElementHeader.tsx's onRetire/onRemoveFromModel). */}
+        {isPlatformAdmin && (
+          <Link to="/platform-admin" className={styles.profileLink} onClick={() => { setOpen(false); }}>
+            <Text as="span" size="sm">
+              Platform admin
+            </Text>
+          </Link>
+        )}
         {/* Sprint F7 item 2: this device only — the profile page's own "Sign out everywhere" is the explicit, heavier action (`{scope:'global'}`); this one previously had no scope at all, which supabase-js v2 defaults to 'global' — narrowing it to 'local' is the actual behaviour change this decision makes, not just a label. */}
         <Button
           variant="ghost"

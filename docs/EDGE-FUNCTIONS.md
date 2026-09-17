@@ -84,9 +84,14 @@ with the human directly): model, rate-limit cap, and optionally the API
 key itself are read from `platform_config`'s own `key = 'llm'` row first —
 the same table/shape the existing suite's own `llm-proxy` already uses —
 falling back field-by-field to the env-var secrets below when that row is
-missing, or a given field on it is unset. There is no in-app settings
-screen for this yet (Atlas has no platform-administrator role to gate one
-with); changing a value today means writing the row directly.
+missing, or a given field on it is unset.
+
+**There is now an in-app settings page — `/platform-admin`** — gated on
+Atlas's first cross-org role, a platform administrator (`docs/PLATFORM-ADMIN.md`
+has the full design and the one-off SQL that grants the first one; there is
+still no self-serve way to *become* one). A platform admin can change
+model/rate-limit/API key from that page without ever touching Supabase
+secrets, SQL, or a redeploy — only granting the role itself still needs SQL.
 
 ### One-time setup
 
@@ -117,6 +122,13 @@ automatically to every edge function by Supabase — nothing to set for
 those.
 
 ### Application-level overrides (`platform_config`)
+
+**The `/platform-admin` page (docs/PLATFORM-ADMIN.md) is the normal way to
+change these now** — a platform admin edits model/rate-limit/API key
+directly in the app. What follows is the underlying mechanism, and the
+path this repo used before that page existed (still valid — a
+`security definer` RPC read/writes this table too, but going straight at
+it with SQL works exactly as well for a one-off change).
 
 `platform_config` has no client access at all — not even select, since a
 row may hold a live secret (SPEC-data-model.md §9.5's own "service-role
