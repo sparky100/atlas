@@ -265,6 +265,15 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       count: data.capabilitiesWithPoorFitPrimarySupporter.length,
       summary: `${String(data.capabilitiesWithPoorFitPrimarySupporter.length)} ${plural(data.capabilitiesWithPoorFitPrimarySupporter.length, 'capability', 'capabilities')} whose primary supporter is rated a poor or adequate fit, with no planned replacement`,
       items: elementItems(data.capabilitiesWithPoorFitPrimarySupporter),
+      // Medium, not high: structurally close to `critical-exposed` above
+      // (a real gap — a system rated poor/adequate fit, nothing lined up
+      // to replace it — with the same "Start a decision" action), but that
+      // one is high specifically because it's gated on `criticality:
+      // 'critical'`; this finding isn't, so it stays in the same tier as
+      // the other genuine-but-not-urgent nudges (a judgment call, not
+      // named in the agreed tiers — this check didn't exist when those
+      // were agreed).
+      severity: 'medium',
       ...(canStartDecision(role)
         ? { itemAction: (item: HealthFindingItem) => <StartDecisionLink href={startDecisionHref(prefillFromPoorFitCapabilityFinding({ id: item.id, name: item.label }))} /> }
         : {}),

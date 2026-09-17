@@ -317,12 +317,23 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
         {' · '}
         {tile.supportedCapabilityCount}/{tile.totalCapabilityCount} supported
       </Text>
+      {/* Ownership is an informational-tier finding (the agreed Health
+          findings severity tiers, ArchitectHome.tsx's own `unowned-
+          capabilities`/`no-technical-owner` checks) — a director doesn't
+          need to worry about it on a card that's otherwise healthy, so it
+          no longer gets its own badge there at all (a well-supported
+          capability with no named owner is architect-level housekeeping,
+          not a director-door weakness). On an emphasised (weak) tile it's
+          still worth knowing, but folded into the one real-weakness chip
+          as trailing text rather than its own separate, equally-coloured
+          pill — two pills read as two equally urgent problems, which
+          "no owner" next to "nothing recorded"/"lifecycle exposure" never
+          was. */}
       {emphasised && (
         <Chip tone={TONE_CHIP[tile.tone]} glyph={<span className={styles.dot} />}>
-          {TONE_LABEL[tile.tone]}
+          {TONE_LABEL[tile.tone]} · {tile.isOwned ? 'owned' : 'no owner'}
         </Chip>
       )}
-      <Chip tone={tile.isOwned ? 'ok' : 'warn'}>{tile.isOwned ? 'owned' : 'no owner'}</Chip>
     </>
   );
 
