@@ -27,6 +27,20 @@
   margin: 0;
 }
 
+/* V2b: the map itself plus the shared Inspector, side by side — same
+   flex-row/first-child-grows shape `LandscapePage.module.css`'s own
+   `.canvasRow` already uses for the identical pairing. */
+.mapRow {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.mapRow > *:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Sprint U4-1 C5: "'+ Add capability' moves to the page action area" —
    same header/actions split LandscapePage.module.css already uses for
    its own "+ Add system"/"+ Add actor". */

@@ -1,3 +1,4 @@
+import { Info } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { BlueprintFrame } from '../BlueprintFrame/BlueprintFrame';
@@ -48,6 +49,17 @@ export interface CapabilityTileProps {
   commentMarker?: { state: 'ink'; count: number } | { state: 'hollow' } | undefined;
   /** Required together with `commentMarker` — opens the comments panel scoped to this capability, without following the tile's own primary link. */
   onCommentMarkerClick?: (() => void) | undefined;
+  /**
+   * V2b: the capability map's own way into the shared Inspector panel —
+   * decided over intercepting the tile's own stretched-link click (which
+   * would have meant a first click selects, a second navigates, a new
+   * interaction mode to learn on this view) in favour of a second small
+   * corner button, the same non-navigating-click pattern
+   * `onCommentMarkerClick` already establishes for this exact tile.
+   * Omitted entirely (not shown disabled) wherever the caller hasn't
+   * wired an Inspector at all — same convention as `onCommentMarkerClick`.
+   */
+  onInspectClick?: (() => void) | undefined;
 }
 
 /**
@@ -86,7 +98,7 @@ export interface CapabilityTileProps {
  * tile is the click target" doesn't apply to it the same way, and L1
  * doesn't participate in colour-by today either.
  */
-export function CapabilityTile({ href, name, tone, toneLabel, size = 'card', secondaryRow, children, commentMarker, onCommentMarkerClick }: CapabilityTileProps) {
+export function CapabilityTile({ href, name, tone, toneLabel, size = 'card', secondaryRow, children, commentMarker, onCommentMarkerClick, onInspectClick }: CapabilityTileProps) {
   const hasChip = tone !== undefined && toneLabel !== undefined;
   return (
     <BlueprintFrame interactive padding={size === 'card' ? 'compact' : 'default'}>
@@ -113,6 +125,14 @@ export function CapabilityTile({ href, name, tone, toneLabel, size = 'card', sec
             }}
           >
             {commentMarker.state === 'ink' ? commentMarker.count : null}
+          </button>
+        )}
+        {/* V2b: the opposite corner from the comment marker — same
+            positioned-above-the-overlay technique, its own doc comment
+            just above explains why DOM order alone is enough. */}
+        {onInspectClick && (
+          <button type="button" className={styles.inspectButton} aria-label={`Inspect ${name}`} title="Inspect" onClick={(e) => { e.preventDefault(); onInspectClick(); }}>
+            <Info size={12} aria-hidden="true" />
           </button>
         )}
         {/*

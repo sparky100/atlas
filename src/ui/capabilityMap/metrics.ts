@@ -112,7 +112,7 @@ function lifecycleStatusOf(system: ElementsHeadRow): LifecycleStatus | null {
 }
 
 /** The most-advanced stage (`planned` < `active` < `retiring` < `retired`) among a capability's supporting systems, or `null` if none have one recorded. */
-export function oldestLifecycleStage(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: Map<UUID, ElementsHeadRow>): LifecycleStatus | null {
+export function oldestLifecycleStage(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): LifecycleStatus | null {
   let oldest: LifecycleStatus | null = null;
   for (const systemId of supportingSystemIds(capabilityId, supportsEdges)) {
     const status = systemsById.get(systemId);
@@ -129,7 +129,7 @@ function criticalityOf(system: ElementsHeadRow): Criticality | null {
 }
 
 /** The most-severe `criticality` (`low` < `medium` < `high` < `critical`) among a capability's supporting systems, or `null` if none have one recorded — the same worst-of shape as `oldestLifecycleStage`, per Prompt 7k item 1. */
-export function worstCriticality(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: Map<UUID, ElementsHeadRow>): Criticality | null {
+export function worstCriticality(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): Criticality | null {
   let worst: Criticality | null = null;
   for (const systemId of supportingSystemIds(capabilityId, supportsEdges)) {
     const system = systemsById.get(systemId);
@@ -174,7 +174,7 @@ export function worstFitForPurposeAcross(descendantCapabilityIds: readonly UUID[
 }
 
 /** The count of a capability's supporting systems whose domain resolves to `'ot'`, out of the total — Prompt 7k item 3's "OT share". */
-export function otShareOf(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: Map<UUID, ElementsHeadRow>): { ot: number; total: number } {
+export function otShareOf(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): { ot: number; total: number } {
   const ids = supportingSystemIds(capabilityId, supportsEdges);
   let ot = 0;
   for (const id of ids) {
@@ -197,7 +197,7 @@ function plannedEndOf(system: ElementsHeadRow): Date | null {
  * more exposed still, not less. See the module comment for why "no
  * planned replacement" isn't (yet) a separate check.
  */
-export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: Map<UUID, ElementsHeadRow>, now: Date = new Date()): boolean {
+export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): boolean {
   for (const systemId of supportingSystemIds(capabilityId, supportsEdges)) {
     const system = systemsById.get(systemId);
     if (!system) continue;
@@ -208,7 +208,7 @@ export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly Re
 }
 
 /** The tone+label a tile should show for the selected colour-by mode — `mode: 'none'` always returns no tone and no label. */
-export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: Map<UUID, ElementsHeadRow>): TileColour {
+export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): TileColour {
   switch (mode) {
     case 'none':
       return { tone: undefined, label: undefined };
@@ -280,7 +280,7 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
  * plain id list rather than this file taking a dependency on `layout.ts`'s
  * tree shape.
  */
-export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityIds: readonly UUID[], supportsEdges: readonly RelationshipsHeadRow[], systemsById: Map<UUID, ElementsHeadRow>): TileColour {
+export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityIds: readonly UUID[], supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): TileColour {
   if (descendantCapabilityIds.length === 0) return { tone: undefined, label: undefined };
   switch (mode) {
     case 'none':

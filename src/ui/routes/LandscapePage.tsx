@@ -33,7 +33,8 @@ import { Inspector } from '../components/Inspector/Inspector';
 import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
 import { LandscapeInspectorContent } from '../landscape/LandscapeInspectorContent';
-import { landscapeInspectorNeighbours, landscapeInspectorOwnersByRole, landscapeInspectorSupports } from '../landscape/landscapeInspectorSelection';
+import { landscapeInspectorNeighbours, landscapeInspectorSupports } from '../landscape/landscapeInspectorSelection';
+import { ownersByRole } from '../elements/ownersByRole';
 import { parseLandscapeFilters, landscapeFiltersToSearchParams } from '../landscape/landscapeFilterParams';
 import { LANDSCAPE_COLOUR_BY_OPTIONS } from '../landscape/landscapeColour';
 import { LandscapeMobileList } from '../landscape/LandscapeMobileList';
@@ -235,7 +236,7 @@ export function LandscapePage() {
     [focusedElement, state, allNodesById],
   );
   const inspectorOwnersByRole = useMemo(
-    () => (focusedElement && state.status === 'ready' ? landscapeInspectorOwnersByRole(focusedElement.element_id, state.data.ownsEdges, state.data.actorsById) : new Map<string, ElementsHeadRow[]>()),
+    () => (focusedElement && state.status === 'ready' ? ownersByRole(focusedElement.element_id, state.data.ownsEdges, state.data.actorsById) : new Map<string, ElementsHeadRow[]>()),
     [focusedElement, state],
   );
   const inspectorSupports = useMemo(

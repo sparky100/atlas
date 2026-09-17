@@ -48,22 +48,6 @@ export function landscapeInspectorNeighbours(
   return result;
 }
 
-/** "Owners by role" for `LandscapeInspectorContent`'s Selection section — every live `owns` edge targeting `focusedElementId`, grouped by role (`business`/`technical`/`service`, `relationshipAttributeSchema.ts`'s `OWNS_ROLE_OPTIONS`), owner resolved via `actorsById` (an `owns` edge's own `from` is always an actor, `relationshipTypeRules.ts`). */
-export function landscapeInspectorOwnersByRole(focusedElementId: UUID, ownsEdges: readonly RelationshipsHeadRow[], actorsById: ReadonlyMap<UUID, ElementsHeadRow>): Map<string, ElementsHeadRow[]> {
-  const byRole = new Map<string, ElementsHeadRow[]>();
-  for (const edge of ownsEdges) {
-    if (edge.to_element_id !== focusedElementId) continue;
-    const owner = actorsById.get(edge.from_element_id);
-    if (!owner) continue;
-    const role = attributesRecord(edge.attributes).role;
-    const key = typeof role === 'string' ? role : 'other';
-    const existing = byRole.get(key);
-    if (existing) existing.push(owner);
-    else byRole.set(key, [owner]);
-  }
-  return byRole;
-}
-
 /**
  * "Supports with roles" for `LandscapeInspectorContent`'s Selection section
  * — every live `supports` edge from `focusedElementId`, named by its

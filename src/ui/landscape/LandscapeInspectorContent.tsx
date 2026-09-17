@@ -1,3 +1,4 @@
+import { SlidersHorizontal } from 'lucide-react';
 import type { Ref } from 'react';
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
@@ -276,7 +277,13 @@ export function LandscapeInspectorContent({
         )}
       </CollapsibleSection>
 
-      <CollapsibleSection title="Filters">
+      <CollapsibleSection
+        title={
+          <span className={styles.filtersTitle}>
+            <SlidersHorizontal size={14} aria-hidden="true" /> Filters
+          </span>
+        }
+      >
         <div ref={filtersSectionRef}>
           <LandscapeFilterBar filters={filters} onChange={onFiltersChange} capabilityOptions={capabilityOptions} />
         </div>

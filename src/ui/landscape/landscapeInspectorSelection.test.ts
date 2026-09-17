@@ -1,14 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Json } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import { landscapeInspectorNeighbours, landscapeInspectorOwnersByRole, landscapeInspectorSupports } from './landscapeInspectorSelection';
+import { landscapeInspectorNeighbours, landscapeInspectorSupports } from './landscapeInspectorSelection';
 
 function system(id: string, name: string): ElementsHeadRow {
   return { element_id: id, element_type: 'system', name, parent_id: null, attributes: {}, exists_delta_id: `d-${id}` };
-}
-
-function actor(id: string, name: string): ElementsHeadRow {
-  return { element_id: id, element_type: 'actor', name, parent_id: null, attributes: {}, exists_delta_id: `d-${id}` };
 }
 
 function capability(id: string, name: string): ElementsHeadRow {
@@ -42,30 +38,6 @@ describe('landscapeInspectorNeighbours', () => {
     const edges = [relationship('r1', 'uses', 's2', 's1', {})];
     const result = landscapeInspectorNeighbours('s1', edges, namesById);
     expect(result).toEqual([{ relationshipId: 'r1', otherId: 's2', otherName: 'Billing', outbound: false, verb: 'used by', description: undefined }]);
-  });
-});
-
-describe('landscapeInspectorOwnersByRole', () => {
-  it('groups owners by role, ignoring edges targeting a different element', () => {
-    const actorsById = new Map([
-      ['a1', actor('a1', 'Alice')],
-      ['a2', actor('a2', 'Bob')],
-    ]);
-    const ownsEdges = [
-      relationship('o1', 'owns', 'a1', 's1', { role: 'business' }),
-      relationship('o2', 'owns', 'a2', 's1', { role: 'technical' }),
-      relationship('o3', 'owns', 'a1', 's2', { role: 'business' }),
-    ];
-    const result = landscapeInspectorOwnersByRole('s1', ownsEdges, actorsById);
-    expect([...result.entries()]).toEqual([
-      ['business', [actorsById.get('a1')]],
-      ['technical', [actorsById.get('a2')]],
-    ]);
-  });
-
-  it('drops an edge whose owner is missing from actorsById rather than showing a broken row', () => {
-    const result = landscapeInspectorOwnersByRole('s1', [relationship('o1', 'owns', 'missing', 's1', { role: 'business' })], new Map());
-    expect(result.size).toBe(0);
   });
 });
 
