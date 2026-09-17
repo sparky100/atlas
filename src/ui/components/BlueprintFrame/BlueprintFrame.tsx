@@ -19,6 +19,16 @@ export interface BlueprintFrameProps {
    * a concept here.
    */
   interactive?: boolean;
+  /**
+   * Capability map density pass: `'compact'` steps the frame's own inset
+   * from `--space-2` down to `--space-1` — the "comfortable → compact
+   * spacing token" step requested for `CapabilityTile`'s card size
+   * (`CapabilityTile.module.css`'s own comment has the rest of that
+   * tile's height reduction). Opt-in, defaulting to `'default'`
+   * (unchanged) — every other caller of this frame (a version stamp, an
+   * exposed-capability plate) keeps its existing padding.
+   */
+  padding?: 'default' | 'compact';
 }
 
 /**
@@ -31,9 +41,9 @@ export interface BlueprintFrameProps {
  * shape difference the content's own status colour (a Chip, a status bar)
  * sits inside, not a replacement for it.
  */
-export function BlueprintFrame({ children, interactive = false }: BlueprintFrameProps) {
+export function BlueprintFrame({ children, interactive = false, padding = 'default' }: BlueprintFrameProps) {
   return (
-    <div className={[styles.frame, interactive ? styles.interactive : ''].filter(Boolean).join(' ')}>
+    <div className={[styles.frame, interactive ? styles.interactive : '', padding === 'compact' ? styles.compact : ''].filter(Boolean).join(' ')}>
       <span className={[styles.corner, styles.topLeft].join(' ')} aria-hidden="true" />
       <span className={[styles.corner, styles.topRight].join(' ')} aria-hidden="true" />
       <span className={[styles.corner, styles.bottomLeft].join(' ')} aria-hidden="true" />

@@ -88,17 +88,30 @@
 
 /* Lifted above the primary link's overlay (CSS paints/hit-tests a
    positioned element above plain in-flow content, regardless of DOM
-   order) so real controls passed as `children` — a zoom link, reorder
-   buttons, an expand toggle, even a further nested list of tiles — stay
-   independently clickable. Deliberately not a flex/layout container
-   itself (`children` can be a small inline control row or a full
-   block-level list) — the caller's own markup decides that; this wrapper
-   only does the one thing every use needs, lifting content above the
-   overlay.
+   order) so real controls passed as `secondaryRow`/`children` — a zoom
+   link, reorder buttons, an expand toggle, even a further nested list of
+   tiles — stay independently clickable. Deliberately not a flex/layout
+   container itself: it wraps *two* different shapes of content
+   (`.secondaryRow` below, a flex row; `children`, a block-level tile
+   list) that shouldn't share one layout rule between them — this span
+   only does the one thing both need, lifting content above the overlay.
 */
 .secondary {
   position: relative;
   z-index: 1;
+}
+
+/* Density pass: the tone chip and `secondaryRow` (CapabilityTile.tsx's
+   own prop) side by side — "one compact row" rather than the chip
+   sitting above a row of its own. `flex-wrap: wrap` is the escape hatch
+   for the rare case reorder mode's own extra buttons don't fit alongside
+   everything else at a narrow column width — content wraps onto a second
+   line rather than overflowing, it just isn't the common case. */
+.secondaryRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 /* M1 close-out item 2: the same bottom-right "ink plate" corner rule the

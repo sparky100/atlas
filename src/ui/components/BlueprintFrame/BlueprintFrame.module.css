@@ -7,6 +7,13 @@
   padding: var(--space-2);
 }
 
+/* `padding="compact"` (BlueprintFrame.tsx's own prop comment): one step
+   down the spacing scale, `--space-2` (comfortable) to `--space-1`
+   (compact) — CapabilityTile's card size only, for now. */
+.compact {
+  padding: var(--space-1);
+}
+
 /**
  * Sprint U4-2b item 4: plain 1px border at rest, the full emphasis
  * border back on hover/focus (`BlueprintFrame.tsx`'s own prop comment).

@@ -306,9 +306,25 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, hasSystems
   );
 }
 
-/** The "→ Landscape" zoom link every tile shows next to its supporting-system count — `null` (rendered as nothing) when there are none to zoom into. */
+/**
+ * The "→ Landscape" zoom link every tile shows next to its supporting-
+ * system count. Layout consistency pass: a tile with zero supporting
+ * systems used to render nothing here at all — the one spot in an
+ * otherwise-reserved row that could still just go blank, so an empty
+ * tile read shorter/sparser than a populated one despite every other row
+ * being height-reserved. A muted "no systems" line (nowhere to zoom to,
+ * so no link) fills that same spot instead — informational, not a
+ * problem, the same "plain, not hidden" stance CLAUDE.md rule 7 takes
+ * everywhere else a count can legitimately be zero.
+ */
 function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, refParam }: { capabilityId: UUID; count: number; orgSlug: string; modelSlug: string; refParam: string }) {
-  if (count === 0) return null;
+  if (count === 0) {
+    return (
+      <Text as="span" tone="faint" size="sm">
+        no systems
+      </Text>
+    );
+  }
   const href = `/o/${orgSlug}/m/${modelSlug}/landscape?${refParam}&capability=${capabilityId}`;
   return (
     <Link to={href} className={styles.zoomLink}>
@@ -508,9 +524,9 @@ function L1ColumnView({
             </Text>
             <span className={styles.mobileGroupMeta}>
               {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <Chip tone={aggregateColour.tone}>{aggregateColour.label}</Chip>}
-              <Chip tone={rollup.isOwned ? 'ok' : 'warn'}>{rollup.isOwned ? 'owned' : 'no owner'}</Chip>
+              {/* "No owner" is informational-tier (the agreed Health findings severity tiers), folded into the muted counts line rather than its own amber pill — same fix as the desktop header below, and DirectorHome.tsx's own capability tiles. */}
               <Text as="span" size="sm" tone="muted">
-                {l2Count} capabilit{l2Count === 1 ? 'y' : 'ies'} · {count} system{count === 1 ? '' : 's'} · {rollup.supportedCapabilityCount}/{rollup.totalCapabilityCount} supported
+                {l2Count} capabilit{l2Count === 1 ? 'y' : 'ies'} · {count} system{count === 1 ? '' : 's'} · {rollup.supportedCapabilityCount}/{rollup.totalCapabilityCount} supported{!rollup.isOwned && ' · no owner'}
               </Text>
             </span>
           </span>
@@ -550,31 +566,62 @@ function L1ColumnView({
 
   return (
     <div className={styles.column} role="listitem">
+      {/*
+       * Layout consistency pass: fixed height, both rows single-line —
+       * see CapabilityMapView.module.css's own `.columnHeader` comment
+       * for why that's now guaranteed "for free" (every row forced to
+       * one line) rather than a hardcoded height. Supersedes Sprint
+       * U4-2b item 1's "L1 names never truncate, wrap the chip/zoom-link
+       * instead" — that traded a variable header height across columns
+       * for never losing a character of a name; this sprint's own ask
+       * (headers line up at a shared baseline across every column) wants
+       * the opposite trade, so the name truncates now (ellipsis, title
+       * attribute for the full name, still a real link to the element
+       * page) — the same single-line treatment `.mobileGroupName` below
+       * already uses for this exact header at <768px, now applied at
+       * every width instead of just the narrowest one.
+       *
+       * Colour-by's own aggregate stays a single Chip (never a bare tone
+       * strip on its own — §6.3/§8.4/§8.7's "never colour-only" rule
+       * needs its own text label somewhere, and a Chip already carries
+       * one; inventing an accessible strip-plus-label pairing for
+       * desktop when a Chip already does the job isn't worth the extra
+       * surface). "No owner" is informational-tier (the agreed Health
+       * findings severity tiers — ArchitectHome.tsx's own
+       * `unowned-capabilities` check is the same tier) — folded into the
+       * one summary line below as plain muted text instead of its own
+       * amber pill, and omitted entirely when the capability *is* owned
+       * (nothing to flag), the same "no badge for the healthy case"
+       * convention DirectorHome.tsx's own capability tiles now use for
+       * the identical finding.
+       */}
       <div className={styles.columnHeader}>
-        <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${column.capability.element_id}`} className={styles.columnLink}>
-          <Text as="span" size="lg">
-            {column.capability.name}
-          </Text>
-        </Link>
-        {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <Chip tone={aggregateColour.tone}>{aggregateColour.label}</Chip>}
-        <Chip tone={rollup.isOwned ? 'ok' : 'warn'}>{rollup.isOwned ? 'owned' : 'no owner'}</Chip>
-        <Text as="span" size="sm" tone="muted">
-          {rollup.supportedCapabilityCount}/{rollup.totalCapabilityCount} supported
+        <div className={styles.columnHeaderTitleRow}>
+          <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${column.capability.element_id}`} className={styles.columnLink} title={column.capability.name}>
+            <Text as="span" size="lg" className={styles.columnName}>
+              {column.capability.name}
+            </Text>
+          </Link>
+          {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <Chip tone={aggregateColour.tone}>{aggregateColour.label}</Chip>}
+          {reorderCapability && (
+            <ReorderButtons
+              capability={column.capability}
+              previous={previousSibling}
+              next={nextSibling}
+              siblings={siblings}
+              context={reorderCapability}
+              previousGlyph="←"
+              previousLabel={`Move ${column.capability.name} left`}
+              nextGlyph="→"
+              nextLabel={`Move ${column.capability.name} right`}
+            />
+          )}
+        </div>
+        <Text as="p" size="sm" tone="muted" className={styles.columnSummary}>
+          {rollup.supportedCapabilityCount}/{rollup.totalCapabilityCount} supported ·{' '}
+          <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+          {!rollup.isOwned && ' · no owner'}
         </Text>
-        <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-        {reorderCapability && (
-          <ReorderButtons
-            capability={column.capability}
-            previous={previousSibling}
-            next={nextSibling}
-            siblings={siblings}
-            context={reorderCapability}
-            previousGlyph="←"
-            previousLabel={`Move ${column.capability.name} left`}
-            nextGlyph="→"
-            nextLabel={`Move ${column.capability.name} right`}
-          />
-        )}
       </div>
       {l2Content}
     </div>
@@ -741,28 +788,35 @@ function L2CardView({
       toneLabel={colour.label}
       commentMarker={commentMarkerFor(threadCounts, card.capability.element_id)}
       onCommentMarkerClick={onCommentMarkerClick ? () => { onCommentMarkerClick(card.capability.element_id); } : undefined}
+      // Density pass: the count/zoom-link sits right after the chip — the
+      // pairing the tile density spec actually asked for — with the
+      // expand toggle next to it (also always-relevant browsing UI) and
+      // reorder mode's own buttons last, since they're opt-in and least
+      // central to "what's this tile telling me at a glance".
+      secondaryRow={
+        <>
+          <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+          {card.l3.length > 0 && (
+            <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { onToggleExpand(card.capability.element_id); }}>
+              {expanded ? '▾' : '▸'} {card.l3.length}
+            </button>
+          )}
+          {reorderCapability && (
+            <ReorderButtons
+              capability={card.capability}
+              previous={previousSibling}
+              next={nextSibling}
+              siblings={siblings}
+              context={reorderCapability}
+              previousGlyph="↑"
+              previousLabel={`Move ${card.capability.name} up`}
+              nextGlyph="↓"
+              nextLabel={`Move ${card.capability.name} down`}
+            />
+          )}
+        </>
+      }
     >
-      <div className={styles.cardSecondaryRow}>
-        {reorderCapability && (
-          <ReorderButtons
-            capability={card.capability}
-            previous={previousSibling}
-            next={nextSibling}
-            siblings={siblings}
-            context={reorderCapability}
-            previousGlyph="↑"
-            previousLabel={`Move ${card.capability.name} up`}
-            nextGlyph="↓"
-            nextLabel={`Move ${card.capability.name} down`}
-          />
-        )}
-        <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-        {card.l3.length > 0 && (
-          <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { onToggleExpand(card.capability.element_id); }}>
-            {expanded ? '▾' : '▸'} {card.l3.length}
-          </button>
-        )}
-      </div>
       {expanded && card.l3.length > 0 && (
         <div className={styles.l3Tiles}>
           {card.l3.map((leaf, index) => {
@@ -778,23 +832,26 @@ function L2CardView({
                 size="compact"
                 commentMarker={commentMarkerFor(threadCounts, leaf.element_id)}
                 onCommentMarkerClick={onCommentMarkerClick ? () => { onCommentMarkerClick(leaf.element_id); } : undefined}
-              >
-                {/* S1 item 13: "L3 reorder controls" — the same move-up/down pattern L2 already has, one level deeper. */}
-                {reorderCapability && (
-                  <ReorderButtons
-                    capability={leaf}
-                    previous={card.l3[index - 1]}
-                    next={card.l3[index + 1]}
-                    siblings={card.l3}
-                    context={reorderCapability}
-                    previousGlyph="↑"
-                    previousLabel={`Move ${leaf.name} up`}
-                    nextGlyph="↓"
-                    nextLabel={`Move ${leaf.name} down`}
-                  />
-                )}
-                <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-              </CapabilityTile>
+                secondaryRow={
+                  <>
+                    <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+                    {/* S1 item 13: "L3 reorder controls" — the same move-up/down pattern L2 already has, one level deeper. */}
+                    {reorderCapability && (
+                      <ReorderButtons
+                        capability={leaf}
+                        previous={card.l3[index - 1]}
+                        next={card.l3[index + 1]}
+                        siblings={card.l3}
+                        context={reorderCapability}
+                        previousGlyph="↑"
+                        previousLabel={`Move ${leaf.name} up`}
+                        nextGlyph="↓"
+                        nextLabel={`Move ${leaf.name} down`}
+                      />
+                    )}
+                  </>
+                }
+              />
             );
           })}
         </div>

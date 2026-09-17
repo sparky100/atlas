@@ -1,25 +1,34 @@
 /**
- * Sprint U4-2b item 1/2: "L1 names never truncate [...] L2 names wrap to
- * two lines inside the tile." Uses the two real longest capability names
- * across all eight starter maps (found by scanning `content/capability-
- * maps/**\/*.json` directly) rather than a made-up string, so this is a
- * real regression check against real content, not a synthetic case that
- * happens to pass — `Regulatory Compliance & Price-Control Reporting`
- * (47 chars, a real level-1 name in the electricity network and utility
- * maps) and `Substation & Circuit Condition Monitoring` (41 chars, a real
- * level-2 name in the electricity network map, under a different parent
- * there — reused here as a child of the L1 name above; only the strings
- * need to be real, not their original tree position).
+ * Sprint U4-2b item 2: "L2 names wrap to two lines inside the tile" — an
+ * L2 tile name never clips internally, checked via `scrollWidth <=
+ * clientWidth` on the name element itself (a single-line `nowrap` +
+ * `text-overflow: ellipsis` name would fail this even though the page
+ * itself never scrolls, since an ellipsized box's own content still
+ * overflows its box internally).
  *
- * "no text overflow on the map at 1280 and 1920" is checked two ways: no
- * horizontal scroll on the page at either width (the same
- * `hasHorizontalScroll` check `capability-map-layout.spec.ts` already
- * uses), and no *internal* clipping on the name elements themselves —
- * `scrollWidth <= clientWidth` on the L1 name, which single-line
- * `nowrap` + `text-overflow: ellipsis` (the pre-fix behaviour) would fail
- * the moment the name doesn't fit the column at its current width, since
- * an ellipsized box's own content still overflows its box internally
- * even though the page itself never scrolls.
+ * L1 used to get the identical "never truncates" treatment (Sprint
+ * U4-2b item 1) — the layout consistency pass reversed that
+ * specifically: a fixed-height header with every column's title on a
+ * shared baseline needs a name that can't grow past one line, so L1
+ * names now truncate with an ellipsis (`CapabilityMapView.module.css`'s
+ * own `.columnName` comment has the full trade-off). This file's own L1
+ * checks below reflect that: no *page-level* horizontal scroll (still
+ * true, and more robustly so now than when L1 could wrap), the full name
+ * still reachable via the link's own `title` attribute and its
+ * accessible name (a CSS `text-overflow: ellipsis` regression clips the
+ * *paint*, never the DOM text or the accessible name — the same
+ * distinction this file's own L2 check below still relies on).
+ *
+ * Uses the two real longest capability names across all eight starter
+ * maps (found by scanning `content/capability-maps/**\/*.json` directly)
+ * rather than a made-up string, so this is a real regression check
+ * against real content, not a synthetic case that happens to pass —
+ * `Regulatory Compliance & Price-Control Reporting` (47 chars, a real
+ * level-1 name in the electricity network and utility maps) and
+ * `Substation & Circuit Condition Monitoring` (41 chars, a real level-2
+ * name in the electricity network map, under a different parent there —
+ * reused here as a child of the L1 name above; only the strings need to
+ * be real, not their original tree position).
  *
  * Same "needs a real Supabase" limitation as every other Playwright test
  * in this repo (playwright.config.ts's own module comment).
@@ -46,7 +55,7 @@ async function hasInternalHorizontalOverflow(locator: ReturnType<Page['getByText
   return locator.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
 }
 
-test('capability map: the longest real starter-map names never truncate, at 1280 and 1920', async ({ page }) => {
+test('capability map: the longest real starter-map names never overflow their box, at 1280 and 1920 (L1 truncates by design, L2 still never does)', async ({ page }) => {
   const env = loadEnv();
 
   const email = `capmap-overflow-${randomUUID()}@example.test`;
@@ -111,21 +120,22 @@ test('capability map: the longest real starter-map names never truncate, at 1280
 
     expect(await hasHorizontalScroll(page)).toBe(false);
 
+    // L1 now truncates by design (this file's own module comment) — the
+    // visual clip (`scrollWidth > clientWidth` on `.columnName`) is
+    // expected, not a regression, so this test no longer asserts it's
+    // absent. What still matters: the full name is never actually lost —
+    // it's the link's own accessible name/DOM text (`toHaveText`, a CSS
+    // ellipsis never shortens that, only the paint) and its `title`
+    // attribute (a real HTML tooltip on hover/long-press).
     const l1NameLink = page.getByRole('link', { name: LONGEST_L1_NAME });
     await expect(l1NameLink).toBeVisible();
-    expect(await hasInternalHorizontalOverflow(l1NameLink)).toBe(false);
-
-    // The full L1 name text is there, unclipped, not an ellipsized
-    // prefix of it — a `text-overflow: ellipsis` regression would still
-    // leave this exact string somewhere in the accessible name/DOM (the
-    // browser doesn't remove the text, just paints it clipped), so this
-    // check on its own wouldn't catch that; it's the `scrollWidth`
-    // check above that does. Kept together because a real truncation bug
-    // could in principle also silently shorten the DOM text itself.
     await expect(l1NameLink).toHaveText(LONGEST_L1_NAME);
+    await expect(l1NameLink).toHaveAttribute('title', LONGEST_L1_NAME);
 
+    // L2 is unchanged: still wraps to two lines, never clips internally.
     const l2NameTile = page.getByRole('link', { name: LONGEST_L2_NAME });
     await expect(l2NameTile).toBeVisible();
     await expect(l2NameTile).toHaveText(LONGEST_L2_NAME);
+    expect(await hasInternalHorizontalOverflow(l2NameTile)).toBe(false);
   }
 });
