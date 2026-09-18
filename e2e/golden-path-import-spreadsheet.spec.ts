@@ -61,3 +61,40 @@ test('import a CSV of three new systems from an empty landscape, then submit, ap
   await expect(page.getByText('Riverside Payments', { exact: true })).toBeVisible();
   await expect(page.getByText('Council Tax System', { exact: true })).toBeVisible();
 });
+
+test('unchecking a failed row lets the rest of the file import instead of being blocked entirely', async ({ page }) => {
+  await signUpCreateOrgAndModel(page, 'importrowselect');
+
+  await goToModelHome(page);
+  await page.getByRole('link', { name: 'Landscape' }).click();
+  await page.getByRole('button', { name: 'Import model updates…' }).first().click();
+  await expect(page.getByRole('dialog', { name: 'Import model updates' })).toBeVisible();
+
+  // Row 2 is a clean new system; row 3 is a module naming a platform that
+  // doesn't exist — a real, common shape (a full-inventory file's own
+  // typo, or a platform not itself included in this file) that used to
+  // block the *entire* import, not just this one row.
+  const csv = ['name,description,platform', 'Northgate,The borough’s new revenues platform.,', 'PM,Project management module.,Nonexistent Platform'].join('\n');
+  await page.getByLabel('Choose a CSV, XLSX, or JSON file to import').setInputFiles({ name: 'systems.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+
+  await expect(page.getByRole('button', { name: '1 row(s) failed' })).toBeDisabled();
+
+  // Uncheck the failed row — it's excluded from the import entirely, not just hidden, so it can no longer block the rest.
+  await page.getByRole('checkbox', { name: 'Include "PM" (row 3) in this import' }).uncheck();
+  const importButton = page.getByRole('button', { name: 'Import' });
+  await expect(importButton).toBeEnabled();
+  await importButton.click();
+
+  await expect(page.getByRole('heading', { name: 'Edits on this change' })).toBeVisible();
+  await expect(page.getByText('Northgate', { exact: true })).toBeVisible();
+  await expect(page.getByText('PM', { exact: true })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await page.getByRole('button', { name: 'Approve & merge' }).click();
+  await expect(page.getByText('merged', { exact: true }).first()).toBeVisible();
+
+  await goToModelHome(page);
+  await page.getByRole('link', { name: 'Landscape' }).click();
+  await expect(page.getByText('Northgate', { exact: true })).toBeVisible();
+  await expect(page.getByText('PM', { exact: true })).toHaveCount(0);
+});

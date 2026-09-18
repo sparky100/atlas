@@ -67,7 +67,7 @@ function downloadTemplateXlsx(): void {
 export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId, orgSlug, modelSlug }: SpreadsheetImportDialogProps) {
   const navigate = useNavigate();
   const { setRef } = useSelectedRef();
-  const { status, error, review, buildResult, notInFile, loadFile, resolveMatch, commit, reset } = useSpreadsheetImport(modelId, orgId, userId);
+  const { status, error, review, excludedRows, toggleRowIncluded, buildResult, notInFile, loadFile, resolveMatch, commit, reset } = useSpreadsheetImport(modelId, orgId, userId);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -202,6 +202,14 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
                       .map((r) => (
                         <li key={r.rowNumber} className={styles.row}>
                           <div className={styles.rowMain}>
+                            <input
+                              type="checkbox"
+                              checked={!excludedRows.systems.has(r.rowNumber)}
+                              onChange={() => {
+                                toggleRowIncluded('systems', r.rowNumber);
+                              }}
+                              aria-label={`Include "${r.name}" (row ${String(r.rowNumber)}) in this import`}
+                            />
                             <Text as="span">{r.name}</Text>
                             {r.outcome.status === 'new' && <Chip tone="info">New</Chip>}
                             {r.outcome.status === 'changed' && <Chip tone="info">Changed: {r.outcome.changedColumns.join(', ')}</Chip>}
@@ -235,6 +243,27 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
                           ))}
                         </li>
                       ))}
+                    {/* A row this reviewer excluded is read from `review.matchedRows` directly, never from `rows` (`buildResult`'s own output) — `buildResult` is built from the already-*filtered* input (CLAUDE.md rule 4's "no fact without provenance" cousin here: an excluded row must never leave a dangling reference for something still included to point at), so an excluded row has no computed classification at all, and would otherwise vanish from this list the instant it's unchecked, taking its own checkbox with it. */}
+                    {review.matchedRows
+                      .filter((m) => excludedRows.systems.has(m.row.rowNumber))
+                      .map((m) => (
+                        <li key={m.row.rowNumber} className={styles.row}>
+                          <div className={styles.rowMain}>
+                            <input
+                              type="checkbox"
+                              checked={false}
+                              onChange={() => {
+                                toggleRowIncluded('systems', m.row.rowNumber);
+                              }}
+                              aria-label={`Include "${m.row.name}" (row ${String(m.row.rowNumber)}) in this import`}
+                            />
+                            <Text as="span" tone="muted">
+                              {m.row.name}
+                            </Text>
+                            <Chip tone="neutral">Excluded</Chip>
+                          </div>
+                        </li>
+                      ))}
                   </ul>
                 </div>
               </CollapsibleSection>
@@ -259,20 +288,54 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
                         ))}
                       </ul>
                     )}
-                    {relationshipBlockedCount > 0 && (
-                      <ul className={styles.rowList}>
-                        {relationshipRows
-                          .filter((r) => r.outcome.status === 'blocked')
-                          .map((r) => (
-                            <li key={r.rowNumber} className={styles.row}>
+                    <ul className={styles.rowList}>
+                      {/* `relationshipRows` (`buildResult`'s own output) only has an entry for a row that's still *included* — `buildResult` is built from the already-filtered input, so it's the wrong list to zip by position against `review.relationshipRows` (every row, unfiltered) once anything's been excluded. Looked up by `rowNumber` instead, never by array index. */}
+                      {relationshipRows
+                        .filter((r) => r.outcome.status !== 'unchanged')
+                        .map((r) => (
+                          <li key={r.rowNumber} className={styles.row}>
+                            <div className={styles.rowMain}>
+                              <input
+                                type="checkbox"
+                                checked={!excludedRows.relationships.has(r.rowNumber)}
+                                onChange={() => {
+                                  toggleRowIncluded('relationships', r.rowNumber);
+                                }}
+                                aria-label={`Include relationships row ${String(r.rowNumber)} in this import`}
+                              />
                               <Text as="span" size="sm">
-                                Row {r.rowNumber}
+                                {(() => {
+                                  const raw = review.relationshipRows.find((rr) => rr.rowNumber === r.rowNumber);
+                                  return raw ? `${raw.from} → ${raw.to}` : `Row ${String(r.rowNumber)}`;
+                                })()}
                               </Text>
+                              {r.outcome.status === 'new' && <Chip tone="info">New</Chip>}
+                              {r.outcome.status === 'changed' && <Chip tone="info">Changed: {r.outcome.changedColumns.join(', ')}</Chip>}
                               {r.outcome.status === 'blocked' && <Chip tone="danger">{r.outcome.reason}</Chip>}
-                            </li>
-                          ))}
-                      </ul>
-                    )}
+                            </div>
+                          </li>
+                        ))}
+                      {review.relationshipRows
+                        .filter((rr) => excludedRows.relationships.has(rr.rowNumber))
+                        .map((rr) => (
+                          <li key={rr.rowNumber} className={styles.row}>
+                            <div className={styles.rowMain}>
+                              <input
+                                type="checkbox"
+                                checked={false}
+                                onChange={() => {
+                                  toggleRowIncluded('relationships', rr.rowNumber);
+                                }}
+                                aria-label={`Include relationships row ${String(rr.rowNumber)} in this import`}
+                              />
+                              <Text as="span" size="sm" tone="muted">
+                                {rr.from} → {rr.to}
+                              </Text>
+                              <Chip tone="neutral">Excluded</Chip>
+                            </div>
+                          </li>
+                        ))}
+                    </ul>
                   </div>
                 </CollapsibleSection>
               )}
@@ -302,6 +365,14 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
                         .map((r) => (
                           <li key={r.rowNumber} className={styles.row}>
                             <div className={styles.rowMain}>
+                              <input
+                                type="checkbox"
+                                checked={!excludedRows.changes.has(r.rowNumber)}
+                                onChange={() => {
+                                  toggleRowIncluded('changes', r.rowNumber);
+                                }}
+                                aria-label={`Include "${r.name}" (changes row ${String(r.rowNumber)}) in this import`}
+                              />
                               <Text as="span">{r.name}</Text>
                               <Chip tone={r.outcome.status === 'blocked' ? 'danger' : 'info'}>{r.outcome.status === 'blocked' ? r.outcome.reason : r.action === 'retire' ? 'Retire' : 'Restore'}</Chip>
                             </div>
@@ -310,6 +381,26 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
                                 {r.reason}
                               </Text>
                             )}
+                          </li>
+                        ))}
+                      {review.changeRows
+                        .filter((cr) => excludedRows.changes.has(cr.rowNumber))
+                        .map((cr) => (
+                          <li key={cr.rowNumber} className={styles.row}>
+                            <div className={styles.rowMain}>
+                              <input
+                                type="checkbox"
+                                checked={false}
+                                onChange={() => {
+                                  toggleRowIncluded('changes', cr.rowNumber);
+                                }}
+                                aria-label={`Include "${cr.name}" (changes row ${String(cr.rowNumber)}) in this import`}
+                              />
+                              <Text as="span" tone="muted">
+                                {cr.name}
+                              </Text>
+                              <Chip tone="neutral">Excluded</Chip>
+                            </div>
                           </li>
                         ))}
                     </ul>
