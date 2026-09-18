@@ -68,10 +68,33 @@ export async function loadSearchPool(supabase: Client, commitId: UUID, modelId: 
   return elements.map((element) => ({ element, aliases: aliasesByElement.get(element.element_id) ?? [] }));
 }
 
-/** Same as `loadSearchPool`, unioned across every type in `elementTypes` — a relationship's target type isn't always singular (`RELATIONSHIP_TYPE_RULES`: e.g. a container `uses` either another container or a system), so the relationship "Add" picker searches every type its group actually allows. */
+/**
+ * Merges several already-loaded search pools into one, ordered by name
+ * (case-insensitive, the same comparison a reader would use) then element
+ * id — the same tie-break `loadSearchPool`'s own `.order('name').order('element_id')`
+ * query already uses within a single type. Exported so `loadSearchPoolForTypes`'s
+ * own merge step is unit-testable without a database.
+ *
+ * Bug this fixes: a plain `pools.flat()` leaves every type's own elements
+ * grouped together in the order `elementTypes` was given — every system,
+ * *then* every container, never interleaved. `matchElements`'s own `limit`
+ * stops at the first N matches it finds while walking the pool in order —
+ * so whenever a query matches `limit` or more elements of the first type
+ * alone, `matchElements` never even reaches the second type's own portion
+ * of the pool, and a real, otherwise-good match (e.g. a container named
+ * "PM" among the systems a broader query like "sa" already matches plenty
+ * of) silently never appears, however well it matches. Sorting the merged
+ * pool by name first means `limit` is applied to one alphabetical list,
+ * not to one type's elements before another's.
+ */
+export function mergeSearchPools(pools: readonly SearchPoolElement[][]): SearchPoolElement[] {
+  return pools.flat().sort((a, b) => a.element.name.localeCompare(b.element.name, undefined, { sensitivity: 'base' }) || a.element.element_id.localeCompare(b.element.element_id));
+}
+
+/** Same as `loadSearchPool`, unioned across every type in `elementTypes` — a relationship's target type isn't always singular (`RELATIONSHIP_TYPE_RULES`: e.g. a container `uses` either another container or a system), so the relationship "Add" picker searches every type its group actually allows. Merged and re-sorted by name (`mergeSearchPools`'s own doc comment explains why: never one type's elements block another's out of a capped result list). */
 export async function loadSearchPoolForTypes(supabase: Client, commitId: UUID, modelId: UUID, elementTypes: readonly ElementType[]): Promise<SearchPoolElement[]> {
   const pools = await Promise.all(elementTypes.map((elementType) => loadSearchPool(supabase, commitId, modelId, elementType)));
-  return pools.flat();
+  return mergeSearchPools(pools);
 }
 
 function descriptionOf(element: ElementsHeadRow): string {
