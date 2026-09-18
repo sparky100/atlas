@@ -245,6 +245,7 @@ Primary key `(relationship_type, from_type, to_type)`. No `org_id`; product cont
 | uses | actor | container | | | |
 | owns | actor | capability | | 1 | |
 | owns | actor | system | | 1 | |
+| owns | actor | container | | 1 | |
 | flows_to | system | system | | | |
 | flows_to | container | container | | | |
 
@@ -272,6 +273,19 @@ only. See ADR-001's own amendment for the full picture (the new `owns`
 constraint this item also adds, C20, is unrelated to this table — it
 constrains an existing `(owns, actor, *)` row's own attribute value, not
 which triples are legal at all).
+
+**Amended (a platform's own modules can have their own owner).** A new row,
+`(owns, actor, container)` — a platform's own modules are frequently owned
+by a different business unit than the platform itself, or than each other
+(Salesforce's CRM vs Field Service, SAP's FI vs PM); `uses (actor,
+container)` above already treats a module as a first-class anchor, and
+`owns` had no documented reason left to be the one relationship type that
+still couldn't reach one directly — this was a gap, not a deliberate
+exclusion. Same `max_primary_per_to: 1` cardinality as the system row,
+enforced identically: `checkPrimaryCardinality`/`checkExternalOwnerRole`
+(`src/engine/deltas.ts`) are already generic on the owned element's id with
+no type check, and `relationship_type_rules` is a TypeScript constant, not
+a real table yet (this section's own opening note) — no migration.
 
 ### 3.4 History
 

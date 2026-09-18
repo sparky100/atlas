@@ -63,6 +63,13 @@ export const RELATIONSHIP_TYPE_RULES: readonly RelationshipTypeRule[] = [
   { relationshipType: 'uses', fromType: 'actor', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'owns', fromType: 'actor', toType: 'capability', maxPerFrom: null, maxPrimaryPerTo: 1, maxPrimaryPerFrom: null },
   { relationshipType: 'owns', fromType: 'actor', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: 1, maxPrimaryPerFrom: null },
+  // A platform's own modules are frequently owned by different business
+  // units than the platform itself or each other (SAP's FI vs PM, or
+  // Salesforce's CRM vs Field Service) — real ownership `uses`
+  // (`container` above) already treats a module as a first-class anchor,
+  // and `owns` had no reason left to be the one relationship type that
+  // still couldn't reach one directly.
+  { relationshipType: 'owns', fromType: 'actor', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: 1, maxPrimaryPerFrom: null },
   { relationshipType: 'flows_to', fromType: 'system', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'flows_to', fromType: 'container', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   // S1 item 20: `flows_to` gains the same container↔system reach `uses`
