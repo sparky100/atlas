@@ -46,13 +46,25 @@ export interface UseSpreadsheetImportResult {
   review: SpreadsheetImportReview | null;
   /** Every `'undecided'` row's own pick so far, keyed by `rowNumber` — the review screen writes to this via `resolveMatch`, `commit` reads it. */
   resolutions: ReadonlyMap<number, MatchResolution>;
-  /** Live classification of every row, given the current `resolutions` — recomputed on every pick, this session's own "always available, never thrown" preview (`buildImportCommit.ts`'s own doc comment). */
+  /**
+   * Row-level opt-out, keyed by each row's own `rowNumber` within its own
+   * array (`systems`/`relationships`/`changes` each number from 1
+   * independently — `rowNumber` alone isn't unique across the three). A
+   * reviewer unchecking a row — most usefully a `'blocked'`/`'needs-pick'`
+   * one — drops it from `matchedRows`/`relationshipRows`/`changeRows`
+   * *before* `buildImportDeltas` ever sees it, the same way "not in this
+   * file at all" already works: excluded is excluded, not merely hidden, so
+   * it never blocks `commit` and never touches `touchedElementIds`.
+   */
+  excludedRows: { systems: ReadonlySet<number>; relationships: ReadonlySet<number>; changes: ReadonlySet<number> };
+  toggleRowIncluded: (kind: 'systems' | 'relationships' | 'changes', rowNumber: number) => void;
+  /** Live classification of every still-included row, given the current `resolutions`/`excludedRows` — recomputed on every pick or toggle, this session's own "always available, never thrown" preview (`buildImportCommit.ts`'s own doc comment). */
   buildResult: ReturnType<typeof buildImportDeltas> | null;
-  /** "Not in file" — every system/module in the model this file's rows never touched, given the current (possibly still-incomplete) picks. */
+  /** "Not in file" — every system/module in the model this file's rows never touched, given the current (possibly still-incomplete) picks and exclusions. */
   notInFile: NotInFileElement[];
   loadFile: (file: File) => Promise<void>;
   resolveMatch: (rowNumber: number, choice: MatchResolution) => void;
-  /** `null` if the commit couldn't proceed (still-unresolved rows, or a real failure — `error` explains which); the new branch's id on success. */
+  /** `null` if the commit couldn't proceed (still-unresolved or still-included-and-blocked rows, or a real failure — `error` explains which); the new branch's id on success. */
   commit: () => Promise<UUID | null>;
   reset: () => void;
 }
@@ -75,6 +87,9 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
   const [error, setError] = useState<string | null>(null);
   const [review, setReview] = useState<SpreadsheetImportReview | null>(null);
   const [resolutions, setResolutions] = useState<Map<number, MatchResolution>>(new Map());
+  const [excludedSystemRows, setExcludedSystemRows] = useState<Set<number>>(new Set());
+  const [excludedRelationshipRows, setExcludedRelationshipRows] = useState<Set<number>>(new Set());
+  const [excludedChangeRows, setExcludedChangeRows] = useState<Set<number>>(new Set());
   const [factsByElementId, setFactsByElementId] = useState<Map<UUID, Map<string, FactsRow>>>(new Map());
   const [existsDeltaIdByElementId, setExistsDeltaIdByElementId] = useState<Map<UUID, UUID>>(new Map());
   const [actors, setActors] = useState<ElementsHeadRow[]>([]);
@@ -88,6 +103,9 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
       setError(null);
       setReview(null);
       setResolutions(new Map());
+      setExcludedSystemRows(new Set());
+      setExcludedRelationshipRows(new Set());
+      setExcludedChangeRows(new Set());
       setStatus('loading');
       try {
         // F2-lite JSON import: the exact same reconciliation, fed by a
@@ -164,32 +182,45 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
     });
   }, []);
 
-  // Recomputed on every render (cheap — pure, in-memory) so a pick's effect
-  // on counts/not-in-file is immediate; never thrown, so this is safe to
-  // call before every row has a resolution yet (`buildImportCommit.ts`'s
+  const toggleRowIncluded = useCallback((kind: 'systems' | 'relationships' | 'changes', rowNumber: number) => {
+    const setExcluded = kind === 'systems' ? setExcludedSystemRows : kind === 'relationships' ? setExcludedRelationshipRows : setExcludedChangeRows;
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowNumber)) next.delete(rowNumber);
+      else next.add(rowNumber);
+      return next;
+    });
+  }, []);
+
+  // Recomputed on every render (cheap — pure, in-memory) so a pick's/toggle's
+  // effect on counts/not-in-file is immediate; never thrown, so this is safe
+  // to call before every row has a resolution yet (`buildImportCommit.ts`'s
   // own doc comment). `PREVIEW_SOURCE_ID` never reaches a real delta — this
   // result is for the dialog's own live counts only; `commit` below throws
   // this away and rebuilds once more with the real `sources` row's id.
+  // Excluded rows are filtered out of the *input* arrays, not the result —
+  // an excluded row never reaches `buildImportDeltas` at all, so it can
+  // never block `commit` and never appears in `touchedElementIds`.
   const buildResult = useMemo(() => {
     if (!review) return null;
     return buildImportDeltas({
-      matchedRows: review.matchedRows,
+      matchedRows: review.matchedRows.filter((m) => !excludedSystemRows.has(m.row.rowNumber)),
       resolutions,
       fileName: review.fileName,
       sourceId: PREVIEW_SOURCE_ID,
       factsByElementId,
       existsDeltaIdByElementId,
       currentSupportsByElementId,
-      relationshipRows: review.relationshipRows,
+      relationshipRows: review.relationshipRows.filter((r) => !excludedRelationshipRows.has(r.rowNumber)),
       systems: review.systems,
       containers: review.containers,
       actors,
       aliasesByElementId,
       currentUsesFlowsToEdges,
       relationshipFactsByRelationshipId,
-      changeRows: review.changeRows,
+      changeRows: review.changeRows.filter((r) => !excludedChangeRows.has(r.rowNumber)),
     });
-  }, [review, resolutions, factsByElementId, existsDeltaIdByElementId, currentSupportsByElementId, actors, aliasesByElementId, currentUsesFlowsToEdges, relationshipFactsByRelationshipId]);
+  }, [review, resolutions, factsByElementId, existsDeltaIdByElementId, currentSupportsByElementId, actors, aliasesByElementId, currentUsesFlowsToEdges, relationshipFactsByRelationshipId, excludedSystemRows, excludedRelationshipRows, excludedChangeRows]);
 
   const notInFile = useMemo(() => {
     if (!review || !buildResult) return [];
@@ -221,21 +252,21 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
       // `sourceId` needs the real row's id, so every delta is rebuilt once
       // more, now that it exists.
       const final = buildImportDeltas({
-        matchedRows: review.matchedRows,
+        matchedRows: review.matchedRows.filter((m) => !excludedSystemRows.has(m.row.rowNumber)),
         resolutions,
         fileName: review.fileName,
         sourceId: source.id,
         factsByElementId,
         existsDeltaIdByElementId,
         currentSupportsByElementId,
-        relationshipRows: review.relationshipRows,
+        relationshipRows: review.relationshipRows.filter((r) => !excludedRelationshipRows.has(r.rowNumber)),
         systems: review.systems,
         containers: review.containers,
         actors,
         aliasesByElementId,
         currentUsesFlowsToEdges,
         relationshipFactsByRelationshipId,
-        changeRows: review.changeRows,
+        changeRows: review.changeRows.filter((r) => !excludedChangeRows.has(r.rowNumber)),
       });
       if (final.deltas.length === 0) {
         setError('Nothing to import — every row was already up to date.');
@@ -274,14 +305,19 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
       setStatus('review');
       return null;
     }
-  }, [review, resolutions, buildResult, modelId, orgId, userId, factsByElementId, existsDeltaIdByElementId, currentSupportsByElementId, actors, aliasesByElementId, currentUsesFlowsToEdges, relationshipFactsByRelationshipId]);
+  }, [review, resolutions, buildResult, modelId, orgId, userId, factsByElementId, existsDeltaIdByElementId, currentSupportsByElementId, actors, aliasesByElementId, currentUsesFlowsToEdges, relationshipFactsByRelationshipId, excludedSystemRows, excludedRelationshipRows, excludedChangeRows]);
 
   const reset = useCallback(() => {
     setStatus('idle');
     setError(null);
     setReview(null);
     setResolutions(new Map());
+    setExcludedSystemRows(new Set());
+    setExcludedRelationshipRows(new Set());
+    setExcludedChangeRows(new Set());
   }, []);
 
-  return { status, error, review, resolutions, buildResult, notInFile, loadFile, resolveMatch, commit, reset };
+  const excludedRows = useMemo(() => ({ systems: excludedSystemRows, relationships: excludedRelationshipRows, changes: excludedChangeRows }), [excludedSystemRows, excludedRelationshipRows, excludedChangeRows]);
+
+  return { status, error, review, resolutions, excludedRows, toggleRowIncluded, buildResult, notInFile, loadFile, resolveMatch, commit, reset };
 }
