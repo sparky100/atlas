@@ -407,7 +407,7 @@ export function LandscapePage() {
         onCreated={reloadMainBranch}
       />
       <Button variant="secondary" onClick={() => { setImportOpen(true); }}>
-        Import from spreadsheet…
+        Import model updates…
       </Button>
     </>
   );
@@ -635,7 +635,7 @@ export function LandscapePage() {
                       onCreated={reloadMainBranch}
                     />
                     <Button variant="secondary" onClick={() => { setImportOpen(true); }}>
-                      Import from spreadsheet…
+                      Import model updates…
                     </Button>
                     <Button variant="ghost" onClick={() => void downloadImportPrompt(supabase, model.id, model.slug)}>
                       Download AI import prompt

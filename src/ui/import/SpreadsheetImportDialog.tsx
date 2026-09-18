@@ -112,11 +112,11 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="Import a spreadsheet" ref={panelRef}>
+      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="Import model updates" ref={panelRef}>
         <Panel raised className={styles.panel ?? ''}>
           <div className={styles.header}>
             <Text as="h2" size="lg">
-              Import a spreadsheet
+              Import model updates
             </Text>
             <Button variant="ghost" aria-label="Close" onClick={handleClose}>
               ✕
