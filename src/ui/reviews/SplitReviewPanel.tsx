@@ -9,6 +9,7 @@ import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
+import { subjectName } from './elementBreadcrumb';
 import styles from './SplitReviewPanel.module.css';
 
 export interface SplitReviewPanelProps {
@@ -44,8 +45,12 @@ function branchSubjectsOf(review: MergeReview): BranchSubject[] {
       subjects.push({ id, kind: 'element', label: (el ?? wasEl)?.name ?? id, action });
     } else if (rel || wasRel) {
       const action = rel && !wasRel ? 'created' : !rel && wasRel ? 'retracted' : 'updated';
-      const type = (rel ?? wasRel)?.relationshipType ?? 'relationship';
-      subjects.push({ id, kind: 'relationship', label: `${type} relationship`, action });
+      // "created — supports relationship" named nothing about *what* it
+      // connects — the same "both ends named" fix `ConflictCards.tsx`'s
+      // `CleanChanges` list already applies via this same helper (S1
+      // item 3), reused here rather than a second, driftable definition
+      // of a relationship's own display name.
+      subjects.push({ id, kind: 'relationship', label: subjectName([base, ours], id), action });
     }
   }
   return subjects;

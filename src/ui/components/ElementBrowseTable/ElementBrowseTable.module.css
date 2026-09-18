@@ -1,10 +1,10 @@
-/* A long browse table scrolls the whole page (this table has no scroll
-   container of its own — ViewPage.module.css's own comment explains why
-   this app avoids a second, nested scrollbar); pinning the toolbar and the
-   column header row (below) to the viewport top keeps search/filter/sort
-   reachable without one, rather than trading the page's natural scroll for
-   a contained one. `z-index: 1` only needs to clear the table body's own
-   plain rows, which set none. */
+/* A long browse table scrolls the whole page (no scroll container of its
+   own for the *vertical* axis — ViewPage.module.css's own comment explains
+   why this app avoids a second, nested scrollbar there); pinning the
+   toolbar and the column header row (below) to the viewport top keeps
+   search/filter/sort reachable without one, rather than trading the
+   page's natural vertical scroll for a contained one. `z-index: 1` only
+   needs to clear the table body's own plain rows, which set none. */
 .toolbar {
   display: flex;
   gap: var(--space-2);
@@ -38,6 +38,24 @@
   font: inherit;
 }
 
+/* Horizontal-only scroll for a wide table on a narrow screen — this app
+   has no page-level horizontal scroll anywhere else (every Playwright spec
+   that checks for it asserts none), so this stays contained here rather
+   than letting the body widen the whole page. The cost: an `overflow-x`
+   ancestor — any value but `visible`, on *either* axis (the CSS Overflow
+   spec computes the other axis to `auto` too the moment one isn't
+   `visible`) — becomes the nearest scroll container for anything
+   `position: sticky` inside it, which breaks sticking to the *viewport*
+   outright, not just "sticks to the wrong box." Measured directly against
+   a real Chromium instance: a `<thead th>` inside this exact wrapper never
+   stuck at all (Sprint U4-1 findings item 5's own follow-up) — it isn't a
+   deploy-lag/cache illusion, it's this. `.headerClip` below is the fix:
+   the column header lives in its own small table *outside* this wrapper
+   (so nothing between it and the viewport has non-visible overflow), kept
+   in horizontal lockstep with this one by `ElementBrowseTable.tsx`'s own
+   scroll handler (`tableWrap.scrollLeft` mirrored onto `.headerClip`,
+   which can still be scrolled *programmatically* even with its own
+   `overflow-x: hidden`). */
 .tableWrap {
   overflow-x: auto;
 }
@@ -49,7 +67,9 @@
      nothing to double up), but `position: sticky` on a `<th>` inside a
      `collapse`d table is a real, long-standing cross-browser bug (WebKit
      in particular); `separate` sidesteps it outright rather than betting
-     on a specific engine version having it fixed. */
+     on a specific engine version having it fixed. Kept even though the
+     header table below no longer needs the sticky-th workaround itself —
+     the body table's own cells still share this class. */
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -62,17 +82,31 @@
   white-space: nowrap;
 }
 
-/* Sticks right beneath `.toolbar` above — `top: var(--row-height)` is the
-   toolbar's own real rendered height (every one of its controls sets that
-   same height, `.search`/`.select`/`Button.module.css`), not a bespoke
-   pixel value, and it remaps with it under compact density. Assumes the
-   toolbar stays one line, which holds at any width wide enough that this
-   table's own `overflow-x: auto` isn't already doing the real work. */
-.table thead th {
+/* The column-header table's own wrapper — sticks right beneath `.toolbar`
+   above (`top: var(--row-height)` is the toolbar's own real rendered
+   height, every one of its controls sets that same height, not a bespoke
+   pixel value, and it remaps with it under compact density; assumes the
+   toolbar stays one line). `overflow-x: hidden` (never `auto` — no
+   scrollbar of its own, no independent user-driven scroll) exists only so
+   `ElementBrowseTable.tsx` can set its `scrollLeft` in step with
+   `.tableWrap`'s real one; sticking to the viewport works here for the
+   same reason it doesn't for `.tableWrap` above — nothing between this
+   element and the viewport has non-visible overflow, because this
+   element *is* that boundary, not a descendant of one. */
+.headerClip {
   position: sticky;
   top: var(--row-height);
   z-index: 1;
+  overflow-x: hidden;
   background: var(--bg);
+}
+
+/* The header table's own columns are fixed-width, copied at runtime from
+   the body table's real, content-driven ones (there's no body of its own
+   here to auto-size against) — `table-layout: fixed` is what makes an
+   explicit `<colgroup>` authoritative instead of advisory. */
+.headerTable {
+  table-layout: fixed;
 }
 
 .sortButton {

@@ -88,7 +88,7 @@ function assertV2(head: Head): void {
   }
 }
 
-/** V6 (SPEC §5.2): no two live relationships share `(type, from, to)` — also never checked by `apply()` (that's exactly why duplicate-relationship is a conflict class in the first place). */
+/** V6 (SPEC §5.2): no two live relationships share `(type, from, to)` — now also checked inline by `apply()`'s own `relationship.create`/`relationship.restore` (Sprint U4-1 findings item 5); this oracle-independent assertion stays as the "and the *classifier's* own resolution actually produces a valid head" check, distinct from `apply()`'s own defense-in-depth. */
 function assertV6(head: Head): void {
   const seen = new Set<string>();
   for (const rel of head.relationships.values()) {

@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { AttributeDefinitionKind } from '../../../contracts/attributeSchema';
 import { attributeDefinitionToFieldSchema } from '../../../contracts/attributeSchema';
@@ -200,6 +200,50 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
   // the null/empty fallbacks until then.
   const exportState = useElementExport({ modelId, commitId: state.status === 'ready' ? state.commitId : null, definitions: attributeDefinitions, rows: state.status === 'ready' ? state.rows : [], filenameBase });
 
+  // Sprint U4-1 findings item 5's own follow-up: the column header lives in
+  // its own small table (`.headerClip`, ElementBrowseTable.module.css),
+  // physically outside `.tableWrap` — the only way to make it stick to the
+  // viewport while `.tableWrap` still scrolls the body horizontally on its
+  // own (see that CSS file's own comment on why the two can't be one
+  // table's `<thead>`/`<tbody>` and still both work). This borrows the
+  // body table's own real, content-driven column widths (there's no body
+  // row here to auto-size the header table's own `table-layout: fixed`
+  // against) from the first rendered body row, and re-measures whenever
+  // the row set, custom column, or optional columns change — anything
+  // that could change a column's natural width. `useLayoutEffect`, not
+  // `useEffect`: the measure-and-set-state round trip has to land before
+  // the browser paints, or the header would visibly snap widths on first
+  // render.
+  const headerIdBase = useId();
+  const tableWrapRef = useRef<HTMLDivElement>(null);
+  const headerClipRef = useRef<HTMLDivElement>(null);
+  const firstBodyRowRef = useRef<HTMLTableRowElement | null>(null);
+  const [colWidths, setColWidths] = useState<number[] | null>(null);
+
+  useLayoutEffect(() => {
+    const row = firstBodyRowRef.current;
+    if (!row) {
+      setColWidths(null);
+      return;
+    }
+    const measure = () => {
+      setColWidths(Array.from(row.children).map((cell) => cell.getBoundingClientRect().width));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(row);
+    return () => {
+      observer.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measures on anything that could change a rendered cell's natural width; `firstBodyRowRef.current` itself isn't a valid dep.
+  }, [state.status === 'ready' ? state.rows : null, customAttr, linkSupportsInline, decisionRowAction]);
+
+  function syncHeaderScroll() {
+    if (headerClipRef.current && tableWrapRef.current) {
+      headerClipRef.current.scrollLeft = tableWrapRef.current.scrollLeft;
+    }
+  }
+
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 
@@ -264,112 +308,129 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
       {state.rows.length === 0 ? (
         <EmptyState>No elements match this filter.</EmptyState>
       ) : (
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                {COLUMNS.map((column) => (
-                  <th key={column.key}>
-                    <button type="button" className={styles.sortButton} onClick={() => { state.setSort(column.key); }}>
-                      {column.label}
-                      {sortKeyEquals(state.sortKey, column.key) && (state.sortDirection === 'asc' ? ' ▲' : ' ▼')}
-                    </button>
-                  </th>
-                ))}
-                {selectedCustomDefinition && (
-                  <th>
-                    <button type="button" className={styles.sortButton} onClick={() => { state.setSort({ custom: selectedCustomDefinition.key }); }}>
-                      {selectedCustomDefinition.label}
-                      {sortKeyEquals(state.sortKey, { custom: selectedCustomDefinition.key }) && (state.sortDirection === 'asc' ? ' ▲' : ' ▼')}
-                    </button>
-                  </th>
-                )}
-                <th>Comments</th>
-                {linkSupportsInline && <th>Link to a capability</th>}
-                {decisionRowAction && <th>Decision</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {state.rows.map((row) => {
-                const unresolvedCount = unresolvedCounts?.get(row.element.element_id)?.open ?? 0;
-                return (
-                <tr key={row.element.element_id}>
-                  <td>
-                    <Link to={elementHref(row.element.element_id)} className={styles.nameCell}>
-                      <ElementTypeGlyph type={row.element.element_type} />
-                      <Text as="span">{row.element.name}</Text>
-                    </Link>
-                  </td>
-                  <td>
-                    <Text as="span" tone="muted" size="sm">
-                      {row.element.element_type}
-                    </Text>
-                  </td>
-                  <td>
-                    {row.owner ? (
-                      <Link to={elementHref(row.owner.element_id)}>
-                        <Text as="span" size="sm">
-                          {row.owner.name}
-                        </Text>
-                      </Link>
-                    ) : (
-                      <Text as="span" tone="faint" size="sm">
-                        —
-                      </Text>
-                    )}
-                  </td>
-                  <td>
-                    {row.lifecycleStatus ? (
-                      <Text as="span" size="sm">
-                        {row.lifecycleStatus}
-                      </Text>
-                    ) : (
-                      <Text as="span" tone="faint" size="sm">
-                        —
-                      </Text>
-                    )}
-                  </td>
+        <>
+          <div className={styles.headerClip} ref={headerClipRef}>
+            <table className={[styles.table, styles.headerTable].filter(Boolean).join(' ')}>
+              {colWidths && (
+                <colgroup>
+                  {colWidths.map((width, i) => (
+                    // Column position, not identity, is what this keys — the
+                    // set of columns only ever changes by length (a
+                    // conditional column appearing/disappearing), never
+                    // reorders, so an index key is safe here.
+                    <col key={`col-${String(i)}`} style={{ width: `${String(width)}px` }} />
+                  ))}
+                </colgroup>
+              )}
+              <thead>
+                <tr>
+                  {COLUMNS.map((column) => (
+                    <th key={column.key} id={`${headerIdBase}-${column.key}`}>
+                      <button type="button" className={styles.sortButton} onClick={() => { state.setSort(column.key); }}>
+                        {column.label}
+                        {sortKeyEquals(state.sortKey, column.key) && (state.sortDirection === 'asc' ? ' ▲' : ' ▼')}
+                      </button>
+                    </th>
+                  ))}
                   {selectedCustomDefinition && (
-                    <td>
-                      {(() => {
-                        const formatted = formatCustomAttributeValue(attributesRecord(row.element.attributes)[selectedCustomDefinition.key]);
-                        return formatted === '' ? (
-                          <Text as="span" tone="faint" size="sm">
-                            —
-                          </Text>
-                        ) : (
-                          <Text as="span" size="sm">
-                            {formatted}
-                          </Text>
-                        );
-                      })()}
-                    </td>
+                    <th id={`${headerIdBase}-custom`}>
+                      <button type="button" className={styles.sortButton} onClick={() => { state.setSort({ custom: selectedCustomDefinition.key }); }}>
+                        {selectedCustomDefinition.label}
+                        {sortKeyEquals(state.sortKey, { custom: selectedCustomDefinition.key }) && (state.sortDirection === 'asc' ? ' ▲' : ' ▼')}
+                      </button>
+                    </th>
                   )}
-                  <td>
-                    {unresolvedCount > 0 ? (
-                      <Text as="span" size="sm" className={styles.unresolvedBadge}>
-                        💬 {unresolvedCount}
+                  <th id={`${headerIdBase}-comments`}>Comments</th>
+                  {linkSupportsInline && <th id={`${headerIdBase}-link`}>Link to a capability</th>}
+                  {decisionRowAction && <th id={`${headerIdBase}-decision`}>Decision</th>}
+                </tr>
+              </thead>
+            </table>
+          </div>
+          <div className={styles.tableWrap} ref={tableWrapRef} onScroll={syncHeaderScroll}>
+            <table className={styles.table}>
+              <tbody>
+                {state.rows.map((row, rowIndex) => {
+                  const unresolvedCount = unresolvedCounts?.get(row.element.element_id)?.open ?? 0;
+                  return (
+                  <tr key={row.element.element_id} ref={rowIndex === 0 ? firstBodyRowRef : undefined}>
+                    <td headers={`${headerIdBase}-name`}>
+                      <Link to={elementHref(row.element.element_id)} className={styles.nameCell}>
+                        <ElementTypeGlyph type={row.element.element_type} />
+                        <Text as="span">{row.element.name}</Text>
+                      </Link>
+                    </td>
+                    <td headers={`${headerIdBase}-type`}>
+                      <Text as="span" tone="muted" size="sm">
+                        {row.element.element_type}
                       </Text>
-                    ) : (
-                      <Text as="span" tone="faint" size="sm">
-                        —
-                      </Text>
-                    )}
-                  </td>
-                  {linkSupportsInline && (
-                    <td>
-                      {row.element.element_type === 'system' && (
-                        <InlineSupportsPicker system={{ elementId: row.element.element_id, name: row.element.name }} config={linkSupportsInline} searchCommitId={state.commitId} />
+                    </td>
+                    <td headers={`${headerIdBase}-owner`}>
+                      {row.owner ? (
+                        <Link to={elementHref(row.owner.element_id)}>
+                          <Text as="span" size="sm">
+                            {row.owner.name}
+                          </Text>
+                        </Link>
+                      ) : (
+                        <Text as="span" tone="faint" size="sm">
+                          —
+                        </Text>
                       )}
                     </td>
-                  )}
-                  {decisionRowAction && <td>{decisionRowAction(row)}</td>}
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    <td headers={`${headerIdBase}-lifecycle`}>
+                      {row.lifecycleStatus ? (
+                        <Text as="span" size="sm">
+                          {row.lifecycleStatus}
+                        </Text>
+                      ) : (
+                        <Text as="span" tone="faint" size="sm">
+                          —
+                        </Text>
+                      )}
+                    </td>
+                    {selectedCustomDefinition && (
+                      <td headers={`${headerIdBase}-custom`}>
+                        {(() => {
+                          const formatted = formatCustomAttributeValue(attributesRecord(row.element.attributes)[selectedCustomDefinition.key]);
+                          return formatted === '' ? (
+                            <Text as="span" tone="faint" size="sm">
+                              —
+                            </Text>
+                          ) : (
+                            <Text as="span" size="sm">
+                              {formatted}
+                            </Text>
+                          );
+                        })()}
+                      </td>
+                    )}
+                    <td headers={`${headerIdBase}-comments`}>
+                      {unresolvedCount > 0 ? (
+                        <Text as="span" size="sm" className={styles.unresolvedBadge}>
+                          💬 {unresolvedCount}
+                        </Text>
+                      ) : (
+                        <Text as="span" tone="faint" size="sm">
+                          —
+                        </Text>
+                      )}
+                    </td>
+                    {linkSupportsInline && (
+                      <td headers={`${headerIdBase}-link`}>
+                        {row.element.element_type === 'system' && (
+                          <InlineSupportsPicker system={{ elementId: row.element.element_id, name: row.element.name }} config={linkSupportsInline} searchCommitId={state.commitId} />
+                        )}
+                      </td>
+                    )}
+                    {decisionRowAction && <td headers={`${headerIdBase}-decision`}>{decisionRowAction(row)}</td>}
+                  </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

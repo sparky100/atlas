@@ -863,6 +863,78 @@ describe('C17: at most one primary supports edge per system, one owns edge per r
   });
 });
 
+describe('V6 (SPEC §5.2): no two live relationships share (type, from, to)', () => {
+  // Sprint U4-1 findings item 5: a real import produced two `supports`
+  // creates for the same (system, capability) pair in one commit (no
+  // dedup on the capture side) and nothing rejected it until it reached
+  // `relationships_head`'s own unique constraint at merge time, as a raw
+  // Postgres error. These exercise `apply()`'s own new inline check.
+  function elementCreate(id: UUID, elementId: UUID, elementType: ElementType, name: string): Delta {
+    const attributes = elementType === 'system' ? { lifecycleStatus: 'active', isExternal: false } : {};
+    return { kind: 'element.create', id, elementId, elementType, name, parentId: null, attributes: attributes as never, sourceId: 'src', confidence: 1 };
+  }
+
+  function usesCreate(id: UUID, relationshipId: UUID, fromElementId: UUID, toElementId: UUID): Delta {
+    return { kind: 'relationship.create', id, relationshipId, relationshipType: 'uses', fromElementId, toElementId, attributes: {}, sourceId: 'src', confidence: 1 };
+  }
+
+  function relationshipRetract(id: UUID, relationshipId: UUID, relationshipType: RelationshipType, previousDeltaId: UUID): Delta {
+    return { kind: 'relationship.retract', id, relationshipId, relationshipType, previousDeltaId, sourceId: 'src', confidence: 1 };
+  }
+
+  function relationshipRestore(id: UUID, relationshipId: UUID, relationshipType: RelationshipType, previousDeltaId: UUID): Delta {
+    return { kind: 'relationship.restore', id, relationshipId, relationshipType, previousDeltaId, sourceId: 'src', confidence: 1 };
+  }
+
+  function twoSystems(): Head {
+    return fold(emptyHead(), [elementCreate('d-a', 'a', 'system', 'A'), elementCreate('d-b', 'b', 'system', 'B')], ctx);
+  }
+
+  it('relationship.create: a second live edge for the same (type, from, to), same commit or a later one, is rejected naming V6 and both endpoints', () => {
+    const head = twoSystems();
+    fold(head, [usesCreate('d-r1', 'rel-1', 'a', 'b')], ctx);
+    const attempt = () => fold(head, [usesCreate('d-r2', 'rel-2', 'a', 'b')], ctx);
+    expect(attempt).toThrow(EngineError);
+    expect(attempt).toThrow(/V6/);
+    expect(attempt).toThrow(/A/);
+    expect(attempt).toThrow(/B/);
+  });
+
+  it('relationship.create: two duplicate creates in the very same commit are rejected — this is the exact shape an unguarded import produces', () => {
+    const head = twoSystems();
+    expect(() => fold(head, [usesCreate('d-r1', 'rel-1', 'a', 'b'), usesCreate('d-r2', 'rel-2', 'a', 'b')], ctx)).toThrow(/V6/);
+  });
+
+  it('relationship.create: a different type, or a different endpoint pair, never conflicts', () => {
+    const head = twoSystems();
+    fold(head, [usesCreate('d-r1', 'rel-1', 'a', 'b')], ctx);
+    const flowsTo: Delta = { kind: 'relationship.create', id: 'd-r2', relationshipId: 'rel-2', relationshipType: 'flows_to', fromElementId: 'a', toElementId: 'b', attributes: {}, sourceId: 'src', confidence: 1 };
+    expect(() => fold(head, [flowsTo], ctx)).not.toThrow();
+    expect(() => fold(head, [usesCreate('d-r3', 'rel-3', 'b', 'a')], ctx)).not.toThrow();
+  });
+
+  it('relationship.create: accepted once the first edge is retracted earlier in the same commit', () => {
+    const head = twoSystems();
+    fold(head, [usesCreate('d-r1', 'rel-1', 'a', 'b')], ctx);
+    const retract = relationshipRetract('d-retract', 'rel-1', 'uses', 'd-r1');
+    const recreate = usesCreate('d-r2', 'rel-2', 'a', 'b');
+    expect(() => fold(head, [retract, recreate], ctx)).not.toThrow();
+  });
+
+  it('relationship.restore: reviving a retracted edge is rejected once a new edge has taken its place; restoring after that new one is retracted too succeeds', () => {
+    const head = twoSystems();
+    fold(head, [usesCreate('d-r1', 'rel-1', 'a', 'b')], ctx);
+    fold(head, [relationshipRetract('d-retract-r1', 'rel-1', 'uses', 'd-r1')], ctx);
+    fold(head, [usesCreate('d-r2', 'rel-2', 'a', 'b')], ctx);
+
+    const attempt = () => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'uses', 'd-retract-r1')], ctx);
+    expect(attempt).toThrow(/V6/);
+
+    fold(head, [relationshipRetract('d-retract-r2', 'rel-2', 'uses', 'd-r2')], ctx);
+    expect(() => fold(head, [relationshipRestore('d-restore-r1', 'rel-1', 'uses', 'd-retract-r1')], ctx)).not.toThrow();
+  });
+});
+
 describe('C18 (Prompt 7k item 4): uses.via/flows_to.via must reference a live integration_platform system', () => {
   function elementCreate(id: UUID, elementId: UUID, elementType: ElementType, name: string, attributes: Record<string, Json> = {}): Delta {
     const base = elementType === 'system' ? { lifecycleStatus: 'active', isExternal: false } : {};

@@ -116,12 +116,19 @@ function parseOwnerCell(cell: string): OwnerReference {
   return { name: name && name.length > 0 ? name : cell, externalOrganisation: org ?? null };
 }
 
-/** The `capability` column's own `|`-delimited list — trimmed, blanks between pipes dropped, first survivor is the primary. */
+/** The `capability` column's own `|`-delimited list — trimmed, blanks between pipes dropped, first survivor is the primary. Also deduplicated (case-insensitive) — a repeated name in the same cell (a copy-paste typo, most often) would otherwise become two `supports` creates for the same (system, capability) pair in one commit, which V6 (SPEC §5.2, src/engine/deltas.ts's own `relationship.create` check) now rejects outright rather than letting it reach `relationships_head` as a duplicate. */
 function parseCapabilityList(cell: string): string[] {
-  return cell
-    .split('|')
-    .map((name) => name.trim())
-    .filter((name) => name.length > 0);
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const raw of cell.split('|')) {
+    const name = raw.trim();
+    if (name.length === 0) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+  return names;
 }
 
 /** `confidence`'s own cell → a number in [0,1], or `undefined` for a genuinely blank cell — anything else (out of range, unparseable) is a real validation error, never a silently-treated-as-blank typo (`cellToBooleanWord`'s own stance above). Duplicated verbatim in `importRelationshipRow.ts`/`importChangeRow.ts` — this module's own small-private-helper convention (`cellToString` is already tripled the same way), not a shared util. */

@@ -220,11 +220,29 @@ resolved_conflicts:
 
 ### 4.2 Duplicate relationship — survivor pick
 
-Both sides created `R_o` (ours) and `R_t` (theirs) with the same `(type, from, to)`. Replay of `rcreate(R_t)` applies (`apply` does not check S-6; V6 does, at validation). No `P` unless the pair is also a primary collision (§4.3).
+Both sides created `R_o` (ours) and `R_t` (theirs) with the same `(type, from, to)`.
+
+~~Replay of `rcreate(R_t)` applies (`apply` does not check S-6; V6 does, at validation). No `P` unless the pair is also a primary collision (§4.3).~~
 
 ```
-M own:  rretract(loser)                 prev = rcreate(loser)
-resolved_conflicts: {winning: rcreate(survivor), discarded: rcreate(loser), resolution: rretract(loser), 'survivor'}
+~~M own:  rretract(loser)                 prev = rcreate(loser)~~
+~~resolved_conflicts: {winning: rcreate(survivor), discarded: rcreate(loser), resolution: rretract(loser), 'survivor'}~~
+```
+
+**Corrected (Sprint U4-1 findings item 5, 18 September):** the design above was never actually safe. `apply` was never taught to check V6 at all — nothing was, beyond `structural:duplicate-relationship` itself, which only ever compares *across* branches (`merge.ts`'s "new on ours × new on theirs" loop), so two `relationship.create` deltas landing in the *same* commit (an unguarded spreadsheet import, most often — no dedup on repeated capability names or on two file rows resolving to the same element) sailed straight through `fold` and only surfaced as `relationships_head`'s own unique-constraint violation, as a raw Postgres error, at merge time. Fixing that meant teaching `apply()`'s own `relationship.create`/`relationship.restore` to check V6 inline (the same "run on every fold, not only once it reaches `relationships_head`" shape C17 already used) — but doing that naively breaks *this* very design: replaying `rcreate(R_t)` onto a head that still holds `R_o` (the "no `P` unless also a primary collision" rule above) is itself a transient V6 violation, and `apply()` cannot tell "this is refresh replay, about to be resolved by `M`" apart from "this is a real, unresolved duplicate."
+
+The fix is symmetric with §4.3's own `owns` shape, and for the identical reason: `P` now retracts `R_o` outright, unconditionally, both choices — never conditional on also being a primary collision — so replay never lands on a live duplicate in the first place.
+
+```
+P:  rretract(R_o)                       prev = R_o's own existsDeltaId
+M:  replay X  → R_t's rcreate applies (no violation: R_o was retracted in P)
+M own, if the reviewer keeps ours:
+    rretract(R_t)                       prev = R_t's own existsDeltaId (from the just-applied replay)
+    rrestore(R_o)                       prev = P's rretract(R_o)
+M own, if the reviewer keeps theirs: nothing — R_o stays retracted, R_t stands
+resolved_conflicts:
+    keep ours:   {winning: rcreate(R_o), discarded: rcreate(R_t), resolution: M's rrestore(R_o), 'survivor'}
+    keep theirs: {winning: rcreate(R_t), discarded: rcreate(R_o), resolution: P's rretract(R_o), 'survivor'}
 ```
 The card shows both relationships' attributes; if the loser carried an attribute value the survivor lacks, the reviewer edits the survivor afterwards through the ordinary editor — that is a field edit, not part of the conflict.
 
@@ -260,7 +278,7 @@ resolved_conflicts:
 ```
 `resolved_conflicts`' `rationale` stays `'primary'` for both types, for one shared card-action vocabulary — extending `owns` to a reassignment prompt later, if ever wanted, is additive (a new choice shape), not a breaking change to this one.
 
-When the pair is also a duplicate (§4.2), the survivor pick subsumes the primary/role pick: the loser is retracted, and `P` reassigns `R_o` only if the loser is `R_t` and `R_t`'s replay would otherwise throw — i.e. always, since `R_o` holds the colliding value on `O` at replay time.
+When the pair is also a duplicate (§4.2), the survivor pick subsumes the primary/role pick outright: §4.2's own `P` already retracts `R_o` unconditionally (Sprint U4-1 findings item 5's correction, above), which is exactly what this section's own `P` would have done anyway — there is nothing left for a separate cardinality resolution to add.
 
 ---
 

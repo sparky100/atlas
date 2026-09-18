@@ -275,7 +275,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
         <details>
           <summary>
             <Text as="span" size="lg">
-              Clean changes ({classification.clean.length})
+              Clean changes — no conflicts or warnings ({classification.clean.length})
             </Text>
           </summary>
           <CleanChanges base={threeWay.base} ours={threeWay.ours} cleanIds={classification.clean} commentsSlotFor={renderCardComments} />
