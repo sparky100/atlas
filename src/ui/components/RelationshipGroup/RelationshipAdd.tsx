@@ -138,6 +138,15 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   const [showViaStage, setShowViaStage] = useState(false);
   const labelId = useId();
   const search = useRelationshipTargetSearch(searchCommitId, modelId, slot.targetTypes, elementId);
+  // V6 (SPEC §5.2, `checkNoDuplicateRelationship` in `src/engine/deltas.ts`):
+  // no two live relationships may share `(type, from, to)`. The search pool
+  // itself doesn't know this element's own existing edges, so it's filtered
+  // out here — picking an already-connected target used to silently create
+  // a second, identical edge; now the commit is correctly rejected, so this
+  // stays a UI-level guard (never offer what would fail) rather than a
+  // confusing engine error the reviewer has no obvious way to act on.
+  const existingOtherIds = new Set(existingRows.map((row) => (direction === 'outbound' ? row.to_element_id : row.from_element_id)));
+  const availableResults = search.results.filter((result) => !existingOtherIds.has(result.element_id));
   const needsLabel = slot.relationshipType === 'uses' || slot.relationshipType === 'flows_to';
   // Only mounted (its own fetch enabled) for uses/flows_to slots — see this
   // hook's own `enabled` doc comment for why every other slot on the same
@@ -441,14 +450,14 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
           {search.error}
         </Text>
       )}
-      {search.status === 'ready' && search.query.trim().length > 0 && search.results.length === 0 && (
+      {search.status === 'ready' && search.query.trim().length > 0 && availableResults.length === 0 && (
         <Text as="p" tone="muted" size="sm">
           Nothing matches.
         </Text>
       )}
-      {search.results.length > 0 && (
+      {availableResults.length > 0 && (
         <ul className={styles.results}>
-          {search.results.map((result) => (
+          {availableResults.map((result) => (
             <li key={result.element_id}>
               <button type="button" className={styles.resultRow} disabled={status === 'creating'} onClick={() => { pickResult({ elementId: result.element_id, name: result.name, elementType: result.element_type }); }}>
                 <ElementTypeGlyph type={result.element_type} />

@@ -127,6 +127,21 @@ describe('buildImportDeltas — new rows', () => {
     ]);
   });
 
+  it('dedupes a row’s own capability list when two different names resolve to the identical capability, never creating the same supports edge twice (V6)', () => {
+    const matchedRows = [
+      matchedRow(row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Case & Request Tracking', 'CRT'] }), {
+        capabilities: [
+          { kind: 'matched', element: { elementId: 'cap-1', name: 'Case & Request Tracking' } },
+          { kind: 'matched', element: { elementId: 'cap-1', name: 'Case & Request Tracking' } },
+        ],
+      }),
+    ];
+    const { deltas } = build(matchedRows);
+    const supports = deltas.filter((d) => d.kind === 'relationship.create' && d.relationshipType === 'supports');
+    expect(supports).toHaveLength(1);
+    expect(supports[0]).toMatchObject({ toElementId: 'cap-1', attributes: { role: 'primary' } });
+  });
+
   it('warns, but still creates the row, when the capability column names one that was not found', () => {
     const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Nonexistent'] }), { capabilities: [{ kind: 'new' }] })];
     const { rows, deltas } = build(matchedRows);
@@ -236,6 +251,23 @@ describe('buildImportDeltas — matched/changed rows', () => {
       const currentSupportsByElementId = new Map([['sys-1', [supportsEdge({ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' })]]]);
       const { deltas } = build(matchedRows, { existsDeltaIdByElementId: new Map([['sys-1', 'd-create']]), currentSupportsByElementId });
       expect(deltas).toEqual([expect.objectContaining({ kind: 'relationship.create', relationshipType: 'supports', toElementId: 'cap-3', attributes: { role: 'secondary' } })]);
+    });
+
+    it('dedupes a same-batch secondary capability two different row entries resolve to, never two relationship.create deltas for the identical edge (V6)', () => {
+      const matchedRows = [
+        matchedRow(row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Payments', 'Reporting', 'MI Reporting'] }), {
+          match: { kind: 'matched', element: { elementId: 'sys-1', name: 'Northgate' } },
+          capabilities: [
+            { kind: 'matched', element: { elementId: 'cap-2', name: 'Payments' } },
+            { kind: 'matched', element: { elementId: 'cap-3', name: 'Reporting' } },
+            { kind: 'matched', element: { elementId: 'cap-3', name: 'Reporting' } },
+          ],
+        }),
+      ];
+      const currentSupportsByElementId = new Map([['sys-1', [supportsEdge({ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' })]]]);
+      const { deltas } = build(matchedRows, { existsDeltaIdByElementId: new Map([['sys-1', 'd-create']]), currentSupportsByElementId });
+      const secondaryCreates = deltas.filter((d) => d.kind === 'relationship.create' && d.relationshipType === 'supports' && d.toElementId === 'cap-3');
+      expect(secondaryCreates).toHaveLength(1);
     });
 
     it('never removes a capability link that is simply absent from the row’s own list', () => {

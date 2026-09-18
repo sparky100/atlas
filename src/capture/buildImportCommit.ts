@@ -185,9 +185,23 @@ function resolveOwnerActorId(outcome: NameResolutionOutcome, ref: { name: string
   return undefined;
 }
 
-/** Every capability a row's own list resolved to, in order — `undefined` entries (unresolved/ambiguous) dropped; `warnings` already covers those. */
+/**
+ * Every capability a row's own list resolved to, in order — `undefined`
+ * entries (unresolved/ambiguous) dropped; `warnings` already covers those.
+ * Deduped by resolved element id, first occurrence wins: `parseCapabilityList`
+ * (`importRowSchema.ts`) already collapses a literal repeated *name* in the
+ * same cell, but two *different* names in the row's own list (an alias and
+ * the capability's own name, say) can still resolve to the identical
+ * element — without this, both the "brand-new element" and "matched
+ * element, capability changed" branches below would each push two
+ * `relationship.create` deltas for the exact same `(supports, elementId,
+ * capabilityId)` triple in one commit, which V6 (`checkNoDuplicateRelationship`,
+ * `src/engine/deltas.ts`) now correctly rejects rather than letting through
+ * as the same real duplicate it always was.
+ */
 function resolvedCapabilityIds(capabilities: readonly NameResolutionOutcome[]): UUID[] {
-  return capabilities.flatMap((c) => (c.kind === 'matched' ? [c.element.elementId] : []));
+  const ids = capabilities.flatMap((c) => (c.kind === 'matched' ? [c.element.elementId] : []));
+  return [...new Set(ids)];
 }
 
 /** A row this same import resolved to a real element — this file's own rows are as legitimate a relationship endpoint as anything already in the model (a system and its own new outbound `uses` edge can land in the same file), and, per the same reasoning, as legitimate a `changes`/`replaced_by` target too (a full inventory import commonly creates a system only to retire it in the same commit — recording history, not proposing a no-op). */
