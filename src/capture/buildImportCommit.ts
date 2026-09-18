@@ -57,6 +57,8 @@ export interface CurrentSupportsEdge {
   role: 'primary' | 'secondary';
   /** The delta that last set this edge's own `role` — its own `exists_delta_id` when `role` was never updated since creation (same fallback `previousDeltaId` uses everywhere else in this module). */
   roleDeltaId: UUID;
+  /** JSON import follow-up (`replaced_by`): the edge's own `exists_delta_id` — a `relationship.retract`'s `previousDeltaId` needs the edge's own `$exists` delta, never `roleDeltaId` (a different attribute's own delta), the same distinction `useElementRetire.ts`'s own transfer makes. */
+  existsDeltaId: UUID;
 }
 
 export type RelationshipRowOutcome = { status: 'blocked'; reason: string } | { status: 'new' } | { status: 'unchanged' } | { status: 'changed'; changedColumns: string[] };
@@ -143,6 +145,11 @@ function resolveIdentity(matched: MatchedImportRow, resolutions: ReadonlyMap<num
   return undefined;
 }
 
+/** JSON import follow-up: a row/relRow/changeRow's own `sourceRef` locator, with its optional `quote` appended — `${fileName} › row N › column — "quote"` when given, otherwise the plain locator, unchanged from before `quote` existed. Shared by every one of this module's per-entry loops (main rows, actors, relationships, changes) — one place building this string, not four. */
+function makeLocator(fileName: string, rowNumber: number, quote: string | undefined): (column: string) => string {
+  return (column: string) => `${fileName} › row ${String(rowNumber)} › ${column}${quote ? ` — "${quote}"` : ''}`;
+}
+
 /** One dedup'd "create this actor if it doesn't already exist" — an owner name repeated across many rows/columns mints exactly one actor, not one per mention. Keyed by `normalizeName`, so "Jane Doe" and "jane doe" share the same new actor. */
 interface PendingActor {
   id: UUID;
@@ -152,18 +159,21 @@ interface PendingActor {
   /** The first row/column this name was seen at — this actor's own `element.create`'s `sourceRef`. */
   firstSeenRowNumber: number;
   firstSeenColumn: 'business_owner' | 'technical_owner';
+  /** JSON import follow-up: the first-seen mention's own row-level `quote`/`confidence`, carried onto this actor's own `element.create` — same first-seen-wins rule as `externalOrganisation` above. */
+  quote: string | undefined;
+  confidence: number | undefined;
 }
 
 function collectPendingActors(matchedRows: readonly MatchedImportRow[]): Map<string, PendingActor> {
   const pending = new Map<string, PendingActor>();
-  const consider = (outcome: NameResolutionOutcome, ref: { name: string; externalOrganisation: string | null } | null, rowNumber: number, column: 'business_owner' | 'technical_owner') => {
+  const consider = (outcome: NameResolutionOutcome, ref: { name: string; externalOrganisation: string | null } | null, row: ImportRow, column: 'business_owner' | 'technical_owner') => {
     if (outcome.kind !== 'new' || ref === null) return;
     const key = normalizeName(ref.name);
-    if (!pending.has(key)) pending.set(key, { id: crypto.randomUUID(), name: ref.name, externalOrganisation: ref.externalOrganisation, firstSeenRowNumber: rowNumber, firstSeenColumn: column });
+    if (!pending.has(key)) pending.set(key, { id: crypto.randomUUID(), name: ref.name, externalOrganisation: ref.externalOrganisation, firstSeenRowNumber: row.rowNumber, firstSeenColumn: column, quote: row.quote, confidence: row.confidence });
   };
   for (const matched of matchedRows) {
-    consider(matched.businessOwner, matched.row.businessOwner, matched.row.rowNumber, 'business_owner');
-    consider(matched.technicalOwner, matched.row.technicalOwner, matched.row.rowNumber, 'technical_owner');
+    consider(matched.businessOwner, matched.row.businessOwner, matched.row, 'business_owner');
+    consider(matched.technicalOwner, matched.row.technicalOwner, matched.row, 'technical_owner');
   }
   return pending;
 }
@@ -213,6 +223,21 @@ function resolveEndpointRef(raw: string, existingPool: readonly ExistingElementR
 
 /** F2-lite JSON import — a "changes" row's own target: an existing system or module, matched by name-or-alias against the model's *current* elements only (never this same file's own new rows — retiring something the file just created makes no sense). `null` when the name resolves to none, or to more than one, of the two pools combined. Needs `elementType` (unlike a plain `ExistingElementRef`) because `lifecycleStatus`'s own `element.update` delta carries it. */
 function resolveChangeTarget(name: string, systems: readonly ElementsHeadRow[], containers: readonly ElementsHeadRow[], aliasesByElementId: ReadonlyMap<UUID, readonly string[]>): { elementId: UUID; elementType: 'system' | 'container' } | null {
+  // "Platform · Module" — the same compound form `resolveEndpointRef` below
+  // resolves for a Relationships-sheet endpoint, so a module retirement can
+  // name a specific platform's own module even when another platform has a
+  // same-named one. Existing elements only (never `fileRowsByName`) — a
+  // change row targets something already in the model, never a row this
+  // same file just created.
+  const compound = name.split('·').map((s) => s.trim());
+  if (compound.length === 2 && compound[0] && compound[1]) {
+    const [platformName, moduleName] = compound;
+    const platform = systems.filter(isPlatformSystem).find((p) => normalizeName(p.name) === normalizeName(platformName));
+    if (!platform) return null;
+    const module = containers.find((c) => c.parent_id === platform.element_id && normalizeName(c.name) === normalizeName(moduleName));
+    return module ? { elementId: module.element_id, elementType: 'container' } : null;
+  }
+
   const systemMatches = exactMatches(name, toRefs(systems), aliasesByElementId).map((ref) => ({ ...ref, elementType: 'system' as const }));
   const containerMatches = exactMatches(name, toRefs(containers), aliasesByElementId).map((ref) => ({ ...ref, elementType: 'container' as const }));
   const all = [...systemMatches, ...containerMatches];
@@ -271,8 +296,8 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
       parentId: null,
       attributes: actor.externalOrganisation !== null ? { subtype: 'organisation', isExternal: true, externalOrganisation: actor.externalOrganisation } : { subtype: 'person', isExternal: false },
       sourceId,
-      sourceRef: `${fileName} › row ${String(actor.firstSeenRowNumber)} › ${actor.firstSeenColumn}`,
-      confidence: 1,
+      sourceRef: makeLocator(fileName, actor.firstSeenRowNumber, actor.quote)(actor.firstSeenColumn),
+      confidence: actor.confidence ?? 1,
     });
     touchedElementIds.push(actor.id);
   }
@@ -280,7 +305,7 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
   for (const matched of matchedRows) {
     const { row } = matched;
     const warnings: string[] = [];
-    const locator = (column: string) => `${fileName} › row ${String(row.rowNumber)} › ${column}`;
+    const locator = makeLocator(fileName, row.rowNumber, row.quote);
 
     if (matched.match.kind === 'blocked') {
       rows.push({ rowNumber: row.rowNumber, name: row.name, outcome: { status: 'blocked', reason: matched.match.reason }, warnings });
@@ -323,16 +348,16 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
         attributes: { ...defaultCreateAttributes(row.elementType, { onMain: false }), ...row.attributes, ...(row.isExternal !== undefined ? { isExternal: row.isExternal } : {}) },
         sourceId,
         sourceRef: locator('row'),
-        confidence: 1,
+        confidence: row.confidence ?? 1,
       } as Delta);
 
       resolvedCapabilityIds(matched.capabilities).forEach((capabilityId, i) => {
-        deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'supports', fromElementId: elementId, toElementId: capabilityId, attributes: { role: i === 0 ? 'primary' : 'secondary' }, sourceId, sourceRef: locator('capability'), confidence: 1 });
+        deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'supports', fromElementId: elementId, toElementId: capabilityId, attributes: { role: i === 0 ? 'primary' : 'secondary' }, sourceId, sourceRef: locator('capability'), confidence: row.confidence ?? 1 });
       });
       const businessOwnerId = resolveOwnerActorId(matched.businessOwner, row.businessOwner, pendingActors);
-      if (businessOwnerId) deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'owns', fromElementId: businessOwnerId, toElementId: elementId, attributes: { role: 'business' }, sourceId, sourceRef: locator('business_owner'), confidence: 1 });
+      if (businessOwnerId) deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'owns', fromElementId: businessOwnerId, toElementId: elementId, attributes: { role: 'business' }, sourceId, sourceRef: locator('business_owner'), confidence: row.confidence ?? 1 });
       const technicalOwnerId = resolveOwnerActorId(matched.technicalOwner, row.technicalOwner, pendingActors);
-      if (technicalOwnerId) deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'owns', fromElementId: technicalOwnerId, toElementId: elementId, attributes: { role: 'technical' }, sourceId, sourceRef: locator('technical_owner'), confidence: 1 });
+      if (technicalOwnerId) deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'owns', fromElementId: technicalOwnerId, toElementId: elementId, attributes: { role: 'technical' }, sourceId, sourceRef: locator('technical_owner'), confidence: row.confidence ?? 1 });
 
       rows.push({ rowNumber: row.rowNumber, name: row.name, outcome: { status: 'new' }, warnings });
       continue;
@@ -372,12 +397,12 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
         previousDeltaId: facts.get(attribute)?.delta_id ?? existsDeltaId,
         sourceId,
         sourceRef: locator(column),
-        confidence: 1,
+        confidence: row.confidence ?? 1,
       } as Delta);
       changedColumns.push(column);
     }
     if (hasChangedBoolean(row.isExternal, facts.get('isExternal'))) {
-      deltas.push({ kind: 'element.update', id: crypto.randomUUID(), elementId, elementType: row.elementType, attribute: 'isExternal', value: row.isExternal, previousDeltaId: facts.get('isExternal')?.delta_id ?? existsDeltaId, sourceId, sourceRef: locator('is_external'), confidence: 1 } as Delta);
+      deltas.push({ kind: 'element.update', id: crypto.randomUUID(), elementId, elementType: row.elementType, attribute: 'isExternal', value: row.isExternal, previousDeltaId: facts.get('isExternal')?.delta_id ?? existsDeltaId, sourceId, sourceRef: locator('is_external'), confidence: row.confidence ?? 1 } as Delta);
       changedColumns.push('is_external');
     }
 
@@ -395,9 +420,9 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
 
       if (primaryDiffers) {
         if (currentPrimary) {
-          deltas.push({ kind: 'relationship.update', id: crypto.randomUUID(), relationshipId: currentPrimary.relationshipId, relationshipType: 'supports', attribute: 'role', value: 'secondary', previousDeltaId: currentPrimary.roleDeltaId, sourceId, sourceRef: locator('capability'), confidence: 1 });
+          deltas.push({ kind: 'relationship.update', id: crypto.randomUUID(), relationshipId: currentPrimary.relationshipId, relationshipType: 'supports', attribute: 'role', value: 'secondary', previousDeltaId: currentPrimary.roleDeltaId, sourceId, sourceRef: locator('capability'), confidence: row.confidence ?? 1 });
         }
-        deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'supports', fromElementId: elementId, toElementId: newPrimaryId, attributes: { role: 'primary' }, sourceId, sourceRef: locator('capability'), confidence: 1 });
+        deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'supports', fromElementId: elementId, toElementId: newPrimaryId, attributes: { role: 'primary' }, sourceId, sourceRef: locator('capability'), confidence: row.confidence ?? 1 });
       }
       // Every other newly-listed capability (index 1+, or index 0 when it
       // already matched the current primary and needed no promotion) that
@@ -406,7 +431,7 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
       for (const capabilityId of newIds) {
         if (capabilityId === newPrimaryId && primaryDiffers) continue;
         if (currentEdges.some((e) => e.capabilityId === capabilityId)) continue;
-        deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'supports', fromElementId: elementId, toElementId: capabilityId, attributes: { role: 'secondary' }, sourceId, sourceRef: locator('capability'), confidence: 1 });
+        deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'supports', fromElementId: elementId, toElementId: capabilityId, attributes: { role: 'secondary' }, sourceId, sourceRef: locator('capability'), confidence: row.confidence ?? 1 });
       }
       if (primaryDiffers || newIds.some((id) => !currentEdges.some((e) => e.capabilityId === id))) changedColumns.push('capability');
     }
@@ -435,7 +460,7 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
   const endpointPool = [...toRefs(systems), ...toRefs(containers), ...toRefs(actors)];
   const platformSystems = systems.filter(isPlatformSystem);
   for (const relRow of relationshipRows) {
-    const locator = (column: string) => `${fileName} › row ${String(relRow.rowNumber)} › ${column}`;
+    const locator = makeLocator(fileName, relRow.rowNumber, relRow.quote);
     const from = resolveEndpointRef(relRow.from, endpointPool, aliasesByElementId, fileRowsByName, platformSystems, containers);
     if (!from) {
       relationshipResults.push({ rowNumber: relRow.rowNumber, outcome: { status: 'blocked', reason: `"from" "${relRow.from}" was not found` } });
@@ -460,7 +485,7 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
     const existingEdge = currentUsesFlowsToEdges.find((e) => e.relationship_type === relRow.type && e.from_element_id === from.elementId && e.to_element_id === to.elementId);
 
     if (!existingEdge) {
-      deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: relRow.type, fromElementId: from.elementId, toElementId: to.elementId, attributes: attrsToSet, sourceId, sourceRef: locator('row'), confidence: 1 });
+      deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: relRow.type, fromElementId: from.elementId, toElementId: to.elementId, attributes: attrsToSet, sourceId, sourceRef: locator('row'), confidence: relRow.confidence ?? 1 });
       relationshipResults.push({ rowNumber: relRow.rowNumber, outcome: { status: 'new' } });
       continue;
     }
@@ -471,7 +496,7 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
       const fact = relFacts.get(attribute);
       const changed = attribute === 'via' ? fact?.value !== value : typeof fact?.value !== 'string' || fact.value !== value;
       if (!changed) continue;
-      deltas.push({ kind: 'relationship.update', id: crypto.randomUUID(), relationshipId: existingEdge.relationship_id, relationshipType: relRow.type, attribute, value, previousDeltaId: relFacts.get(attribute)?.delta_id ?? existingEdge.exists_delta_id, sourceId, sourceRef: locator(attribute), confidence: 1 } as Delta);
+      deltas.push({ kind: 'relationship.update', id: crypto.randomUUID(), relationshipId: existingEdge.relationship_id, relationshipType: relRow.type, attribute, value, previousDeltaId: relFacts.get(attribute)?.delta_id ?? existingEdge.exists_delta_id, sourceId, sourceRef: locator(attribute), confidence: relRow.confidence ?? 1 } as Delta);
       changedColumns.push(attribute);
     }
     relationshipResults.push({ rowNumber: relRow.rowNumber, outcome: changedColumns.length > 0 ? { status: 'changed', changedColumns } : { status: 'unchanged' } });
@@ -484,10 +509,12 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
   // system/container attribute alone).
   const changeResults: ChangeRowResult[] = [];
   for (const changeRow of changeRows) {
-    const locator = (column: string) => `${fileName} › row ${String(changeRow.rowNumber)} › ${column}`;
+    const locator = makeLocator(fileName, changeRow.rowNumber, changeRow.quote);
+    const pushResult = (outcome: ChangeRowOutcome) => changeResults.push({ rowNumber: changeRow.rowNumber, name: changeRow.name, action: changeRow.action, reason: changeRow.reason, outcome });
+
     const target = resolveChangeTarget(changeRow.name, systems, containers, aliasesByElementId);
     if (!target) {
-      changeResults.push({ rowNumber: changeRow.rowNumber, name: changeRow.name, action: changeRow.action, reason: changeRow.reason, outcome: { status: 'blocked', reason: `"${changeRow.name}" was not found, or matched more than one existing system/module` } });
+      pushResult({ status: 'blocked', reason: `"${changeRow.name}" was not found, or matched more than one existing system/module` });
       continue;
     }
     const { elementId, elementType } = target;
@@ -495,19 +522,53 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
     const facts = factsByElementId.get(elementId) ?? new Map<string, FactsRow>();
     const existsDeltaId = existsDeltaIdByElementId.get(elementId);
     if (existsDeltaId === undefined) {
-      changeResults.push({ rowNumber: changeRow.rowNumber, name: changeRow.name, action: changeRow.action, reason: changeRow.reason, outcome: { status: 'blocked', reason: "the matched element's current state could not be read" } });
+      pushResult({ status: 'blocked', reason: "the matched element's current state could not be read" });
       continue;
     }
 
+    // `replaced_by` (JSON import follow-up) — resolved against the same
+    // pool as `name` itself, existing elements only. Resolved before any
+    // delta is pushed: an explicit replacement that can't be found blocks
+    // the whole row, the same "can't silently skip an explicit instruction"
+    // stance `platform` unresolved already takes for a module row.
+    let replacementId: UUID | undefined;
+    if (changeRow.replacedBy !== null) {
+      const replacement = resolveChangeTarget(changeRow.replacedBy, systems, containers, aliasesByElementId);
+      if (!replacement) {
+        pushResult({ status: 'blocked', reason: `"replaced_by" "${changeRow.replacedBy}" was not found, or matched more than one existing system/module` });
+        continue;
+      }
+      replacementId = replacement.elementId;
+    }
+
+    const changeDeltas: Delta[] = [];
     const targetStatus = changeRow.action === 'retire' ? 'retired' : 'active';
     const currentStatus = facts.get('lifecycleStatus')?.value;
-    if (currentStatus === targetStatus) {
-      changeResults.push({ rowNumber: changeRow.rowNumber, name: changeRow.name, action: changeRow.action, reason: changeRow.reason, outcome: { status: 'unchanged', elementId } });
-      continue;
+    if (currentStatus !== targetStatus) {
+      changeDeltas.push({ kind: 'element.update', id: crypto.randomUUID(), elementId, elementType, attribute: 'lifecycleStatus', value: targetStatus, previousDeltaId: facts.get('lifecycleStatus')?.delta_id ?? existsDeltaId, sourceId, sourceRef: locator(changeRow.action), confidence: changeRow.confidence ?? 1 });
     }
 
-    deltas.push({ kind: 'element.update', id: crypto.randomUUID(), elementId, elementType, attribute: 'lifecycleStatus', value: targetStatus, previousDeltaId: facts.get('lifecycleStatus')?.delta_id ?? existsDeltaId, sourceId, sourceRef: locator(changeRow.action), confidence: 1 });
-    changeResults.push({ rowNumber: changeRow.rowNumber, name: changeRow.name, action: changeRow.action, reason: changeRow.reason, outcome: { status: 'applied', elementId } });
+    // `replaced_by`: every one of the retiring element's own `supports`
+    // edges (primary and secondary alike) transfers to the replacement as
+    // `role: 'secondary'` — `useElementRetire.ts`'s own "replaced by"
+    // picker, verbatim: never `'primary'` (a collision this reconciliation
+    // pass has no reliable way to rule out either), and every edge, not
+    // just the primary one (the retiring element's own current capability
+    // set is exactly what's being handed off).
+    if (replacementId !== undefined) {
+      const ownSupportsEdges = currentSupportsByElementId?.get(elementId) ?? [];
+      for (const edge of ownSupportsEdges) {
+        changeDeltas.push({ kind: 'relationship.retract', id: crypto.randomUUID(), relationshipId: edge.relationshipId, relationshipType: 'supports', previousDeltaId: relationshipFactsByRelationshipId.get(edge.relationshipId)?.get('$exists')?.delta_id ?? edge.existsDeltaId, sourceId, sourceRef: locator('replaced_by'), confidence: changeRow.confidence ?? 1 });
+        changeDeltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'supports', fromElementId: replacementId, toElementId: edge.capabilityId, attributes: { role: 'secondary' }, sourceId, sourceRef: locator('replaced_by'), confidence: changeRow.confidence ?? 1 });
+      }
+    }
+
+    if (changeDeltas.length === 0) {
+      pushResult({ status: 'unchanged', elementId });
+      continue;
+    }
+    deltas.push(...changeDeltas);
+    pushResult({ status: 'applied', elementId });
   }
 
   return { rows, relationshipRows: relationshipResults, changeRows: changeResults, deltas, touchedElementIds, aliasesToWrite };

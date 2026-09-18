@@ -60,6 +60,10 @@ export interface ImportRow {
   capabilityNames: string[];
   businessOwner: OwnerReference | null;
   technicalOwner: OwnerReference | null;
+  /** JSON import follow-up: a supporting quote from whatever the file's author is working from — free text, never validated beyond non-blank. Carried onto every delta this row produces (`buildImportCommit.ts`), appended to `sourceRef`. */
+  quote?: string | undefined;
+  /** JSON import follow-up: a confidence in [0,1] for this row as a whole — overrides the otherwise-hardcoded `1` on every delta this row produces. */
+  confidence?: number | undefined;
 }
 
 export type ImportRowResult = { ok: true; row: ImportRow } | { ok: false; rowNumber: number; error: string };
@@ -119,6 +123,15 @@ function parseCapabilityList(cell: string): string[] {
     .filter((name) => name.length > 0);
 }
 
+/** `confidence`'s own cell → a number in [0,1], or `undefined` for a genuinely blank cell — anything else (out of range, unparseable) is a real validation error, never a silently-treated-as-blank typo (`cellToBooleanWord`'s own stance above). Duplicated verbatim in `importRelationshipRow.ts`/`importChangeRow.ts` — this module's own small-private-helper convention (`cellToString` is already tripled the same way), not a shared util. */
+function parseConfidence(raw: unknown): { ok: true; value: number | undefined } | { ok: false; error: string } {
+  if (raw === null || raw === undefined) return { ok: true, value: undefined };
+  if (typeof raw === 'string' && raw.trim() === '') return { ok: true, value: undefined };
+  const num = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw.trim()) : NaN;
+  if (!Number.isFinite(num) || num < 0 || num > 1) return { ok: false, error: 'must be a number between 0 and 1' };
+  return { ok: true, value: num };
+}
+
 /** Validates one raw row object (as `XLSX.utils.sheet_to_json` produces, keyed by header name) against the F2-lite format. Reuses `validateAttributeValue` for every core attribute rather than re-implementing the enum/text checks this product already has one place for. */
 export function validateImportRow(raw: Record<string, unknown>, rowNumber: number): ImportRowResult {
   const name = cellToString(raw.name);
@@ -154,6 +167,9 @@ export function validateImportRow(raw: Record<string, unknown>, rowNumber: numbe
   const businessOwnerCell = cellToString(raw.business_owner);
   const technicalOwnerCell = cellToString(raw.technical_owner);
 
+  const confidenceResult = parseConfidence(raw.confidence);
+  if (!confidenceResult.ok) return { ok: false, rowNumber, error: `"confidence": ${confidenceResult.error}` };
+
   return {
     ok: true,
     row: {
@@ -166,6 +182,8 @@ export function validateImportRow(raw: Record<string, unknown>, rowNumber: numbe
       capabilityNames: parseCapabilityList(cellToString(raw.capability) ?? ''),
       businessOwner: businessOwnerCell !== undefined ? parseOwnerCell(businessOwnerCell) : null,
       technicalOwner: technicalOwnerCell !== undefined ? parseOwnerCell(technicalOwnerCell) : null,
+      quote: cellToString(raw.quote),
+      confidence: confidenceResult.value,
     },
   };
 }

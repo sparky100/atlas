@@ -60,10 +60,14 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+/** Pure — `docs/import/PROMPT.md`'s own two markers, substituted; no Supabase, no DOM. Extracted from `downloadImportPrompt` below so the actual served content (not just `buildImportPromptSchema`'s own `{{SCHEMA}}` fragment) has something to test against. */
+export function renderImportPrompt(capabilities: readonly ElementsHeadRow[]): string {
+  return promptTemplate.replace('{{SCHEMA}}', buildImportPromptSchema()).replace('{{CAPABILITY_LIST}}', buildCapabilityListMarkdown(capabilities));
+}
+
 /** Loads this model's own current capability tree, renders the prompt, and triggers the download — `atlas-import-prompt-<model-slug>.md`. A model with no commits yet (no main) renders with an empty capability list rather than failing; there's nothing to name yet either way. */
 export async function downloadImportPrompt(supabase: Client, modelId: UUID, modelSlug: string): Promise<void> {
   const main = await getMainBranch(supabase, modelId);
   const capabilities = main ? await listCapabilitiesForMap(supabase, main.head_commit_id) : [];
-  const rendered = promptTemplate.replace('{{SCHEMA}}', buildImportPromptSchema()).replace('{{CAPABILITY_LIST}}', buildCapabilityListMarkdown(capabilities));
-  downloadBlob(new Blob([rendered], { type: 'text/markdown' }), `atlas-import-prompt-${modelSlug}.md`);
+  downloadBlob(new Blob([renderImportPrompt(capabilities)], { type: 'text/markdown' }), `atlas-import-prompt-${modelSlug}.md`);
 }

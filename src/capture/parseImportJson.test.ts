@@ -29,7 +29,7 @@ describe('parseImportJson', () => {
     expect(result.relationshipErrors).toEqual([]);
     expect(result.relationshipRows).toEqual([{ rowNumber: 1, from: 'Northgate', type: 'uses', to: 'Southgate', description: 'reads accounts from', via: null, dataClassification: null }]);
     expect(result.changeErrors).toEqual([]);
-    expect(result.changeRows).toEqual([{ rowNumber: 1, name: 'Legacy CRM', action: 'retire', reason: 'Decommissioned' }]);
+    expect(result.changeRows).toEqual([{ rowNumber: 1, name: 'Legacy CRM', action: 'retire', reason: 'Decommissioned', replacedBy: null, quote: undefined, confidence: undefined }]);
   });
 
   it('collects a per-entry error in each section without discarding the entries that did validate', async () => {
@@ -67,5 +67,25 @@ describe('parseImportJson', () => {
   it('throws a real error when systems is missing or empty', async () => {
     await expect(parseImportJson(jsonFile({}))).rejects.toThrow(ImportFileParseError);
     await expect(parseImportJson(jsonFile({ systems: [] }))).rejects.toThrow(ImportFileParseError);
+  });
+
+  it('parses replaced_by, quote, and confidence on a changes entry', async () => {
+    const file = jsonFile({
+      systems: [{ name: 'Legacy CRM' }, { name: 'Electron' }],
+      changes: [{ name: 'Legacy CRM', action: 'retire', replaced_by: 'Electron', quote: 'CRM was decommissioned in March', confidence: 0.9 }],
+    });
+    const result = await parseImportJson(file);
+    expect(result.changeErrors).toEqual([]);
+    expect(result.changeRows).toEqual([{ rowNumber: 1, name: 'Legacy CRM', action: 'retire', reason: null, replacedBy: 'Electron', quote: 'CRM was decommissioned in March', confidence: 0.9 }]);
+  });
+
+  it('parses quote and confidence on systems and relationships entries', async () => {
+    const file = jsonFile({
+      systems: [{ name: 'Northgate', quote: 'Northgate handles billing', confidence: 0.8 }],
+      relationships: [{ from: 'Northgate', type: 'uses', to: 'Southgate', description: 'reads from', quote: 'Northgate reads from Southgate', confidence: 0.65 }],
+    });
+    const result = await parseImportJson(file);
+    expect(result.rows[0]).toMatchObject({ quote: 'Northgate handles billing', confidence: 0.8 });
+    expect(result.relationshipRows[0]).toMatchObject({ quote: 'Northgate reads from Southgate', confidence: 0.65 });
   });
 });
