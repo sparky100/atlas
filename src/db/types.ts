@@ -222,6 +222,8 @@ export interface SourceRow {
   user_id: UUID | null;
   created_by: UUID;
   created_at: string;
+  /** F2-lite: required iff `kind === 'spreadsheet'` — every element id that import run's rows matched or created, so a change page can recompute "not in file" at any later time. `20260918010000_import_touched_element_ids.sql`. */
+  import_touched_element_ids: UUID[] | null;
 }
 
 export type AliasType = 'name' | 'code' | 'external_ref' | 'source_system_key' | 'template_code' | 'merged_id';

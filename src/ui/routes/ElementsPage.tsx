@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import type { AttributeDefinitionKind } from '../../contracts/attributeSchema';
 import type { Json } from '../../contracts/rows';
@@ -23,6 +23,7 @@ import { useElementBrowse, type ElementBrowseFilter } from '../elements/useEleme
 import type { BrowseRow } from '../../db/elementBrowse';
 import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromCriticalExposedFinding, prefillFromCriticalSupportEndFinding } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
+import { SpreadsheetImportDialog } from '../import/SpreadsheetImportDialog';
 import styles from './ElementsPage.module.css';
 
 const VALID_FILTERS: readonly ElementBrowseFilter[] = [
@@ -88,6 +89,7 @@ export function ElementsPage() {
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const canEdit = canEditOnMain(role);
+  const [importOpen, setImportOpen] = useState(false);
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   // F1 ("custom attributes") PR4: read-only here, same reuse as
   // ElementPage.tsx's own PR3 wiring — any member can see these
@@ -220,9 +222,11 @@ export function ElementsPage() {
                 : undefined
             }
             decisionRowAction={decisionRowAction}
+            onImportClick={canEdit ? () => { setImportOpen(true); } : undefined}
           />
         </main>
       </div>
+      <SpreadsheetImportDialog open={importOpen} onClose={() => { setImportOpen(false); }} modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
     </div>
   );
 }

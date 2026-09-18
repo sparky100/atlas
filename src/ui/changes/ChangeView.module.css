@@ -72,6 +72,12 @@
   margin-bottom: var(--space-1);
 }
 
+.importCounts {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
 .deltaList {
   list-style: none;
   margin: 0;

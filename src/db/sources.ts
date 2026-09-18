@@ -83,17 +83,21 @@ export interface CreateSpreadsheetSourceInput {
   createdBy: UUID;
   /** The imported file's own name — shown in a provenance badge's hover card the same way `createMergeResolutionSource`'s branch title is, so "where did this come from" names the actual file, not just "a spreadsheet". */
   fileName: string;
+  /** F2-lite: every element id this run's rows matched or created — `sources.import_touched_element_ids`, required for this kind. Lets a change page recompute "not in file" at any later time, not just while the file is still in memory. */
+  touchedElementIds: readonly UUID[];
 }
 
 /**
- * One `spreadsheet` source per import run (F2, narrowed capture pipeline,
- * Phase 1) — every delta that run's own commit writes shares it.
- * `sources_insert`'s RLS already allows an ordinary contributor+ to
- * insert `kind: 'spreadsheet'` (`supabase/migrations/20260906071500_sources_and_aliases.sql`)
- * — no migration needed for this function to exist.
+ * One `spreadsheet` source per import run (F2-lite, reconciliation-style
+ * import superseding F2 Phase 1/2's narrower matching) — every delta that
+ * run's own commit writes shares it. `sources_insert`'s RLS already allows
+ * an ordinary contributor+ to insert `kind: 'spreadsheet'`
+ * (`supabase/migrations/20260906071500_sources_and_aliases.sql`) — no RLS
+ * change needed for this function, only the `import_touched_element_ids`
+ * column `20260918010000_import_touched_element_ids.sql` added.
  */
 export async function createSpreadsheetSource(supabase: Client, input: CreateSpreadsheetSourceInput): Promise<SourceRow> {
-  const row = { id: input.id, org_id: input.orgId, model_id: input.modelId, kind: 'spreadsheet' as const, name: input.fileName, created_by: input.createdBy };
+  const row = { id: input.id, org_id: input.orgId, model_id: input.modelId, kind: 'spreadsheet' as const, name: input.fileName, created_by: input.createdBy, import_touched_element_ids: [...input.touchedElementIds] };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
   const { data, error } = await supabase.from('sources').insert(row).select('*').single();
   if (error) throw new Error(`createSpreadsheetSource: ${error.message}`);

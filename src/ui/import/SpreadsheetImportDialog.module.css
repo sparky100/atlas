@@ -1,0 +1,110 @@
+/*
+ * The product's first modal — every other flow is an inline page panel
+ * (`SpreadsheetImportDialog.tsx`'s own doc comment on why this one isn't).
+ * z-index above `ToastHost`'s own 20 (`ToastHost.module.css`), since a
+ * toast firing while this is open should never hide behind it.
+ */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+  overflow-y: auto;
+  background: rgb(0 0 0 / 0.5);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 720px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.templateLinks {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: var(--border-width) dashed var(--border);
+  border-radius: var(--radius-md);
+}
+
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.counts {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.rowList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.rowMain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.select {
+  font: inherit;
+}
+
+.notInFile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}

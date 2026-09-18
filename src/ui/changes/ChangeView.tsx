@@ -12,7 +12,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { createChangeBranch, getMainBranch } from '../../db/branches';
-import type { MemberRole } from '../../db/types';
+import type { MemberRole, SourceRow } from '../../db/types';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { formatDateTime } from '../time';
 import { canApproveOrMergeRequest, canCancelChange } from '../orgs/useMembership';
@@ -27,10 +27,14 @@ import { useApproveAndMerge } from './useApproveAndMerge';
 import { useCancelChange } from './useCancelChange';
 import { useChange } from './useChange';
 import { useChangeSummary } from './useChangeSummary';
+import { useImportSummary } from './useImportSummary';
 import { useOpenMergeRequest } from './useOpenMergeRequest';
 import { useSubmitForReview } from './useSubmitForReview';
 import { ReviewerPicker } from './ReviewerPicker';
 import styles from './ChangeView.module.css';
+
+/** A stable identity for `useImportSummary`'s own `sourcesById` before `useChangeSummary` has loaded — a fresh `new Map()` literal every render would retrigger that hook's load effect every render for no reason. */
+const EMPTY_SOURCES_BY_ID: ReadonlyMap<UUID, SourceRow> = new Map();
 
 export interface ChangeViewProps {
   orgId: UUID;
@@ -84,6 +88,8 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   const { userId } = useAuth();
   const { status, branch, error, updateMetadata, reload } = useChange(branchId);
   const summaryState = useChangeSummary(modelId, branch);
+  const importSourcesById = summaryState.status === 'ready' ? summaryState.summary.sourcesById : EMPTY_SOURCES_BY_ID;
+  const importSummary = useImportSummary(orgId, modelId, branch, importSourcesById, userId, reload);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -468,6 +474,47 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
               </Button>
             </div>
           </form>
+        </Panel>
+      )}
+
+      {importSummary.state.status !== 'none' && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Import summary
+          </Text>
+          {importSummary.state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+          {importSummary.state.status === 'error' && <Text as="p">{importSummary.state.message}</Text>}
+          {importSummary.state.status === 'ready' && (
+            <>
+              <Text as="p" size="sm" tone="muted">
+                From {importSummary.state.fileName}
+              </Text>
+              <div className={styles.importCounts}>
+                <Chip tone="info">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && (s.elementType === 'system' || s.elementType === 'container') && s.deltas.some((d) => d.kind === 'element.create')).length : 0} new</Chip>
+                <Chip tone="info">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && (s.elementType === 'system' || s.elementType === 'container') && !s.deltas.some((d) => d.kind === 'element.create')).length : 0} changed</Chip>
+                {importSummary.state.notInFile.length > 0 && <Chip tone="warn">{importSummary.state.notInFile.length} not in file</Chip>}
+              </div>
+              {importSummary.state.notInFile.length > 0 && (
+                <ul className={styles.subjectList}>
+                  {importSummary.state.notInFile.map((element) => (
+                    <li key={element.elementId} className={styles.subjectRow}>
+                      <div className={styles.subjectTitle}>
+                        <ElementTypeGlyph type={element.elementType} />
+                        <Text as="span" size="lg">
+                          {element.name}
+                        </Text>
+                      </div>
+                      {canEdit && (
+                        <Button variant="secondary" disabled={importSummary.retiring === element.elementId} onClick={() => { void importSummary.retire(element); }}>
+                          {importSummary.retiring === element.elementId ? 'Retiring…' : 'Retire'}
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
         </Panel>
       )}
 

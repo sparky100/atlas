@@ -434,6 +434,7 @@ Where a fact came from (S-7).
 | `capability_map_id` | uuid | → `capability_maps(id)`, nullable; not null iff `kind = 'template'` |
 | `user_id` | uuid | → `auth.users(id)`, nullable; not null iff `kind = 'manual'` |
 | `created_by` | uuid | not null |
+| `import_touched_element_ids` | uuid[] | nullable; not null iff `kind = 'spreadsheet'` — **added by F2-lite** (`20260918010000_import_touched_element_ids.sql`): every element id that import run's own rows matched or created, so a change page can recompute "not in file" (this model's own systems/platforms/modules minus this set) at any later time, not just while the file is still in memory. |
 
 Unique `(model_id, user_id) where kind = 'manual'`. Index `(model_id, kind)`.
 

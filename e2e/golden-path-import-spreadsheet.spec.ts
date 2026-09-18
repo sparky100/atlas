@@ -1,50 +1,63 @@
 /**
- * F2 (narrowed capture pipeline), Phase 1 — "Import a spreadsheet…" on the
- * Changes page. Click-only from Home (S2 discipline); the file itself is
- * supplied in memory via `setInputFiles`'s buffer form — the standard,
- * and only, way Playwright drives a real `<input type="file">`, not a
- * `page.goto`/URL-construction shortcut.
+ * F2-lite ("spreadsheet import as reconciliation") — the two new entry
+ * points (`SpreadsheetImportDialog.tsx`'s own doc comment on why it's a
+ * dialog, reachable from the Landscape's empty state and its "+ Add" row,
+ * and the Elements browse table's toolbar) replace F2 Phase 1/2's own
+ * Changes-page-embedded panel. Click-only from Home (S2 discipline); the
+ * file itself is supplied in memory via `setInputFiles`'s buffer form — the
+ * standard, and only, way Playwright drives a real `<input type="file">`,
+ * not a `page.goto`/URL-construction shortcut.
  *
- * Covers: a new system created from the file, an existing one updated
- * (matched by exact name), a `supports` link resolved by exact capability
- * name, and the whole thing landing on an ordinary `record`-intent change
- * branch that the existing review flow already handles — no new review
- * queue exists for this.
+ * Covers the user's own stated scenario: from an empty landscape, import a
+ * three-row file, land on the change, submit, approve & merge (`record`
+ * intent's own one-click path — never the shared review queue), see all
+ * three systems on the landscape.
  */
 import { expect, test } from '@playwright/test';
-import { addCapability, addSystemFromHome, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
-test('import a CSV of systems: one new, one matched by name and linked to a capability by name', async ({ page }) => {
+test('import a CSV of three new systems from an empty landscape, then submit, approve and merge the change', async ({ page }) => {
   await signUpCreateOrgAndModel(page, 'importgolden');
 
-  // The capability the file's own `supports` column names, and the
-  // existing system the file both matches (by exact name) and updates.
-  await addCapability(page, 'Billing');
   await goToModelHome(page);
-  await addSystemFromHome(page, { name: 'Council Tax System', description: 'Old description.' });
-  await goToModelHome(page);
+  await page.getByRole('link', { name: 'Landscape' }).click();
+  await expect(page.getByRole('heading', { name: 'Landscape' })).toBeVisible();
+  await expect(page.getByText('No systems yet.')).toBeVisible();
+  // Two entry points can both be on screen at once at desktop width (the
+  // empty state's own affordance, and the page's standing "+ Add" row) —
+  // either opens the identical dialog, so `.first()` rather than assuming
+  // which one a given viewport renders.
+  await page.getByRole('button', { name: 'Import from spreadsheet…' }).first().click();
 
-  await page.getByRole('link', { name: 'Changes' }).click();
-  await expect(page.getByRole('heading', { name: 'Import a spreadsheet' })).toBeVisible();
-
-  const csv = ['name,description,supports', 'Council Tax System,Handles council tax accounts.,', 'Northgate,The borough’s new revenues platform.,Billing'].join('\n');
+  await expect(page.getByRole('dialog', { name: 'Import a spreadsheet' })).toBeVisible();
+  const csv = ['name,description', 'Northgate,The borough’s new revenues platform.', 'Riverside Payments,Handles resident payments.', 'Council Tax System,Manages council tax accounts.'].join('\n');
   await page.getByLabel('Choose a CSV or XLSX file to import').setInputFiles({ name: 'systems.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
 
-  // Both rows resolve without needing a pick — "Council Tax System" is an
-  // exact-name match, "Northgate" is new, and "Billing" resolves by exact
-  // name too, so the Import button is enabled immediately.
-  await expect(page.getByText('Matched: Council Tax System')).toBeVisible();
-  await expect(page.getByText('supports: Billing')).toBeVisible();
+  // Every row is a clean, unambiguous new system — nothing to pick, no failures — so the Import button is enabled immediately.
+  await expect(page.getByText('3 new')).toBeVisible();
   const importButton = page.getByRole('button', { name: 'Import' });
   await expect(importButton).toBeEnabled();
   await importButton.click();
 
-  // Lands on the new change branch's own page — the ordinary change page,
-  // not a bespoke review surface built for this feature. `record` intent
-  // renders as "Recording: <title>" (branchIntent.ts's own wording).
-  await expect(page.getByRole('heading', { name: /Recording: Import: systems\.csv/ })).toBeVisible();
+  // Lands on the new change branch's own page — the ordinary change page, not a bespoke review surface built for this feature. `record` intent renders as "Recording: <title>" (branchIntent.ts's own wording), and the branch's own title is "Imported from <file>".
+  await expect(page.getByRole('heading', { name: 'Recording: Imported from systems.csv' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Edits on this change' })).toBeVisible();
   await expect(page.getByText('Northgate', { exact: true })).toBeVisible();
-  await expect(page.getByText('supports Northgate → Billing')).toBeVisible();
-  await expect(page.getByText('Handles council tax accounts.')).toBeVisible();
+  await expect(page.getByText('Riverside Payments', { exact: true })).toBeVisible();
+  await expect(page.getByText('Council Tax System', { exact: true })).toBeVisible();
+
+  // `record` intent's own one-click review path (`useApproveAndMerge.ts`) — submit, then "Approve & merge" appears directly on this same page, never the shared /review queue.
+  await page.getByRole('button', { name: 'Submit for review' }).click();
+  const approveButton = page.getByRole('button', { name: 'Approve & merge' });
+  await expect(approveButton).toBeVisible();
+  await approveButton.click();
+  await expect(page.getByText('merged', { exact: true }).first()).toBeVisible();
+
+  // Back on the Landscape, all three systems are there.
+  await goToModelHome(page);
+  await page.getByRole('link', { name: 'Landscape' }).click();
+  await expect(page.getByText('No systems yet.')).toHaveCount(0);
+  await expect(page.getByText('Northgate', { exact: true })).toBeVisible();
+  await expect(page.getByText('Riverside Payments', { exact: true })).toBeVisible();
+  await expect(page.getByText('Council Tax System', { exact: true })).toBeVisible();
 });

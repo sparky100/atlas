@@ -74,6 +74,8 @@ export interface ElementBrowseTableProps {
    * type — but typed to allow it rather than assuming).
    */
   decisionRowAction?: ((row: BrowseRow) => ReactNode | null) | undefined;
+  /** F2-lite: renders "Import…" beside Export when present, omitted (same presence-gates-visibility convention as `linkSupportsInline`) for a viewer who can't edit main. Owns opening the dialog itself — this table only renders the button. */
+  onImportClick?: (() => void) | undefined;
 }
 
 // A narrower key type than `ElementBrowseSortKey` — this fixed column list
@@ -192,7 +194,7 @@ function InlineSupportsPicker({ system, config, searchCommitId }: { system: { el
 }
 
 /** Sprint U3b: "filterable, sortable table of elements by type with owner and lifecycle." A real `<table>` — semantic tabular data, not a design-system gap (native `<table>`/`<th>`/`<td>` is the correct element here, the same way `<ul>`/`<li>` already is for plain lists elsewhere in this app). */
-export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenameBase, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange, decisionRowAction }: ElementBrowseTableProps) {
+export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenameBase, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange, decisionRowAction, onImportClick }: ElementBrowseTableProps) {
   // Called unconditionally (Rules of Hooks) — `commitId`/`rows` are only real
   // once `state.status === 'ready'`, and the export loader refuses to run on
   // the null/empty fallbacks until then.
@@ -251,6 +253,11 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
         >
           Export XLSX
         </Button>
+        {onImportClick && (
+          <Button variant="secondary" onClick={onImportClick}>
+            Import…
+          </Button>
+        )}
       </div>
       {exportState.error !== null && <Text as="p">{exportState.error}</Text>}
 

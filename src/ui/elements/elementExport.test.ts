@@ -59,7 +59,7 @@ describe('buildProvenanceById', () => {
       { subject_type: 'element', subject_id: 's-1', attribute: '$exists', value: null, delta_id: 'd1', source_id: 'src-1', source_ref: null, effective_date: '2026-01-15', confidence: 1, asserted_by: 'u', asserted_at: '2026-01-15T00:00:00Z' },
       { subject_type: 'element', subject_id: 's-1', attribute: 'vendor', value: 'V', delta_id: 'd2', source_id: 'src-1', source_ref: null, effective_date: null, confidence: 1, asserted_by: 'u', asserted_at: '2026-01-15T00:00:00Z' },
     ];
-    const sources = new Map<string, SourceRow>([['src-1', { id: 'src-1', org_id: 'o', model_id: 'm', kind: 'spreadsheet', name: 'Register.xlsx', uri: null, captured_at: null, capture_job_id: null, capability_map_id: null, user_id: null, created_by: 'u', created_at: 'now' }]]);
+    const sources = new Map<string, SourceRow>([['src-1', { id: 'src-1', org_id: 'o', model_id: 'm', kind: 'spreadsheet', name: 'Register.xlsx', uri: null, captured_at: null, capture_job_id: null, capability_map_id: null, user_id: null, created_by: 'u', created_at: 'now', import_touched_element_ids: [] }]]);
     const provenance = buildProvenanceById(facts, sources, NOW);
     expect(provenance.get('s-1')?.sourceName).toBe('Register.xlsx');
     expect(provenance.get('s-1')?.age).toBe('5mo');
