@@ -6,7 +6,7 @@ import { supabase } from '../supabaseClient';
 
 export interface MatchEnrichment {
   relationshipCount: number;
-  /** The `owns` relationship's owning actor into this element, if any (only ever populated for a `system`, per `RELATIONSHIP_TYPE_RULES` — null for every other type, not specially cased). Prompt 7k item 2: a target can have up to three owners at once (one per role); this compact row picks the `business` owner when there is one, else whichever other role is present — same preference `elementBrowse.ts`'s own `loadOwnersByElementId` uses. */
+  /** The `owns` relationship's owning actor into this element, if any (populated for a `system` or `container`, per `RELATIONSHIP_TYPE_RULES` — null for every other type, not specially cased). Prompt 7k item 2: a target can have up to three owners at once (one per role); this compact row picks the `business` owner when there is one, else whichever other role is present — same preference `elementBrowse.ts`'s own `loadOwnersByElementId` uses. */
   owner: ElementsHeadRow | null;
   /**
    * A container's own parent platform/system, resolved for display — a

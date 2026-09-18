@@ -179,10 +179,12 @@ export function useElementBrowse(
         ids = new Set(computeStaleAttributesFinding(facts, systems).staleSystems.map((e) => e.element_id));
       } else if (filter === 'no-technical-owner') {
         const systems = elements.filter((e) => e.element_type === 'system');
-        ids = new Set(findSystemsWithoutTechnicalOwner(systems, ownsEdges).map((e) => e.element_id));
+        const containers = elements.filter((e) => e.element_type === 'container');
+        ids = new Set(findSystemsWithoutTechnicalOwner([...systems, ...containers], ownsEdges).map((e) => e.element_id));
       } else if (filter === 'critical-no-business-owner') {
         const systems = elements.filter((e) => e.element_type === 'system');
-        ids = new Set(findCriticalSystemsWithoutBusinessOwner(systems, ownsEdges).map((e) => e.element_id));
+        const containers = elements.filter((e) => e.element_type === 'container');
+        ids = new Set(findCriticalSystemsWithoutBusinessOwner([...systems, ...containers], ownsEdges).map((e) => e.element_id));
       } else if (filter === 'critical-exposed') {
         const systems = elements.filter((e) => e.element_type === 'system');
         ids = new Set(findCriticalExposedSystems(systems).map((e) => e.element_id));
@@ -192,8 +194,9 @@ export function useElementBrowse(
         ids = new Set(findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges).map((e) => e.element_id));
       } else if (filter === 'essential-no-technical-owner') {
         const systems = elements.filter((e) => e.element_type === 'system');
+        const containers = elements.filter((e) => e.element_type === 'container');
         const capabilities = elements.filter((e) => e.element_type === 'capability');
-        ids = new Set(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
+        ids = new Set(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...systems, ...containers], capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
       } else if (filter === 'critical-support-end') {
         const systems = elements.filter((e) => e.element_type === 'system');
         ids = new Set(findCriticalSystemsPastOrNearSupportEnd(systems).map((e) => e.element_id));

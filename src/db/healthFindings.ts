@@ -473,10 +473,19 @@ export function computeSelfOwnedCapabilityIds(capabilities: readonly ElementsHea
   return new Set([...directlyOwned, ...ownedViaSupportingSystem]);
 }
 
-/** Systems with no `owns` edge carrying `role: 'technical'` — Prompt 7k item 2's "systems without a technical owner" finding, the same shape `findSystemsWithoutCapability` above already uses. */
-export function findSystemsWithoutTechnicalOwner(systems: readonly ElementsHeadRow[], ownsEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
+/**
+ * Systems (or, since `owns` reaches a container directly too, modules) with
+ * no `owns` edge carrying `role: 'technical'` — Prompt 7k item 2's "systems
+ * without a technical owner" finding, the same shape
+ * `findSystemsWithoutCapability` above already uses. `elements` is whatever
+ * mix of systems/containers the caller wants checked — this function has no
+ * type check of its own, so a platform's own modules (frequently owned by a
+ * different team than the platform itself) surface here exactly like a
+ * top-level system does once the caller includes them.
+ */
+export function findSystemsWithoutTechnicalOwner(elements: readonly ElementsHeadRow[], ownsEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
   const technicallyOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).role === 'technical').map((edge) => edge.to_element_id));
-  return systems.filter((system) => !technicallyOwnedIds.has(system.element_id));
+  return elements.filter((element) => !technicallyOwnedIds.has(element.element_id));
 }
 
 /**
@@ -542,11 +551,15 @@ export function computeStaleAttributesFinding(facts: readonly FactsRow[], system
  * business owner" — depends on item 2's role data, the same
  * `role === 'business'` reading `computeSelfOwnedCapabilityIds` above uses,
  * applied to systems directly rather than capabilities (`owns` can already
- * target either — `relationshipTypeRules.ts`).
+ * target either — `relationshipTypeRules.ts`). `elements` is whatever mix
+ * of systems/containers the caller wants checked — `criticality` is a
+ * `ContainerAttributes` field too (a module can be criticality-rated
+ * independently of its platform), so a critical, unowned module surfaces
+ * here exactly like a critical, unowned system once the caller includes it.
  */
-export function findCriticalSystemsWithoutBusinessOwner(systems: readonly ElementsHeadRow[], ownsEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
+export function findCriticalSystemsWithoutBusinessOwner(elements: readonly ElementsHeadRow[], ownsEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
   const businessOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).role === 'business').map((edge) => edge.to_element_id));
-  return systems.filter((system) => attributesRecord(system.attributes).criticality === 'critical' && !businessOwnedIds.has(system.element_id));
+  return elements.filter((element) => attributesRecord(element.attributes).criticality === 'critical' && !businessOwnedIds.has(element.element_id));
 }
 
 /**
@@ -581,20 +594,24 @@ export function findCriticalExposedSystems(systems: readonly ElementsHeadRow[], 
  * `computeSelfOwnedCapabilityIds` above already uses in the other direction
  * (capability ownership derived from a supporting system's `owns` edge).
  * "Technical owner" reuses `findSystemsWithoutTechnicalOwner`'s own
- * `role: 'technical'` definition, scoped down to just the systems this
- * finding cares about.
+ * `role: 'technical'` definition, scoped down to just the elements this
+ * finding cares about. `elements` is whatever mix of systems/containers the
+ * caller wants checked — `supports (container, capability)` already
+ * qualifies a module as "supporting" here exactly like a system does, so a
+ * module supporting an essential-function capability with no technical
+ * owner of its own surfaces once the caller includes containers.
  */
 export function findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(
-  systems: readonly ElementsHeadRow[],
+  elements: readonly ElementsHeadRow[],
   capabilities: readonly ElementsHeadRow[],
   supportsEdges: readonly RelationshipsHeadRow[],
   ownsEdges: readonly RelationshipsHeadRow[],
 ): ElementsHeadRow[] {
   const essentialFunctionIds = new Set(capabilities.filter((c) => attributesRecord(c.attributes).essentialFunction === true).map((c) => c.element_id));
   if (essentialFunctionIds.size === 0) return [];
-  const supportingSystemIds = new Set(supportsEdges.filter((edge) => essentialFunctionIds.has(edge.to_element_id)).map((edge) => edge.from_element_id));
+  const supportingElementIds = new Set(supportsEdges.filter((edge) => essentialFunctionIds.has(edge.to_element_id)).map((edge) => edge.from_element_id));
   const technicallyOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).role === 'technical').map((edge) => edge.to_element_id));
-  return systems.filter((system) => supportingSystemIds.has(system.element_id) && !technicallyOwnedIds.has(system.element_id));
+  return elements.filter((element) => supportingElementIds.has(element.element_id) && !technicallyOwnedIds.has(element.element_id));
 }
 
 /**

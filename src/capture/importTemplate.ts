@@ -28,7 +28,14 @@ const EXAMPLE_ROW: Record<ImportColumn, string> = {
   technical_owner: 'Ofgem (External: Energy regulator)',
 };
 
-/** A second example row — a module of a platform, so "platform column alone decides structure" is shown, not just described. */
+/**
+ * A second example row — a module of a platform, so "platform column alone
+ * decides structure" is shown, not just described. `business_owner` is
+ * filled in too, deliberately: a module can carry its own owner,
+ * independent of its platform's (or its sibling modules') — SAP's FI and PM
+ * modules routinely answer to different business units, exactly the case
+ * `RELATIONSHIP_TYPE_RULES`'s `owns: actor → container` row exists for.
+ */
 const EXAMPLE_MODULE_ROW: Record<ImportColumn, string> = {
   name: 'PM',
   description: 'Plant maintenance module.',
@@ -42,7 +49,7 @@ const EXAMPLE_MODULE_ROW: Record<ImportColumn, string> = {
   external_organisation: '',
   platform: 'SAP',
   capability: 'Asset Maintenance',
-  business_owner: '',
+  business_owner: 'Priya Patel',
   technical_owner: '',
 };
 

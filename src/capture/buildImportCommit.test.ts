@@ -179,6 +179,23 @@ describe('buildImportDeltas — new rows', () => {
     expect(deltas.filter((d) => d.kind === 'element.create' && d.elementType === 'actor')).toHaveLength(0);
     expect(deltas.find((d) => d.kind === 'relationship.create')).toMatchObject({ relationshipType: 'owns', fromElementId: 'actor-1', attributes: { role: 'technical' } });
   });
+
+  it('a new module (container) row with its own business_owner gets a legal owns edge targeting the module itself, not its platform (RELATIONSHIP_TYPE_RULES: owns/actor/container)', () => {
+    const matchedRows = [
+      matchedRow(row({ rowNumber: 2, name: 'PM', elementType: 'container', platformName: 'SAP', businessOwner: { name: 'Jane Doe', externalOrganisation: null } }), {
+        platform: { kind: 'matched', element: { elementId: 'sap-1', name: 'SAP' } },
+        businessOwner: { kind: 'new' },
+      }),
+    ];
+    const { deltas } = build(matchedRows);
+    const moduleCreate = deltas.find((d) => d.kind === 'element.create' && d.elementType === 'container');
+    expect(moduleCreate).toMatchObject({ elementType: 'container', parentId: 'sap-1' });
+    const actorCreate = deltas.find((d) => d.kind === 'element.create' && d.elementType === 'actor');
+    const ownsEdge = deltas.find((d) => d.kind === 'relationship.create' && d.relationshipType === 'owns');
+    if (moduleCreate?.kind === 'element.create' && actorCreate?.kind === 'element.create') {
+      expect(ownsEdge).toMatchObject({ relationshipType: 'owns', fromElementId: actorCreate.elementId, toElementId: moduleCreate.elementId, attributes: { role: 'business' } });
+    }
+  });
 });
 
 describe('buildImportDeltas — matched/changed rows', () => {

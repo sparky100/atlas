@@ -9,7 +9,7 @@ import { supabase } from '../supabaseClient';
 export interface SearchResultRow {
   element: ElementsHeadRow;
   relationshipCount: number;
-  /** The `owns` relationship's primary actor into this element, if any (only ever populated for a `system`, per `RELATIONSHIP_TYPE_RULES` — null for every other type, not specially cased). */
+  /** The `owns` relationship's primary actor into this element, if any (populated for a `system` or `container`, per `RELATIONSHIP_TYPE_RULES` — null for every other type, not specially cased). */
   owner: ElementsHeadRow | null;
 }
 
