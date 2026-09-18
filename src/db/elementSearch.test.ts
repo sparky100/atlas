@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasExactMatch, matchElements, type SearchPoolElement } from './elementSearch';
+import { hasExactMatch, matchElements, mergeSearchPools, type SearchPoolElement } from './elementSearch';
 import type { ElementsHeadRow } from '../contracts/rows';
 
 function el(overrides: Partial<ElementsHeadRow>): ElementsHeadRow {
@@ -46,6 +46,55 @@ describe('matchElements (Blocking: element creation)', () => {
     const target = el({ element_id: 'e1', name: 'Payment Gateway', attributes: {} });
     const p = pool([{ element: target }]);
     expect(matchElements(p, 'undefined')).toEqual([]);
+  });
+});
+
+describe('mergeSearchPools', () => {
+  it('interleaves multiple type pools by name rather than leaving each type grouped together', () => {
+    const systems = pool([
+      { element: el({ element_id: 's1', name: 'Salesforce' }) },
+      { element: el({ element_id: 's2', name: 'SAP' }) },
+    ]);
+    const containers = pool([{ element: el({ element_id: 'c1', element_type: 'container', name: 'PM' }) }]);
+    const merged = mergeSearchPools([systems, containers]);
+    // Alphabetical, not grouped by type: "Sal" sorts before "Sap" (L < P),
+    // so Salesforce comes before SAP regardless of which pool either came from.
+    expect(merged.map((p) => p.element.name)).toEqual(['PM', 'Salesforce', 'SAP']);
+  });
+
+  it('a query matching enough elements of the first type no longer starves out a real match of the second type', () => {
+    // Ten systems all matching "sa" would already fill matchElements's
+    // default limit of 8 before a flat concatenation ever reached the
+    // container pool — the exact bug this function fixes.
+    const systems = pool(Array.from({ length: 10 }, (_, i) => ({ element: el({ element_id: `s${String(i)}`, name: `Sales System ${String(i)}` }) })));
+    const containers = pool([{ element: el({ element_id: 'c1', element_type: 'container', name: 'PM' }) }]);
+    const merged = mergeSearchPools([systems, containers]);
+    const matches = matchElements(merged, 'sa');
+    expect(matches).toHaveLength(8);
+    // "PM" doesn't match "sa" at all here — this asserts the merge itself
+    // sorted correctly (PM sorts before every "Sales System N"), not that
+    // it happens to match this particular query.
+    expect(merged[0]?.element.name).toBe('PM');
+  });
+
+  it('ties on name break by element id, the same tie-break loadSearchPool\'s own query uses', () => {
+    const a = pool([{ element: el({ element_id: 'b', name: 'Same' }) }]);
+    const b = pool([{ element: el({ element_id: 'a', name: 'Same' }) }]);
+    const merged = mergeSearchPools([a, b]);
+    expect(merged.map((p) => p.element.element_id)).toEqual(['a', 'b']);
+  });
+
+  it('sorts case-insensitively', () => {
+    const a = pool([{ element: el({ element_id: 'e1', name: 'apple' }) }]);
+    const b = pool([{ element: el({ element_id: 'e2', name: 'Banana' }) }]);
+    const merged = mergeSearchPools([b, a]);
+    expect(merged.map((p) => p.element.name)).toEqual(['apple', 'Banana']);
+  });
+
+  it('is empty for no pools, and a single pool is just re-sorted', () => {
+    expect(mergeSearchPools([])).toEqual([]);
+    const p = pool([{ element: el({ element_id: 'e2', name: 'Zebra' }) }, { element: el({ element_id: 'e1', name: 'Apple' }) }]);
+    expect(mergeSearchPools([p]).map((x) => x.element.name)).toEqual(['Apple', 'Zebra']);
   });
 });
 
