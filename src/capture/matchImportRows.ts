@@ -1,31 +1,51 @@
 /**
- * F2 (narrowed capture pipeline) — matches each parsed row against the
- * model's current systems (and, for `supports`, capabilities), in order:
- * exact `id` → exact `normalizeName` equality → fuzzy trigram similarity
- * → new. Pure — takes already-loaded element lists, no Supabase call of
- * its own, so it's fully unit-testable against hand-built element sets.
+ * F2-lite ("spreadsheet import as reconciliation") — resolves each parsed
+ * row's own identity against the model's current elements, plus its
+ * `platform`/`capability`/`business_owner`/`technical_owner` references.
+ * Pure — takes already-loaded element lists, no Supabase call of its own,
+ * so it's fully unit-testable against hand-built element sets.
  *
- * Phase 2 (this session's plan) is the fuzzy tier below — the same
- * trigram-similarity primitive `src/engine/trigram.ts` already implements
- * for E7/merge_elements (its own doc comment: "the real matching path
- * once the capture pipeline... exists", i.e. this module), reused as-is
- * rather than rewritten. `IDENTITY_TRIGRAM_THRESHOLD` (0.6) and the 0.05
- * ambiguity margin are this session's own plan's stated thresholds, not a
- * new invention.
+ * Two different resolution strategies, both stated in this session's own
+ * plan:
  *
- * A capability named in `supports` that doesn't resolve — exactly or
- * fuzzily — to an existing one is never auto-created (same stance the
- * full capture spec takes on capability creation, §15: "never automatic;
- * a reviewer adds it on the map") — it's surfaced as an unresolved
- * warning on the row instead.
+ *  - A row's own identity (`ElementMatchOutcome`) — "matched to an existing
+ *    element by name or alias, exact case-insensitive; near-matches listed
+ *    with same-as / new choices". A near-match (fuzzy trigram, the same
+ *    `IDENTITY_TRIGRAM_THRESHOLD` E7/merge_elements and the old F2 Phase 2
+ *    importer already use) is *never* auto-resolved here, even when there's
+ *    only one candidate above the threshold — that's the one deliberate
+ *    behaviour change from F2 Phase 2's own fuzzy tier, which did
+ *    auto-resolve a lone leader. An exact tie (two live elements already
+ *    share this exact name/alias) folds into the same "needs a pick"
+ *    outcome as a near-match, since both need the identical same-as/new UI.
+ *  - `platform`/`capability`/`business_owner`/`technical_owner` are plain
+ *    references, not this row's own identity — these keep the old cascade
+ *    (exact, then fuzzy auto-resolving a lone leader, ambiguous only on a
+ *    genuine tie) rather than the stricter row-identity rule above. What
+ *    differs between them is only what an unresolved reference *means*,
+ *    decided by `buildImportCommit.ts`, not here: a `platform` that doesn't
+ *    resolve is a hard row failure (platforms are matched, never
+ *    auto-created — a typo silently spinning one up would be worse than
+ *    refusing the row); a `capability` that doesn't resolve is a warning,
+ *    no link (capabilities are never auto-created, same stance
+ *    `docs/SPEC-capture.md` §15 already takes); an owner that doesn't
+ *    resolve is created as a new actor (the spec's own "actors created if
+ *    missing").
  */
-import type { ElementsHeadRow } from '../contracts/rows';
 import type { UUID } from '../contracts/delta';
+import type { ElementsHeadRow } from '../contracts/rows';
 import { normalizeName } from '../engine/merge';
 import { IDENTITY_TRIGRAM_THRESHOLD, trigramSimilarity } from '../engine/trigram';
 import type { ImportRow } from './importRowSchema';
 
-/** How close a second-best fuzzy candidate has to be to the best one to make the match ambiguous rather than confident — this session's own plan's stated value, not SPEC-capture.md's (§7.5 doesn't fix one; this narrowed build does). */
+/** A system's own `kind === 'platform'` — the same check `src/ui/elements/systemKind.ts`'s `isPlatform` makes, reimplemented rather than imported: `src/capture` is a pipeline stage `src/ui` depends on, never the other way (CLAUDE.md's own layering — crossing it here would be working around the layering, not a sign it's wrong). Exported for `notInFile.ts`'s own identical need, so the two don't each reimplement it. */
+export function isPlatformSystem(system: ElementsHeadRow): boolean {
+  const attributes = system.attributes;
+  const kind = attributes !== null && typeof attributes === 'object' && !Array.isArray(attributes) ? (attributes as Record<string, unknown>).kind : undefined;
+  return kind === 'platform';
+}
+
+/** How close a second-best fuzzy candidate has to be to the best one to still count as a tie (`NameResolutionOutcome`'s own ambiguous case) — carried over from F2 Phase 2's own stated value. */
 const AMBIGUITY_MARGIN = 0.05;
 
 export interface ExistingElementRef {
@@ -33,86 +53,114 @@ export interface ExistingElementRef {
   name: string;
 }
 
+/** This row's own identity — never auto-resolves a near-match; see this module's own doc comment. */
 export type ElementMatchOutcome =
   | { kind: 'new' }
   | { kind: 'matched'; element: ExistingElementRef }
-  /** Either two or more live elements share this exact normalized name, or two or more scored within `AMBIGUITY_MARGIN` of each other's fuzzy trigram similarity — a real tie either way; the reviewer picks one (or "create new") rather than this module guessing. */
-  | { kind: 'ambiguous'; candidates: ExistingElementRef[] };
+  | { kind: 'undecided'; candidates: ExistingElementRef[] }
+  /** A module row (`platform` set) whose platform itself didn't resolve to exactly one existing platform — there is no pool of "this platform's modules" to match against, so this row can't proceed at all. Surfaced as a row failure, same bucket as a schema-validation error. */
+  | { kind: 'blocked'; reason: string };
 
-export type SupportsOutcome =
-  | { kind: 'none' }
-  | { kind: 'matched'; capability: ExistingElementRef }
-  | { kind: 'ambiguous'; candidates: ExistingElementRef[] }
-  /** Named in the row's own `supports` column, but nothing on the target branch matches it, exactly or fuzzily — never auto-created. */
-  | { kind: 'unresolved'; name: string };
+/** A plain reference column (`platform`/`capability`/`business_owner`/`technical_owner`) — old F2 Phase 2 cascade, auto-resolving a lone fuzzy leader. */
+export type NameResolutionOutcome = { kind: 'none' } | { kind: 'new' } | { kind: 'matched'; element: ExistingElementRef } | { kind: 'ambiguous'; candidates: ExistingElementRef[] };
 
 export interface MatchedImportRow {
   row: ImportRow;
+  /** This row's own system-or-module identity. */
   match: ElementMatchOutcome;
-  supports: SupportsOutcome;
+  /** `{ kind: 'none' }` for a top-level system row (`row.platformName === null`). */
+  platform: NameResolutionOutcome;
+  capability: NameResolutionOutcome;
+  businessOwner: NameResolutionOutcome;
+  technicalOwner: NameResolutionOutcome;
 }
 
 function toRefs(elements: readonly ElementsHeadRow[]): ExistingElementRef[] {
   return elements.map((e) => ({ elementId: e.element_id, name: e.name }));
 }
 
-function matchByExactName(name: string, pool: readonly ExistingElementRef[]): ElementMatchOutcome {
+/** Every distinct element in `pool` whose own name, or any known alias, normalizes to `name` — exact, case-insensitive (`normalizeName` is exactly trim+lowercase), name-or-alias per this session's own plan. */
+function exactMatches(name: string, pool: readonly ExistingElementRef[], aliasesByElementId: ReadonlyMap<UUID, readonly string[]>): ExistingElementRef[] {
   const target = normalizeName(name);
-  const candidates = pool.filter((e) => normalizeName(e.name) === target);
-  if (candidates.length === 0) return { kind: 'new' };
-  if (candidates.length === 1) {
-    const [only] = candidates;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length check above guarantees this.
-    return { kind: 'matched', element: only! };
-  }
-  return { kind: 'ambiguous', candidates };
+  return pool.filter((ref) => normalizeName(ref.name) === target || (aliasesByElementId.get(ref.elementId) ?? []).some((alias) => normalizeName(alias) === target));
 }
 
-/**
- * The fuzzy tier — only ever reached for a name with zero *exact*
- * normalized-name hits (`matchByNameCascade` below never falls through an
- * exact `matched`/`ambiguous` result into this). Every candidate scoring
- * `≥ IDENTITY_TRIGRAM_THRESHOLD` is a real hit; the best one wins unless a
- * second is within `AMBIGUITY_MARGIN` of it, in which case every candidate
- * that close to the best is shown, not silently narrowed to two.
- */
-function matchByFuzzyName(name: string, pool: readonly ExistingElementRef[]): ElementMatchOutcome {
+/** Every candidate scoring `>= IDENTITY_TRIGRAM_THRESHOLD`, best first — the near-match candidate list itself is identical for both resolution strategies; only what a caller does with "exactly one, well clear of the rest" differs. */
+function fuzzyMatches(name: string, pool: readonly ExistingElementRef[]): { ref: ExistingElementRef; score: number }[] {
   const target = normalizeName(name);
-  const scored = pool
+  return pool
     .map((ref) => ({ ref, score: trigramSimilarity(target, normalizeName(ref.name)) }))
     .filter((s) => s.score >= IDENTITY_TRIGRAM_THRESHOLD)
     .sort((a, b) => b.score - a.score);
-  const best = scored[0];
+}
+
+/** A row's own identity — exact (name-or-alias) first; a clean miss falls through to fuzzy, whose candidates always need an explicit pick, never auto-resolved (this module's own doc comment). */
+function matchRowIdentity(name: string, pool: readonly ExistingElementRef[], aliasesByElementId: ReadonlyMap<UUID, readonly string[]>): ElementMatchOutcome {
+  const exact = exactMatches(name, pool, aliasesByElementId);
+  if (exact.length === 1) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length check above guarantees this.
+    return { kind: 'matched', element: exact[0]! };
+  }
+  if (exact.length > 1) return { kind: 'undecided', candidates: exact };
+
+  const fuzzy = fuzzyMatches(name, pool);
+  if (fuzzy.length === 0) return { kind: 'new' };
+  return { kind: 'undecided', candidates: fuzzy.map((s) => s.ref) };
+}
+
+/** A plain reference column — exact (name-or-alias) first, then fuzzy auto-resolving a lone leader; only a genuine tie (exact or fuzzy-within-margin) is ambiguous. */
+function resolveReference(name: string | null, pool: readonly ExistingElementRef[], aliasesByElementId: ReadonlyMap<UUID, readonly string[]>): NameResolutionOutcome {
+  if (name === null) return { kind: 'none' };
+  const exact = exactMatches(name, pool, aliasesByElementId);
+  if (exact.length === 1) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length check above guarantees this.
+    return { kind: 'matched', element: exact[0]! };
+  }
+  if (exact.length > 1) return { kind: 'ambiguous', candidates: exact };
+
+  const fuzzy = fuzzyMatches(name, pool);
+  const best = fuzzy[0];
   if (!best) return { kind: 'new' };
-  const tiedWithBest = scored.filter((s) => best.score - s.score < AMBIGUITY_MARGIN);
+  const tiedWithBest = fuzzy.filter((s) => best.score - s.score < AMBIGUITY_MARGIN);
   if (tiedWithBest.length > 1) return { kind: 'ambiguous', candidates: tiedWithBest.map((s) => s.ref) };
   return { kind: 'matched', element: best.ref };
 }
 
-/** Exact tier first, fuzzy tier only on a clean miss (`new`) — an exact `ambiguous` tie is a real fact about the pool (two elements already share this name exactly) and must never be papered over by a fuzzy re-ranking. */
-function matchByNameCascade(name: string, pool: readonly ExistingElementRef[]): ElementMatchOutcome {
-  const exact = matchByExactName(name, pool);
-  return exact.kind === 'new' ? matchByFuzzyName(name, pool) : exact;
+export interface MatchImportRowsInput {
+  rows: readonly ImportRow[];
+  /** Every live system in the model, any `kind` — a row's own identity pool when `row.elementType === 'system'`, and the pool `platform` resolves against, filtered to `attributes.kind === 'platform'`. */
+  systems: readonly ElementsHeadRow[];
+  /** Every live container in the model — a module row's own identity is matched only among a *resolved* platform's own modules (`parent_id` equal to it), never the whole pool. */
+  containers: readonly ElementsHeadRow[];
+  capabilities: readonly ElementsHeadRow[];
+  actors: readonly ElementsHeadRow[];
+  /** `listAliasesForModel`'s own shape (`src/db/aliases.ts`) — every live alias, grouped by the element it names, `merged_id` excluded (an alias to a merged-away element could never plausibly be *this* file's own subject). */
+  aliasesByElementId: ReadonlyMap<UUID, readonly string[]>;
 }
 
-/** One row's own system match — `row.id`, when given, always wins (and always resolves against `systems` by id, never falls through to name matching even on a miss, so a stale/typo'd id is a clear "not found" rather than a surprising name-based match). */
-function matchSystemRow(row: ImportRow, systems: readonly ElementsHeadRow[]): ElementMatchOutcome {
-  if (row.id !== null) {
-    const byId = systems.find((s) => s.element_id === row.id);
-    return byId ? { kind: 'matched', element: { elementId: byId.element_id, name: byId.name } } : { kind: 'new' };
-  }
-  return matchByNameCascade(row.name, toRefs(systems));
-}
+/** `systems`/`containers`/`capabilities`/`actors` are the target branch's own current head rows (the same reads every other page already does); this module doesn't fetch anything itself. */
+export function matchImportRows(input: MatchImportRowsInput): MatchedImportRow[] {
+  const { rows, systems, containers, capabilities, actors, aliasesByElementId } = input;
+  const platformPool = toRefs(systems.filter(isPlatformSystem));
+  const capabilityPool = toRefs(capabilities);
+  const actorPool = toRefs(actors);
 
-function matchSupports(row: ImportRow, capabilities: readonly ElementsHeadRow[]): SupportsOutcome {
-  if (row.supportsCapabilityName === null) return { kind: 'none' };
-  const outcome = matchByNameCascade(row.supportsCapabilityName, toRefs(capabilities));
-  if (outcome.kind === 'matched') return { kind: 'matched', capability: outcome.element };
-  if (outcome.kind === 'ambiguous') return { kind: 'ambiguous', candidates: outcome.candidates };
-  return { kind: 'unresolved', name: row.supportsCapabilityName };
-}
+  return rows.map((row): MatchedImportRow => {
+    const capability = resolveReference(row.capabilityName, capabilityPool, aliasesByElementId);
+    const businessOwner = resolveReference(row.businessOwnerName, actorPool, aliasesByElementId);
+    const technicalOwner = resolveReference(row.technicalOwnerName, actorPool, aliasesByElementId);
 
-/** `systems`/`capabilities` are the target branch's own current head rows (`listSystemsForLandscape`/`listCapabilitiesForMap` — the same reads every other page already does; this module doesn't fetch anything itself). */
-export function matchImportRows(rows: readonly ImportRow[], systems: readonly ElementsHeadRow[], capabilities: readonly ElementsHeadRow[]): MatchedImportRow[] {
-  return rows.map((row) => ({ row, match: matchSystemRow(row, systems), supports: matchSupports(row, capabilities) }));
+    if (row.elementType === 'system') {
+      return { row, match: matchRowIdentity(row.name, toRefs(systems), aliasesByElementId), platform: { kind: 'none' }, capability, businessOwner, technicalOwner };
+    }
+
+    // `elementType === 'container'` iff `platformName !== null` (importRowSchema.ts) — `resolveReference` itself takes `string | null` regardless, so no assertion is needed to satisfy the type checker.
+    const platform = resolveReference(row.platformName, platformPool, aliasesByElementId);
+    if (platform.kind !== 'matched') {
+      const reason = platform.kind === 'new' ? `platform "${row.platformName ?? ''}" was not found — a platform is matched, never created by an import` : `platform "${row.platformName ?? ''}" matched more than one existing platform`;
+      return { row, match: { kind: 'blocked', reason }, platform, capability, businessOwner, technicalOwner };
+    }
+    const modulePool = toRefs(containers.filter((c) => c.parent_id === platform.element.elementId));
+    return { row, match: matchRowIdentity(row.name, modulePool, aliasesByElementId), platform, capability, businessOwner, technicalOwner };
+  });
 }

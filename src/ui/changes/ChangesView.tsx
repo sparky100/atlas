@@ -15,7 +15,6 @@ import { useThreadCounts } from '../comments/useThreadCounts';
 import type { BranchIntent, BranchRow } from '../../db/types';
 import { branchStatusTone } from './branchStatus';
 import { dateFieldLabelForIntent, INTENT_LABEL, INTENT_OPTIONS, NEW_CHANGE_INTENT_OPTIONS } from './branchIntent';
-import { SpreadsheetImportPanel } from './SpreadsheetImportPanel';
 import { useChangeSummaries } from './useChangeSummaries';
 import { useChanges } from './useChanges';
 import styles from './ChangesView.module.css';
@@ -208,13 +207,6 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
           {error !== null && <Text as="p">{error}</Text>}
         </Panel>
       )}
-
-      {/* F2, narrowed capture pipeline, Phase 1 — a fixed-format spreadsheet
-          import lands here, alongside the manual "New change" form: it
-          builds and commits one `record`-intent change branch, same as
-          creating one by hand, just from a file's own rows instead of a
-          form. Same `canCreate` gate. */}
-      {canCreate && <SpreadsheetImportPanel modelId={modelId} orgId={orgId} userId={userId} orgSlug={orgSlug} modelSlug={modelSlug} />}
 
       <Text as="h2" size="lg">
         Changes

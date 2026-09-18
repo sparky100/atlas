@@ -4,7 +4,7 @@ import { validateImportRow } from './importRowSchema';
 describe('validateImportRow', () => {
   it('accepts a minimal row with only a name', () => {
     const result = validateImportRow({ name: 'Northgate' }, 2);
-    expect(result).toEqual({ ok: true, row: { rowNumber: 2, id: null, name: 'Northgate', attributes: {}, supportsCapabilityName: null } });
+    expect(result).toEqual({ ok: true, row: { rowNumber: 2, name: 'Northgate', elementType: 'system', attributes: {}, platformName: null, capabilityName: null, businessOwnerName: null, technicalOwnerName: null } });
   });
 
   it('requires name', () => {
@@ -21,26 +21,30 @@ describe('validateImportRow', () => {
     }
   });
 
-  it('accepts a valid id column', () => {
-    const result = validateImportRow({ name: 'Northgate', id: '11111111-1111-1111-1111-111111111111' }, 2);
+  it('a blank platform column makes the row a top-level system', () => {
+    const result = validateImportRow({ name: 'Northgate' }, 2);
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.row.id).toBe('11111111-1111-1111-1111-111111111111');
+    if (result.ok) expect(result.row.elementType).toBe('system');
   });
 
-  it('rejects an id that is not a valid uuid', () => {
-    const result = validateImportRow({ name: 'Northgate', id: 'not-a-uuid' }, 2);
-    expect(result).toEqual({ ok: false, rowNumber: 2, error: '"id" must be a valid element id (uuid) or left blank, got "not-a-uuid"' });
+  it('a filled platform column makes the row a module, carrying the platform name unresolved', () => {
+    const result = validateImportRow({ name: 'PM', platform: 'SAP' }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.row.elementType).toBe('container');
+      expect(result.row.platformName).toBe('SAP');
+    }
   });
 
-  it('accepts a valid lifecycleStatus enum value', () => {
-    const result = validateImportRow({ name: 'Northgate', lifecycleStatus: 'retiring' }, 2);
+  it('accepts a valid lifecycle enum value, stored under the lifecycleStatus attribute key', () => {
+    const result = validateImportRow({ name: 'Northgate', lifecycle: 'retiring' }, 2);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.row.attributes.lifecycleStatus).toBe('retiring');
   });
 
-  it('rejects an invalid lifecycleStatus enum value, naming the real options', () => {
-    const result = validateImportRow({ name: 'Northgate', lifecycleStatus: 'deprecated' }, 2);
-    expect(result).toEqual({ ok: false, rowNumber: 2, error: 'Lifecycle must be one of: planned, active, retiring, retired' });
+  it('rejects an invalid lifecycle enum value, naming the real options', () => {
+    const result = validateImportRow({ name: 'Northgate', lifecycle: 'deprecated' }, 2);
+    expect(result).toEqual({ ok: false, rowNumber: 2, error: '"lifecycle": Lifecycle must be one of: planned, active, retiring, retired' });
   });
 
   it('rejects an invalid criticality enum value', () => {
@@ -48,10 +52,44 @@ describe('validateImportRow', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('carries the supports column through unresolved, for matchImportRows to resolve', () => {
-    const result = validateImportRow({ name: 'Northgate', supports: 'Billing' }, 2);
+  it('accepts kind and vendor on a top-level system row', () => {
+    const result = validateImportRow({ name: 'Northgate', kind: 'platform', vendor: 'Acme' }, 2);
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.row.supportsCapabilityName).toBe('Billing');
+    if (result.ok) {
+      expect(result.row.attributes.kind).toBe('platform');
+      expect(result.row.attributes.vendor).toBe('Acme');
+    }
+  });
+
+  it('rejects kind on a module row — a module has no kind of its own', () => {
+    const result = validateImportRow({ name: 'PM', platform: 'SAP', kind: 'application' }, 2);
+    expect(result).toEqual({ ok: false, rowNumber: 2, error: '"kind": container has no attribute "kind"' });
+  });
+
+  it('rejects vendor on a module row — a module never overrides its platform’s vendor', () => {
+    const result = validateImportRow({ name: 'PM', platform: 'SAP', vendor: 'Acme' }, 2);
+    expect(result).toEqual({ ok: false, rowNumber: 2, error: '"vendor": container has no attribute "vendor"' });
+  });
+
+  it('accepts a module override of lifecycle/criticality/domain/hosting_model', () => {
+    const result = validateImportRow({ name: 'PM', platform: 'SAP', lifecycle: 'active', criticality: 'high', domain: 'ot', hosting_model: 'on_premises' }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.row.attributes.lifecycleStatus).toBe('active');
+      expect(result.row.attributes.criticality).toBe('high');
+      expect(result.row.attributes.domain).toBe('ot');
+      expect(result.row.attributes.hostingModel).toBe('on_premises');
+    }
+  });
+
+  it('carries the capability/business_owner/technical_owner columns through unresolved, for matchImportRows to resolve', () => {
+    const result = validateImportRow({ name: 'Northgate', capability: 'Billing', business_owner: 'Jane Doe', technical_owner: 'John Smith' }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.row.capabilityName).toBe('Billing');
+      expect(result.row.businessOwnerName).toBe('Jane Doe');
+      expect(result.row.technicalOwnerName).toBe('John Smith');
+    }
   });
 
   it('treats a blank optional cell the same as an absent one', () => {
@@ -60,7 +98,7 @@ describe('validateImportRow', () => {
     if (result.ok) expect(result.row.attributes).toEqual({});
   });
 
-  it('ignores columns outside the fixed v1 format', () => {
+  it('ignores columns outside the fixed format', () => {
     const result = validateImportRow({ name: 'Northgate', someRandomColumn: 'whatever' }, 2);
     expect(result.ok).toBe(true);
   });

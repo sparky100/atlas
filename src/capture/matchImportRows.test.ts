@@ -1,115 +1,158 @@
 import { describe, expect, it } from 'vitest';
+import type { Json } from '../contracts/rows';
 import type { ElementsHeadRow } from '../contracts/rows';
 import type { ImportRow } from './importRowSchema';
-import { matchImportRows } from './matchImportRows';
+import { matchImportRows, type MatchImportRowsInput } from './matchImportRows';
 
-function system(id: string, name: string): ElementsHeadRow {
-  return { element_id: id, element_type: 'system', name, parent_id: null, attributes: {}, exists_delta_id: `${id}-create` };
+function system(id: string, name: string, attributes: Record<string, Json> = {}): ElementsHeadRow {
+  return { element_id: id, element_type: 'system', name, parent_id: null, attributes, exists_delta_id: `${id}-create` };
+}
+function container(id: string, name: string, parentId: string | null): ElementsHeadRow {
+  return { element_id: id, element_type: 'container', name, parent_id: parentId, attributes: {}, exists_delta_id: `${id}-create` };
 }
 function capability(id: string, name: string): ElementsHeadRow {
   return { element_id: id, element_type: 'capability', name, parent_id: null, attributes: {}, exists_delta_id: `${id}-create` };
 }
+function actor(id: string, name: string): ElementsHeadRow {
+  return { element_id: id, element_type: 'actor', name, parent_id: null, attributes: { subtype: 'person', isExternal: false }, exists_delta_id: `${id}-create` };
+}
 function row(overrides: Partial<ImportRow> & { rowNumber: number; name: string }): ImportRow {
-  return { id: null, attributes: {}, supportsCapabilityName: null, ...overrides };
+  return { elementType: 'system', attributes: {}, platformName: null, capabilityName: null, businessOwnerName: null, technicalOwnerName: null, ...overrides };
+}
+function match(rows: ImportRow[], overrides: Partial<MatchImportRowsInput> = {}) {
+  return matchImportRows({ rows, systems: [], containers: [], capabilities: [], actors: [], aliasesByElementId: new Map(), ...overrides });
 }
 
-describe('matchImportRows', () => {
-  it('matches a row by exact id, ignoring name entirely', () => {
-    const systems = [system('sys-1', 'Old Name')];
-    const [result] = matchImportRows([row({ rowNumber: 2, name: 'A Completely Different Name', id: 'sys-1' })], systems, []);
-    expect(result?.match).toEqual({ kind: 'matched', element: { elementId: 'sys-1', name: 'Old Name' } });
-  });
-
-  it('treats an id that does not resolve to any live system as new, not an error', () => {
-    const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgate', id: 'sys-does-not-exist' })], [system('sys-1', 'Northgate')], []);
-    expect(result?.match).toEqual({ kind: 'new' });
-  });
-
-  it('matches by exact normalized name when no id is given', () => {
+describe('matchImportRows — a row’s own identity', () => {
+  it('matches by exact normalized name', () => {
     const systems = [system('sys-1', 'Northgate')];
-    const [result] = matchImportRows([row({ rowNumber: 2, name: '  NORTHGATE  ' })], systems, []);
+    const [result] = match([row({ rowNumber: 2, name: '  NORTHGATE  ' })], { systems });
     expect(result?.match).toEqual({ kind: 'matched', element: { elementId: 'sys-1', name: 'Northgate' } });
   });
 
-  it('is new when no system matches by id or name', () => {
-    const [result] = matchImportRows([row({ rowNumber: 2, name: 'Brand New System' })], [system('sys-1', 'Northgate')], []);
+  it('matches by an alias, even when the row’s own name differs entirely', () => {
+    const systems = [system('sys-1', 'Northgate')];
+    const aliasesByElementId = new Map([['sys-1', ['Riverside Payments']]]);
+    const [result] = match([row({ rowNumber: 2, name: 'Riverside Payments' })], { systems, aliasesByElementId });
+    expect(result?.match).toEqual({ kind: 'matched', element: { elementId: 'sys-1', name: 'Northgate' } });
+  });
+
+  it('is new when nothing matches by name, alias, or fuzzy similarity', () => {
+    const [result] = match([row({ rowNumber: 2, name: 'Brand New System' })], { systems: [system('sys-1', 'Northgate')] });
     expect(result?.match).toEqual({ kind: 'new' });
   });
 
-  it('flags an ambiguous match when two live systems share the exact normalized name', () => {
+  it('an exact tie (two live elements share the exact normalized name) needs a pick', () => {
     const systems = [system('sys-1', 'Northgate'), system('sys-2', 'northgate')];
-    const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgate' })], systems, []);
-    expect(result?.match.kind).toBe('ambiguous');
-    if (result?.match.kind === 'ambiguous') {
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate' })], { systems });
+    expect(result?.match.kind).toBe('undecided');
+    if (result?.match.kind === 'undecided') {
       expect(result.match.candidates.map((c) => c.elementId).sort()).toEqual(['sys-1', 'sys-2']);
     }
   });
 
-  it('resolves the supports column against capabilities by exact name', () => {
-    const capabilities = [capability('cap-1', 'Billing')];
-    const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgate', supportsCapabilityName: 'Billing' })], [], capabilities);
-    expect(result?.supports).toEqual({ kind: 'matched', capability: { elementId: 'cap-1', name: 'Billing' } });
-  });
-
-  it('leaves supports unresolved (never auto-created) when the named capability does not exist', () => {
-    const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgate', supportsCapabilityName: 'Nonexistent' })], [], [capability('cap-1', 'Billing')]);
-    expect(result?.supports).toEqual({ kind: 'unresolved', name: 'Nonexistent' });
-  });
-
-  it('leaves supports as none when the row does not name one', () => {
-    const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgate' })], [], [capability('cap-1', 'Billing')]);
-    expect(result?.supports).toEqual({ kind: 'none' });
-  });
-
-  it('flags supports as ambiguous when two capabilities share the exact normalized name', () => {
-    const capabilities = [capability('cap-1', 'Billing'), capability('cap-2', 'BILLING')];
-    const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgate', supportsCapabilityName: 'Billing' })], [], capabilities);
-    expect(result?.supports.kind).toBe('ambiguous');
-  });
-
-  describe('fuzzy tier (Phase 2) — only reached on a clean exact-name miss', () => {
-    it('confidently matches a name that only differs by a typo (trigram similarity above the 0.6 threshold)', () => {
+  describe('a near-match always needs a pick — never auto-resolved, even a lone leader', () => {
+    it('a single fuzzy candidate well above the 0.6 threshold still needs a pick', () => {
       // trigramSimilarity(normalizeName('Northgatte'), normalizeName('Northgate')) = 0.750
       const systems = [system('sys-1', 'Northgate')];
-      const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgatte' })], systems, []);
-      expect(result?.match).toEqual({ kind: 'matched', element: { elementId: 'sys-1', name: 'Northgate' } });
+      const [result] = match([row({ rowNumber: 2, name: 'Northgatte' })], { systems });
+      expect(result?.match).toEqual({ kind: 'undecided', candidates: [{ elementId: 'sys-1', name: 'Northgate' }] });
     });
 
     it('stays new when the best fuzzy score is still below the 0.6 threshold', () => {
       // trigramSimilarity('council tax system', 'council tax servicing') = 0.464 — real overlap, still not a match.
       const systems = [system('sys-1', 'Council Tax Servicing')];
-      const [result] = matchImportRows([row({ rowNumber: 2, name: 'Council Tax System' })], systems, []);
+      const [result] = match([row({ rowNumber: 2, name: 'Council Tax System' })], { systems });
       expect(result?.match).toEqual({ kind: 'new' });
     });
 
-    it('flags an ambiguous fuzzy match when two candidates score within the 0.05 margin of each other', () => {
+    it('every candidate scoring above the threshold is offered, not narrowed to two', () => {
       // trigramSimilarity('riverside payments', 'riverside payment') = 0.850
-      // trigramSimilarity('riverside payments', 'riverside paymentss') = 0.857 — 0.007 apart, both real hits.
+      // trigramSimilarity('riverside payments', 'riverside paymentss') = 0.857
       const systems = [system('sys-1', 'Riverside Payment'), system('sys-2', 'Riverside Paymentss')];
-      const [result] = matchImportRows([row({ rowNumber: 2, name: 'Riverside Payments' })], systems, []);
-      expect(result?.match.kind).toBe('ambiguous');
-      if (result?.match.kind === 'ambiguous') {
+      const [result] = match([row({ rowNumber: 2, name: 'Riverside Payments' })], { systems });
+      expect(result?.match.kind).toBe('undecided');
+      if (result?.match.kind === 'undecided') {
         expect(result.match.candidates.map((c) => c.elementId).sort()).toEqual(['sys-1', 'sys-2']);
       }
     });
 
-    it('never falls through to the fuzzy tier when the exact tier already found an ambiguous tie', () => {
-      // Two exact matches for "Northgate" — a real, if rare, exact tie that
-      // must be surfaced as-is, never re-scored (and possibly narrowed to
-      // one "clear winner") by the fuzzy tier underneath it.
+    it('never falls through to the fuzzy tier when the exact tier already found a tie', () => {
       const systems = [system('sys-1', 'Northgate'), system('sys-2', 'northgate'), system('sys-3', 'Northgatte')];
-      const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgate' })], systems, []);
-      expect(result?.match.kind).toBe('ambiguous');
-      if (result?.match.kind === 'ambiguous') {
+      const [result] = match([row({ rowNumber: 2, name: 'Northgate' })], { systems });
+      expect(result?.match.kind).toBe('undecided');
+      if (result?.match.kind === 'undecided') {
         expect(result.match.candidates.map((c) => c.elementId).sort()).toEqual(['sys-1', 'sys-2']);
       }
     });
+  });
+});
 
-    it('applies the same fuzzy cascade to the supports column', () => {
-      // trigramSimilarity('billing', 'biling') = 0.667
-      const capabilities = [capability('cap-1', 'Biling')];
-      const [result] = matchImportRows([row({ rowNumber: 2, name: 'Northgate', supportsCapabilityName: 'Billing' })], [], capabilities);
-      expect(result?.supports).toEqual({ kind: 'matched', capability: { elementId: 'cap-1', name: 'Biling' } });
-    });
+describe('matchImportRows — a module row’s own platform', () => {
+  it('resolves the platform by exact name among kind=platform systems only', () => {
+    const systems = [system('sap-1', 'SAP', { kind: 'platform' }), system('other-1', 'Other')];
+    const [result] = match([row({ rowNumber: 2, name: 'PM', elementType: 'container', platformName: 'SAP' })], { systems });
+    expect(result?.platform).toEqual({ kind: 'matched', element: { elementId: 'sap-1', name: 'SAP' } });
+  });
+
+  it('blocks the row when the named platform does not exist — never auto-created', () => {
+    const [result] = match([row({ rowNumber: 2, name: 'PM', elementType: 'container', platformName: 'SAP' })], { systems: [] });
+    expect(result?.match).toEqual({ kind: 'blocked', reason: expect.stringContaining('not found') });
+  });
+
+  it('blocks the row when the named platform is ambiguous', () => {
+    const systems = [system('sap-1', 'SAP', { kind: 'platform' }), system('sap-2', 'sap', { kind: 'platform' })];
+    const [result] = match([row({ rowNumber: 2, name: 'PM', elementType: 'container', platformName: 'SAP' })], { systems });
+    expect(result?.match).toEqual({ kind: 'blocked', reason: expect.stringContaining('more than one') });
+  });
+
+  it('once the platform resolves, the module’s own identity is matched only among that platform’s own modules', () => {
+    const systems = [system('sap-1', 'SAP', { kind: 'platform' }), system('other-1', 'Other', { kind: 'platform' })];
+    const containers = [container('pm-1', 'PM', 'sap-1'), container('pm-2', 'PM', 'other-1')];
+    const [result] = match([row({ rowNumber: 2, name: 'PM', elementType: 'container', platformName: 'SAP' })], { systems, containers });
+    expect(result?.match).toEqual({ kind: 'matched', element: { elementId: 'pm-1', name: 'PM' } });
+  });
+});
+
+describe('matchImportRows — capability/owner references (auto-resolving cascade, distinct from row identity)', () => {
+  it('resolves capability by exact name', () => {
+    const capabilities = [capability('cap-1', 'Billing')];
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityName: 'Billing' })], { capabilities });
+    expect(result?.capability).toEqual({ kind: 'matched', element: { elementId: 'cap-1', name: 'Billing' } });
+  });
+
+  it('is new (never auto-created, never blocks the row) when the named capability does not exist', () => {
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityName: 'Nonexistent' })], { capabilities: [capability('cap-1', 'Billing')] });
+    expect(result?.capability).toEqual({ kind: 'new' });
+  });
+
+  it('is none when the row does not name one', () => {
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate' })], { capabilities: [capability('cap-1', 'Billing')] });
+    expect(result?.capability).toEqual({ kind: 'none' });
+  });
+
+  it('is ambiguous when two capabilities share the exact normalized name', () => {
+    const capabilities = [capability('cap-1', 'Billing'), capability('cap-2', 'BILLING')];
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityName: 'Billing' })], { capabilities });
+    expect(result?.capability.kind).toBe('ambiguous');
+  });
+
+  it('auto-resolves a lone fuzzy leader for a reference column (unlike row identity)', () => {
+    // trigramSimilarity('billing', 'biling') = 0.667
+    const capabilities = [capability('cap-1', 'Biling')];
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityName: 'Billing' })], { capabilities });
+    expect(result?.capability).toEqual({ kind: 'matched', element: { elementId: 'cap-1', name: 'Biling' } });
+  });
+
+  it('resolves business_owner and technical_owner against actors independently', () => {
+    const actors = [actor('actor-1', 'Jane Doe'), actor('actor-2', 'John Smith')];
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', businessOwnerName: 'Jane Doe', technicalOwnerName: 'John Smith' })], { actors });
+    expect(result?.businessOwner).toEqual({ kind: 'matched', element: { elementId: 'actor-1', name: 'Jane Doe' } });
+    expect(result?.technicalOwner).toEqual({ kind: 'matched', element: { elementId: 'actor-2', name: 'John Smith' } });
+  });
+
+  it('is new for an owner name matching no live actor — the caller creates one', () => {
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', businessOwnerName: 'Jane Doe' })], { actors: [] });
+    expect(result?.businessOwner).toEqual({ kind: 'new' });
   });
 });

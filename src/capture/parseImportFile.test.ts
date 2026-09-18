@@ -40,14 +40,25 @@ describe('parseImportFile', () => {
 
   it('collects a per-row error without discarding the rows that did validate', async () => {
     const file = xlsxFile([
-      ['name', 'lifecycleStatus'],
+      ['name', 'lifecycle'],
       ['Northgate', 'active'],
       ['Bad Row', 'not-a-real-status'],
       ['Council Tax System', null],
     ]);
     const result = await parseImportFile(file);
     expect(result.rows.map((r) => r.name)).toEqual(['Northgate', 'Council Tax System']);
-    expect(result.errors).toEqual([{ rowNumber: 3, error: 'Lifecycle must be one of: planned, active, retiring, retired' }]);
+    expect(result.errors).toEqual([{ rowNumber: 3, error: '"lifecycle": Lifecycle must be one of: planned, active, retiring, retired' }]);
+  });
+
+  it('reports the file’s own detected columns and a preview of its first raw rows, for the dialog’s own preview', async () => {
+    const file = xlsxFile([
+      ['name', 'platform'],
+      ['PM', 'SAP'],
+      ['FI', 'SAP'],
+    ]);
+    const result = await parseImportFile(file);
+    expect(result.detectedColumns).toEqual(['name', 'platform']);
+    expect(result.previewRows).toEqual([{ name: 'PM', platform: 'SAP' }, { name: 'FI', platform: 'SAP' }]);
   });
 
   it('numbers rows starting at 2 (row 1 is the header), matching what a reader sees in Excel', async () => {

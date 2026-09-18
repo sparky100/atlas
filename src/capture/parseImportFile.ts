@@ -1,8 +1,9 @@
 /**
- * F2 (narrowed capture pipeline), Phase 1 — reads a `.csv` or `.xlsx` file
- * into validated rows. The only place SheetJS (`xlsx`) is imported in this
- * module (`importRowSchema.ts`'s own validation stays testable without
- * it), same split `elementExportXlsx.ts` already established for export.
+ * F2-lite ("spreadsheet import as reconciliation") — reads a `.csv` or
+ * `.xlsx` file into validated rows. The only place SheetJS (`xlsx`) is
+ * imported in this module (`importRowSchema.ts`'s own validation stays
+ * testable without it), same split `elementExportXlsx.ts` already
+ * established for export.
  *
  * `XLSX.read` auto-detects CSV (SheetJS's own documented behaviour) —
  * there is deliberately no separate CSV parser here; both file types go
@@ -13,11 +14,18 @@ import { validateImportRow, type ImportRow, type ImportRowResult } from './impor
 
 export interface ParsedImportFile {
   fileName: string;
+  /** Every column header the file's own header row actually has, in file order — the dialog's "detected columns" preview, before any per-row validation runs. */
+  detectedColumns: string[];
+  /** The file's own first few raw rows (pre-validation, keyed by header) — the dialog's "first rows" preview. */
+  previewRows: Record<string, unknown>[];
   /** Every row that validated. */
   rows: ImportRow[];
   /** Every row that didn't, in source order — a real error per row (`ImportRowResult`'s own `error`), never silently dropped. */
   errors: { rowNumber: number; error: string }[];
 }
+
+/** How many of the file's own raw rows the dialog's preview shows, before any matching/classification runs. */
+const PREVIEW_ROW_COUNT = 5;
 
 export class ImportFileParseError extends Error {}
 
@@ -50,6 +58,15 @@ export async function parseImportFile(file: File): Promise<ParsedImportFile> {
   }
 
   const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: null });
+  // `header: 1` reads the sheet as a plain array-of-arrays — its own first
+  // row is the file's real header cells, in file order, independent of
+  // `sheet_to_json`'s own object-keying (which silently drops a header
+  // cell that's blank or a duplicate) — exactly what "detected columns"
+  // should show, including a column this format doesn't recognise.
+  const headerRow = (XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] ?? []) as unknown[];
+  const detectedColumns = headerRow
+    .map((cell) => (typeof cell === 'string' || typeof cell === 'number' || typeof cell === 'boolean' ? String(cell).trim() : ''))
+    .filter((cell) => cell.length > 0);
 
   const rows: ImportRow[] = [];
   const errors: { rowNumber: number; error: string }[] = [];
@@ -64,5 +81,5 @@ export async function parseImportFile(file: File): Promise<ParsedImportFile> {
     throw new ImportFileParseError(`"${file.name}" has a header row but no data rows.`);
   }
 
-  return { fileName: file.name, rows, errors };
+  return { fileName: file.name, detectedColumns, previewRows: rawRows.slice(0, PREVIEW_ROW_COUNT), rows, errors };
 }

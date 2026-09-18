@@ -52,6 +52,7 @@ import { lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
 import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import { parseCapabilityParam, zoomQueryString } from '../nav/zoomParams';
+import { SpreadsheetImportDialog } from '../import/SpreadsheetImportDialog';
 import styles from './LandscapePage.module.css';
 
 /**
@@ -269,6 +270,7 @@ export function LandscapePage() {
   // Sprint U4-1 E1: see this component's own module comment.
   const narrow = useIsNarrowViewport(768);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const addMenuId = useId();
 
   // Sprint M1b (`docs/HANDOFF-M1b-comments.md`'s Canvas section, direction
@@ -402,6 +404,9 @@ export function LandscapePage() {
         refParam={refParam}
         onCreated={reloadMainBranch}
       />
+      <Button variant="secondary" onClick={() => { setImportOpen(true); }}>
+        Import from spreadsheet…
+      </Button>
     </>
   );
 
@@ -627,6 +632,9 @@ export function LandscapePage() {
                       refParam={refParam}
                       onCreated={reloadMainBranch}
                     />
+                    <Button variant="secondary" onClick={() => { setImportOpen(true); }}>
+                      Import from spreadsheet…
+                    </Button>
                   </div>
                 )}
               </div>
@@ -761,6 +769,7 @@ export function LandscapePage() {
         )}
         </main>
       </div>
+      <SpreadsheetImportDialog open={importOpen} onClose={() => { setImportOpen(false); }} modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
     </div>
   );
 }
