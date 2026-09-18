@@ -107,8 +107,11 @@ interface PendingTarget {
  *
  * Prompt 7k item 2 adds a third staged question, for `owns` only, and only
  * when the *owned* side of the edge (never the actor side — `owns` has no
- * role concept for the actor) is a `system`: "which role?"
- * (business/technical/service). A capability target skips the question
+ * role concept for the actor) is a `system` or `container`: "which role?"
+ * (business/technical/service) — a platform's own modules are frequently
+ * owned by a different business unit than the platform itself (SAP's FI vs
+ * PM, Salesforce's CRM vs Field Service), so a module target gets the same
+ * prompt a system target does. A capability target skips the question
  * entirely and defaults to `business` (`defaultAttributesForPlainPick`) —
  * the item's own "defaults to business on capability targets, prompts on
  * system targets" wording. Which side is the owned one depends on
@@ -182,7 +185,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   function ownedElementTypeFor(target: PendingTarget): ElementType {
     return direction === 'outbound' ? target.elementType : elementType;
   }
-  const asksOwnsRole = slot.relationshipType === 'owns' && pendingTarget !== null && ownedElementTypeFor(pendingTarget) === 'system';
+  const asksOwnsRole = slot.relationshipType === 'owns' && pendingTarget !== null && (ownedElementTypeFor(pendingTarget) === 'system' || ownedElementTypeFor(pendingTarget) === 'container');
 
   function currentPrimaryDemotion(): RelationshipCreateDemotion | null {
     const currentPrimary = existingRows.find((row) => attributesRecord(row.attributes).role === 'primary');
@@ -192,7 +195,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   }
 
   function pickResult(target: PendingTarget): void {
-    const willAskOwnsRole = slot.relationshipType === 'owns' && ownedElementTypeFor(target) === 'system';
+    const willAskOwnsRole = slot.relationshipType === 'owns' && (ownedElementTypeFor(target) === 'system' || ownedElementTypeFor(target) === 'container');
     if (asksPrimary || needsLabel || willAskOwnsRole) {
       setPendingTarget(target);
       return;
@@ -401,7 +404,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
           What role does {ownerName} have for {ownedName}?
         </Text>
         <Text as="p" tone="muted" size="sm">
-          A system can have up to three owners at once — one business, one technical, one service.
+          A system or module can have up to three owners at once — one business, one technical, one service.
         </Text>
         <div className={styles.actions}>
           <Button variant="secondary" onClick={() => { answerOwnsRole('business'); }} disabled={status === 'creating'}>

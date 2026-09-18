@@ -21,18 +21,19 @@ import type { Json } from '../../../contracts/rows';
  * `uses`/`flows_to` never reach this function any more — RelationshipAdd's
  * `needsLabel` intercepts them first.
  *
- * `owns` only reaches here for a *capability* target — a system target is
- * always intercepted by RelationshipAdd's own staged "which role?" prompt
- * (item 1's "defaults to business on capability targets, prompts on
- * system targets" — the default below is that capability-target default;
- * `ownedElementType` is `undefined` only for a relationship type that
- * never needs it, i.e. never `owns`, so this being undefined for an
- * `owns` call would be a caller bug, not a legitimate case to silently
- * fall through). `owns` on a system target instead returns `undefined`
- * from here (defensive; RelationshipAdd's own staging should have already
- * intercepted it), letting `useRelationshipCreate`'s own bare fallback
- * (`{ role: 'business' }`) apply — the same default this function would
- * have returned anyway.
+ * `owns` only reaches here for a *capability* target — a system or
+ * container target is always intercepted by RelationshipAdd's own staged
+ * "which role?" prompt (item 1's "defaults to business on capability
+ * targets, prompts on system targets" — a module target gets the same
+ * prompt a system target does, see RelationshipAdd's own doc comment; the
+ * default below is that capability-target default; `ownedElementType` is
+ * `undefined` only for a relationship type that never needs it, i.e. never
+ * `owns`, so this being undefined for an `owns` call would be a caller bug,
+ * not a legitimate case to silently fall through). `owns` on a system or
+ * container target instead returns `undefined` from here (defensive;
+ * RelationshipAdd's own staging should have already intercepted it),
+ * letting `useRelationshipCreate`'s own bare fallback (`{ role: 'business'
+ * }`) apply — the same default this function would have returned anyway.
  */
 export function defaultAttributesForPlainPick(relationshipType: RelationshipType, ownedElementType?: ElementType): Record<string, Json> | undefined {
   if (relationshipType === 'supports') return { role: 'secondary' };

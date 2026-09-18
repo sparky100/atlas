@@ -28,8 +28,8 @@ function system(id: string, attributes: Record<string, Json> = {}): ElementsHead
   return { element_id: id, element_type: 'system', name: `System ${id}`, parent_id: null, attributes, exists_delta_id: `delta-${id}` };
 }
 
-function container(id: string, parentId: string): ElementsHeadRow {
-  return { element_id: id, element_type: 'container', name: `Container ${id}`, parent_id: parentId, attributes: {}, exists_delta_id: `delta-${id}` };
+function container(id: string, parentId: string, attributes: Record<string, Json> = {}): ElementsHeadRow {
+  return { element_id: id, element_type: 'container', name: `Container ${id}`, parent_id: parentId, attributes, exists_delta_id: `delta-${id}` };
 }
 
 function actor(id: string, attributes: Record<string, Json> = {}): ElementsHeadRow {
@@ -333,6 +333,14 @@ describe('findSystemsWithoutTechnicalOwner (Prompt 7k item 2)', () => {
     const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'technical' })];
     expect(findSystemsWithoutTechnicalOwner(systems, owns)).toEqual([]);
   });
+
+  it('a platform module without its own technical owner is caught too, independently of its platform', () => {
+    const sap = system('sap');
+    const fi = container('fi', 'sap');
+    const pm = container('pm', 'sap');
+    const owns = [relationship('r1', 'owns', 'actor-1', 'sap', { role: 'technical' }), relationship('r2', 'owns', 'actor-1', 'fi', { role: 'technical' })];
+    expect(findSystemsWithoutTechnicalOwner([sap, fi, pm], owns).map((e) => e.element_id)).toEqual(['pm']);
+  });
 });
 
 describe('findCriticalSystemsWithoutBusinessOwner (Prompt 7k item 1)', () => {
@@ -357,6 +365,12 @@ describe('findCriticalSystemsWithoutBusinessOwner (Prompt 7k item 1)', () => {
     const systems = [system('sys-1', { criticality: 'critical' })];
     const owns = [relationship('r1', 'owns', 'actor-1', 'sys-1', { role: 'business' })];
     expect(findCriticalSystemsWithoutBusinessOwner(systems, owns)).toEqual([]);
+  });
+
+  it('a critical module rated independently of its platform is flagged too, same as a critical system', () => {
+    const sap = system('sap', { criticality: 'low' });
+    const fi = container('fi', 'sap', { criticality: 'critical' });
+    expect(findCriticalSystemsWithoutBusinessOwner([sap, fi], []).map((e) => e.element_id)).toEqual(['fi']);
   });
 });
 
@@ -628,6 +642,14 @@ describe('findSystemsSupportingEssentialFunctionWithoutTechnicalOwner (Prompt 7k
   it('is empty with no capabilities marked essentialFunction at all', () => {
     const systems = [system('sys-1')];
     expect(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, [capability('cap-1')], [], [])).toEqual([]);
+  });
+
+  it('a module supporting an essential-function capability directly (not via its platform) is flagged too', () => {
+    const sap = system('sap');
+    const fi = container('fi', 'sap');
+    const capabilities = [{ ...capability('cap-1'), attributes: { essentialFunction: true } }];
+    const supports = [relationship('r1', 'supports', 'fi', 'cap-1')];
+    expect(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([sap, fi], capabilities, supports, []).map((e) => e.element_id)).toEqual(['fi']);
   });
 });
 

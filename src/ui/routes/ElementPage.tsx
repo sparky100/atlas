@@ -12,6 +12,7 @@ import { Button } from '../components/Button/Button';
 import { ChangesTouchingSection } from '../components/ChangesTouchingSection/ChangesTouchingSection';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { CommentsSection } from '../components/CommentsSection/CommentsSection';
+import { ConvertToModuleAction } from '../components/ConvertToModuleAction/ConvertToModuleAction';
 import { ElementDecisionsSection } from '../components/ElementDecisionsSection/ElementDecisionsSection';
 import { ElementHeader } from '../components/ElementHeader/ElementHeader';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
@@ -116,6 +117,8 @@ export function ElementPage() {
   // E7's own "Merge into…" — same inline-panel convention as `retiring`/
   // `removingFromModel` above.
   const [merging, setMerging] = useState(false);
+  // "Convert to a module of…" — same inline-panel convention as `merging` above.
+  const [converting, setConverting] = useState(false);
   const navigate = useNavigate();
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
@@ -261,6 +264,7 @@ export function ElementPage() {
               onRetire={canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') ? () => { setRetiring(true); } : undefined}
               onRemoveFromModel={canEdit && state.data.children.length === 0 ? () => { setRemovingFromModel(true); } : undefined}
               onMerge={canEdit ? () => { setMerging(true); } : undefined}
+              onConvertToModule={canEdit && state.data.element.element_type === 'system' && state.data.children.length === 0 ? () => { setConverting(true); } : undefined}
               contextHref={
                 state.data.element.element_type === 'system' || state.data.element.element_type === 'container'
                   ? `/o/${orgSlug ?? ''}/m/${model.slug}/context/${state.data.element.element_id}?${refQueryParam(ref, viewing)}`
@@ -324,6 +328,27 @@ export function ElementPage() {
                   void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/e/${survivorId}?${refQueryParam(ref, viewing)}`);
                 }}
                 onCancel={() => { setMerging(false); }}
+              />
+            )}
+            {converting && state.data.element.element_type === 'system' && (
+              <ConvertToModuleAction
+                modelId={model.id}
+                orgId={organisation?.id ?? ''}
+                userId={userId}
+                element={state.data.element}
+                relationshipEndpoints={state.data.relationshipEndpoints}
+                searchCommitId={searchCommitId ?? state.data.commitId}
+                branch={editingBranch ?? PLACEHOLDER_BRANCH}
+                expectedHeadCommitId={state.data.commitId}
+                onConverted={(newContainerId) => {
+                  setConverting(false);
+                  // The current element no longer exists at this ref once
+                  // converted — navigate straight to the new module rather
+                  // than reloading into `notPresentAtRef`'s own empty state
+                  // (same reasoning `onMerged` above gives).
+                  void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/e/${newContainerId}?${refQueryParam(ref, viewing)}`);
+                }}
+                onCancel={() => { setConverting(false); }}
               />
             )}
             {proposingChange && (

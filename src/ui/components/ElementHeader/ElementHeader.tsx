@@ -82,6 +82,16 @@ export interface ElementHeaderProps {
    */
   onMerge?: (() => void) | undefined;
   /**
+   * "Convert to a module of…" (`src/engine/convertSystemToModule.ts`'s own
+   * module comment) — system only, same `canEditBranch` gate as
+   * `onRetire`/`onMerge`. Omitted (not shown disabled) whenever the caller's
+   * gate disallows it, or when the system already has live children of its
+   * own (the engine refuses that case outright — converting a platform that
+   * already has modules is out of scope), same convention `onRemoveFromModel`
+   * already uses for its own children check.
+   */
+  onConvertToModule?: (() => void) | undefined;
+  /**
    * Sticky ref close-out: "Contributors see 'read-only: under review' on
    * elements of a Proposed change." — the explanation `onEdit`'s own
    * omitted-not-disabled convention never gave: neither `onEdit` nor
@@ -145,7 +155,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, readOnlyReason, contextHref }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, readOnlyReason, contextHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
@@ -303,6 +313,18 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onPro
                 }}
               >
                 <Text as="span">Merge into…</Text>
+              </button>
+            )}
+            {onConvertToModule && (
+              <button
+                type="button"
+                className={styles.menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onConvertToModule();
+                }}
+              >
+                <Text as="span">Convert to a module of…</Text>
               </button>
             )}
             {onRemoveFromModel && (

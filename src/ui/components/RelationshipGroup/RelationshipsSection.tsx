@@ -15,6 +15,7 @@ import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { FactBadge } from '../FactBadge/FactBadge';
+import { endpointDisplayName } from './relationshipEndpointLabel';
 import { RelationshipAdd } from './RelationshipAdd';
 import { RelationshipRemove, type RelationshipsSectionRemoveConfig } from './RelationshipRemove';
 import { Text } from '../Text/Text';
@@ -260,6 +261,11 @@ function RelationshipDirectionGroup({
         // in this row surfaces it otherwise.
         const description = attrs.description;
         const justAdded = other !== undefined && other.element_id === justAddedElementId;
+        // "Platform · Module" for a container endpoint — `endpoints`
+        // carries the parent alongside every container endpoint now
+        // (`useElementPage.ts`'s own fetch), so this is a lookup, never a
+        // second round trip.
+        const otherDisplayName = other ? endpointDisplayName(other, endpoints) : '';
 
         return (
           <div key={rel.relationship_id} className={styles.rowGroup}>
@@ -270,7 +276,7 @@ function RelationshipDirectionGroup({
               {other ? (
                 <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${other.element_id}`} className={styles.endpointLink}>
                   <ElementTypeGlyph type={other.element_type} />
-                  <Text as="span">{other.name}</Text>
+                  <Text as="span">{otherDisplayName}</Text>
                 </Link>
               ) : (
                 <Text as="span" tone="faint">
@@ -296,7 +302,7 @@ function RelationshipDirectionGroup({
                   relationship={rel}
                   direction={direction}
                   elementName={elementName}
-                  otherName={other?.name}
+                  otherName={other ? otherDisplayName : undefined}
                   siblingRows={rows}
                   endpoints={endpoints}
                   relationshipFacts={relationshipFacts}

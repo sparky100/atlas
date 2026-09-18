@@ -16,6 +16,10 @@ describe('defaultAttributesForPlainPick (Sprint U4-1 B5 bugfix, extended by Prom
     expect(defaultAttributesForPlainPick('owns', 'system')).toBeUndefined();
   });
 
+  it('owns targeting a container gets undefined too, same as a system target — a module gets the same staged role prompt', () => {
+    expect(defaultAttributesForPlainPick('owns', 'container')).toBeUndefined();
+  });
+
   it('every other relationship type gets undefined — this function never invents attributes for a type it does not know needs one', () => {
     const others: RelationshipType[] = RELATIONSHIP_TYPES.filter((t) => t !== 'supports' && t !== 'owns');
     for (const type of others) {

@@ -40,4 +40,14 @@ describe('RELATIONSHIP_TYPE_RULES', () => {
     expect(findRelationshipTypeRule('flows_to', 'container', 'capability')).toBeUndefined();
     expect(findRelationshipTypeRule('flows_to', 'system', 'actor')).toBeUndefined();
   });
+
+  it('an actor can own a container directly, same as it can own a system (a platform\'s own modules often have different owners than the platform itself)', () => {
+    expect(findRelationshipTypeRule('owns', 'actor', 'container')).toBeDefined();
+    expect(findRelationshipTypeRule('owns', 'actor', 'container')).toMatchObject({ maxPerFrom: null, maxPrimaryPerTo: 1, maxPrimaryPerFrom: null });
+  });
+
+  it('owns still never reaches a capability-owning actor beyond what already existed, and never reaches an actor-owned actor', () => {
+    expect(findRelationshipTypeRule('owns', 'system', 'container')).toBeUndefined();
+    expect(findRelationshipTypeRule('owns', 'actor', 'actor')).toBeUndefined();
+  });
 });
