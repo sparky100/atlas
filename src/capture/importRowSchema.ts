@@ -31,14 +31,20 @@
 import { validateAttributeValue } from '../contracts/attributeSchema';
 
 /** The exact header names a row must use — order doesn't matter, extra columns are ignored, case-sensitive (matching every other attribute key in this product). Snake_case, this session's own plan's spelling — distinct from the camelCase attribute keys they map onto below. */
-export const IMPORT_COLUMNS = ['name', 'description', 'kind', 'lifecycle', 'criticality', 'domain', 'hosting_model', 'vendor', 'platform', 'capability', 'business_owner', 'technical_owner'] as const;
+export const IMPORT_COLUMNS = ['name', 'description', 'kind', 'lifecycle', 'criticality', 'domain', 'hosting_model', 'vendor', 'is_external', 'external_organisation', 'platform', 'capability', 'business_owner', 'technical_owner'] as const;
 export type ImportColumn = (typeof IMPORT_COLUMNS)[number];
 
 export type ImportRowElementType = 'system' | 'container';
 
-export type ImportRowAttributeKey = 'description' | 'kind' | 'lifecycleStatus' | 'criticality' | 'domain' | 'hostingModel' | 'vendor';
+export type ImportRowAttributeKey = 'description' | 'kind' | 'lifecycleStatus' | 'criticality' | 'domain' | 'hostingModel' | 'vendor' | 'externalOrganisation';
 
-/** One validated row, ready for matching (`matchImportRows.ts`) — `attributes` only carries keys the row actually set (an omitted/blank optional column means "don't touch this attribute" for a matched row, and "use the schema default" for a new one, same as every other create/edit path in this app). `platformName`/`capabilityName`/`businessOwnerName`/`technicalOwnerName` are raw row text, not resolved here — resolving a name against the model's own elements needs the model's own current head, which this pure module has no access to. */
+/** An owner column's own cell — either a plain name, or "Name (External: Org)" (import close-out), which creates the owner as an external organisation actor (`subtype: 'organisation'`, `isExternal: true`, `externalOrganisation: Org`) if no existing actor named `name` already resolves it. */
+export interface OwnerReference {
+  name: string;
+  externalOrganisation: string | null;
+}
+
+/** One validated row, ready for matching (`matchImportRows.ts`) — `attributes`/`isExternal` only carry keys the row actually set (an omitted/blank optional column means "don't touch this attribute" for a matched row, and "use the schema default" for a new one, same as every other create/edit path in this app). `platformName`/`capabilityNames`/`businessOwner`/`technicalOwner` are raw row text, not resolved here — resolving a name against the model's own elements needs the model's own current head, which this pure module has no access to. */
 export interface ImportRow {
   /** 1-based row number in the source file, for error messages and per-delta `sourceRef` — never used as an id. */
   rowNumber: number;
@@ -46,11 +52,14 @@ export interface ImportRow {
   /** `'container'` (a module) iff `platform` was set — "platform column alone decides structure". */
   elementType: ImportRowElementType;
   attributes: Partial<Record<ImportRowAttributeKey, string>>;
+  /** `isExternal` is the one boolean-kind column (`is_external`) — kept outside `attributes` (a string-only bag) rather than widening that type for one field. `undefined` means the column was blank (don't touch this fact); `true`/`false` is always a deliberate value from the file. */
+  isExternal: boolean | undefined;
   /** The platform this row's module belongs to, by name — `null` means this row is a top-level system. Resolved (matched, never created) at match time. */
   platformName: string | null;
-  capabilityName: string | null;
-  businessOwnerName: string | null;
-  technicalOwnerName: string | null;
+  /** Import close-out: the `capability` column accepts a `|`-delimited list — the first name is the primary `supports` link, the rest secondary. Empty array means the column was blank. */
+  capabilityNames: string[];
+  businessOwner: OwnerReference | null;
+  technicalOwner: OwnerReference | null;
 }
 
 export type ImportRowResult = { ok: true; row: ImportRow } | { ok: false; rowNumber: number; error: string };
@@ -71,7 +80,7 @@ function cellToString(raw: unknown): string | undefined {
   return str.length > 0 ? str : undefined;
 }
 
-/** Column header → the attribute key it sets, and nothing else — `platform`/`capability`/`business_owner`/`technical_owner` are resolved as references, not plain attributes, so they're deliberately not in this list. Exported for `buildImportCommit.ts`'s own identical need (a changed/created attribute's own `sourceRef` names its column, not its attribute key) — one mapping, not two that could drift apart. */
+/** Column header → the attribute key it sets, and nothing else — `platform`/`capability`/`business_owner`/`technical_owner` are resolved as references, not plain attributes, and `is_external` is its own boolean-kind column (below), so none of those five are in this list. Exported for `buildImportCommit.ts`'s own identical need (a changed/created attribute's own `sourceRef` names its column, not its attribute key) — one mapping, not two that could drift apart. */
 export const ATTRIBUTE_COLUMNS: readonly (readonly [ImportColumn, ImportRowAttributeKey])[] = [
   ['description', 'description'],
   ['kind', 'kind'],
@@ -80,7 +89,35 @@ export const ATTRIBUTE_COLUMNS: readonly (readonly [ImportColumn, ImportRowAttri
   ['domain', 'domain'],
   ['hosting_model', 'hostingModel'],
   ['vendor', 'vendor'],
+  ['external_organisation', 'externalOrganisation'],
 ];
+
+const TRUE_WORDS = new Set(['true', 'yes', 'y', '1']);
+const FALSE_WORDS = new Set(['false', 'no', 'n', '0']);
+
+/** `is_external`'s own cell → a real boolean, or `undefined` for blank — `undefined` for anything else too (an unrecognised word), which `validateImportRow` below turns into a real error rather than silently treating a typo as "blank". */
+function cellToBooleanWord(cell: string): boolean | undefined {
+  const normalized = cell.toLowerCase();
+  if (TRUE_WORDS.has(normalized)) return true;
+  if (FALSE_WORDS.has(normalized)) return false;
+  return undefined;
+}
+
+/** "Name (External: Org)" → `{name, externalOrganisation}`; a plain name has no parens and gets `externalOrganisation: null`. Case-insensitive on the literal word "External"; the org text itself is kept verbatim. */
+function parseOwnerCell(cell: string): OwnerReference {
+  const match = /^(.*?)\s*\(\s*external\s*:\s*(.+?)\s*\)\s*$/i.exec(cell);
+  if (!match) return { name: cell, externalOrganisation: null };
+  const [, name, org] = match;
+  return { name: name && name.length > 0 ? name : cell, externalOrganisation: org ?? null };
+}
+
+/** The `capability` column's own `|`-delimited list — trimmed, blanks between pipes dropped, first survivor is the primary. */
+function parseCapabilityList(cell: string): string[] {
+  return cell
+    .split('|')
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0);
+}
 
 /** Validates one raw row object (as `XLSX.utils.sheet_to_json` produces, keyed by header name) against the F2-lite format. Reuses `validateAttributeValue` for every core attribute rather than re-implementing the enum/text checks this product already has one place for. */
 export function validateImportRow(raw: Record<string, unknown>, rowNumber: number): ImportRowResult {
@@ -99,11 +136,23 @@ export function validateImportRow(raw: Record<string, unknown>, rowNumber: numbe
     const result = validateAttributeValue(elementType, key, cell);
     if (!result.ok) return { ok: false, rowNumber, error: `"${column}": ${result.error}` };
     // `validateAttributeValue` normalises to `Json`, which for every one of
-    // these seven keys is always a plain string when the input wasn't
+    // these eight keys is always a plain string when the input wasn't
     // empty (text/enum kinds only, per the column list above) — safe to
     // narrow back for `ImportRow`'s own string-only attributes shape.
     if (typeof result.value === 'string') attributes[key] = result.value;
   }
+
+  const isExternalCell = cellToString(raw.is_external);
+  let isExternal: boolean | undefined;
+  if (isExternalCell !== undefined) {
+    isExternal = cellToBooleanWord(isExternalCell);
+    if (isExternal === undefined) return { ok: false, rowNumber, error: `"is_external" must be true/false (or yes/no), got "${isExternalCell}"` };
+    const result = validateAttributeValue(elementType, 'isExternal', isExternal);
+    if (!result.ok) return { ok: false, rowNumber, error: `"is_external": ${result.error}` };
+  }
+
+  const businessOwnerCell = cellToString(raw.business_owner);
+  const technicalOwnerCell = cellToString(raw.technical_owner);
 
   return {
     ok: true,
@@ -112,10 +161,11 @@ export function validateImportRow(raw: Record<string, unknown>, rowNumber: numbe
       name,
       elementType,
       attributes,
+      isExternal,
       platformName,
-      capabilityName: cellToString(raw.capability) ?? null,
-      businessOwnerName: cellToString(raw.business_owner) ?? null,
-      technicalOwnerName: cellToString(raw.technical_owner) ?? null,
+      capabilityNames: parseCapabilityList(cellToString(raw.capability) ?? ''),
+      businessOwner: businessOwnerCell !== undefined ? parseOwnerCell(businessOwnerCell) : null,
+      technicalOwner: technicalOwnerCell !== undefined ? parseOwnerCell(technicalOwnerCell) : null,
     },
   };
 }

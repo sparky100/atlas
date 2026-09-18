@@ -85,6 +85,8 @@ export interface CreateSpreadsheetSourceInput {
   fileName: string;
   /** F2-lite: every element id this run's rows matched or created — `sources.import_touched_element_ids`, required for this kind. Lets a change page recompute "not in file" at any later time, not just while the file is still in memory. */
   touchedElementIds: readonly UUID[];
+  /** F2-lite import close-out: every confirmed same-as pick's own alias, awaiting this change's own merge — `sources.pending_aliases`, applied by `mergeApprovedRequest`, never written here. */
+  pendingAliases: readonly { elementId: UUID; aliasValue: string }[];
 }
 
 /**
@@ -97,11 +99,17 @@ export interface CreateSpreadsheetSourceInput {
  * column `20260918010000_import_touched_element_ids.sql` added.
  */
 export async function createSpreadsheetSource(supabase: Client, input: CreateSpreadsheetSourceInput): Promise<SourceRow> {
-  const row = { id: input.id, org_id: input.orgId, model_id: input.modelId, kind: 'spreadsheet' as const, name: input.fileName, created_by: input.createdBy, import_touched_element_ids: [...input.touchedElementIds] };
+  const row = { id: input.id, org_id: input.orgId, model_id: input.modelId, kind: 'spreadsheet' as const, name: input.fileName, created_by: input.createdBy, import_touched_element_ids: [...input.touchedElementIds], pending_aliases: input.pendingAliases.map((a) => ({ elementId: a.elementId, aliasValue: a.aliasValue })) };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
   const { data, error } = await supabase.from('sources').insert(row).select('*').single();
   if (error) throw new Error(`createSpreadsheetSource: ${error.message}`);
   return data as SourceRow;
+}
+
+/** F2-lite import close-out: marks a spreadsheet source's pending aliases as applied, once `mergeApprovedRequest` has written each one as a real `aliases` row — idempotent (an empty array clears cleanly again) so a re-run after a partial failure never double-writes. */
+export async function clearPendingAliases(supabase: Client, sourceId: UUID): Promise<void> {
+  const { error } = await supabase.from('sources').update({ pending_aliases: [] }).eq('id', sourceId);
+  if (error) throw new Error(`clearPendingAliases: ${error.message}`);
 }
 
 /**

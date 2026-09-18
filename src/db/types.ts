@@ -224,6 +224,8 @@ export interface SourceRow {
   created_at: string;
   /** F2-lite: required iff `kind === 'spreadsheet'` — every element id that import run's rows matched or created, so a change page can recompute "not in file" at any later time. `20260918010000_import_touched_element_ids.sql`. */
   import_touched_element_ids: UUID[] | null;
+  /** F2-lite import close-out: confirmed same-as picks awaiting this change's own merge — applied (real `aliases` rows, then cleared here) by `mergeApprovedRequest` once the branch carrying this source's deltas actually merges; never applied on cancel/reject. `20260919010000_pending_aliases.sql`. */
+  pending_aliases: { elementId: UUID; aliasValue: string }[];
 }
 
 export type AliasType = 'name' | 'code' | 'external_ref' | 'source_system_key' | 'template_code' | 'merged_id';

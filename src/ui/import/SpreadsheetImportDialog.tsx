@@ -29,7 +29,9 @@ import { Chip } from '../components/Chip/Chip';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { importTemplateXlsxBlob } from './importTemplateXlsx';
+import { downloadImportPrompt } from './downloadImportPrompt';
 import { useSpreadsheetImport } from '../changes/useSpreadsheetImport';
+import { supabase } from '../supabaseClient';
 import styles from './SpreadsheetImportDialog.module.css';
 
 export interface SpreadsheetImportDialogProps {
@@ -91,7 +93,12 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
   const newCount = rows.filter((r) => r.outcome.status === 'new').length;
   const changedCount = rows.filter((r) => r.outcome.status === 'changed').length;
   const unchangedCount = rows.filter((r) => r.outcome.status === 'unchanged').length;
-  const canImport = rows.length > 0 && needsPickCount === 0 && blockedCount === 0;
+  const relationshipRows = buildResult?.relationshipRows ?? [];
+  const relationshipBlockedCount = relationshipRows.filter((r) => r.outcome.status === 'blocked').length;
+  const changeRows = buildResult?.changeRows ?? [];
+  const changeBlockedCount = changeRows.filter((r) => r.outcome.status === 'blocked').length;
+  const canImport = rows.length > 0 && needsPickCount === 0 && blockedCount === 0 && relationshipBlockedCount === 0 && changeBlockedCount === 0;
+  const totalBlockedCount = blockedCount + relationshipBlockedCount + changeBlockedCount;
 
   return (
     // Click-outside-to-close on the backdrop — mouse-only by design; Escape
@@ -117,7 +124,7 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
           </div>
 
           <Text as="p" tone="muted" size="sm">
-            One row per system, or a module (set <Text as="span" mono size="sm">platform</Text>). Columns: {IMPORT_COLUMNS.join(', ')} — only <Text as="span" mono size="sm">name</Text> is required.
+            One row per system, or a module (set <Text as="span" mono size="sm">platform</Text>). Columns: {IMPORT_COLUMNS.join(', ')} — only <Text as="span" mono size="sm">name</Text> is required. An XLSX file may also carry a "Relationships" sheet for <Text as="span" mono size="sm">uses</Text>/<Text as="span" mono size="sm">flows_to</Text> edges. A <Text as="span" mono size="sm">.json</Text> file uses the same reconciliation instead of sheets: <Text as="span" mono size="sm">{'{ systems, relationships, changes }'}</Text>, with <Text as="span" mono size="sm">changes</Text> an explicit retire/restore list for elements this file's own author already knows are being decommissioned or reinstated.
           </Text>
           <div className={styles.templateLinks}>
             <Button variant="ghost" onClick={downloadTemplateCsv}>
@@ -126,14 +133,17 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
             <Button variant="ghost" onClick={downloadTemplateXlsx}>
               Download template (XLSX)
             </Button>
+            <Button variant="ghost" onClick={() => void downloadImportPrompt(supabase, modelId, modelSlug)}>
+              Download AI import prompt
+            </Button>
           </div>
 
           {(status === 'idle' || status === 'loading' || status === 'error') && (
             <div className={styles.dropzone}>
               <input
                 type="file"
-                accept=".csv,.xlsx"
-                aria-label="Choose a CSV or XLSX file to import"
+                accept=".csv,.xlsx,.json"
+                aria-label="Choose a CSV, XLSX, or JSON file to import"
                 disabled={status === 'loading'}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -227,6 +237,86 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
                   ))}
               </ul>
 
+              {relationshipRows.length > 0 && (
+                <div className={styles.preview}>
+                  <Text as="h3" size="sm">
+                    Relationships ({relationshipRows.length})
+                  </Text>
+                  <div className={styles.counts}>
+                    <Chip tone="info">{relationshipRows.filter((r) => r.outcome.status === 'new').length} new</Chip>
+                    <Chip tone="info">{relationshipRows.filter((r) => r.outcome.status === 'changed').length} changed</Chip>
+                    <Chip tone="neutral">{relationshipRows.filter((r) => r.outcome.status === 'unchanged').length} unchanged</Chip>
+                    {relationshipBlockedCount > 0 && <Chip tone="danger">{relationshipBlockedCount} failed</Chip>}
+                  </div>
+                  {review.relationshipParseErrors.length > 0 && (
+                    <ul className={styles.rowList}>
+                      {review.relationshipParseErrors.map((e) => (
+                        <li key={e.rowNumber}>
+                          <Text as="p" size="sm">
+                            Relationships row {e.rowNumber}: {e.error}
+                          </Text>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {relationshipBlockedCount > 0 && (
+                    <ul className={styles.rowList}>
+                      {relationshipRows
+                        .filter((r) => r.outcome.status === 'blocked')
+                        .map((r) => (
+                          <li key={r.rowNumber} className={styles.row}>
+                            <Text as="span" size="sm">
+                              Row {r.rowNumber}
+                            </Text>
+                            {r.outcome.status === 'blocked' && <Chip tone="danger">{r.outcome.reason}</Chip>}
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {changeRows.length > 0 && (
+                <div className={styles.preview}>
+                  <Text as="h3" size="sm">
+                    Changes ({changeRows.length})
+                  </Text>
+                  <div className={styles.counts}>
+                    <Chip tone="info">{changeRows.filter((r) => r.outcome.status === 'applied').length} to apply</Chip>
+                    <Chip tone="neutral">{changeRows.filter((r) => r.outcome.status === 'unchanged').length} unchanged</Chip>
+                    {changeBlockedCount > 0 && <Chip tone="danger">{changeBlockedCount} failed</Chip>}
+                  </div>
+                  {review.changeParseErrors.length > 0 && (
+                    <ul className={styles.rowList}>
+                      {review.changeParseErrors.map((e) => (
+                        <li key={e.rowNumber}>
+                          <Text as="p" size="sm">
+                            Changes entry {e.rowNumber}: {e.error}
+                          </Text>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <ul className={styles.rowList}>
+                    {changeRows
+                      .filter((r) => r.outcome.status !== 'unchanged')
+                      .map((r) => (
+                        <li key={r.rowNumber} className={styles.row}>
+                          <div className={styles.rowMain}>
+                            <Text as="span">{r.name}</Text>
+                            <Chip tone={r.outcome.status === 'blocked' ? 'danger' : 'info'}>{r.outcome.status === 'blocked' ? r.outcome.reason : r.action === 'retire' ? 'Retire' : 'Restore'}</Chip>
+                          </div>
+                          {r.reason !== null && (
+                            <Text as="p" size="sm" tone="muted">
+                              {r.reason}
+                            </Text>
+                          )}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+
               {notInFile.length > 0 && (
                 <div className={styles.notInFile}>
                   <Text as="h3" size="sm">
@@ -260,7 +350,7 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
                     });
                   }}
                 >
-                  {status === 'committing' ? 'Importing…' : needsPickCount > 0 ? `Resolve ${String(needsPickCount)} row(s) first` : blockedCount > 0 ? `${String(blockedCount)} row(s) failed` : 'Import'}
+                  {status === 'committing' ? 'Importing…' : needsPickCount > 0 ? `Resolve ${String(needsPickCount)} row(s) first` : totalBlockedCount > 0 ? `${String(totalBlockedCount)} row(s) failed` : 'Import'}
                 </Button>
                 <Button variant="ghost" disabled={status === 'committing'} onClick={reset}>
                   Choose a different file

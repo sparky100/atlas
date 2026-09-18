@@ -10,11 +10,16 @@
  * through the one code path below.
  */
 import * as XLSX from 'xlsx';
+import type { ImportChangeRow } from './importChangeRow';
+import { validateImportRelationshipRow, type ImportRelationshipRow, type ImportRelationshipRowResult } from './importRelationshipRow';
 import { validateImportRow, type ImportRow, type ImportRowResult } from './importRowSchema';
+
+/** The one other sheet name this format recognises — case-sensitive, matching every other header/sheet name in this format. XLSX only: a plain CSV has no second sheet to carry one, so `relationshipRows`/`relationshipErrors` are always empty for a `.csv` file. */
+const RELATIONSHIPS_SHEET_NAME = 'Relationships';
 
 export interface ParsedImportFile {
   fileName: string;
-  /** Every column header the file's own header row actually has, in file order — the dialog's "detected columns" preview, before any per-row validation runs. */
+  /** Every column header the file's own header row actually has, in file order — the dialog's "detected columns" preview, before any per-row validation runs. For a JSON import (`parseImportJson.ts`), this is the top-level section names instead (`systems`, `relationships`, `changes`) — there being no header row to read. */
   detectedColumns: string[];
   /** The file's own first few raw rows (pre-validation, keyed by header) — the dialog's "first rows" preview. */
   previewRows: Record<string, unknown>[];
@@ -22,10 +27,18 @@ export interface ParsedImportFile {
   rows: ImportRow[];
   /** Every row that didn't, in source order — a real error per row (`ImportRowResult`'s own `error`), never silently dropped. */
   errors: { rowNumber: number; error: string }[];
+  /** Import close-out: every row from an optional "Relationships" sheet that validated. */
+  relationshipRows: ImportRelationshipRow[];
+  /** Every "Relationships" sheet row that didn't validate — same "surfaced, never dropped" stance as `errors`. */
+  relationshipErrors: { rowNumber: number; error: string }[];
+  /** F2-lite JSON import's own "changes" section — always empty for a CSV/XLSX file, which has no such section. */
+  changeRows: ImportChangeRow[];
+  /** Every "changes" entry that didn't validate — always empty for a CSV/XLSX file. */
+  changeErrors: { rowNumber: number; error: string }[];
 }
 
-/** How many of the file's own raw rows the dialog's preview shows, before any matching/classification runs. */
-const PREVIEW_ROW_COUNT = 5;
+/** How many of the file's own raw rows the dialog's preview shows, before any matching/classification runs. Exported for `parseImportJson.ts`'s own identical preview need. */
+export const PREVIEW_ROW_COUNT = 5;
 
 export class ImportFileParseError extends Error {}
 
@@ -35,9 +48,10 @@ export class ImportFileParseError extends Error {}
  * source didn't fill reads as `null`, not `undefined`, so a genuinely
  * blank optional column and a column the file never had at all look the
  * same to `validateImportRow`, which is the right behaviour for both).
- * Reads the first sheet only — a v1 scope choice (this session's plan's
- * own "Explicitly out of scope" list), not a silent limitation: multi-sheet
- * input is Phase 3's own "different file formats/structures" territory.
+ * Reads the first sheet as the main element rows, plus one other named
+ * sheet — "Relationships" (import close-out) — if the workbook has one;
+ * every other sheet is ignored. A CSV file is single-sheet by construction,
+ * so its own `relationshipRows`/`relationshipErrors` are always empty.
  */
 export async function parseImportFile(file: File): Promise<ParsedImportFile> {
   const buffer = await file.arrayBuffer();
@@ -81,5 +95,17 @@ export async function parseImportFile(file: File): Promise<ParsedImportFile> {
     throw new ImportFileParseError(`"${file.name}" has a header row but no data rows.`);
   }
 
-  return { fileName: file.name, detectedColumns, previewRows: rawRows.slice(0, PREVIEW_ROW_COUNT), rows, errors };
+  const relationshipRows: ImportRelationshipRow[] = [];
+  const relationshipErrors: { rowNumber: number; error: string }[] = [];
+  const relationshipsSheet = workbook.Sheets[RELATIONSHIPS_SHEET_NAME];
+  if (relationshipsSheet) {
+    const rawRelationshipRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(relationshipsSheet, { defval: null });
+    rawRelationshipRows.forEach((raw, index) => {
+      const result: ImportRelationshipRowResult = validateImportRelationshipRow(raw, index + 2);
+      if (result.ok) relationshipRows.push(result.row);
+      else relationshipErrors.push({ rowNumber: result.rowNumber, error: result.error });
+    });
+  }
+
+  return { fileName: file.name, detectedColumns, previewRows: rawRows.slice(0, PREVIEW_ROW_COUNT), rows, errors, relationshipRows, relationshipErrors, changeRows: [], changeErrors: [] };
 }

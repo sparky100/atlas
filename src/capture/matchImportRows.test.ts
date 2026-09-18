@@ -17,7 +17,7 @@ function actor(id: string, name: string): ElementsHeadRow {
   return { element_id: id, element_type: 'actor', name, parent_id: null, attributes: { subtype: 'person', isExternal: false }, exists_delta_id: `${id}-create` };
 }
 function row(overrides: Partial<ImportRow> & { rowNumber: number; name: string }): ImportRow {
-  return { elementType: 'system', attributes: {}, platformName: null, capabilityName: null, businessOwnerName: null, technicalOwnerName: null, ...overrides };
+  return { elementType: 'system', attributes: {}, isExternal: undefined, platformName: null, capabilityNames: [], businessOwner: null, technicalOwner: null, ...overrides };
 }
 function match(rows: ImportRow[], overrides: Partial<MatchImportRowsInput> = {}) {
   return matchImportRows({ rows, systems: [], containers: [], capabilities: [], actors: [], aliasesByElementId: new Map(), ...overrides });
@@ -117,42 +117,52 @@ describe('matchImportRows — a module row’s own platform', () => {
 describe('matchImportRows — capability/owner references (auto-resolving cascade, distinct from row identity)', () => {
   it('resolves capability by exact name', () => {
     const capabilities = [capability('cap-1', 'Billing')];
-    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityName: 'Billing' })], { capabilities });
-    expect(result?.capability).toEqual({ kind: 'matched', element: { elementId: 'cap-1', name: 'Billing' } });
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Billing'] })], { capabilities });
+    expect(result?.capabilities).toEqual([{ kind: 'matched', element: { elementId: 'cap-1', name: 'Billing' } }]);
+  });
+
+  it('resolves a "|"-delimited list independently, one outcome per name, same order', () => {
+    const capabilities = [capability('cap-1', 'Billing'), capability('cap-2', 'Customer Accounts')];
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Billing', 'Customer Accounts', 'Nonexistent'] })], { capabilities });
+    expect(result?.capabilities).toEqual([
+      { kind: 'matched', element: { elementId: 'cap-1', name: 'Billing' } },
+      { kind: 'matched', element: { elementId: 'cap-2', name: 'Customer Accounts' } },
+      { kind: 'new' },
+    ]);
   });
 
   it('is new (never auto-created, never blocks the row) when the named capability does not exist', () => {
-    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityName: 'Nonexistent' })], { capabilities: [capability('cap-1', 'Billing')] });
-    expect(result?.capability).toEqual({ kind: 'new' });
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Nonexistent'] })], { capabilities: [capability('cap-1', 'Billing')] });
+    expect(result?.capabilities).toEqual([{ kind: 'new' }]);
   });
 
-  it('is none when the row does not name one', () => {
+  it('is an empty list when the row does not name one', () => {
     const [result] = match([row({ rowNumber: 2, name: 'Northgate' })], { capabilities: [capability('cap-1', 'Billing')] });
-    expect(result?.capability).toEqual({ kind: 'none' });
+    expect(result?.capabilities).toEqual([]);
   });
 
   it('is ambiguous when two capabilities share the exact normalized name', () => {
     const capabilities = [capability('cap-1', 'Billing'), capability('cap-2', 'BILLING')];
-    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityName: 'Billing' })], { capabilities });
-    expect(result?.capability.kind).toBe('ambiguous');
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Billing'] })], { capabilities });
+    expect(result?.capabilities[0]?.kind).toBe('ambiguous');
   });
 
   it('auto-resolves a lone fuzzy leader for a reference column (unlike row identity)', () => {
     // trigramSimilarity('billing', 'biling') = 0.667
     const capabilities = [capability('cap-1', 'Biling')];
-    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityName: 'Billing' })], { capabilities });
-    expect(result?.capability).toEqual({ kind: 'matched', element: { elementId: 'cap-1', name: 'Biling' } });
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Billing'] })], { capabilities });
+    expect(result?.capabilities).toEqual([{ kind: 'matched', element: { elementId: 'cap-1', name: 'Biling' } }]);
   });
 
   it('resolves business_owner and technical_owner against actors independently', () => {
     const actors = [actor('actor-1', 'Jane Doe'), actor('actor-2', 'John Smith')];
-    const [result] = match([row({ rowNumber: 2, name: 'Northgate', businessOwnerName: 'Jane Doe', technicalOwnerName: 'John Smith' })], { actors });
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', businessOwner: { name: 'Jane Doe', externalOrganisation: null }, technicalOwner: { name: 'John Smith', externalOrganisation: null } })], { actors });
     expect(result?.businessOwner).toEqual({ kind: 'matched', element: { elementId: 'actor-1', name: 'Jane Doe' } });
     expect(result?.technicalOwner).toEqual({ kind: 'matched', element: { elementId: 'actor-2', name: 'John Smith' } });
   });
 
   it('is new for an owner name matching no live actor — the caller creates one', () => {
-    const [result] = match([row({ rowNumber: 2, name: 'Northgate', businessOwnerName: 'Jane Doe' })], { actors: [] });
+    const [result] = match([row({ rowNumber: 2, name: 'Northgate', businessOwner: { name: 'Jane Doe', externalOrganisation: null } })], { actors: [] });
     expect(result?.businessOwner).toEqual({ kind: 'new' });
   });
 });
