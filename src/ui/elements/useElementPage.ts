@@ -307,6 +307,26 @@ export function useElementPage(
       ]);
       const relationshipFacts = new Map(relationships.map((rel, i) => [rel.relationship_id, relationshipFactsList[i] ?? new Map<string, FactsRow>()]));
 
+      // A container endpoint's own parent platform — never itself a
+      // relationship endpoint, so the from/to/via batch above never
+      // includes it. `RelationshipsSection.tsx` wants "Platform · Module"
+      // for a container row (the same convention `landscapeModules.ts`'s
+      // own `withModuleLabels` already uses), which needs the parent's
+      // name; folded into this same map (never a second one — the section
+      // only ever does one `endpoints.get(id)` lookup regardless of why a
+      // row is in there) once fetched.
+      const containerParentIds = [
+        ...new Set(
+          [...relationshipEndpoints.values()]
+            .filter((e): e is ElementsHeadRow & { parent_id: UUID } => e.element_type === 'container' && e.parent_id !== null)
+            .map((e) => e.parent_id),
+        ),
+      ];
+      if (containerParentIds.length > 0) {
+        const parents = await source.elementsByIds(containerParentIds);
+        for (const [id, row] of parents) relationshipEndpoints.set(id, row);
+      }
+
       const allSourceIds = [
         ...new Set([...facts.values()].map((f) => f.source_id).concat([...relationshipFactsList.flatMap((m) => [...m.values()].map((f) => f.source_id))])),
       ];
