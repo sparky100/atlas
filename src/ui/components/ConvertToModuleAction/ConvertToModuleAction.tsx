@@ -3,7 +3,6 @@ import { attributeFieldSchema } from '../../../contracts/attributeSchema';
 import type { ElementsHeadRow } from '../../../contracts/rows';
 import type { UUID } from '../../../contracts/delta';
 import type { BranchRow } from '../../../db/types';
-import { isPlatform } from '../../elements/systemKind';
 import { useConvertToModule } from '../../elements/useConvertToModule';
 import { useConvertToModulePreview } from '../../elements/useConvertToModulePreview';
 import { useRelationshipTargetSearch } from '../../elements/useRelationshipTargetSearch';
@@ -38,13 +37,23 @@ export interface ConvertToModuleActionProps {
  * an existing platform all along becomes one of its modules
  * (`src/engine/convertSystemToModule.ts`'s own module comment covers why
  * this needs to be a new operation rather than an `element.update` or a
- * merge). Picks another system as the target platform, previews exactly
- * what `useConvertToModulePreview` computes from the real engine builder
- * (never a second, hand-written approximation — CLAUDE.md rule 7), then
- * commits through `useConvertToModule`. The target search is scoped to
- * `kind: 'platform'` systems client-side (`RelationshipAdd.tsx`'s own
- * `via`-stage picker does the identical filter for the identical reason) —
- * the engine itself only requires a live `system`, no stricter invariant.
+ * merge). Picks another system as the target, previews exactly what
+ * `useConvertToModulePreview` computes from the real engine builder (never
+ * a second, hand-written approximation — CLAUDE.md rule 7), then commits
+ * through `useConvertToModule`.
+ *
+ * The target search is deliberately *not* narrowed to `kind: 'platform'` —
+ * there are several platform-like kinds (`SystemKind`: `platform`,
+ * `integration_platform`, `data_platform`), and SPEC-data-model.md's own
+ * "platforms and modules" amendment is explicit that a container's parent
+ * has no kind requirement at all ("legal for any container… a parent-kind-
+ * aware invariant would be more machinery than this feature needs" —
+ * `relationshipTypeRules.ts`'s `supports(container, capability)` amendment
+ * takes the identical stance). Every live system is a legal target, exactly
+ * matching what the engine itself actually requires — unlike
+ * `RelationshipAdd.tsx`'s own `via`-stage picker, which narrows to
+ * `integration_platform` because `via` genuinely means nothing for any
+ * other kind.
  */
 export function ConvertToModuleAction({
   modelId,
@@ -60,7 +69,6 @@ export function ConvertToModuleAction({
 }: ConvertToModuleActionProps) {
   const [target, setTarget] = useState<ConvertToModuleTarget | null>(null);
   const search = useRelationshipTargetSearch(searchCommitId, modelId, ['system'], element.element_id, target === null);
-  const platformResults = search.results.filter((el) => isPlatform(el));
   const preview = useConvertToModulePreview(modelId, expectedHeadCommitId, element.element_id, target?.elementId ?? null);
   const { status, error, convert } = useConvertToModule({
     modelId,
@@ -77,7 +85,7 @@ export function ConvertToModuleAction({
   return (
     <div className={styles.panel}>
       <Text as="p" size="sm">
-        Convert &ldquo;{element.name}&rdquo; into a module of another platform? &ldquo;{element.name}&rdquo; is retracted; a new module with its own facts and relationships takes its place, and its old name stays searchable.
+        Convert &ldquo;{element.name}&rdquo; into a module of another system? &ldquo;{element.name}&rdquo; is retracted; a new module with its own facts and relationships takes its place, and its old name stays searchable.
       </Text>
 
       {target ? (
@@ -96,11 +104,11 @@ export function ConvertToModuleAction({
       ) : (
         <div>
           <input
-            // eslint-disable-next-line jsx-a11y/no-autofocus -- opening this panel is itself the request to search for a target platform.
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- opening this panel is itself the request to search for a target system.
             autoFocus
             type="text"
             className={styles.input}
-            placeholder="Search for the platform this is a module of…"
+            placeholder="Search for the system this is a module of…"
             value={search.query}
             onChange={(e) => {
               search.setQuery(e.target.value);
@@ -111,14 +119,14 @@ export function ConvertToModuleAction({
               Loading…
             </Text>
           )}
-          {search.status === 'ready' && search.query.trim().length > 0 && platformResults.length === 0 && (
+          {search.status === 'ready' && search.query.trim().length > 0 && search.results.length === 0 && (
             <Text as="p" tone="muted" size="sm">
-              No platforms match.
+              No systems match.
             </Text>
           )}
-          {platformResults.length > 0 && (
+          {search.results.length > 0 && (
             <ul className={styles.results}>
-              {platformResults.map((result) => (
+              {search.results.map((result) => (
                 <li key={result.element_id}>
                   <button
                     type="button"
