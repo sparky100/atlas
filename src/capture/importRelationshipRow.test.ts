@@ -53,4 +53,18 @@ describe('validateImportRelationshipRow', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.row.via).toBe('ESB');
   });
+
+  it('accepts an optional quote and confidence, carried through unresolved', () => {
+    const result = validateImportRelationshipRow({ from: 'A', type: 'uses', to: 'B', description: 'reads from', quote: 'A reads balances from B', confidence: 0.65 }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.row.quote).toBe('A reads balances from B');
+      expect(result.row.confidence).toBe(0.65);
+    }
+  });
+
+  it('rejects a confidence outside [0,1]', () => {
+    const result = validateImportRelationshipRow({ from: 'A', type: 'uses', to: 'B', description: 'reads from', confidence: 2 }, 2);
+    expect(result).toEqual({ ok: false, rowNumber: 2, error: '"confidence": must be a number between 0 and 1' });
+  });
 });

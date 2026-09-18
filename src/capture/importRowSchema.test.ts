@@ -136,4 +136,18 @@ describe('validateImportRow', () => {
     const result = validateImportRow({ name: 'Northgate', someRandomColumn: 'whatever' }, 2);
     expect(result.ok).toBe(true);
   });
+
+  it('accepts an optional quote and confidence, carried through unresolved', () => {
+    const result = validateImportRow({ name: 'Northgate', quote: 'Northgate handles all revenue billing', confidence: 0.8 }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.row.quote).toBe('Northgate handles all revenue billing');
+      expect(result.row.confidence).toBe(0.8);
+    }
+  });
+
+  it('rejects a confidence outside [0,1]', () => {
+    const result = validateImportRow({ name: 'Northgate', confidence: -0.1 }, 2);
+    expect(result).toEqual({ ok: false, rowNumber: 2, error: '"confidence": must be a number between 0 and 1' });
+  });
 });

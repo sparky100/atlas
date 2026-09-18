@@ -21,4 +21,27 @@ describe('buildImportPromptSchema', () => {
     expect(schema).toContain('External:');
     expect(schema).toContain('|');
   });
+
+  it('names every real changes-section field, including replaced_by', () => {
+    const schema = buildImportPromptSchema();
+    for (const column of ['name', 'action', 'reason', 'replaced_by']) {
+      expect(schema).toContain(column);
+    }
+    expect(schema).toContain('retire');
+    expect(schema).toContain('restore');
+  });
+
+  it('documents quote/confidence as applying to every entry, in all three arrays', () => {
+    const schema = buildImportPromptSchema();
+    expect(schema).toContain('quote');
+    expect(schema).toContain('confidence');
+  });
+
+  it('describes the real JSON shape, never CSV', () => {
+    const schema = buildImportPromptSchema();
+    expect(schema).toContain('systems');
+    expect(schema).toContain('relationships');
+    expect(schema).toContain('changes');
+    expect(schema).not.toContain('CSV');
+  });
 });

@@ -132,11 +132,15 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
 
         // Import close-out: every matched system/module's own live `supports`
         // edges, grouped by `from`, for the capability-diff/demotion pass.
+        // JSON import follow-up (`replaced_by`) also reads this map, so
+        // `existsDeltaId` is carried alongside `roleDeltaId` — the two are
+        // different deltas (the edge's own `$exists` vs. its `role` update),
+        // and a `relationship.retract` needs the former.
         const supportsByElementId = new Map<UUID, CurrentSupportsEdge[]>();
         for (const edge of supportsEdges) {
           const role = attributesRecord(edge.attributes).role;
           const forElement = supportsByElementId.get(edge.from_element_id) ?? [];
-          forElement.push({ relationshipId: edge.relationship_id, capabilityId: edge.to_element_id, role: role === 'primary' ? 'primary' : 'secondary', roleDeltaId: relationshipFacts.get(edge.relationship_id)?.get('role')?.delta_id ?? edge.exists_delta_id });
+          forElement.push({ relationshipId: edge.relationship_id, capabilityId: edge.to_element_id, role: role === 'primary' ? 'primary' : 'secondary', roleDeltaId: relationshipFacts.get(edge.relationship_id)?.get('role')?.delta_id ?? edge.exists_delta_id, existsDeltaId: relationshipFacts.get(edge.relationship_id)?.get('$exists')?.delta_id ?? edge.exists_delta_id });
           supportsByElementId.set(edge.from_element_id, forElement);
         }
         setCurrentSupportsByElementId(supportsByElementId);

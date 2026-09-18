@@ -67,11 +67,15 @@ function relationshipRow(overrides: Partial<ImportRelationshipRow> & { rowNumber
 }
 
 function changeRow(overrides: Partial<ImportChangeRow> & { rowNumber: number; name: string; action: ImportChangeRow['action'] }): ImportChangeRow {
-  return { reason: null, ...overrides };
+  return { reason: null, replacedBy: null, ...overrides };
 }
 
 function container(id: string, name: string, parentId: string, attributes: Record<string, unknown> = {}): ElementsHeadRow {
   return { element_id: id, element_type: 'container', name, parent_id: parentId, attributes, exists_delta_id: `${id}-create` } as ElementsHeadRow;
+}
+
+function supportsEdge(overrides: Partial<CurrentSupportsEdge> & { relationshipId: string; capabilityId: string; role: CurrentSupportsEdge['role'] }): CurrentSupportsEdge {
+  return { roleDeltaId: 'd-role', existsDeltaId: 'd-exists', ...overrides };
 }
 
 describe('buildImportDeltas — new rows', () => {
@@ -203,7 +207,7 @@ describe('buildImportDeltas — matched/changed rows', () => {
   describe('capability diff — a changed primary demotes the previous one', () => {
     it('does nothing when the row’s own resolved capability already matches the current primary', () => {
       const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Billing'] }), { match: { kind: 'matched', element: { elementId: 'sys-1', name: 'Northgate' } }, capabilities: [{ kind: 'matched', element: { elementId: 'cap-1', name: 'Billing' } }] })];
-      const currentSupportsByElementId = new Map([['sys-1', [{ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' as const, roleDeltaId: 'd-role' }]]]);
+      const currentSupportsByElementId = new Map([['sys-1', [supportsEdge({ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' })]]]);
       const { deltas, rows } = build(matchedRows, { existsDeltaIdByElementId: new Map([['sys-1', 'd-create']]), currentSupportsByElementId });
       expect(deltas.some((d) => d.kind === 'relationship.create' || d.kind === 'relationship.update')).toBe(false);
       expect(rows[0]?.outcome).toEqual({ status: 'unchanged', elementId: 'sys-1' });
@@ -211,7 +215,7 @@ describe('buildImportDeltas — matched/changed rows', () => {
 
     it('creates the new primary and demotes the old one when the row names a different capability', () => {
       const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Payments'] }), { match: { kind: 'matched', element: { elementId: 'sys-1', name: 'Northgate' } }, capabilities: [{ kind: 'matched', element: { elementId: 'cap-2', name: 'Payments' } }] })];
-      const currentSupportsByElementId = new Map([['sys-1', [{ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' as const, roleDeltaId: 'd-role' }]]]);
+      const currentSupportsByElementId = new Map([['sys-1', [supportsEdge({ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' })]]]);
       const { deltas, rows } = build(matchedRows, { existsDeltaIdByElementId: new Map([['sys-1', 'd-create']]), currentSupportsByElementId });
       expect(deltas).toEqual([
         expect.objectContaining({ kind: 'relationship.update', relationshipId: 'rel-1', attribute: 'role', value: 'secondary', previousDeltaId: 'd-role' }),
@@ -222,7 +226,7 @@ describe('buildImportDeltas — matched/changed rows', () => {
 
     it('adds a second listed capability as secondary without touching the primary, when it is not already linked', () => {
       const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Billing', 'Reporting'] }), { match: { kind: 'matched', element: { elementId: 'sys-1', name: 'Northgate' } }, capabilities: [{ kind: 'matched', element: { elementId: 'cap-1', name: 'Billing' } }, { kind: 'matched', element: { elementId: 'cap-3', name: 'Reporting' } }] })];
-      const currentSupportsByElementId = new Map([['sys-1', [{ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' as const, roleDeltaId: 'd-role' }]]]);
+      const currentSupportsByElementId = new Map([['sys-1', [supportsEdge({ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' })]]]);
       const { deltas } = build(matchedRows, { existsDeltaIdByElementId: new Map([['sys-1', 'd-create']]), currentSupportsByElementId });
       expect(deltas).toEqual([expect.objectContaining({ kind: 'relationship.create', relationshipType: 'supports', toElementId: 'cap-3', attributes: { role: 'secondary' } })]);
     });
@@ -231,8 +235,8 @@ describe('buildImportDeltas — matched/changed rows', () => {
       const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Billing'] }), { match: { kind: 'matched', element: { elementId: 'sys-1', name: 'Northgate' } }, capabilities: [{ kind: 'matched', element: { elementId: 'cap-1', name: 'Billing' } }] })];
       const currentSupportsByElementId = new Map([
         ['sys-1', [
-          { relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' as const, roleDeltaId: 'd-role' },
-          { relationshipId: 'rel-2', capabilityId: 'cap-9', role: 'secondary' as const, roleDeltaId: 'd-role-2' },
+          supportsEdge({ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' }),
+          supportsEdge({ relationshipId: 'rel-2', capabilityId: 'cap-9', role: 'secondary', roleDeltaId: 'd-role-2' }),
         ]],
       ]);
       const { deltas } = build(matchedRows, { existsDeltaIdByElementId: new Map([['sys-1', 'd-create']]), currentSupportsByElementId });
@@ -242,7 +246,7 @@ describe('buildImportDeltas — matched/changed rows', () => {
 
     it('leaves capability links entirely alone when the row has no capability column at all', () => {
       const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Northgate' }), { match: { kind: 'matched', element: { elementId: 'sys-1', name: 'Northgate' } } })];
-      const currentSupportsByElementId = new Map([['sys-1', [{ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' as const, roleDeltaId: 'd-role' }]]]);
+      const currentSupportsByElementId = new Map([['sys-1', [supportsEdge({ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' })]]]);
       const { deltas } = build(matchedRows, { existsDeltaIdByElementId: new Map([['sys-1', 'd-create']]), currentSupportsByElementId });
       expect(deltas).toHaveLength(0);
     });
@@ -406,9 +410,113 @@ describe('buildImportDeltas — JSON import "changes" section', () => {
     expect(results[0]?.outcome).toMatchObject({ status: 'blocked' });
   });
 
+  it('resolves a "Platform · Module" compound name to a specific platform’s own module', () => {
+    const systems = [system('sap-1', 'SAP', { kind: 'platform' }), system('workday-1', 'Workday', { kind: 'platform' })];
+    // Two platforms each have their own module named "PM" — a plain "PM" would be ambiguous (two exact matches), so only the compound form disambiguates.
+    const containers = [container('sap-pm-1', 'PM', 'sap-1'), container('workday-pm-1', 'PM', 'workday-1')];
+    const factsByElementId = new Map([['sap-pm-1', new Map([['lifecycleStatus', fact('d-lifecycle', 'active')]])]]);
+    const { deltas, changeRows: results } = build([], { systems, containers, factsByElementId, existsDeltaIdByElementId: new Map([['sap-pm-1', 'sap-pm-1-create'], ['workday-pm-1', 'workday-pm-1-create']]), changeRows: [changeRow({ rowNumber: 1, name: 'SAP · PM', action: 'retire' })] });
+    expect(deltas).toEqual([expect.objectContaining({ kind: 'element.update', elementId: 'sap-pm-1', elementType: 'container', attribute: 'lifecycleStatus', value: 'retired' })]);
+    expect(results).toEqual([{ rowNumber: 1, name: 'SAP · PM', action: 'retire', reason: null, outcome: { status: 'applied', elementId: 'sap-pm-1' } }]);
+  });
+
+  it('blocks a plain module name that exact-matches more than one platform’s own module, same as the ambiguous-without-qualification case', () => {
+    const systems = [system('sap-1', 'SAP', { kind: 'platform' }), system('workday-1', 'Workday', { kind: 'platform' })];
+    const containers = [container('sap-pm-1', 'PM', 'sap-1'), container('workday-pm-1', 'PM', 'workday-1')];
+    const { changeRows: results } = build([], { systems, containers, changeRows: [changeRow({ rowNumber: 1, name: 'PM', action: 'retire' })] });
+    expect(results[0]?.outcome).toEqual({ status: 'blocked', reason: '"PM" was not found, or matched more than one existing system/module' });
+  });
+
   it('never targets an actor — lifecycleStatus is a system/module attribute only', () => {
     const actors = [{ element_id: 'actor-1', element_type: 'actor', name: 'Jane Doe', parent_id: null, attributes: {}, exists_delta_id: 'actor-1-create' } as ElementsHeadRow];
     const { changeRows: results } = build([], { actors, changeRows: [changeRow({ rowNumber: 1, name: 'Jane Doe', action: 'retire' })] });
     expect(results[0]?.outcome).toMatchObject({ status: 'blocked' });
+  });
+
+  describe('replaced_by — transfers supports edges to the named replacement', () => {
+    it('retracts every one of the retiring element’s own supports edges and re-creates them on the replacement, role secondary (never primary, matching useElementRetire.ts)', () => {
+      const systems = [system('legacy-1', 'Legacy CRM'), system('electron-1', 'Electron')];
+      const factsByElementId = new Map([['legacy-1', new Map([['lifecycleStatus', fact('d-lifecycle', 'active')]])]]);
+      const currentSupportsByElementId = new Map([
+        ['legacy-1', [
+          supportsEdge({ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' }),
+          supportsEdge({ relationshipId: 'rel-2', capabilityId: 'cap-2', role: 'secondary', roleDeltaId: 'd-role-2', existsDeltaId: 'd-exists-2' }),
+        ]],
+      ]);
+      const { deltas, changeRows: results } = build([], {
+        systems,
+        factsByElementId,
+        currentSupportsByElementId,
+        existsDeltaIdByElementId: new Map([['legacy-1', 'legacy-1-create'], ['electron-1', 'electron-1-create']]),
+        changeRows: [changeRow({ rowNumber: 1, name: 'Legacy CRM', action: 'retire', replacedBy: 'Electron' })],
+      });
+      expect(deltas).toEqual([
+        expect.objectContaining({ kind: 'element.update', elementId: 'legacy-1', attribute: 'lifecycleStatus', value: 'retired' }),
+        expect.objectContaining({ kind: 'relationship.retract', relationshipId: 'rel-1', previousDeltaId: 'd-exists' }),
+        expect.objectContaining({ kind: 'relationship.create', relationshipType: 'supports', fromElementId: 'electron-1', toElementId: 'cap-1', attributes: { role: 'secondary' } }),
+        expect.objectContaining({ kind: 'relationship.retract', relationshipId: 'rel-2', previousDeltaId: 'd-exists-2' }),
+        expect.objectContaining({ kind: 'relationship.create', relationshipType: 'supports', fromElementId: 'electron-1', toElementId: 'cap-2', attributes: { role: 'secondary' } }),
+      ]);
+      expect(results).toEqual([{ rowNumber: 1, name: 'Legacy CRM', action: 'retire', reason: null, outcome: { status: 'applied', elementId: 'legacy-1' } }]);
+    });
+
+    it('resolves replaced_by by "Platform · Module" the same as name itself', () => {
+      const systems = [system('legacy-1', 'Legacy CRM'), system('sap-1', 'SAP', { kind: 'platform' })];
+      const containers = [container('sap-pm-1', 'PM', 'sap-1')];
+      const currentSupportsByElementId = new Map([['legacy-1', [supportsEdge({ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' })]]]);
+      const { deltas } = build([], { systems, containers, currentSupportsByElementId, existsDeltaIdByElementId: new Map([['legacy-1', 'legacy-1-create'], ['sap-pm-1', 'sap-pm-1-create']]), changeRows: [changeRow({ rowNumber: 1, name: 'Legacy CRM', action: 'retire', replacedBy: 'SAP · PM' })] });
+      expect(deltas.find((d) => d.kind === 'relationship.create')).toMatchObject({ fromElementId: 'sap-pm-1' });
+    });
+
+    it('blocks the whole row when replaced_by is given but does not resolve', () => {
+      const systems = [system('legacy-1', 'Legacy CRM')];
+      const { changeRows: results } = build([], { systems, existsDeltaIdByElementId: new Map([['legacy-1', 'legacy-1-create']]), changeRows: [changeRow({ rowNumber: 1, name: 'Legacy CRM', action: 'retire', replacedBy: 'Nonexistent' })] });
+      expect(results[0]?.outcome).toEqual({ status: 'blocked', reason: '"replaced_by" "Nonexistent" was not found, or matched more than one existing system/module' });
+    });
+
+    it('is applied (not unchanged) when only the replacement transfer produces deltas, even though lifecycleStatus was already retired', () => {
+      const systems = [system('legacy-1', 'Legacy CRM'), system('electron-1', 'Electron')];
+      const factsByElementId = new Map([['legacy-1', new Map([['lifecycleStatus', fact('d-lifecycle', 'retired')]])]]);
+      const currentSupportsByElementId = new Map([['legacy-1', [supportsEdge({ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' })]]]);
+      const { deltas, changeRows: results } = build([], { systems, factsByElementId, currentSupportsByElementId, existsDeltaIdByElementId: new Map([['legacy-1', 'legacy-1-create'], ['electron-1', 'electron-1-create']]), changeRows: [changeRow({ rowNumber: 1, name: 'Legacy CRM', action: 'retire', replacedBy: 'Electron' })] });
+      expect(deltas.some((d) => d.kind === 'element.update')).toBe(false);
+      expect(deltas.some((d) => d.kind === 'relationship.retract')).toBe(true);
+      expect(results[0]?.outcome).toEqual({ status: 'applied', elementId: 'legacy-1' });
+    });
+  });
+});
+
+describe('buildImportDeltas — JSON import per-entry quote/confidence provenance', () => {
+  it('overrides the otherwise-hardcoded confidence and appends the quote to sourceRef, on a new system row', () => {
+    const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Northgate', quote: 'Northgate handles all revenue billing', confidence: 0.8 }))];
+    const { deltas } = build(matchedRows);
+    expect(deltas[0]).toMatchObject({ confidence: 0.8, sourceRef: `${FILE_NAME} › row 2 › row — "Northgate handles all revenue billing"` });
+  });
+
+  it('defaults to confidence 1 and a plain sourceRef when quote/confidence are omitted, unchanged from before they existed', () => {
+    const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Northgate' }))];
+    const { deltas } = build(matchedRows);
+    expect(deltas[0]).toMatchObject({ confidence: 1, sourceRef: `${FILE_NAME} › row 2 › row` });
+  });
+
+  it('carries confidence/quote onto a relationship row’s own delta', () => {
+    const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Northgate' })), matchedRow(row({ rowNumber: 3, name: 'Southgate' }))];
+    const relationshipRows = [relationshipRow({ rowNumber: 6, from: 'Northgate', to: 'Southgate', quote: 'Northgate reads balances from Southgate', confidence: 0.65 })];
+    const { deltas } = build(matchedRows, { relationshipRows });
+    expect(deltas.find((d) => d.kind === 'relationship.create' && d.relationshipType === 'uses')).toMatchObject({ confidence: 0.65, sourceRef: `${FILE_NAME} › row 6 › row — "Northgate reads balances from Southgate"` });
+  });
+
+  it('carries confidence/quote onto a changes row’s own delta', () => {
+    const systems = [system('sys-1', 'Legacy CRM')];
+    const factsByElementId = new Map([['sys-1', new Map([['lifecycleStatus', fact('d-lifecycle', 'active')]])]]);
+    const { deltas } = build([], { systems, factsByElementId, existsDeltaIdByElementId: new Map([['sys-1', 'sys-1-create']]), changeRows: [changeRow({ rowNumber: 1, name: 'Legacy CRM', action: 'retire', quote: 'CRM was decommissioned in March', confidence: 0.9 })] });
+    expect(deltas[0]).toMatchObject({ confidence: 0.9, sourceRef: `${FILE_NAME} › row 1 › retire — "CRM was decommissioned in March"` });
+  });
+
+  it('carries confidence/quote from the mentioning row onto the new actor this import mints for an unresolved owner', () => {
+    const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Northgate', businessOwner: { name: 'Jane Doe', externalOrganisation: null }, quote: 'Jane Doe owns Northgate', confidence: 0.7 }), { businessOwner: { kind: 'new' } })];
+    const { deltas } = build(matchedRows);
+    const actorCreate = deltas.find((d) => d.kind === 'element.create' && d.elementType === 'actor');
+    expect(actorCreate).toMatchObject({ confidence: 0.7, sourceRef: `${FILE_NAME} › row 2 › business_owner — "Jane Doe owns Northgate"` });
   });
 });
