@@ -132,6 +132,12 @@ export function ElementSearchAdd({
         </ul>
       )}
 
+      {search.moreCount > 0 && (
+        <Text as="p" tone="muted" size="sm">
+          {search.results.length} shown — {search.moreCount} more match{search.moreCount === 1 ? '' : 'es'}. Keep typing to narrow before creating a new one.
+        </Text>
+      )}
+
       {search.showCreate && (
         <Button variant="primary" disabled={createStatus === 'creating'} onClick={() => void create(search.query)}>
           {createStatus === 'creating' ? 'Adding…' : `Create ${elementType} "${search.query.trim()}"`}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasExactMatch, matchElements, mergeSearchPools, type SearchPoolElement } from './elementSearch';
+import { countMatches, hasExactMatch, matchElements, mergeSearchPools, type SearchPoolElement } from './elementSearch';
 import type { ElementsHeadRow } from '../contracts/rows';
 
 function el(overrides: Partial<ElementsHeadRow>): ElementsHeadRow {
@@ -46,6 +46,78 @@ describe('matchElements (Blocking: element creation)', () => {
     const target = el({ element_id: 'e1', name: 'Payment Gateway', attributes: {} });
     const p = pool([{ element: target }]);
     expect(matchElements(p, 'undefined')).toEqual([]);
+  });
+
+  it('excludes one element id before ranking/capping, backfilling from the next-best match rather than just shrinking the list', () => {
+    const entries = Array.from({ length: 9 }, (_, i) => ({ element: el({ element_id: `e${String(i)}`, name: `System ${String(i)}` }) }));
+    const withExclusion = matchElements(pool(entries), 'System', 8, 'e0');
+    expect(withExclusion).toHaveLength(8);
+    expect(withExclusion.some((e) => e.element_id === 'e0')).toBe(false);
+  });
+
+  describe('ranking (a real match should never be silently outranked by a worse one)', () => {
+    it('a name match ranks above a description match, regardless of pool order', () => {
+      const nameMatch = el({ element_id: 'name', name: 'Salesforce' });
+      const descriptionMatch = el({ element_id: 'desc', name: 'Azure Synapse', attributes: { description: 'A SaaS data warehouse' } });
+      // Description-match entry placed first in the pool — order alone must not decide this.
+      const p = pool([{ element: descriptionMatch }, { element: nameMatch }]);
+      expect(matchElements(p, 'sa').map((e) => e.element_id)).toEqual(['name', 'desc']);
+    });
+
+    it('a name-prefix match ranks above a name match buried mid-string', () => {
+      const prefix = el({ element_id: 'prefix', name: 'SAP' });
+      const midString = el({ element_id: 'mid', name: 'Legacy SAP Adapter' });
+      const p = pool([{ element: midString }, { element: prefix }]);
+      expect(matchElements(p, 'sap').map((e) => e.element_id)).toEqual(['prefix', 'mid']);
+    });
+
+    it('an exact name match ranks above every other tier', () => {
+      const exact = el({ element_id: 'exact', name: 'PM' });
+      const prefix = el({ element_id: 'prefix', name: 'PM Suite' });
+      const p = pool([{ element: prefix }, { element: exact }]);
+      expect(matchElements(p, 'pm').map((e) => e.element_id)).toEqual(['exact', 'prefix']);
+    });
+
+    it('a description match ranks above an alias match', () => {
+      const descriptionMatch = el({ element_id: 'desc', name: 'Billing Service', attributes: { description: 'Handles sales tax' } });
+      const aliasMatch = el({ element_id: 'alias', name: 'Payments' });
+      const p = pool([{ element: aliasMatch, aliases: ['sales-legacy'] }, { element: descriptionMatch }]);
+      expect(matchElements(p, 'sales').map((e) => e.element_id)).toEqual(['desc', 'alias']);
+    });
+
+    it('the 8-result cap keeps the best matches, not just the first found', () => {
+      const goodMatches = Array.from({ length: 3 }, (_, i) => ({ element: el({ element_id: `good${String(i)}`, name: `Sales System ${String(i)}` }) }));
+      // Ten description-only matches, loaded before the name matches above.
+      const weakMatches = Array.from({ length: 10 }, (_, i) => ({
+        element: el({ element_id: `weak${String(i)}`, name: `System ${String(i)}`, attributes: { description: 'part of the sales pipeline' } }),
+      }));
+      const p = pool([...weakMatches, ...goodMatches]);
+      const results = matchElements(p, 'sales');
+      expect(results).toHaveLength(8);
+      // All three name matches survive the cap despite loading last.
+      expect(goodMatches.every(({ element }) => results.some((r) => r.element_id === element.element_id))).toBe(true);
+    });
+  });
+});
+
+describe('countMatches', () => {
+  it('counts every match, unbounded by the display limit', () => {
+    const entries = Array.from({ length: 12 }, (_, i) => ({ element: el({ element_id: `e${String(i)}`, name: `System ${String(i)}` }) }));
+    const p = pool(entries);
+    expect(matchElements(p, 'System')).toHaveLength(8);
+    expect(countMatches(p, 'System')).toBe(12);
+  });
+
+  it('is 0 for an empty query or no matches', () => {
+    const p = pool([{ element: el({ name: 'Anything' }) }]);
+    expect(countMatches(p, '')).toBe(0);
+    expect(countMatches(p, 'zzz')).toBe(0);
+  });
+
+  it('excludes the same id matchElements would, so the two never disagree about how many more there are', () => {
+    const entries = Array.from({ length: 5 }, (_, i) => ({ element: el({ element_id: `e${String(i)}`, name: `System ${String(i)}` }) }));
+    const p = pool(entries);
+    expect(countMatches(p, 'System', 'e0')).toBe(4);
   });
 });
 

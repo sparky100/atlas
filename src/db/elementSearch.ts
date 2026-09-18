@@ -103,25 +103,84 @@ function descriptionOf(element: ElementsHeadRow): string {
 }
 
 /**
- * Pure matching (Blocking: element creation's "matches against names,
- * aliases and descriptions"): case-insensitive substring, name first, then
- * description, then alias — checked in that order only to short-circuit,
- * not to rank (`limit` caps the result list for a typeahead-sized display,
- * not a relevance sort). An empty/whitespace-only query matches nothing —
- * there's no "everything" state for this control, only "type to search."
+ * How well `q` (already trimmed/lowercased) matches one pool entry, lowest
+ * number best — `null` for no match at all. Field priority (name, then
+ * description, then alias) is preserved exactly as it always was; new here
+ * is ranking *within* a field, so a name that starts with the query (a
+ * system literally called "Salesforce" for a "sa" search) beats one that
+ * merely contains it somewhere in the middle (a system whose *description*
+ * happens to mention "SaaS") purely because it happened to load first —
+ * the bug behind `matchElements` silently truncating a highly relevant
+ * result out of a capped list while a poor one took its place.
  */
-export function matchElements(pool: readonly SearchPoolElement[], query: string, limit = 8): ElementsHeadRow[] {
+function matchTier(element: ElementsHeadRow, aliases: readonly string[], q: string): number | null {
+  const name = element.name.toLowerCase();
+  if (name === q) return 0;
+  if (name.startsWith(q)) return 1;
+  if (name.includes(q)) return 2;
+  const description = descriptionOf(element).toLowerCase();
+  if (description.startsWith(q)) return 3;
+  if (description.includes(q)) return 4;
+  for (const alias of aliases) {
+    const a = alias.toLowerCase();
+    if (a.startsWith(q)) return 5;
+    if (a.includes(q)) return 6;
+  }
+  return null;
+}
+
+/**
+ * Every pool entry that matches `query` at all, best match first
+ * (`matchTier`'s own doc comment) — ties broken by stable sort, which
+ * preserves the pool's own incoming order (for `loadSearchPoolForTypes`,
+ * already alphabetical by name via `mergeSearchPools`). `excludeElementId`,
+ * when given, drops one id before ranking/counting — applied here, not as
+ * a post-filter on an already-capped result, so excluding an element that
+ * would otherwise have filled a visible slot doesn't just shrink the
+ * result list by one instead of backfilling from the next-best match
+ * (`useRelationshipTargetSearch.ts`'s own reason for excluding the
+ * element whose own "+ Add" this is — relating something to itself is
+ * never legal). Unbounded — callers needing a capped display list or just
+ * the total match count both derive from this same ranking, so the two
+ * can never disagree about what counts as a match.
+ */
+function rankedMatches(pool: readonly SearchPoolElement[], query: string, excludeElementId?: UUID): ElementsHeadRow[] {
   const q = query.trim().toLowerCase();
   if (q === '') return [];
-  const matches: ElementsHeadRow[] = [];
+  const ranked: { element: ElementsHeadRow; tier: number }[] = [];
   for (const { element, aliases } of pool) {
-    if (matches.length >= limit) break;
-    const nameMatch = element.name.toLowerCase().includes(q);
-    const descriptionMatch = !nameMatch && descriptionOf(element).toLowerCase().includes(q);
-    const aliasMatch = !nameMatch && !descriptionMatch && aliases.some((alias) => alias.toLowerCase().includes(q));
-    if (nameMatch || descriptionMatch || aliasMatch) matches.push(element);
+    if (excludeElementId !== undefined && element.element_id === excludeElementId) continue;
+    const tier = matchTier(element, aliases, q);
+    if (tier !== null) ranked.push({ element, tier });
   }
-  return matches;
+  ranked.sort((a, b) => a.tier - b.tier);
+  return ranked.map((r) => r.element);
+}
+
+/**
+ * Pure matching (Blocking: element creation's "matches against names,
+ * aliases and descriptions"), best matches first (`matchTier`), capped at
+ * `limit` for a typeahead-sized display — an empty/whitespace-only query
+ * matches nothing, there's no "everything" state for this control, only
+ * "type to search." Pair with `countMatches` (same ranking, unbounded) to
+ * know whether this cap actually cut anything off.
+ */
+export function matchElements(pool: readonly SearchPoolElement[], query: string, limit = 8, excludeElementId?: UUID): ElementsHeadRow[] {
+  return rankedMatches(pool, query, excludeElementId).slice(0, limit);
+}
+
+/**
+ * The total number of pool entries `matchElements` would match before its
+ * own `limit` truncates them — a caller shows this against the visible
+ * result count so "nothing shown past position N" reads as "keep typing to
+ * narrow," not "this doesn't exist yet" (the false-duplicate risk a silent
+ * cap invites: `showCreate`/`hasCreatableExactMatch` only ever suppress
+ * "Create…" for an *exact* match, so a real near-match sitting just past
+ * the cap is invisible *and* offers no signal that clicking "Create" would
+ * make a duplicate).
+ */
+export function countMatches(pool: readonly SearchPoolElement[], query: string, excludeElementId?: UUID): number {
+  return rankedMatches(pool, query, excludeElementId).length;
 }
 
 /**

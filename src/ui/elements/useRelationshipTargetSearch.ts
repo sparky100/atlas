@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import { loadSearchPoolForTypes, matchElements, type SearchPoolElement } from '../../db/elementSearch';
+import { countMatches, loadSearchPoolForTypes, matchElements, type SearchPoolElement } from '../../db/elementSearch';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -13,6 +13,8 @@ export interface UseRelationshipTargetSearchResult {
   status: RelationshipTargetSearchStatus;
   error: string | null;
   results: ElementsHeadRow[];
+  /** How many more real matches exist beyond `results` (`countMatches` minus what's shown) — a caller renders this so an empty or short `results` list reads as "keep typing to narrow," never "this doesn't exist." 0 when nothing was cut off. */
+  moreCount: number;
 }
 
 /**
@@ -60,8 +62,14 @@ export function useRelationshipTargetSearch(commitId: UUID, modelId: UUID, targe
     // `typesKey` stands in for `targetTypes`, a fresh array every render.
   }, [commitId, modelId, typesKey, enabled]);
 
-  const matches = pool ? matchElements(pool, query).filter((element) => element.element_id !== excludeElementId) : [];
+  // Excluding `excludeElementId` inside `matchElements`/`countMatches`
+  // themselves (rather than filtering the already-capped result afterward)
+  // means a query that matches this element too still backfills the
+  // display from the next-best real candidate, instead of just showing one
+  // fewer result than the cap allows.
+  const matches = pool ? matchElements(pool, query, 8, excludeElementId) : [];
+  const totalMatches = pool ? countMatches(pool, query, excludeElementId) : 0;
   const status: RelationshipTargetSearchStatus = error !== null ? 'error' : pool === null ? 'loading' : 'ready';
 
-  return { query, setQuery, status, error, results: matches };
+  return { query, setQuery, status, error, results: matches, moreCount: Math.max(0, totalMatches - matches.length) };
 }
