@@ -270,6 +270,20 @@ describe('buildImportDeltas — matched/changed rows', () => {
       expect(secondaryCreates).toHaveLength(1);
     });
 
+    it('promotes an already-linked secondary capability to primary in place, never a fresh relationship.create for the identical edge (V6)', () => {
+      const matchedRows = [
+        matchedRow(row({ rowNumber: 2, name: 'CRM', capabilityNames: ['Case & Request Tracking'] }), {
+          match: { kind: 'matched', element: { elementId: 'sys-1', name: 'CRM' } },
+          capabilities: [{ kind: 'matched', element: { elementId: 'cap-1', name: 'Case & Request Tracking' } }],
+        }),
+      ];
+      const currentSupportsByElementId = new Map([['sys-1', [supportsEdge({ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'secondary' })]]]);
+      const { deltas, rows } = build(matchedRows, { existsDeltaIdByElementId: new Map([['sys-1', 'd-create']]), currentSupportsByElementId });
+      expect(deltas).toEqual([expect.objectContaining({ kind: 'relationship.update', relationshipId: 'rel-1', relationshipType: 'supports', attribute: 'role', value: 'primary', previousDeltaId: 'd-role' })]);
+      expect(deltas.some((d) => d.kind === 'relationship.create')).toBe(false);
+      expect(rows[0]?.outcome).toMatchObject({ status: 'changed', changedColumns: ['capability'] });
+    });
+
     it('never removes a capability link that is simply absent from the row’s own list', () => {
       const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Northgate', capabilityNames: ['Billing'] }), { match: { kind: 'matched', element: { elementId: 'sys-1', name: 'Northgate' } }, capabilities: [{ kind: 'matched', element: { elementId: 'cap-1', name: 'Billing' } }] })];
       const currentSupportsByElementId = new Map([

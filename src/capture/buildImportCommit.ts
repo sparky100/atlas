@@ -474,7 +474,19 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
         if (currentPrimary) {
           deltas.push({ kind: 'relationship.update', id: crypto.randomUUID(), relationshipId: currentPrimary.relationshipId, relationshipType: 'supports', attribute: 'role', value: 'secondary', previousDeltaId: currentPrimary.roleDeltaId, sourceId, sourceRef: locator('capability'), confidence: row.confidence ?? 1 });
         }
-        deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'supports', fromElementId: elementId, toElementId: newPrimaryId, attributes: { role: 'primary' }, sourceId, sourceRef: locator('capability'), confidence: row.confidence ?? 1 });
+        // The row's new primary can already be linked as a *secondary* edge
+        // (a real production case: an element already supports a capability
+        // secondarily, and an import now names it primary) — promoting that
+        // edge in place, never a fresh `relationship.create`, which would
+        // leave two live edges for the identical (supports, elementId,
+        // newPrimaryId) triple and fail V6 (`checkNoDuplicateRelationship`,
+        // src/engine/deltas.ts) the moment this commit is folded.
+        const existingNewPrimaryEdge = currentEdges.find((e) => e.capabilityId === newPrimaryId);
+        if (existingNewPrimaryEdge) {
+          deltas.push({ kind: 'relationship.update', id: crypto.randomUUID(), relationshipId: existingNewPrimaryEdge.relationshipId, relationshipType: 'supports', attribute: 'role', value: 'primary', previousDeltaId: existingNewPrimaryEdge.roleDeltaId, sourceId, sourceRef: locator('capability'), confidence: row.confidence ?? 1 });
+        } else {
+          deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'supports', fromElementId: elementId, toElementId: newPrimaryId, attributes: { role: 'primary' }, sourceId, sourceRef: locator('capability'), confidence: row.confidence ?? 1 });
+        }
       }
       // Every other newly-listed capability (index 1+, or index 0 when it
       // already matched the current primary and needed no promotion) that
