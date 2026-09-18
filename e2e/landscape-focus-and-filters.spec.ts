@@ -167,6 +167,30 @@ test('landscape filters: checking one capability narrows the canvas to its own s
   await expect(canvas).toHaveAttribute('aria-label', /2 systems across 1 lanes/, { timeout: 15_000 });
 });
 
+test('landscape filters: a facet stays open across two selections, no re-opening needed', async ({ page }) => {
+  const env = loadEnv();
+  const fixture = await bootstrapChangeBranchFixture(page, env, 'facetstay', 'Facet System');
+  const { orgSlug, modelSlug } = fixture;
+
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/landscape`);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('aria-label', /1 systems/, { timeout: 30_000 });
+
+  await page.locator('summary', { hasText: 'Lifecycle' }).click();
+  await page.getByRole('checkbox', { name: 'Active' }).check();
+  // Regression: a filter change used to reset `useLandscapeDisplay`'s own
+  // state to 'loading' while the worker recomputed the layout, which
+  // unmounted the whole canvas+Inspector subtree gated on it
+  // (`LandscapePage.tsx`) — closing every open `<details>` facet
+  // (`LandscapeFilterBar.tsx`) along with it. Checking a second option in
+  // the *same* facet with no intervening `summary` click proves it never
+  // closed; a closed `<details>` would make this `.check()` time out
+  // (the checkbox inside it is not visible to Playwright).
+  await page.getByRole('checkbox', { name: 'Planned' }).check();
+  await expect(page.getByRole('checkbox', { name: 'Active' })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Planned' })).toBeChecked();
+});
+
 test('landscape lanes: collapse/expand and pin, each remembered per user across a reload', async ({ page }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'lanepref', 'Alpha System');
