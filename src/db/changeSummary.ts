@@ -194,17 +194,29 @@ export async function loadChangeSummariesForModel(supabase: Client, modelId: UUI
       continue;
     }
 
-    const toBeHead = foldFromGenesis(branch.head_commit_id, loader);
-    const asIsHead = foldFromGenesis(branch.base_commit_id, loader);
-    const { subjects, affectedCapabilities } = summarizeOwnDeltas(ownDeltas, asIsHead, toBeHead);
-    // Every element in either head, not just this branch's own touched
-    // subjects — a `relationship.create` delta's endpoint is frequently a
-    // pre-existing element nothing else on this branch touched, and
-    // `describeEnvelope`'s own doc comment is explicit that an unresolved
-    // id falls back to "(unknown)" rather than guessing.
-    const nameLookup: NameLookup = (id) => toBeHead.elements.get(id)?.name ?? asIsHead.elements.get(id)?.name;
-    const description = describeEnvelope(ownDeltas, nameLookup);
-    result.set(branch.id, { subjects, affectedCapabilities, description });
+    // Same "one bad row shouldn't blank the whole list" stance as the
+    // null-commit-id skip above, extended to the fold itself: a branch
+    // whose own history can't be replayed (a pre-existing structural
+    // violation from before a gate like V6 existed, most often — a real
+    // production case, `useChangeSummaries.ts`'s own doc comment already
+    // promised this degrades one card, not the whole batch) is skipped
+    // here rather than left to throw and take every other branch's
+    // summary down with it, cancelled or not.
+    try {
+      const toBeHead = foldFromGenesis(branch.head_commit_id, loader);
+      const asIsHead = foldFromGenesis(branch.base_commit_id, loader);
+      const { subjects, affectedCapabilities } = summarizeOwnDeltas(ownDeltas, asIsHead, toBeHead);
+      // Every element in either head, not just this branch's own touched
+      // subjects — a `relationship.create` delta's endpoint is frequently a
+      // pre-existing element nothing else on this branch touched, and
+      // `describeEnvelope`'s own doc comment is explicit that an unresolved
+      // id falls back to "(unknown)" rather than guessing.
+      const nameLookup: NameLookup = (id) => toBeHead.elements.get(id)?.name ?? asIsHead.elements.get(id)?.name;
+      const description = describeEnvelope(ownDeltas, nameLookup);
+      result.set(branch.id, { subjects, affectedCapabilities, description });
+    } catch {
+      continue;
+    }
   }
   return result;
 }
