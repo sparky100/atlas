@@ -65,7 +65,18 @@ export function useLandscapeDisplay(
     }
     const currentData = data;
     let cancelled = false;
-    setState({ status: 'loading' });
+    // Stale-while-revalidate: a filter, lane-pin/collapse, or width change
+    // recomputes the layout, but there's nothing wrong with the layout
+    // already on screen while that recompute runs — blanking it to
+    // 'loading' unmounts the whole canvas+Inspector subtree gated on
+    // `displayState.status === 'ready'` (`LandscapePage.tsx`), which reset
+    // every currently-open filter facet (`LandscapeFilterBar.tsx`'s own
+    // `<details>`) and the rest of the Inspector's own open/closed section
+    // state on every single filter click — a real, reported bug. Only a
+    // genuinely-empty state (nothing computed yet) shows 'loading'; a
+    // recompute on top of an already-ready display keeps showing the
+    // previous one until the new one lands.
+    setState((prev) => (prev.status === 'ready' ? prev : { status: 'loading' }));
 
     async function compute(): Promise<void> {
       const allSystems = [...currentData.systemsById.values()];
