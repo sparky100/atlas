@@ -190,10 +190,14 @@ function resolvedCapabilityIds(capabilities: readonly NameResolutionOutcome[]): 
   return capabilities.flatMap((c) => (c.kind === 'matched' ? [c.element.elementId] : []));
 }
 
-/** A row this same import resolved to a real element — this file's own rows are as legitimate a relationship endpoint as anything already in the model (a system and its own new outbound `uses` edge can land in the same file). */
+/** A row this same import resolved to a real element — this file's own rows are as legitimate a relationship endpoint as anything already in the model (a system and its own new outbound `uses` edge can land in the same file), and, per the same reasoning, as legitimate a `changes`/`replaced_by` target too (a full inventory import commonly creates a system only to retire it in the same commit — recording history, not proposing a no-op). */
 interface ResolvedFileRow {
   elementId: UUID;
   row: ImportRow;
+  /** The *real*, resolved element type — never `row.elementType` alone, which only reflects this row's own `platform` field and stops being trustworthy once a bare row can resolve to an existing module (`matchImportRows.ts`'s own container cross-check). */
+  elementType: 'system' | 'container';
+  /** Set only for a row that minted a brand-new element in this very batch — that element's own `element.create` delta id, so a same-file `changes` entry retiring/restoring it in the same commit has something to chain its own `previousDeltaId` onto (nothing is pre-loaded for an element that doesn't exist outside this batch yet). `undefined` for a row that matched something already in the model. */
+  createDeltaId: UUID | undefined;
 }
 
 /** Import close-out: a Relationships-sheet endpoint — a plain name, or "Platform · Module" naming one of a platform's own modules. Name-or-alias, exact only (no fuzzy tier — a reference column at this remove from the row's own identity isn't worth the same near-match UI); `null` when nothing resolves it. */
@@ -226,9 +230,8 @@ function resolveChangeTarget(name: string, systems: readonly ElementsHeadRow[], 
   // "Platform · Module" — the same compound form `resolveEndpointRef` below
   // resolves for a Relationships-sheet endpoint, so a module retirement can
   // name a specific platform's own module even when another platform has a
-  // same-named one. Existing elements only (never `fileRowsByName`) — a
-  // change row targets something already in the model, never a row this
-  // same file just created.
+  // same-named one. Existing elements only — `resolveChangeReference` below
+  // is the one that also checks this same file's own new/matched rows.
   const compound = name.split('·').map((s) => s.trim());
   if (compound.length === 2 && compound[0] && compound[1]) {
     const [platformName, moduleName] = compound;
@@ -245,6 +248,34 @@ function resolveChangeTarget(name: string, systems: readonly ElementsHeadRow[], 
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length check above guarantees this.
   const match = all[0]!;
   return { elementId: match.elementId, elementType: match.elementType };
+}
+
+/**
+ * A `changes` row's own `name`/`replaced_by` — `resolveChangeTarget` against
+ * the model's current elements first, falling back to this same file's own
+ * new/matched rows (`fileRowsByName`) only when nothing existing matches. A
+ * full-inventory import commonly creates a system only to retire it (with a
+ * replacement) in the very same commit — recording a fact that was already
+ * true, not proposing a no-op — so a `changes` entry naming something this
+ * file's own `systems` array is also describing is a real, common shape, not
+ * a mistake. The existing-model pool always wins on a genuine name clash
+ * (matching `resolveEndpointRef`'s own precedence for the identical
+ * question on a Relationships-sheet endpoint).
+ *
+ * A resolved *file* row's own currently-pending `supports` edges (if any —
+ * a row's own `capability` column) are **not** transferred to a
+ * `replaced_by` target the way a pre-existing element's live edges are:
+ * there is nothing pre-loaded to read for an element that doesn't exist
+ * outside this batch yet, and redirecting deltas this same pass already
+ * queued is out of scope here — the capability link lands on the new
+ * element itself, not the replacement, and needs a manual follow-up if
+ * that's not wanted.
+ */
+function resolveChangeReference(name: string, systems: readonly ElementsHeadRow[], containers: readonly ElementsHeadRow[], aliasesByElementId: ReadonlyMap<UUID, readonly string[]>, fileRowsByName: ReadonlyMap<string, ResolvedFileRow>): { elementId: UUID; elementType: 'system' | 'container'; createDeltaId: UUID | undefined } | null {
+  const existing = resolveChangeTarget(name, systems, containers, aliasesByElementId);
+  if (existing) return { ...existing, createDeltaId: undefined };
+  const fileRow = fileRowsByName.get(normalizeName(name));
+  return fileRow ? { elementId: fileRow.elementId, elementType: fileRow.elementType, createDeltaId: fileRow.createDeltaId } : null;
 }
 
 /** `via` is always a plain system name (never "Platform · Module" — an integration platform is a top-level system, never a module) and must resolve to `kind === 'integration_platform'`, whether that system already exists or is itself one of this file's own new rows. */
@@ -331,11 +362,12 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
 
     if (resolution === 'new') {
       const elementId = crypto.randomUUID();
+      const createDeltaId = crypto.randomUUID();
       touchedElementIds.push(elementId);
-      fileRowsByName.set(normalizeName(row.name), { elementId, row });
+      fileRowsByName.set(normalizeName(row.name), { elementId, row, elementType: row.elementType, createDeltaId });
       deltas.push({
         kind: 'element.create',
-        id: crypto.randomUUID(),
+        id: createDeltaId,
         elementId,
         elementType: row.elementType,
         name: row.name,
@@ -373,19 +405,19 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
     // safe, well-defined "what changes" the owner rules don't have.
     const elementId: UUID = resolution;
     touchedElementIds.push(elementId);
-    fileRowsByName.set(normalizeName(row.name), { elementId, row });
-    const facts = factsByElementId.get(elementId) ?? new Map<string, FactsRow>();
-    const existsDeltaId = existsDeltaIdByElementId.get(elementId);
-    if (existsDeltaId === undefined) {
-      rows.push({ rowNumber: row.rowNumber, name: row.name, outcome: { status: 'blocked', reason: "the matched element's current state could not be read" }, warnings });
-      continue;
-    }
     // The row's own `elementType` only ever reflects its own `platform`
     // column — never trusted for an *existing* element (a bare row's own
     // identity can now resolve to a module via `crossCheckAgainstModules`,
     // `matchImportRows.ts`), so every delta below carries the real,
     // resolved element's own type instead.
     const elementType = containers.some((c) => c.element_id === elementId) ? 'container' : 'system';
+    fileRowsByName.set(normalizeName(row.name), { elementId, row, elementType, createDeltaId: undefined });
+    const facts = factsByElementId.get(elementId) ?? new Map<string, FactsRow>();
+    const existsDeltaId = existsDeltaIdByElementId.get(elementId);
+    if (existsDeltaId === undefined) {
+      rows.push({ rowNumber: row.rowNumber, name: row.name, outcome: { status: 'blocked', reason: "the matched element's current state could not be read" }, warnings });
+      continue;
+    }
 
     const changedColumns: string[] = [];
     for (const [column, attribute] of ATTRIBUTE_COLUMNS) {
@@ -518,28 +550,35 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
     const locator = makeLocator(fileName, changeRow.rowNumber, changeRow.quote);
     const pushResult = (outcome: ChangeRowOutcome) => changeResults.push({ rowNumber: changeRow.rowNumber, name: changeRow.name, action: changeRow.action, reason: changeRow.reason, outcome });
 
-    const target = resolveChangeTarget(changeRow.name, systems, containers, aliasesByElementId);
+    const target = resolveChangeReference(changeRow.name, systems, containers, aliasesByElementId, fileRowsByName);
     if (!target) {
       pushResult({ status: 'blocked', reason: `"${changeRow.name}" was not found, or matched more than one existing system/module` });
       continue;
     }
     const { elementId, elementType } = target;
     touchedElementIds.push(elementId);
-    const facts = factsByElementId.get(elementId) ?? new Map<string, FactsRow>();
-    const existsDeltaId = existsDeltaIdByElementId.get(elementId);
+    // A same-file new/matched row (`target.createDeltaId` set) has nothing
+    // pre-loaded — its own `element.create` delta id stands in for
+    // `existsDeltaId`, the exact same fallback role it already plays for
+    // every attribute on a *matched* row that's never had its own update
+    // yet (`facts.get(attribute)?.delta_id ?? existsDeltaId`, above).
+    const facts = target.createDeltaId === undefined ? (factsByElementId.get(elementId) ?? new Map<string, FactsRow>()) : new Map<string, FactsRow>();
+    const existsDeltaId = target.createDeltaId ?? existsDeltaIdByElementId.get(elementId);
     if (existsDeltaId === undefined) {
       pushResult({ status: 'blocked', reason: "the matched element's current state could not be read" });
       continue;
     }
 
-    // `replaced_by` (JSON import follow-up) — resolved against the same
-    // pool as `name` itself, existing elements only. Resolved before any
-    // delta is pushed: an explicit replacement that can't be found blocks
-    // the whole row, the same "can't silently skip an explicit instruction"
-    // stance `platform` unresolved already takes for a module row.
+    // `replaced_by` (JSON import follow-up) — resolved the same way `name`
+    // itself now is: the model's current elements first, falling back to
+    // this same file's own new/matched rows (`resolveChangeReference`'s own
+    // doc comment). Resolved before any delta is pushed: an explicit
+    // replacement that can't be found blocks the whole row, the same
+    // "can't silently skip an explicit instruction" stance `platform`
+    // unresolved already takes for a module row.
     let replacementId: UUID | undefined;
     if (changeRow.replacedBy !== null) {
-      const replacement = resolveChangeTarget(changeRow.replacedBy, systems, containers, aliasesByElementId);
+      const replacement = resolveChangeReference(changeRow.replacedBy, systems, containers, aliasesByElementId, fileRowsByName);
       if (!replacement) {
         pushResult({ status: 'blocked', reason: `"replaced_by" "${changeRow.replacedBy}" was not found, or matched more than one existing system/module` });
         continue;

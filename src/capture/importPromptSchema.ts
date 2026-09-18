@@ -56,9 +56,9 @@ Fields: \`${RELATIONSHIP_IMPORT_COLUMNS.join(', ')}\`
 
 Fields: \`${CHANGE_IMPORT_COLUMNS.join(', ')}\`
 
-- \`name\` names a system or module that already exists in the model *before* this import — a \`changes\` entry never creates anything, and can't target something this same import's own \`systems\` array is also creating for the first time (retire it in a later import instead, once it's actually in the model). "Platform · Module" works here too.
+- \`name\` names an existing system or module — a \`changes\` entry never creates anything itself, but it can name one this same import's own \`systems\` array is introducing for the first time (a full inventory commonly creates something only to record, in the same file, that it's already being retired or replaced). "Platform · Module" works here too.
 - \`action\` is \`retire\` or \`restore\`.
-- \`replaced_by\` (retire only) names the system or module taking over — every one of the retiring element's own capability links transfers to it.
+- \`replaced_by\` (retire only) names the system or module taking over — same rule as \`name\`, so it can also be something this same import is introducing. Every one of the retiring element's own *already-existing* capability links transfers to it; a capability this same \`systems\` entry just linked for the first time does not (there's nothing to transfer yet) — put the \`capability\` field on the replacement instead if that's what's meant.
 - \`reason\` is free text explaining why, shown to whoever reviews the import.
 
 Use \`changes\` only when you're told something is being decommissioned or reinstated on purpose — never guess that something no longer exists just because nobody mentioned it.

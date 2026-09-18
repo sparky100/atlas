@@ -411,10 +411,27 @@ describe('buildImportDeltas — JSON import "changes" section', () => {
     expect(results[0]?.outcome).toEqual({ status: 'blocked', reason: '"Nonexistent" was not found, or matched more than one existing system/module' });
   });
 
-  it('never targets this same file’s own newly-created row — a change row only resolves against the model’s existing elements', () => {
+  it('resolves against this same file’s own newly-created row when nothing existing matches — a full-inventory import can create a system only to retire it in the same commit', () => {
     const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Brand New System' }))];
-    const { changeRows: results } = build(matchedRows, { changeRows: [changeRow({ rowNumber: 1, name: 'Brand New System', action: 'retire' })] });
-    expect(results[0]?.outcome).toMatchObject({ status: 'blocked' });
+    const { deltas, changeRows: results } = build(matchedRows, { changeRows: [changeRow({ rowNumber: 1, name: 'Brand New System', action: 'retire' })] });
+    const create = deltas.find((d) => d.kind === 'element.create');
+    if (create?.kind !== 'element.create') throw new Error('expected an element.create delta');
+    expect(deltas).toEqual([create, expect.objectContaining({ kind: 'element.update', elementId: create.elementId, attribute: 'lifecycleStatus', value: 'retired', previousDeltaId: create.id })]);
+    expect(results[0]?.outcome).toEqual({ status: 'applied', elementId: create.elementId });
+  });
+
+  it('still blocks when the name matches nothing at all — neither the model nor this same file', () => {
+    const { changeRows: results } = build([], { changeRows: [changeRow({ rowNumber: 1, name: 'Nowhere To Be Found', action: 'retire' })] });
+    expect(results[0]?.outcome).toEqual({ status: 'blocked', reason: '"Nowhere To Be Found" was not found, or matched more than one existing system/module' });
+  });
+
+  it('prefers a real existing match over a same-file new row of the identical name', () => {
+    const systems = [system('sys-1', 'Legacy CRM')];
+    const factsByElementId = new Map([['sys-1', new Map([['lifecycleStatus', fact('d-lifecycle', 'active')]])]]);
+    const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Legacy CRM' }), { match: { kind: 'matched', element: { elementId: 'sys-1', name: 'Legacy CRM' } } })];
+    const { deltas, changeRows: results } = build(matchedRows, { systems, factsByElementId, existsDeltaIdByElementId: new Map([['sys-1', 'sys-1-create']]), changeRows: [changeRow({ rowNumber: 1, name: 'Legacy CRM', action: 'retire' })] });
+    expect(deltas.find((d) => d.kind === 'element.update')).toMatchObject({ elementId: 'sys-1', previousDeltaId: 'd-lifecycle' });
+    expect(results[0]?.outcome).toEqual({ status: 'applied', elementId: 'sys-1' });
   });
 
   it('resolves a "Platform · Module" compound name to a specific platform’s own module', () => {
@@ -465,6 +482,38 @@ describe('buildImportDeltas — JSON import "changes" section', () => {
         expect.objectContaining({ kind: 'relationship.create', relationshipType: 'supports', fromElementId: 'electron-1', toElementId: 'cap-2', attributes: { role: 'secondary' } }),
       ]);
       expect(results).toEqual([{ rowNumber: 1, name: 'Legacy CRM', action: 'retire', reason: null, outcome: { status: 'applied', elementId: 'legacy-1' } }]);
+    });
+
+    it('resolves replaced_by against this same file’s own newly-created row too (retiring an existing element in favour of a system this same import is also introducing)', () => {
+      const systems = [system('legacy-1', 'Legacy CRM')];
+      const factsByElementId = new Map([['legacy-1', new Map([['lifecycleStatus', fact('d-lifecycle', 'active')]])]]);
+      const currentSupportsByElementId = new Map([['legacy-1', [supportsEdge({ relationshipId: 'rel-1', capabilityId: 'cap-1', role: 'primary' })]]]);
+      const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Electron Platform' }))];
+      const { deltas, changeRows: results } = build(matchedRows, {
+        systems,
+        factsByElementId,
+        currentSupportsByElementId,
+        existsDeltaIdByElementId: new Map([['legacy-1', 'legacy-1-create']]),
+        changeRows: [changeRow({ rowNumber: 1, name: 'Legacy CRM', action: 'retire', replacedBy: 'Electron Platform' })],
+      });
+      const create = deltas.find((d) => d.kind === 'element.create');
+      if (create?.kind !== 'element.create') throw new Error('expected an element.create delta');
+      expect(deltas.find((d) => d.kind === 'relationship.create' && d.relationshipType === 'supports')).toMatchObject({ fromElementId: create.elementId, toElementId: 'cap-1', attributes: { role: 'secondary' } });
+      expect(results[0]?.outcome).toEqual({ status: 'applied', elementId: 'legacy-1' });
+    });
+
+    it('leaves a same-batch retiring element’s own newly-created capability link untransferred — nothing is pre-loaded to read for an element that doesn’t exist outside this batch yet', () => {
+      const matchedRows = [
+        matchedRow(row({ rowNumber: 2, name: 'Piclo', capabilityNames: ['Flexibility Markets'] }), { capabilities: [{ kind: 'matched', element: { elementId: 'cap-1', name: 'Flexibility Markets' } }] }),
+        matchedRow(row({ rowNumber: 3, name: 'Electron Platform' })),
+      ];
+      const { deltas, changeRows: results } = build(matchedRows, { changeRows: [changeRow({ rowNumber: 1, name: 'Piclo', action: 'retire', replacedBy: 'Electron Platform' })] });
+      const piclo = deltas.find((d) => d.kind === 'element.create' && d.name === 'Piclo');
+      if (piclo?.kind !== 'element.create') throw new Error('expected Piclo’s own element.create delta');
+      // Piclo's own capability link lands on Piclo itself (its own row said so) — never transferred, since there's no pre-existing edge for the changes pass to find and move.
+      expect(deltas.find((d) => d.kind === 'relationship.create' && d.relationshipType === 'supports')).toMatchObject({ fromElementId: piclo.elementId, toElementId: 'cap-1' });
+      expect(deltas.some((d) => d.kind === 'relationship.retract')).toBe(false);
+      expect(results[0]?.outcome).toMatchObject({ status: 'applied' });
     });
 
     it('resolves replaced_by by "Platform · Module" the same as name itself', () => {
