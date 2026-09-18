@@ -267,29 +267,37 @@ export async function listInFlightBranchesTouchingSubject(supabase: Client, mode
  * than N. `excludeBranchId` drops the change's own branch from the
  * result — it always touches its own subjects, which isn't "another" open
  * change.
+ *
+ * `subjectIds` is every subject a real change branch touches — a live
+ * report hit 89 on one branch — so, per SPEC §6.7/CLAUDE.md rule 8, this
+ * never puts that list in an `.in()` filter. Same rewrite as
+ * `src/db/landscape.ts`'s `listLandscapeEdges`/`listSupportsEdgesForSystems`:
+ * each step queries the model scope alone (`deltas`/`commits`/`branches`
+ * all carry `model_id`) and narrows to the id set in memory, so the
+ * request URL never grows with the caller-supplied list. `status` stays an
+ * `.in()` filter — a fixed, small enum, never a growing id list.
  */
 export async function listInFlightBranchesTouchingSubjects(supabase: Client, modelId: UUID, subjectIds: readonly UUID[], excludeBranchId: UUID): Promise<BranchRow[]> {
   if (subjectIds.length === 0) return [];
-  assertInFilterSize('listInFlightBranchesTouchingSubjects', 'subject_id', subjectIds);
-  // Same selectAll/order-by-primary-key treatment as listInFlightBranchesTouchingSubject above.
-  const deltasQuery = supabase.from('deltas').select('commit_id', { count: 'exact' }).eq('model_id', modelId).in('subject_id', subjectIds).order('id');
-  const deltaRows = await selectAll<{ commit_id: UUID }>(deltasQuery);
-  const commitIds = [...new Set(deltaRows.map((row) => row.commit_id))];
-  if (commitIds.length === 0) return [];
+  const subjectIdSet = new Set(subjectIds);
 
-  assertInFilterSize('listInFlightBranchesTouchingSubjects', 'id (commits)', commitIds);
-  const commitsQuery = supabase.from('commits').select('branch_id', { count: 'exact' }).in('id', commitIds).order('id');
-  const commitRows = await selectAll<{ branch_id: UUID }>(commitsQuery);
-  const branchIds = [...new Set(commitRows.map((row) => row.branch_id))].filter((id) => id !== excludeBranchId);
-  if (branchIds.length === 0) return [];
+  const deltasQuery = supabase.from('deltas').select('commit_id, subject_id', { count: 'exact' }).eq('model_id', modelId).order('id');
+  const deltaRows = await selectAll<{ commit_id: UUID; subject_id: UUID }>(deltasQuery);
+  const commitIds = new Set(deltaRows.filter((row) => subjectIdSet.has(row.subject_id)).map((row) => row.commit_id));
+  if (commitIds.size === 0) return [];
 
-  assertInFilterSize('listInFlightBranchesTouchingSubjects', 'id (branches)', branchIds);
+  const commitsQuery = supabase.from('commits').select('id, branch_id', { count: 'exact' }).eq('model_id', modelId).order('id');
+  const commitRows = await selectAll<{ id: UUID; branch_id: UUID }>(commitsQuery);
+  const branchIds = new Set(commitRows.filter((row) => commitIds.has(row.id)).map((row) => row.branch_id));
+  branchIds.delete(excludeBranchId);
+  if (branchIds.size === 0) return [];
+
   const { data: branchRows, error: branchError } = await supabase
     .from('branches')
     .select('*')
-    .in('id', branchIds)
+    .eq('model_id', modelId)
     .neq('kind', 'main')
     .in('status', ['draft', 'proposed', 'in_review', 'approved']);
   if (branchError) throw new Error(`listInFlightBranchesTouchingSubjects: ${branchError.message}`);
-  return branchRows as BranchRow[];
+  return (branchRows as BranchRow[]).filter((row) => branchIds.has(row.id));
 }
