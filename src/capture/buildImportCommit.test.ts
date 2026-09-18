@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
+import type { ImportChangeRow } from './importChangeRow';
 import type { ImportRelationshipRow } from './importRelationshipRow';
 import type { ImportRow } from './importRowSchema';
 import type { CurrentSupportsEdge } from './buildImportCommit';
@@ -38,6 +39,7 @@ interface BuildOptions {
   aliasesByElementId?: Map<string, readonly string[]>;
   currentUsesFlowsToEdges?: RelationshipsHeadRow[];
   relationshipFactsByRelationshipId?: Map<string, Map<string, FactsRow>>;
+  changeRows?: ImportChangeRow[];
 }
 
 function build(matchedRows: MatchedImportRow[], options: BuildOptions = {}) {
@@ -56,11 +58,20 @@ function build(matchedRows: MatchedImportRow[], options: BuildOptions = {}) {
     aliasesByElementId: options.aliasesByElementId,
     currentUsesFlowsToEdges: options.currentUsesFlowsToEdges,
     relationshipFactsByRelationshipId: options.relationshipFactsByRelationshipId,
+    changeRows: options.changeRows,
   });
 }
 
 function relationshipRow(overrides: Partial<ImportRelationshipRow> & { rowNumber: number }): ImportRelationshipRow {
   return { from: 'A', type: 'uses', to: 'B', description: 'reads from', via: null, dataClassification: null, ...overrides };
+}
+
+function changeRow(overrides: Partial<ImportChangeRow> & { rowNumber: number; name: string; action: ImportChangeRow['action'] }): ImportChangeRow {
+  return { reason: null, ...overrides };
+}
+
+function container(id: string, name: string, parentId: string, attributes: Record<string, unknown> = {}): ElementsHeadRow {
+  return { element_id: id, element_type: 'container', name, parent_id: parentId, attributes, exists_delta_id: `${id}-create` } as ElementsHeadRow;
 }
 
 describe('buildImportDeltas — new rows', () => {
@@ -355,5 +366,49 @@ describe('buildImportDeltas — Relationships sheet', () => {
     const { deltas, relationshipRows: results } = build([], { relationshipRows: [relationshipRow({ rowNumber: 6, from: 'Northgate', to: 'Southgate', description: 'reads from' })], systems, currentUsesFlowsToEdges, relationshipFactsByRelationshipId });
     expect(deltas).toHaveLength(0);
     expect(results[0]?.outcome).toEqual({ status: 'unchanged' });
+  });
+});
+
+describe('buildImportDeltas — JSON import "changes" section', () => {
+  it('retires a matched system: sets lifecycleStatus to retired', () => {
+    const systems = [system('sys-1', 'Legacy CRM')];
+    const factsByElementId = new Map([['sys-1', new Map([['lifecycleStatus', fact('d-lifecycle', 'active')]])]]);
+    const { deltas, changeRows: results } = build([], { systems, factsByElementId, existsDeltaIdByElementId: new Map([['sys-1', 'sys-1-create']]), changeRows: [changeRow({ rowNumber: 1, name: 'Legacy CRM', action: 'retire' })] });
+    expect(deltas).toEqual([expect.objectContaining({ kind: 'element.update', elementId: 'sys-1', elementType: 'system', attribute: 'lifecycleStatus', value: 'retired', previousDeltaId: 'd-lifecycle' })]);
+    expect(results).toEqual([{ rowNumber: 1, name: 'Legacy CRM', action: 'retire', reason: null, outcome: { status: 'applied', elementId: 'sys-1' } }]);
+  });
+
+  it('restores a matched module: sets lifecycleStatus back to active', () => {
+    const systems = [system('sap-1', 'SAP', { kind: 'platform' })];
+    const containers = [container('pm-1', 'PM', 'sap-1')];
+    const factsByElementId = new Map([['pm-1', new Map([['lifecycleStatus', fact('d-lifecycle', 'retired')]])]]);
+    const { deltas, changeRows: results } = build([], { systems, containers, factsByElementId, existsDeltaIdByElementId: new Map([['pm-1', 'pm-1-create']]), changeRows: [changeRow({ rowNumber: 1, name: 'PM', action: 'restore', reason: 'Brought back into service' })] });
+    expect(deltas).toEqual([expect.objectContaining({ kind: 'element.update', elementId: 'pm-1', elementType: 'container', attribute: 'lifecycleStatus', value: 'active', previousDeltaId: 'd-lifecycle' })]);
+    expect(results).toEqual([{ rowNumber: 1, name: 'PM', action: 'restore', reason: 'Brought back into service', outcome: { status: 'applied', elementId: 'pm-1' } }]);
+  });
+
+  it('reports unchanged, with zero deltas, when the target already has the requested lifecycle status', () => {
+    const systems = [system('sys-1', 'Legacy CRM')];
+    const factsByElementId = new Map([['sys-1', new Map([['lifecycleStatus', fact('d-lifecycle', 'retired')]])]]);
+    const { deltas, changeRows: results } = build([], { systems, factsByElementId, existsDeltaIdByElementId: new Map([['sys-1', 'sys-1-create']]), changeRows: [changeRow({ rowNumber: 1, name: 'Legacy CRM', action: 'retire' })] });
+    expect(deltas).toHaveLength(0);
+    expect(results[0]?.outcome).toEqual({ status: 'unchanged', elementId: 'sys-1' });
+  });
+
+  it('blocks when the name is not found among the model’s current systems/modules', () => {
+    const { changeRows: results } = build([], { changeRows: [changeRow({ rowNumber: 1, name: 'Nonexistent', action: 'retire' })] });
+    expect(results[0]?.outcome).toEqual({ status: 'blocked', reason: '"Nonexistent" was not found, or matched more than one existing system/module' });
+  });
+
+  it('never targets this same file’s own newly-created row — a change row only resolves against the model’s existing elements', () => {
+    const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Brand New System' }))];
+    const { changeRows: results } = build(matchedRows, { changeRows: [changeRow({ rowNumber: 1, name: 'Brand New System', action: 'retire' })] });
+    expect(results[0]?.outcome).toMatchObject({ status: 'blocked' });
+  });
+
+  it('never targets an actor — lifecycleStatus is a system/module attribute only', () => {
+    const actors = [{ element_id: 'actor-1', element_type: 'actor', name: 'Jane Doe', parent_id: null, attributes: {}, exists_delta_id: 'actor-1-create' } as ElementsHeadRow];
+    const { changeRows: results } = build([], { actors, changeRows: [changeRow({ rowNumber: 1, name: 'Jane Doe', action: 'retire' })] });
+    expect(results[0]?.outcome).toMatchObject({ status: 'blocked' });
   });
 });

@@ -21,6 +21,7 @@ import { defaultCreateAttributes } from '../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
 import { normalizeName } from '../engine/merge';
 import { ATTRIBUTE_COLUMNS, type ImportRow, type ImportRowAttributeKey } from './importRowSchema';
+import type { ImportChangeRow } from './importChangeRow';
 import type { ImportRelationshipRow } from './importRelationshipRow';
 import { exactMatches, isIntegrationPlatformSystem, isPlatformSystem, toRefs, type ExistingElementRef, type MatchedImportRow, type NameResolutionOutcome } from './matchImportRows';
 
@@ -65,6 +66,17 @@ export interface RelationshipRowResult {
   outcome: RelationshipRowOutcome;
 }
 
+/** F2-lite JSON import — one "changes" entry's own outcome. Never `'new'` (a change row only ever targets an existing system/module, never creates one). */
+export type ChangeRowOutcome = { status: 'blocked'; reason: string } | { status: 'unchanged'; elementId: UUID } | { status: 'applied'; elementId: UUID };
+
+export interface ChangeRowResult {
+  rowNumber: number;
+  name: string;
+  action: ImportChangeRow['action'];
+  reason: string | null;
+  outcome: ChangeRowOutcome;
+}
+
 export interface BuildImportInput {
   matchedRows: readonly MatchedImportRow[];
   /** Keyed by `row.rowNumber` — only rows whose `match.kind === 'undecided'` need an entry. */
@@ -88,12 +100,16 @@ export interface BuildImportInput {
   currentUsesFlowsToEdges?: readonly RelationshipsHeadRow[] | undefined;
   /** Every *matched* `uses`/`flows_to` edge's own current facts, keyed by relationship id then attribute — the relationship-side twin of `factsByElementId`. */
   relationshipFactsByRelationshipId?: ReadonlyMap<UUID, ReadonlyMap<string, FactsRow>> | undefined;
+  /** F2-lite JSON import's own "changes" section — empty/omitted for a CSV/XLSX import, which has no such section. */
+  changeRows?: readonly ImportChangeRow[] | undefined;
 }
 
 export interface BuildImportResult {
   rows: RowResult[];
   /** Import close-out — one per `relationshipRows` input row, same order. Always empty when the input's own `relationshipRows` is empty/omitted. */
   relationshipRows: RelationshipRowResult[];
+  /** F2-lite JSON import — one per `changeRows` input row, same order. Always empty for a CSV/XLSX import. */
+  changeRows: ChangeRowResult[];
   deltas: Delta[];
   /** Every element id a non-`blocked` row resolved to (matched, same-as-picked, or newly minted — owners included) — `sources.import_touched_element_ids`'s own value, and the live "not in file" preview's own input (`notInFile.ts`). */
   touchedElementIds: UUID[];
@@ -195,6 +211,17 @@ function resolveEndpointRef(raw: string, existingPool: readonly ExistingElementR
   return null;
 }
 
+/** F2-lite JSON import — a "changes" row's own target: an existing system or module, matched by name-or-alias against the model's *current* elements only (never this same file's own new rows — retiring something the file just created makes no sense). `null` when the name resolves to none, or to more than one, of the two pools combined. Needs `elementType` (unlike a plain `ExistingElementRef`) because `lifecycleStatus`'s own `element.update` delta carries it. */
+function resolveChangeTarget(name: string, systems: readonly ElementsHeadRow[], containers: readonly ElementsHeadRow[], aliasesByElementId: ReadonlyMap<UUID, readonly string[]>): { elementId: UUID; elementType: 'system' | 'container' } | null {
+  const systemMatches = exactMatches(name, toRefs(systems), aliasesByElementId).map((ref) => ({ ...ref, elementType: 'system' as const }));
+  const containerMatches = exactMatches(name, toRefs(containers), aliasesByElementId).map((ref) => ({ ...ref, elementType: 'container' as const }));
+  const all = [...systemMatches, ...containerMatches];
+  if (all.length !== 1) return null;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- length check above guarantees this.
+  const match = all[0]!;
+  return { elementId: match.elementId, elementType: match.elementType };
+}
+
 /** `via` is always a plain system name (never "Platform · Module" — an integration platform is a top-level system, never a module) and must resolve to `kind === 'integration_platform'`, whether that system already exists or is itself one of this file's own new rows. */
 function resolveVia(raw: string, systems: readonly ElementsHeadRow[], aliasesByElementId: ReadonlyMap<UUID, readonly string[]>, fileRowsByName: ReadonlyMap<string, ResolvedFileRow>): ExistingElementRef | null {
   const exact = exactMatches(raw, toRefs(systems), aliasesByElementId);
@@ -224,6 +251,7 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
     aliasesByElementId = new Map<UUID, readonly string[]>(),
     currentUsesFlowsToEdges = [],
     relationshipFactsByRelationshipId = new Map<UUID, ReadonlyMap<string, FactsRow>>(),
+    changeRows = [],
   } = input;
 
   const deltas: Delta[] = [];
@@ -449,5 +477,38 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
     relationshipResults.push({ rowNumber: relRow.rowNumber, outcome: changedColumns.length > 0 ? { status: 'changed', changedColumns } : { status: 'unchanged' } });
   }
 
-  return { rows, relationshipRows: relationshipResults, deltas, touchedElementIds, aliasesToWrite };
+  // F2-lite JSON import: the "changes" section — explicit retire/restore
+  // declarations, resolved against the model's own current systems/modules
+  // only (never this file's own new rows, and never an actor — matching
+  // `useElementRetire.ts`'s own restriction: `lifecycleStatus` is a
+  // system/container attribute alone).
+  const changeResults: ChangeRowResult[] = [];
+  for (const changeRow of changeRows) {
+    const locator = (column: string) => `${fileName} › row ${String(changeRow.rowNumber)} › ${column}`;
+    const target = resolveChangeTarget(changeRow.name, systems, containers, aliasesByElementId);
+    if (!target) {
+      changeResults.push({ rowNumber: changeRow.rowNumber, name: changeRow.name, action: changeRow.action, reason: changeRow.reason, outcome: { status: 'blocked', reason: `"${changeRow.name}" was not found, or matched more than one existing system/module` } });
+      continue;
+    }
+    const { elementId, elementType } = target;
+    touchedElementIds.push(elementId);
+    const facts = factsByElementId.get(elementId) ?? new Map<string, FactsRow>();
+    const existsDeltaId = existsDeltaIdByElementId.get(elementId);
+    if (existsDeltaId === undefined) {
+      changeResults.push({ rowNumber: changeRow.rowNumber, name: changeRow.name, action: changeRow.action, reason: changeRow.reason, outcome: { status: 'blocked', reason: "the matched element's current state could not be read" } });
+      continue;
+    }
+
+    const targetStatus = changeRow.action === 'retire' ? 'retired' : 'active';
+    const currentStatus = facts.get('lifecycleStatus')?.value;
+    if (currentStatus === targetStatus) {
+      changeResults.push({ rowNumber: changeRow.rowNumber, name: changeRow.name, action: changeRow.action, reason: changeRow.reason, outcome: { status: 'unchanged', elementId } });
+      continue;
+    }
+
+    deltas.push({ kind: 'element.update', id: crypto.randomUUID(), elementId, elementType, attribute: 'lifecycleStatus', value: targetStatus, previousDeltaId: facts.get('lifecycleStatus')?.delta_id ?? existsDeltaId, sourceId, sourceRef: locator(changeRow.action), confidence: 1 });
+    changeResults.push({ rowNumber: changeRow.rowNumber, name: changeRow.name, action: changeRow.action, reason: changeRow.reason, outcome: { status: 'applied', elementId } });
+  }
+
+  return { rows, relationshipRows: relationshipResults, changeRows: changeResults, deltas, touchedElementIds, aliasesToWrite };
 }

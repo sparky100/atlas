@@ -2,10 +2,12 @@ import { useCallback, useMemo, useState } from 'react';
 import type { CommitEnvelope, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { buildImportDeltas, type CurrentSupportsEdge, type MatchResolution } from '../../capture/buildImportCommit';
+import type { ImportChangeRow } from '../../capture/importChangeRow';
 import type { ImportRelationshipRow } from '../../capture/importRelationshipRow';
 import { computeNotInFile, type NotInFileElement } from '../../capture/notInFile';
 import { matchImportRows, type MatchedImportRow } from '../../capture/matchImportRows';
 import { ImportFileParseError, parseImportFile } from '../../capture/parseImportFile';
+import { parseImportJson } from '../../capture/parseImportJson';
 import { listAliasesForModel } from '../../db/aliases';
 import { createChangeBranch, getMainBranch } from '../../db/branches';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
@@ -33,6 +35,9 @@ export interface SpreadsheetImportReview {
   /** Import close-out: the optional "Relationships" sheet's own rows/errors — always empty for a CSV, or an XLSX with no such sheet. */
   relationshipRows: ImportRelationshipRow[];
   relationshipParseErrors: { rowNumber: number; error: string }[];
+  /** F2-lite JSON import's own "changes" section — always empty for a CSV/XLSX file. */
+  changeRows: ImportChangeRow[];
+  changeParseErrors: { rowNumber: number; error: string }[];
 }
 
 export interface UseSpreadsheetImportResult {
@@ -85,7 +90,12 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
       setResolutions(new Map());
       setStatus('loading');
       try {
-        const parsed = await parseImportFile(file);
+        // F2-lite JSON import: the exact same reconciliation, fed by a
+        // `.json` file's own `{ systems, relationships, changes }` shape
+        // instead of a spreadsheet's rows/sheets — `parseImportJson` returns
+        // the identical `ParsedImportFile` shape, so nothing below this
+        // branch needs to know which parser ran.
+        const parsed = file.name.toLowerCase().endsWith('.json') ? await parseImportJson(file) : await parseImportFile(file);
         const main = await getMainBranch(supabase, modelId);
         if (!main) throw new Error('This model has no main to import into.');
         const [systems, containers, capabilities, loadedActors, loadedAliasesByElementId, allFacts, supportsEdges, usesFlowsToEdges] = await Promise.all([
@@ -131,7 +141,7 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
         }
         setCurrentSupportsByElementId(supportsByElementId);
 
-        setReview({ fileName: parsed.fileName, detectedColumns: parsed.detectedColumns, previewRows: parsed.previewRows, matchedRows, parseErrors: parsed.errors, systems, containers, relationshipRows: parsed.relationshipRows, relationshipParseErrors: parsed.relationshipErrors });
+        setReview({ fileName: parsed.fileName, detectedColumns: parsed.detectedColumns, previewRows: parsed.previewRows, matchedRows, parseErrors: parsed.errors, systems, containers, relationshipRows: parsed.relationshipRows, relationshipParseErrors: parsed.relationshipErrors, changeRows: parsed.changeRows, changeParseErrors: parsed.changeErrors });
         setStatus('review');
       } catch (e) {
         const message = e instanceof ImportFileParseError ? e.message : e instanceof Error ? e.message : 'Could not read this file.';
@@ -173,6 +183,7 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
       aliasesByElementId,
       currentUsesFlowsToEdges,
       relationshipFactsByRelationshipId,
+      changeRows: review.changeRows,
     });
   }, [review, resolutions, factsByElementId, existsDeltaIdByElementId, currentSupportsByElementId, actors, aliasesByElementId, currentUsesFlowsToEdges, relationshipFactsByRelationshipId]);
 
@@ -185,6 +196,7 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
     if (!review || !userId || !buildResult) return null;
     if (buildResult.rows.some((r) => r.outcome.status === 'needs-pick' || r.outcome.status === 'blocked')) return null;
     if (buildResult.relationshipRows.some((r) => r.outcome.status === 'blocked')) return null;
+    if (buildResult.changeRows.some((r) => r.outcome.status === 'blocked')) return null;
     setError(null);
     setStatus('committing');
     try {
@@ -219,6 +231,7 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
         aliasesByElementId,
         currentUsesFlowsToEdges,
         relationshipFactsByRelationshipId,
+        changeRows: review.changeRows,
       });
       if (final.deltas.length === 0) {
         setError('Nothing to import — every row was already up to date.');

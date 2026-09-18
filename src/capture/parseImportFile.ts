@@ -10,6 +10,7 @@
  * through the one code path below.
  */
 import * as XLSX from 'xlsx';
+import type { ImportChangeRow } from './importChangeRow';
 import { validateImportRelationshipRow, type ImportRelationshipRow, type ImportRelationshipRowResult } from './importRelationshipRow';
 import { validateImportRow, type ImportRow, type ImportRowResult } from './importRowSchema';
 
@@ -18,7 +19,7 @@ const RELATIONSHIPS_SHEET_NAME = 'Relationships';
 
 export interface ParsedImportFile {
   fileName: string;
-  /** Every column header the file's own header row actually has, in file order — the dialog's "detected columns" preview, before any per-row validation runs. */
+  /** Every column header the file's own header row actually has, in file order — the dialog's "detected columns" preview, before any per-row validation runs. For a JSON import (`parseImportJson.ts`), this is the top-level section names instead (`systems`, `relationships`, `changes`) — there being no header row to read. */
   detectedColumns: string[];
   /** The file's own first few raw rows (pre-validation, keyed by header) — the dialog's "first rows" preview. */
   previewRows: Record<string, unknown>[];
@@ -30,10 +31,14 @@ export interface ParsedImportFile {
   relationshipRows: ImportRelationshipRow[];
   /** Every "Relationships" sheet row that didn't validate — same "surfaced, never dropped" stance as `errors`. */
   relationshipErrors: { rowNumber: number; error: string }[];
+  /** F2-lite JSON import's own "changes" section — always empty for a CSV/XLSX file, which has no such section. */
+  changeRows: ImportChangeRow[];
+  /** Every "changes" entry that didn't validate — always empty for a CSV/XLSX file. */
+  changeErrors: { rowNumber: number; error: string }[];
 }
 
-/** How many of the file's own raw rows the dialog's preview shows, before any matching/classification runs. */
-const PREVIEW_ROW_COUNT = 5;
+/** How many of the file's own raw rows the dialog's preview shows, before any matching/classification runs. Exported for `parseImportJson.ts`'s own identical preview need. */
+export const PREVIEW_ROW_COUNT = 5;
 
 export class ImportFileParseError extends Error {}
 
@@ -102,5 +107,5 @@ export async function parseImportFile(file: File): Promise<ParsedImportFile> {
     });
   }
 
-  return { fileName: file.name, detectedColumns, previewRows: rawRows.slice(0, PREVIEW_ROW_COUNT), rows, errors, relationshipRows, relationshipErrors };
+  return { fileName: file.name, detectedColumns, previewRows: rawRows.slice(0, PREVIEW_ROW_COUNT), rows, errors, relationshipRows, relationshipErrors, changeRows: [], changeErrors: [] };
 }
