@@ -1,8 +1,19 @@
+/* A long browse table scrolls the whole page (this table has no scroll
+   container of its own — ViewPage.module.css's own comment explains why
+   this app avoids a second, nested scrollbar); pinning the toolbar and the
+   column header row (below) to the viewport top keeps search/filter/sort
+   reachable without one, rather than trading the page's natural scroll for
+   a contained one. `z-index: 1` only needs to clear the table body's own
+   plain rows, which set none. */
 .toolbar {
   display: flex;
   gap: var(--space-2);
   margin-bottom: var(--space-4);
   flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
 }
 
 .search {
@@ -33,7 +44,14 @@
 
 .table {
   width: 100%;
-  border-collapse: collapse;
+  /* `separate` + zero spacing, not `collapse` — visually identical here
+     (every cell's only border is its own `border-bottom`, so there's
+     nothing to double up), but `position: sticky` on a `<th>` inside a
+     `collapse`d table is a real, long-standing cross-browser bug (WebKit
+     in particular); `separate` sidesteps it outright rather than betting
+     on a specific engine version having it fixed. */
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .table th,
@@ -42,6 +60,19 @@
   padding: var(--space-2);
   border-bottom: var(--border-width) solid var(--border-strong);
   white-space: nowrap;
+}
+
+/* Sticks right beneath `.toolbar` above — `top: var(--row-height)` is the
+   toolbar's own real rendered height (every one of its controls sets that
+   same height, `.search`/`.select`/`Button.module.css`), not a bespoke
+   pixel value, and it remaps with it under compact density. Assumes the
+   toolbar stays one line, which holds at any width wide enough that this
+   table's own `overflow-x: auto` isn't already doing the real work. */
+.table thead th {
+  position: sticky;
+  top: var(--row-height);
+  z-index: 1;
+  background: var(--bg);
 }
 
 .sortButton {
