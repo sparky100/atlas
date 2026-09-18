@@ -69,6 +69,34 @@ export type ElementMatchOutcome =
   /** A module row (`platform` set) whose platform itself didn't resolve to exactly one existing platform — there is no pool of "this platform's modules" to match against, so this row can't proceed at all. Surfaced as a row failure, same bucket as a schema-validation error. */
   | { kind: 'blocked'; reason: string };
 
+/**
+ * A bare (top-level) row's own name that matched no top-level system at all
+ * — checked, once, against every platform's own modules too, before
+ * settling for `'new'`. Real-world gap this closes: an AI-authored import in
+ * particular has no reliable way to know a name it's describing already
+ * exists as *someone's* module rather than a top-level system (it isn't
+ * shown the model's own structure), so a row with no `platform` column set
+ * is exactly the shape this produces — left unchecked, it silently creates
+ * a duplicate top-level system for something that already exists as a
+ * module. Exact match only (no fuzzy tier, matching `resolveEndpointRef`'s
+ * own reasoning for a reference this far removed from a row's own primary
+ * identity); never auto-resolved — routed into the identical `'undecided'`
+ * same-as/new picker every near-match already uses, each candidate's own
+ * `name` rendered as "Platform · Module" so a reviewer can tell it's a
+ * module, not another top-level system. `null` when nothing in the
+ * containers pool matches either (the ordinary `'new'` outcome stands).
+ */
+function crossCheckAgainstModules(name: string, systems: readonly ElementsHeadRow[], containers: readonly ElementsHeadRow[], aliasesByElementId: ReadonlyMap<UUID, readonly string[]>): ElementMatchOutcome | null {
+  const moduleMatches = exactMatches(name, toRefs(containers), aliasesByElementId);
+  if (moduleMatches.length === 0) return null;
+  const candidates = moduleMatches.map((m) => {
+    const container = containers.find((c) => c.element_id === m.elementId);
+    const platform = container ? systems.find((s) => s.element_id === container.parent_id) : undefined;
+    return { elementId: m.elementId, name: platform ? `${platform.name} · ${m.name}` : m.name };
+  });
+  return { kind: 'undecided', candidates };
+}
+
 /** A plain reference column (`platform`/`capability`/`business_owner`/`technical_owner`) — old F2 Phase 2 cascade, auto-resolving a lone fuzzy leader. */
 export type NameResolutionOutcome = { kind: 'none' } | { kind: 'new' } | { kind: 'matched'; element: ExistingElementRef } | { kind: 'ambiguous'; candidates: ExistingElementRef[] };
 
@@ -161,7 +189,9 @@ export function matchImportRows(input: MatchImportRowsInput): MatchedImportRow[]
     const technicalOwner = resolveReference(row.technicalOwner?.name ?? null, actorPool, aliasesByElementId);
 
     if (row.elementType === 'system') {
-      return { row, match: matchRowIdentity(row.name, toRefs(systems), aliasesByElementId), platform: { kind: 'none' }, capabilities, businessOwner, technicalOwner };
+      const identity = matchRowIdentity(row.name, toRefs(systems), aliasesByElementId);
+      const match = identity.kind === 'new' ? (crossCheckAgainstModules(row.name, systems, containers, aliasesByElementId) ?? identity) : identity;
+      return { row, match, platform: { kind: 'none' }, capabilities, businessOwner, technicalOwner };
     }
 
     // `elementType === 'container'` iff `platformName !== null` (importRowSchema.ts) — `resolveReference` itself takes `string | null` regardless, so no assertion is needed to satisfy the type checker.

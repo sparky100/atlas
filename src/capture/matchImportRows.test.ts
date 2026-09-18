@@ -86,6 +86,47 @@ describe('matchImportRows — a row’s own identity', () => {
       }
     });
   });
+
+  describe('a bare row that already exists as someone’s module — real gap: an import can’t always know a name belongs to an existing platform’s own structure', () => {
+    it('needs a pick, offering the existing module as "Platform · Module", rather than silently creating a duplicate top-level system', () => {
+      const systems = [system('sap-1', 'SAP', { kind: 'platform' })];
+      const containers = [container('pm-1', 'PM', 'sap-1')];
+      const [result] = match([row({ rowNumber: 2, name: 'PM' })], { systems, containers });
+      expect(result?.match).toEqual({ kind: 'undecided', candidates: [{ elementId: 'pm-1', name: 'SAP · PM' }] });
+    });
+
+    it('matches by alias too', () => {
+      const systems = [system('sap-1', 'SAP', { kind: 'platform' })];
+      const containers = [container('pm-1', 'PM', 'sap-1')];
+      const aliasesByElementId = new Map([['pm-1', ['Plant Maintenance']]]);
+      const [result] = match([row({ rowNumber: 2, name: 'Plant Maintenance' })], { systems, containers, aliasesByElementId });
+      expect(result?.match).toEqual({ kind: 'undecided', candidates: [{ elementId: 'pm-1', name: 'SAP · PM' }] });
+    });
+
+    it('offers every matching module when more than one platform has a same-named module', () => {
+      const systems = [system('sap-1', 'SAP', { kind: 'platform' }), system('workday-1', 'Workday', { kind: 'platform' })];
+      const containers = [container('sap-pm-1', 'PM', 'sap-1'), container('workday-pm-1', 'PM', 'workday-1')];
+      const [result] = match([row({ rowNumber: 2, name: 'PM' })], { systems, containers });
+      expect(result?.match.kind).toBe('undecided');
+      if (result?.match.kind === 'undecided') {
+        expect(result.match.candidates.map((c) => c.name).sort()).toEqual(['SAP · PM', 'Workday · PM']);
+      }
+    });
+
+    it('never overrides a real top-level match — the containers pool is only ever consulted once the systems pool comes back with nothing', () => {
+      const systems = [system('sys-1', 'PM'), system('sap-1', 'SAP', { kind: 'platform' })];
+      const containers = [container('pm-1', 'PM', 'sap-1')];
+      const [result] = match([row({ rowNumber: 2, name: 'PM' })], { systems, containers });
+      expect(result?.match).toEqual({ kind: 'matched', element: { elementId: 'sys-1', name: 'PM' } });
+    });
+
+    it('stays new when no module matches either', () => {
+      const systems = [system('sap-1', 'SAP', { kind: 'platform' })];
+      const containers = [container('fi-1', 'FI', 'sap-1')];
+      const [result] = match([row({ rowNumber: 2, name: 'PM' })], { systems, containers });
+      expect(result?.match).toEqual({ kind: 'new' });
+    });
+  });
 });
 
 describe('matchImportRows — a module row’s own platform', () => {

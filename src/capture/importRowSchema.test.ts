@@ -150,4 +150,30 @@ describe('validateImportRow', () => {
     const result = validateImportRow({ name: 'Northgate', confidence: -0.1 }, 2);
     expect(result).toEqual({ ok: false, rowNumber: 2, error: '"confidence": must be a number between 0 and 1' });
   });
+
+  describe('a module row’s own name redundantly pre-qualified as "Platform · Module"', () => {
+    it('strips the prefix when it matches this row’s own platform', () => {
+      const result = validateImportRow({ name: 'SAP · PM', platform: 'SAP' }, 2);
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.row.name).toBe('PM');
+    });
+
+    it('is case- and whitespace-insensitive about the platform half', () => {
+      const result = validateImportRow({ name: '  sap  ·  PM  ', platform: 'SAP' }, 2);
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.row.name).toBe('PM');
+    });
+
+    it('leaves the name alone when the prefix names a different platform', () => {
+      const result = validateImportRow({ name: 'Salesforce · CRM', platform: 'SAP' }, 2);
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.row.name).toBe('Salesforce · CRM');
+    });
+
+    it('leaves a top-level system’s own name alone, even if it happens to contain "·"', () => {
+      const result = validateImportRow({ name: 'SAP · PM' }, 2);
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.row.name).toBe('SAP · PM');
+    });
+  });
 });

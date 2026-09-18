@@ -29,6 +29,7 @@
  * real file and hands each raw row here.
  */
 import { validateAttributeValue } from '../contracts/attributeSchema';
+import { normalizeName } from '../engine/merge';
 
 /** The exact header names a row must use — order doesn't matter, extra columns are ignored, case-sensitive (matching every other attribute key in this product). Snake_case, this session's own plan's spelling — distinct from the camelCase attribute keys they map onto below. */
 export const IMPORT_COLUMNS = ['name', 'description', 'kind', 'lifecycle', 'criticality', 'domain', 'hosting_model', 'vendor', 'is_external', 'external_organisation', 'platform', 'capability', 'business_owner', 'technical_owner'] as const;
@@ -132,15 +133,38 @@ function parseConfidence(raw: unknown): { ok: true; value: number | undefined } 
   return { ok: true, value: num };
 }
 
+/**
+ * A module row's own `name` occasionally arrives pre-qualified as
+ * "Platform · Module" — the exact compound form this format uses to
+ * *reference* a module from `relationships`/`changes` (`resolveEndpointRef`/
+ * `resolveChangeTarget`, `buildImportCommit.ts`), echoed back into the row's
+ * own `name` field by mistake (an AI-authored import is especially prone to
+ * this: it's the same convention it was shown for referencing a module, just
+ * misapplied to naming one). Left alone, this both fails to match the real,
+ * bare-named existing module (creating an ugly duplicate) and breaks every
+ * relationship row that references this same file's own new module by its
+ * bare name (`fileRowsByName` is keyed by the *actual* `name` used here).
+ * Stripped once, here, only when the prefix's own platform half matches this
+ * row's own `platform` field exactly — never a module name that genuinely
+ * contains "·" for an unrelated reason.
+ */
+function stripRedundantPlatformPrefix(name: string, platformName: string | null): string {
+  if (platformName === null) return name;
+  const compound = name.split('·').map((s) => s.trim());
+  if (compound.length !== 2 || !compound[0] || !compound[1]) return name;
+  return normalizeName(compound[0]) === normalizeName(platformName) ? compound[1] : name;
+}
+
 /** Validates one raw row object (as `XLSX.utils.sheet_to_json` produces, keyed by header name) against the F2-lite format. Reuses `validateAttributeValue` for every core attribute rather than re-implementing the enum/text checks this product already has one place for. */
 export function validateImportRow(raw: Record<string, unknown>, rowNumber: number): ImportRowResult {
-  const name = cellToString(raw.name);
-  if (name === undefined) {
+  const rawName = cellToString(raw.name);
+  if (rawName === undefined) {
     return { ok: false, rowNumber, error: '"name" is required' };
   }
 
   const platformName = cellToString(raw.platform) ?? null;
   const elementType: ImportRowElementType = platformName === null ? 'system' : 'container';
+  const name = stripRedundantPlatformPrefix(rawName, platformName);
 
   const attributes: ImportRow['attributes'] = {};
   for (const [column, key] of ATTRIBUTE_COLUMNS) {
