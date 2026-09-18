@@ -38,11 +38,19 @@ import { normalizeName } from '../engine/merge';
 import { IDENTITY_TRIGRAM_THRESHOLD, trigramSimilarity } from '../engine/trigram';
 import type { ImportRow } from './importRowSchema';
 
+function systemKindOf(system: ElementsHeadRow): unknown {
+  const attributes = system.attributes;
+  return attributes !== null && typeof attributes === 'object' && !Array.isArray(attributes) ? (attributes as Record<string, unknown>).kind : undefined;
+}
+
 /** A system's own `kind === 'platform'` — the same check `src/ui/elements/systemKind.ts`'s `isPlatform` makes, reimplemented rather than imported: `src/capture` is a pipeline stage `src/ui` depends on, never the other way (CLAUDE.md's own layering — crossing it here would be working around the layering, not a sign it's wrong). Exported for `notInFile.ts`'s own identical need, so the two don't each reimplement it. */
 export function isPlatformSystem(system: ElementsHeadRow): boolean {
-  const attributes = system.attributes;
-  const kind = attributes !== null && typeof attributes === 'object' && !Array.isArray(attributes) ? (attributes as Record<string, unknown>).kind : undefined;
-  return kind === 'platform';
+  return systemKindOf(system) === 'platform';
+}
+
+/** A system's own `kind === 'integration_platform'` — import close-out: what `via` (the Relationships sheet's own optional column) must resolve to, the same check `src/ui/elements/systemKind.ts`'s `isIntegrationPlatform` makes (reimplemented for the same layering reason `isPlatformSystem` above states). */
+export function isIntegrationPlatformSystem(system: ElementsHeadRow): boolean {
+  return systemKindOf(system) === 'integration_platform';
 }
 
 /** How close a second-best fuzzy candidate has to be to the best one to still count as a tie (`NameResolutionOutcome`'s own ambiguous case) — carried over from F2 Phase 2's own stated value. */
@@ -70,17 +78,19 @@ export interface MatchedImportRow {
   match: ElementMatchOutcome;
   /** `{ kind: 'none' }` for a top-level system row (`row.platformName === null`). */
   platform: NameResolutionOutcome;
-  capability: NameResolutionOutcome;
+  /** One outcome per name in `row.capabilityNames` (import close-out's `|`-delimited list), same order — index 0 is the row's own primary candidate. */
+  capabilities: NameResolutionOutcome[];
   businessOwner: NameResolutionOutcome;
   technicalOwner: NameResolutionOutcome;
 }
 
-function toRefs(elements: readonly ElementsHeadRow[]): ExistingElementRef[] {
+/** Exported for `buildImportCommit.ts`'s own identical need — resolving a Relationships-sheet endpoint against the same element pools, by the same rule. */
+export function toRefs(elements: readonly ElementsHeadRow[]): ExistingElementRef[] {
   return elements.map((e) => ({ elementId: e.element_id, name: e.name }));
 }
 
-/** Every distinct element in `pool` whose own name, or any known alias, normalizes to `name` — exact, case-insensitive (`normalizeName` is exactly trim+lowercase), name-or-alias per this session's own plan. */
-function exactMatches(name: string, pool: readonly ExistingElementRef[], aliasesByElementId: ReadonlyMap<UUID, readonly string[]>): ExistingElementRef[] {
+/** Every distinct element in `pool` whose own name, or any known alias, normalizes to `name` — exact, case-insensitive (`normalizeName` is exactly trim+lowercase), name-or-alias per this session's own plan. Exported for `buildImportCommit.ts`'s own Relationships-sheet endpoint resolution — the identical rule, not a second implementation of it. */
+export function exactMatches(name: string, pool: readonly ExistingElementRef[], aliasesByElementId: ReadonlyMap<UUID, readonly string[]>): ExistingElementRef[] {
   const target = normalizeName(name);
   return pool.filter((ref) => normalizeName(ref.name) === target || (aliasesByElementId.get(ref.elementId) ?? []).some((alias) => normalizeName(alias) === target));
 }
@@ -146,21 +156,21 @@ export function matchImportRows(input: MatchImportRowsInput): MatchedImportRow[]
   const actorPool = toRefs(actors);
 
   return rows.map((row): MatchedImportRow => {
-    const capability = resolveReference(row.capabilityName, capabilityPool, aliasesByElementId);
-    const businessOwner = resolveReference(row.businessOwnerName, actorPool, aliasesByElementId);
-    const technicalOwner = resolveReference(row.technicalOwnerName, actorPool, aliasesByElementId);
+    const capabilities = row.capabilityNames.map((name) => resolveReference(name, capabilityPool, aliasesByElementId));
+    const businessOwner = resolveReference(row.businessOwner?.name ?? null, actorPool, aliasesByElementId);
+    const technicalOwner = resolveReference(row.technicalOwner?.name ?? null, actorPool, aliasesByElementId);
 
     if (row.elementType === 'system') {
-      return { row, match: matchRowIdentity(row.name, toRefs(systems), aliasesByElementId), platform: { kind: 'none' }, capability, businessOwner, technicalOwner };
+      return { row, match: matchRowIdentity(row.name, toRefs(systems), aliasesByElementId), platform: { kind: 'none' }, capabilities, businessOwner, technicalOwner };
     }
 
     // `elementType === 'container'` iff `platformName !== null` (importRowSchema.ts) — `resolveReference` itself takes `string | null` regardless, so no assertion is needed to satisfy the type checker.
     const platform = resolveReference(row.platformName, platformPool, aliasesByElementId);
     if (platform.kind !== 'matched') {
       const reason = platform.kind === 'new' ? `platform "${row.platformName ?? ''}" was not found — a platform is matched, never created by an import` : `platform "${row.platformName ?? ''}" matched more than one existing platform`;
-      return { row, match: { kind: 'blocked', reason }, platform, capability, businessOwner, technicalOwner };
+      return { row, match: { kind: 'blocked', reason }, platform, capabilities, businessOwner, technicalOwner };
     }
     const modulePool = toRefs(containers.filter((c) => c.parent_id === platform.element.elementId));
-    return { row, match: matchRowIdentity(row.name, modulePool, aliasesByElementId), platform, capability, businessOwner, technicalOwner };
+    return { row, match: matchRowIdentity(row.name, modulePool, aliasesByElementId), platform, capabilities, businessOwner, technicalOwner };
   });
 }

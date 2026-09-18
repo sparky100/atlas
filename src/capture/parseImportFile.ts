@@ -10,7 +10,11 @@
  * through the one code path below.
  */
 import * as XLSX from 'xlsx';
+import { validateImportRelationshipRow, type ImportRelationshipRow, type ImportRelationshipRowResult } from './importRelationshipRow';
 import { validateImportRow, type ImportRow, type ImportRowResult } from './importRowSchema';
+
+/** The one other sheet name this format recognises — case-sensitive, matching every other header/sheet name in this format. XLSX only: a plain CSV has no second sheet to carry one, so `relationshipRows`/`relationshipErrors` are always empty for a `.csv` file. */
+const RELATIONSHIPS_SHEET_NAME = 'Relationships';
 
 export interface ParsedImportFile {
   fileName: string;
@@ -22,6 +26,10 @@ export interface ParsedImportFile {
   rows: ImportRow[];
   /** Every row that didn't, in source order — a real error per row (`ImportRowResult`'s own `error`), never silently dropped. */
   errors: { rowNumber: number; error: string }[];
+  /** Import close-out: every row from an optional "Relationships" sheet that validated. */
+  relationshipRows: ImportRelationshipRow[];
+  /** Every "Relationships" sheet row that didn't validate — same "surfaced, never dropped" stance as `errors`. */
+  relationshipErrors: { rowNumber: number; error: string }[];
 }
 
 /** How many of the file's own raw rows the dialog's preview shows, before any matching/classification runs. */
@@ -35,9 +43,10 @@ export class ImportFileParseError extends Error {}
  * source didn't fill reads as `null`, not `undefined`, so a genuinely
  * blank optional column and a column the file never had at all look the
  * same to `validateImportRow`, which is the right behaviour for both).
- * Reads the first sheet only — a v1 scope choice (this session's plan's
- * own "Explicitly out of scope" list), not a silent limitation: multi-sheet
- * input is Phase 3's own "different file formats/structures" territory.
+ * Reads the first sheet as the main element rows, plus one other named
+ * sheet — "Relationships" (import close-out) — if the workbook has one;
+ * every other sheet is ignored. A CSV file is single-sheet by construction,
+ * so its own `relationshipRows`/`relationshipErrors` are always empty.
  */
 export async function parseImportFile(file: File): Promise<ParsedImportFile> {
   const buffer = await file.arrayBuffer();
@@ -81,5 +90,17 @@ export async function parseImportFile(file: File): Promise<ParsedImportFile> {
     throw new ImportFileParseError(`"${file.name}" has a header row but no data rows.`);
   }
 
-  return { fileName: file.name, detectedColumns, previewRows: rawRows.slice(0, PREVIEW_ROW_COUNT), rows, errors };
+  const relationshipRows: ImportRelationshipRow[] = [];
+  const relationshipErrors: { rowNumber: number; error: string }[] = [];
+  const relationshipsSheet = workbook.Sheets[RELATIONSHIPS_SHEET_NAME];
+  if (relationshipsSheet) {
+    const rawRelationshipRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(relationshipsSheet, { defval: null });
+    rawRelationshipRows.forEach((raw, index) => {
+      const result: ImportRelationshipRowResult = validateImportRelationshipRow(raw, index + 2);
+      if (result.ok) relationshipRows.push(result.row);
+      else relationshipErrors.push({ rowNumber: result.rowNumber, error: result.error });
+    });
+  }
+
+  return { fileName: file.name, detectedColumns, previewRows: rawRows.slice(0, PREVIEW_ROW_COUNT), rows, errors, relationshipRows, relationshipErrors };
 }

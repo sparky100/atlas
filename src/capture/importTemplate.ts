@@ -9,6 +9,7 @@
  * directly outside `parseImportFile.ts`).
  */
 import { IMPORT_COLUMNS, type ImportColumn } from './importRowSchema';
+import { RELATIONSHIP_IMPORT_COLUMNS, type RelationshipImportColumn } from './importRelationshipRow';
 
 const EXAMPLE_ROW: Record<ImportColumn, string> = {
   name: 'Council Tax System',
@@ -19,15 +20,49 @@ const EXAMPLE_ROW: Record<ImportColumn, string> = {
   domain: 'it',
   hosting_model: 'public_cloud',
   vendor: 'Acme Corp',
+  is_external: 'false',
+  external_organisation: '',
   platform: '',
-  capability: 'Billing',
+  capability: 'Billing|Customer Accounts',
   business_owner: 'Jane Doe',
-  technical_owner: 'John Smith',
+  technical_owner: 'Ofgem (External: Energy regulator)',
 };
 
-/** Header row, then one example row — the exact shape a `.csv`/`.xlsx` writer turns into a real file. */
+/** A second example row — a module of a platform, so "platform column alone decides structure" is shown, not just described. */
+const EXAMPLE_MODULE_ROW: Record<ImportColumn, string> = {
+  name: 'PM',
+  description: 'Plant maintenance module.',
+  kind: '',
+  lifecycle: 'active',
+  criticality: '',
+  domain: '',
+  hosting_model: '',
+  vendor: '',
+  is_external: 'false',
+  external_organisation: '',
+  platform: 'SAP',
+  capability: 'Asset Maintenance',
+  business_owner: '',
+  technical_owner: '',
+};
+
+/** Header row, then two example rows — the exact shape a `.csv`/`.xlsx` writer turns into a real file. */
 export function importTemplateRows(): string[][] {
-  return [[...IMPORT_COLUMNS], IMPORT_COLUMNS.map((column) => EXAMPLE_ROW[column])];
+  return [[...IMPORT_COLUMNS], IMPORT_COLUMNS.map((column) => EXAMPLE_ROW[column]), IMPORT_COLUMNS.map((column) => EXAMPLE_MODULE_ROW[column])];
+}
+
+const EXAMPLE_RELATIONSHIP_ROW: Record<RelationshipImportColumn, string> = {
+  from: 'Council Tax System',
+  type: 'flows_to',
+  to: 'SAP · PM',
+  description: 'sends payment confirmations to',
+  via: '',
+  data_classification: 'official',
+};
+
+/** Header row, then one example row, for the optional "Relationships" sheet (import close-out; XLSX only — a plain CSV has no second sheet to carry one). Shows the "Platform · Module" compound endpoint form. */
+export function importRelationshipTemplateRows(): string[][] {
+  return [[...RELATIONSHIP_IMPORT_COLUMNS], RELATIONSHIP_IMPORT_COLUMNS.map((column) => EXAMPLE_RELATIONSHIP_ROW[column])];
 }
 
 function csvCell(value: string): string {
@@ -35,7 +70,7 @@ function csvCell(value: string): string {
   return value;
 }
 
-/** RFC 4180 CSV of the template — the same escaping `elementExport.ts`'s own `csvCell` uses, kept local rather than imported: `src/capture` is a pipeline stage `src/ui` depends on, never the other way (CLAUDE.md's own layering). */
+/** RFC 4180 CSV of the template — the same escaping `elementExport.ts`'s own `csvCell` uses, kept local rather than imported: `src/capture` is a pipeline stage `src/ui` depends on, never the other way (CLAUDE.md's own layering). CSV is single-sheet by construction, so this never includes the Relationships example — only the XLSX template does. */
 export function importTemplateCsv(): string {
   return importTemplateRows()
     .map((row) => row.map(csvCell).join(','))

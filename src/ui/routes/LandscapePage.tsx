@@ -53,6 +53,8 @@ import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import { parseCapabilityParam, zoomQueryString } from '../nav/zoomParams';
 import { SpreadsheetImportDialog } from '../import/SpreadsheetImportDialog';
+import { downloadImportPrompt } from '../import/downloadImportPrompt';
+import { supabase } from '../supabaseClient';
 import styles from './LandscapePage.module.css';
 
 /**
@@ -634,6 +636,9 @@ export function LandscapePage() {
                     />
                     <Button variant="secondary" onClick={() => { setImportOpen(true); }}>
                       Import from spreadsheet…
+                    </Button>
+                    <Button variant="ghost" onClick={() => void downloadImportPrompt(supabase, model.id, model.slug)}>
+                      Download AI import prompt
                     </Button>
                   </div>
                 )}

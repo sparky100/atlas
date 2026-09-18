@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { Button } from '../components/Button/Button';
 import { CommentsPanel } from '../components/CommentsPanel/CommentsPanel';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
@@ -32,6 +33,8 @@ import { useColourByPreference } from '../capabilityMap/useColourByPreference';
 import { Inspector } from '../components/Inspector/Inspector';
 import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
 import { useHomeMode } from '../home/useHomeMode';
+import { downloadImportPrompt } from '../import/downloadImportPrompt';
+import { supabase } from '../supabaseClient';
 import styles from './CapabilityMapPage.module.css';
 
 /**
@@ -274,10 +277,22 @@ export function CapabilityMapPage() {
 
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
-        {state.status === 'refNotFound' && canEdit && <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reloadAll} />}
+        {state.status === 'refNotFound' && canEdit && (
+          <>
+            <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reloadAll} />
+            <Button variant="ghost" onClick={() => void downloadImportPrompt(supabase, model.id, model.slug)}>
+              Download AI import prompt
+            </Button>
+          </>
+        )}
         {state.status === 'refNotFound' && !canEdit && <Text as="p">Nothing here yet.</Text>}
         {state.status === 'ready' && state.data.tree.l1.length === 0 && state.data.tree.orphans.length === 0 && canEdit && (
-          <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reloadAll} />
+          <>
+            <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reloadAll} />
+            <Button variant="ghost" onClick={() => void downloadImportPrompt(supabase, model.id, model.slug)}>
+              Download AI import prompt
+            </Button>
+          </>
         )}
         {state.status === 'ready' && (() => {
           const reorderCapability = canEdit && mainBranch ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: mainBranch, expectedHeadCommitId: state.data.commitId, onReordered: reloadAll } : undefined;

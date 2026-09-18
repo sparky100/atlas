@@ -23,6 +23,7 @@
  */
 import type { Delta, UUID } from '../contracts/delta';
 import { fromRefreshBranchResult, toRefreshBranchParams, type RefreshBranchCommitInput, type ResolvedConflictWireRow } from '../contracts/rows';
+import { listOwnDeltas } from '../engine/branch';
 import { foldFromGenesis, headHash } from '../engine/head';
 import { computeMergeReview, type MergeReview } from '../engine/merge';
 import {
@@ -34,12 +35,13 @@ import {
   type StructuralChoice,
 } from '../engine/mergeResolution';
 import { serializeHeadProjection } from '../engine/projection';
-import { listAliasesForModel } from './aliases';
+import { createAlias, listAliasesForModel } from './aliases';
 import { getBranch, getMainBranch } from './branches';
 import type { Client } from './client';
 import { buildCommitLoader } from './commitLoader';
 import type { CommitResult } from './commits';
-import { createMergeResolutionSource } from './sources';
+import { getSourcesByIds } from './elements';
+import { clearPendingAliases, createMergeResolutionSource } from './sources';
 import type { BranchRow, MergeRequestRow } from './types';
 
 export async function getMergeRequestById(supabase: Client, id: UUID): Promise<MergeRequestRow | null> {
@@ -182,6 +184,36 @@ export async function mergeApprovedRequest(supabase: Client, modelId: UUID, merg
   if (data === null || (data as { id: UUID | null }).id === null) {
     return { ok: false, reason: 'refresh_required', message: 'main advanced since this request was approved — it has been returned to pending for another look.' };
   }
+
+  // F2-lite import close-out: "aliases from same-as picks are written on
+  // merge, not at import; cancel/reject leaves no alias." This is the one
+  // place a merge actually lands, so it's the one place that can apply
+  // them — `branch`'s own deltas (never main's, never a sibling branch's)
+  // are what a spreadsheet import attached `pending_aliases` to. Best-
+  // effort: a failure here never undoes the merge that already succeeded
+  // above, it just leaves an alias unwritten (the same "surfaced, not
+  // silent" gap ADR-008 rule 4 tolerates elsewhere — nothing that fails
+  // this quietly again on the next real merge, since there won't be one).
+  try {
+    const ownDeltas = listOwnDeltas({ baseCommitId: branch.base_commit_id, headCommitId: branch.head_commit_id }, loader);
+    const sourceIds = [...new Set(ownDeltas.map((d) => d.sourceId))];
+    if (sourceIds.length > 0) {
+      const sourcesById = await getSourcesByIds(supabase, sourceIds);
+      for (const source of sourcesById.values()) {
+        if (source.kind !== 'spreadsheet' || source.pending_aliases.length === 0) continue;
+        for (const alias of source.pending_aliases) {
+          await createAlias(supabase, { id: crypto.randomUUID(), orgId: source.org_id, modelId, elementId: alias.elementId, aliasValue: alias.aliasValue, aliasType: 'name', sourceId: source.id, createdBy: source.created_by });
+        }
+        await clearPendingAliases(supabase, source.id);
+      }
+    }
+  } catch {
+    // The merge already succeeded (the RPC above committed) — an alias is
+    // a convenience for the *next* import/search, never a fact this merge
+    // itself depends on, so a failure here is swallowed rather than
+    // reported as a merge failure it isn't.
+  }
+
   return { ok: true, commitId: (data as { id: UUID }).id };
 }
 

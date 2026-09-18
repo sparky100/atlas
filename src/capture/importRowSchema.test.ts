@@ -4,7 +4,7 @@ import { validateImportRow } from './importRowSchema';
 describe('validateImportRow', () => {
   it('accepts a minimal row with only a name', () => {
     const result = validateImportRow({ name: 'Northgate' }, 2);
-    expect(result).toEqual({ ok: true, row: { rowNumber: 2, name: 'Northgate', elementType: 'system', attributes: {}, platformName: null, capabilityName: null, businessOwnerName: null, technicalOwnerName: null } });
+    expect(result).toEqual({ ok: true, row: { rowNumber: 2, name: 'Northgate', elementType: 'system', attributes: {}, isExternal: undefined, platformName: null, capabilityNames: [], businessOwner: null, technicalOwner: null } });
   });
 
   it('requires name', () => {
@@ -86,10 +86,44 @@ describe('validateImportRow', () => {
     const result = validateImportRow({ name: 'Northgate', capability: 'Billing', business_owner: 'Jane Doe', technical_owner: 'John Smith' }, 2);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.row.capabilityName).toBe('Billing');
-      expect(result.row.businessOwnerName).toBe('Jane Doe');
-      expect(result.row.technicalOwnerName).toBe('John Smith');
+      expect(result.row.capabilityNames).toEqual(['Billing']);
+      expect(result.row.businessOwner).toEqual({ name: 'Jane Doe', externalOrganisation: null });
+      expect(result.row.technicalOwner).toEqual({ name: 'John Smith', externalOrganisation: null });
     }
+  });
+
+  it('splits a "|"-delimited capability list, trimming each name', () => {
+    const result = validateImportRow({ name: 'Northgate', capability: ' Billing | Customer Accounts |' }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.row.capabilityNames).toEqual(['Billing', 'Customer Accounts']);
+  });
+
+  it('parses "Name (External: Org)" into an owner reference with externalOrganisation set', () => {
+    const result = validateImportRow({ name: 'Northgate', business_owner: 'Ofgem (External: Energy regulator)' }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.row.businessOwner).toEqual({ name: 'Ofgem', externalOrganisation: 'Energy regulator' });
+  });
+
+  it('accepts is_external as true/false (or yes/no)', () => {
+    const result = validateImportRow({ name: 'Northgate', is_external: 'yes' }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.row.isExternal).toBe(true);
+  });
+
+  it('rejects an unrecognised is_external value', () => {
+    const result = validateImportRow({ name: 'Northgate', is_external: 'maybe' }, 2);
+    expect(result).toEqual({ ok: false, rowNumber: 2, error: '"is_external" must be true/false (or yes/no), got "maybe"' });
+  });
+
+  it('accepts external_organisation on a top-level system row', () => {
+    const result = validateImportRow({ name: 'Ofgem', is_external: 'true', external_organisation: 'Energy regulator' }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.row.attributes.externalOrganisation).toBe('Energy regulator');
+  });
+
+  it('rejects external_organisation on a module row — a module has none of its own', () => {
+    const result = validateImportRow({ name: 'PM', platform: 'SAP', external_organisation: 'Acme' }, 2);
+    expect(result).toEqual({ ok: false, rowNumber: 2, error: '"external_organisation": container has no attribute "externalOrganisation"' });
   });
 
   it('treats a blank optional cell the same as an absent one', () => {

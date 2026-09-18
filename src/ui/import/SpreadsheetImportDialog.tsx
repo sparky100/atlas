@@ -29,7 +29,9 @@ import { Chip } from '../components/Chip/Chip';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { importTemplateXlsxBlob } from './importTemplateXlsx';
+import { downloadImportPrompt } from './downloadImportPrompt';
 import { useSpreadsheetImport } from '../changes/useSpreadsheetImport';
+import { supabase } from '../supabaseClient';
 import styles from './SpreadsheetImportDialog.module.css';
 
 export interface SpreadsheetImportDialogProps {
@@ -91,7 +93,9 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
   const newCount = rows.filter((r) => r.outcome.status === 'new').length;
   const changedCount = rows.filter((r) => r.outcome.status === 'changed').length;
   const unchangedCount = rows.filter((r) => r.outcome.status === 'unchanged').length;
-  const canImport = rows.length > 0 && needsPickCount === 0 && blockedCount === 0;
+  const relationshipRows = buildResult?.relationshipRows ?? [];
+  const relationshipBlockedCount = relationshipRows.filter((r) => r.outcome.status === 'blocked').length;
+  const canImport = rows.length > 0 && needsPickCount === 0 && blockedCount === 0 && relationshipBlockedCount === 0;
 
   return (
     // Click-outside-to-close on the backdrop — mouse-only by design; Escape
@@ -117,7 +121,7 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
           </div>
 
           <Text as="p" tone="muted" size="sm">
-            One row per system, or a module (set <Text as="span" mono size="sm">platform</Text>). Columns: {IMPORT_COLUMNS.join(', ')} — only <Text as="span" mono size="sm">name</Text> is required.
+            One row per system, or a module (set <Text as="span" mono size="sm">platform</Text>). Columns: {IMPORT_COLUMNS.join(', ')} — only <Text as="span" mono size="sm">name</Text> is required. An XLSX file may also carry a "Relationships" sheet for <Text as="span" mono size="sm">uses</Text>/<Text as="span" mono size="sm">flows_to</Text> edges.
           </Text>
           <div className={styles.templateLinks}>
             <Button variant="ghost" onClick={downloadTemplateCsv}>
@@ -125,6 +129,9 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
             </Button>
             <Button variant="ghost" onClick={downloadTemplateXlsx}>
               Download template (XLSX)
+            </Button>
+            <Button variant="ghost" onClick={() => void downloadImportPrompt(supabase, modelId, modelSlug)}>
+              Download AI import prompt
             </Button>
           </div>
 
@@ -227,6 +234,45 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
                   ))}
               </ul>
 
+              {relationshipRows.length > 0 && (
+                <div className={styles.preview}>
+                  <Text as="h3" size="sm">
+                    Relationships ({relationshipRows.length})
+                  </Text>
+                  <div className={styles.counts}>
+                    <Chip tone="info">{relationshipRows.filter((r) => r.outcome.status === 'new').length} new</Chip>
+                    <Chip tone="info">{relationshipRows.filter((r) => r.outcome.status === 'changed').length} changed</Chip>
+                    <Chip tone="neutral">{relationshipRows.filter((r) => r.outcome.status === 'unchanged').length} unchanged</Chip>
+                    {relationshipBlockedCount > 0 && <Chip tone="danger">{relationshipBlockedCount} failed</Chip>}
+                  </div>
+                  {review.relationshipParseErrors.length > 0 && (
+                    <ul className={styles.rowList}>
+                      {review.relationshipParseErrors.map((e) => (
+                        <li key={e.rowNumber}>
+                          <Text as="p" size="sm">
+                            Relationships row {e.rowNumber}: {e.error}
+                          </Text>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {relationshipBlockedCount > 0 && (
+                    <ul className={styles.rowList}>
+                      {relationshipRows
+                        .filter((r) => r.outcome.status === 'blocked')
+                        .map((r) => (
+                          <li key={r.rowNumber} className={styles.row}>
+                            <Text as="span" size="sm">
+                              Row {r.rowNumber}
+                            </Text>
+                            {r.outcome.status === 'blocked' && <Chip tone="danger">{r.outcome.reason}</Chip>}
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
               {notInFile.length > 0 && (
                 <div className={styles.notInFile}>
                   <Text as="h3" size="sm">
@@ -260,7 +306,7 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
                     });
                   }}
                 >
-                  {status === 'committing' ? 'Importing…' : needsPickCount > 0 ? `Resolve ${String(needsPickCount)} row(s) first` : blockedCount > 0 ? `${String(blockedCount)} row(s) failed` : 'Import'}
+                  {status === 'committing' ? 'Importing…' : needsPickCount > 0 ? `Resolve ${String(needsPickCount)} row(s) first` : blockedCount + relationshipBlockedCount > 0 ? `${String(blockedCount + relationshipBlockedCount)} row(s) failed` : 'Import'}
                 </Button>
                 <Button variant="ghost" disabled={status === 'committing'} onClick={reset}>
                   Choose a different file

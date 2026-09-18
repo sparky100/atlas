@@ -21,8 +21,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { CommitEnvelope } from '../contracts/delta';
 import type { FactsRow } from '../contracts/rows';
 import { computeNotInFile } from './notInFile';
-import { createAlias, listAliasesForModel } from '../db/aliases';
-import { createChangeBranch, getBranch, getMainBranch } from '../db/branches';
+import { listAliasesForModel } from '../db/aliases';
+import { cancelChange, createChangeBranch, getBranch, getMainBranch } from '../db/branches';
 import { listCapabilitiesForMap } from '../db/capabilityMap';
 import type { Client } from '../db/client';
 import { createServiceRoleClient, createSupabaseClient } from '../db/client';
@@ -99,17 +99,16 @@ describe('spreadsheet import (F2-lite, reconciliation) against a real local Supa
     const final = buildImportDeltas({ matchedRows, resolutions, fileName, sourceId: 'placeholder', factsByElementId, existsDeltaIdByElementId });
     expect(final.rows.some((r) => r.outcome.status === 'needs-pick' || r.outcome.status === 'blocked')).toBe(false);
 
-    const source = await createSpreadsheetSource(owner.client, { id: randomUUID(), orgId, modelId, createdBy: owner.id, fileName, touchedElementIds: final.touchedElementIds });
+    // Import close-out: a confirmed same-as pick's alias is staged as
+    // `pending_aliases`, never written immediately — `submitApproveAndMerge`
+    // below is what actually applies it, via `mergeApprovedRequest`.
+    const source = await createSpreadsheetSource(owner.client, { id: randomUUID(), orgId, modelId, createdBy: owner.id, fileName, touchedElementIds: final.touchedElementIds, pendingAliases: final.aliasesToWrite });
     const rebuilt = buildImportDeltas({ matchedRows, resolutions, fileName, sourceId: source.id, factsByElementId, existsDeltaIdByElementId });
 
     const branch = await createChangeBranch(owner.client, { id: randomUUID(), orgId, modelId, name: `import-${fileName.replace(/\.[^./]+$/, '')}-${randomUUID().slice(0, 8)}`, title: `Imported from ${fileName}`, createdBy: owner.id, mainHeadCommitId: main.head_commit_id, intent: 'record' });
     const envelope: CommitEnvelope = { id: randomUUID(), branchId: branch.id, parentCommitId: branch.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title: `Import from ${fileName}`, body: null, deltas: rebuilt.deltas };
     const commitResult = await commitToBranch(owner.client, { modelId, branchId: branch.id, expectedHeadCommitId: branch.head_commit_id, envelope });
     if (!commitResult.ok) throw new Error(`commit: ${commitResult.message}`);
-
-    for (const alias of rebuilt.aliasesToWrite) {
-      await createAlias(owner.client, { id: randomUUID(), orgId, modelId, elementId: alias.elementId, aliasValue: alias.aliasValue, aliasType: 'name', sourceId: source.id, createdBy: owner.id });
-    }
 
     return { source, branch, final: rebuilt, systems, containers };
   }
@@ -199,5 +198,30 @@ describe('spreadsheet import (F2-lite, reconciliation) against a real local Supa
     expect(systemsAfterSecond.map((s) => s.name).sort()).toEqual([...firstFileRows.map((r) => r.name), NEW_ROW_NAME].sort());
     const updatedHousingRegister = await listFactsForCommit(owner.client, mainAfterSecond.head_commit_id).then((facts) => facts.find((f) => f.subject_id === idByName.get('Housing Register') && f.attribute === 'description'));
     expect(updatedHousingRegister?.value).toBe('Updated description of Housing Register');
+  });
+
+  it('a confirmed same-as pick’s alias round-trips as sources.pending_aliases, stays unwritten on commit, and is never written at all if the change is cancelled', async () => {
+    const main = await getMainBranch(owner.client, modelId);
+    if (!main) throw new Error('main branch not found');
+    const systems = await listSystemsForLandscape(owner.client, main.head_commit_id);
+    const wasteCollectionId = systems.find((s) => s.name === 'Waste Collection')?.element_id;
+    if (!wasteCollectionId) throw new Error('Waste Collection not found — expected from the earlier test in this file');
+
+    const nearMatchRows = [{ name: 'Waste Collectionn', description: 'Description of Waste Collection' }];
+    const resolutions = new Map<number, MatchResolution>([[2, wasteCollectionId]]);
+    const { source, branch, final } = await runImport('pending-alias.csv', nearMatchRows, resolutions);
+    expect(final.aliasesToWrite).toEqual([{ elementId: wasteCollectionId, aliasValue: 'Waste Collectionn' }]);
+
+    // Round-trip: the pending alias was written to sources.pending_aliases, not to a real aliases row.
+    const sourcesNow = await listSourcesForModel(owner.client, modelId);
+    const sourceRow = sourcesNow.find((s) => s.id === source.id);
+    expect(sourceRow?.pending_aliases).toEqual([{ elementId: wasteCollectionId, aliasValue: 'Waste Collectionn' }]);
+    const aliasesRightAfterCommit = await listAliasesForModel(owner.client, modelId);
+    expect(aliasesRightAfterCommit.get(wasteCollectionId) ?? []).not.toContain('Waste Collectionn');
+
+    // Cancelling the change leaves the pending alias forever unwritten.
+    await cancelChange(owner.client, branch.id, 'testing: cancel leaves no alias');
+    const aliasesAfterCancel = await listAliasesForModel(owner.client, modelId);
+    expect(aliasesAfterCancel.get(wasteCollectionId) ?? []).not.toContain('Waste Collectionn');
   });
 });
