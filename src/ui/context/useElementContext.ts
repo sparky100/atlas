@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { UUID } from '../../contracts/delta';
-import type { ElementsHeadRow } from '../../contracts/rows';
-import { projectionContainersForLandscape, projectionElementById, projectionElementsByIds, projectionRelationshipsForElement, projectionRelationshipsTouchingAny, resolveBranchModeProjection } from '../../db/branchProjection';
-import { getElementHead, getElementsByIds, listRelationshipsForElement } from '../../db/elements';
+import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
+import { projectionContainersForLandscape, projectionElementById, projectionElementsByIds, projectionFlowsViaElement, projectionRelationshipsForElement, projectionRelationshipsTouchingAny, resolveBranchModeProjection } from '../../db/branchProjection';
+import { getElementHead, getElementsByIds, listFlowsViaElement, listRelationshipsForElement } from '../../db/elements';
 import type { HeadProjection } from '../../engine/projection';
 import { listContainersForLandscape } from '../../db/landscape';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
@@ -13,7 +13,7 @@ import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
 import { computeContextGroup, computePlatformConnections, type ContextGroup, type PlatformConnection } from './contextGrouping';
 import { buildPlatformModulesById, type ContextModule } from './contextDiagramData';
-import { isPlatform } from '../elements/systemKind';
+import { isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -51,7 +51,28 @@ export interface ElementGroupData {
   diff: VersionDiff | null;
 }
 
-export type ElementContextData = PlatformStructureData | ElementGroupData;
+/**
+ * Integration platform context: a `kind: 'integration_platform'` system
+ * hub — its own direct neighbours are never the point (rare in practice,
+ * per `computePlatformConnections`'s own comment on the sibling
+ * "platforms and modules" concept); what matters is every `uses`/
+ * `flows_to` edge elsewhere in the model naming this element as its
+ * `via`. Reuses the exact same query the element page's own "Flows via
+ * this platform" section already runs (`listFlowsViaElement`/
+ * `projectionFlowsViaElement`) rather than a second definition of "what
+ * counts as a flow via this platform."
+ */
+export interface IntegrationPlatformContextData {
+  kind: 'integration-platform';
+  commitId: UUID;
+  view: ViewRow;
+  hub: ElementsHeadRow;
+  flows: RelationshipsHeadRow[];
+  /** Every flow's own `from`/`to` endpoint, by id — never the hub itself, which is only ever the `via`, not an endpoint, of these edges (same as `ElementPageData.flowsViaThisPlatformEndpoints`'s own doc comment). */
+  endpoints: Map<UUID, ElementsHeadRow>;
+}
+
+export type ElementContextData = PlatformStructureData | IntegrationPlatformContextData | ElementGroupData;
 
 export type ElementContextState =
   | { status: 'loading' }
@@ -160,6 +181,20 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
           if (!cancelled) setState({ status: 'ready', data: { kind: 'platform-structure', commitId, view, hub, modules, connections, diff } });
           return;
         }
+      }
+
+      // Integration platform context: a `kind: 'integration_platform'`
+      // hub's own direct neighbours are never the point (this branch never
+      // even reaches `computeContextGroup`) — what matters is every
+      // `uses`/`flows_to` edge elsewhere in the model naming this element
+      // as its `via`, the same query `PlatformFlowsSection`'s own element-
+      // page data already runs.
+      if (hub.element_type === 'system' && isIntegrationPlatform(hub)) {
+        const flows = projection ? projectionFlowsViaElement(projection, elementId) : await listFlowsViaElement(supabase, commitId, elementId);
+        const endpointIds = [...new Set(flows.flatMap((f) => [f.from_element_id, f.to_element_id]))];
+        const endpoints = projection ? projectionElementsByIds(projection, endpointIds) : await getElementsByIds(supabase, commitId, endpointIds);
+        if (!cancelled) setState({ status: 'ready', data: { kind: 'integration-platform', commitId, view, hub, flows, endpoints } });
+        return;
       }
 
       // Every relationship type (`RELATIONSHIP_TYPES`) is one `computeContextGroup` itself already classifies — no further filtering needed here.
