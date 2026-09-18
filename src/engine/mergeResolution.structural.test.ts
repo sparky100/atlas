@@ -209,7 +209,7 @@ describe('structural: converged-retract', () => {
 });
 
 describe('structural: duplicate-relationship survivor pick', () => {
-  it('the loser is retracted in M; the survivor stands', () => {
+  it('keep ours: P retracts ours, M retracts theirs and restores ours', () => {
     const { review, ours, theirsExtra } = scenario(
       [createEl('d0', 'a', 'A'), createEl('d1', 'b', 'B')],
       [createRel('d-ours-rel', 'rel-ours', 'uses', 'a', 'b')],
@@ -218,13 +218,34 @@ describe('structural: duplicate-relationship survivor pick', () => {
     const choice: DuplicateRelationshipChoice = { class: 'duplicate-relationship', relationshipId: 'rel-ours', relatedRelationshipId: 'rel-theirs', keep: 'ours' };
     const result = buildStructuralResolutions(review, [choice], 'src', idMinter('m'));
 
-    expect(result.prepDeltas).toEqual([]);
-    expect(result.mergeDeltas).toEqual([expect.objectContaining({ kind: 'relationship.retract', relationshipId: 'rel-theirs', previousDeltaId: 'd-theirs-rel' })]);
+    expect(result.prepDeltas).toEqual([expect.objectContaining({ kind: 'relationship.retract', relationshipId: 'rel-ours', previousDeltaId: 'd-ours-rel' })]);
+    expect(result.mergeDeltas).toEqual([
+      expect.objectContaining({ kind: 'relationship.retract', relationshipId: 'rel-theirs', previousDeltaId: 'd-theirs-rel' }),
+      expect.objectContaining({ kind: 'relationship.restore', relationshipId: 'rel-ours', previousDeltaId: 'm-1' }),
+    ]);
     expect(result.resolvedConflicts).toEqual([{ winningDeltaId: 'd-ours-rel', discardedDeltaId: 'd-theirs-rel', resolutionDeltaId: expect.any(String), rationale: 'survivor' }]);
 
     const finalHead = replay(ours, result.prepDeltas, theirsExtra, result.mergeDeltas);
     expect(finalHead.relationships.has('rel-ours')).toBe(true);
     expect(finalHead.relationships.has('rel-theirs')).toBe(false);
+  });
+
+  it('keep theirs: P retracts ours, M has no own deltas — theirs stands', () => {
+    const { review, ours, theirsExtra } = scenario(
+      [createEl('d0', 'a', 'A'), createEl('d1', 'b', 'B')],
+      [createRel('d-ours-rel', 'rel-ours', 'uses', 'a', 'b')],
+      [createRel('d-theirs-rel', 'rel-theirs', 'uses', 'a', 'b')],
+    );
+    const choice: DuplicateRelationshipChoice = { class: 'duplicate-relationship', relationshipId: 'rel-ours', relatedRelationshipId: 'rel-theirs', keep: 'theirs' };
+    const result = buildStructuralResolutions(review, [choice], 'src', idMinter('m'));
+
+    expect(result.prepDeltas).toEqual([expect.objectContaining({ kind: 'relationship.retract', relationshipId: 'rel-ours', previousDeltaId: 'd-ours-rel' })]);
+    expect(result.mergeDeltas).toEqual([]);
+    expect(result.resolvedConflicts).toEqual([{ winningDeltaId: 'd-theirs-rel', discardedDeltaId: 'd-ours-rel', resolutionDeltaId: expect.any(String), rationale: 'survivor' }]);
+
+    const finalHead = replay(ours, result.prepDeltas, theirsExtra, result.mergeDeltas);
+    expect(finalHead.relationships.has('rel-ours')).toBe(false);
+    expect(finalHead.relationships.has('rel-theirs')).toBe(true);
   });
 });
 

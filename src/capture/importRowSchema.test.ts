@@ -98,6 +98,12 @@ describe('validateImportRow', () => {
     if (result.ok) expect(result.row.capabilityNames).toEqual(['Billing', 'Customer Accounts']);
   });
 
+  it('deduplicates a repeated capability name in the same cell, case-insensitively, keeping the first casing seen — a copy-paste typo like "Billing | Billing" must never produce two supports creates for the same pair (V6)', () => {
+    const result = validateImportRow({ name: 'Northgate', capability: 'Billing | billing | Customer Accounts' }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.row.capabilityNames).toEqual(['Billing', 'Customer Accounts']);
+  });
+
   it('parses "Name (External: Org)" into an owner reference with externalOrganisation set', () => {
     const result = validateImportRow({ name: 'Northgate', business_owner: 'Ofgem (External: Energy regulator)' }, 2);
     expect(result.ok).toBe(true);

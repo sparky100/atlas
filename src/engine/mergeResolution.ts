@@ -194,7 +194,7 @@ export interface ResolvedStructuralConflictFields {
 }
 
 export interface BuiltStructuralResolutions {
-  /** The `preparation`-kind commit's deltas (SPEC §5.1, C21) — mechanical, derived from the findings alone, identical whatever the reviewer chooses. Empty for a refresh with only duplicate/cardinality/converged findings — those never need one. */
+  /** The `preparation`-kind commit's deltas (SPEC §5.1, C21) — mechanical, derived from the findings alone, identical whatever the reviewer chooses. Empty only for a refresh with no blocking findings, or whose only findings are Case B ("theirs" retracted) with nothing dangling on our own side — every other shape below (including duplicate-relationship and cardinality, both of which retract ours' own colliding copy here first) needs at least one. */
   prepDeltas: Delta[];
   /** The `merge` commit's own deltas — where the reviewer's actual decision lives. */
   mergeDeltas: Delta[];
@@ -473,16 +473,36 @@ export function buildStructuralResolutions(review: MergeReview, choices: readonl
   }
 
   // ---- duplicate-relationship: survivor pick (ADR-021 §4.2) ----
+  // `relationshipId` is always *ours'* own copy of the pair, `relatedRelationshipId`
+  // always *theirs'* (merge.ts's own "new on ours x new on theirs" loop, which
+  // is where this finding — and this pairing — comes from). Ours' own copy
+  // is retracted in P unconditionally, both choices, then restored in M if
+  // it's the side that wins — the same shape `owns` cardinality already
+  // uses just below, and for the same reason: V6 (SPEC §5.2, now also
+  // checked inline by `apply()`'s own `relationship.create`/`restore`,
+  // src/engine/deltas.ts) forbids two live relationships sharing
+  // `(type, from, to)` even for the instant between X's replay of theirs'
+  // own create and M's own resolution — leaving ours' copy live across
+  // that replay, as the old single-retract-in-M shape did, would throw
+  // there instead of resolving cleanly.
   for (const c of choices) {
     if (c.class !== 'duplicate-relationship') continue;
-    const loserId = c.keep === 'ours' ? c.relatedRelationshipId : c.relationshipId;
-    const survivorId = c.keep === 'ours' ? c.relationshipId : c.relatedRelationshipId;
-    const loserRow = ours.relationships.get(loserId) ?? theirs.relationships.get(loserId);
-    const survivorRow = ours.relationships.get(survivorId) ?? theirs.relationships.get(survivorId);
-    if (!loserRow || !survivorRow) throw new EngineError(`buildStructuralResolutions: duplicate-relationship choice for ${c.relationshipId}/${c.relatedRelationshipId} references an unknown relationship`);
-    const retractId = mintId();
-    mergeDeltas.push(relationshipRetractDelta(retractId, loserId, loserRow.relationshipType, loserRow.existsDeltaId, sourceId));
-    resolvedConflicts.push({ winningDeltaId: survivorRow.existsDeltaId, discardedDeltaId: loserRow.existsDeltaId, resolutionDeltaId: retractId, rationale: 'survivor' });
+    const oursId = c.relationshipId;
+    const theirsId = c.relatedRelationshipId;
+    const oursRow = ours.relationships.get(oursId);
+    const theirsRow = theirs.relationships.get(theirsId);
+    if (!oursRow || !theirsRow) throw new EngineError(`buildStructuralResolutions: duplicate-relationship choice for ${oursId}/${theirsId} references an unknown relationship`);
+    const prepId = mintId();
+    prepDeltas.push(relationshipRetractDelta(prepId, oursId, oursRow.relationshipType, oursRow.existsDeltaId, sourceId));
+    if (c.keep === 'ours') {
+      const retractTheirsId = mintId();
+      mergeDeltas.push(relationshipRetractDelta(retractTheirsId, theirsId, theirsRow.relationshipType, theirsRow.existsDeltaId, sourceId));
+      const restoreOursId = mintId();
+      mergeDeltas.push(relationshipRestoreDelta(restoreOursId, oursId, oursRow.relationshipType, prepId, sourceId));
+      resolvedConflicts.push({ winningDeltaId: oursRow.existsDeltaId, discardedDeltaId: theirsRow.existsDeltaId, resolutionDeltaId: restoreOursId, rationale: 'survivor' });
+    } else {
+      resolvedConflicts.push({ winningDeltaId: theirsRow.existsDeltaId, discardedDeltaId: oursRow.existsDeltaId, resolutionDeltaId: prepId, rationale: 'survivor' });
+    }
   }
 
   // ---- cardinality: primary/role pick (ADR-021 §4.3) ----
