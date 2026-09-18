@@ -27,11 +27,11 @@ test('import a CSV of three new systems from an empty landscape, then submit, ap
   // empty state's own affordance, and the page's standing "+ Add" row) —
   // either opens the identical dialog, so `.first()` rather than assuming
   // which one a given viewport renders.
-  await page.getByRole('button', { name: 'Import from spreadsheet…' }).first().click();
+  await page.getByRole('button', { name: 'Import model updates…' }).first().click();
 
-  await expect(page.getByRole('dialog', { name: 'Import a spreadsheet' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Import model updates' })).toBeVisible();
   const csv = ['name,description', 'Northgate,The borough’s new revenues platform.', 'Riverside Payments,Handles resident payments.', 'Council Tax System,Manages council tax accounts.'].join('\n');
-  await page.getByLabel('Choose a CSV or XLSX file to import').setInputFiles({ name: 'systems.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await page.getByLabel('Choose a CSV, XLSX, or JSON file to import').setInputFiles({ name: 'systems.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
 
   // Every row is a clean, unambiguous new system — nothing to pick, no failures — so the Import button is enabled immediately.
   await expect(page.getByText('3 new')).toBeVisible();

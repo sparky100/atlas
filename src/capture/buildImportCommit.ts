@@ -380,6 +380,12 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
       rows.push({ rowNumber: row.rowNumber, name: row.name, outcome: { status: 'blocked', reason: "the matched element's current state could not be read" }, warnings });
       continue;
     }
+    // The row's own `elementType` only ever reflects its own `platform`
+    // column — never trusted for an *existing* element (a bare row's own
+    // identity can now resolve to a module via `crossCheckAgainstModules`,
+    // `matchImportRows.ts`), so every delta below carries the real,
+    // resolved element's own type instead.
+    const elementType = containers.some((c) => c.element_id === elementId) ? 'container' : 'system';
 
     const changedColumns: string[] = [];
     for (const [column, attribute] of ATTRIBUTE_COLUMNS) {
@@ -390,7 +396,7 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
         kind: 'element.update',
         id: crypto.randomUUID(),
         elementId,
-        elementType: row.elementType,
+        elementType,
         attribute,
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- `hasChanged` above already returned false for `undefined`.
         value: value!,
@@ -402,7 +408,7 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
       changedColumns.push(column);
     }
     if (hasChangedBoolean(row.isExternal, facts.get('isExternal'))) {
-      deltas.push({ kind: 'element.update', id: crypto.randomUUID(), elementId, elementType: row.elementType, attribute: 'isExternal', value: row.isExternal, previousDeltaId: facts.get('isExternal')?.delta_id ?? existsDeltaId, sourceId, sourceRef: locator('is_external'), confidence: row.confidence ?? 1 } as Delta);
+      deltas.push({ kind: 'element.update', id: crypto.randomUUID(), elementId, elementType, attribute: 'isExternal', value: row.isExternal, previousDeltaId: facts.get('isExternal')?.delta_id ?? existsDeltaId, sourceId, sourceRef: locator('is_external'), confidence: row.confidence ?? 1 } as Delta);
       changedColumns.push('is_external');
     }
 

@@ -26,6 +26,7 @@ import type { MatchResolution } from '../../capture/buildImportCommit';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { importTemplateXlsxBlob } from './importTemplateXlsx';
@@ -112,11 +113,11 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="Import a spreadsheet" ref={panelRef}>
+      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="Import model updates" ref={panelRef}>
         <Panel raised className={styles.panel ?? ''}>
           <div className={styles.header}>
             <Text as="h2" size="lg">
-              Import a spreadsheet
+              Import model updates
             </Text>
             <Button variant="ghost" aria-label="Close" onClick={handleClose}>
               ✕
@@ -166,175 +167,173 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
 
           {review && (status === 'review' || status === 'committing') && (
             <div className={styles.review}>
-              <div className={styles.preview}>
-                <Text as="h3" size="sm">
-                  Detected columns
-                </Text>
+              <CollapsibleSection title="Detected columns" defaultOpen={false}>
                 <Text as="p" size="sm" mono>
                   {review.detectedColumns.join(', ')}
                 </Text>
-              </div>
+              </CollapsibleSection>
 
-              <div className={styles.counts}>
-                <Chip tone="info">{newCount} new</Chip>
-                <Chip tone="info">{changedCount} changed</Chip>
-                <Chip tone="neutral">{unchangedCount} unchanged</Chip>
-                {needsPickCount > 0 && <Chip tone="warn">{needsPickCount} need a pick</Chip>}
-                {blockedCount > 0 && <Chip tone="danger">{blockedCount} failed</Chip>}
-                {review.parseErrors.length > 0 && <Chip tone="danger">{review.parseErrors.length} invalid</Chip>}
-              </div>
-
-              {review.parseErrors.length > 0 && (
-                <ul className={styles.rowList}>
-                  {review.parseErrors.map((e) => (
-                    <li key={e.rowNumber}>
-                      <Text as="p" size="sm">
-                        Row {e.rowNumber}: {e.error}
-                      </Text>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <ul className={styles.rowList}>
-                {rows
-                  .filter((r) => r.outcome.status !== 'unchanged')
-                  .map((r) => (
-                    <li key={r.rowNumber} className={styles.row}>
-                      <div className={styles.rowMain}>
-                        <Text as="span">{r.name}</Text>
-                        {r.outcome.status === 'new' && <Chip tone="info">New</Chip>}
-                        {r.outcome.status === 'changed' && <Chip tone="info">Changed: {r.outcome.changedColumns.join(', ')}</Chip>}
-                        {r.outcome.status === 'blocked' && <Chip tone="danger">{r.outcome.reason}</Chip>}
-                      </div>
-                      {r.outcome.status === 'needs-pick' && (
-                        <select
-                          className={styles.select}
-                          aria-label={`Which existing element does row ${String(r.rowNumber)} match?`}
-                          defaultValue=""
-                          onChange={(e) => {
-                            const choice: MatchResolution = e.target.value === 'new' ? 'new' : e.target.value;
-                            resolveMatch(r.rowNumber, choice);
-                          }}
-                        >
-                          <option value="" disabled>
-                            {r.outcome.candidates.length} near-match(es) — pick one
-                          </option>
-                          {r.outcome.candidates.map((c) => (
-                            <option key={c.elementId} value={c.elementId}>
-                              Same as: {c.name}
-                            </option>
-                          ))}
-                          <option value="new">Create new instead</option>
-                        </select>
-                      )}
-                      {r.warnings.map((w) => (
-                        <Text as="p" size="sm" tone="muted" key={w}>
-                          {w}
-                        </Text>
-                      ))}
-                    </li>
-                  ))}
-              </ul>
-
-              {relationshipRows.length > 0 && (
+              <CollapsibleSection title="Systems" meta={`(${String(rows.length)})`}>
                 <div className={styles.preview}>
-                  <Text as="h3" size="sm">
-                    Relationships ({relationshipRows.length})
-                  </Text>
                   <div className={styles.counts}>
-                    <Chip tone="info">{relationshipRows.filter((r) => r.outcome.status === 'new').length} new</Chip>
-                    <Chip tone="info">{relationshipRows.filter((r) => r.outcome.status === 'changed').length} changed</Chip>
-                    <Chip tone="neutral">{relationshipRows.filter((r) => r.outcome.status === 'unchanged').length} unchanged</Chip>
-                    {relationshipBlockedCount > 0 && <Chip tone="danger">{relationshipBlockedCount} failed</Chip>}
+                    <Chip tone="info">{newCount} new</Chip>
+                    <Chip tone="info">{changedCount} changed</Chip>
+                    <Chip tone="neutral">{unchangedCount} unchanged</Chip>
+                    {needsPickCount > 0 && <Chip tone="warn">{needsPickCount} need a pick</Chip>}
+                    {blockedCount > 0 && <Chip tone="danger">{blockedCount} failed</Chip>}
+                    {review.parseErrors.length > 0 && <Chip tone="danger">{review.parseErrors.length} invalid</Chip>}
                   </div>
-                  {review.relationshipParseErrors.length > 0 && (
+
+                  {review.parseErrors.length > 0 && (
                     <ul className={styles.rowList}>
-                      {review.relationshipParseErrors.map((e) => (
+                      {review.parseErrors.map((e) => (
                         <li key={e.rowNumber}>
                           <Text as="p" size="sm">
-                            Relationships row {e.rowNumber}: {e.error}
+                            Row {e.rowNumber}: {e.error}
                           </Text>
                         </li>
                       ))}
                     </ul>
                   )}
-                  {relationshipBlockedCount > 0 && (
-                    <ul className={styles.rowList}>
-                      {relationshipRows
-                        .filter((r) => r.outcome.status === 'blocked')
-                        .map((r) => (
-                          <li key={r.rowNumber} className={styles.row}>
-                            <Text as="span" size="sm">
-                              Row {r.rowNumber}
-                            </Text>
-                            {r.outcome.status === 'blocked' && <Chip tone="danger">{r.outcome.reason}</Chip>}
-                          </li>
-                        ))}
-                    </ul>
-                  )}
-                </div>
-              )}
 
-              {changeRows.length > 0 && (
-                <div className={styles.preview}>
-                  <Text as="h3" size="sm">
-                    Changes ({changeRows.length})
-                  </Text>
-                  <div className={styles.counts}>
-                    <Chip tone="info">{changeRows.filter((r) => r.outcome.status === 'applied').length} to apply</Chip>
-                    <Chip tone="neutral">{changeRows.filter((r) => r.outcome.status === 'unchanged').length} unchanged</Chip>
-                    {changeBlockedCount > 0 && <Chip tone="danger">{changeBlockedCount} failed</Chip>}
-                  </div>
-                  {review.changeParseErrors.length > 0 && (
-                    <ul className={styles.rowList}>
-                      {review.changeParseErrors.map((e) => (
-                        <li key={e.rowNumber}>
-                          <Text as="p" size="sm">
-                            Changes entry {e.rowNumber}: {e.error}
-                          </Text>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                   <ul className={styles.rowList}>
-                    {changeRows
+                    {rows
                       .filter((r) => r.outcome.status !== 'unchanged')
                       .map((r) => (
                         <li key={r.rowNumber} className={styles.row}>
                           <div className={styles.rowMain}>
                             <Text as="span">{r.name}</Text>
-                            <Chip tone={r.outcome.status === 'blocked' ? 'danger' : 'info'}>{r.outcome.status === 'blocked' ? r.outcome.reason : r.action === 'retire' ? 'Retire' : 'Restore'}</Chip>
+                            {r.outcome.status === 'new' && <Chip tone="info">New</Chip>}
+                            {r.outcome.status === 'changed' && <Chip tone="info">Changed: {r.outcome.changedColumns.join(', ')}</Chip>}
+                            {r.outcome.status === 'blocked' && <Chip tone="danger">{r.outcome.reason}</Chip>}
                           </div>
-                          {r.reason !== null && (
-                            <Text as="p" size="sm" tone="muted">
-                              {r.reason}
-                            </Text>
+                          {r.outcome.status === 'needs-pick' && (
+                            <select
+                              className={styles.select}
+                              aria-label={`Which existing element does row ${String(r.rowNumber)} match?`}
+                              defaultValue=""
+                              onChange={(e) => {
+                                const choice: MatchResolution = e.target.value === 'new' ? 'new' : e.target.value;
+                                resolveMatch(r.rowNumber, choice);
+                              }}
+                            >
+                              <option value="" disabled>
+                                {r.outcome.candidates.length} near-match(es) — pick one
+                              </option>
+                              {r.outcome.candidates.map((c) => (
+                                <option key={c.elementId} value={c.elementId}>
+                                  Same as: {c.name}
+                                </option>
+                              ))}
+                              <option value="new">Create new instead</option>
+                            </select>
                           )}
+                          {r.warnings.map((w) => (
+                            <Text as="p" size="sm" tone="muted" key={w}>
+                              {w}
+                            </Text>
+                          ))}
                         </li>
                       ))}
                   </ul>
                 </div>
+              </CollapsibleSection>
+
+              {relationshipRows.length > 0 && (
+                <CollapsibleSection title="Relationships" meta={`(${String(relationshipRows.length)})`}>
+                  <div className={styles.preview}>
+                    <div className={styles.counts}>
+                      <Chip tone="info">{relationshipRows.filter((r) => r.outcome.status === 'new').length} new</Chip>
+                      <Chip tone="info">{relationshipRows.filter((r) => r.outcome.status === 'changed').length} changed</Chip>
+                      <Chip tone="neutral">{relationshipRows.filter((r) => r.outcome.status === 'unchanged').length} unchanged</Chip>
+                      {relationshipBlockedCount > 0 && <Chip tone="danger">{relationshipBlockedCount} failed</Chip>}
+                    </div>
+                    {review.relationshipParseErrors.length > 0 && (
+                      <ul className={styles.rowList}>
+                        {review.relationshipParseErrors.map((e) => (
+                          <li key={e.rowNumber}>
+                            <Text as="p" size="sm">
+                              Relationships row {e.rowNumber}: {e.error}
+                            </Text>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {relationshipBlockedCount > 0 && (
+                      <ul className={styles.rowList}>
+                        {relationshipRows
+                          .filter((r) => r.outcome.status === 'blocked')
+                          .map((r) => (
+                            <li key={r.rowNumber} className={styles.row}>
+                              <Text as="span" size="sm">
+                                Row {r.rowNumber}
+                              </Text>
+                              {r.outcome.status === 'blocked' && <Chip tone="danger">{r.outcome.reason}</Chip>}
+                            </li>
+                          ))}
+                      </ul>
+                    )}
+                  </div>
+                </CollapsibleSection>
+              )}
+
+              {changeRows.length > 0 && (
+                <CollapsibleSection title="Changes" meta={`(${String(changeRows.length)})`}>
+                  <div className={styles.preview}>
+                    <div className={styles.counts}>
+                      <Chip tone="info">{changeRows.filter((r) => r.outcome.status === 'applied').length} to apply</Chip>
+                      <Chip tone="neutral">{changeRows.filter((r) => r.outcome.status === 'unchanged').length} unchanged</Chip>
+                      {changeBlockedCount > 0 && <Chip tone="danger">{changeBlockedCount} failed</Chip>}
+                    </div>
+                    {review.changeParseErrors.length > 0 && (
+                      <ul className={styles.rowList}>
+                        {review.changeParseErrors.map((e) => (
+                          <li key={e.rowNumber}>
+                            <Text as="p" size="sm">
+                              Changes entry {e.rowNumber}: {e.error}
+                            </Text>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <ul className={styles.rowList}>
+                      {changeRows
+                        .filter((r) => r.outcome.status !== 'unchanged')
+                        .map((r) => (
+                          <li key={r.rowNumber} className={styles.row}>
+                            <div className={styles.rowMain}>
+                              <Text as="span">{r.name}</Text>
+                              <Chip tone={r.outcome.status === 'blocked' ? 'danger' : 'info'}>{r.outcome.status === 'blocked' ? r.outcome.reason : r.action === 'retire' ? 'Retire' : 'Restore'}</Chip>
+                            </div>
+                            {r.reason !== null && (
+                              <Text as="p" size="sm" tone="muted">
+                                {r.reason}
+                              </Text>
+                            )}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                </CollapsibleSection>
               )}
 
               {notInFile.length > 0 && (
-                <div className={styles.notInFile}>
-                  <Text as="h3" size="sm">
-                    Not in file ({notInFile.length})
-                  </Text>
-                  <Text as="p" size="sm" tone="muted">
-                    Still in the model, but this file never mentioned them — nothing is retracted; retire one from the change page after importing.
-                  </Text>
-                  <ul className={styles.rowList}>
-                    {notInFile.map((n) => (
-                      <li key={n.elementId}>
-                        <Text as="span" size="sm">
-                          {n.name}
-                        </Text>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <CollapsibleSection title="Not in file" meta={`(${String(notInFile.length)})`} defaultOpen={false}>
+                  <div className={styles.notInFile}>
+                    <Text as="p" size="sm" tone="muted">
+                      Still in the model, but this file never mentioned them — nothing is retracted; retire one from the change page after importing.
+                    </Text>
+                    <ul className={styles.rowList}>
+                      {notInFile.map((n) => (
+                        <li key={n.elementId}>
+                          <Text as="span" size="sm">
+                            {n.name}
+                          </Text>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </CollapsibleSection>
               )}
 
               <div className={styles.actions}>

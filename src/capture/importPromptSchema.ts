@@ -28,6 +28,7 @@ Fields (only what's actually known has to be filled in): \`${IMPORT_COLUMNS.join
 
 - \`name\` is the only field that's always required.
 - \`platform\` decides structure: leave it out for a top-level system. Set it to an existing platform's name (e.g. "SAP") to make this entry one of that platform's own modules instead.
+- When \`platform\` is set, \`name\` is the module's own bare name only (e.g. "PM") — never prefixed with the platform (never "SAP · PM"). "Platform · Module" is only for *referencing* a module elsewhere (\`relationships\`' \`from\`/\`to\`/\`via\`, \`changes\`' \`name\`/\`replaced_by\`), never for naming one here.
 - \`kind\` is one of: application, integration_platform, data_platform, infrastructure, platform. Only meaningful for a top-level system (no \`platform\`) — leave it out on a module.
 - \`lifecycle\` is one of: planned, active, retiring, retired.
 - \`criticality\` is one of: critical, high, medium, low.
@@ -55,7 +56,7 @@ Fields: \`${RELATIONSHIP_IMPORT_COLUMNS.join(', ')}\`
 
 Fields: \`${CHANGE_IMPORT_COLUMNS.join(', ')}\`
 
-- \`name\` names an existing system or module — a \`changes\` entry never creates anything. "Platform · Module" works here too.
+- \`name\` names a system or module that already exists in the model *before* this import — a \`changes\` entry never creates anything, and can't target something this same import's own \`systems\` array is also creating for the first time (retire it in a later import instead, once it's actually in the model). "Platform · Module" works here too.
 - \`action\` is \`retire\` or \`restore\`.
 - \`replaced_by\` (retire only) names the system or module taking over — every one of the retiring element's own capability links transfers to it.
 - \`reason\` is free text explaining why, shown to whoever reviews the import.

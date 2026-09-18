@@ -197,6 +197,13 @@ describe('buildImportDeltas — matched/changed rows', () => {
     expect(rows[0]?.outcome).toMatchObject({ status: 'changed', changedColumns: ['is_external'] });
   });
 
+  it('uses the resolved element’s own real type, not the row’s own (a bare row can resolve to a module — matchImportRows.ts’s own container cross-check)', () => {
+    const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'PM', attributes: { description: 'New description' } }), { match: { kind: 'matched', element: { elementId: 'pm-1', name: 'PM' } } })];
+    const containers = [container('pm-1', 'PM', 'sap-1')];
+    const { deltas } = build(matchedRows, { containers, existsDeltaIdByElementId: new Map([['pm-1', 'd-create']]) });
+    expect(deltas[0]).toMatchObject({ kind: 'element.update', elementId: 'pm-1', elementType: 'container', attribute: 'description', value: 'New description' });
+  });
+
   it('never (re-)links owners for a matched row, even when one resolved', () => {
     const matchedRows = [matchedRow(row({ rowNumber: 2, name: 'Northgate', technicalOwner: { name: 'John Smith', externalOrganisation: null } }), { match: { kind: 'matched', element: { elementId: 'sys-1', name: 'Northgate' } }, technicalOwner: { kind: 'matched', element: { elementId: 'actor-1', name: 'John Smith' } } })];
     const { rows, deltas } = build(matchedRows, { existsDeltaIdByElementId: new Map([['sys-1', 'd-create']]) });
