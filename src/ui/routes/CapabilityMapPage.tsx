@@ -156,6 +156,21 @@ export function CapabilityMapPage() {
       return next;
     });
   };
+  // Capability map redesign: domains collapsed by default, one open at a
+  // time — the same single-open accordion shape this page's pre-redesign
+  // mobile-only treatment already used (`expandedL1`), now the only
+  // interaction model at every width. `null` (collapsed) unless deep-
+  // linked into via `?domain=<capabilityId>` (e.g. "Open capability map →"
+  // from a specific domain on Home) — the lazy initializer reads
+  // `searchParams` once, on this component's first mount only, the same
+  // "session-only, not persisted" state `expanded` above already is (and
+  // for the same reload/remount-survival reason — see that state's own
+  // comment). An id that doesn't match any real domain is harmless: no
+  // row ever matches it, so it just never renders expanded.
+  const [expandedDomainId, setExpandedDomainId] = useState<UUID | null>(() => searchParams.get('domain'));
+  const toggleDomain = (id: UUID): void => {
+    setExpandedDomainId((prev) => (prev === id ? null : id));
+  };
   // Sprint U4-2a check B5: "Sync descriptions"/"Export as starter map" move
   // from two always-visible buttons of their own into one "⋯" overflow
   // menu beside "+ Add capability" — same always-collapsed pattern
@@ -178,12 +193,12 @@ export function CapabilityMapPage() {
       ? (state.data.tree.l1.flatMap((column) => column.l2.flatMap((card) => [card.capability, ...card.l3])).find((c) => c.element_id === commentsPanelCapabilityId)?.name ?? '')
       : '';
 
-  // V2b: the shared Inspector's own "which tile is inspected" state — same
+  // V2b: the shared Inspector's own "which row is inspected" state — same
   // single-open-id shape `commentsPanelCapabilityId` above already uses,
-  // opened via `CapabilityMapView`'s own new `onInspectClick` (the small
-  // corner button `CapabilityTile.tsx` now renders, since this view has no
-  // click-to-focus concept of its own to repurpose — every tile's primary
-  // link still navigates, unchanged).
+  // opened via `CapabilityMapView`'s own `onInspectClick` (a small inline
+  // button rendered at every level, since this view has no click-to-focus
+  // concept of its own to repurpose — every row's primary link still
+  // navigates, unchanged).
   const [selectedCapabilityId, setSelectedCapabilityId] = useState<UUID | null>(null);
   const { collapsed: inspectorCollapsed, setCollapsed: setInspectorCollapsed } = useInspectorCollapsedPreference(userId);
 
@@ -310,6 +325,8 @@ export function CapabilityMapPage() {
                 refParam={refParam}
                 reorderCapability={reorderCapability}
                 reorderMode={reorderMode}
+                expandedDomainId={expandedDomainId}
+                onToggleDomain={toggleDomain}
                 expanded={expanded}
                 onToggleExpand={toggleExpanded}
                 threadCounts={threadCounts}

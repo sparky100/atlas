@@ -113,7 +113,10 @@ test('capability map export: "Export as starter map" writes a draft, flagged as 
   await draftRow.getByRole('button', { name: 'Import' }).click();
 
   // The exported content actually arrived — both levels, name and
-  // description carried over.
+  // description carried over. "Grid Operations" is the domain's own
+  // collapsed summary row; "Outage Management" is its L2 child, hidden
+  // until expanded (capability map redesign — collapsed by default).
   await expect(page.getByText('Grid Operations')).toBeVisible();
+  await page.getByRole('button', { name: /Grid Operations/ }).click();
   await expect(page.getByText('Outage Management', { exact: true })).toBeVisible();
 });

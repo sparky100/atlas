@@ -2,11 +2,13 @@
  * M1 close-out item 2: "Capability map: markers on tiles (bottom-right,
  * same rule) and the panel, per the corner rule in UI-principles §6.1."
  *
- * Two L2 tiles, one with an open thread (the ink marker), one with every
+ * Two L2 cards, one with an open thread (the ink marker), one with every
  * thread resolved (the hollow marker) — `docs/HANDOFF-M1b-comments.md`'s
- * own bottom-right corner rule, now on `CapabilityTile` (L2 cards and L3
- * tiles both use it — `CapabilityMapView.tsx`'s own module comment)
- * alongside the landscape's canvas-drawn version of the same marker.
+ * own corner rule, drawn post-redesign by the shared `CommentMarkerButton`
+ * (a plain inline badge, not a tile corner overlay — `CapabilityMapView.tsx`'s
+ * own `CapabilityRow` comment). Each capability's own domain is collapsed
+ * by default now, so this test expands both before checking for their
+ * markers.
  *
  * Same "needs a real Supabase" limitation as every Playwright test here.
  */
@@ -90,22 +92,24 @@ test('capability map: an ink marker for an open thread, a hollow marker for an a
   await resolveComment(signedIn, { commentId: resolvedRoot.id, resolvedBy: userId });
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
+
+  // Domains are a single-open accordion (redesign item 1) — opening
+  // "Resolved Thread Group" later closes "Open Thread Group" again, so
+  // each group's own card and marker are checked while it's the one open,
+  // not both at once.
+  await page.getByRole('button', { name: /Open Thread Group/ }).click();
   await expect(page.getByText('Has An Open Thread')).toBeVisible();
 
-  // The ink marker — bottom-right, an open thread's own count.
-  const openThreadTile = page.locator('div').filter({ hasText: 'Has An Open Thread' }).last();
-  const inkMarker = openThreadTile.getByRole('button', { name: '1 unresolved comment' });
+  // The ink marker — an open thread's own count, on the card's own row.
+  const openThreadCard = page.getByRole('listitem').filter({ hasText: 'Has An Open Thread' });
+  const inkMarker = openThreadCard.getByRole('button', { name: '1 unresolved comment' });
   await expect(inkMarker).toBeVisible();
 
-  // The hollow marker — bottom-right, no count (every thread resolved).
-  const resolvedThreadTile = page.locator('div').filter({ hasText: 'Has Only A Resolved Thread' }).last();
-  const hollowMarker = resolvedThreadTile.getByRole('button', { name: 'All comments resolved' });
-  await expect(hollowMarker).toBeVisible();
-
-  // Clicking either marker opens the panel scoped to that capability, not
-  // its own element page (the tile's own primary link would do that
-  // instead — CapabilityTile.tsx's own `e.preventDefault()` on the marker
-  // click is what keeps the two from firing together).
+  // Clicking the marker opens the panel scoped to that capability, not
+  // its own element page (the card's own primary link would do that
+  // instead — `CommentMarkerButton`'s own `e.preventDefault()`/
+  // `e.stopPropagation()` on the marker click is what keeps the two from
+  // firing together).
   await inkMarker.click();
   await expect(page).toHaveURL(/\/capability-map$/);
   const panel = page.getByRole('complementary', { name: 'Comments on Has An Open Thread' });
@@ -114,6 +118,13 @@ test('capability map: an ink marker for an open thread, a hollow marker for an a
   await panel.getByRole('button', { name: 'Close comments panel' }).click();
   await expect(panel).not.toBeVisible();
 
+  await page.getByRole('button', { name: /Resolved Thread Group/ }).click();
+  await expect(page.getByText('Has Only A Resolved Thread')).toBeVisible();
+
+  // The hollow marker — no count (every thread resolved).
+  const resolvedThreadCard = page.getByRole('listitem').filter({ hasText: 'Has Only A Resolved Thread' });
+  const hollowMarker = resolvedThreadCard.getByRole('button', { name: 'All comments resolved' });
+  await expect(hollowMarker).toBeVisible();
   await hollowMarker.click();
   await expect(page.getByRole('complementary', { name: 'Comments on Has Only A Resolved Thread' })).toBeVisible();
 });

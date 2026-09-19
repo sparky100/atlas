@@ -123,12 +123,24 @@ test('Backfill capability order: an owner sees and can run it; an architect on t
   // the "Reorder mode" toggle, now in the Inspector's own Filters section.
   await ownerPage.getByRole('button', { name: 'Capability map actions' }).click();
   await ownerPage.getByLabel('Reorder mode').check();
+  // A domain's own move buttons live in its expanded body — expand
+  // "Backfill Alpha" to reach them. Domains stack vertically now
+  // (capability map redesign), so its own move buttons read "up"/"down",
+  // not "left"/"right".
+  await ownerPage.getByRole('button', { name: /Backfill Alpha/ }).click();
   // Alphabetical tiebreak among the order-less pair (findOrderBackfillCandidates'
-  // own comment) put Alpha before Beta — "move Alpha right" is the one
-  // enabled button of the pair (Beta's own "right" has no next sibling).
-  await ownerPage.getByRole('button', { name: 'Move Backfill Alpha right' }).click();
+  // own comment) put Alpha before Beta — "move Alpha down" is the one
+  // enabled button of the pair (Beta's own "down" has no next sibling).
+  await ownerPage.getByRole('button', { name: 'Move Backfill Alpha down' }).click();
   await expect(async () => {
-    const order = await ownerPage.getByRole('link', { name: /^(Backfill Alpha|Backfill Beta)$/ }).allTextContents();
+    const withTops = await Promise.all(
+      ['Backfill Alpha', 'Backfill Beta'].map(async (name) => {
+        const box = await ownerPage.getByRole('listitem').filter({ hasText: name }).boundingBox();
+        if (!box) throw new Error(`no bounding box for domain "${name}"`);
+        return { name, top: box.y };
+      }),
+    );
+    const order = withTops.sort((a, b) => a.top - b.top).map((w) => w.name);
     expect(order).toEqual(['Backfill Beta', 'Backfill Alpha']);
   }).toPass();
 });

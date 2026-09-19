@@ -1,12 +1,16 @@
 /**
- * Sprint U4-1 C2: "responsive grid of level-1 groups (5 columns >=1280,
- * 4 desktop, 2 tablet, 1 at 390px), whole map visible without horizontal
- * scroll". `CapabilityMapView.module.css`'s own comment names the exact
- * breakpoints this asserts against, and its `role="list"`/`role="listitem"`
- * addition (CapabilityMapView.tsx's own comment) is what lets this test
- * find the grid container without a CSS-module class selector — this
- * codebase's e2e specs never match by (possibly production-hashed) class
- * name.
+ * Capability map redesign (density pass): domains are a vertical stack of
+ * collapsible rows now, not a responsive grid of always-open columns —
+ * see `CapabilityMapView.module.css`'s own `.domains` comment. What still
+ * has a responsive column count is the *card grid inside an expanded
+ * domain* (redesign item 3/7: "3-4 columns depending on viewport... drop
+ * to 2 then 1 column" at narrower widths) — `.cardGrid`'s own comment
+ * names the exact breakpoints this asserts against (768/1024/1280,
+ * matching this codebase's own existing breakpoint family), reusing the
+ * `role="list"`/`role="listitem"` pair Sprint U4-1 C2 originally added so
+ * this test still finds the container without a CSS-module class
+ * selector — this codebase's e2e specs never match by (possibly
+ * production-hashed) class name.
  *
  * Same "needs a real Supabase" limitation as e2e/capability-map.spec.ts.
  */
@@ -20,9 +24,9 @@ import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
 
-/** The grid container's own `grid-template-columns`, split into its per-column tokens — its length is the actual rendered column count at whatever viewport the page is currently at. */
-async function columnCount(page: Page): Promise<number> {
-  const value = await page.getByRole('list', { name: 'Level 1 capabilities' }).evaluate((el) => getComputedStyle(el).gridTemplateColumns);
+/** The card grid's own `grid-template-columns`, split into its per-column tokens — its length is the actual rendered column count at whatever viewport the page is currently at. Found by its own `role="list"` (`aria-label="Finance capabilities"`, `CapabilityMapView.tsx`'s own `cardGrid` comment) rather than a CSS-module class selector. */
+async function cardColumnCount(page: Page): Promise<number> {
+  const value = await page.getByRole('list', { name: 'Finance capabilities' }).evaluate((el) => getComputedStyle(el).gridTemplateColumns);
   return value.trim().split(/\s+/).filter(Boolean).length;
 }
 
@@ -30,7 +34,7 @@ async function hasHorizontalScroll(page: Page): Promise<boolean> {
   return page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
 }
 
-test('capability map layout: L1 column count matches the responsive grid tiers, with no horizontal scroll at any of them', async ({ page }) => {
+test('capability map layout: an expanded domain\'s card grid matches the responsive tiers, with no horizontal scroll at any of them, and every domain stays reachable collapsed', async ({ page }) => {
   const env = loadEnv();
 
   const email = `capmap-layout-${randomUUID()}@example.test`;
@@ -67,22 +71,39 @@ test('capability map layout: L1 column count matches the responsive grid tiers, 
   const { data: sourceRow } = await signedIn.from('sources').select('id').eq('model_id', modelId).eq('user_id', userId).single();
   const seedSourceId = (sourceRow as { id: string }).id;
 
-  // Six L1 capabilities: more than any tier's own column count (5 at the
-  // widest), so a real grid actually has to wrap a row rather than every
-  // tier trivially fitting everything on one line regardless of whether
-  // wrapping works.
-  const names = ['Finance', 'Procurement', 'Human Resources', 'Customer Contact', 'Estates', 'Digital & Technology'];
-  const deltas: Delta[] = names.map((name, index) => ({
-    kind: 'element.create',
-    id: randomUUID(),
-    elementId: randomUUID(),
-    elementType: 'capability',
-    name,
-    parentId: null,
-    attributes: { order: (index + 1) * 10 },
-    sourceId: seedSourceId,
-    confidence: 1,
-  }));
+  // Six L1 domains (still worth covering: every one must stay reachable
+  // as a collapsed row at the narrowest tier), one of which ("Finance")
+  // also gets six L2 children — more than any card-grid tier's own column
+  // count (4 at the widest), so expanding it actually wraps a row rather
+  // than every tier trivially fitting everything on one line regardless
+  // of whether wrapping works.
+  const domainNames = ['Finance', 'Procurement', 'Human Resources', 'Customer Contact', 'Estates', 'Digital & Technology'];
+  const financeId = randomUUID();
+  const l2Names = ['Payroll', 'Budgeting', 'Treasury', 'Tax', 'Audit', 'Reporting'];
+  const deltas: Delta[] = [
+    ...domainNames.map((name, index): Delta => ({
+      kind: 'element.create',
+      id: randomUUID(),
+      elementId: name === 'Finance' ? financeId : randomUUID(),
+      elementType: 'capability',
+      name,
+      parentId: null,
+      attributes: { order: (index + 1) * 10 },
+      sourceId: seedSourceId,
+      confidence: 1,
+    })),
+    ...l2Names.map((name, index): Delta => ({
+      kind: 'element.create',
+      id: randomUUID(),
+      elementId: randomUUID(),
+      elementType: 'capability',
+      name,
+      parentId: financeId,
+      attributes: { order: (index + 1) * 10 },
+      sourceId: seedSourceId,
+      confidence: 1,
+    })),
+  ];
 
   const envelope: CommitEnvelope = {
     id: randomUUID(),
@@ -90,7 +111,7 @@ test('capability map layout: L1 column count matches the responsive grid tiers, 
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    title: 'seed six ordered L1 capabilities',
+    title: 'seed six ordered L1 domains, one with six L2 children',
     body: null,
     deltas,
   };
@@ -98,27 +119,33 @@ test('capability map layout: L1 column count matches the responsive grid tiers, 
   if (!seedResult.ok) throw new Error(`seeding capability-map-layout fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
-  await expect(page.getByText('Finance')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Finance/ })).toBeVisible();
+  await page.getByRole('button', { name: /Finance/ }).click();
+  await expect(page.getByText('Payroll')).toBeVisible();
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(async () => { expect(await columnCount(page)).toBe(5); }).toPass();
+  await expect(async () => { expect(await cardColumnCount(page)).toBe(4); }).toPass();
   expect(await hasHorizontalScroll(page)).toBe(false);
 
   await page.setViewportSize({ width: 1100, height: 900 });
-  await expect(async () => { expect(await columnCount(page)).toBe(4); }).toPass();
+  await expect(async () => { expect(await cardColumnCount(page)).toBe(3); }).toPass();
   expect(await hasHorizontalScroll(page)).toBe(false);
 
   await page.setViewportSize({ width: 800, height: 900 });
-  await expect(async () => { expect(await columnCount(page)).toBe(2); }).toPass();
+  await expect(async () => { expect(await cardColumnCount(page)).toBe(2); }).toPass();
   expect(await hasHorizontalScroll(page)).toBe(false);
 
   await page.setViewportSize({ width: 390, height: 800 });
-  await expect(async () => { expect(await columnCount(page)).toBe(1); }).toPass();
+  await expect(async () => { expect(await cardColumnCount(page)).toBe(1); }).toPass();
   expect(await hasHorizontalScroll(page)).toBe(false);
 
-  // Every capability is still reachable at the narrowest tier — wrapped
-  // onto further rows, not dropped or hidden behind a scrollbar.
-  for (const name of names) {
-    await expect(page.getByText(name)).toBeVisible();
+  // Every domain (and, for the one expanded, every L2 child) is still
+  // reachable at the narrowest tier — wrapped onto further rows, not
+  // dropped or hidden behind a scrollbar.
+  for (const name of domainNames) {
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
+  }
+  for (const name of l2Names) {
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
   }
 });

@@ -105,8 +105,12 @@ test('capability map: two-level tree with an orphan, L2→L3 expand, orphan flag
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
 
-  // The two-level tree: L1 column, L2 card nested under it.
-  await expect(page.getByText('Digital Services')).toBeVisible();
+  // Domains are collapsed by default (capability map redesign) — the L1
+  // domain itself is visible as a summary row, but its L2 card isn't,
+  // until the row is expanded.
+  await expect(page.getByRole('button', { name: /Digital Services/ })).toBeVisible();
+  await expect(page.getByText('Housing', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: /Digital Services/ }).click();
   await expect(page.getByText('Housing', { exact: true })).toBeVisible();
 
   // The orphan is flagged, not silently dropped or misplaced.

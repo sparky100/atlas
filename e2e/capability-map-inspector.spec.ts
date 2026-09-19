@@ -1,13 +1,16 @@
 /**
  * V2b's Inspector, Capability map rollout: this view had no click-to-focus
- * concept of its own (every tile is a full stretched link that navigates
- * straight to the element page), so the decided way in is a second small
- * corner button per tile (`CapabilityTile.tsx`'s own `onInspectClick`,
- * the `Info` icon — UI-principles.md §2.0/§6.5) that opens the Inspector
- * scoped to that capability without following the tile's own primary
- * link. This spec proves that button, and that Selection/Connections show
- * the capability's own direct facts (never rolled up the way an L1 tile's
- * own aggregate tone is).
+ * concept of its own (every row's primary link navigates straight to the
+ * element page), so the decided way in is a second small inline button
+ * per row (`onInspectClick`, `CapabilityMapView.tsx`'s own `InspectButton`,
+ * UI-principles.md §2.0/§6.5) that opens the Inspector scoped to that
+ * capability without following the row's own primary link. For a domain
+ * (L1), this button lives in the domain's own expanded body, not its
+ * collapsed summary row — the same place its pre-redesign mobile
+ * accordion already put it, now the only interaction model at every
+ * width. This spec proves that button, and that Selection/Connections
+ * show the capability's own direct facts (never rolled up the way a
+ * domain's own aggregate tone is).
  *
  * The "collapse the panel and reload, it stays collapsed" scenario is not
  * repeated here — `inspector_collapsed` is one shared preference across
@@ -92,6 +95,9 @@ test('capability map inspector: the per-tile Inspect button opens Selection/Conn
   const inspector = page.getByRole('complementary', { name: 'Inspector' });
   await expect(inspector.getByText('Nothing inspected.')).toBeVisible();
 
+  // A domain's own Inspect button lives in its expanded body, not the
+  // collapsed summary row.
+  await page.getByRole('button', { name: /Housing/ }).click();
   await page.getByRole('button', { name: 'Inspect Housing' }).click();
 
   // Still on the capability map — the Inspect button never followed the
