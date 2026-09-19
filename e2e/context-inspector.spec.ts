@@ -50,8 +50,8 @@ test('context inspector: clicking a neighbour tile focuses it (Selection/Connect
   const canvas = page.locator('canvas');
   await expect(page.getByRole('img', { name: /Context diagram: Core Billing and 1 connected/ })).toBeVisible({ timeout: 30_000 });
 
-  const layout = computeContextDiagramLayout(hubId, [neighbourId], [], undefined, [{ id: 'edge', neighbourId, arrowAtHub: true, label: '← reads billing records from' }]);
-  const neighbourTile = layout.internalNeighbours.find((t) => t.elementId === neighbourId);
+  const layout = computeContextDiagramLayout(hubId, [{ id: neighbourId, isExternal: false, isActor: false }], undefined, [{ id: 'edge', neighbourId, arrowAtHub: true, label: '← reads billing records from' }]);
+  const neighbourTile = layout.neighbours.find((t) => t.elementId === neighbourId);
   if (!neighbourTile) throw new Error('computeContextDiagramLayout did not place the seeded neighbour');
   const wrapper = page.locator('[data-scale]');
   const scale = Number(await wrapper.getAttribute('data-scale'));

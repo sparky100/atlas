@@ -31,7 +31,7 @@
  * than inventing a smaller case in a test.
  */
 import type { UUID } from '../../../contracts/delta';
-import type { ContextEdgeInput } from '../contextDiagramLayout';
+import type { ContextEdgeInput, ContextNeighbourInput } from '../contextDiagramLayout';
 
 export interface ScenarioModule {
   code: string;
@@ -136,22 +136,20 @@ export function scenarioEdgeLabel(flow: ScenarioFlow): string {
 
 export interface ScenarioLayoutInputs {
   hubId: UUID;
-  internal: UUID[];
-  external: UUID[];
+  neighbours: ContextNeighbourInput[];
   edges: ContextEdgeInput[];
 }
 
 /** The scenario as `computeContextDiagramLayout` inputs, with stable, readable ids (`pm`, `gdt`, `escoms`…) — no database, no randomness. */
 export function scenarioLayoutInputs(scenario: ContainerContextScenario = PM_CONTEXT_SCENARIO): ScenarioLayoutInputs {
   const hubId = scenario.hubModuleCode.toLowerCase();
-  const internal: UUID[] = [];
-  const external: UUID[] = [];
+  const neighbours: ContextNeighbourInput[] = [];
   const edges: ContextEdgeInput[] = [];
   for (const neighbour of scenario.neighbours) {
-    (neighbour.isExternal ? external : internal).push(neighbour.key);
+    neighbours.push({ id: neighbour.key, isExternal: neighbour.isExternal, isActor: neighbour.elementType === 'actor' });
     neighbour.flows.forEach((flow, i) => {
       edges.push({ id: `${neighbour.key}-${String(i)}`, neighbourId: neighbour.key, arrowAtHub: flow.direction === 'in', label: scenarioEdgeLabel(flow) });
     });
   }
-  return { hubId, internal, external, edges };
+  return { hubId, neighbours, edges };
 }
