@@ -85,6 +85,26 @@ function allRects(layout: ContextDiagramLayout): Rect[] {
   return [tileRect(layout.hub), ...layout.neighbours.map(tileRect)];
 }
 
+function sign(n: number): number {
+  return n > 0 ? 1 : n < 0 ? -1 : 0;
+}
+
+/** Standard orientation-based segment intersection (general position, not just axis-aligned) — true for a real crossing or overlap, false for two segments that merely share an endpoint (every edge's own ports are already asserted distinct elsewhere, so two *different* routed edges are never expected to share one). */
+function segmentsIntersect(a1: Point, a2: Point, b1: Point, b2: Point): boolean {
+  const cross = (o: Point, p: Point, q: Point) => (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+  const onSegment = (p: Point, q: Point, r: Point) => Math.min(p.x, q.x) <= r.x && r.x <= Math.max(p.x, q.x) && Math.min(p.y, q.y) <= r.y && r.y <= Math.max(p.y, q.y);
+  const d1 = sign(cross(b1, b2, a1));
+  const d2 = sign(cross(b1, b2, a2));
+  const d3 = sign(cross(a1, a2, b1));
+  const d4 = sign(cross(a1, a2, b2));
+  if (d1 !== d2 && d3 !== d4) return true;
+  if (d1 === 0 && onSegment(b1, b2, a1)) return true;
+  if (d2 === 0 && onSegment(b1, b2, a2)) return true;
+  if (d3 === 0 && onSegment(a1, a2, b1)) return true;
+  if (d4 === 0 && onSegment(a1, a2, b2)) return true;
+  return false;
+}
+
 function neighbour(id: string, opts: Partial<ContextNeighbourInput> = {}): ContextNeighbourInput {
   return { id, isExternal: false, isActor: false, ...opts };
 }
@@ -202,6 +222,28 @@ describe('computeContextDiagramLayout — hub and groups', () => {
     );
     const xs = new Set(layout.neighbours.map((t) => t.x));
     expect(xs.size).toBe(2);
+  });
+
+  it('4 single-edge source neighbours never cross each other\'s lines — lane order is chosen to avoid it, not just tied to stacking position', () => {
+    const ids = ['s0', 's1', 's2', 's3'];
+    const layout = computeContextDiagramLayout(
+      'hub',
+      ids.map((id) => neighbour(id)),
+      undefined,
+      ids.map((id) => ({ id: `e-${id}`, neighbourId: id, arrowAtHub: true, label: 'x' })),
+    );
+    for (let i = 0; i < layout.edges.length; i++) {
+      for (let j = i + 1; j < layout.edges.length; j++) {
+        const edgeA = layout.edges[i];
+        const edgeB = layout.edges[j];
+        if (!edgeA || !edgeB) continue;
+        for (const [a1, a2] of segmentsOf(edgeA)) {
+          for (const [b1, b2] of segmentsOf(edgeB)) {
+            expect(segmentsIntersect(a1, a2, b1, b2)).toBe(false);
+          }
+        }
+      }
+    }
   });
 });
 
@@ -326,6 +368,21 @@ describe('SAP PM context fixture — the standing density case (fixtures/sapCont
     for (const edge of layout.edges) {
       for (const [a, b] of segmentsOf(edge)) {
         for (const rect of rects) expect(segmentCrossesInterior(a, b, rect)).toBe(false);
+      }
+    }
+  });
+
+  it('no two different edges\' own lines cross each other (lane order is crossing-aware, not just tile-safe)', () => {
+    for (let i = 0; i < layout.edges.length; i++) {
+      for (let j = i + 1; j < layout.edges.length; j++) {
+        const edgeA = layout.edges[i];
+        const edgeB = layout.edges[j];
+        if (!edgeA || !edgeB) continue;
+        for (const [a1, a2] of segmentsOf(edgeA)) {
+          for (const [b1, b2] of segmentsOf(edgeB)) {
+            expect(segmentsIntersect(a1, a2, b1, b2)).toBe(false);
+          }
+        }
       }
     }
   });
