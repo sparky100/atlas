@@ -5,6 +5,7 @@ import { Chip } from '../components/Chip/Chip';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../components/Text/Text';
 import { attributesRecord } from '../elements/attributesRecord';
+import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
 import styles from './IntegrationPlatformMobileList.module.css';
 
 export interface IntegrationPlatformMobileListProps {
@@ -32,8 +33,10 @@ export function IntegrationPlatformMobileList({ flows, endpoints, elementHref }:
     bySource.set(flow.from_element_id, list);
   }
   const sourceIds = [...bySource.keys()].sort((a, b) => {
-    const nameA = endpoints.get(a)?.name ?? '';
-    const nameB = endpoints.get(b)?.name ?? '';
+    const sourceA = endpoints.get(a);
+    const sourceB = endpoints.get(b);
+    const nameA = sourceA ? moduleDisplayNameFromMap(sourceA, endpoints) : '';
+    const nameB = sourceB ? moduleDisplayNameFromMap(sourceB, endpoints) : '';
     return nameA.localeCompare(nameB) || a.localeCompare(b);
   });
 
@@ -48,7 +51,7 @@ export function IntegrationPlatformMobileList({ flows, endpoints, elementHref }:
               <Link to={elementHref(sourceId)} className={styles.groupHeader}>
                 <ElementTypeGlyph type={source.element_type} />
                 <Text as="span" size="lg">
-                  {source.name}
+                  {moduleDisplayNameFromMap(source, endpoints)}
                 </Text>
               </Link>
             ) : (
@@ -66,7 +69,7 @@ export function IntegrationPlatformMobileList({ flows, endpoints, elementHref }:
                     {target ? (
                       <Link to={elementHref(flow.to_element_id)} className={styles.rowMain}>
                         <ElementTypeGlyph type={target.element_type} />
-                        <Text as="span">{target.name}</Text>
+                        <Text as="span">{moduleDisplayNameFromMap(target, endpoints)}</Text>
                       </Link>
                     ) : (
                       <Text as="span" tone="faint">

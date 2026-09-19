@@ -31,6 +31,7 @@ import type { AliasRow, BranchRow, DecisionRow, SourceRow } from '../../db/types
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import { attributesRecord } from './attributesRecord';
 import { capabilityLevel } from './capabilityDepth';
+import { containerParentIds } from './moduleDisplayName';
 import { isIntegrationPlatform, isPlatform } from './systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -315,15 +316,9 @@ export function useElementPage(
       // name; folded into this same map (never a second one — the section
       // only ever does one `endpoints.get(id)` lookup regardless of why a
       // row is in there) once fetched.
-      const containerParentIds = [
-        ...new Set(
-          [...relationshipEndpoints.values()]
-            .filter((e): e is ElementsHeadRow & { parent_id: UUID } => e.element_type === 'container' && e.parent_id !== null)
-            .map((e) => e.parent_id),
-        ),
-      ];
-      if (containerParentIds.length > 0) {
-        const parents = await source.elementsByIds(containerParentIds);
+      const relationshipEndpointParentIds = containerParentIds(relationshipEndpoints.values());
+      if (relationshipEndpointParentIds.length > 0) {
+        const parents = await source.elementsByIds(relationshipEndpointParentIds);
         for (const [id, row] of parents) relationshipEndpoints.set(id, row);
       }
 
@@ -343,6 +338,16 @@ export function useElementPage(
         flowsViaThisPlatform = await source.flowsViaElement(elementId);
         const endpointIds = flowsViaThisPlatform.flatMap((r) => [r.from_element_id, r.to_element_id]);
         flowsViaThisPlatformEndpoints = await source.elementsByIds(endpointIds);
+        // "Platform · Module": a flow's own source/target can itself be a
+        // module of some other platform — same "fold its own parent into
+        // the same map" pattern `relationshipEndpointParentIds` above
+        // already establishes for `PlatformFlowsSection.tsx`'s identical
+        // need.
+        const flowEndpointParentIds = containerParentIds(flowsViaThisPlatformEndpoints.values());
+        if (flowEndpointParentIds.length > 0) {
+          const parents = await source.elementsByIds(flowEndpointParentIds);
+          for (const [id, row] of parents) flowsViaThisPlatformEndpoints.set(id, row);
+        }
       }
 
       // "Platforms and modules": a platform's own children (already loaded

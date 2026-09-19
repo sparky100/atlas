@@ -13,6 +13,7 @@ import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
 import { computeContextGroup, computePlatformConnections, type ContextGroup, type PlatformConnection } from './contextGrouping';
 import { buildPlatformModulesById, type ContextModule } from './contextDiagramData';
+import { containerParentIds } from '../elements/moduleDisplayName';
 import { isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -68,20 +69,11 @@ export interface IntegrationPlatformContextData {
   view: ViewRow;
   hub: ElementsHeadRow;
   flows: RelationshipsHeadRow[];
-  /** Every flow's own `from`/`to` endpoint, by id — never the hub itself, which is only ever the `via`, not an endpoint, of these edges (same as `ElementPageData.flowsViaThisPlatformEndpoints`'s own doc comment). */
+  /** Every flow's own `from`/`to` endpoint, by id, *plus* each container endpoint's own parent (`moduleDisplayNameFromMap`'s own requirement) — never the hub itself, which is only ever the `via`, not an endpoint, of these edges (same as `ElementPageData.flowsViaThisPlatformEndpoints`'s own doc comment). */
   endpoints: Map<UUID, ElementsHeadRow>;
 }
 
 export type ElementContextData = PlatformStructureData | IntegrationPlatformContextData | ElementGroupData;
-
-/** Every container's own `parent_id` among `elements` — the ids `computeContextGroup`/`computePlatformConnections` need merged into their own `elementsById` map to resolve `moduleDisplayName`'s "Platform · Module" for a container hub, neighbour, or platform-level connection (none of which is otherwise a relationship endpoint the caller already fetched). */
-function containerParentIds(elements: Iterable<ElementsHeadRow>): UUID[] {
-  const ids = new Set<UUID>();
-  for (const element of elements) {
-    if (element.element_type === 'container' && element.parent_id !== null) ids.add(element.parent_id);
-  }
-  return [...ids];
-}
 
 export type ElementContextState =
   | { status: 'loading' }
@@ -209,7 +201,16 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
       if (hub.element_type === 'system' && isIntegrationPlatform(hub)) {
         const flows = projection ? projectionFlowsViaElement(projection, elementId) : await listFlowsViaElement(supabase, commitId, elementId);
         const endpointIds = [...new Set(flows.flatMap((f) => [f.from_element_id, f.to_element_id]))];
-        const endpoints = projection ? projectionElementsByIds(projection, endpointIds) : await getElementsByIds(supabase, commitId, endpointIds);
+        const rawEndpoints = projection ? projectionElementsByIds(projection, endpointIds) : await getElementsByIds(supabase, commitId, endpointIds);
+        // "Platform · Module": a source or target routed via this platform
+        // can itself be a module of some *other* platform — resolved once,
+        // merged into the same map `IntegrationPlatformContextView.tsx`/
+        // `IntegrationPlatformDiagramCanvas.tsx`/`IntegrationPlatformMobileList.tsx`
+        // (and the element page's own `PlatformFlowsSection.tsx`, shared
+        // verbatim) already look parents up in.
+        const endpointParentIds = containerParentIds(rawEndpoints.values());
+        const endpointParentsById = projection ? projectionElementsByIds(projection, endpointParentIds) : await getElementsByIds(supabase, commitId, endpointParentIds);
+        const endpoints = new Map([...rawEndpoints, ...endpointParentsById]);
         if (!cancelled) setState({ status: 'ready', data: { kind: 'integration-platform', commitId, view, hub, flows, endpoints } });
         return;
       }

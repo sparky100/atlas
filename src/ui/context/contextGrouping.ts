@@ -48,7 +48,7 @@
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import { attributesRecord } from '../elements/attributesRecord';
-import { moduleDisplayName } from '../elements/moduleDisplayName';
+import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
 
 export interface ContextNeighbour {
   element: ElementsHeadRow;
@@ -119,16 +119,10 @@ function byNameThenId(a: ElementsHeadRow, b: ElementsHeadRow): number {
   return a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id);
 }
 
-/** `moduleDisplayName(element, parent)`, `parent` looked up from `elementsById` by `element.parent_id` — the one place this function resolves a display name, so `computeContextGroup`/`computePlatformConnections` below can't drift into two different lookups for the identical fact. */
-function displayNameOf(element: ElementsHeadRow, elementsById: ReadonlyMap<UUID, ElementsHeadRow>): string {
-  const parent = element.parent_id !== null ? (elementsById.get(element.parent_id) ?? null) : null;
-  return moduleDisplayName(element, parent);
-}
-
 /**
  * @param hub The system or container this Context view is scoped to (V3: a container is now a real hub of its own, not just a system — see this module's own comment).
  * @param relationships Every relationship touching `hub` — `src/db/elements.ts`'s `listRelationshipsForElement`, unfiltered. This function does the type filtering itself so the query stays the same one every other "everything touching this element" reader already uses.
- * @param elementsById Every other endpoint named by `relationships`, by id, *plus* the hub's own parent and every neighbour container's own parent (`useElementContext.ts`'s own merge before calling this) — `displayNameOf` above needs a parent to resolve "Platform · Module" for a container hub or neighbour, and a bare relationship endpoint alone was never going to include one.
+ * @param elementsById Every other endpoint named by `relationships`, by id, *plus* the hub's own parent and every neighbour container's own parent (`useElementContext.ts`'s own merge before calling this) — `moduleDisplayNameFromMap` needs a parent to resolve "Platform · Module" for a container hub or neighbour, and a bare relationship endpoint alone was never going to include one.
  */
 export function computeContextGroup(hub: ElementsHeadRow, relationships: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): ContextGroup {
   const neighbourEdges = new Map<UUID, RelationshipsHeadRow[]>();
@@ -177,7 +171,7 @@ export function computeContextGroup(hub: ElementsHeadRow, relationships: readonl
   for (const [elementId, edges] of neighbourEdges) {
     const element = elementsById.get(elementId);
     if (!element) continue; // named by a relationship but not resolved (e.g. retracted since) — never render a node for data that isn't there.
-    (isExternal(element) ? external : internal).push({ element, edges, displayName: displayNameOf(element, elementsById) });
+    (isExternal(element) ? external : internal).push({ element, edges, displayName: moduleDisplayNameFromMap(element, elementsById) });
   }
   internal.sort((a, b) => byNameThenId(a.element, b.element));
   external.sort((a, b) => byNameThenId(a.element, b.element));
@@ -201,7 +195,7 @@ export function computeContextGroup(hub: ElementsHeadRow, relationships: readonl
     .filter((s): s is ContextSupport => s !== null)
     .sort((a, b) => (a.primary === b.primary ? byNameThenId(a.capability, b.capability) : a.primary ? -1 : 1));
 
-  return { hub, hubDisplayName: displayNameOf(hub, elementsById), internal, external, owners, supports };
+  return { hub, hubDisplayName: moduleDisplayNameFromMap(hub, elementsById), internal, external, owners, supports };
 }
 
 /** One of a platform's own genuine direct relationships — item 2's "Platform-level connections" plain-text line, never a canvas node or a drawn edge (there is no canvas at this level any more). */
@@ -243,7 +237,7 @@ export function computePlatformConnections(hub: ElementsHeadRow, relationships: 
     const otherId = fromIsHub ? rel.to_element_id : rel.from_element_id;
     const other = elementsById.get(otherId);
     if (!other) continue; // named by a relationship but not resolved (e.g. retracted since) — never render a row for data that isn't there.
-    result.push({ relationshipId: rel.relationship_id, otherElementId: otherId, otherName: displayNameOf(other, elementsById), label: edgeLabel(rel, hub.element_id) });
+    result.push({ relationshipId: rel.relationship_id, otherElementId: otherId, otherName: moduleDisplayNameFromMap(other, elementsById), label: edgeLabel(rel, hub.element_id) });
   }
   return result.sort((a, b) => a.otherName.localeCompare(b.otherName) || a.otherElementId.localeCompare(b.otherElementId));
 }
