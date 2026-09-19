@@ -4,6 +4,7 @@ import type { ElementsHeadRow, Json } from '../../contracts/rows';
 import { listAllElements, loadOwnersByElementId, lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
 import { attributesRecord } from './attributesRecord';
 import { compareCustomAttributeValues, sortKeyEquals, type ElementBrowseSortKey } from './elementBrowseSort';
+import { moduleDisplayName } from './moduleDisplayName';
 import {
   computeStaleAttributesFinding,
   findCapabilitiesWithNoSupporters,
@@ -85,19 +86,28 @@ export type ElementBrowseState =
       reload: () => void;
     };
 
+// Sorted (and, for 'name', compared) by `moduleDisplayName`, not the bare
+// `element.name` — the table shows "SAP · RE", so it sorts under "S" too,
+// the same "what you see is what you sorted by" guarantee
+// `landscapeModules.ts`'s `withModuleLabels` already gets for free by
+// overwriting `.name` outright before its own caller sorts.
+function displayName(row: BrowseRow): string {
+  return moduleDisplayName(row.element, row.parent);
+}
+
 function compareRows(a: BrowseRow, b: BrowseRow, key: ElementBrowseSortKey): number {
   if (typeof key === 'object') {
-    return compareCustomAttributeValues(attributesRecord(a.element.attributes)[key.custom], attributesRecord(b.element.attributes)[key.custom]) || a.element.name.localeCompare(b.element.name);
+    return compareCustomAttributeValues(attributesRecord(a.element.attributes)[key.custom], attributesRecord(b.element.attributes)[key.custom]) || displayName(a).localeCompare(displayName(b));
   }
   switch (key) {
     case 'name':
-      return a.element.name.localeCompare(b.element.name);
+      return displayName(a).localeCompare(displayName(b));
     case 'type':
-      return a.element.element_type.localeCompare(b.element.element_type) || a.element.name.localeCompare(b.element.name);
+      return a.element.element_type.localeCompare(b.element.element_type) || displayName(a).localeCompare(displayName(b));
     case 'owner':
-      return (a.owner?.name ?? '').localeCompare(b.owner?.name ?? '') || a.element.name.localeCompare(b.element.name);
+      return (a.owner?.name ?? '').localeCompare(b.owner?.name ?? '') || displayName(a).localeCompare(displayName(b));
     case 'lifecycle':
-      return (a.lifecycleStatus ?? '').localeCompare(b.lifecycleStatus ?? '') || a.element.name.localeCompare(b.element.name);
+      return (a.lifecycleStatus ?? '').localeCompare(b.lifecycleStatus ?? '') || displayName(a).localeCompare(displayName(b));
   }
 }
 
@@ -215,6 +225,7 @@ export function useElementBrowse(
         element,
         owner: ownersByElementId.get(element.element_id) ?? null,
         lifecycleStatus: lifecycleStatusOf(element),
+        parent: element.parent_id !== null ? (elementsById.get(element.parent_id) ?? null) : null,
       }));
 
       if (!cancelled) {

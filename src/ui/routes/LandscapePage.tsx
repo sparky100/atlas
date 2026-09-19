@@ -303,6 +303,11 @@ export function LandscapePage() {
       element: row.system,
       owner: row.owner,
       lifecycleStatus: lifecycleStatusOf(row.system),
+      // `row.system.name` is already "Platform · Module"-qualified where it
+      // applies (`useCapabilityLandscape.ts`'s own `withModuleLabels` pass)
+      // — `null` here just means `moduleDisplayName` leaves that already-
+      // qualified name alone rather than re-qualifying it a second time.
+      parent: null,
     }));
   }, [capabilityLandscapeState]);
   const capabilityExport = useElementExport({

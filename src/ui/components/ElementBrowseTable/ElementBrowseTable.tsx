@@ -7,6 +7,7 @@ import { ELEMENT_TYPE_FILTER_OPTIONS, type BrowseRow } from '../../../db/element
 import type { AttributeDefinitionRow, BranchRow } from '../../../db/types';
 import type { ThreadCount } from '../../comments/useThreadCounts';
 import { attributesRecord, formatCustomAttributeValue } from '../../elements/attributesRecord';
+import { moduleDisplayName } from '../../elements/moduleDisplayName';
 import type { DraftValue } from '../../elements/useElementEditor';
 import { RelationshipAdd } from '../RelationshipGroup/RelationshipAdd';
 import { AttributeValueInput } from '../AttributeValueInput/AttributeValueInput';
@@ -375,7 +376,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                     <td headers={`${headerIdBase}-name`}>
                       <Link to={elementHref(row.element.element_id)} className={styles.nameCell}>
                         <ElementTypeGlyph type={row.element.element_type} />
-                        <Text as="span">{row.element.name}</Text>
+                        <Text as="span">{moduleDisplayName(row.element, row.parent)}</Text>
                       </Link>
                     </td>
                     <td headers={`${headerIdBase}-type`}>

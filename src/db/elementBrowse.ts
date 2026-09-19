@@ -81,6 +81,8 @@ export interface BrowseRow {
   owner: ElementsHeadRow | null;
   /** `SystemAttributes.lifecycleStatus` — the only type that carries one; `null` for every other type. */
   lifecycleStatus: string | null;
+  /** `element`'s own parent, for `moduleDisplayName`'s "Platform · Module" convention — the whole model's elements are already loaded for this table (`useElementBrowse.ts`), so this is a free Map lookup, never a second query. `null` for every element without a parent. */
+  parent: ElementsHeadRow | null;
 }
 
 export function lifecycleStatusOf(element: ElementsHeadRow): string | null {
