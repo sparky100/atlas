@@ -17,8 +17,9 @@ function group(): ContextGroup {
   const externalNeighbour = element('n2', 'External Neighbour');
   return {
     hub,
-    internal: [{ element: internalNeighbour, edges: [edge('e1', 'hub', 'n1')] }],
-    external: [{ element: externalNeighbour, edges: [edge('e2', 'n2', 'hub')] }],
+    hubDisplayName: hub.name,
+    internal: [{ element: internalNeighbour, edges: [edge('e1', 'hub', 'n1')], displayName: internalNeighbour.name }],
+    external: [{ element: externalNeighbour, edges: [edge('e2', 'n2', 'hub')], displayName: externalNeighbour.name }],
     owners: [],
     supports: [],
   };

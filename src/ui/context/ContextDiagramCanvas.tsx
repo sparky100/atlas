@@ -203,6 +203,18 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
     return map;
   }, [group]);
 
+  // "Platform · Module" (moduleDisplayName, via `ContextGroup`'s own
+  // `hubDisplayName`/`ContextNeighbour.displayName` — computed once in
+  // `computeContextGroup`, not recomputed here) — every place this canvas
+  // shows a tile's name (label, hover tooltip) reads from this map instead
+  // of `element.name` directly, so a module of some other platform never
+  // reads as a bare, ambiguous short name on the diagram either.
+  const displayNameById = useMemo(() => {
+    const map = new Map<UUID, string>([[group.hub.element_id, group.hubDisplayName]]);
+    for (const n of [...group.internal, ...group.external]) map.set(n.element.element_id, n.displayName);
+    return map;
+  }, [group]);
+
   /** Every drawn edge, in the layout's own input shape — always neighbour ↔ hub now (V3 dropped the module endpoint entirely); the arrow belongs at the logical `to` side. */
   const edgeInputs = useMemo<ContextEdgeInput[]>(() => {
     const result: ContextEdgeInput[] = [];
@@ -333,8 +345,9 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
       const drawTile = (tile: DiagramTile, isHub: boolean): void => {
         const element = elementsById.get(tile.elementId);
         if (!element) return;
+        const displayName = displayNameById.get(tile.elementId) ?? element.name;
         const external = attributesRecord(element.attributes).isExternal === true;
-        const isHovered = hover?.label === element.name;
+        const isHovered = hover?.label === displayName;
         // V2b: the focused neighbour reads the same as the hub itself
         // (thicker, full-strength border) — a real, visible "this is what
         // the Inspector is showing" cue, never colour-only (§6.3/§8.4/§8.7)
@@ -355,7 +368,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
 
         if (showLabels) {
           const glyph = element.element_type === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph(element.element_type);
-          nodeLabels.push({ glyph, name: element.name, worldX: tile.x, worldY: tile.y + tile.h / 2, maxWidth: tile.w - 30 });
+          nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: tile.y + tile.h / 2, maxWidth: tile.w - 30 });
         }
       };
 
@@ -424,7 +437,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
     return () => {
       observer.disconnect();
     };
-  }, [layout, elementsById, transform, hover, hoveredEdgeId, labelMode, labelsWouldCollide, zoomShowsText, focusedElementId]);
+  }, [layout, elementsById, displayNameById, transform, hover, hoveredEdgeId, labelMode, labelsWouldCollide, zoomShowsText, focusedElementId]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -449,7 +462,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
     const tile = tileAt(screenX, screenY);
     if (tile) {
       const element = elementsById.get(tile.elementId);
-      setHover(element ? { label: element.name, screenX, screenY } : null);
+      setHover(element ? { label: displayNameById.get(tile.elementId) ?? element.name, screenX, screenY } : null);
       setHoveredEdgeId(null);
       return;
     }
@@ -542,7 +555,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
         ref={canvasRef}
         className={styles.canvas}
         role="img"
-        aria-label={`Context diagram: ${group.hub.name} and ${String(group.internal.length + group.external.length)} connected systems, containers or people. Use the element page for an accessible, list-based view of any of these.`}
+        aria-label={`Context diagram: ${group.hubDisplayName} and ${String(group.internal.length + group.external.length)} connected systems, containers or people. Use the element page for an accessible, list-based view of any of these.`}
         tabIndex={0}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

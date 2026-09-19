@@ -65,7 +65,7 @@ export function ContextInspectorContent({ focusedNeighbour, hubId, elementHref, 
           <div className={styles.selection}>
             <div className={styles.selectionHeader}>
               <Text as="p" size="sm" className={styles.selectionName}>
-                {element.name}
+                {focusedNeighbour?.displayName ?? element.name}
               </Text>
               <button type="button" className={styles.clearFocus} onClick={onClearFocus}>
                 Clear

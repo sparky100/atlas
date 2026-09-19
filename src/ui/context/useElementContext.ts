@@ -74,6 +74,15 @@ export interface IntegrationPlatformContextData {
 
 export type ElementContextData = PlatformStructureData | IntegrationPlatformContextData | ElementGroupData;
 
+/** Every container's own `parent_id` among `elements` — the ids `computeContextGroup`/`computePlatformConnections` need merged into their own `elementsById` map to resolve `moduleDisplayName`'s "Platform · Module" for a container hub, neighbour, or platform-level connection (none of which is otherwise a relationship endpoint the caller already fetched). */
+function containerParentIds(elements: Iterable<ElementsHeadRow>): UUID[] {
+  const ids = new Set<UUID>();
+  for (const element of elements) {
+    if (element.element_type === 'container' && element.parent_id !== null) ids.add(element.parent_id);
+  }
+  return [...ids];
+}
+
 export type ElementContextState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
@@ -175,8 +184,16 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
 
           const ownEdges = hubRelationships.filter((r) => r.relationship_type === 'uses' || r.relationship_type === 'flows_to');
           const otherIds = [...new Set(ownEdges.flatMap((r) => [r.from_element_id, r.to_element_id]))].filter((id) => id !== elementId);
-          const elementsById = projection ? projectionElementsByIds(projection, otherIds) : await getElementsByIds(supabase, commitId, otherIds);
-          const connections = computePlatformConnections(hub, ownEdges, elementsById);
+          const otherElementsById = projection ? projectionElementsByIds(projection, otherIds) : await getElementsByIds(supabase, commitId, otherIds);
+          // "Platform · Module": the other end of a genuine platform-level
+          // connection is rare but, per this branch's own doc comment, not
+          // guaranteed to be a top-level system — it can itself be a module
+          // of some *other* platform, which needs that platform's own row
+          // resolved here too (`computePlatformConnections`'s own doc
+          // comment on `PlatformConnection.otherName`).
+          const connectionParentIds = containerParentIds(otherElementsById.values());
+          const connectionParentsById = projection ? projectionElementsByIds(projection, connectionParentIds) : await getElementsByIds(supabase, commitId, connectionParentIds);
+          const connections = computePlatformConnections(hub, ownEdges, new Map([...otherElementsById, ...connectionParentsById]));
 
           if (!cancelled) setState({ status: 'ready', data: { kind: 'platform-structure', commitId, view, hub, modules, connections, diff } });
           return;
@@ -199,8 +216,15 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
 
       // Every relationship type (`RELATIONSHIP_TYPES`) is one `computeContextGroup` itself already classifies — no further filtering needed here.
       const otherIds = [...new Set(hubRelationships.flatMap((r) => [r.from_element_id, r.to_element_id]))].filter((id) => id !== elementId);
-      const elementsById = projection ? projectionElementsByIds(projection, otherIds) : await getElementsByIds(supabase, commitId, otherIds);
-      const group = computeContextGroup(hub, hubRelationships, elementsById);
+      const neighbourElementsById = projection ? projectionElementsByIds(projection, otherIds) : await getElementsByIds(supabase, commitId, otherIds);
+      // "Platform · Module" (moduleDisplayName): the hub itself (V3 lets a
+      // container be a hub) and any neighbour can be a module of some
+      // platform not otherwise loaded here — resolved once, merged into
+      // the same map `computeContextGroup`'s own doc comment says it now
+      // expects to also carry parents in, not only relationship endpoints.
+      const groupParentIds = containerParentIds([hub, ...neighbourElementsById.values()]);
+      const groupParentsById = projection ? projectionElementsByIds(projection, groupParentIds) : await getElementsByIds(supabase, commitId, groupParentIds);
+      const group = computeContextGroup(hub, hubRelationships, new Map([...neighbourElementsById, ...groupParentsById]));
 
       if (!cancelled) setState({ status: 'ready', data: { kind: 'group', commitId, view, group, diff } });
     }

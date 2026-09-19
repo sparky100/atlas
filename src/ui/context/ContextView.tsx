@@ -149,7 +149,7 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null, 
           <ElementTypeGlyph type={group.hub.element_type} external={hubExternal} />
           <Link to={elementHref(group.hub.element_id)}>
             <Text as="span" size="lg">
-              {group.hub.name}
+              {group.hubDisplayName}
             </Text>
           </Link>
           {hubExternal && <Chip tone="neutral">external</Chip>}
