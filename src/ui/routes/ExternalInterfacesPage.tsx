@@ -47,7 +47,7 @@ export function ExternalInterfacesPage() {
               External interfaces
             </Text>
           </div>
-          <ExternalInterfacesView modelId={model.id} />
+          <ExternalInterfacesView modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
         </main>
       </div>
     </div>

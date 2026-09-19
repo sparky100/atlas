@@ -534,7 +534,7 @@ describe('findBoundaryCrossings (Prompt 7k item 3)', () => {
     ]);
     const edges = [relationship('r1', 'flows_to', 'sys-it', 'sys-ot', { description: 'sends readings to', dataClassification: 'official' })];
     expect(findBoundaryCrossings(edges, elementsById)).toEqual([
-      { relationshipId: 'r1', relationshipType: 'flows_to', fromName: 'System sys-it', toName: 'System sys-ot', fromDomain: 'it', toDomain: 'ot', missingVerb: false, missingDataClassification: false },
+      { relationshipId: 'r1', relationshipType: 'flows_to', fromElementId: 'sys-it', toElementId: 'sys-ot', fromName: 'System sys-it', toName: 'System sys-ot', fromDomain: 'it', toDomain: 'ot', missingVerb: false, missingDataClassification: false },
     ]);
   });
 
@@ -716,7 +716,7 @@ describe('findExternalInterfacesMissingClassification (S1 item 11a)', () => {
       ['sys-ext', system('sys-ext', { isExternal: true })],
     ]);
     const edges = [relationship('r1', 'flows_to', 'sys-int', 'sys-ext')];
-    expect(findExternalInterfacesMissingClassification(edges, elementsById)).toEqual([{ relationshipId: 'r1', relationshipType: 'flows_to', fromName: 'System sys-int', toName: 'System sys-ext' }]);
+    expect(findExternalInterfacesMissingClassification(edges, elementsById)).toEqual([{ relationshipId: 'r1', relationshipType: 'flows_to', fromElementId: 'sys-int', toElementId: 'sys-ext', fromName: 'System sys-int', toName: 'System sys-ext' }]);
   });
 
   it('a system with only externalOrganisation set (not isExternal) still counts as the external side', () => {
@@ -781,7 +781,7 @@ describe('findExternalOrganisationAccess (S1 item 11a)', () => {
       ['sys-1', system('sys-1')],
     ]);
     const edges = [relationship('r1', 'uses', 'act-1', 'sys-1', { description: 'submits RIIO returns to' })];
-    expect(findExternalOrganisationAccess(edges, elementsById)).toEqual([{ relationshipId: 'r1', organisation: 'Ofgem', systemName: 'System sys-1' }]);
+    expect(findExternalOrganisationAccess(edges, elementsById)).toEqual([{ relationshipId: 'r1', actorId: 'act-1', organisation: 'Ofgem', systemId: 'sys-1', systemName: 'System sys-1' }]);
   });
 
   it('falls back to the actor\'s own name when externalOrganisation is unset', () => {
@@ -790,7 +790,7 @@ describe('findExternalOrganisationAccess (S1 item 11a)', () => {
       ['sys-1', system('sys-1')],
     ]);
     const edges = [relationship('r1', 'uses', 'act-1', 'sys-1')];
-    expect(findExternalOrganisationAccess(edges, elementsById)).toEqual([{ relationshipId: 'r1', organisation: 'Actor act-1', systemName: 'System sys-1' }]);
+    expect(findExternalOrganisationAccess(edges, elementsById)).toEqual([{ relationshipId: 'r1', actorId: 'act-1', organisation: 'Actor act-1', systemId: 'sys-1', systemName: 'System sys-1' }]);
   });
 
   it('never lists an internal actor\'s own uses edge', () => {
@@ -828,8 +828,8 @@ describe('findExternalOrganisationAccess (S1 item 11a)', () => {
     ]);
     const edges = [relationship('r1', 'uses', 'act-1', 'sys-1'), relationship('r2', 'uses', 'act-1', 'sys-2')];
     expect(findExternalOrganisationAccess(edges, elementsById)).toEqual([
-      { relationshipId: 'r1', organisation: 'Ofgem', systemName: 'System sys-1' },
-      { relationshipId: 'r2', organisation: 'Ofgem', systemName: 'System sys-2' },
+      { relationshipId: 'r1', actorId: 'act-1', organisation: 'Ofgem', systemId: 'sys-1', systemName: 'System sys-1' },
+      { relationshipId: 'r2', actorId: 'act-1', organisation: 'Ofgem', systemId: 'sys-2', systemName: 'System sys-2' },
     ]);
   });
 });
