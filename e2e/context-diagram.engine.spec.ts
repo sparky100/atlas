@@ -133,7 +133,10 @@ test("SAP PM's own Context page (a container, one of SAP's modules) renders its 
   const canvasWrapper = page.locator('[data-scale]');
   await expect(canvasWrapper).toBeVisible();
   await expect(canvasWrapper).toHaveAttribute('data-scale', /.+/);
-  await expect(page.getByRole('img', { name: /Context diagram: PM and 5 connected/ })).toBeVisible();
+  // The hub's own aria-label now reads "SAP · PM" — moduleDisplayName's
+  // "Platform · Module" convention, applied to the Context diagram's hub
+  // tile too (PM is one of SAP's own modules).
+  await expect(page.getByRole('img', { name: /Context diagram: SAP · PM and 5 connected/ })).toBeVisible();
   await expect(canvasWrapper).toHaveAttribute('data-edge-labels-collide', 'false');
   await expect(canvasWrapper).toHaveAttribute('data-edge-labels', 'visible');
   const labelsToggle = page.getByRole('button', { name: 'Show edge labels' });

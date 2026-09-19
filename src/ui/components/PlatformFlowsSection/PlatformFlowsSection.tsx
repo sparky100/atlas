@@ -6,6 +6,7 @@ import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { Text } from '../Text/Text';
 import { attributesRecord } from '../../elements/attributesRecord';
+import { moduleDisplayNameFromMap } from '../../elements/moduleDisplayName';
 import styles from './PlatformFlowsSection.module.css';
 
 export interface PlatformFlowsSectionProps {
@@ -23,6 +24,12 @@ export interface PlatformFlowsSectionProps {
  * state here means "a real platform with nothing routed through it yet"
  * — exactly the fact `findUnusedIntegrationPlatforms`
  * (`src/db/healthFindings.ts`) turns into its own health finding.
+ *
+ * `endpoints` must also carry each container endpoint's own parent, not
+ * only the flow's own `from`/`to` rows — `moduleDisplayNameFromMap` needs
+ * it to resolve "Platform · Module" for a source/target that's itself a
+ * module of some other platform (both callers, `ElementPage.tsx` and
+ * `IntegrationPlatformContextView.tsx`, already merge it in).
  */
 export function PlatformFlowsSection({ orgSlug, modelSlug, flows, endpoints }: PlatformFlowsSectionProps) {
   if (flows.length === 0) {
@@ -38,11 +45,11 @@ export function PlatformFlowsSection({ orgSlug, modelSlug, flows, endpoints }: P
         return (
           <li key={flow.relationship_id} className={styles.row}>
             <div className={styles.endpoints}>
-              <EndpointLink orgSlug={orgSlug} modelSlug={modelSlug} elementId={flow.from_element_id} element={from} />
+              <EndpointLink orgSlug={orgSlug} modelSlug={modelSlug} elementId={flow.from_element_id} element={from} endpoints={endpoints} />
               <Text as="span" tone="muted" size="sm">
                 →
               </Text>
-              <EndpointLink orgSlug={orgSlug} modelSlug={modelSlug} elementId={flow.to_element_id} element={to} />
+              <EndpointLink orgSlug={orgSlug} modelSlug={modelSlug} elementId={flow.to_element_id} element={to} endpoints={endpoints} />
               <Chip tone="neutral">{flow.relationship_type.replace('_', ' ')}</Chip>
             </div>
             {typeof description === 'string' && description.trim() !== '' && (
@@ -57,7 +64,19 @@ export function PlatformFlowsSection({ orgSlug, modelSlug, flows, endpoints }: P
   );
 }
 
-function EndpointLink({ orgSlug, modelSlug, elementId, element }: { orgSlug: string; modelSlug: string; elementId: UUID; element: ElementsHeadRow | undefined }) {
+function EndpointLink({
+  orgSlug,
+  modelSlug,
+  elementId,
+  element,
+  endpoints,
+}: {
+  orgSlug: string;
+  modelSlug: string;
+  elementId: UUID;
+  element: ElementsHeadRow | undefined;
+  endpoints: ReadonlyMap<UUID, ElementsHeadRow>;
+}) {
   if (!element) {
     return (
       <Text as="span" tone="faint">
@@ -68,7 +87,7 @@ function EndpointLink({ orgSlug, modelSlug, elementId, element }: { orgSlug: str
   return (
     <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${element.element_id}`} className={styles.link}>
       <ElementTypeGlyph type={element.element_type} />
-      <Text as="span">{element.name}</Text>
+      <Text as="span">{moduleDisplayNameFromMap(element, endpoints)}</Text>
     </Link>
   );
 }

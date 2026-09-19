@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
@@ -8,6 +9,8 @@ import styles from './ExternalInterfacesView.module.css';
 
 export interface ExternalInterfacesViewProps {
   modelId: UUID;
+  orgSlug: string;
+  modelSlug: string;
 }
 
 /**
@@ -18,7 +21,7 @@ export interface ExternalInterfacesViewProps {
  * none at all) while still having external organisations with access,
  * and vice versa.
  */
-export function ExternalInterfacesView({ modelId }: ExternalInterfacesViewProps) {
+export function ExternalInterfacesView({ modelId, orgSlug, modelSlug }: ExternalInterfacesViewProps) {
   const state = useExternalInterfaces(modelId);
 
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
@@ -35,7 +38,7 @@ export function ExternalInterfacesView({ modelId }: ExternalInterfacesViewProps)
         ) : (
           <ul className={styles.list}>
             {state.crossings.map((crossing) => (
-              <CrossingRow key={crossing.relationshipId} crossing={crossing} />
+              <CrossingRow key={crossing.relationshipId} crossing={crossing} orgSlug={orgSlug} modelSlug={modelSlug} />
             ))}
           </ul>
         )}
@@ -50,7 +53,7 @@ export function ExternalInterfacesView({ modelId }: ExternalInterfacesViewProps)
         ) : (
           <ul className={styles.list}>
             {state.organisationAccess.map((access) => (
-              <AccessRow key={access.relationshipId} access={access} />
+              <AccessRow key={access.relationshipId} access={access} orgSlug={orgSlug} modelSlug={modelSlug} />
             ))}
           </ul>
         )}
@@ -59,12 +62,20 @@ export function ExternalInterfacesView({ modelId }: ExternalInterfacesViewProps)
   );
 }
 
-function CrossingRow({ crossing }: { crossing: ExternalInterfaceCrossing }) {
+/**
+ * Bug fix: this list, and `AccessRow` below, were the "next screen" you
+ * land on from the door's own Assurance rows, but every row was plain
+ * text — no way to reach the system/actor actually needing a fix without
+ * separately searching for it by name. Each endpoint now links to its own
+ * element page, the same `/o/{org}/m/{model}/e/{id}` href
+ * `RelationshipsSection.tsx`'s own endpoint links already use.
+ */
+function CrossingRow({ crossing, orgSlug, modelSlug }: { crossing: ExternalInterfaceCrossing; orgSlug: string; modelSlug: string }) {
   return (
     <li className={styles.row}>
       <div>
         <Text as="span" size="lg">
-          {crossing.fromName} → {crossing.toName}
+          <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${crossing.fromElementId}`}>{crossing.fromName}</Link> → <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${crossing.toElementId}`}>{crossing.toName}</Link>
         </Text>
         <div className={styles.rowMeta}>
           <Chip tone="neutral">{crossing.relationshipType.replace('_', ' ')}</Chip>
@@ -77,11 +88,11 @@ function CrossingRow({ crossing }: { crossing: ExternalInterfaceCrossing }) {
   );
 }
 
-function AccessRow({ access }: { access: ExternalOrganisationAccess }) {
+function AccessRow({ access, orgSlug, modelSlug }: { access: ExternalOrganisationAccess; orgSlug: string; modelSlug: string }) {
   return (
     <li className={styles.row}>
       <Text as="span" size="lg">
-        {access.organisation} uses {access.systemName}
+        <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${access.actorId}`}>{access.organisation}</Link> uses <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${access.systemId}`}>{access.systemName}</Link>
       </Text>
     </li>
   );

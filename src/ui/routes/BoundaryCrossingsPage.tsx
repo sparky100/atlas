@@ -47,7 +47,7 @@ export function BoundaryCrossingsPage() {
               Boundary crossings
             </Text>
           </div>
-          <BoundaryCrossingsView modelId={model.id} />
+          <BoundaryCrossingsView modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
         </main>
       </div>
     </div>

@@ -6,6 +6,14 @@ function system(id: string, name: string, external = false): ElementsHeadRow {
   return { element_id: id, element_type: 'system', name, parent_id: null, attributes: { lifecycleStatus: 'active', isExternal: external }, exists_delta_id: `d-${id}` };
 }
 
+function platform(id: string, name: string): ElementsHeadRow {
+  return { element_id: id, element_type: 'system', name, parent_id: null, attributes: { kind: 'platform' }, exists_delta_id: `d-${id}` };
+}
+
+function container(id: string, name: string, parentId: string | null): ElementsHeadRow {
+  return { element_id: id, element_type: 'container', name, parent_id: parentId, attributes: {}, exists_delta_id: `d-${id}` };
+}
+
 function usesEdge(from: string, to: string, description?: string): RelationshipsHeadRow {
   return { relationship_id: 'r1', relationship_type: 'uses', from_element_id: from, to_element_id: to, attributes: description !== undefined ? { description } : {}, exists_delta_id: 'd-r1' };
 }
@@ -173,6 +181,36 @@ describe('computeContextGroup', () => {
     expect(byId.get('owner2')).toMatchObject({ isExternal: true, externalOrganisation: 'Ofgem' });
   });
 
+  it('"Platform · Module": a container neighbour whose parent is a live platform gets moduleDisplayName\'s own qualified name, when the caller\'s elementsById also carries that parent', () => {
+    const hub = system('hub', 'Hub');
+    const sap = platform('sap', 'SAP');
+    const module = container('pm', 'PM', 'sap');
+    const group = computeContextGroup(hub, [rel('r1', 'uses', 'hub', 'pm')], new Map([['pm', module], ['sap', sap]]));
+    expect(group.internal.map((n) => n.displayName)).toEqual(['SAP · PM']);
+  });
+
+  it('a container neighbour reads bare when its own parent isn\'t in elementsById at all — never throws, never blanks the row', () => {
+    const hub = system('hub', 'Hub');
+    const module = container('pm', 'PM', 'sap');
+    const group = computeContextGroup(hub, [rel('r1', 'uses', 'hub', 'pm')], new Map([['pm', module]]));
+    expect(group.internal.map((n) => n.displayName)).toEqual(['PM']);
+  });
+
+  it('hubDisplayName qualifies the hub itself too — V3 lets a container be a hub in its own right, and it can be a module', () => {
+    const sap = platform('sap', 'SAP');
+    const hub = container('pm', 'PM', 'sap');
+    const neighbour = system('n1', 'Neighbour');
+    const group = computeContextGroup(hub, [rel('r1', 'uses', 'pm', 'n1')], new Map([['n1', neighbour], ['sap', sap]]));
+    expect(group.hubDisplayName).toBe('SAP · PM');
+  });
+
+  it('a system hub or neighbour is never qualified — moduleDisplayName only ever touches a container', () => {
+    const hub = system('hub', 'Hub');
+    const neighbour = system('n1', 'Neighbour');
+    const group = computeContextGroup(hub, [rel('r1', 'uses', 'hub', 'n1')], new Map([['n1', neighbour]]));
+    expect(group.hubDisplayName).toBe('Hub');
+    expect(group.internal.map((n) => n.displayName)).toEqual(['Neighbour']);
+  });
 });
 
 describe('computePlatformConnections', () => {
@@ -207,6 +245,14 @@ describe('computePlatformConnections', () => {
     const a = system('a', 'Alpha');
     const connections = computePlatformConnections(hub, [rel('r1', 'uses', 'sap', 'b'), rel('r2', 'uses', 'sap', 'a')], new Map([['a', a], ['b', b]]));
     expect(connections.map((c) => c.otherElementId)).toEqual(['a', 'b']);
+  });
+
+  it('"Platform · Module": the rare direct connection to a module of some *other* platform is qualified too, when that platform is also in elementsById', () => {
+    const hub = platform('sap', 'SAP');
+    const arcgis = platform('arcgis', 'ArcGIS');
+    const module = container('ent', 'Enterprise', 'arcgis');
+    const connections = computePlatformConnections(hub, [usesEdge('sap', 'ent', 'reads asset data from')], new Map([['ent', module], ['arcgis', arcgis]]));
+    expect(connections).toEqual([{ relationshipId: 'r1', otherElementId: 'ent', otherName: 'ArcGIS · Enterprise', label: 'reads asset data from →' }]);
   });
 });
 

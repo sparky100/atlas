@@ -142,7 +142,7 @@ function NeighbourRow({
       <Link to={href} className={styles.rowMain}>
         <ElementTypeGlyph type={element.element_type} external={external} {...(actorSubtype !== undefined ? { actorSubtype } : {})} />
         <Text as="span" className={styles.rowName}>
-          {element.name}
+          {neighbour.displayName}
         </Text>
         {lifecycleTone !== undefined && lifecycleStatus !== null && <span className={styles.lifecycleDot} data-tone={lifecycleTone} role="img" aria-label={lifecycleStatus} title={lifecycleStatus} />}
         {/* V1's mobile list groups by direction, not internal/external (its

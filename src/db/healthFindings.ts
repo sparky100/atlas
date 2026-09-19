@@ -113,6 +113,8 @@ export function findUnlabeledVerbRelationships(edges: readonly RelationshipsHead
 export interface BoundaryCrossing {
   relationshipId: UUID;
   relationshipType: 'uses' | 'flows_to';
+  fromElementId: UUID;
+  toElementId: UUID;
   fromName: string;
   toName: string;
   fromDomain: SystemDomain;
@@ -164,7 +166,7 @@ export function findBoundaryCrossings(edges: readonly RelationshipsHeadRow[], el
     const dataClassification = attrs.dataClassification;
     const missingDataClassification = edge.relationship_type === 'flows_to' && !(typeof dataClassification === 'string' && dataClassification.trim() !== '');
 
-    result.push({ relationshipId: edge.relationship_id, relationshipType: edge.relationship_type, fromName: from.name, toName: to.name, fromDomain, toDomain, missingVerb, missingDataClassification });
+    result.push({ relationshipId: edge.relationship_id, relationshipType: edge.relationship_type, fromElementId: from.element_id, toElementId: to.element_id, fromName: from.name, toName: to.name, fromDomain, toDomain, missingVerb, missingDataClassification });
   }
   return result;
 }
@@ -201,6 +203,8 @@ export function findBoundaryCrossingsMissingClassification(edges: readonly Relat
 export interface ExternalInterfaceCrossing {
   relationshipId: UUID;
   relationshipType: 'uses' | 'flows_to';
+  fromElementId: UUID;
+  toElementId: UUID;
   fromName: string;
   toName: string;
 }
@@ -250,14 +254,17 @@ export function findExternalInterfacesMissingClassification(edges: readonly Rela
     if (edge.relationship_type !== 'flows_to') continue;
     const dataClassification = attributesRecord(edge.attributes).dataClassification;
     if (typeof dataClassification === 'string' && dataClassification.trim() !== '') continue;
-    result.push({ relationshipId: edge.relationship_id, relationshipType: edge.relationship_type, fromName: from.name, toName: to.name });
+    result.push({ relationshipId: edge.relationship_id, relationshipType: edge.relationship_type, fromElementId: from.element_id, toElementId: to.element_id, fromName: from.name, toName: to.name });
   }
   return result;
 }
 
 export interface ExternalOrganisationAccess {
   relationshipId: UUID;
+  /** The external actor itself — the "PowerOn"-style organisation label is a display string, not always a stable id on its own, so this is the actual element to link to. */
+  actorId: UUID;
   organisation: string;
+  systemId: UUID;
   systemName: string;
 }
 
@@ -281,7 +288,7 @@ export function findExternalOrganisationAccess(edges: readonly RelationshipsHead
     const attrs = attributesRecord(actor.attributes);
     if (attrs.isExternal !== true) continue;
     const organisation = typeof attrs.externalOrganisation === 'string' && attrs.externalOrganisation.trim() !== '' ? attrs.externalOrganisation : actor.name;
-    result.push({ relationshipId: edge.relationship_id, organisation, systemName: target.name });
+    result.push({ relationshipId: edge.relationship_id, actorId: actor.element_id, organisation, systemId: target.element_id, systemName: target.name });
   }
   return result;
 }

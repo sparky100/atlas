@@ -5,7 +5,8 @@ import type { ElementsHeadRow } from '../../contracts/rows';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
-import { quantizeScale } from '../landscape/zoom';
+import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
+import { quantizeScale, wheelZoomFactor } from '../landscape/zoom';
 import { NODE_WIDTH } from '../landscape/layout';
 import { allPlatformFlowTilesOf, computeIntegrationPlatformContextLayout, type IntegrationPlatformContextLayout, type PlatformFlowEdgeInput, type PlatformFlowTile } from './integrationPlatformContextLayout';
 import styles from './IntegrationPlatformDiagramCanvas.module.css';
@@ -146,6 +147,12 @@ function drawPill(ctx: CanvasRenderingContext2D, text: string, cx: number, cy: n
  * a second look" elsewhere in the product — never colour-only, since the
  * classification pill on that same edge is real text a screen reader (or
  * a colour-blind reviewer) can still read.
+ *
+ * "Platform · Module": a source/target tile's own label reads
+ * `moduleDisplayNameFromMap(element, elementsById)`, not the raw
+ * `element.name` — `elementsById` (the caller's own `endpoints` map) must
+ * already carry each container's own parent for this to resolve, same
+ * requirement `contextGrouping.ts`'s own `computeContextGroup` documents.
  */
 export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, edges, elementsById, neighbourContextHref, elementHref }: IntegrationPlatformDiagramCanvasProps) {
   const navigate = useNavigate();
@@ -250,8 +257,9 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
       const drawTile = (tile: PlatformFlowTile, isHub: boolean): void => {
         const element = elementsById.get(tile.elementId);
         if (!element) return;
+        const displayName = moduleDisplayNameFromMap(element, elementsById);
         const external = attributesRecord(element.attributes).isExternal === true;
-        const isHovered = hover?.label === element.name;
+        const isHovered = hover?.label === displayName;
 
         ctx.save();
         roundRectPath(ctx, tile.x, tile.y, tile.w, tile.h, 8);
@@ -267,7 +275,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
 
         if (zoomShowsText) {
           const glyph = element.element_type === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph(element.element_type);
-          nodeLabels.push({ glyph, name: element.name, worldX: tile.x, worldY: tile.y + tile.h / 2, maxWidth: tile.w - 30 });
+          nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: tile.y + tile.h / 2, maxWidth: tile.w - 30 });
         }
       };
 
@@ -343,7 +351,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
     }
     const tile = tileAt(screenX, screenY);
     const element = tile ? elementsById.get(tile.elementId) ?? (tile.elementId === hub.element_id ? hub : undefined) : undefined;
-    setHover(element ? { label: element.name, screenX, screenY } : null);
+    setHover(element ? { label: moduleDisplayNameFromMap(element, elementsById), screenX, screenY } : null);
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>): void {
@@ -379,7 +387,10 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
   function handleWheel(e: React.WheelEvent<HTMLCanvasElement>): void {
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
-    zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1, { x: e.clientX - rect.left, y: e.clientY - rect.top });
+    // See `ContextDiagramCanvas.tsx`'s identical `handleWheel` comment —
+    // same fix, same bug, same trace back to `LandscapeCanvas.tsx`'s own
+    // original `wheelZoomFactor` fix.
+    zoomBy(wheelZoomFactor(e.deltaY, e.deltaMode), { x: e.clientX - rect.left, y: e.clientY - rect.top });
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLCanvasElement>): void {

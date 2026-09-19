@@ -7,12 +7,17 @@
  * landscape canvas (`useLandscape.ts`), the capability-map flat list
  * (`useCapabilityLandscape.ts`, via `landscapeModules.ts`'s own
  * `withModuleLabels`), the Relationships section
- * (`relationshipEndpointLabel.ts`), and every search list a container can
+ * (`relationshipEndpointLabel.ts`), every search list a container can
  * appear in (Home search, the "+ Add" element-creation control, and every
- * relationship/retire/merge target picker). One implementation, so "the
- * same convention" can never quietly drift into four slightly different
+ * relationship/retire/merge target picker), the ordinary Context diagram
+ * (`contextGrouping.ts`), and the integration-platform Context view plus
+ * its own "Flows via this platform" section — shared verbatim with the
+ * element page (`PlatformFlowsSection.tsx`, `IntegrationPlatformMobileList.tsx`,
+ * `IntegrationPlatformDiagramCanvas.tsx`). One implementation, so "the
+ * same convention" can never quietly drift into several slightly different
  * ones.
  */
+import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { isPlatform } from './systemKind';
 
@@ -26,4 +31,33 @@ import { isPlatform } from './systemKind';
 export function moduleDisplayName(element: ElementsHeadRow, parent: ElementsHeadRow | null): string {
   if (element.element_type !== 'container' || parent === null) return element.name;
   return isPlatform(parent) ? `${parent.name} · ${element.name}` : element.name;
+}
+
+/**
+ * Every container's own `parent_id` among `elements` — the batch of ids a
+ * caller needs to additionally fetch (and merge into the same `elementsById`
+ * map) so `moduleDisplayNameFromMap` below can resolve every one of them. A
+ * container's own parent is never itself a relationship endpoint or a
+ * search-pool member the caller's own query already fetched, so this is
+ * always a second, small, targeted lookup — never widened into "fetch every
+ * element's parent," which no caller here actually needs.
+ */
+export function containerParentIds(elements: Iterable<ElementsHeadRow>): UUID[] {
+  const ids = new Set<UUID>();
+  for (const element of elements) {
+    if (element.element_type === 'container' && element.parent_id !== null) ids.add(element.parent_id);
+  }
+  return [...ids];
+}
+
+/**
+ * `moduleDisplayName(element, parent)`, `parent` looked up from
+ * `elementsById` by `element.parent_id` — the common shape every caller
+ * with a plain "every element I might need, by id" map already has (once
+ * `containerParentIds`'s own batch is merged into it), rather than
+ * resolving the parent by hand at each call site.
+ */
+export function moduleDisplayNameFromMap(element: ElementsHeadRow, elementsById: ReadonlyMap<UUID, ElementsHeadRow>): string {
+  const parent = element.parent_id !== null ? (elementsById.get(element.parent_id) ?? null) : null;
+  return moduleDisplayName(element, parent);
 }

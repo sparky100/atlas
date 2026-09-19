@@ -189,6 +189,7 @@ const ACTOR_SUBTYPE_OPTIONS = ['person', 'team', 'organisation'] as const;
 
 const ACTOR_META: Record<keyof ActorAttributes, AttributeFieldMeta> = {
   subtype: { label: 'Type', required: true, kind: 'enum', options: ACTOR_SUBTYPE_OPTIONS },
+  description: { label: 'Description', required: false, kind: 'text', multiline: true },
   email: { label: 'Email', required: false, kind: 'text' },
   orgUnit: { label: 'Org unit', required: false, kind: 'text' },
   isExternal: { label: 'External', required: true, kind: 'boolean' },
@@ -199,7 +200,7 @@ const ACTOR_META: Record<keyof ActorAttributes, AttributeFieldMeta> = {
   // actor page's own dedicated member picker instead.
   memberId: { label: 'Member', required: false, kind: 'text', editable: false, hidden: true },
 };
-const ACTOR_ORDER: (keyof ActorAttributes)[] = ['subtype', 'email', 'orgUnit', 'isExternal', 'externalOrganisation', 'memberId'];
+const ACTOR_ORDER: (keyof ActorAttributes)[] = ['subtype', 'description', 'email', 'orgUnit', 'isExternal', 'externalOrganisation', 'memberId'];
 
 export const ATTRIBUTE_SCHEMA_BY_TYPE: Record<ElementType, readonly AttributeFieldSchema[]> = {
   capability: schemaOf(CAPABILITY_ORDER, CAPABILITY_META),

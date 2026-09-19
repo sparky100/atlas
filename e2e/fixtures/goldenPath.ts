@@ -179,6 +179,26 @@ export async function addSystemFromHome(page: Page, options: AddSystemOptions): 
 }
 
 /**
+ * From the Home search box, create a container as a module of an existing
+ * platform (system) — `HomeSearch.tsx`'s own `showPlatformPicker` sheet.
+ * Lands on the new module's own page.
+ */
+export async function addContainerFromHome(page: Page, name: string, platformNameMatch: string): Promise<void> {
+  const searchBox = page.getByPlaceholder('Search or create a capability, system, or actor…');
+  await expect(searchBox).toBeVisible();
+  await searchBox.fill(name);
+  await page.getByRole('combobox').selectOption('container');
+  await page.getByRole('button', { name: `Create container "${name}"` }).click();
+
+  await expect(page.getByText('Which platform is this a module of? (required)')).toBeVisible();
+  await page.getByPlaceholder('Search for the platform this is a module of…').fill(platformNameMatch);
+  await page.getByRole('button', { name: new RegExp(platformNameMatch) }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+
+  await expect(page.getByRole('heading', { name })).toBeVisible();
+}
+
+/**
  * From an element page already on screen, add a `uses` relationship with a
  * verb phrase to another (existing) element — S2 flow 2's own
  * "verb-labelled uses relationship".

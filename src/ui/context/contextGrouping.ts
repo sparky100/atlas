@@ -48,11 +48,14 @@
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import { attributesRecord } from '../elements/attributesRecord';
+import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
 
 export interface ContextNeighbour {
   element: ElementsHeadRow;
   /** The `uses`/`flows_to` edges connecting this neighbour to the hub — always at least one (that's how it got here); occasionally two, if the pair is connected both ways. */
   edges: RelationshipsHeadRow[];
+  /** `moduleDisplayName(element, parent)` — "Platform · Module" when `element` is a container whose parent is a live platform, otherwise just its own name. Resolved once here, from `computeContextGroup`'s own `elementsById` (which must include each container's own parent, not only relationship endpoints — that caller's own doc comment says so), so every renderer (canvas, mobile list, inspector) shows the identical text without recomputing it. */
+  displayName: string;
 }
 
 /** One capability the hub *system* supports (`supports: system -> capability`) — Sprint U4-2b item 12's own header line, never a Context node or a drawn edge (this module's own first rule still holds: `supports` is the landscape's lane structure). */
@@ -73,6 +76,8 @@ export interface ContextOwner {
 
 export interface ContextGroup {
   hub: ElementsHeadRow;
+  /** `moduleDisplayName(hub, parent)` — see `ContextNeighbour.displayName`'s own comment; V3 lets a container be a hub in its own right, so the hub itself can be a module too, not only a neighbour. */
+  hubDisplayName: string;
   /** Non-external neighbours, reached via a drawn `uses`/`flows_to` edge. */
   internal: ContextNeighbour[];
   /** External neighbours (`isExternal: true`), reached via a drawn edge — UI-principles' "outside a ring". */
@@ -117,7 +122,7 @@ function byNameThenId(a: ElementsHeadRow, b: ElementsHeadRow): number {
 /**
  * @param hub The system or container this Context view is scoped to (V3: a container is now a real hub of its own, not just a system — see this module's own comment).
  * @param relationships Every relationship touching `hub` — `src/db/elements.ts`'s `listRelationshipsForElement`, unfiltered. This function does the type filtering itself so the query stays the same one every other "everything touching this element" reader already uses.
- * @param elementsById Every other endpoint named by `relationships`, by id — batch-loaded via `getElementsByIds`.
+ * @param elementsById Every other endpoint named by `relationships`, by id, *plus* the hub's own parent and every neighbour container's own parent (`useElementContext.ts`'s own merge before calling this) — `moduleDisplayNameFromMap` needs a parent to resolve "Platform · Module" for a container hub or neighbour, and a bare relationship endpoint alone was never going to include one.
  */
 export function computeContextGroup(hub: ElementsHeadRow, relationships: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): ContextGroup {
   const neighbourEdges = new Map<UUID, RelationshipsHeadRow[]>();
@@ -166,7 +171,7 @@ export function computeContextGroup(hub: ElementsHeadRow, relationships: readonl
   for (const [elementId, edges] of neighbourEdges) {
     const element = elementsById.get(elementId);
     if (!element) continue; // named by a relationship but not resolved (e.g. retracted since) — never render a node for data that isn't there.
-    (isExternal(element) ? external : internal).push({ element, edges });
+    (isExternal(element) ? external : internal).push({ element, edges, displayName: moduleDisplayNameFromMap(element, elementsById) });
   }
   internal.sort((a, b) => byNameThenId(a.element, b.element));
   external.sort((a, b) => byNameThenId(a.element, b.element));
@@ -190,13 +195,14 @@ export function computeContextGroup(hub: ElementsHeadRow, relationships: readonl
     .filter((s): s is ContextSupport => s !== null)
     .sort((a, b) => (a.primary === b.primary ? byNameThenId(a.capability, b.capability) : a.primary ? -1 : 1));
 
-  return { hub, internal, external, owners, supports };
+  return { hub, hubDisplayName: moduleDisplayNameFromMap(hub, elementsById), internal, external, owners, supports };
 }
 
 /** One of a platform's own genuine direct relationships — item 2's "Platform-level connections" plain-text line, never a canvas node or a drawn edge (there is no canvas at this level any more). */
 export interface PlatformConnection {
   relationshipId: UUID;
   otherElementId: UUID;
+  /** `moduleDisplayName(other, parent)` — the other end is rare but not guaranteed to be a top-level system (`computePlatformConnections`'s own doc comment on how rare this whole case already is); a module of some *other* platform reads "Platform · Module" here too, same as everywhere else this convention applies. */
   otherName: string;
   /** `edgeLabel`'s own formatted verb phrase, direction arrow included. */
   label: string;
@@ -231,7 +237,7 @@ export function computePlatformConnections(hub: ElementsHeadRow, relationships: 
     const otherId = fromIsHub ? rel.to_element_id : rel.from_element_id;
     const other = elementsById.get(otherId);
     if (!other) continue; // named by a relationship but not resolved (e.g. retracted since) — never render a row for data that isn't there.
-    result.push({ relationshipId: rel.relationship_id, otherElementId: otherId, otherName: other.name, label: edgeLabel(rel, hub.element_id) });
+    result.push({ relationshipId: rel.relationship_id, otherElementId: otherId, otherName: moduleDisplayNameFromMap(other, elementsById), label: edgeLabel(rel, hub.element_id) });
   }
   return result.sort((a, b) => a.otherName.localeCompare(b.otherName) || a.otherElementId.localeCompare(b.otherElementId));
 }

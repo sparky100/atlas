@@ -256,6 +256,7 @@ export interface ContainerAttributes {
 
 export interface ActorAttributes {
   subtype: ActorSubtype;
+  description?: string;
   /** Person only. */
   email?: string;
   orgUnit?: string;

@@ -9,27 +9,41 @@
 import type { ElementType } from '../../contracts/delta';
 import { hasExactMatch, type SearchPoolElement } from '../../db/elementSearch';
 
-/** Top-level-only element types (ADR-001: `parentId` required non-null for container/component) — the only kinds a home-page search-and-create, with nowhere to pick a parent, can sensibly *create*. Search is broader — see `HOME_SEARCH_TYPES` below — this list governs the create dropdown only. */
+/**
+ * Top-level element types (ADR-001: `parentId` null) — created immediately,
+ * with no further step once a write branch is resolved (`container` below
+ * is the one creatable type that isn't top-level, and needs its own "which
+ * platform is this a module of?" step first — `HomeSearch.tsx`'s own
+ * `showPlatformPicker`). Kept separate from `HOME_SEARCH_TYPES` below
+ * because `hasCreatableExactMatch` still only ever needs this narrower,
+ * unscoped-by-parent set — see that function's own doc comment.
+ */
 export const HOME_SEARCH_CREATABLE_TYPES: readonly ElementType[] = ['capability', 'system', 'actor'];
 
 /**
- * Every type Home search looks through — `HOME_SEARCH_CREATABLE_TYPES` plus
- * `container`. A container has no parent picker to create through from
- * Home (same reasoning that list's own doc comment gives), but it's a real
- * destination now — its own element page, and its own Context page (V3) —
- * so a search that never finds "SAP FI" at all is a real gap, and finding
- * an existing module by name is exactly this control's own duplicate-
- * prevention purpose (`elementSearch.ts`'s module comment).
+ * Every type Home search's own create dropdown offers, and every type its
+ * search looks through: `HOME_SEARCH_CREATABLE_TYPES` plus `container`.
+ * "SAP FI" — an existing module, found by name — and "a new module of
+ * SAP" — created by name plus a platform picker (`HomeSearch.tsx`'s own
+ * `showPlatformPicker` sheet) — are both real, common things to want from
+ * this one search box; a search that could never even find the module by
+ * name was the real gap this list originally closed, and now the same
+ * search box can create one too.
  */
 export const HOME_SEARCH_TYPES: readonly ElementType[] = [...HOME_SEARCH_CREATABLE_TYPES, 'container'];
 
 /**
  * `hasExactMatch` (`elementSearch.ts`) restricted to `HOME_SEARCH_CREATABLE_TYPES`
- * — an exact match on a container's own name must not suppress the "Create
- * <type>" row, since a container was never one of the types that row
- * offers to begin with (a module and a top-level system/capability can
- * legitimately share a name — "Reporting" the module, "Reporting" the
- * system).
+ * — an exact match on a container's own name must never suppress the
+ * "Create <type>" row. Two independent reasons, not just one: a module and
+ * a top-level system/capability can legitimately share a name ("Reporting"
+ * the module, "Reporting" the system) *and*, even restricted to container
+ * vs. container, this check has no platform to scope by — an existing "RE"
+ * module of SAP must not block creating a different, unrelated "RE" module
+ * of some other platform. The search results list above this row already
+ * surfaces any real duplicate by name (containers are searched, just not
+ * exact-match-suppressed) — that's the actual duplicate-catching moment,
+ * not this blunt, parent-blind check.
  */
 export function hasCreatableExactMatch(pool: readonly SearchPoolElement[], query: string): boolean {
   return hasExactMatch(

@@ -13,6 +13,7 @@ import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
 import { computeContextGroup, computePlatformConnections, type ContextGroup, type PlatformConnection } from './contextGrouping';
 import { buildPlatformModulesById, type ContextModule } from './contextDiagramData';
+import { containerParentIds } from '../elements/moduleDisplayName';
 import { isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -68,7 +69,7 @@ export interface IntegrationPlatformContextData {
   view: ViewRow;
   hub: ElementsHeadRow;
   flows: RelationshipsHeadRow[];
-  /** Every flow's own `from`/`to` endpoint, by id — never the hub itself, which is only ever the `via`, not an endpoint, of these edges (same as `ElementPageData.flowsViaThisPlatformEndpoints`'s own doc comment). */
+  /** Every flow's own `from`/`to` endpoint, by id, *plus* each container endpoint's own parent (`moduleDisplayNameFromMap`'s own requirement) — never the hub itself, which is only ever the `via`, not an endpoint, of these edges (same as `ElementPageData.flowsViaThisPlatformEndpoints`'s own doc comment). */
   endpoints: Map<UUID, ElementsHeadRow>;
 }
 
@@ -175,8 +176,16 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
 
           const ownEdges = hubRelationships.filter((r) => r.relationship_type === 'uses' || r.relationship_type === 'flows_to');
           const otherIds = [...new Set(ownEdges.flatMap((r) => [r.from_element_id, r.to_element_id]))].filter((id) => id !== elementId);
-          const elementsById = projection ? projectionElementsByIds(projection, otherIds) : await getElementsByIds(supabase, commitId, otherIds);
-          const connections = computePlatformConnections(hub, ownEdges, elementsById);
+          const otherElementsById = projection ? projectionElementsByIds(projection, otherIds) : await getElementsByIds(supabase, commitId, otherIds);
+          // "Platform · Module": the other end of a genuine platform-level
+          // connection is rare but, per this branch's own doc comment, not
+          // guaranteed to be a top-level system — it can itself be a module
+          // of some *other* platform, which needs that platform's own row
+          // resolved here too (`computePlatformConnections`'s own doc
+          // comment on `PlatformConnection.otherName`).
+          const connectionParentIds = containerParentIds(otherElementsById.values());
+          const connectionParentsById = projection ? projectionElementsByIds(projection, connectionParentIds) : await getElementsByIds(supabase, commitId, connectionParentIds);
+          const connections = computePlatformConnections(hub, ownEdges, new Map([...otherElementsById, ...connectionParentsById]));
 
           if (!cancelled) setState({ status: 'ready', data: { kind: 'platform-structure', commitId, view, hub, modules, connections, diff } });
           return;
@@ -192,15 +201,31 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
       if (hub.element_type === 'system' && isIntegrationPlatform(hub)) {
         const flows = projection ? projectionFlowsViaElement(projection, elementId) : await listFlowsViaElement(supabase, commitId, elementId);
         const endpointIds = [...new Set(flows.flatMap((f) => [f.from_element_id, f.to_element_id]))];
-        const endpoints = projection ? projectionElementsByIds(projection, endpointIds) : await getElementsByIds(supabase, commitId, endpointIds);
+        const rawEndpoints = projection ? projectionElementsByIds(projection, endpointIds) : await getElementsByIds(supabase, commitId, endpointIds);
+        // "Platform · Module": a source or target routed via this platform
+        // can itself be a module of some *other* platform — resolved once,
+        // merged into the same map `IntegrationPlatformContextView.tsx`/
+        // `IntegrationPlatformDiagramCanvas.tsx`/`IntegrationPlatformMobileList.tsx`
+        // (and the element page's own `PlatformFlowsSection.tsx`, shared
+        // verbatim) already look parents up in.
+        const endpointParentIds = containerParentIds(rawEndpoints.values());
+        const endpointParentsById = projection ? projectionElementsByIds(projection, endpointParentIds) : await getElementsByIds(supabase, commitId, endpointParentIds);
+        const endpoints = new Map([...rawEndpoints, ...endpointParentsById]);
         if (!cancelled) setState({ status: 'ready', data: { kind: 'integration-platform', commitId, view, hub, flows, endpoints } });
         return;
       }
 
       // Every relationship type (`RELATIONSHIP_TYPES`) is one `computeContextGroup` itself already classifies — no further filtering needed here.
       const otherIds = [...new Set(hubRelationships.flatMap((r) => [r.from_element_id, r.to_element_id]))].filter((id) => id !== elementId);
-      const elementsById = projection ? projectionElementsByIds(projection, otherIds) : await getElementsByIds(supabase, commitId, otherIds);
-      const group = computeContextGroup(hub, hubRelationships, elementsById);
+      const neighbourElementsById = projection ? projectionElementsByIds(projection, otherIds) : await getElementsByIds(supabase, commitId, otherIds);
+      // "Platform · Module" (moduleDisplayName): the hub itself (V3 lets a
+      // container be a hub) and any neighbour can be a module of some
+      // platform not otherwise loaded here — resolved once, merged into
+      // the same map `computeContextGroup`'s own doc comment says it now
+      // expects to also carry parents in, not only relationship endpoints.
+      const groupParentIds = containerParentIds([hub, ...neighbourElementsById.values()]);
+      const groupParentsById = projection ? projectionElementsByIds(projection, groupParentIds) : await getElementsByIds(supabase, commitId, groupParentIds);
+      const group = computeContextGroup(hub, hubRelationships, new Map([...neighbourElementsById, ...groupParentsById]));
 
       if (!cancelled) setState({ status: 'ready', data: { kind: 'group', commitId, view, group, diff } });
     }
