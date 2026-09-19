@@ -4,13 +4,12 @@ import { Link } from 'react-router';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import type { BranchRow } from '../../db/types';
-import { isCapabilityOwnedWithAncestry } from '../../db/healthFindings';
 import type { ThreadCount } from '../comments/useThreadCounts';
 import { CommentMarkerButton } from '../components/CommentMarkerButton/CommentMarkerButton';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { computeCapabilityRollup } from './capabilityRollup';
-import { domainCoverageSegments, domainCoverageSummary } from './domainSummary';
+import { domainCoverageSegments, domainCoverageSummary, domainSystemsCountText } from './domainSummary';
 import { aggregateTileColourFor, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
 import type { CapabilityMapTree, L1Column, L2Card } from './layout';
 import { useCapabilityReorder } from './useCapabilityReorder';
@@ -139,9 +138,12 @@ export interface CapabilityMapViewProps {
  * a thin left-border + plain label text, never a filled tile or a pill).
  *
  * Domains (`DomainSection` below) are collapsed by default and stay a
- * single summary row — chevron, name, a plain coverage sentence, and a
- * segmented mini-bar (`domainSummary.ts`'s `domainCoverageSegments`, one
- * segment per subtree capability, informational only) — until expanded,
+ * single summary row — chevron, name, a plain coverage sentence paired
+ * with its own segmented mini-bar (`domainSummary.ts`'s
+ * `domainCoverageSegments`, one segment per subtree capability,
+ * informational only), the domain's own supporting-system count, and an
+ * owner note when it lacks one — each its own visual zone, read in that
+ * order — until expanded,
  * at which point its own L2 cards (`CapabilityRow`) render in a
  * responsive grid, each a single compact row: name, a thin left-border
  * indicator, the supporting-system count. L3 (an L2's own children, when
@@ -451,12 +453,25 @@ function DomainSection({
             {column.capability.name}
           </Text>
         </span>
-        <Text as="span" size="sm" tone="muted" className={styles.domainSummaryText}>
-          {domainCoverageSummary(rollup.supportedCapabilityCount, rollup.totalCapabilityCount)}
+        {/*
+         * Bug fix (findings-from-use follow-up, item 1/4): the fraction and
+         * its mini-bar are one visual zone, read together — the bar used to
+         * sit far to the right, separated from the fraction it illustrates
+         * by whatever space `.domainName`'s old flex-grow left behind.
+         */}
+        <span className={styles.domainCoverage}>
+          <Text as="span" size="sm" tone="muted" className={styles.domainSummaryText}>
+            {domainCoverageSummary(rollup.supportedCapabilityCount, rollup.totalCapabilityCount)}
+          </Text>
+          <CoverageMiniBar segments={segments} />
+        </span>
+        {/* Bug fix, item 1: this used to be `aggregateColour`'s own coverage-mode label ("capabilities supported"/"no capabilities supported") — a fixed phrase restating the fraction's zero/non-zero state, not a value of its own. The domain's real supporting-system count belongs here instead. */}
+        <Text as="span" size="sm" tone="muted" className={styles.domainSystemsCount}>
+          {domainSystemsCountText(count)}
         </Text>
-        {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <FactIndicator tone={aggregateColour.tone} label={aggregateColour.label} />}
+        {/* Coverage mode's own aggregate label is always this same "capabilities supported"/"no capabilities supported" non-value — already fully covered by the fraction/mini-bar/count above, so it's never shown for that one mode; every other colour-by mode's label is a real, distinct fact (a lifecycle stage, "exposed", a criticality level, an OT-share fraction, a fit rating) and still shows here. */}
+        {colourBy !== 'metric:supportingSystemCount' && aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <FactIndicator tone={aggregateColour.tone} label={aggregateColour.label} />}
         {!rollup.isOwned && <FactIndicator tone="warn" label="no owner recorded" />}
-        <CoverageMiniBar segments={segments} />
       </button>
       {domainExpanded && (
         <div id={panelId} className={styles.domainBody}>
@@ -478,8 +493,6 @@ function DomainSection({
                 colourBy={colourBy}
                 supportsEdges={supportsEdges}
                 systemsById={systemsById}
-                capabilitiesById={capabilitiesById}
-                selfOwnedIds={selfOwnedIds}
                 orgSlug={orgSlug}
                 modelSlug={modelSlug}
                 refParam={refParam}
@@ -504,23 +517,29 @@ function DomainSection({
 /**
  * Redesign item 3: a compact capability card, one level of L3 nesting
  * supported — name, a thin left-border indicator (`colourBy`'s own tone),
- * the supporting-system count on the right; "no owner" as its own plain-
- * text fact when the capability isn't owned (`isCapabilityOwnedWithAncestry`,
- * called directly per capability now rather than only at the domain
- * rollup — a one-line existing predicate, no new computation). Replaces
- * the pre-redesign split between a desktop `CapabilityTile` (blueprint-
- * framed, tone-filled, a Chip pill) and a mobile-only dense row — one
- * shape at every width now, since the redesign's own coloring rule (thin
- * line/dot + plain text, never a fill or a pill) never wanted the tile's
- * filled treatment to begin with.
+ * the supporting-system count on the right. Replaces the pre-redesign
+ * split between a desktop `CapabilityTile` (blueprint-framed, tone-filled,
+ * a Chip pill) and a mobile-only dense row — one shape at every width now,
+ * since the redesign's own coloring rule (thin line/dot + plain text,
+ * never a fill or a pill) never wanted the tile's filled treatment to
+ * begin with.
+ *
+ * No per-card "no owner recorded" note (bug-fix follow-up, item 5):
+ * ownership here is `isCapabilityOwnedWithAncestry`'s own 2-level ancestor
+ * walk (self, parent, grandparent), so a card can only ever read as
+ * *unowned* when its owning L1 domain is unowned too — the domain header's
+ * own "no owner recorded" (`DomainSection`, driven by `rollup.isOwned`,
+ * the same predicate applied to the L1 itself) is therefore never less
+ * informative than repeating the identical fact on every card beneath it,
+ * and a card that *is* owned already renders no owner note at all. This
+ * isn't a threshold or a "mostly" case — it's true every time, so the
+ * per-card note is dropped rather than conditionally suppressed.
  */
 function CapabilityRow({
   card,
   colourBy,
   supportsEdges,
   systemsById,
-  capabilitiesById,
-  selfOwnedIds,
   orgSlug,
   modelSlug,
   refParam,
@@ -539,8 +558,6 @@ function CapabilityRow({
   colourBy: ColourByMode;
   supportsEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
-  capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>;
-  selfOwnedIds: ReadonlySet<UUID>;
   orgSlug: string;
   modelSlug: string;
   refParam: string;
@@ -559,7 +576,6 @@ function CapabilityRow({
 }) {
   const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById);
   const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
-  const owned = isCapabilityOwnedWithAncestry(card.capability, selfOwnedIds, capabilitiesById);
   const marker = commentMarkerFor(threadCounts, card.capability.element_id);
 
   return (
@@ -573,8 +589,8 @@ function CapabilityRow({
         <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
       </div>
       <div className={styles.cardSecondary}>
-        {colour.tone !== undefined && colour.label !== undefined && <FactIndicator tone={colour.tone} label={colour.label} />}
-        {!owned && <FactIndicator tone="warn" label="no owner recorded" />}
+        {/* Coverage mode's own label is always the same "supporting systems"/"no supporting systems" non-value — the real count already sits beside the name above (`LandscapeZoomLink`), so it's never shown for that one mode; every other colour-by mode's label is a real, distinct fact and still shows here. */}
+        {colourBy !== 'metric:supportingSystemCount' && colour.tone !== undefined && colour.label !== undefined && <FactIndicator tone={colour.tone} label={colour.label} />}
         {marker && onCommentMarkerClick && <CommentMarkerButton marker={marker} onClick={() => { onCommentMarkerClick(card.capability.element_id); }} />}
         {!nested && card.l3.length > 0 && (
           <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { onToggleExpand(card.capability.element_id); }}>
@@ -593,8 +609,6 @@ function CapabilityRow({
               colourBy={colourBy}
               supportsEdges={supportsEdges}
               systemsById={systemsById}
-              capabilitiesById={capabilitiesById}
-              selfOwnedIds={selfOwnedIds}
               orgSlug={orgSlug}
               modelSlug={modelSlug}
               refParam={refParam}

@@ -122,18 +122,22 @@ test('capability map: two-level tree with an orphan, L2→L3 expand, orphan flag
   await page.getByRole('button', { name: /▸\s*1/ }).click();
   await expect(page.getByText('Repairs')).toBeVisible();
 
-  // Colour-by actually changes a tile's tone: no coverage chip once
-  // explicitly set to None, a real one (stating the tone in words — the
-  // literal count lives in the "→ Landscape" link instead, never
-  // duplicated onto this chip too) after switching to Coverage. Starts
-  // from an explicit "None" selection, not an assumed default — Sprint
-  // U4-1 C4 gives this model a real default colour-by the instant it
-  // loads (this fixture's own user owns their org, so home_mode defaults
-  // to architect, and coverage is the architect default on a model that
-  // already has a system) — this test is about the *switch* working, not
-  // about which mode happens to load first.
+  // Colour-by actually changes a tile's tone: no lifecycle-stage indicator
+  // once explicitly set to None, a real one (the stage name itself,
+  // "active" — this fixture's one system's own `lifecycleStatus`) after
+  // switching to Oldest lifecycle stage. Starts from an explicit "None"
+  // selection, not an assumed default — Sprint U4-1 C4 gives this model a
+  // real default colour-by the instant it loads (this fixture's own user
+  // owns their org, so home_mode defaults to architect, and coverage is
+  // the architect default on a model that already has a system) — this
+  // test is about the *switch* working, not about which mode happens to
+  // load first. Uses lifecycle stage rather than Coverage: a bug-fix
+  // follow-up removed Coverage's own indicator here entirely — its label
+  // only ever restated the coverage fraction's zero/non-zero state in
+  // words ("supporting systems"/"no supporting systems"), never a value
+  // of its own, so it could never demonstrate a *changing* tone anyway.
   await page.getByLabel('Colour by').selectOption({ label: 'None' });
-  await expect(page.getByText('supporting systems')).toHaveCount(0);
-  await page.getByLabel('Colour by').selectOption({ label: 'Coverage (supporting-system count)' });
-  await expect(page.getByText('supporting systems')).toBeVisible();
+  await expect(page.getByText('active', { exact: true })).toHaveCount(0);
+  await page.getByLabel('Colour by').selectOption({ label: 'Oldest lifecycle stage' });
+  await expect(page.getByText('active', { exact: true })).toBeVisible();
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RelationshipsHeadRow } from '../../contracts/rows';
-import { domainCoverageSegments, domainCoverageSummary } from './domainSummary';
+import { domainCoverageSegments, domainCoverageSummary, domainSystemsCountText } from './domainSummary';
 
 function supportsEdge(toElementId: string, fromElementId: string): RelationshipsHeadRow {
   return {
@@ -40,5 +40,19 @@ describe('domainCoverageSummary', () => {
   it('uses singular "capability has" when the total is exactly one', () => {
     expect(domainCoverageSummary(1, 1)).toBe('1 of 1 capability has a supporting system');
     expect(domainCoverageSummary(0, 1)).toBe('0 of 1 capability has a supporting system');
+  });
+});
+
+describe('domainSystemsCountText', () => {
+  it('reads "no systems" at zero', () => {
+    expect(domainSystemsCountText(0)).toBe('no systems');
+  });
+
+  it('uses singular "system" for exactly one', () => {
+    expect(domainSystemsCountText(1)).toBe('1 system');
+  });
+
+  it('pluralizes "systems" for any other count', () => {
+    expect(domainSystemsCountText(11)).toBe('11 systems');
   });
 });

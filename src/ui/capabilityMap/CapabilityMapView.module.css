@@ -57,8 +57,19 @@
   color: var(--text-muted);
 }
 
+/**
+ * Bug fix (findings-from-use follow-up, item 3/4): this used to be
+ * `flex: 1 1 auto`, which let the name's own box grow to soak up every bit
+ * of the row's leftover width — invisible padding a short name doesn't
+ * fill, but which still pushed the fraction/mini-bar/count/owner group
+ * that follows it all the way to the row's right edge, reading as "the
+ * mini-bar sits far away from its fraction" and competing with the
+ * Inspector panel at that same edge. `flex: 0 1 auto` sizes the name to
+ * its own content (still shrinking, still ellipsising) instead, so the
+ * facts that follow sit immediately after it.
+ */
 .domainName {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -66,6 +77,19 @@
 }
 
 .domainSummaryText {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/** Bug fix, item 2/4: the fraction and its mini-bar as one grouped zone — a tighter internal gap than the row's own `.domainHeader` gap keeps them read together, distinct from the systems-count/owner-status zones after it. */
+.domainCoverage {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+.domainSystemsCount {
   flex: 0 0 auto;
   white-space: nowrap;
 }
