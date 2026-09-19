@@ -179,6 +179,69 @@ function compareIds(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+/**
+ * Whether `upper` (the smaller lane index — its own horizontal run sits
+ * nearer the hub) visibly crosses `lower` (a larger lane index, nearer the
+ * neighbour row). Every no-riser edge's route is exactly two vertical
+ * segments joined by one horizontal run at its own lane's height:
+ * `upper`'s rise from the neighbour row up to *its* lane necessarily
+ * passes through every lane below it, including `lower`'s — a real,
+ * visible crossing whenever that rise's own x (`upper.fromX`) falls
+ * inside `lower`'s own horizontal span; symmetrically, `lower`'s rise from
+ * its own lane up to the hub passes through every lane above it,
+ * including `upper`'s, crossing it whenever that rise's x (`lower.toX`)
+ * falls inside `upper`'s own span. Either one alone is a crossing a
+ * viewer actually sees.
+ */
+export function lanesCross(upper: { fromX: number; toX: number }, lower: { fromX: number; toX: number }): boolean {
+  const upperLo = Math.min(upper.fromX, upper.toX);
+  const upperHi = Math.max(upper.fromX, upper.toX);
+  const lowerLo = Math.min(lower.fromX, lower.toX);
+  const lowerHi = Math.max(lower.fromX, lower.toX);
+  const lowerRiseCrossesUpper = lower.toX >= upperLo && lower.toX <= upperHi;
+  const upperRiseCrossesLower = upper.fromX >= lowerLo && upper.fromX <= lowerHi;
+  return lowerRiseCrossesUpper || upperRiseCrossesLower;
+}
+
+/**
+ * Refines a lane order (widest-span-first is a reasonable starting point,
+ * but not itself crossing-aware — two edges whose spans happen to be
+ * close, or whose spans don't correlate with which one should sit nearer
+ * the hub, can still cross needlessly) with bounded adjacent-swap passes,
+ * the same "layered crossing reduction" technique the Sugiyama framework
+ * uses for this exact class of problem. Swapping two *adjacent* lanes only
+ * ever changes whether that one pair crosses — every other pair's
+ * relative order, and therefore its own crossing status, is untouched —
+ * so a pass that swaps only when doing so turns a real crossing into a
+ * clean one (never the reverse) strictly reduces the total count and
+ * never worsens it. A fixed point is reached deterministically within `n`
+ * passes (the standard bubble-sort bound); a pair that crosses either way
+ * (a genuine, unavoidable crossing between two interleaved edges) is left
+ * in its span-order position, same as today.
+ */
+export function minimizeLaneCrossings<T>(ordered: readonly T[], pointOf: (item: T) => { fromX: number; toX: number }): T[] {
+  const order = [...ordered];
+  let pass = 0;
+  while (pass < order.length) {
+    let swapped = false;
+    for (let i = 0; i < order.length - 1; i += 1) {
+      const a = order[i];
+      const b = order[i + 1];
+      if (a === undefined || b === undefined) continue;
+      const pa = pointOf(a);
+      const pb = pointOf(b);
+      if (lanesCross(pa, pb) && !lanesCross(pb, pa)) {
+        order[i] = b;
+        order[i + 1] = a;
+        swapped = true;
+      }
+    }
+    if (!swapped) break;
+    pass += 1;
+  }
+  return order;
+}
+
 /** Rework item 1: the gap between adjacent neighbour tiles for a row of `count` — grows with count, capped. */
 export function fanGapFor(count: number): number {
   return Math.min(FAN_GAP_MAX, TILE_GUTTER_X + FAN_GAP_STEP * Math.max(0, count - 1));
@@ -341,16 +404,17 @@ export function computeContextDiagramLayout(
     }
   }
 
-  // Top-channel lanes: every edge whose top-channel horizontal has a real span. Widest span nearest the hub (lane 0) — its long run then sits farthest from the label stacks.
+  // Top-channel lanes: every edge whose top-channel horizontal has a real span. Widest span nearest the hub (lane 0) as a starting order — its long run then sits farthest from the label stacks. A deeper row's own edge doesn't have a real x to route the top channel against yet at this point — only `provisionalRiserX`, a crude, per-side, per-row placeholder shared by every edge on that side (real per-edge spacing depends on lane rank, which doesn't exist yet either) — so this first pass exists only to give `riserX` below a valid, self-consistent order to spread edges out by; it is not the order edges actually draw in (see `topLaneEdges` below, computed a second time once real riser x's exist).
   const topSpanOf = (p: EdgePlan): number => Math.abs(p.toX - (p.provisionalRiserX ?? p.fromX));
-  const topLaneEdges = plans.filter((p) => topSpanOf(p) >= 1).sort((a, b) => topSpanOf(b) - topSpanOf(a) || compareIds(a.edge.id, b.edge.id));
-  const topLane = new Map<UUID, number>(topLaneEdges.map((p, i) => [p.edge.id, i]));
+  const topLaneEdgesBySpan = plans.filter((p) => topSpanOf(p) >= 1).sort((a, b) => topSpanOf(b) - topSpanOf(a) || compareIds(a.edge.id, b.edge.id));
+  const provisionalTopLane = new Map<UUID, number>(minimizeLaneCrossings(topLaneEdgesBySpan, (p) => ({ fromX: p.provisionalRiserX ?? p.fromX, toX: p.toX })).map((p, i) => [p.edge.id, i]));
 
-  // Own-row lanes for deeper rows (the horizontal from the neighbour's drop out to its riser): per row, widest span first.
+  // Own-row lanes for deeper rows (the horizontal from the neighbour's drop out to its riser): per row, widest span first as a starting order, same crossing refinement as the top channel above (using the same provisional riser x — this channel's own edges are compared only against each other, on the same row and side, where the shared placeholder value is at least consistent between them).
   const ownLane = new Map<UUID, number>();
   const ownLaneCount = new Map<number, number>();
   for (let rowIndex = 1; rowIndex < plannedRows.length; rowIndex += 1) {
-    const rowPlans = plans.filter((p) => p.rowIndex === rowIndex).sort((a, b) => Math.abs((b.provisionalRiserX ?? b.fromX) - b.fromX) - Math.abs((a.provisionalRiserX ?? a.fromX) - a.fromX) || compareIds(a.edge.id, b.edge.id));
+    const rowPlansBySpan = plans.filter((p) => p.rowIndex === rowIndex).sort((a, b) => Math.abs((b.provisionalRiserX ?? b.fromX) - b.fromX) - Math.abs((a.provisionalRiserX ?? a.fromX) - a.fromX) || compareIds(a.edge.id, b.edge.id));
+    const rowPlans = minimizeLaneCrossings(rowPlansBySpan, (p) => ({ fromX: p.fromX, toX: p.provisionalRiserX ?? p.fromX }));
     rowPlans.forEach((p, i) => ownLane.set(p.edge.id, i));
     ownLaneCount.set(rowIndex, rowPlans.length);
   }
@@ -358,7 +422,7 @@ export function computeContextDiagramLayout(
   // Riser x per side: the edge with the highest top lane (smallest lane index) runs outermost, so an inner riser never crosses an outer edge's lane. Every riser on a side is placed relative to the widest extents any deeper row sees, so risers from different rows on the same side stay parallel and ordered.
   const riserX = new Map<UUID, number>();
   for (const side of ['left', 'right'] as const) {
-    const sidePlans = plans.filter((p) => p.riserSide === side).sort((a, b) => (topLane.get(a.edge.id) ?? 0) - (topLane.get(b.edge.id) ?? 0) || compareIds(a.edge.id, b.edge.id));
+    const sidePlans = plans.filter((p) => p.riserSide === side).sort((a, b) => (provisionalTopLane.get(a.edge.id) ?? 0) - (provisionalTopLane.get(b.edge.id) ?? 0) || compareIds(a.edge.id, b.edge.id));
     if (sidePlans.length === 0) continue;
     const base = side === 'left' ? Math.min(...sidePlans.map((q) => extentsAbove(q.rowIndex).left)) : Math.max(...sidePlans.map((q) => extentsAbove(q.rowIndex).right));
     const count = sidePlans.length;
@@ -367,6 +431,11 @@ export function computeContextDiagramLayout(
       riserX.set(p.edge.id, side === 'left' ? base - OUTER_RISER_MARGIN - outwardIndex * RISER_PITCH : base + OUTER_RISER_MARGIN + outwardIndex * RISER_PITCH);
     });
   }
+
+  // Top-channel lanes, for real: every deeper-row edge now has its own actual riser x (just computed above, no longer the crude shared placeholder every edge on a side used to share) — re-running the same crossing minimization against real endpoints (row-0 edges already had exact `fromX` all along) gives the order edges actually draw in. Re-deriving this doesn't disturb `riserX` itself: a riser's own x only had to be a valid, uniquely-spaced position on its own side, never tied to one specific top-lane order.
+  const topChannelPoint = (p: EdgePlan): { fromX: number; toX: number } => ({ fromX: riserX.get(p.edge.id) ?? p.provisionalRiserX ?? p.fromX, toX: p.toX });
+  const topLaneEdges = minimizeLaneCrossings(topLaneEdgesBySpan, topChannelPoint);
+  const topLane = new Map<UUID, number>(topLaneEdges.map((p, i) => [p.edge.id, i]));
 
   // ---- y-phase: channel heights from label stacks and lane counts, then place rows. ----
   const rows: DiagramRow[] = [];

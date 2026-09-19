@@ -5,7 +5,7 @@ import type { ElementsHeadRow } from '../../contracts/rows';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
-import { quantizeScale } from '../landscape/zoom';
+import { quantizeScale, wheelZoomFactor } from '../landscape/zoom';
 import { NODE_WIDTH } from '../landscape/layout';
 import {
   allTilesOf,
@@ -529,7 +529,14 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
   function handleWheel(e: React.WheelEvent<HTMLCanvasElement>): void {
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
-    zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1, { x: e.clientX - rect.left, y: e.clientY - rect.top });
+    // `wheelZoomFactor` (`landscape/zoom.ts`) scales the step by how much of
+    // a single wheel "notch" this event's own deltaY represents — see its
+    // own comment for the bug this fixes (a burst of small-delta events,
+    // from a trackpad or a high-resolution mouse, used to each get the same
+    // full step as one real notch and could compound to MIN/MAX_SCALE, and
+    // therefore off-screen, in a fraction of a second) — `LandscapeCanvas.tsx`'s
+    // own `handleWheel` fixed this first; this canvas had the identical bug.
+    zoomBy(wheelZoomFactor(e.deltaY, e.deltaMode), { x: e.clientX - rect.left, y: e.clientY - rect.top });
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLCanvasElement>): void {

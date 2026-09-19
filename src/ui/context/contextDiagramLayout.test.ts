@@ -6,6 +6,8 @@ import {
   edgeNear,
   fanGapFor,
   LANE_PITCH,
+  lanesCross,
+  minimizeLaneCrossings,
   MIN_DIAGRAM_WIDTH,
   placeEdgeLabels,
   spreadAlong,
@@ -224,6 +226,75 @@ describe('spreadAlong', () => {
   it('places count attach points evenly inside a span, never on its ends', () => {
     expect(spreadAlong(0, 100, 0, 1)).toBe(50);
     expect([0, 1, 2].map((i) => spreadAlong(0, 100, i, 3))).toEqual([25, 50, 75]);
+  });
+});
+
+describe('lanesCross (rework item 2 refinement: crossing-aware lane order)', () => {
+  it('reports no crossing when neither edge\'s own rise falls inside the other\'s span — a "staggered", not interleaved, pair', () => {
+    // Two edges both running left-to-right (fromX < toX), B's own reach
+    // poking slightly past A's on the high side only — the specific shape
+    // where an edge's own two rises (fromX and toX) both land outside the
+    // other edge's span, so no rise ever has to cross the other's
+    // horizontal run.
+    expect(lanesCross({ fromX: 50, toX: 590 }, { fromX: 100, toX: 595 })).toBe(false);
+  });
+
+  it('reports a crossing the other way round for that same pair — order genuinely matters, not just which edges are involved', () => {
+    expect(lanesCross({ fromX: 100, toX: 595 }, { fromX: 50, toX: 590 })).toBe(true);
+  });
+
+  it('reports a crossing both ways when one span fully nests the other — the nested edge\'s own lane sits inside the nesting edge\'s two rises regardless of which is "upper", so this is a genuine, unavoidable crossing', () => {
+    const outer = { fromX: 0, toX: 600 };
+    const inner = { fromX: 100, toX: 550 };
+    expect(lanesCross(outer, inner)).toBe(true);
+    expect(lanesCross(inner, outer)).toBe(true);
+  });
+
+  it('reports no crossing either way for two edges with disjoint spans', () => {
+    const left = { fromX: 0, toX: 50 };
+    const right = { fromX: 200, toX: 250 };
+    expect(lanesCross(left, right)).toBe(false);
+    expect(lanesCross(right, left)).toBe(false);
+  });
+});
+
+describe('minimizeLaneCrossings (rework item 2 refinement)', () => {
+  const point = (item: { fromX: number; toX: number }) => item;
+
+  it('swaps an adjacent pair whose current order crosses when the reverse order would not', () => {
+    const a = { fromX: 50, toX: 590 };
+    const b = { fromX: 100, toX: 595 };
+    // Starting order [b, a] has b "upper" (closer to the hub) — crosses, per
+    // the lanesCross test above; the fix is exactly swapping to [a, b].
+    expect(minimizeLaneCrossings([b, a], point)).toEqual([a, b]);
+  });
+
+  it('leaves a genuinely unavoidable pair in its starting order — there is nothing a swap could improve', () => {
+    const outer = { fromX: 0, toX: 600 };
+    const inner = { fromX: 100, toX: 550 };
+    expect(minimizeLaneCrossings([outer, inner], point)).toEqual([outer, inner]);
+    expect(minimizeLaneCrossings([inner, outer], point)).toEqual([inner, outer]);
+  });
+
+  it('leaves an already-clean order untouched', () => {
+    const disjointOrder = [{ fromX: 0, toX: 50 }, { fromX: 200, toX: 250 }, { fromX: 400, toX: 450 }];
+    expect(minimizeLaneCrossings(disjointOrder, point)).toEqual(disjointOrder);
+  });
+
+  it('resolves a crossing that only becomes adjacent after an earlier swap (needs more than one pass)', () => {
+    // c starts on top, needs to end up on the bottom (below both a and b) to
+    // avoid crossing either of them; a single adjacent-swap pass only moves
+    // it down one position, so this exercises the multi-pass loop.
+    const a = { fromX: 50, toX: 590 };
+    const b = { fromX: 100, toX: 595 };
+    const c = { fromX: 150, toX: 600 };
+    const result = minimizeLaneCrossings([c, a, b], point);
+    for (let i = 0; i < result.length - 1; i += 1) {
+      const upper = result[i];
+      const lower = result[i + 1];
+      if (!upper || !lower) throw new Error('expected both lanes to exist');
+      expect(lanesCross(upper, lower)).toBe(false);
+    }
   });
 });
 

@@ -6,7 +6,7 @@ import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
-import { quantizeScale } from '../landscape/zoom';
+import { quantizeScale, wheelZoomFactor } from '../landscape/zoom';
 import { NODE_WIDTH } from '../landscape/layout';
 import { allPlatformFlowTilesOf, computeIntegrationPlatformContextLayout, type IntegrationPlatformContextLayout, type PlatformFlowEdgeInput, type PlatformFlowTile } from './integrationPlatformContextLayout';
 import styles from './IntegrationPlatformDiagramCanvas.module.css';
@@ -387,7 +387,10 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
   function handleWheel(e: React.WheelEvent<HTMLCanvasElement>): void {
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
-    zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1, { x: e.clientX - rect.left, y: e.clientY - rect.top });
+    // See `ContextDiagramCanvas.tsx`'s identical `handleWheel` comment —
+    // same fix, same bug, same trace back to `LandscapeCanvas.tsx`'s own
+    // original `wheelZoomFactor` fix.
+    zoomBy(wheelZoomFactor(e.deltaY, e.deltaMode), { x: e.clientX - rect.left, y: e.clientY - rect.top });
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLCanvasElement>): void {
