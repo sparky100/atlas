@@ -202,6 +202,78 @@ export function spreadAlong(from: number, width: number, index: number, count: n
   return from + (width * (index + 1)) / (count + 1);
 }
 
+/**
+ * Whether `upper` (whichever of the pair sits *nearer the hub*) visibly
+ * crosses `lower` (nearer the group's own tiles). Every edge in the group
+ * shares one starting line (the tiles' own shared edge) and one ending
+ * line (the hub's own edge), with only its own lane's position in between
+ * differing — so `lower`'s own reach from the shared tile line out to its
+ * (farther-out) lane necessarily passes *through* the nearer lane too,
+ * including `upper`'s, crossing it whenever that reach's fixed position
+ * (`lower.fromX`, `lower`'s own attach point on the shared tile line) falls
+ * inside `upper`'s own span; symmetrically, `upper`'s own final reach from
+ * its lane in to the hub passes through every lane nearer the tiles than
+ * it, including `lower`'s, crossing it whenever that reach's fixed
+ * position (`upper.toX`, `upper`'s own attach point on the hub) falls
+ * inside `lower`'s own span. Either one alone is a crossing a viewer
+ * actually sees.
+ *
+ * Verified against a hand-worked crossing before trusting this formula —
+ * a naive first draft had `upper`/`lower`'s roles swapped and reported
+ * *no* crossing for a pair already confirmed (by tracing the geometry by
+ * hand) to cross; only this version reproduces that known result. Purely
+ * about which end of the pair sits closer to the hub, not about a
+ * pre-assigned lane index (this runs *before* lane indices exist, to
+ * decide what they should be) — and axis-agnostic: a column passes y
+ * values through these x-named fields, a row passes x.
+ */
+export function lanesCross(upper: { fromX: number; toX: number }, lower: { fromX: number; toX: number }): boolean {
+  const upperLo = Math.min(upper.fromX, upper.toX);
+  const upperHi = Math.max(upper.fromX, upper.toX);
+  const lowerLo = Math.min(lower.fromX, lower.toX);
+  const lowerHi = Math.max(lower.fromX, lower.toX);
+  const upperReachCrossesLower = upper.fromX >= lowerLo && upper.fromX <= lowerHi;
+  const lowerReachCrossesUpper = lower.toX >= upperLo && lower.toX <= upperHi;
+  return upperReachCrossesLower || lowerReachCrossesUpper;
+}
+
+/**
+ * Refines a lane order (widest-span-first is a reasonable starting point,
+ * but not itself crossing-aware) with bounded adjacent-swap passes — the
+ * "layered crossing reduction" technique the Sugiyama framework uses for
+ * this exact class of problem. Swapping two *adjacent* lanes only ever
+ * changes whether that one pair crosses — every other pair's relative
+ * order, and therefore its own crossing status, is untouched — so a pass
+ * that swaps only when doing so turns a real crossing into a clean one
+ * (never the reverse) strictly reduces the total count and never worsens
+ * it. A fixed point is reached deterministically within `n` passes (the
+ * standard bubble-sort bound); a pair that crosses either way (a genuine,
+ * unavoidable crossing between two interleaved edges) is left in its
+ * span-order position.
+ */
+export function minimizeLaneCrossings<T>(ordered: readonly T[], pointOf: (item: T) => { fromX: number; toX: number }): T[] {
+  const order = [...ordered];
+  let pass = 0;
+  while (pass < order.length) {
+    let swapped = false;
+    for (let i = 0; i < order.length - 1; i += 1) {
+      const a = order[i];
+      const b = order[i + 1];
+      if (a === undefined || b === undefined) continue;
+      const pa = pointOf(a);
+      const pb = pointOf(b);
+      if (lanesCross(pa, pb) && !lanesCross(pb, pa)) {
+        order[i] = b;
+        order[i + 1] = a;
+        swapped = true;
+      }
+    }
+    if (!swapped) break;
+    pass += 1;
+  }
+  return order;
+}
+
 /** Which band (0 = nearest the hub) the tile at `position` in a group's own internal-then-external order falls in — a further band every `MAX_PER_BAND` entries. */
 export function bandIndexOf(position: number): number {
   return Math.floor(position / MAX_PER_BAND);
@@ -301,6 +373,34 @@ function flattenGroupEdges(placed: readonly PlacedTile[], edgesByNeighbour: Read
 }
 
 /**
+ * Lane order for a group's own edges, index 0 always meaning "nearest the
+ * hub" — every call site below builds its own lane coordinate so that k=0
+ * is nearest the hub, specifically so this one index means the same thing
+ * everywhere. Widest span (`|hubPos - neighbourPos|`) gets index 0, refined
+ * by `minimizeLaneCrossings` — v1's own row engine's "widest span nearest
+ * the hub" convention, reused here (the function is axis-agnostic; a
+ * column passes y values through its `fromX`/`toX` fields, a row passes
+ * x).
+ *
+ * Deliberately decoupled from hub-port order, which stays in neighbour-
+ * stacking order (a neighbour's own visual position) — tying both to the
+ * same raw index leaves one edge's own tile-to-lane reach crossing
+ * another's lane-to-hub run whenever the group has more than a couple of
+ * differently-positioned neighbours, even though a crossing-free lane
+ * order exists (hand-verified against a 4-neighbour column: ordered by
+ * raw stacking position it crosses at least once; this ordering doesn't,
+ * for the same 4 neighbours — checked exhaustively across every pair, not
+ * just the one crossing pair that motivated the fix).
+ */
+function laneIndexById(pairs: readonly { id: UUID; neighbourPos: number; hubPos: number }[]): Map<UUID, number> {
+  const bySpan = [...pairs].sort((a, b) => Math.abs(b.hubPos - b.neighbourPos) - Math.abs(a.hubPos - a.neighbourPos) || compareIds(a.id, b.id));
+  const refined = minimizeLaneCrossings(bySpan, (p) => ({ fromX: p.neighbourPos, toX: p.hubPos }));
+  const map = new Map<UUID, number>();
+  refined.forEach((p, i) => map.set(p.id, i));
+  return map;
+}
+
+/**
  * A source/target column: `sign` is `-1` (left, source) or `+1` (right,
  * target). Tiles stack down the group's own y axis (`placeGroup`),
  * vertically centred on the hub's own vertical span; a tile's own band
@@ -337,14 +437,26 @@ function layoutColumn(sign: -1 | 1, internalIds: readonly UUID[], externalIds: r
 
   const flat = flattenGroupEdges(placed, edgesByNeighbour);
   const laneCount = flat.length;
-  const edges: RoutedEdge[] = flat.map((edge, k) => {
+  // Hub-port order stays in neighbour-stacking order (`k`) — a neighbour's
+  // own visual position, so the topmost source's edge lands on the hub's
+  // own topmost port. Lane order is a *separate* ranking (`laneIndexById`'s
+  // own comment) — computed from each edge's own (neighbourPortY, hubPortY)
+  // pair, so it can differ from `k` whenever that avoids a crossing.
+  const ports = flat.map((edge, k) => {
     const tile = tileAt.get(edge.neighbourId);
-    if (!tile) return null;
     const siblings = [...(edgesByNeighbour.get(edge.neighbourId) ?? [])].sort((a, b) => compareIds(a.id, b.id));
     const slot = Math.max(0, siblings.findIndex((s) => s.id === edge.id));
-    const neighbourPortY = spreadAlong(tile.y, NODE_HEIGHT, slot, siblings.length);
+    const neighbourPortY = tile ? spreadAlong(tile.y, NODE_HEIGHT, slot, siblings.length) : 0;
     const hubPortY = spreadAlong(hub.y, hub.h, k, laneCount);
-    const laneX = sign === -1 ? hub.x - gap + spreadAlong(0, gap, k, laneCount) : hub.x + hub.w + spreadAlong(0, gap, k, laneCount);
+    return { edge, tile, slot, siblingCount: siblings.length, neighbourPortY, hubPortY };
+  });
+  const laneIndex = laneIndexById(ports.map((p) => ({ id: p.edge.id, neighbourPos: p.neighbourPortY, hubPos: p.hubPortY })));
+
+  const edges: RoutedEdge[] = ports.map(({ edge, tile, slot, neighbourPortY, hubPortY }) => {
+    if (!tile) return null;
+    const k = laneIndex.get(edge.id) ?? 0;
+    // k=0 nearest the hub on both sides — `laneIndexById`'s own comment on why that has to be consistent across every call site.
+    const laneX = sign === -1 ? hub.x - spreadAlong(0, gap, k, laneCount) : hub.x + hub.w + spreadAlong(0, gap, k, laneCount);
     const neighbourAnchor: Point = { x: sign === -1 ? tile.x + tile.w : tile.x, y: neighbourPortY };
     const hubAnchor: Point = { x: sign === -1 ? hub.x : hub.x + hub.w, y: hubPortY };
     // Centred at least half of `COLUMN_LABEL_MAX_WIDTH` past the tile's own edge, so even a full-width pill clears the tile — `gap`'s own sizing above gives this (and the matching clearance from the hub, and from a sibling slot) room.
@@ -391,13 +503,22 @@ function layoutRow(sign: -1 | 1, internalIds: readonly UUID[], externalIds: read
 
   const flat = flattenGroupEdges(placed, edgesByNeighbour);
   const laneCount = flat.length;
-  const edges: RoutedEdge[] = flat.map((edge, k) => {
+  // Hub-port order stays in neighbour-stacking order (`k`); lane order is a
+  // separate, crossing-aware ranking — `layoutColumn`'s own comment on
+  // `laneIndexById` explains why (same fix, x and y swapped).
+  const ports = flat.map((edge, k) => {
     const tile = tileAt.get(edge.neighbourId);
-    if (!tile) return null;
     const siblings = [...(edgesByNeighbour.get(edge.neighbourId) ?? [])].sort((a, b) => compareIds(a.id, b.id));
     const slot = Math.max(0, siblings.findIndex((s) => s.id === edge.id));
-    const neighbourPortX = spreadAlong(tile.x, NODE_WIDTH, slot, siblings.length);
+    const neighbourPortX = tile ? spreadAlong(tile.x, NODE_WIDTH, slot, siblings.length) : 0;
     const hubPortX = spreadAlong(hub.x, hub.w, k, laneCount);
+    return { edge, tile, slot, neighbourPortX, hubPortX };
+  });
+  const laneIndex = laneIndexById(ports.map((p) => ({ id: p.edge.id, neighbourPos: p.neighbourPortX, hubPos: p.hubPortX })));
+
+  const edges: RoutedEdge[] = ports.map(({ edge, tile, slot, neighbourPortX, hubPortX }) => {
+    if (!tile) return null;
+    const k = laneIndex.get(edge.id) ?? 0;
     const laneY = sign === -1 ? hub.y - spreadAlong(0, GAP_HUB_TB, k, laneCount) : hub.y + hub.h + spreadAlong(0, GAP_HUB_TB, k, laneCount);
     const neighbourAnchor: Point = { x: neighbourPortX, y: sign === -1 ? tile.y + tile.h : tile.y };
     const hubAnchor: Point = { x: hubPortX, y: sign === -1 ? hub.y : hub.y + hub.h };
