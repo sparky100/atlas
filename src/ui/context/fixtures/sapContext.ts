@@ -1,10 +1,13 @@
 /**
  * The standing test fixture for the Context diagram: a real-density
  * scenario, not a synthetic two-neighbour one — SAP PM (Asset Maintenance),
- * one of SAP's own modules, with four internal neighbours carrying one to
- * two flows each, and one external organisation auditing it directly (so
- * the boundary, the external band and a real multi-edge fan are all
- * exercised together).
+ * one of SAP's own modules, with its real 8 neighbours and 12 relationships
+ * (Context layout v2's own test fixture, matched to the real page this
+ * layout was designed against): 3 source-direction neighbours, 4
+ * target-direction, and exactly one two-way pair (Field Service, dispatch
+ * out / completion in) — so the ring layout's source/target columns, the
+ * bidirectional-merge case, and (Informatica, an external SaaS vendor) the
+ * boundary are all exercised together in one fixture.
  *
  * V3 ("container context pages, platform context simplified to structure
  * only") moved the Context diagram's own crowding case from the platform
@@ -31,7 +34,7 @@
  * than inventing a smaller case in a test.
  */
 import type { UUID } from '../../../contracts/delta';
-import type { ContextEdgeInput } from '../contextDiagramLayout';
+import type { ContextEdgeInput, ContextNeighbourInput } from '../contextDiagramLayout';
 
 export interface ScenarioModule {
   code: string;
@@ -76,7 +79,15 @@ export interface ContainerContextScenario {
   neighbours: ScenarioNeighbour[];
 }
 
-/** SAP PM's own real neighbours — the Context diagram's density case, moved down to a single module's own page (V3). Every flow here named PM directly in the pre-V3 combined diagram this fixture originally modelled; nothing invented. */
+/**
+ * SAP PM's own real 8 neighbours, 12 relationships — the Context diagram's
+ * density case, moved down to a single module's own page (V3), then
+ * expanded to the real page's own full neighbour set for Context layout
+ * v2 (the 5-neighbour set this replaced only ever modelled a subset).
+ * Exactly one two-way pair (`field-service`) by design — v2's own
+ * bidirectional-merge case — every other neighbour is single-direction,
+ * some with more than one flow the same way.
+ */
 export const PM_CONTEXT_SCENARIO: ContainerContextScenario = {
   hubModuleCode: 'PM',
   neighbours: [
@@ -88,13 +99,30 @@ export const PM_CONTEXT_SCENARIO: ContainerContextScenario = {
       flows: [{ relationshipType: 'flows_to', direction: 'in', verb: 'publishes as-built drawings to' }],
     },
     {
-      key: 'escoms',
-      name: 'ESCOMS',
+      key: 'crm',
+      name: 'CRM',
       elementType: 'system',
       isExternal: false,
       flows: [
-        { relationshipType: 'flows_to', direction: 'out', verb: 'issues planned outage work orders to' },
-        { relationshipType: 'flows_to', direction: 'in', verb: 'reports fault and switching events to' },
+        { relationshipType: 'uses', direction: 'in', verb: 'raises customer fault reports to' },
+        { relationshipType: 'uses', direction: 'in', verb: 'requests asset location lookups from' },
+      ],
+    },
+    {
+      key: 'narms',
+      name: 'NARMS',
+      elementType: 'system',
+      isExternal: false,
+      flows: [{ relationshipType: 'flows_to', direction: 'in', verb: 'reports network asset risk scores to' }],
+    },
+    {
+      key: 'enterprise',
+      name: 'Enterprise',
+      elementType: 'system',
+      isExternal: false,
+      flows: [
+        { relationshipType: 'uses', direction: 'out', verb: 'posts maintenance cost actuals to' },
+        { relationshipType: 'uses', direction: 'out', verb: 'synchronises asset hierarchy to' },
       ],
     },
     {
@@ -103,9 +131,24 @@ export const PM_CONTEXT_SCENARIO: ContainerContextScenario = {
       elementType: 'system',
       isExternal: false,
       flows: [
-        { relationshipType: 'flows_to', direction: 'out', verb: 'sends maintenance outage requests to' },
-        { relationshipType: 'flows_to', direction: 'in', verb: 'returns switching schedules and completion to' },
+        { relationshipType: 'flows_to', direction: 'out', verb: 'sends planned maintenance outage requests to' },
+        { relationshipType: 'flows_to', direction: 'out', verb: 'sends emergency switching escalations to' },
       ],
+    },
+    {
+      key: 'rhythm',
+      name: 'RHYTHM',
+      elementType: 'system',
+      isExternal: false,
+      flows: [{ relationshipType: 'flows_to', direction: 'out', verb: 'sends planned maintenance schedules to' }],
+    },
+    {
+      key: 'informatica',
+      name: 'Informatica',
+      elementType: 'system',
+      isExternal: true,
+      externalOrganisation: 'Informatica',
+      flows: [{ relationshipType: 'flows_to', direction: 'out', verb: 'streams asset and work order data to' }],
     },
     {
       key: 'field-service',
@@ -116,14 +159,6 @@ export const PM_CONTEXT_SCENARIO: ContainerContextScenario = {
         { relationshipType: 'flows_to', direction: 'out', verb: 'dispatches work orders to' },
         { relationshipType: 'flows_to', direction: 'in', verb: 'returns job completion and timesheets to' },
       ],
-    },
-    {
-      key: 'ofgem',
-      name: 'Ofgem',
-      elementType: 'actor',
-      isExternal: true,
-      externalOrganisation: 'Ofgem',
-      flows: [{ relationshipType: 'uses', direction: 'in', verb: 'audits maintenance compliance for' }],
     },
   ],
 };
@@ -136,22 +171,20 @@ export function scenarioEdgeLabel(flow: ScenarioFlow): string {
 
 export interface ScenarioLayoutInputs {
   hubId: UUID;
-  internal: UUID[];
-  external: UUID[];
+  neighbours: ContextNeighbourInput[];
   edges: ContextEdgeInput[];
 }
 
-/** The scenario as `computeContextDiagramLayout` inputs, with stable, readable ids (`pm`, `gdt`, `escoms`…) — no database, no randomness. */
+/** The scenario as `computeContextDiagramLayout` inputs, with stable, readable ids (`pm`, `gdt`, `crm`…) — no database, no randomness. */
 export function scenarioLayoutInputs(scenario: ContainerContextScenario = PM_CONTEXT_SCENARIO): ScenarioLayoutInputs {
   const hubId = scenario.hubModuleCode.toLowerCase();
-  const internal: UUID[] = [];
-  const external: UUID[] = [];
+  const neighbours: ContextNeighbourInput[] = [];
   const edges: ContextEdgeInput[] = [];
   for (const neighbour of scenario.neighbours) {
-    (neighbour.isExternal ? external : internal).push(neighbour.key);
+    neighbours.push({ id: neighbour.key, isExternal: neighbour.isExternal, isActor: neighbour.elementType === 'actor' });
     neighbour.flows.forEach((flow, i) => {
       edges.push({ id: `${neighbour.key}-${String(i)}`, neighbourId: neighbour.key, arrowAtHub: flow.direction === 'in', label: scenarioEdgeLabel(flow) });
     });
   }
-  return { hubId, internal, external, edges };
+  return { hubId, neighbours, edges };
 }

@@ -16,26 +16,6 @@
   gap: var(--space-2);
 }
 
-/**
- * Sprint U4-2b item 12: the header's own "Supports:"/"Owned by:" lines —
- * renamed from the old `.owners` (which only ever held the one line) now
- * that it holds up to two.
- */
-.headerSummary {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin-bottom: var(--space-6);
-}
-
-/** V1 polish, "header collapses to a one-line summary when the diagram renders": one row, truncated rather than wrapping — the canvas below is the real content once it's mounted. */
-.headerSummaryCollapsed {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: var(--space-4);
-}
-
 /** V1: the diagram/mobile-list body — a flex column so the canvas (itself `flex: 1`, `ContextDiagramCanvas.module.css`) can grow to fill whatever height `ViewPage.module.css`'s `.mainWithView` leaves it, same shape the landscape's own canvas row uses. */
 .diagram {
   display: flex;

@@ -9,14 +9,17 @@ import { quantizeScale, wheelZoomFactor } from '../landscape/zoom';
 import { NODE_WIDTH } from '../landscape/layout';
 import {
   allTilesOf,
+  BOUNDARY_MARGIN,
   computeContextDiagramLayout,
   edgeLabelsCollide,
   edgeNear,
   placeEdgeLabels,
   type ContextDiagramLayout,
   type ContextEdgeInput,
+  type ContextNeighbourInput,
   type DiagramTile,
   type EdgeLabelPill,
+  type Point,
 } from './contextDiagramLayout';
 import { edgeLabel, type ContextGroup } from './contextGrouping';
 import styles from './ContextDiagramCanvas.module.css';
@@ -227,16 +230,15 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
     return result;
   }, [group]);
 
+  /** V2's own grouping input (module comment on `classifyNeighbourGroup`) — direction comes from `edgeInputs` above, `isActor`/`isExternal` from the element itself. */
+  const neighbourInputs = useMemo<ContextNeighbourInput[]>(
+    () => [...group.internal, ...group.external].map((n) => ({ id: n.element.element_id, isExternal: attributesRecord(n.element.attributes).isExternal === true, isActor: n.element.element_type === 'actor' })),
+    [group],
+  );
+
   const layout = useMemo<ContextDiagramLayout>(
-    () =>
-      computeContextDiagramLayout(
-        group.hub.element_id,
-        group.internal.map((n) => n.element.element_id),
-        group.external.map((n) => n.element.element_id),
-        layoutWidthHint,
-        edgeInputs,
-      ),
-    [group, layoutWidthHint, edgeInputs],
+    () => computeContextDiagramLayout(group.hub.element_id, neighbourInputs, layoutWidthHint, edgeInputs),
+    [group.hub.element_id, neighbourInputs, layoutWidthHint, edgeInputs],
   );
 
   const labelById = useMemo(() => new Map(layout.edges.map((e) => [e.id, e.label])), [layout]);
@@ -295,19 +297,20 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
 
       const showLabels = zoomShowsText;
 
-      // The dotted enterprise boundary — around the hub and internal neighbours only, drawn first so tiles/edges layer on top.
-      if (layout.boundary.bottom > layout.boundary.top) {
+      // The dotted enterprise boundary — around the hub and internal neighbours only, drawn first so tiles/edges layer on top. V2: a bounding box now that neighbours surround the hub on four sides rather than sitting in one row below it; `null` when the hub has no internal neighbour at all.
+      if (layout.boundary) {
+        const b = layout.boundary;
         ctx.save();
         ctx.strokeStyle = tokens.borderStrong;
         ctx.lineWidth = 1.5;
         ctx.setLineDash([6, 4]);
-        roundRectPath(ctx, 8, layout.boundary.top - 8, layout.width - 16, layout.boundary.bottom - layout.boundary.top + 16, 12);
+        roundRectPath(ctx, b.left - BOUNDARY_MARGIN, b.top - BOUNDARY_MARGIN, b.right - b.left + BOUNDARY_MARGIN * 2, b.bottom - b.top + BOUNDARY_MARGIN * 2, 12);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.restore();
       }
 
-      // Rework item 2: every edge is an axis-aligned polyline from the layout — its own lane, its own attach points. The hovered edge draws last and heavier so it reads on top of its neighbours.
+      // Every edge is an axis-aligned polyline from the layout — its own lane, its own attach points. The hovered edge draws last and heavier so it reads on top of its neighbours.
       const drawEdge = (edge: (typeof layout.edges)[number], highlighted: boolean): void => {
         ctx.save();
         ctx.strokeStyle = highlighted ? tokens.text : tokens.borderStrong;
@@ -321,20 +324,31 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
         ctx.stroke();
         ctx.restore();
 
-        // One arrowhead, at the target only (UI-principles §9) — both ends are vertical runs into a tile's top/bottom edge, so no angle computation.
-        const targetAnchor = edge.arrowAtHub ? edge.hubAnchor : edge.neighbourAnchor;
-        const arrowSign = edge.arrowAtHub ? -1 : 1; // up into the hub, or down into the neighbour
-        ctx.save();
-        ctx.translate(targetAnchor.x, targetAnchor.y);
-        ctx.rotate(arrowSign > 0 ? Math.PI / 2 : -Math.PI / 2);
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(-8, -4);
-        ctx.lineTo(-8, 4);
-        ctx.closePath();
-        ctx.fillStyle = highlighted ? tokens.text : tokens.borderStrong;
-        ctx.fill();
-        ctx.restore();
+        // An arrowhead at whichever end(s) carry one (UI-principles §9's
+        // "target only" for a normal edge; a merged bidirectional pair,
+        // V2's own rework item 3, gets one at both ends). A group's own
+        // final segment can now run in any of the four axis-aligned
+        // directions (left/right groups end horizontally, above/below
+        // groups end vertically), so the angle comes from the actual
+        // adjacent segment rather than being assumed vertical.
+        const drawArrowhead = (target: Point, from: Point): void => {
+          const angle = Math.atan2(target.y - from.y, target.x - from.x);
+          ctx.save();
+          ctx.translate(target.x, target.y);
+          ctx.rotate(angle);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(-8, -4);
+          ctx.lineTo(-8, 4);
+          ctx.closePath();
+          ctx.fillStyle = highlighted ? tokens.text : tokens.borderStrong;
+          ctx.fill();
+          ctx.restore();
+        };
+        const beforeLast = edge.points[edge.points.length - 2] ?? edge.neighbourAnchor;
+        const afterFirst = edge.points[1] ?? edge.hubAnchor;
+        if (edge.arrowAtHub) drawArrowhead(edge.hubAnchor, beforeLast);
+        if (!edge.arrowAtHub || edge.arrowAtNeighbour) drawArrowhead(edge.neighbourAnchor, afterFirst);
       };
       for (const edge of layout.edges) if (edge.id !== hoveredEdgeId) drawEdge(edge, false);
       const hoveredEdge = layout.edges.find((e) => e.id === hoveredEdgeId);
@@ -373,8 +387,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
       };
 
       drawTile(layout.hub, true);
-      for (const tile of layout.internalNeighbours) drawTile(tile, false);
-      for (const tile of layout.externalNeighbours) drawTile(tile, false);
+      for (const tile of layout.neighbours) drawTile(tile, false);
 
       ctx.restore();
 
@@ -557,6 +570,14 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
       data-edge-labels={edgeLabelsVisible ? 'visible' : 'hidden'}
       data-edge-labels-collide={labelsWouldCollide ? 'true' : 'false'}
       data-focused-element-id={focusedElementId ?? ''}
+      // Context layout v2, rework item 3: the number of *routed* edges — a
+      // two-way neighbour's own opposing pair merges into one, so this is
+      // lower than the raw relationship count whenever a bidirectional pair
+      // exists. Canvas pixels aren't Playwright-inspectable (this
+      // component's own module comment); this count is, and is the one
+      // DOM-observable proof a merge actually happened rather than drawing
+      // two separately routed lines.
+      data-edge-count={layout.edges.length}
     >
       <canvas
         ref={canvasRef}

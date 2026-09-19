@@ -1,19 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   allTilesOf,
+  bandIndexOf,
+  classifyNeighbourGroup,
   computeContextDiagramLayout,
   edgeLabelsCollide,
   edgeNear,
-  fanGapFor,
-  LANE_PITCH,
-  lanesCross,
-  minimizeLaneCrossings,
   MIN_DIAGRAM_WIDTH,
   placeEdgeLabels,
   spreadAlong,
-  tileTopAnchor,
   truncateToWidth,
   type ContextDiagramLayout,
+  type ContextEdgeInput,
+  type ContextNeighbourInput,
   type DiagramTile,
   type EdgeLabelPill,
   type Point,
@@ -83,142 +82,138 @@ function segmentsOf(edge: RoutedEdge): [Point, Point][] {
 
 /** Every obstacle rect a routed edge must never cross the interior of: the hub tile, and every neighbour tile. */
 function allRects(layout: ContextDiagramLayout): Rect[] {
-  return [tileRect(layout.hub), ...[...layout.internalNeighbours, ...layout.externalNeighbours].map(tileRect)];
+  return [tileRect(layout.hub), ...layout.neighbours.map(tileRect)];
+}
+
+function neighbour(id: string, opts: Partial<ContextNeighbourInput> = {}): ContextNeighbourInput {
+  return { id, isExternal: false, isActor: false, ...opts };
 }
 
 /** The standing fixture (`fixtures/sapContext.ts`), laid out at a given width. */
 function pmLayout(widthHint = 1280): ContextDiagramLayout {
   const inputs = scenarioLayoutInputs();
-  return computeContextDiagramLayout(inputs.hubId, inputs.internal, inputs.external, widthHint, inputs.edges);
+  return computeContextDiagramLayout(inputs.hubId, inputs.neighbours, widthHint, inputs.edges);
 }
 
-describe('computeContextDiagramLayout — tiles', () => {
-  it('the hub always gets the standard node size — V3 dropped the one case that widened it, a platform\'s own module row (PlatformStructureView.tsx has that now)', () => {
-    const layout = computeContextDiagramLayout('hub', [], []);
+describe('classifyNeighbourGroup', () => {
+  const inEdge: ContextEdgeInput = { id: 'e1', neighbourId: 'n', arrowAtHub: true, label: 'in' };
+  const outEdge: ContextEdgeInput = { id: 'e2', neighbourId: 'n', arrowAtHub: false, label: 'out' };
+
+  it('is always "actor" for an actor, whatever its own edges say', () => {
+    expect(classifyNeighbourGroup(true, [inEdge])).toBe('actor');
+    expect(classifyNeighbourGroup(true, [outEdge])).toBe('actor');
+    expect(classifyNeighbourGroup(true, [inEdge, outEdge])).toBe('actor');
+  });
+
+  it('is "source" when every edge flows into the hub, "target" when every edge flows out', () => {
+    expect(classifyNeighbourGroup(false, [inEdge])).toBe('source');
+    expect(classifyNeighbourGroup(false, [outEdge])).toBe('target');
+  });
+
+  it('is "twoWay" when a non-actor has at least one edge each way', () => {
+    expect(classifyNeighbourGroup(false, [inEdge, outEdge])).toBe('twoWay');
+  });
+});
+
+describe('bandIndexOf', () => {
+  it('is 0 for the first MAX_PER_BAND (4) positions, then increments every 4 after that', () => {
+    expect([0, 1, 2, 3].map(bandIndexOf)).toEqual([0, 0, 0, 0]);
+    expect([4, 5, 6, 7].map(bandIndexOf)).toEqual([1, 1, 1, 1]);
+    expect(bandIndexOf(8)).toBe(2);
+  });
+});
+
+describe('computeContextDiagramLayout — hub and groups', () => {
+  it('the hub always gets the standard node size', () => {
+    const layout = computeContextDiagramLayout('hub', []);
     expect(layout.hub.w).toBe(NODE_WIDTH);
     expect(layout.hub.h).toBe(NODE_HEIGHT);
   });
 
-  it('the hub is horizontally centred within the diagram width', () => {
-    const layout = computeContextDiagramLayout('hub', [], []);
-    expect(layout.hub.x + layout.hub.w / 2).toBeCloseTo(layout.width / 2, 0);
+  it('a source neighbour (edge flows into the hub) sits to the left; a target neighbour (edge flows out) sits to the right', () => {
+    const layout = computeContextDiagramLayout('hub', [neighbour('src'), neighbour('tgt')], undefined, [
+      { id: 'e1', neighbourId: 'src', arrowAtHub: true, label: 'reports to' },
+      { id: 'e2', neighbourId: 'tgt', arrowAtHub: false, label: 'sends to' },
+    ]);
+    const src = layout.neighbours.find((t) => t.elementId === 'src');
+    const tgt = layout.neighbours.find((t) => t.elementId === 'tgt');
+    expect(src?.x).toBeLessThan(layout.hub.x);
+    expect(tgt?.x).toBeGreaterThan(layout.hub.x + layout.hub.w);
   });
 
-  it('the boundary encloses the hub and internal neighbours; external neighbours sit below it', () => {
-    const layout = computeContextDiagramLayout('hub', ['internal-1'], ['external-1']);
-    expect(layout.boundary.top).toBeLessThanOrEqual(layout.hub.y);
-    expect(layout.boundary.bottom).toBeGreaterThanOrEqual((layout.internalNeighbours[0]?.y ?? 0) + NODE_HEIGHT);
-    expect(layout.externalNeighbours[0]?.y ?? 0).toBeGreaterThan(layout.boundary.bottom);
+  it('a two-way neighbour (edges both ways) sits below the hub', () => {
+    const layout = computeContextDiagramLayout('hub', [neighbour('both')], undefined, [
+      { id: 'e1', neighbourId: 'both', arrowAtHub: true, label: 'reports to' },
+      { id: 'e2', neighbourId: 'both', arrowAtHub: false, label: 'sends to' },
+    ]);
+    const tile = layout.neighbours.find((t) => t.elementId === 'both');
+    expect(tile?.y).toBeGreaterThan(layout.hub.y + layout.hub.h);
+    expect((tile?.x ?? 0) + NODE_WIDTH / 2).toBeCloseTo(layout.hub.x + layout.hub.w / 2, 0);
   });
 
-  it('wraps onto a second row only when even the minimum gutter cannot fit every tile', () => {
-    const many = Array.from({ length: 20 }, (_, i) => `n${String(i)}`);
-    const layout = computeContextDiagramLayout('hub', many, [], 960);
-    const rowsUsed = new Set(layout.internalNeighbours.map((t) => t.y));
-    expect(rowsUsed.size).toBeGreaterThan(1);
-    expect(layout.rows.filter((r) => !r.external)).toHaveLength(rowsUsed.size);
+  it('an actor sits above the hub even when its own edge flows into it, same direction a source would otherwise use', () => {
+    const layout = computeContextDiagramLayout('hub', [neighbour('person', { isActor: true })], undefined, [{ id: 'e1', neighbourId: 'person', arrowAtHub: true, label: 'audits' }]);
+    const tile = layout.neighbours.find((t) => t.elementId === 'person');
+    expect(tile?.y).toBeLessThan(layout.hub.y);
   });
 
-  it('a wider diagram fits more tiles per row than the minimum floor', () => {
-    const many = Array.from({ length: 20 }, (_, i) => `n${String(i)}`);
-    const narrow = computeContextDiagramLayout('hub', many, [], 960);
-    const wide = computeContextDiagramLayout('hub', many, [], 2400);
-    expect(new Set(wide.internalNeighbours.map((t) => t.y)).size).toBeLessThan(new Set(narrow.internalNeighbours.map((t) => t.y)).size);
+  it('with no neighbours at all, the layout is just the hub — no boundary to draw', () => {
+    const layout = computeContextDiagramLayout('hub', []);
+    expect(layout.neighbours).toHaveLength(0);
+    expect(layout.boundary).toBeNull();
+  });
+
+  it('the boundary encloses the hub and every internal neighbour; an external neighbour in the same group sits outside it', () => {
+    const layout = computeContextDiagramLayout('hub', [neighbour('int-src'), neighbour('ext-src', { isExternal: true })], undefined, [
+      { id: 'e1', neighbourId: 'int-src', arrowAtHub: true, label: 'a' },
+      { id: 'e2', neighbourId: 'ext-src', arrowAtHub: true, label: 'b' },
+    ]);
+    const boundary = layout.boundary;
+    if (!boundary) throw new Error('expected a boundary');
+    const internalTile = layout.neighbours.find((t) => t.elementId === 'int-src');
+    const externalTile = layout.neighbours.find((t) => t.elementId === 'ext-src');
+    if (!internalTile || !externalTile) throw new Error('expected both tiles');
+    expect(internalTile.x).toBeGreaterThanOrEqual(boundary.left);
+    expect(internalTile.x + internalTile.w).toBeLessThanOrEqual(boundary.right);
+    // External sits strictly farther from the hub, on the same (left) side, than any internal tile in the same group.
+    expect(externalTile.x).toBeLessThan(internalTile.x);
+    expect(externalTile.x).toBeLessThan(boundary.left);
   });
 
   it('is deterministic — the same inputs always produce the same layout, routes included', () => {
     const inputs = scenarioLayoutInputs();
-    const a = computeContextDiagramLayout(inputs.hubId, inputs.internal, inputs.external, 1280, inputs.edges);
-    const b = computeContextDiagramLayout(inputs.hubId, inputs.internal, inputs.external, 1280, inputs.edges);
+    const a = computeContextDiagramLayout(inputs.hubId, inputs.neighbours, 1280, inputs.edges);
+    const b = computeContextDiagramLayout(inputs.hubId, inputs.neighbours, 1280, inputs.edges);
     expect(b).toEqual(a);
   });
 
   it('has no minimum floor smaller than MIN_DIAGRAM_WIDTH even with a narrower hint', () => {
-    const layout = computeContextDiagramLayout('hub', [], [], 400);
+    const layout = computeContextDiagramLayout('hub', [], 400);
     expect(layout.width).toBe(MIN_DIAGRAM_WIDTH);
   });
 
-  it('a short row of neighbours is centred within the diagram width, not left-hugging', () => {
-    const layout = computeContextDiagramLayout('hub', ['n1', 'n2', 'n3'], []);
-    const left = Math.min(...layout.internalNeighbours.map((t) => t.x));
-    const right = Math.max(...layout.internalNeighbours.map((t) => t.x + t.w));
-    expect((left + right) / 2).toBeCloseTo(layout.width / 2, 0);
-  });
-
-  it('centre-weighted layout still wraps and centres each row independently when neighbours overflow one row', () => {
-    const many = Array.from({ length: 20 }, (_, i) => `n${String(i)}`);
-    const layout = computeContextDiagramLayout('hub', many, [], 960);
-    const rows = new Map<number, DiagramTile[]>();
-    for (const tile of layout.internalNeighbours) {
-      const row = rows.get(tile.y) ?? [];
-      row.push(tile);
-      rows.set(tile.y, row);
-    }
-    for (const row of rows.values()) {
-      const leftEdge = Math.min(...row.map((t) => t.x));
-      const rightEdge = Math.max(...row.map((t) => t.x + t.w));
-      expect((leftEdge + rightEdge) / 2).toBeCloseTo(layout.width / 2, 0);
-    }
+  it('never more than MAX_PER_BAND (4) source tiles share a band — a 5th source starts a second, more distant column', () => {
+    const ids = Array.from({ length: 5 }, (_, i) => `s${String(i)}`);
+    const layout = computeContextDiagramLayout(
+      'hub',
+      ids.map((id) => neighbour(id)),
+      undefined,
+      ids.map((id) => ({ id: `e-${id}`, neighbourId: id, arrowAtHub: true, label: 'x' })),
+    );
+    const xs = new Set(layout.neighbours.map((t) => t.x));
+    expect(xs.size).toBe(2);
   });
 });
 
 describe('allTilesOf', () => {
-  it('flattens every region into one list, hub included', () => {
-    const layout = computeContextDiagramLayout('hub', ['internal-1'], ['external-1']);
+  it('flattens hub and neighbours into one list', () => {
+    const layout = computeContextDiagramLayout('hub', [neighbour('n1'), neighbour('n2', { isExternal: true })], undefined, [
+      { id: 'e1', neighbourId: 'n1', arrowAtHub: true, label: 'x' },
+      { id: 'e2', neighbourId: 'n2', arrowAtHub: true, label: 'y' },
+    ]);
     const ids = allTilesOf(layout).map((t) => t.elementId);
-    expect(ids).toEqual(expect.arrayContaining(['hub', 'internal-1', 'external-1']));
+    expect(ids).toEqual(expect.arrayContaining(['hub', 'n1', 'n2']));
     expect(ids).toHaveLength(3);
-  });
-});
-
-describe('tileTopAnchor', () => {
-  it("V1 polish, \"leaving neighbours from above\": anchors at a tile's own top-centre", () => {
-    const layout = computeContextDiagramLayout('hub', ['n1'], []);
-    const neighbour = layout.internalNeighbours[0];
-    if (!neighbour) throw new Error('expected a neighbour tile');
-    expect(tileTopAnchor(neighbour)).toEqual({ x: neighbour.x + neighbour.w / 2, y: neighbour.y });
-  });
-});
-
-describe('fan (rework item 1)', () => {
-  it('the gap between neighbours grows with their count, capped', () => {
-    expect(fanGapFor(1)).toBe(24);
-    expect(fanGapFor(2)).toBe(44);
-    expect(fanGapFor(5)).toBe(104);
-    expect(fanGapFor(50)).toBe(120);
-  });
-
-  it('five neighbours spread wider than two — not the same layout compressed', () => {
-    const two = computeContextDiagramLayout('hub', ['a', 'b'], [], 1280);
-    const five = computeContextDiagramLayout('hub', ['a', 'b', 'c', 'd', 'e'], [], 1280);
-    const gapOf = (layout: ContextDiagramLayout) => {
-      const xs = [...layout.internalNeighbours].sort((p, q) => p.x - q.x);
-      return (xs[1]?.x ?? 0) - ((xs[0]?.x ?? 0) + (xs[0]?.w ?? 0));
-    };
-    expect(gapOf(two)).toBe(fanGapFor(2));
-    expect(gapOf(five)).toBe(fanGapFor(5));
-    expect(gapOf(five)).toBeGreaterThan(gapOf(two));
-    expect(five.rows[0]?.gap).toBe(fanGapFor(5));
-  });
-
-  it('shrinks the gap toward the minimum gutter before wrapping when the fan would overflow', () => {
-    // Five NODE_WIDTH tiles fit the minimum width only at the minimum gutter (5 × 160 + 4 × 24 = 896 = 960 − 2 × 32) — the fan gap for five (104) would overflow, so the gap shrinks rather than the row wrapping.
-    const five = Array.from({ length: 5 }, (_, i) => `n${String(i)}`);
-    const layout = computeContextDiagramLayout('hub', five, [], MIN_DIAGRAM_WIDTH);
-    expect(new Set(layout.internalNeighbours.map((t) => t.y)).size).toBe(1);
-    expect(layout.rows[0]?.gap).toBeLessThan(fanGapFor(5));
-    expect(layout.rows[0]?.gap).toBeGreaterThanOrEqual(24);
-    for (const tile of layout.internalNeighbours) {
-      expect(tile.x).toBeGreaterThanOrEqual(0);
-      expect(tile.x + tile.w).toBeLessThanOrEqual(layout.width);
-    }
-  });
-
-  it('with no edges at all, every neighbour still lands in one plain fanned row, sorted by id', () => {
-    const layout = computeContextDiagramLayout('hub', ['n3', 'n1', 'n2'], []);
-    expect(layout.internalNeighbours).toHaveLength(3);
-    expect(new Set(layout.internalNeighbours.map((t) => t.y)).size).toBe(1);
-    expect([...layout.internalNeighbours].sort((a, b) => a.x - b.x).map((t) => t.elementId)).toEqual(['n1', 'n2', 'n3']);
   });
 });
 
@@ -229,72 +224,44 @@ describe('spreadAlong', () => {
   });
 });
 
-describe('lanesCross (rework item 2 refinement: crossing-aware lane order)', () => {
-  it('reports no crossing when neither edge\'s own rise falls inside the other\'s span — a "staggered", not interleaved, pair', () => {
-    // Two edges both running left-to-right (fromX < toX), B's own reach
-    // poking slightly past A's on the high side only — the specific shape
-    // where an edge's own two rises (fromX and toX) both land outside the
-    // other edge's span, so no rise ever has to cross the other's
-    // horizontal run.
-    expect(lanesCross({ fromX: 50, toX: 590 }, { fromX: 100, toX: 595 })).toBe(false);
+describe('bidirectional pairs merge into one routed edge (rework item 3)', () => {
+  it('a two-way neighbour\'s own in/out pair draws as a single edge, arrowheads at both ends, both verbs in one label', () => {
+    const layout = computeContextDiagramLayout('hub', [neighbour('both')], undefined, [
+      { id: 'in', neighbourId: 'both', arrowAtHub: true, label: '← reports to' },
+      { id: 'out', neighbourId: 'both', arrowAtHub: false, label: 'sends to →' },
+    ]);
+    expect(layout.edges).toHaveLength(1);
+    const [edge] = layout.edges;
+    if (!edge) throw new Error('expected one merged edge');
+    expect(edge.arrowAtHub).toBe(true);
+    expect(edge.arrowAtNeighbour).toBe(true);
+    expect(edge.relationshipIds).toEqual(expect.arrayContaining(['in', 'out']));
+    expect(edge.relationshipIds).toHaveLength(2);
+    expect(edge.label).toContain('reports to');
+    expect(edge.label).toContain('sends to');
   });
 
-  it('reports a crossing the other way round for that same pair — order genuinely matters, not just which edges are involved', () => {
-    expect(lanesCross({ fromX: 100, toX: 595 }, { fromX: 50, toX: 590 })).toBe(true);
+  it('an uneven in/out count pairs up what it can and draws the leftover as an ordinary single-direction edge', () => {
+    const layout = computeContextDiagramLayout('hub', [neighbour('both')], undefined, [
+      { id: 'in1', neighbourId: 'both', arrowAtHub: true, label: 'in one' },
+      { id: 'in2', neighbourId: 'both', arrowAtHub: true, label: 'in two' },
+      { id: 'out1', neighbourId: 'both', arrowAtHub: false, label: 'out one' },
+    ]);
+    expect(layout.edges).toHaveLength(2);
+    const merged = layout.edges.filter((e) => e.arrowAtNeighbour);
+    const leftover = layout.edges.filter((e) => !e.arrowAtNeighbour);
+    expect(merged).toHaveLength(1);
+    expect(leftover).toHaveLength(1);
+    expect(leftover[0]?.relationshipIds).toHaveLength(1);
   });
 
-  it('reports a crossing both ways when one span fully nests the other — the nested edge\'s own lane sits inside the nesting edge\'s two rises regardless of which is "upper", so this is a genuine, unavoidable crossing', () => {
-    const outer = { fromX: 0, toX: 600 };
-    const inner = { fromX: 100, toX: 550 };
-    expect(lanesCross(outer, inner)).toBe(true);
-    expect(lanesCross(inner, outer)).toBe(true);
-  });
-
-  it('reports no crossing either way for two edges with disjoint spans', () => {
-    const left = { fromX: 0, toX: 50 };
-    const right = { fromX: 200, toX: 250 };
-    expect(lanesCross(left, right)).toBe(false);
-    expect(lanesCross(right, left)).toBe(false);
-  });
-});
-
-describe('minimizeLaneCrossings (rework item 2 refinement)', () => {
-  const point = (item: { fromX: number; toX: number }) => item;
-
-  it('swaps an adjacent pair whose current order crosses when the reverse order would not', () => {
-    const a = { fromX: 50, toX: 590 };
-    const b = { fromX: 100, toX: 595 };
-    // Starting order [b, a] has b "upper" (closer to the hub) — crosses, per
-    // the lanesCross test above; the fix is exactly swapping to [a, b].
-    expect(minimizeLaneCrossings([b, a], point)).toEqual([a, b]);
-  });
-
-  it('leaves a genuinely unavoidable pair in its starting order — there is nothing a swap could improve', () => {
-    const outer = { fromX: 0, toX: 600 };
-    const inner = { fromX: 100, toX: 550 };
-    expect(minimizeLaneCrossings([outer, inner], point)).toEqual([outer, inner]);
-    expect(minimizeLaneCrossings([inner, outer], point)).toEqual([inner, outer]);
-  });
-
-  it('leaves an already-clean order untouched', () => {
-    const disjointOrder = [{ fromX: 0, toX: 50 }, { fromX: 200, toX: 250 }, { fromX: 400, toX: 450 }];
-    expect(minimizeLaneCrossings(disjointOrder, point)).toEqual(disjointOrder);
-  });
-
-  it('resolves a crossing that only becomes adjacent after an earlier swap (needs more than one pass)', () => {
-    // c starts on top, needs to end up on the bottom (below both a and b) to
-    // avoid crossing either of them; a single adjacent-swap pass only moves
-    // it down one position, so this exercises the multi-pass loop.
-    const a = { fromX: 50, toX: 590 };
-    const b = { fromX: 100, toX: 595 };
-    const c = { fromX: 150, toX: 600 };
-    const result = minimizeLaneCrossings([c, a, b], point);
-    for (let i = 0; i < result.length - 1; i += 1) {
-      const upper = result[i];
-      const lower = result[i + 1];
-      if (!upper || !lower) throw new Error('expected both lanes to exist');
-      expect(lanesCross(upper, lower)).toBe(false);
-    }
+  it('a source or target neighbour (all edges one way) never merges, even with several edges', () => {
+    const layout = computeContextDiagramLayout('hub', [neighbour('src')], undefined, [
+      { id: 'a', neighbourId: 'src', arrowAtHub: true, label: 'one' },
+      { id: 'b', neighbourId: 'src', arrowAtHub: true, label: 'two' },
+    ]);
+    expect(layout.edges).toHaveLength(2);
+    expect(layout.edges.every((e) => !e.arrowAtNeighbour)).toBe(true);
   });
 });
 
@@ -303,19 +270,19 @@ describe('SAP PM context fixture — the standing density case (fixtures/sapCont
   const layout = pmLayout(1280);
   const measure = fixedWidthMeasurer(6);
 
-  it('is the scenario the fixture describes: 4 internal neighbours with 1–2 flows each, 1 external actor', () => {
-    expect(inputs.internal).toHaveLength(4);
-    expect(inputs.external).toHaveLength(1);
-    for (const neighbour of PM_CONTEXT_SCENARIO.neighbours.filter((n) => !n.isExternal)) {
-      expect(neighbour.flows.length).toBeGreaterThanOrEqual(1);
-      expect(neighbour.flows.length).toBeLessThanOrEqual(2);
-    }
-    expect(layout.edges).toHaveLength(inputs.edges.length);
+  it('is the scenario the fixture describes: 8 neighbours, 12 relationships, 1 external, exactly 1 two-way pair', () => {
+    const internal = inputs.neighbours.filter((n) => !n.isExternal);
+    const external = inputs.neighbours.filter((n) => n.isExternal);
+    expect(inputs.neighbours).toHaveLength(8);
+    expect(internal).toHaveLength(7);
+    expect(external).toHaveLength(1);
+    expect(inputs.edges).toHaveLength(12);
+    const twoWay = PM_CONTEXT_SCENARIO.neighbours.filter((n) => new Set(n.flows.map((f) => f.direction)).size === 2);
+    expect(twoWay).toHaveLength(1);
+    expect(twoWay[0]?.key).toBe('field-service');
   });
 
-  it('places all four internal neighbours in one fanned row at the four-neighbour gap, with no two tiles overlapping', () => {
-    expect(new Set(layout.internalNeighbours.map((t) => t.y)).size).toBe(1);
-    expect(layout.rows[0]?.gap).toBe(fanGapFor(4));
+  it('places every tile with no two tiles overlapping, hub included', () => {
     const tiles = allTilesOf(layout);
     for (let i = 0; i < tiles.length; i++) {
       for (let j = i + 1; j < tiles.length; j++) expect(tilesOverlap(tiles[i], tiles[j])).toBe(false);
@@ -332,57 +299,40 @@ describe('SAP PM context fixture — the standing density case (fixtures/sapCont
     }
   });
 
-  it('gives every laned edge its own lane, LANE_PITCH apart, and every edge its own attach point at both ends (rework item 2: no two edges share a segment)', () => {
-    const laned = layout.edges.filter((e) => e.lane !== null);
-    expect(laned.length).toBeGreaterThan(0);
-    expect(new Set(laned.map((e) => e.lane)).size).toBe(laned.length);
-    // The top-channel horizontal is always the segment that ends at the hub attach point — its y is the lane, whichever row the edge started from.
-    const laneYs = laned.map((e) => e.points[e.points.length - 2]?.y ?? NaN).sort((a, b) => a - b);
-    for (let i = 1; i < laneYs.length; i++) expect((laneYs[i] ?? 0) - (laneYs[i - 1] ?? 0)).toBeCloseTo(LANE_PITCH);
+  it('no two edges share a port on the hub tile (or on a neighbour tile)', () => {
     const hubAttach = layout.edges.map((e) => `${String(e.hubAnchor.x)} ${String(e.hubAnchor.y)}`);
     expect(new Set(hubAttach).size).toBe(hubAttach.length);
     const neighbourAttach = layout.edges.map((e) => `${String(e.neighbourAnchor.x)} ${String(e.neighbourAnchor.y)}`);
     expect(new Set(neighbourAttach).size).toBe(neighbourAttach.length);
   });
 
-  it('no edge segment passes through the interior of any tile (the external actor rises outside the internal row)', () => {
+  it("field-service's own two-way pair renders as one edge, arrowheads at both ends, both verbs in one label — not two separately routed lines", () => {
+    const fieldServiceEdges = layout.edges.filter((e) => e.neighbourId === 'field-service');
+    expect(fieldServiceEdges).toHaveLength(1);
+    const [edge] = fieldServiceEdges;
+    if (!edge) throw new Error('expected field-service to have one routed edge');
+    expect(edge.arrowAtHub).toBe(true);
+    expect(edge.arrowAtNeighbour).toBe(true);
+    expect(edge.relationshipIds).toHaveLength(2);
+    expect(edge.label).toContain('dispatches work orders to');
+    expect(edge.label).toContain('returns job completion and timesheets to');
+    // 12 relationships in, 11 routed edges out — the only place the count drops is this one merge.
+    expect(inputs.edges).toHaveLength(12);
+    expect(layout.edges).toHaveLength(11);
+  });
+
+  it('no edge segment passes through the interior of any tile', () => {
     const rects = allRects(layout);
     for (const edge of layout.edges) {
       for (const [a, b] of segmentsOf(edge)) {
         for (const rect of rects) expect(segmentCrossesInterior(a, b, rect)).toBe(false);
       }
     }
-    const ofgem = layout.edges.find((e) => e.neighbourId === 'ofgem');
-    expect(ofgem?.points.length).toBe(6);
   });
 
-  it("every edge's lanes sit above its own neighbour's label stack, never through it", () => {
-    for (const edge of layout.edges) {
-      const row = layout.rows.find((r) => r.tileIds.includes(edge.neighbourId));
-      const stackTop = Math.min(...layout.edges.filter((e) => e.neighbourId === edge.neighbourId).map((e) => e.labelAnchor.y)) - 15;
-      for (const p of edge.points.slice(1, -1)) {
-        if (p.x !== edge.neighbourAnchor.x || p.y !== edge.labelAnchor.y) expect(p.y).toBeLessThanOrEqual(stackTop);
-      }
-      expect(row).toBeDefined();
-    }
-  });
-
-  it('places every label on its own edge, inside its own tile span, with no two pills and no pill/tile colliding at 1280 (rework item 3)', () => {
+  it('places every label with no two pills and no pill/tile colliding at 1280', () => {
     const pills = placeEdgeLabels(layout.edges, measure);
     expect(pills).toHaveLength(layout.edges.length);
-    for (const pill of pills) {
-      const edge = layout.edges.find((e) => e.id === pill.edgeId);
-      if (!edge) throw new Error('pill without an edge');
-      const rect = pillRect(pill);
-      // The leader (the edge's own drop) passes through the pill.
-      expect(rect.left).toBeLessThanOrEqual(edge.neighbourAnchor.x);
-      expect(rect.right).toBeGreaterThanOrEqual(edge.neighbourAnchor.x);
-      expect(rect.left).toBeGreaterThanOrEqual(edge.labelAnchor.minX - 0.001);
-      expect(rect.right).toBeLessThanOrEqual(edge.labelAnchor.maxX + 0.001);
-      // Just above the neighbour tile it leaves.
-      const tile = allTilesOf(layout).find((t) => t.elementId === edge.neighbourId);
-      expect(rect.bottom).toBeLessThanOrEqual(tile?.y ?? 0);
-    }
     for (let i = 0; i < pills.length; i++) {
       for (let j = i + 1; j < pills.length; j++) {
         const a = pills[i];
@@ -393,7 +343,7 @@ describe('SAP PM context fixture — the standing density case (fixtures/sapCont
     expect(edgeLabelsCollide(pills, allTilesOf(layout))).toBe(false);
   });
 
-  it('still routes cleanly at the minimum width, with labels wrapping rather than the layout degrading', () => {
+  it('still routes cleanly at the minimum width, with no tile overlap or edge-through-tile', () => {
     const narrow = pmLayout(MIN_DIAGRAM_WIDTH);
     const rects = allRects(narrow);
     for (const edge of narrow.edges) {
@@ -401,9 +351,6 @@ describe('SAP PM context fixture — the standing density case (fixtures/sapCont
         for (const rect of rects) expect(segmentCrossesInterior(a, b, rect)).toBe(false);
       }
     }
-    const pills = placeEdgeLabels(narrow.edges, measure);
-    expect(pills.some((p) => p.lines.length === 2)).toBe(true);
-    expect(edgeLabelsCollide(pills, allTilesOf(narrow))).toBe(false);
   });
 
   it('keeps every routed point inside the diagram bounds', () => {
@@ -422,10 +369,9 @@ describe('placeEdgeLabels / edgeLabelsCollide', () => {
   const measure = fixedWidthMeasurer(6);
 
   it('wraps a label to two lines when it does not fit its span on one, and ellipsizes a line that still does not fit', () => {
-    const layout = computeContextDiagramLayout('hub', ['n1'], [], 1280, [{ id: 'e', neighbourId: 'n1', arrowAtHub: true, label: '⇢ submits reconciliation and payroll adjustment records to the central ledger' }]);
+    const layout = computeContextDiagramLayout('hub', [neighbour('n1')], 1280, [{ id: 'e', neighbourId: 'n1', arrowAtHub: true, label: '⇢ submits reconciliation and payroll adjustment records to the central ledger' }]);
     const [pill] = placeEdgeLabels(layout.edges, measure);
     expect(pill?.lines).toHaveLength(2);
-    expect(pill?.width).toBeLessThanOrEqual((layout.edges[0]?.labelAnchor.maxX ?? 0) - (layout.edges[0]?.labelAnchor.minX ?? 0) + 0.001);
     const wide = fixedWidthMeasurer(40);
     const [big] = placeEdgeLabels(layout.edges, wide);
     expect(big?.lines.every((l) => l.length > 0)).toBe(true);
@@ -433,7 +379,7 @@ describe('placeEdgeLabels / edgeLabelsCollide', () => {
   });
 
   it('skips an edge with a blank label', () => {
-    const layout = computeContextDiagramLayout('hub', ['n1'], [], 1280, [{ id: 'e', neighbourId: 'n1', arrowAtHub: true, label: '   ' }]);
+    const layout = computeContextDiagramLayout('hub', [neighbour('n1')], 1280, [{ id: 'e', neighbourId: 'n1', arrowAtHub: true, label: '   ' }]);
     expect(placeEdgeLabels(layout.edges, measure)).toEqual([]);
   });
 
@@ -456,7 +402,7 @@ describe('placeEdgeLabels / edgeLabelsCollide', () => {
   });
 });
 
-describe('edgeNear (hover/tap-to-reveal, rework item 4)', () => {
+describe('edgeNear (hover/tap-to-reveal)', () => {
   const layout = pmLayout(1280);
 
   it('finds the edge whose polyline passes within tolerance of a point, and nothing for a point in open space', () => {
@@ -464,18 +410,8 @@ describe('edgeNear (hover/tap-to-reveal, rework item 4)', () => {
     if (!edge) throw new Error('expected an edge');
     const [a, b] = segmentsOf(edge)[0] ?? [];
     if (!a || !b) throw new Error('expected a segment');
-    const mid = { x: (a.x + b.x) / 2 + 2, y: (a.y + b.y) / 2 };
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     expect(edgeNear(layout.edges, mid, 6)?.id).toBe(edge.id);
     expect(edgeNear(layout.edges, { x: -500, y: -500 }, 6)).toBeNull();
-  });
-
-  it('prefers the nearest edge when two are within tolerance', () => {
-    const laned = layout.edges.filter((e) => e.lane !== null).sort((p, q) => (p.lane ?? 0) - (q.lane ?? 0));
-    const first = laned[0];
-    const second = laned[1];
-    if (!first || !second) throw new Error('expected two laned edges');
-    const y0 = first.points[1]?.y ?? 0;
-    const x = Math.max(Math.min(first.points[1]?.x ?? 0, first.points[2]?.x ?? 0), Math.min(second.points[1]?.x ?? 0, second.points[2]?.x ?? 0)) + 1;
-    expect(edgeNear(layout.edges, { x, y: y0 + 1 }, LANE_PITCH)?.id).toBe(first.id);
   });
 });

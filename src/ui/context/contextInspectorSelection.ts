@@ -16,7 +16,7 @@
 import type { UUID } from '../../contracts/delta';
 import type { ContextGroup, ContextNeighbour } from './contextGrouping';
 
-/** The focused neighbour (internal or external) named by `focusedElementId`, or `null` when nothing's focused, the id doesn't name a neighbour of this hub, or (a fresh page load, a reload after an edit) the neighbour it used to name is simply gone. Never the hub itself — `ContextDiagramCanvasProps`'s own `focusedElementId` doc comment explains why the hub never enters focus at all. */
+/** The focused neighbour (internal or external) named by `focusedElementId`, or `null` when nothing's focused, the id names the hub itself, or (a fresh page load, a reload after an edit) the neighbour it used to name is simply gone. Always `null` for the hub's own id — a click on the hub tile still navigates rather than focusing it (`ContextDiagramCanvasProps`'s own `focusedElementId` doc comment) — `ContextInspectorContent.tsx`'s own caller treats every `null` result here as "show the hub instead" (V2 item 5), not as "show nothing". */
 export function contextInspectorFocusedNeighbour(focusedElementId: UUID | null, group: ContextGroup): ContextNeighbour | null {
   if (focusedElementId === null) return null;
   return [...group.internal, ...group.external].find((n) => n.element.element_id === focusedElementId) ?? null;

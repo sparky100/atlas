@@ -50,8 +50,8 @@ test('context inspector: clicking a neighbour tile focuses it (Selection/Connect
   const canvas = page.locator('canvas');
   await expect(page.getByRole('img', { name: /Context diagram: Core Billing and 1 connected/ })).toBeVisible({ timeout: 30_000 });
 
-  const layout = computeContextDiagramLayout(hubId, [neighbourId], [], undefined, [{ id: 'edge', neighbourId, arrowAtHub: true, label: '← reads billing records from' }]);
-  const neighbourTile = layout.internalNeighbours.find((t) => t.elementId === neighbourId);
+  const layout = computeContextDiagramLayout(hubId, [{ id: neighbourId, isExternal: false, isActor: false }], undefined, [{ id: 'edge', neighbourId, arrowAtHub: true, label: '← reads billing records from' }]);
+  const neighbourTile = layout.neighbours.find((t) => t.elementId === neighbourId);
   if (!neighbourTile) throw new Error('computeContextDiagramLayout did not place the seeded neighbour');
   const wrapper = page.locator('[data-scale]');
   const scale = Number(await wrapper.getAttribute('data-scale'));
@@ -60,19 +60,29 @@ test('context inspector: clicking a neighbour tile focuses it (Selection/Connect
   const screenOf = (tile: { x: number; y: number }) => ({ x: (tile.x + NODE_WIDTH / 2) * scale + tx, y: (tile.y + NODE_HEIGHT / 2) * scale + ty });
   const neighbourScreen = screenOf(neighbourTile);
 
-  // Nothing focused yet — the Inspector's own empty state.
+  // Nothing clicked yet — V2 item 5: the Inspector defaults to the hub
+  // itself, not an empty state, and has no "Clear" (there's nothing to
+  // clear back to — the hub view is the default).
   const inspector = page.getByRole('complementary', { name: 'Inspector' });
-  await expect(inspector.getByText('Nothing focused.')).toBeVisible();
+  await expect(inspector.getByText('Core Billing', { exact: true })).toBeVisible();
+  await expect(inspector.getByRole('button', { name: 'Clear' })).toHaveCount(0);
 
-  // First click: focuses, no navigation.
+  // First click: focuses the neighbour, no navigation.
   await canvas.click({ position: neighbourScreen });
   await expect(wrapper).toHaveAttribute('data-focused-element-id', neighbourId);
   await expect(page).toHaveURL(new RegExp(`/context/${hubId}$`));
   await expect(inspector.getByText('Payment Gateway', { exact: true })).toBeVisible();
   await expect(inspector.getByText(/reads billing records from/)).toBeVisible();
 
-  // Second click on the already-focused tile: navigates (Payment Gateway
-  // is a system, so this drills into its own Context page).
+  // Clearing the neighbour focus returns the Inspector to the hub default,
+  // not to an empty state.
+  await inspector.getByRole('button', { name: 'Clear' }).click();
+  await expect(inspector.getByText('Core Billing', { exact: true })).toBeVisible();
+  await expect(inspector.getByText('Payment Gateway', { exact: true })).toHaveCount(0);
+
+  // Re-focus, then a second click on the already-focused tile: navigates
+  // (Payment Gateway is a system, so this drills into its own Context page).
+  await canvas.click({ position: neighbourScreen });
   await canvas.click({ position: neighbourScreen });
   await expect(page).toHaveURL(new RegExp(`/context/${neighbourId}`));
 });

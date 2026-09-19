@@ -1,4 +1,3 @@
-import type { ReactElement } from 'react';
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import type { ElementVersionDiff, VersionDiff } from '../../engine/versionDiff';
@@ -14,19 +13,6 @@ import { ContextDiagramCanvas } from './ContextDiagramCanvas';
 import { ContextMobileList } from './ContextMobileList';
 import type { ContextGroup } from './contextGrouping';
 import styles from './ContextView.module.css';
-
-// Prompt 7k item 2: "Business owner: Housing · Technical owner: IT
-// Operations" — a fixed, deterministic role order (not alphabetical: reads
-// business-first, the same priority `elementBrowse.ts`'s own owner-column
-// preference gives it), each rendered only when at least one owner holds
-// it. A role this product doesn't know about (shouldn't happen — `OwnsRole`
-// is a closed union — but this reads plain strings off stored data) falls
-// back to the raw value, capitalised, rather than being silently dropped.
-const OWNS_ROLE_ORDER = ['business', 'technical', 'service'] as const;
-function ownsRoleLabel(role: string): string {
-  const known: Record<string, string> = { business: 'Business', technical: 'Technical', service: 'Service' };
-  return known[role] ?? role.charAt(0).toUpperCase() + role.slice(1);
-}
 
 export interface ContextViewProps {
   group: ContextGroup;
@@ -65,10 +51,12 @@ const MOBILE_BREAKPOINT_PX = 768;
  * carry are gone — every neighbour/flow rendering below now only ever
  * handles one hub's own relationships, never a nested module's.
  *
- * The hub block's own "Supports: ..."/"Owned by: ..." header lines
- * (`.headerSummary` below) are kept exactly as V1's own wording asks
- * ("Header keeps Supports ... and Owned by") — real header content, never
- * a diagram node or a drawn edge, same as before this sprint.
+ * V2 (Context layout v2, item 5): the header's own "Supports: ..."/
+ * "Owned by: ..." lines are gone — that's Inspector content now
+ * (`ContextInspectorContent.tsx`'s own hub-as-default-selection case), not
+ * a permanent line competing with the canvas for space. The hub title row
+ * below (name, glyph, external chip, diff badge, "Containers →") stays;
+ * only the summary lines moved.
  *
  * No diff highlighting on the canvas/mobile body — V1 doesn't ask for it,
  * unlike the landscape, and this view's own diff support stays scoped to
@@ -82,65 +70,6 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null, 
   const hubExternal = attributesRecord(group.hub.attributes).isExternal === true;
   const diffById = new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []);
   const hubDiff = diffById.get(group.hub.element_id);
-  // S1 item 11a — see the "Owned by" line's own comment below.
-  const internalOwners = group.owners.filter((o) => !o.isExternal);
-  const externalOwners = group.owners.filter((o) => o.isExternal);
-  // V1 polish, "header collapses to a one-line summary when the diagram
-  // renders": the same condition that decides whether the diagram body
-  // mounts below (`(group.internal.length > 0 || group.external.length >
-  // 0)`) — once the diagram is taking up real canvas space, the header
-  // doesn't also need three separate paragraphs' worth of the same facts;
-  // one compact line, still linking every name, does. The empty-state case
-  // (no diagram at all) keeps the fuller, multi-line summary unchanged —
-  // there's no canvas competing for space there.
-  const hasDiagram = group.internal.length > 0 || group.external.length > 0;
-
-  const supportsDirectPart =
-    group.supports.length > 0 ? (
-      <>
-        Supports:{' '}
-        {group.supports.map((s, i) => (
-          <span key={s.capability.element_id}>
-            {i > 0 && ', '}
-            <Link to={elementHref(s.capability.element_id)}>{s.capability.name}</Link>
-          </span>
-        ))}
-      </>
-    ) : null;
-
-  const ownersPart =
-    group.owners.length > 0 ? (
-      <>
-        {OWNS_ROLE_ORDER.filter((role) => internalOwners.some((o) => o.role === role)).map((role, groupIndex) => (
-          <span key={role}>
-            {groupIndex > 0 && ' · '}
-            {ownsRoleLabel(role)} owner:{' '}
-            {internalOwners
-              .filter((o) => o.role === role)
-              .map((owner, i) => (
-                <span key={owner.actor.element_id}>
-                  {i > 0 && ', '}
-                  <Link to={elementHref(owner.actor.element_id)}>{owner.actor.name}</Link>
-                </span>
-              ))}
-          </span>
-        ))}
-        {externalOwners.length > 0 && (
-          <span>
-            {internalOwners.length > 0 && ' · '}
-            External:{' '}
-            {externalOwners.map((owner, i) => (
-              <span key={owner.actor.element_id}>
-                {i > 0 && ', '}
-                <Link to={elementHref(owner.actor.element_id)}>{owner.externalOrganisation ?? owner.actor.name}</Link>
-              </span>
-            ))}
-          </span>
-        )}
-      </>
-    ) : null;
-
-  const collapsedSummaryParts = [supportsDirectPart, ownersPart].filter((p): p is ReactElement => p !== null);
 
   return (
     <div>
@@ -162,50 +91,6 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null, 
           </LinkButton>
         )}
       </div>
-
-      {(group.supports.length > 0 || group.owners.length > 0) &&
-        (hasDiagram ? (
-          // V1 polish: one compact line once the diagram is rendering
-          // below — same content as the fuller block, just not competing
-          // with the canvas for vertical space.
-          <Text as="p" tone="muted" size="sm" className={styles.headerSummaryCollapsed}>
-            {collapsedSummaryParts.map((part, i) => (
-              <span key={i}>
-                {i > 0 && ' · '}
-                {part}
-              </span>
-            ))}
-          </Text>
-        ) : (
-          <div className={styles.headerSummary}>
-            {/* Item 12: "Supports: <capabilities, primary first>", each one a
-                link — computeContextGroup already sorted the list; this just
-                renders it, and the capability's own element page is the link
-                target (the same page every other Context/element-page link in
-                this view already points at). */}
-            {supportsDirectPart && (
-              <Text as="p" tone="muted" size="sm">
-                {supportsDirectPart}
-              </Text>
-            )}
-            {ownersPart && (
-              <Text as="p" tone="muted" size="sm">
-                {/* Prompt 7k item 2: grouped by role ("Business owner: Housing
-                    · Technical owner: IT Operations"), not a single flat
-                    "Owned by:" list — computeContextGroup already sorted
-                    `owners` by role, so within each role group the actors are
-                    already in the right order too. S1 item 11a: only ever
-                    *internal* owners here — an external owner can only ever
-                    hold role "service" (C20, src/engine/deltas.ts), and is
-                    split into its own trailing "External:" clause below
-                    instead, naming the organisation rather than folding it
-                    in as one more "Service owner" name indistinguishable
-                    from an internal one. */}
-                {ownersPart}
-              </Text>
-            )}
-          </div>
-        ))}
 
       {group.internal.length === 0 && group.external.length === 0 && group.owners.length === 0 && (
         <div>

@@ -4,9 +4,9 @@
  * density fixture) into a real model, on top of
  * `bootstrapChangeBranchFixture`'s freshly signed-up owner: SAP as a
  * platform with its eight modules and their capabilities (the
- * platform-structure page's own fixture), and PM's own four internal
- * neighbours with one to two flows each plus one external organisation
- * actor (the Context diagram's own density fixture, now scoped to a single
+ * platform-structure page's own fixture), and PM's own real 8 neighbours
+ * and 12 relationships, one external system, exactly one two-way pair
+ * (the Context diagram's own density fixture, now scoped to a single
  * module's own page — V3). One `manual` commit through the real
  * `commitToBranch` path, so the seeded head is exactly what a person would
  * have built by hand.

@@ -1,22 +1,28 @@
 /**
- * Sprint U4-2b item 12: "Header shows 'Supports: <capabilities, primary
- * first>' and 'Owned by: <team>' with links; empty state reads 'No
- * connections to other systems or actors yet' with the add link." Also
- * the sprint's own combined Playwright line: "context header for a system
- * with supports but no uses." Prompt 7k item 2 relabels the owner line by
- * role ("Business owner: <team>" etc, `ContextView.tsx`'s own comment) —
- * this test's fixture owns edge and assertion are updated to match, the
- * underlying "owned-by is a header line, not a drawn edge" behaviour this
- * item originally built is otherwise unchanged.
+ * Sprint U4-2b item 12: "Shows 'Supports: <capabilities, primary first>'
+ * and 'Owned by: <team>' with links; empty state reads 'No connections to
+ * other systems or actors yet' with the add link." Prompt 7k item 2
+ * relabels the owner line by role ("Business owner: <team>" etc).
+ *
+ * Context layout v2, item 5: this content used to be a permanent header
+ * line above the canvas (`ContextView.tsx`'s own `.headerSummary`); it's
+ * now the Inspector's own default view of the hub (`ContextInspectorContent.tsx`'s
+ * `HubFacts`), shown whenever nothing else is focused — which is the state
+ * every assertion below checks, since none of these tests click anything.
+ * The underlying "supports/owned-by is a fact about the hub, not a drawn
+ * edge" behaviour this item originally built is unchanged, just relocated;
+ * `page.getByText(...)` finds the text wherever it renders, so the
+ * assertions themselves didn't need to change, only this comment and the
+ * test titles below.
  *
  * Two systems in one fixture: one supports two capabilities (primary
  * second, to prove sort order isn't insertion order) and is owned by a
  * team, with no uses/flows_to edges at all — the exact "supports but no
- * uses" scenario, which should show both header lines *and* the empty
- * state together (src/ui/context/ContextView.tsx's own module comment:
- * the empty state is about system/actor connections specifically, not
- * about supports). The other has no relationships of any kind, to prove
- * the header lines are correctly absent when there's nothing to show.
+ * uses" scenario, which should show both lines *and* the empty state
+ * together (the empty state is about system/actor connections
+ * specifically, not about supports). The other has no relationships of
+ * any kind, to prove the lines are correctly absent when there's nothing
+ * to show.
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
@@ -28,7 +34,7 @@ import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
 
-test('context header: a system with supports but no uses shows "Supports:" (primary first) and "Owned by:", both linked, alongside the no-connections empty state', async ({ page }) => {
+test('context inspector default view: a system with supports but no uses shows "Supports:" (primary first) and "Owned by:", both linked, alongside the no-connections empty state', async ({ page }) => {
   const env = loadEnv();
 
   const email = `context-header-${randomUUID()}@example.test`;
@@ -87,7 +93,8 @@ test('context header: a system with supports but no uses shows "Supports:" (prim
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/context/${systemId}?ref=main`);
   await expect(page.getByRole('heading', { name: 'Billing Service' })).toBeVisible();
 
-  // "Supports:", primary (Zeta) first, both linked.
+  // "Supports:", primary (Zeta) first, both linked — the Inspector's
+  // default hub view, nothing clicked yet.
   const supportsLine = page.getByText('Supports:', { exact: false });
   await expect(supportsLine).toBeVisible();
   const zetaLink = supportsLine.getByRole('link', { name: 'Zeta Capability' });
@@ -114,7 +121,7 @@ test('context header: a system with supports but no uses shows "Supports:" (prim
   await expect(page.getByRole('heading', { name: 'Zeta Capability' })).toBeVisible();
 });
 
-test('context header: a system with no relationships at all shows neither "Supports:" nor "Owned by:"', async ({ page }) => {
+test('context inspector default view: a system with no relationships at all shows neither "Supports:" nor "Owned by:"', async ({ page }) => {
   const env = loadEnv();
 
   const email = `context-header-empty-${randomUUID()}@example.test`;
