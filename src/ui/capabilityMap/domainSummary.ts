@@ -28,3 +28,17 @@ export function domainCoverageSegments(subtreeCapabilityIds: readonly UUID[], su
 export function domainCoverageSummary(supportedCount: number, totalCount: number): string {
   return `${String(supportedCount)} of ${String(totalCount)} capabilit${totalCount === 1 ? 'y has' : 'ies have'} a supporting system`;
 }
+
+/**
+ * "11 systems" / "1 system" / "no systems" — the collapsed domain row's own
+ * plain count of distinct supporting systems across its subtree
+ * (`rollup.supportingSystemIds.length`), its own visual zone. Fixes a
+ * density-pass bug: the row's middle bullet used to be
+ * `aggregateTileColourFor`'s own coverage-mode label ("capabilities
+ * supported" / "no capabilities supported"), a fixed phrase that restates
+ * the coverage fraction's zero/non-zero state in words rather than showing
+ * any value of its own — this is the real number that phrase displaced.
+ */
+export function domainSystemsCountText(count: number): string {
+  return count === 0 ? 'no systems' : `${String(count)} system${count === 1 ? '' : 's'}`;
+}

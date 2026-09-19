@@ -106,18 +106,21 @@ test('capability rollup: the same "1 system, 1/7 supported" rollup appears on th
   await expect(directorTile.getByText('1 system', { exact: false })).toBeVisible();
   await expect(directorTile.getByText('1/7 supported')).toBeVisible();
 
-  // 2) Capability map, desktop.
+  // 2) Capability map (capability map density redesign: the domain row's
+  // own coverage sentence and supporting-system count are both always
+  // visible, collapsed or not — no expand needed to see the rollup).
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await expect(page.getByText('Digital Services', { exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: '1 system →' })).toBeVisible();
-  await expect(page.getByText('1/7 supported')).toBeVisible();
+  await expect(page.getByText('1 of 7 capabilities have a supporting system')).toBeVisible();
+  await expect(page.getByText('1 system', { exact: true })).toBeVisible();
 
-  // 3) Capability map, mobile accordion (<768px) — same page, narrower
-  // viewport, same precedent as e2e/capability-map-mobile-accordion.engine.spec.ts.
+  // 3) Same page, narrower viewport (<768px) — one accordion model at
+  // every width post-redesign, not a separate mobile layout.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await expect(page.getByText('Digital Services', { exact: true })).toBeVisible();
-  await expect(page.getByText('6 capabilities · 1 system · 1/7 supported')).toBeVisible();
+  await expect(page.getByText('1 of 7 capabilities have a supporting system')).toBeVisible();
+  await expect(page.getByText('1 system', { exact: true })).toBeVisible();
 
   // 4) Capability-scoped landscape (`/landscape?capability=`).
   await page.setViewportSize({ width: 1280, height: 900 });

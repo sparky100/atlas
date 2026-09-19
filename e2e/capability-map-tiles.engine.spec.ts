@@ -92,12 +92,14 @@ test('capability map cards: the name link navigates, a plain-text tone indicator
   await expect(page.getByText('Housing', { exact: true })).toBeVisible();
 
   // Colour-by on: the row's own indicator needs a real mode selected to
-  // have anything to check.
-  await page.getByLabel('Colour by').selectOption({ label: 'Coverage (supporting-system count)' });
-  // The indicator states the tone in words, not the count — the count
-  // itself is `LandscapeZoomLink`'s own "1 system →" text, checked
-  // separately below; repeating it here used to duplicate it on screen.
-  await expect(page.getByText('supporting systems')).toBeVisible();
+  // have anything to check. Not Coverage: a bug-fix follow-up removed that
+  // one mode's own indicator on cards entirely — its label only ever
+  // restated the "→ Landscape" count's zero/non-zero state in words
+  // ("supporting systems"/"no supporting systems"), never a value of its
+  // own, so it had nothing left to click once fixed. Oldest lifecycle
+  // stage's own label is the stage name itself, a real, distinct fact.
+  await page.getByLabel('Colour by').selectOption({ label: 'Oldest lifecycle stage' });
+  await expect(page.getByText('active', { exact: true })).toBeVisible();
 
   // "Plain-text name, no underline": the primary link is the capability's
   // own name, and it's what actually navigates.
@@ -112,7 +114,7 @@ test('capability map cards: the name link navigates, a plain-text tone indicator
   // a click target of any kind.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await page.getByRole('button', { name: /Digital Services/ }).click();
-  await page.getByText('supporting systems').click();
+  await page.getByText('active', { exact: true }).click();
   await expect(page).toHaveURL(/\/capability-map/);
   await expect(page).not.toHaveURL(new RegExp(`/e/${housingId}$`));
 
