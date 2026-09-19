@@ -125,7 +125,7 @@ test("SAP PM's own Context page (a container, one of SAP's modules) renders its 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/context/${pmId}`);
   await expect(page.getByRole('heading', { name: 'Context' })).toBeVisible();
 
-  // PM's own header — its own direct `supports` edge to its own capability, exactly like any other hub (never "grouped by module": a container is never nested any more).
+  // The Inspector's default hub view (nothing clicked yet) — PM's own direct `supports` edge to its own capability, exactly like any other hub (never "grouped by module": a container is never nested any more).
   await expect(page.getByText('Supports:', { exact: false })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Asset Maintenance' })).toBeVisible();
 

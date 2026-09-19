@@ -204,8 +204,8 @@ export function ContextPage() {
                 hasSelection={focusedElementId !== null}
               >
                 <ContextInspectorContent
-                  focusedNeighbour={focusedNeighbour}
-                  hubId={state.data.group.hub.element_id}
+                  group={state.data.group}
+                  focusedElementId={focusedElementId}
                   elementHref={(id) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${id}?${refParam}`}
                   neighbourContextHref={(id) => `/o/${orgSlug ?? ''}/m/${model.slug}/context/${id}?${refParam}`}
                   onClearFocus={() => {

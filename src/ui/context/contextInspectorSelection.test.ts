@@ -40,7 +40,7 @@ describe('contextInspectorFocusedNeighbour', () => {
     expect(result?.element.name).toBe('External Neighbour');
   });
 
-  it('returns null for the hub itself — the hub never enters focus', () => {
+  it('returns null for the hub itself — a click on the hub tile still navigates rather than focusing it; the caller treats this null as "show the hub instead", not "show nothing" (V2 item 5)', () => {
     expect(contextInspectorFocusedNeighbour('hub', group())).toBeNull();
   });
 
