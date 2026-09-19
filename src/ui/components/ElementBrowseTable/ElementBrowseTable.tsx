@@ -214,9 +214,25 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
   // `useEffect`: the measure-and-set-state round trip has to land before
   // the browser paints, or the header would visibly snap widths on first
   // render.
+  //
+  // Bug fix: a body column's own content can be narrower than its header
+  // label ever is — every visible row's Owner cell reads as a bare "—"
+  // (`FactBadge`-less unset marker) far more often than not, so the body's
+  // own natural width for that column can end up narrower than the word
+  // "Owner" itself. `.table th`'s `white-space: nowrap` (module CSS) then
+  // has nowhere to put the overflow but visually on top of the next
+  // header cell — exactly the "Owner"/"Lifecycle" overlap this was found
+  // against. Each column's width is now the *larger* of the body's own
+  // measured width and the header cell's own natural content width
+  // (`scrollWidth`, not `getBoundingClientRect().width` — the header th's
+  // rendered box is exactly the too-narrow value causing the bug, so its
+  // own bounding rect can't be used as "how wide this label needs to be";
+  // `scrollWidth` reports the unclipped content size regardless of how
+  // narrow the box around it currently is).
   const headerIdBase = useId();
   const tableWrapRef = useRef<HTMLDivElement>(null);
   const headerClipRef = useRef<HTMLDivElement>(null);
+  const headerRowRef = useRef<HTMLTableRowElement>(null);
   const firstBodyRowRef = useRef<HTMLTableRowElement | null>(null);
   const [colWidths, setColWidths] = useState<number[] | null>(null);
 
@@ -227,7 +243,9 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
       return;
     }
     const measure = () => {
-      setColWidths(Array.from(row.children).map((cell) => cell.getBoundingClientRect().width));
+      const headerRow = headerRowRef.current;
+      const headerWidths = headerRow ? Array.from(headerRow.children).map((cell) => cell.scrollWidth) : [];
+      setColWidths(Array.from(row.children).map((cell, i) => Math.max(cell.getBoundingClientRect().width, headerWidths[i] ?? 0)));
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -235,8 +253,8 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
     return () => {
       observer.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measures on anything that could change a rendered cell's natural width; `firstBodyRowRef.current` itself isn't a valid dep.
-  }, [state.status === 'ready' ? state.rows : null, customAttr, linkSupportsInline, decisionRowAction]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measures on anything that could change a rendered cell's natural width (including the header's own sort-arrow toggling); `firstBodyRowRef.current`/`headerRowRef.current` themselves aren't valid deps.
+  }, [state.status === 'ready' ? state.rows : null, customAttr, linkSupportsInline, decisionRowAction, state.status === 'ready' ? state.sortKey : null, state.status === 'ready' ? state.sortDirection : null]);
 
   function syncHeaderScroll() {
     if (headerClipRef.current && tableWrapRef.current) {
@@ -323,7 +341,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                 </colgroup>
               )}
               <thead>
-                <tr>
+                <tr ref={headerRowRef}>
                   {COLUMNS.map((column) => (
                     <th key={column.key} id={`${headerIdBase}-${column.key}`}>
                       <button type="button" className={styles.sortButton} onClick={() => { state.setSort(column.key); }}>
