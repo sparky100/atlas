@@ -1,23 +1,14 @@
 /**
- * Sprint U4-2b item 2: "L2 names wrap to two lines inside the tile" — an
- * L2 tile name never clips internally, checked via `scrollWidth <=
- * clientWidth` on the name element itself (a single-line `nowrap` +
- * `text-overflow: ellipsis` name would fail this even though the page
- * itself never scrolls, since an ellipsized box's own content still
- * overflows its box internally).
- *
- * L1 used to get the identical "never truncates" treatment (Sprint
- * U4-2b item 1) — the layout consistency pass reversed that
- * specifically: a fixed-height header with every column's title on a
- * shared baseline needs a name that can't grow past one line, so L1
- * names now truncate with an ellipsis (`CapabilityMapView.module.css`'s
- * own `.columnName` comment has the full trade-off). This file's own L1
- * checks below reflect that: no *page-level* horizontal scroll (still
- * true, and more robustly so now than when L1 could wrap), the full name
- * still reachable via the link's own `title` attribute and its
- * accessible name (a CSS `text-overflow: ellipsis` regression clips the
- * *paint*, never the DOM text or the accessible name — the same
- * distinction this file's own L2 check below still relies on).
+ * Capability map redesign (density pass): every row is a single line now
+ * — the domain header, and (item 3's own "single row: name, indicator,
+ * count") every capability card — so a long name truncates with an
+ * ellipsis at both levels, not just L1 (Sprint U4-2b item 1's own
+ * L1-truncates/L2-wraps split no longer applies once L2 is a single-row
+ * card too, not a multi-line tile). A CSS `text-overflow: ellipsis`
+ * regression clips the *paint*, never the DOM text or the accessible
+ * name, so what still matters — at both levels — is that the full name
+ * survives as real text and a `title` attribute (a real HTML tooltip on
+ * hover/long-press), never actually lost.
  *
  * Uses the two real longest capability names across all eight starter
  * maps (found by scanning `content/capability-maps/**\/*.json` directly)
@@ -50,12 +41,7 @@ async function hasHorizontalScroll(page: Page): Promise<boolean> {
   return page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
 }
 
-/** No internal horizontal clipping on the element itself — the check that catches a single-line `nowrap` + ellipsis truncation the page-level scroll check alone would miss (an ellipsized box never makes the *page* scroll; it clips its own content instead). */
-async function hasInternalHorizontalOverflow(locator: ReturnType<Page['getByText']>): Promise<boolean> {
-  return locator.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
-}
-
-test('capability map: the longest real starter-map names never overflow their box, at 1280 and 1920 (L1 truncates by design, L2 still never does)', async ({ page }) => {
+test('capability map: the longest real starter-map names never cause page-level scroll and stay reachable via title/DOM text, at 1280 and 1920', async ({ page }) => {
   const env = loadEnv();
 
   const email = `capmap-overflow-${randomUUID()}@example.test`;
@@ -113,29 +99,28 @@ test('capability map: the longest real starter-map names never overflow their bo
   if (!seedResult.ok) throw new Error(`seeding capability-map-text-overflow fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
-  await expect(page.getByText(LONGEST_L1_NAME)).toBeVisible();
+  const domainToggle = page.getByRole('button', { name: new RegExp(LONGEST_L1_NAME.slice(0, 20)) });
+  await expect(domainToggle).toBeVisible();
 
   for (const width of [1280, 1920]) {
     await page.setViewportSize({ width, height: 1000 });
-
     expect(await hasHorizontalScroll(page)).toBe(false);
 
-    // L1 now truncates by design (this file's own module comment) — the
-    // visual clip (`scrollWidth > clientWidth` on `.columnName`) is
-    // expected, not a regression, so this test no longer asserts it's
-    // absent. What still matters: the full name is never actually lost —
-    // it's the link's own accessible name/DOM text (`toHaveText`, a CSS
-    // ellipsis never shortens that, only the paint) and its `title`
-    // attribute (a real HTML tooltip on hover/long-press).
-    const l1NameLink = page.getByRole('link', { name: LONGEST_L1_NAME });
-    await expect(l1NameLink).toBeVisible();
-    await expect(l1NameLink).toHaveText(LONGEST_L1_NAME);
-    await expect(l1NameLink).toHaveAttribute('title', LONGEST_L1_NAME);
+    // Collapsed domain header: the name truncates by design (a single-
+    // line summary row) — what matters is the full name is still real
+    // DOM text (the button's own accessible name includes it in full,
+    // `toContainText`, a CSS ellipsis never shortens that) and reachable
+    // via the `title` attribute on its own wrapping element.
+    await expect(domainToggle).toContainText(LONGEST_L1_NAME);
+    await expect(page.locator('[title="' + LONGEST_L1_NAME + '"]')).toBeAttached();
 
-    // L2 is unchanged: still wraps to two lines, never clips internally.
-    const l2NameTile = page.getByRole('link', { name: LONGEST_L2_NAME });
-    await expect(l2NameTile).toBeVisible();
-    await expect(l2NameTile).toHaveText(LONGEST_L2_NAME);
-    expect(await hasInternalHorizontalOverflow(l2NameTile)).toBe(false);
+    // Expanding reveals the L2 card — same truncate-but-never-lose
+    // treatment, checked via its own primary link (real text + `title`).
+    await domainToggle.click();
+    const l2Link = page.getByRole('link', { name: LONGEST_L2_NAME });
+    await expect(l2Link).toBeVisible();
+    await expect(l2Link).toHaveText(LONGEST_L2_NAME);
+    await expect(l2Link).toHaveAttribute('title', LONGEST_L2_NAME);
+    await domainToggle.click(); // collapse again before the next viewport iteration
   }
 });

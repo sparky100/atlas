@@ -1,123 +1,274 @@
 /**
- * Sprint U4-1 C2: a responsive grid of L1 groups, replacing the old
- * horizontally-scrolling row — the item's own text is "whole map visible
- * without horizontal scroll". Column count narrows with viewport width;
- * breakpoints are mobile-first (base rule = narrowest tier, each
- * `min-width` query widens it) and combine this codebase's own existing
- * tiers (docs/UI-principles.md §2: mobile < 768px, desktop >= 1024px)
- * with the sprint text's two explicit numbers (>=1280px, a 390px mobile
- * floor) bracketing them:
- *   < 768px (mobile, down to 390px): 1 column
- *   768-1023px (tablet): 2 columns
- *   1024-1279px (desktop): 4 columns
- *   >= 1280px: 5 columns
- * Extra L1 groups beyond one row's column count wrap onto further rows on
- * their own (grid's normal auto-placement) — vertical scroll only, never
- * horizontal.
+ * Capability map redesign (density pass): domains are a vertical stack of
+ * collapsible rows now, not a responsive grid of always-open columns —
+ * collapsing only makes sense stacked, one row's own collapse/expand
+ * never affecting a sibling's width the way it would in a side-by-side
+ * grid. `role="list"`/`role="listitem"` (Sprint U4-1 C2) carries over
+ * unchanged — real list semantics for a screen reader either way.
  */
-.columns {
+.domains {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.domain {
+  border: var(--border-width) solid var(--border);
+  /* No token in tokens.css sits at exactly 8px (`--radius-sm` is 4px,
+     `--radius-md` is 6px, `--radius-lg` is 10px) — a literal value here
+     rather than picking the nearest token, since the redesign's own
+     design-token brief names this size specifically. */
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+/**
+ * Redesign item 1/2: the domain's own single summary row, collapsed by
+ * default — a real `<button>` (whole row the click target), chevron,
+ * name, a plain coverage sentence, the aggregate colour-by/owner facts,
+ * and the mini-bar, each its own flex child (a distinct visual zone) —
+ * never one dot-joined string. `flex-wrap: wrap` lets it drop to a second
+ * line at a narrow viewport rather than truncating information (item 7:
+ * "keep the domain header row on one line as long as possible before
+ * wrapping").
+ */
+.domainHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-3);
+  border: none;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  flex-wrap: wrap;
+}
+
+.domainHeader:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.domainChevron {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.domainName {
+  flex: 1 1 auto;
+  min-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.domainSummaryText {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/**
+ * Redesign item 2: one segment per subtree capability, quiet green/amber
+ * by coverage — informational only, never a severity indicator (it never
+ * renders alone: `.domainSummaryText` beside it already carries the same
+ * fact in words, satisfying "never colour-only" without this bar needing
+ * its own text label too). A thin line, not a fill — each segment is a
+ * small flat rect, no shadow, no border.
+ */
+.miniBar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.miniBarSegment {
+  display: block;
+  width: 6px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--border-strong);
+}
+
+.miniBarSegment[data-covered='true'] {
+  background: var(--status-ok);
+}
+
+.miniBarSegment[data-covered='false'] {
+  background: var(--status-warn);
+}
+
+.domainBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.domainActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+.domainOpenLink {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/**
+ * Redesign item 3: capability cards in a responsive grid once their
+ * domain is expanded — 4 columns at the widest tier down to 1 at mobile
+ * (item 7), reusing this codebase's own existing breakpoint family
+ * (768/1024/1280) rather than inventing a new one.
+ */
+.cardGrid {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: var(--space-6);
+  gap: var(--space-2);
 }
 
 @media (min-width: 768px) {
-  .columns {
+  .cardGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1024px) {
-  .columns {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .cardGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1280px) {
-  .columns {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+  .cardGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
-.column {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  /* Grid item, not a flex item any more — min-width: 0 (not the old fixed
-     220px) is what actually stops a long tile name from forcing the grid
-     wider than its column and reintroducing horizontal scroll. */
-  min-width: 0;
-}
-
 /**
- * Layout consistency pass: two guaranteed-single-line rows (the title
- * row, the summary line below it) rather than the old "wrap whatever
- * doesn't fit onto a second line" shape (Sprint U4-2a item 3, then
- * Sprint U4-2b item 1's own revision of it) — see `.columnName`'s own
- * comment for why truncation is back. No explicit `height` here: once
- * both children are forced to exactly one line each (fixed font size,
- * fixed line-height, `nowrap` + ellipsis), the header's total height is
- * already identical across every column by construction, which is more
- * robust than a hardcoded number that could drift out of sync with the
- * real text metrics at a given density.
+ * Redesign item 3/4: a single compact row — name, a thin left-border
+ * indicator (`colourBy`'s own tone, `data-tone` below), the supporting-
+ * system count — flat and bordered, no shadow, no tone-filled background.
+ * Replaces the pre-redesign `CapabilityTile` (deleted: blueprint frame,
+ * tone fill, a Chip pill) for exactly the reason the role-boundary rule
+ * exists — a filled amber tile reads as a flagged problem, which this
+ * view is not allowed to compute or show.
  */
-.columnHeader {
+.card {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  padding-bottom: var(--space-1);
-  border-bottom: var(--border-width-emphasis) solid var(--border-strong);
+  min-width: 0;
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
 }
 
-/* The title row: name, colour-by's own aggregate chip, reorder buttons —
-   one line, `flex-wrap: nowrap` (the default) relying on `.columnName`'s
-   own ellipsis rather than `.columnHeader`'s old `flex-wrap: wrap` to
-   keep this row from ever growing past one line. */
-.columnHeaderTitleRow {
+.card[data-tone='ok'] {
+  border-left-color: var(--status-ok);
+}
+.card[data-tone='warn'] {
+  border-left-color: var(--status-warn);
+}
+.card[data-tone='danger'] {
+  border-left-color: var(--status-danger);
+}
+.card[data-tone='info'] {
+  border-left-color: var(--status-info);
+}
+.card[data-tone='neutral'] {
+  border-left-color: var(--status-neutral);
+}
+
+/** An L3 row, nested one level under its own expanded L2 parent — same card, indented, no expand toggle of its own (L3 has no further children). */
+.cardNested {
+  margin-left: var(--space-4);
+}
+
+.cardMain {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
   min-width: 0;
 }
 
-/**
- * Sprint U4-1 C3 review note: the L1 header's own name link, unlike its
- * L2/L3 children, is plain text-in-a-header, not a whole-tile click
- * target — just the underline removal `CapabilityTile`'s primary link
- * gets for the same reason (plain-text name). `flex: 1 1 auto` +
- * `min-width: 0` are what let `.columnName`'s own ellipsis actually
- * engage instead of forcing the row wider than the column.
- */
-.columnLink {
+.cardLink {
   color: inherit;
   text-decoration: none;
-  flex: 1 1 auto;
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+.cardName {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardSecondary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.l3List {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 /**
- * Layout consistency pass: single-line, ellipsis-truncated — the same
- * treatment `.mobileGroupName` below already gives this exact header at
- * <768px, now applied at every width so every column's title sits on the
- * same baseline regardless of name length (`title` attribute on the
- * link itself carries the full name for a hover/long-press). Supersedes
- * Sprint U4-2b item 1's "never truncate, wrap instead" — see
- * `.columnHeader`'s own comment for the trade this sprint made instead.
+ * The shared "fact, not a flag" indicator — a dot in `tone`'s own colour
+ * (or `--border-strong` for "no tone at all", `data-tone='none'`) next to
+ * its own plain-text label, the one formula every informational surface
+ * in this redesigned view shares (a domain's aggregate/owner fact, a
+ * card's own colour-by tone/owner fact). Never a filled background, never
+ * a border, never a pill.
  */
-.columnName {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.factIndicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 0 auto;
 }
 
-/* The summary line: "7/8 supported · 8 systems →[ · no owner]" — one
-   line, same ellipsis safety net as the title row above in case a very
-   narrow column (the 2-column tablet tier) can't fit it all. */
-.columnSummary {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.factDot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex: 0 0 auto;
+}
+
+.factDot[data-tone='ok'] {
+  background: var(--status-ok);
+}
+.factDot[data-tone='warn'] {
+  background: var(--status-warn);
+}
+.factDot[data-tone='danger'] {
+  background: var(--status-danger);
+}
+.factDot[data-tone='info'] {
+  background: var(--status-info);
+}
+.factDot[data-tone='neutral'] {
+  background: var(--status-neutral);
 }
 
 .expandButton {
@@ -129,17 +280,9 @@
   flex: 0 0 auto;
 }
 
-.l3Tiles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: var(--border-width) solid var(--border);
-}
-
 .zoomLink {
   white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 /* Sprint U4-1 C1's reorder buttons — same visual treatment as .expandButton (plain, muted, no button chrome), just a pair side by side. */
@@ -167,196 +310,6 @@
   margin-top: var(--space-6);
 }
 
-/**
- * Check B6: below 768px, the always-collapsed L1 accordion header
- * (CapabilityMapView.tsx's own `narrow` branch of `L1ColumnView`) — a
- * single full-width button, not `.columnHeader`'s link-plus-controls row,
- * since the whole point of this header at this width is picking which
- * group to open.
- *
- * `min-width: 0` is load-bearing, not decorative: `.column` is `display:
- * flex; flex-direction: column`, and this button is one of its (cross-
- * axis, i.e. width) items — a flex item's automatic minimum width
- * defaults to its own min-content size unless overridden, so without
- * this the button's un-wrapped row of name + counts + chevron set an
- * unshrinkable floor wider than a 390px viewport, forcing `.main` (and
- * everything inside it) open regardless of `width: 100%` above — the
- * exact class of bug `ModelNav.module.css`'s own `.refChip` fix (bug
- * #39) and `.columnLink`'s `flex: 1 1 auto; min-width: 0` already guard
- * against elsewhere in this same file family. Found via
- * e2e/capability-map-mobile-accordion.spec.ts's own horizontal-scroll
- * check at 390px.
- */
-.mobileGroupHeader {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-width: 0;
-  padding: var(--space-3);
-  border: var(--border-width) solid var(--border-strong);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-
-/* A solid 4px bar in the group's aggregate tone — a strip, not a fill
-   (CapabilityTile.module.css's own tinted-background formula is for a
-   whole tile being that tone; this header isn't one), same `data-tone`
-   convention. `none` renders as `--border` so an untoned group still
-   reads as a row, not a gap. */
-.mobileToneStrip {
-  flex: 0 0 auto;
-  width: 4px;
-  align-self: stretch;
-  border-radius: var(--radius-sm);
-  background: var(--border);
-}
-
-.mobileToneStrip[data-tone='ok'] {
-  background: var(--status-ok);
-}
-.mobileToneStrip[data-tone='warn'] {
-  background: var(--status-warn);
-}
-.mobileToneStrip[data-tone='danger'] {
-  background: var(--status-danger);
-}
-.mobileToneStrip[data-tone='info'] {
-  background: var(--status-info);
-}
-.mobileToneStrip[data-tone='neutral'] {
-  background: var(--status-neutral);
-}
-
-.mobileGroupHeaderText {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.mobileGroupName {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mobileGroupMeta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.mobileChevron {
-  flex: 0 0 auto;
-  color: var(--text-muted);
-}
-
-/* The expanded group's own body: "Open →" (direct navigation, since the
-   header itself is a pure toggle — see L1ColumnView's own comment) plus
-   every L2 dense row, indented under the header it belongs to. */
-.mobileGroupBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-  padding: var(--space-2) var(--space-2) var(--space-2) calc(4px + var(--space-3));
-}
-
-/* `min-width: 0` on every direct child below, same reasoning as
-   `.mobileGroupHeader`'s own comment: each is a flex item of a `flex-
-   direction: column` ancestor (`.column`/`.mobileGroupBody`), so without
-   it its own row of content sets an unshrinkable width floor instead of
-   actually fitting the column it's stacked in. */
-.mobileGroupPrimaryRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  min-width: 0;
-  padding-bottom: var(--space-1);
-  border-bottom: var(--border-width) solid var(--border);
-}
-
-/* Check B6's "L2 dense rows, no blueprint frame" — a plain bordered row,
-   not CapabilityTile's BlueprintFrame + tone-filled box. */
-.mobileL2Row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
-  padding: var(--space-2);
-  border-radius: var(--radius-sm);
-  border-left: 3px solid var(--border);
-}
-
-.mobileL2Row[data-tone='ok'] {
-  border-left-color: var(--status-ok);
-}
-.mobileL2Row[data-tone='warn'] {
-  border-left-color: var(--status-warn);
-}
-.mobileL2Row[data-tone='danger'] {
-  border-left-color: var(--status-danger);
-}
-.mobileL2Row[data-tone='info'] {
-  border-left-color: var(--status-info);
-}
-.mobileL2Row[data-tone='neutral'] {
-  border-left-color: var(--status-neutral);
-}
-
-.mobileRowMain {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.mobileRowLink {
-  color: inherit;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.mobileRowSecondary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-/* L3 "on tap" (check B6): further dense rows, one level more indented,
-   revealed by `.expandButton` — same toggle desktop's tiles already use. */
-.mobileL3List {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
-  margin-top: var(--space-1);
-  padding-left: var(--space-4);
-  border-top: var(--border-width) solid var(--border);
-  padding-top: var(--space-2);
-}
-
-.mobileL3Row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  padding: var(--space-1) 0;
-}
-
-/* V2b: L1's own inline Inspector trigger — `CapabilityTile.module.css`'s
-   own `.inspectButton` is this same idea for a tile that already has a
-   frame to pin a corner button to; L1 has no frame (it isn't a
-   `CapabilityTile`), so this is a plain inline button instead, sized to
-   match the row of small icon-only controls it sits beside. */
 .inspectButton {
   display: flex;
   align-items: center;
@@ -369,6 +322,7 @@
   background: transparent;
   color: var(--text-faint);
   cursor: pointer;
+  flex: 0 0 auto;
 }
 
 .inspectButton:hover {

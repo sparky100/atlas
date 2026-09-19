@@ -1,22 +1,22 @@
+import { useId } from 'react';
 import { Info } from 'lucide-react';
-import { useId, useState } from 'react';
 import { Link } from 'react-router';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import type { BranchRow } from '../../db/types';
+import { isCapabilityOwnedWithAncestry } from '../../db/healthFindings';
 import type { ThreadCount } from '../comments/useThreadCounts';
-import { CapabilityTile } from '../components/CapabilityTile/CapabilityTile';
-import { Chip } from '../components/Chip/Chip';
+import { CommentMarkerButton } from '../components/CommentMarkerButton/CommentMarkerButton';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
-import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { computeCapabilityRollup } from './capabilityRollup';
+import { domainCoverageSegments, domainCoverageSummary } from './domainSummary';
 import { aggregateTileColourFor, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
 import type { CapabilityMapTree, L1Column, L2Card } from './layout';
 import { useCapabilityReorder } from './useCapabilityReorder';
 import styles from './CapabilityMapView.module.css';
 
-/** M1 close-out item 2's own marker shape, derived once per tile from the caller's raw `{ open, total }` — `undefined` (no marker at all) for a capability with no comment thread. */
+/** M1 close-out item 2's own marker shape, derived once per row from the caller's raw `{ open, total }` — `undefined` (no marker at all) for a capability with no comment thread. */
 function commentMarkerFor(threadCounts: ReadonlyMap<UUID, ThreadCount> | undefined, capabilityId: UUID): { state: 'ink'; count: number } | { state: 'hollow' } | undefined {
   const counts = threadCounts?.get(capabilityId);
   if (!counts || counts.total === 0) return undefined;
@@ -28,7 +28,7 @@ function commentMarkerFor(threadCounts: ReadonlyMap<UUID, ThreadCount> | undefin
  * we need to commit through them" shape (Sprint U4-1 C1). Also used to be
  * `addCapability`'s shape too, before Sprint U4-1 C5 moved "+ Add
  * capability" out of this component entirely, into `CapabilityMapPage.tsx`'s
- * own page-action area — reordering stays a per-tile control rendered
+ * own page-action area — reordering stays a per-row control rendered
  * inside the map itself, not a page action, so it's the one caller left.
  */
 export interface CapabilityMapEditContext {
@@ -48,13 +48,13 @@ export interface CapabilityMapViewProps {
   /** Capability rollup's owner-coverage input — `src/db/healthFindings.ts`'s `computeSelfOwnedCapabilityIds` result, computed once by the caller. */
   selfOwnedIds: ReadonlySet<UUID>;
   /**
-   * Sprint U4-1 C4: resolved and persisted by the caller
-   * (`useColourByPreference`) — this component only reads it to tint
-   * tiles now. V2b: the `<select>` control itself (and the "link systems"
-   * hint, `hasSystems`) moved into the shared Inspector's own Filters
-   * section (`CapabilityMapInspectorContent.tsx`, owned by
-   * `CapabilityMapPage.tsx`) — this component no longer renders a toolbar
-   * or takes an `onColourByChange`/`hasSystems` prop of its own.
+   * Resolved and persisted by the caller (`useColourByPreference`) — this
+   * component only reads it to pick each row's own thin tone indicator.
+   * The `<select>` control itself (and the "link systems" hint,
+   * `hasSystems`) lives in the shared Inspector's own Filters section
+   * (`CapabilityMapInspectorContent.tsx`, owned by `CapabilityMapPage.tsx`)
+   * — this component no longer renders a toolbar or takes an
+   * `onColourByChange`/`hasSystems` prop of its own.
    */
   colourBy: ColourByMode;
   orgSlug: string;
@@ -85,138 +85,101 @@ export interface CapabilityMapViewProps {
    * Sprint U4-2a item 3's "Reorder mode" toggle — controlled from the
    * caller (`CapabilityMapPage.tsx`), same reasoning as `colourBy` just
    * above: this component gets unmounted and remounted by its own parent
-   * every time `reorderCapability`'s own `onReordered` triggers a reload
-   * (`state.status` cycles through `'loading'` before `'ready'` again,
-   * and the parent only renders this component at all while `'ready'`) —
+   * every time `reorderCapability`'s own `onReordered` triggers a reload —
    * local state here would silently reset to `false` after literally
-   * every successful move, found live via this session's own e2e run
-   * (the spec's second move failed because the toggle it had just turned
-   * on was already gone again). V2b: the checkbox control itself moved
-   * into the Inspector's Filters section alongside colour-by's own
-   * `<select>` — this component only reads the resolved boolean now, no
-   * `onReorderModeChange` setter of its own.
+   * every successful move.
    */
   reorderMode: boolean;
   /**
-   * S1 item 13: which L2 cards have their L3 children expanded — lifted
-   * to the caller for the same reason `reorderMode` already is (this
-   * component's own prop comment above): `onReordered` triggers a
-   * `reload` that unmounts and remounts this component, and local state
-   * here would silently collapse back to empty the moment an L3 reorder
-   * succeeds — found live via this item's own e2e run, the same way the
-   * `reorderMode` bug was originally found.
+   * Density pass (capability map redesign): which one domain (L1
+   * capability), if any, is expanded — the same single-open-at-a-time
+   * accordion shape this view's own pre-redesign mobile treatment already
+   * used (`expandedL1`), now the only interaction model at every width,
+   * not a mobile-only fallback. Lifted to the caller for the same "this
+   * component gets unmounted/remounted on every mutation-triggered
+   * reload" reason `reorderMode`/`expanded` below already are. `null`
+   * (collapsed) by default — `CapabilityMapPage.tsx` seeds it from
+   * `?domain=` on first load.
+   */
+  expandedDomainId: UUID | null;
+  onToggleDomain: (id: UUID) => void;
+  /**
+   * Which L2 cards have their L3 children expanded — lifted to the caller
+   * for the same reload/remount reason as `expandedDomains` above.
    */
   expanded: ReadonlySet<UUID>;
   onToggleExpand: (id: UUID) => void;
-  /** M1 close-out item 2: "markers on tiles (bottom-right, same rule)" — the caller's own `useThreadCounts` result, keyed by capability id. `undefined` while still loading, same convention `unresolvedCount`/`unresolvedCommentCounts` already use elsewhere; a tile with no entry (or `total === 0`) shows no marker at all. Desktop `CapabilityTile`s only (L2 cards, L3 tiles) — narrow's own `MobileL2Row`/L3 rows carry none of this yet, same named gap `LandscapePage.tsx`'s own `LandscapeMobileList` comment already accepts for the identical reason (no room, no prior wiring to build on). */
+  /** M1 close-out item 2: "markers on tiles (bottom-right, same rule)" — the caller's own `useThreadCounts` result, keyed by capability id. `undefined` while still loading, same convention `unresolvedCount`/`unresolvedCommentCounts` already use elsewhere; a row with no entry (or `total === 0`) shows no marker at all. */
   threadCounts?: ReadonlyMap<UUID, ThreadCount> | undefined;
   /** Opens the comments panel scoped to the clicked capability — omitted entirely (same convention as `reorderCapability`) wherever the caller hasn't wired a panel at all. */
   onCommentMarkerClick?: ((capabilityId: UUID) => void) | undefined;
-  /** V2b: opens the shared Inspector panel scoped to the clicked capability, at every level (L1 header, L2 card, L3 tile, desktop and mobile) — same omitted-entirely convention as `onCommentMarkerClick`. `CapabilityTile.tsx`'s own `onInspectClick` prop comment explains why this is a second small corner button rather than repurposing the tile's own primary link. */
+  /** Opens the shared Inspector panel scoped to the clicked capability, at every level (domain header, L2 row, L3 row) — same omitted-entirely convention as `onCommentMarkerClick`. */
   onInspectClick?: ((capabilityId: UUID) => void) | undefined;
 }
 
 /**
- * The capability map's renderer (UI-principles §6.1, §3.1): nested tiles —
- * L1 as columns, L2 as stacked cards, L3 revealed inline on expand. Plain
- * DOM/CSS, not Canvas — see src/ui/capabilityMap/layout.ts's module
- * comment for why. Colour-by (src/ui/capabilityMap/metrics.ts) is a
- * toolbar toggle — `colourBy`/`onColourByChange` are controlled from the
- * caller (`CapabilityMapPage.tsx`'s `useColourByPreference`, Sprint U4-1
- * C4), not local state here, since its default depends on context
- * (home mode, whether the model has systems yet) and its choice needs to
- * persist across visits, both concerns this component itself shouldn't
- * own. Every mode still shows the supporting-system count as text
- * regardless (§4.3-style "never colour-only").
+ * The capability map's renderer (UI-principles §6.1, §3.1): nested
+ * capabilities — L1 as collapsible domain rows, L2/L3 as compact cards
+ * revealed only once their domain is expanded. Plain DOM/CSS, not Canvas —
+ * see src/ui/capabilityMap/layout.ts's module comment for why.
  *
- * Sprint U2 step 3: every tile's supporting-system count is now also the
- * zoom chain's entry point — a link to the landscape filtered to exactly
- * those systems (UI-principles §2.1's "capability map → landscape"), the
- * same exact-match set the count itself already names
- * (src/ui/capabilityMap/metrics.ts's `supportingSystemIds`). A tile with
- * zero supporting systems gets no link — there's nowhere to zoom to.
+ * **Capability map redesign (density pass)**: this view is the structural
+ * reference — what capabilities exist, how they group into domains, what
+ * systems support each one — never a findings surface. Home (Director/
+ * Architect) already owns "where are we weak": severity coloring, reason
+ * pills, "start a decision" actions, a findings dataset. This view states
+ * a fact in neutral text when a capability has no supporting system or no
+ * recorded owner — never amber alarm styling, never a judgment, and never
+ * its own recomputed version of what's wrong (that would drift from
+ * Home's own findings over time). Concretely: no filled tone backgrounds,
+ * no Chip pills, no dot-joined meta strings — a thin line/dot indicator
+ * paired with plain text, in its own visual zone, everywhere a fact needs
+ * showing. `colourBy` (`metrics.ts`) still selects which fact a row's own
+ * indicator carries (unchanged as a feature — only how it's drawn changed:
+ * a thin left-border + plain label text, never a filled tile or a pill).
  *
- * Playwright coverage: e2e/capability-map.spec.ts (Sprint U2 step 4 —
- * deferred there from step 1 at the user's own request, one step later
- * than originally scheduled), covering a two-level tree with an orphan,
- * expanding an L2 to reveal L3, and a colour-by switch actually changing
- * a tile's tone.
+ * Domains (`DomainSection` below) are collapsed by default and stay a
+ * single summary row — chevron, name, a plain coverage sentence, and a
+ * segmented mini-bar (`domainSummary.ts`'s `domainCoverageSegments`, one
+ * segment per subtree capability, informational only) — until expanded,
+ * at which point its own L2 cards (`CapabilityRow`) render in a
+ * responsive grid, each a single compact row: name, a thin left-border
+ * indicator, the supporting-system count. L3 (an L2's own children, when
+ * it has any) reveal via the same expand toggle this app already used
+ * pre-redesign (`expanded`/`onToggleExpand`, unchanged), as further
+ * `CapabilityRow`s one level indented — this redesign only ever changes
+ * how a domain and a card are *drawn*, never the three-level structure
+ * itself or any of its existing links (owner display, the "→ Landscape"
+ * supporting-system drill-through, reorder, comments, Inspector).
  *
- * Sprint U4-1 C2: the L1 row (`.columns`) is a responsive CSS grid, not a
- * horizontally-scrolling one — see CapabilityMapView.module.css's own
- * comment for the breakpoint tiers. `role="list"`/`role="listitem"` on the
- * grid and each L1 column give it real list semantics (there was no
- * accessible structure here before — a bare `<div>` grid of tiles reads
- * as nothing in particular to a screen reader) and, as a side effect,
- * something e2e/capability-map-layout.spec.ts can query without a
- * CSS-module class selector. Column count itself is asserted there via
- * `getComputedStyle(...).gridTemplateColumns` at each breakpoint, plus a
- * no-horizontal-scroll check at the narrowest (390px).
- *
- * Sprint U4-1 C3: L2 cards and L3 tiles are both the shared
- * `CapabilityTile` component (`src/ui/components/CapabilityTile/
- * CapabilityTile.tsx` — that file's own comment has the full design:
- * blueprint-framed, plain-text name, whole tile as the click target,
- * colour-by tone filling the tile rather than sitting in a separate
- * chip alone). Not L1: an L1 column holds several independently-
- * clickable L2 cards, not one clickable unit, so a tile-style whole-
- * column click target and fill don't apply the same way — but the
- * human's own review of C3 did ask for a *group-level* signal at L1: a
- * Chip (a strip, not a fill — `aggregateTileColourFor`, metrics.ts)
- * aggregated across every L2 *and* L3 descendant, worst-of-children for
- * exposure/lifecycle stage, fraction-supported for coverage — so a
- * capability exposed only at L3 still shows at its L1 ancestor, and the
- * L1 name link itself just loses its underline (`.columnLink`), the same
- * "plain-text name" reasoning as the tile component's own primary link,
- * without becoming a stretched-link tile itself.
- *
- * Sprint U4-1 C5: "'+ Add capability' moves to the page action area;
- * colour-by stays left as a view control." This component no longer
- * renders `CapabilityMapAddForm` at all — `CapabilityMapPage.tsx`'s own
- * header now owns that action, alongside its title, the same page-level
- * spot `LandscapePage.tsx` already uses for "+ Add system"/"+ Add actor".
- * Colour-by (the `select` in `.toolbar` below) stays exactly where it
- * was: a view control that changes how this view reads, not a page
- * action that changes the model — the same distinction `LandscapePage.tsx`
- * draws between its own header actions and `BranchViewModeControl`.
- *
- * Check B6 (docs/CHECK-U4-2a.md): below 768px, each L1 column collapses
- * to an accordion group — name, tone strip, coverage chip, counts — only
- * one open at a time (`expandedL1` above); its L2 children render as
- * dense rows (`MobileL2Row`) instead of blueprint-framed `CapabilityTile`
- * cards, with L3 revealed by the same tap-to-expand toggle desktop
- * already has. See `L1ColumnView`'s own comment for why this branches on
- * a JS `narrow` flag rather than a CSS media query.
+ * Playwright coverage: e2e/capability-map*.engine.spec.ts.
  */
-export function CapabilityMapView({ tree, supportsEdges, systemsById, capabilities, selfOwnedIds, colourBy, orgSlug, modelSlug, refParam, reorderCapability, reorderMode, expanded, onToggleExpand, threadCounts, onCommentMarkerClick, onInspectClick }: CapabilityMapViewProps) {
-  // Check B6: "Mobile (<768px): L1 groups as a collapsed list [...] one
-  // expanded at a time; L2 dense rows, no blueprint frame; L3 on tap" —
-  // the same JS-driven breakpoint LandscapePage.tsx's own E1 disclosures
-  // use (`useIsNarrowViewport`'s own comment explains why this needs to
-  // be a real conditional mount, not a CSS-only restyle: L1's header goes
-  // from a plain-text Link + row of controls to a single accordion toggle
-  // button — those aren't the same markup restyled, they're two different
-  // interaction models). `.columns`/`.column` (the grid + its
-  // `role="list"`/`role="listitem"` pair Sprint U4-1 C2 added) stay the
-  // outer structure at every width — narrow collapses each column's own
-  // L2 content behind its header instead of swapping the grid out for a
-  // different container, so e2e/capability-map-layout.spec.ts's own
-  // "1 column at 390px" / list-role assertions still hold unchanged.
-  const narrow = useIsNarrowViewport(768);
-  const [expandedL1, setExpandedL1] = useState<UUID | null>(null);
-
-  function toggleExpandedL1(id: UUID): void {
-    setExpandedL1((prev) => (prev === id ? null : id));
-  }
+export function CapabilityMapView({
+  tree,
+  supportsEdges,
+  systemsById,
+  capabilities,
+  selfOwnedIds,
+  colourBy,
+  orgSlug,
+  modelSlug,
+  refParam,
+  reorderCapability,
+  reorderMode,
+  expandedDomainId,
+  onToggleDomain,
+  expanded,
+  onToggleExpand,
+  threadCounts,
+  onCommentMarkerClick,
+  onInspectClick,
+}: CapabilityMapViewProps) {
   // Sprint U4-2a item 3: "reorder controls behind a Reorder mode" — the
-  // move buttons used to render inline on every tile whenever the caller
+  // move buttons used to render inline on every row whenever the caller
   // had edit rights at all, which meant an owner/architect saw two extra
-  // buttons crowding *every* L1 header and L2 card just to browse the map
-  // (and directly caused item 3's other complaint, "L1 header on one
-  // row" — that's what was pushing the header onto a second line at the
-  // narrower desktop breakpoints). Gating on an explicit toggle — off by
-  // default — means reordering stays exactly as capable as before but
-  // costs nothing when someone's just reading the map, editor or not.
+  // buttons crowding every row just to browse the map. Gating on an
+  // explicit toggle — off by default — means reordering stays exactly as
+  // capable as before but costs nothing when someone's just reading.
   const activeReorderCapability = reorderMode ? reorderCapability : undefined;
 
   // Sprint U4-1 C5: no "+ Add capability" fallback here any more —
@@ -227,15 +190,15 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, capabiliti
     return <EmptyState>No capabilities yet. A capability map has nothing to show until at least one Capability element exists.</EmptyState>;
   }
 
-  // Capability rollup's own ancestor-walk input (`isCapabilityOwnedWithAncestry`) — built once per render rather than inside each L1 tile.
+  // Capability rollup's own ancestor-walk input (`isCapabilityOwnedWithAncestry`) — built once per render rather than inside each domain.
   const capabilitiesById = new Map(capabilities.map((c) => [c.element_id, c]));
 
   return (
     <div>
       {tree.l1.length > 0 && (
-        <div className={styles.columns} role="list" aria-label="Level 1 capabilities">
+        <div className={styles.domains} role="list" aria-label="Capability domains">
           {tree.l1.map((column, index) => (
-            <L1ColumnView
+            <DomainSection
               key={column.capability.element_id}
               column={column}
               colourBy={colourBy}
@@ -253,9 +216,8 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, capabiliti
               nextSibling={tree.l1[index + 1]?.capability}
               siblings={tree.l1.map((c) => c.capability)}
               reorderCapability={activeReorderCapability}
-              narrow={narrow}
-              l1Expanded={expandedL1 === column.capability.element_id}
-              onToggleL1={toggleExpandedL1}
+              domainExpanded={expandedDomainId === column.capability.element_id}
+              onToggleDomain={onToggleDomain}
               threadCounts={threadCounts}
               onCommentMarkerClick={onCommentMarkerClick}
               onInspectClick={onInspectClick}
@@ -283,15 +245,11 @@ export function CapabilityMapView({ tree, supportsEdges, systemsById, capabiliti
 }
 
 /**
- * The "→ Landscape" zoom link every tile shows next to its supporting-
- * system count. Layout consistency pass: a tile with zero supporting
- * systems used to render nothing here at all — the one spot in an
- * otherwise-reserved row that could still just go blank, so an empty
- * tile read shorter/sparser than a populated one despite every other row
- * being height-reserved. A muted "no systems" line (nowhere to zoom to,
- * so no link) fills that same spot instead — informational, not a
- * problem, the same "plain, not hidden" stance CLAUDE.md rule 7 takes
- * everywhere else a count can legitimately be zero.
+ * The "→ Landscape" zoom link every row shows next to its supporting-
+ * system count. A row with zero supporting systems shows a muted "no
+ * systems" line instead (nowhere to zoom to, so no link) — informational,
+ * not a problem, the same "plain, not hidden" stance CLAUDE.md rule 7
+ * takes everywhere else a count can legitimately be zero.
  */
 export function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, refParam }: { capabilityId: UUID; count: number; orgSlug: string; modelSlug: string; refParam: string }) {
   if (count === 0) {
@@ -312,13 +270,11 @@ export function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, ref
 }
 
 /**
- * V2b: the L1 header's own way into the shared Inspector — L1 doesn't use
- * `CapabilityTile` (that component's own module comment: "an L1 column
- * holds several independently-clickable L2 cards, not one clickable
- * unit"), so it gets a plain inline button here instead of
- * `CapabilityTile.tsx`'s own corner-positioned one, same icon
- * (`UI-principles.md §2.0`'s curated set) and same non-navigating-click
- * pattern.
+ * A row's own way into the shared Inspector — a small icon-only button,
+ * reused identically at domain, L2 and L3 level (none of them are a
+ * `BlueprintFrame`-style tile with a frame of its own to pin a corner
+ * button to any more, post-redesign, so every level shares this one plain
+ * inline control instead of a per-tile corner overlay).
  */
 function InspectButton({ name, onClick }: { name: string; onClick: () => void }) {
   return (
@@ -334,19 +290,9 @@ function InspectButton({ name, onClick }: { name: string; onClick: () => void })
  * `next` are this capability's immediate siblings in display order
  * (`compareCapabilities`) — `undefined` at either end of the list, which
  * disables the matching button rather than wrapping around; that's the
- * only reason a button is ever disabled here. Every capability gets an
- * `order` at creation now (`useCapabilityCreate.ts`), and S1 item 13's
- * `useCapabilityReorder`'s own `resolveOrders` assigns one on the fly for
- * anything older the moment it's actually moved — so there's no "not
- * orderable yet" state left to show either way; `siblings` is what makes
- * that on-the-fly assignment collision-free (its own prop comment).
- * Mounted only when the caller has
- * edit rights (`L1ColumnView`/`L2CardView` render this conditionally on
- * `reorderCapability`, never with `context` missing) — `useCapabilityReorder`
- * is a real hook, so it can't be called conditionally *inside* one
- * always-mounted component the way a plain `if` can guard a prop;
- * conditional mounting is the correct place for that decision, same as
- * `addCapability`'s sibling `CapabilityMapAddForm`.
+ * only reason a button is ever disabled here. Mounted only when the
+ * caller has edit rights (`DomainSection`/`CapabilityRow` render this
+ * conditionally on `reorderCapability`, never with `context` missing).
  */
 function ReorderButtons({
   capability,
@@ -354,10 +300,6 @@ function ReorderButtons({
   next,
   siblings,
   context,
-  previousGlyph,
-  previousLabel,
-  nextGlyph,
-  nextLabel,
 }: {
   capability: ElementsHeadRow;
   previous: ElementsHeadRow | undefined;
@@ -365,20 +307,16 @@ function ReorderButtons({
   /** S1 item 13: the full sibling group in display order — `useCapabilityReorder`'s own `swap`/`resolveOrders` comment explains why this is what lets a swap succeed even when `capability` or its neighbor has no `order` yet, instead of refusing. */
   siblings: readonly ElementsHeadRow[];
   context: CapabilityMapEditContext & { onReordered: () => void };
-  previousGlyph: string;
-  previousLabel: string;
-  nextGlyph: string;
-  nextLabel: string;
 }) {
   const { status, error, swap } = useCapabilityReorder(context);
 
   return (
     <span className={styles.reorderButtons}>
-      <button type="button" aria-label={previousLabel} disabled={previous === undefined || status === 'reordering'} onClick={() => { if (previous) void swap(capability, previous, siblings); }}>
-        {previousGlyph}
+      <button type="button" aria-label={`Move ${capability.name} up`} disabled={previous === undefined || status === 'reordering'} onClick={() => { if (previous) void swap(capability, previous, siblings); }}>
+        ↑
       </button>
-      <button type="button" aria-label={nextLabel} disabled={next === undefined || status === 'reordering'} onClick={() => { if (next) void swap(capability, next, siblings); }}>
-        {nextGlyph}
+      <button type="button" aria-label={`Move ${capability.name} down`} disabled={next === undefined || status === 'reordering'} onClick={() => { if (next) void swap(capability, next, siblings); }}>
+        ↓
       </button>
       {error !== null && (
         <Text as="span" size="xs">
@@ -389,7 +327,47 @@ function ReorderButtons({
   );
 }
 
-function L1ColumnView({
+/**
+ * One quiet fact-with-text zone — the shared shape every informational
+ * indicator in this redesigned view uses (a domain's coverage/colour-by
+ * state, a row's own colour-by tone, "no owner"): a small dot or line in
+ * `tone`'s own colour, `--text-faint`/`--border` when there's no tone at
+ * all, next to its own plain-text label. Never a filled background, never
+ * a border, never a pill — the one formula CLAUDE.md rule 2/this
+ * redesign's own role boundary asks every "fact, not a flag" surface here
+ * to share, so a reviewer only has to check it's used correctly once.
+ */
+function FactIndicator({ tone, label }: { tone: 'ok' | 'warn' | 'danger' | 'info' | 'neutral' | undefined; label: string }) {
+  return (
+    <span className={styles.factIndicator}>
+      <span className={styles.factDot} data-tone={tone ?? 'none'} aria-hidden="true" />
+      <Text as="span" size="sm" tone="muted">
+        {label}
+      </Text>
+    </span>
+  );
+}
+
+/**
+ * A collapsed domain's own mini-bar (redesign item 2): one small segment
+ * per subtree capability (`domainSummary.ts`'s `domainCoverageSegments`),
+ * quiet green/amber by whether that capability has a supporting system —
+ * informational, never a severity indicator, and always paired with the
+ * plain coverage sentence beside it (never colour-only).
+ */
+function CoverageMiniBar({ segments }: { segments: readonly { capabilityId: UUID; hasSupport: boolean }[] }) {
+  if (segments.length === 0) return null;
+  return (
+    <span className={styles.miniBar} role="img" aria-label={`${String(segments.filter((s) => s.hasSupport).length)} of ${String(segments.length)} covered`}>
+      {segments.map((segment, index) => (
+        // A capability id can repeat across a subtree walk in principle — position is what the bar itself renders in order, not identity.
+        <span key={`${segment.capabilityId}-${String(index)}`} className={styles.miniBarSegment} data-covered={segment.hasSupport} />
+      ))}
+    </span>
+  );
+}
+
+function DomainSection({
   column,
   colourBy,
   supportsEdges,
@@ -406,9 +384,8 @@ function L1ColumnView({
   nextSibling,
   siblings,
   reorderCapability,
-  narrow,
-  l1Expanded,
-  onToggleL1,
+  domainExpanded,
+  onToggleDomain,
   threadCounts,
   onCommentMarkerClick,
   onInspectClick,
@@ -430,327 +407,120 @@ function L1ColumnView({
   /** S1 item 13: every L1 capability, in display order — `ReorderButtons`' own `siblings` prop comment. */
   siblings: readonly ElementsHeadRow[];
   reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
-  /** Check B6: <768px, this column collapses to an accordion group — see `CapabilityMapView`'s own comment for why this is a prop, not a CSS media query. */
-  narrow: boolean;
-  l1Expanded: boolean;
-  onToggleL1: (id: UUID) => void;
+  domainExpanded: boolean;
+  onToggleDomain: (id: UUID) => void;
   threadCounts: ReadonlyMap<UUID, ThreadCount> | undefined;
   onCommentMarkerClick: ((capabilityId: UUID) => void) | undefined;
   onInspectClick: ((capabilityId: UUID) => void) | undefined;
 }) {
   const panelId = useId();
-  // Capability rollup (Sprint U4-2, "capability rollup", decided): a level-1
-  // tile's own system count and "N/M supported" fraction are always a
-  // rollup over its subtree (itself plus every L2/L3 descendant), deduped
-  // by system — the shared `computeCapabilityRollup` also supplies this
-  // Chip's own `descendantCapabilityIds` input, replacing the inline
-  // flattened-id-list builder that used to live here (it hand-rolled the
-  // exact same "L1 itself + every L2 + every L3" set `capabilityRollup.ts`
-  // now computes once, shared across every level-1-tile surface).
+  // Capability rollup (Sprint U4-2, "capability rollup", decided): a
+  // domain's own system count and "N of M have a supporting system"
+  // sentence are always a rollup over its subtree (itself plus every
+  // L2/L3 descendant), deduped by system.
   const rollup = computeCapabilityRollup(column.capability, capabilities, capabilitiesById, supportsEdges, selfOwnedIds);
   const count = rollup.supportingSystemIds.length;
   const aggregateColour = aggregateTileColourFor(colourBy, rollup.subtreeCapabilityIds, supportsEdges, systemsById);
-  const l2Count = column.l2.length;
-
-  const l2Content = column.l2.map((card, index) =>
-    narrow ? (
-      <MobileL2Row
-        key={card.capability.element_id}
-        card={card}
-        colourBy={colourBy}
-        supportsEdges={supportsEdges}
-        systemsById={systemsById}
-        orgSlug={orgSlug}
-        modelSlug={modelSlug}
-        refParam={refParam}
-        expanded={expanded.has(card.capability.element_id)}
-        onToggleExpand={onToggleExpand}
-        previousSibling={column.l2[index - 1]?.capability}
-        nextSibling={column.l2[index + 1]?.capability}
-        siblings={column.l2.map((c) => c.capability)}
-        reorderCapability={reorderCapability}
-        onInspectClick={onInspectClick}
-      />
-    ) : (
-      <L2CardView
-        key={card.capability.element_id}
-        card={card}
-        colourBy={colourBy}
-        supportsEdges={supportsEdges}
-        systemsById={systemsById}
-        orgSlug={orgSlug}
-        modelSlug={modelSlug}
-        refParam={refParam}
-        expanded={expanded.has(card.capability.element_id)}
-        onToggleExpand={onToggleExpand}
-        previousSibling={column.l2[index - 1]?.capability}
-        nextSibling={column.l2[index + 1]?.capability}
-        siblings={column.l2.map((c) => c.capability)}
-        reorderCapability={reorderCapability}
-        threadCounts={threadCounts}
-        onCommentMarkerClick={onCommentMarkerClick}
-        onInspectClick={onInspectClick}
-      />
-    ),
-  );
-
-  if (narrow) {
-    // Check B6: a collapsed accordion group — name, tone strip, coverage
-    // chip, counts, one expanded at a time (`CapabilityMapView`'s own
-    // `expandedL1` state). The header is a single toggle button, not a
-    // link plus separate controls: a link and a button can't nest inside
-    // each other, and this group's whole point at this width is picking
-    // which one to open, not navigating away from the list — "Open →"
-    // below, inside the expanded panel, is where direct navigation to
-    // the L1 capability's own element page still lives.
-    return (
-      <div className={styles.column} role="listitem">
-        <button
-          type="button"
-          className={styles.mobileGroupHeader}
-          aria-expanded={l1Expanded}
-          aria-controls={panelId}
-          onClick={() => {
-            onToggleL1(column.capability.element_id);
-          }}
-        >
-          <span className={styles.mobileToneStrip} data-tone={aggregateColour.tone ?? 'none'} aria-hidden="true" />
-          <span className={styles.mobileGroupHeaderText}>
-            <Text as="span" size="lg" className={styles.mobileGroupName}>
-              {column.capability.name}
-            </Text>
-            <span className={styles.mobileGroupMeta}>
-              {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <Chip tone={aggregateColour.tone}>{aggregateColour.label}</Chip>}
-              {/* "No owner" is informational-tier (the agreed Health findings severity tiers), folded into the muted counts line rather than its own amber pill — same fix as the desktop header below, and DirectorHome.tsx's own capability tiles. */}
-              <Text as="span" size="sm" tone="muted">
-                {l2Count} capabilit{l2Count === 1 ? 'y' : 'ies'} · {count} system{count === 1 ? '' : 's'} · {rollup.supportedCapabilityCount}/{rollup.totalCapabilityCount} supported{!rollup.isOwned && ' · no owner'}
-              </Text>
-            </span>
-          </span>
-          <span className={styles.mobileChevron} aria-hidden="true">
-            {l1Expanded ? '▾' : '▸'}
-          </span>
-        </button>
-        {l1Expanded && (
-          <div id={panelId} className={styles.mobileGroupBody}>
-            <div className={styles.mobileGroupPrimaryRow}>
-              <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${column.capability.element_id}`} className={styles.mobileRowLink}>
-                <Text as="span" size="sm">
-                  Open {column.capability.name} →
-                </Text>
-              </Link>
-              <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-              {onInspectClick && <InspectButton name={column.capability.name} onClick={() => { onInspectClick(column.capability.element_id); }} />}
-              {reorderCapability && (
-                <ReorderButtons
-                  capability={column.capability}
-                  previous={previousSibling}
-                  next={nextSibling}
-                  siblings={siblings}
-                  context={reorderCapability}
-                  previousGlyph="↑"
-                  previousLabel={`Move ${column.capability.name} up`}
-                  nextGlyph="↓"
-                  nextLabel={`Move ${column.capability.name} down`}
-                />
-              )}
-            </div>
-            {l2Content}
-          </div>
-        )}
-      </div>
-    );
-  }
+  const segments = domainCoverageSegments(rollup.subtreeCapabilityIds, rollup.subtreeSupportsEdges);
 
   return (
-    <div className={styles.column} role="listitem">
+    <div className={styles.domain} role="listitem">
       {/*
-       * Layout consistency pass: fixed height, both rows single-line —
-       * see CapabilityMapView.module.css's own `.columnHeader` comment
-       * for why that's now guaranteed "for free" (every row forced to
-       * one line) rather than a hardcoded height. Supersedes Sprint
-       * U4-2b item 1's "L1 names never truncate, wrap the chip/zoom-link
-       * instead" — that traded a variable header height across columns
-       * for never losing a character of a name; this sprint's own ask
-       * (headers line up at a shared baseline across every column) wants
-       * the opposite trade, so the name truncates now (ellipsis, title
-       * attribute for the full name, still a real link to the element
-       * page) — the same single-line treatment `.mobileGroupName` below
-       * already uses for this exact header at <768px, now applied at
-       * every width instead of just the narrowest one.
-       *
-       * Colour-by's own aggregate stays a single Chip (never a bare tone
-       * strip on its own — §6.3/§8.4/§8.7's "never colour-only" rule
-       * needs its own text label somewhere, and a Chip already carries
-       * one; inventing an accessible strip-plus-label pairing for
-       * desktop when a Chip already does the job isn't worth the extra
-       * surface). "No owner" is informational-tier (the agreed Health
-       * findings severity tiers — ArchitectHome.tsx's own
-       * `unowned-capabilities` check is the same tier) — folded into the
-       * one summary line below as plain muted text instead of its own
-       * amber pill, and omitted entirely when the capability *is* owned
-       * (nothing to flag), the same "no badge for the healthy case"
-       * convention DirectorHome.tsx's own capability tiles now use for
-       * the identical finding.
+       * Redesign item 1/2: collapsed by default, a single row — chevron,
+       * name, a plain coverage sentence, a segmented mini-bar — each its
+       * own visual zone (never one dot-joined string). A real `<button>`,
+       * whole row the click target, `aria-expanded` reflecting state —
+       * the same accordion shape this view's own mobile treatment already
+       * used pre-redesign, now the *only* domain header at every width
+       * (no more separate desktop-always-open layout).
        */}
-      <div className={styles.columnHeader}>
-        <div className={styles.columnHeaderTitleRow}>
-          <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${column.capability.element_id}`} className={styles.columnLink} title={column.capability.name}>
-            <Text as="span" size="lg" className={styles.columnName}>
-              {column.capability.name}
-            </Text>
-          </Link>
-          {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <Chip tone={aggregateColour.tone}>{aggregateColour.label}</Chip>}
-          {onInspectClick && <InspectButton name={column.capability.name} onClick={() => { onInspectClick(column.capability.element_id); }} />}
-          {reorderCapability && (
-            <ReorderButtons
-              capability={column.capability}
-              previous={previousSibling}
-              next={nextSibling}
-              siblings={siblings}
-              context={reorderCapability}
-              previousGlyph="←"
-              previousLabel={`Move ${column.capability.name} left`}
-              nextGlyph="→"
-              nextLabel={`Move ${column.capability.name} right`}
-            />
-          )}
-        </div>
-        <Text as="p" size="sm" tone="muted" className={styles.columnSummary}>
-          {rollup.supportedCapabilityCount}/{rollup.totalCapabilityCount} supported ·{' '}
-          <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-          {!rollup.isOwned && ' · no owner'}
-        </Text>
-      </div>
-      {l2Content}
-    </div>
-  );
-}
-
-/**
- * Check B6's "L2 dense rows, no blueprint frame; L3 on tap": the mobile
- * counterpart to `L2CardView` — a plain row (name, tone chip, secondary
- * controls) instead of a `CapabilityTile`, and its L3 children (when
- * expanded via the same `expanded` Set/`onToggleExpand` desktop's L2→L3
- * toggle already uses) render as further dense rows rather than compact
- * tiles. Kept as its own component, not a `dense` prop on `L2CardView`,
- * since the two render genuinely different markup (a `CapabilityTile`
- * wrapper vs. a plain `div`), the same reasoning `L1ColumnView`'s own
- * narrow/wide split uses.
- */
-function MobileL2Row({
-  card,
-  colourBy,
-  supportsEdges,
-  systemsById,
-  orgSlug,
-  modelSlug,
-  refParam,
-  expanded,
-  onToggleExpand,
-  previousSibling,
-  nextSibling,
-  siblings,
-  reorderCapability,
-  onInspectClick,
-}: {
-  card: L2Card;
-  colourBy: ColourByMode;
-  supportsEdges: RelationshipsHeadRow[];
-  systemsById: Map<UUID, ElementsHeadRow>;
-  orgSlug: string;
-  modelSlug: string;
-  refParam: string;
-  expanded: boolean;
-  onToggleExpand: (id: UUID) => void;
-  previousSibling: ElementsHeadRow | undefined;
-  nextSibling: ElementsHeadRow | undefined;
-  /** S1 item 13: every L2 sibling under this L1, in display order — `ReorderButtons`' own `siblings` prop comment. */
-  siblings: readonly ElementsHeadRow[];
-  reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
-  onInspectClick: ((capabilityId: UUID) => void) | undefined;
-}) {
-  const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById);
-  const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
-
-  return (
-    <div className={styles.mobileL2Row} data-tone={colour.tone ?? 'none'}>
-      <div className={styles.mobileRowMain}>
-        <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`} className={styles.mobileRowLink}>
-          <Text as="span" size="md">
-            {card.capability.name}
+      <button
+        type="button"
+        className={styles.domainHeader}
+        aria-expanded={domainExpanded}
+        aria-controls={panelId}
+        onClick={() => {
+          onToggleDomain(column.capability.element_id);
+        }}
+      >
+        <span className={styles.domainChevron} aria-hidden="true">
+          {domainExpanded ? '▾' : '▸'}
+        </span>
+        <span className={styles.domainName} title={column.capability.name}>
+          <Text as="span" size="lg">
+            {column.capability.name}
           </Text>
-        </Link>
-        {colour.tone !== undefined && colour.label !== undefined && <Chip tone={colour.tone}>{colour.label}</Chip>}
-      </div>
-      <div className={styles.mobileRowSecondary}>
-        {reorderCapability && (
-          <ReorderButtons
-            capability={card.capability}
-            previous={previousSibling}
-            next={nextSibling}
-            siblings={siblings}
-            context={reorderCapability}
-            previousGlyph="↑"
-            previousLabel={`Move ${card.capability.name} up`}
-            nextGlyph="↓"
-            nextLabel={`Move ${card.capability.name} down`}
-          />
-        )}
-        <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-        {card.l3.length > 0 && (
-          // Check B6: "L3 on tap" — the same expand toggle desktop's dense-
-          // frame tile already has (`.expandButton`, unchanged), just on a
-          // plain row instead of a blueprint-framed card.
-          <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { onToggleExpand(card.capability.element_id); }}>
-            {expanded ? '▾' : '▸'} {card.l3.length}
-          </button>
-        )}
-        {onInspectClick && <InspectButton name={card.capability.name} onClick={() => { onInspectClick(card.capability.element_id); }} />}
-      </div>
-      {expanded && card.l3.length > 0 && (
-        <div className={styles.mobileL3List}>
-          {card.l3.map((leaf, index) => {
-            const leafColour = tileColourFor(colourBy, leaf.element_id, supportsEdges, systemsById);
-            const leafCount = supportingSystemIds(leaf.element_id, supportsEdges).length;
-            return (
-              <div key={leaf.element_id} className={styles.mobileL3Row} data-tone={leafColour.tone ?? 'none'}>
-                <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${leaf.element_id}`} className={styles.mobileRowLink}>
-                  <Text as="span" size="sm">
-                    {leaf.name}
-                  </Text>
-                </Link>
-                {leafColour.tone !== undefined && leafColour.label !== undefined && <Chip tone={leafColour.tone}>{leafColour.label}</Chip>}
-                {/* S1 item 13: "L3 reorder controls" — the same move-up/down pattern L2 already has, one level deeper. */}
-                {reorderCapability && (
-                  <ReorderButtons
-                    capability={leaf}
-                    previous={card.l3[index - 1]}
-                    next={card.l3[index + 1]}
-                    siblings={card.l3}
-                    context={reorderCapability}
-                    previousGlyph="↑"
-                    previousLabel={`Move ${leaf.name} up`}
-                    nextGlyph="↓"
-                    nextLabel={`Move ${leaf.name} down`}
-                  />
-                )}
-                <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-                {onInspectClick && <InspectButton name={leaf.name} onClick={() => { onInspectClick(leaf.element_id); }} />}
-              </div>
-            );
-          })}
+        </span>
+        <Text as="span" size="sm" tone="muted" className={styles.domainSummaryText}>
+          {domainCoverageSummary(rollup.supportedCapabilityCount, rollup.totalCapabilityCount)}
+        </Text>
+        {aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <FactIndicator tone={aggregateColour.tone} label={aggregateColour.label} />}
+        {!rollup.isOwned && <FactIndicator tone="warn" label="no owner recorded" />}
+        <CoverageMiniBar segments={segments} />
+      </button>
+      {domainExpanded && (
+        <div id={panelId} className={styles.domainBody}>
+          <div className={styles.domainActions}>
+            <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${column.capability.element_id}`} className={styles.domainOpenLink}>
+              <Text as="span" size="sm">
+                Open {column.capability.name} →
+              </Text>
+            </Link>
+            <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+            {onInspectClick && <InspectButton name={column.capability.name} onClick={() => { onInspectClick(column.capability.element_id); }} />}
+            {reorderCapability && <ReorderButtons capability={column.capability} previous={previousSibling} next={nextSibling} siblings={siblings} context={reorderCapability} />}
+          </div>
+          <div className={styles.cardGrid} role="list" aria-label={`${column.capability.name} capabilities`}>
+            {column.l2.map((card, index) => (
+              <CapabilityRow
+                key={card.capability.element_id}
+                card={card}
+                colourBy={colourBy}
+                supportsEdges={supportsEdges}
+                systemsById={systemsById}
+                capabilitiesById={capabilitiesById}
+                selfOwnedIds={selfOwnedIds}
+                orgSlug={orgSlug}
+                modelSlug={modelSlug}
+                refParam={refParam}
+                expanded={expanded.has(card.capability.element_id)}
+                onToggleExpand={onToggleExpand}
+                previousSibling={column.l2[index - 1]?.capability}
+                nextSibling={column.l2[index + 1]?.capability}
+                siblings={column.l2.map((c) => c.capability)}
+                reorderCapability={reorderCapability}
+                threadCounts={threadCounts}
+                onCommentMarkerClick={onCommentMarkerClick}
+                onInspectClick={onInspectClick}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function L2CardView({
+/**
+ * Redesign item 3: a compact capability card, one level of L3 nesting
+ * supported — name, a thin left-border indicator (`colourBy`'s own tone),
+ * the supporting-system count on the right; "no owner" as its own plain-
+ * text fact when the capability isn't owned (`isCapabilityOwnedWithAncestry`,
+ * called directly per capability now rather than only at the domain
+ * rollup — a one-line existing predicate, no new computation). Replaces
+ * the pre-redesign split between a desktop `CapabilityTile` (blueprint-
+ * framed, tone-filled, a Chip pill) and a mobile-only dense row — one
+ * shape at every width now, since the redesign's own coloring rule (thin
+ * line/dot + plain text, never a fill or a pill) never wanted the tile's
+ * filled treatment to begin with.
+ */
+function CapabilityRow({
   card,
   colourBy,
   supportsEdges,
   systemsById,
+  capabilitiesById,
+  selfOwnedIds,
   orgSlug,
   modelSlug,
   refParam,
@@ -763,11 +533,14 @@ function L2CardView({
   threadCounts,
   onCommentMarkerClick,
   onInspectClick,
+  nested = false,
 }: {
   card: L2Card;
   colourBy: ColourByMode;
   supportsEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
+  capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>;
+  selfOwnedIds: ReadonlySet<UUID>;
   orgSlug: string;
   modelSlug: string;
   refParam: string;
@@ -775,94 +548,70 @@ function L2CardView({
   onToggleExpand: (id: UUID) => void;
   previousSibling: ElementsHeadRow | undefined;
   nextSibling: ElementsHeadRow | undefined;
-  /** S1 item 13: every L2 sibling under this L1, in display order — `ReorderButtons`' own `siblings` prop comment. */
+  /** S1 item 13: every sibling under the same parent, in display order — `ReorderButtons`' own `siblings` prop comment. */
   siblings: readonly ElementsHeadRow[];
   reorderCapability: (CapabilityMapEditContext & { onReordered: () => void }) | undefined;
   threadCounts: ReadonlyMap<UUID, ThreadCount> | undefined;
   onCommentMarkerClick: ((capabilityId: UUID) => void) | undefined;
   onInspectClick: ((capabilityId: UUID) => void) | undefined;
+  /** `true` for an L3 row rendered inside its own L2 parent's expanded list — indented, no expand toggle of its own (L3 has no further children). */
+  nested?: boolean;
 }) {
   const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById);
   const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
+  const owned = isCapabilityOwnedWithAncestry(card.capability, selfOwnedIds, capabilitiesById);
+  const marker = commentMarkerFor(threadCounts, card.capability.element_id);
 
   return (
-    <CapabilityTile
-      href={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`}
-      name={card.capability.name}
-      tone={colour.tone}
-      toneLabel={colour.label}
-      commentMarker={commentMarkerFor(threadCounts, card.capability.element_id)}
-      onCommentMarkerClick={onCommentMarkerClick ? () => { onCommentMarkerClick(card.capability.element_id); } : undefined}
-      onInspectClick={onInspectClick ? () => { onInspectClick(card.capability.element_id); } : undefined}
-      // Density pass: the count/zoom-link sits right after the chip — the
-      // pairing the tile density spec actually asked for — with the
-      // expand toggle next to it (also always-relevant browsing UI) and
-      // reorder mode's own buttons last, since they're opt-in and least
-      // central to "what's this tile telling me at a glance".
-      secondaryRow={
-        <>
-          <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-          {card.l3.length > 0 && (
-            <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { onToggleExpand(card.capability.element_id); }}>
-              {expanded ? '▾' : '▸'} {card.l3.length}
-            </button>
-          )}
-          {reorderCapability && (
-            <ReorderButtons
-              capability={card.capability}
-              previous={previousSibling}
-              next={nextSibling}
-              siblings={siblings}
-              context={reorderCapability}
-              previousGlyph="↑"
-              previousLabel={`Move ${card.capability.name} up`}
-              nextGlyph="↓"
-              nextLabel={`Move ${card.capability.name} down`}
+    <div className={[styles.card, nested ? styles.cardNested : ''].filter(Boolean).join(' ')} data-tone={colour.tone ?? 'none'} role={nested ? undefined : 'listitem'}>
+      <div className={styles.cardMain}>
+        <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`} className={styles.cardLink} title={card.capability.name}>
+          <Text as="span" size="md" className={styles.cardName}>
+            {card.capability.name}
+          </Text>
+        </Link>
+        <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+      </div>
+      <div className={styles.cardSecondary}>
+        {colour.tone !== undefined && colour.label !== undefined && <FactIndicator tone={colour.tone} label={colour.label} />}
+        {!owned && <FactIndicator tone="warn" label="no owner recorded" />}
+        {marker && onCommentMarkerClick && <CommentMarkerButton marker={marker} onClick={() => { onCommentMarkerClick(card.capability.element_id); }} />}
+        {!nested && card.l3.length > 0 && (
+          <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { onToggleExpand(card.capability.element_id); }}>
+            {expanded ? '▾' : '▸'} {card.l3.length}
+          </button>
+        )}
+        {onInspectClick && <InspectButton name={card.capability.name} onClick={() => { onInspectClick(card.capability.element_id); }} />}
+        {reorderCapability && <ReorderButtons capability={card.capability} previous={previousSibling} next={nextSibling} siblings={siblings} context={reorderCapability} />}
+      </div>
+      {!nested && expanded && card.l3.length > 0 && (
+        <div className={styles.l3List}>
+          {card.l3.map((leaf, index) => (
+            <CapabilityRow
+              key={leaf.element_id}
+              card={{ capability: leaf, l3: [] }}
+              colourBy={colourBy}
+              supportsEdges={supportsEdges}
+              systemsById={systemsById}
+              capabilitiesById={capabilitiesById}
+              selfOwnedIds={selfOwnedIds}
+              orgSlug={orgSlug}
+              modelSlug={modelSlug}
+              refParam={refParam}
+              expanded={false}
+              onToggleExpand={onToggleExpand}
+              previousSibling={card.l3[index - 1]}
+              nextSibling={card.l3[index + 1]}
+              siblings={card.l3}
+              reorderCapability={reorderCapability}
+              threadCounts={threadCounts}
+              onCommentMarkerClick={onCommentMarkerClick}
+              onInspectClick={onInspectClick}
+              nested
             />
-          )}
-        </>
-      }
-    >
-      {expanded && card.l3.length > 0 && (
-        <div className={styles.l3Tiles}>
-          {card.l3.map((leaf, index) => {
-            const leafColour = tileColourFor(colourBy, leaf.element_id, supportsEdges, systemsById);
-            const leafCount = supportingSystemIds(leaf.element_id, supportsEdges).length;
-            return (
-              <CapabilityTile
-                key={leaf.element_id}
-                href={`/o/${orgSlug}/m/${modelSlug}/e/${leaf.element_id}`}
-                name={leaf.name}
-                tone={leafColour.tone}
-                toneLabel={leafColour.label}
-                size="compact"
-                commentMarker={commentMarkerFor(threadCounts, leaf.element_id)}
-                onCommentMarkerClick={onCommentMarkerClick ? () => { onCommentMarkerClick(leaf.element_id); } : undefined}
-                onInspectClick={onInspectClick ? () => { onInspectClick(leaf.element_id); } : undefined}
-                secondaryRow={
-                  <>
-                    <LandscapeZoomLink capabilityId={leaf.element_id} count={leafCount} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
-                    {/* S1 item 13: "L3 reorder controls" — the same move-up/down pattern L2 already has, one level deeper. */}
-                    {reorderCapability && (
-                      <ReorderButtons
-                        capability={leaf}
-                        previous={card.l3[index - 1]}
-                        next={card.l3[index + 1]}
-                        siblings={card.l3}
-                        context={reorderCapability}
-                        previousGlyph="↑"
-                        previousLabel={`Move ${leaf.name} up`}
-                        nextGlyph="↓"
-                        nextLabel={`Move ${leaf.name} down`}
-                      />
-                    )}
-                  </>
-                }
-              />
-            );
-          })}
+          ))}
         </div>
       )}
-    </CapabilityTile>
+    </div>
   );
 }

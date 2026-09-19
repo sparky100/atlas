@@ -1,13 +1,18 @@
 /**
  * Sprint U4-1 C1: "tailoring allows drag-to-reorder among siblings
- * (attribute update)". Implemented as move-left/right (L1) and move-up/
- * down (L2) buttons rather than a mouse drag gesture —
- * useCapabilityReorder.ts's own module comment explains why (no
- * drag-and-drop anywhere else in this codebase, no DnD library, and
- * buttons stay keyboard-/screen-reader-operable) — the *effect* (a
- * capability swaps places with an adjacent sibling, `attributes.order`
- * updated) is the same either way; SPEC-data-model.md §11 records a real
- * drag gesture as a reviewed, deliberate follow-up, not a gap in this item.
+ * (attribute update)". Implemented as move-up/down buttons at every level
+ * rather than a mouse drag gesture — useCapabilityReorder.ts's own module
+ * comment explains why (no drag-and-drop anywhere else in this codebase,
+ * no DnD library, and buttons stay keyboard-/screen-reader-operable) —
+ * the *effect* (a capability swaps places with an adjacent sibling,
+ * `attributes.order` updated) is the same either way; SPEC-data-model.md
+ * §11 records a real drag gesture as a reviewed, deliberate follow-up,
+ * not a gap in this item. Capability map redesign: domains stack
+ * vertically now (no more side-by-side L1 columns), so L1's own move
+ * buttons read "up"/"down" too, the same as L2/L3 always have — not
+ * "left"/"right" any more (`CapabilityMapView.tsx`'s own `ReorderButtons`,
+ * unified across every level). A domain's own move buttons live in its
+ * expanded body, same place its own Inspect button and "Open →" link do.
  *
  * Also covers the review follow-up that tightened C1: every capability
  * gets an `order` at creation now (useCapabilityCreate.ts), including a
@@ -15,7 +20,7 @@
  * with no "not orderable yet" disabled state left anywhere.
  */
 import { randomUUID } from 'node:crypto';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import type { CommitEnvelope } from '../src/contracts/delta';
 import { getMainBranch } from '../src/db/branches';
 import { createSupabaseClient } from '../src/db/client';
@@ -23,6 +28,18 @@ import { commitToBranch } from '../src/db/commits';
 import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
+
+/** `names`, sorted by each one's own domain row's real top-to-bottom position on the page — the vertical-stack equivalent of the old "query every link matching either name, in DOM order" trick, now that a domain's own name is plain text inside a collapsed row's button, not a link. */
+async function domainOrder(page: Page, names: readonly string[]): Promise<string[]> {
+  const withTops = await Promise.all(
+    names.map(async (name) => {
+      const box = await page.getByRole('listitem').filter({ hasText: name }).boundingBox();
+      if (!box) throw new Error(`no bounding box for domain "${name}"`);
+      return { name, top: box.y };
+    }),
+  );
+  return withTops.sort((a, b) => a.top - b.top).map((w) => w.name);
+}
 
 test('reordering: move-right swaps two L1 capabilities, move-down swaps two L2 capabilities, and a hand-added capability can be moved immediately', async ({ page }) => {
   const env = loadEnv();
@@ -92,22 +109,22 @@ test('reordering: move-right swaps two L1 capabilities, move-down swaps two L2 c
   // so they don't exist in the DOM at all until this is turned on.
   await page.getByLabel('Reorder mode').check();
 
-  // --- L1: move Root Alpha right, swapping places with Root Beta ---
-  // Every move button's own accessible name already names the capability
-  // it moves ("Move Root Alpha right") — no need to scope into a
-  // particular column/card container first.
-  await page.getByRole('button', { name: 'Move Root Alpha right' }).click();
+  // A domain's own move buttons live in its expanded body — expand Root
+  // Alpha to reach them (this also reveals its own L2 children, "Child
+  // X"/"Child Y", needed below).
+  await page.getByRole('button', { name: /Root Alpha/ }).click();
+
+  // --- L1: move Root Alpha down, swapping places with Root Beta ---
+  await page.getByRole('button', { name: 'Move Root Alpha down' }).click();
 
   // The swap is order-only (attributes.order), not a rename — Root Alpha
-  // still reads "Root Alpha" after the move, just in the second position.
-  // Both names are globally unique on this page, so querying every link
-  // matching either name gives their real DOM (= display) order directly.
+  // still reads "Root Alpha" after the move, just in the second position
+  // (top to bottom now — domains stack vertically, not side by side).
   await expect(async () => {
-    const l1Order = await page.getByRole('link', { name: /^(Root Alpha|Root Beta)$/ }).allTextContents();
-    expect(l1Order).toEqual(['Root Beta', 'Root Alpha']);
+    expect(await domainOrder(page, ['Root Alpha', 'Root Beta'])).toEqual(['Root Beta', 'Root Alpha']);
   }).toPass();
 
-  // --- L2: move Child X down within Root Alpha's own column, swapping with Child Y ---
+  // --- L2: move Child X down within Root Alpha's own expanded body, swapping with Child Y ---
   await page.getByRole('button', { name: 'Move Child X down' }).click();
 
   await expect(async () => {
@@ -126,15 +143,18 @@ test('reordering: move-right swaps two L1 capabilities, move-down swaps two L2 c
   // Lands after Root Beta and Root Alpha (order 10/21 after the swap above,
   // so the new capability gets 21) — last among the three L1s.
   await expect(async () => {
-    const l1Order = await page.getByRole('link', { name: /^(Root Alpha|Root Beta|Hand Added Root)$/ }).allTextContents();
-    expect(l1Order).toEqual(['Root Beta', 'Root Alpha', 'Hand Added Root']);
+    expect(await domainOrder(page, ['Root Alpha', 'Root Beta', 'Hand Added Root'])).toEqual(['Root Beta', 'Root Alpha', 'Hand Added Root']);
   }).toPass();
 
-  await page.getByRole('button', { name: 'Move Hand Added Root left' }).click();
+  // Single-open accordion: Root Alpha is still the one open domain (the
+  // add action didn't touch which domain is expanded), so the freshly-
+  // added "Hand Added Root" needs its own expand click to reach its own
+  // move button.
+  await page.getByRole('button', { name: /Hand Added Root/ }).click();
+  await page.getByRole('button', { name: 'Move Hand Added Root up' }).click();
 
   await expect(async () => {
-    const l1Order = await page.getByRole('link', { name: /^(Root Alpha|Root Beta|Hand Added Root)$/ }).allTextContents();
-    expect(l1Order).toEqual(['Root Beta', 'Hand Added Root', 'Root Alpha']);
+    expect(await domainOrder(page, ['Root Alpha', 'Root Beta', 'Hand Added Root'])).toEqual(['Root Beta', 'Hand Added Root', 'Root Alpha']);
   }).toPass();
 });
 
@@ -217,8 +237,12 @@ test('reordering: L3 tiles have their own move controls, and a capability with n
   if (!seedResult.ok) throw new Error(`seeding capability-map-reorder-l3 fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
-  await expect(page.getByText('L3 Reorder Root')).toBeVisible();
+  await expect(page.getByRole('button', { name: /L3 Reorder Root/ })).toBeVisible();
   await page.getByLabel('Reorder mode').check();
+
+  // A domain's own children (and their move buttons) live in its expanded
+  // body — expand "L3 Reorder Root" to reach "L3 Reorder Mid".
+  await page.getByRole('button', { name: /L3 Reorder Root/ }).click();
 
   // --- L3: expand L3 Reorder Mid, move Leaf X down, swapping with Leaf Y ---
   await page.getByRole('button', { name: /▸ 2/ }).click();
@@ -233,7 +257,10 @@ test('reordering: L3 tiles have their own move controls, and a capability with n
   // --- Order assigned on the fly: neither No Order Child has an `order`
   // at all, yet the move button still works, without the old "Both
   // capabilities need an existing order before they can swap places"
-  // refusal message ever appearing. ---
+  // refusal message ever appearing. --- Single-open accordion: expanding
+  // "No Order Root" (a different domain) closes "L3 Reorder Root" again,
+  // which is fine — its own checks above are already done.
+  await page.getByRole('button', { name: /No Order Root/ }).click();
   await expect(page.getByText('No Order Child A')).toBeVisible();
   await page.getByRole('button', { name: 'Move No Order Child A down' }).click();
 

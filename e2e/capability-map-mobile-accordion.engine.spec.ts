@@ -1,14 +1,14 @@
 /**
- * Check B6 (docs/CHECK-U4-2a.md): "Mobile (<768px): L1 groups as a
- * collapsed list (name, tone strip, coverage chip, counts), one expanded
- * at a time; L2 dense rows, no blueprint frame; L3 on tap; Playwright at
- * 390px for twelve L1 groups" — found "Not started."
- *
- * Twelve L1 capabilities (more than any desktop grid tier ever shows in
- * one row, and the exact count the item's own text names) — one of them
- * ("Finance") carries two L2 children, one of which carries an L3 leaf,
- * so the accordion, the dense L2 rows, and the L3 on-tap reveal all get
- * exercised, not just the collapsed-list shell.
+ * Capability map redesign (density pass): the single-open accordion this
+ * view's pre-redesign mobile treatment already used (Check B6,
+ * docs/CHECK-U4-2a.md) is now the *only* domain interaction model, at
+ * every width — no more separate desktop-always-open grid. This is that
+ * behavior's own regression coverage at the narrowest supported width
+ * (390px), covering: twelve domains all collapsed by default, opening one
+ * reveals its own compact capability cards, its own L3 "on tap" reveal,
+ * and opening a second domain closes the first (single-open, not a set
+ * of independently-toggled ones) — the redesign's own density goal
+ * (never showing every domain's contents at once) depends on this.
  *
  * Same "needs a real Supabase" limitation as e2e/capability-map.spec.ts.
  */
@@ -26,7 +26,7 @@ async function hasHorizontalScroll(page: Page): Promise<boolean> {
   return page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
 }
 
-test('capability map mobile accordion: twelve L1 groups collapse at 390px, one open at a time, L2 dense rows, L3 on tap', async ({ page }) => {
+test('capability map accordion: twelve domains collapse at 390px, one open at a time, compact cards, L3 on tap', async ({ page }) => {
   const env = loadEnv();
 
   const email = `capmap-mobile-${randomUUID()}@example.test`;
@@ -104,9 +104,9 @@ test('capability map mobile accordion: twelve L1 groups collapse at 390px, one o
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await expect(page.getByText('Finance', { exact: true })).toBeVisible();
 
-  // All twelve L1 group headers are present and collapsed — every name is
+  // All twelve domain headers are present and collapsed — every name is
   // visible (a collapsed list still shows its own headers), but nothing
-  // from inside any group (L2/L3 names, "Open →") is, and there's no
+  // from inside any domain (L2/L3 names, "Open →") is, and there's no
   // horizontal scroll.
   for (const name of l1Names) {
     await expect(page.getByText(name, { exact: true })).toBeVisible();
@@ -118,8 +118,8 @@ test('capability map mobile accordion: twelve L1 groups collapse at 390px, one o
   const financeToggle = page.getByRole('listitem').filter({ hasText: 'Finance' }).getByRole('button').first();
   const procurementToggle = page.getByRole('listitem').filter({ hasText: 'Procurement' }).getByRole('button').first();
 
-  // Opening Finance reveals its own L2 dense rows ("Accounts Payable",
-  // "Payroll") — not L3 yet, that's still behind its own tap.
+  // Opening Finance reveals its own compact capability cards ("Accounts
+  // Payable", "Payroll") — not L3 yet, that's still behind its own tap.
   await expect(financeToggle).toHaveAttribute('aria-expanded', 'false');
   await financeToggle.click();
   await expect(financeToggle).toHaveAttribute('aria-expanded', 'true');
@@ -128,18 +128,20 @@ test('capability map mobile accordion: twelve L1 groups collapse at 390px, one o
   await expect(page.getByText('Supplier Invoicing')).not.toBeVisible();
   expect(await hasHorizontalScroll(page)).toBe(false);
 
-  // L3 on tap: the expand toggle on "Accounts Payable"'s own dense row —
-  // the only L2 row with an L3 child while Finance is open, so its own
+  // L3 on tap: the expand toggle on "Accounts Payable"'s own card — the
+  // only L2 card with an L3 child while Finance is open, so its own
   // "▸ 1" toggle is the only button whose accessible name ends in a bare
   // digit (every other button here is either a header, whose own trailing
-  // text is "N systems"/"N capabilities", or a reorder button with a
-  // named aria-label) — reveals "Supplier Invoicing" underneath it.
+  // text is a coverage sentence, or a reorder button with a named
+  // aria-label) — reveals "Supplier Invoicing" underneath it.
   await page.getByRole('button', { name: /\d$/ }).click();
   await expect(page.getByText('Supplier Invoicing')).toBeVisible();
   expect(await hasHorizontalScroll(page)).toBe(false);
 
   // One expanded at a time: opening Procurement closes Finance — its own
-  // L2/L3 content disappears again, not just visually collapsed underneath.
+  // capability cards disappear again, not just visually collapsed
+  // underneath (this is what keeps the redesign's own density goal from
+  // creeping back in as more domains get opened over a session).
   await procurementToggle.click();
   await expect(procurementToggle).toHaveAttribute('aria-expanded', 'true');
   await expect(financeToggle).toHaveAttribute('aria-expanded', 'false');
@@ -147,7 +149,7 @@ test('capability map mobile accordion: twelve L1 groups collapse at 390px, one o
   await expect(page.getByText('Payroll')).not.toBeVisible();
   await expect(page.getByText('Supplier Invoicing')).not.toBeVisible();
 
-  // Every L1 name is still reachable — none dropped or hidden behind
+  // Every domain name is still reachable — none dropped or hidden behind
   // scroll at the narrowest tier.
   for (const name of l1Names) {
     await expect(page.getByText(name, { exact: true })).toBeVisible();

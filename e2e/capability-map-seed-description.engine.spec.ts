@@ -76,11 +76,14 @@ test('seeding from a starter map carries the map item\'s own description onto th
   const mapRow = page.locator('li').filter({ hasText: `${sector} v${String(version)}` });
   await mapRow.getByRole('button', { name: 'Import' }).click();
 
-  // The import replaces the picker with the real tree — one L1 capability.
+  // The import replaces the picker with the real tree — one domain,
+  // collapsed by default (capability map redesign) — expand it to reach
+  // its own "Open →" link.
   await expect(page.getByRole('heading', { name: 'Start from a capability map' })).toHaveCount(0);
-  await expect(page.getByText('Network Operations')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Network Operations/ })).toBeVisible();
+  await page.getByRole('button', { name: /Network Operations/ }).click();
 
-  await page.getByRole('link', { name: 'Network Operations' }).click();
+  await page.getByRole('link', { name: /Open Network Operations/ }).click();
   await expect(page.getByRole('heading', { name: 'Network Operations' })).toBeVisible();
 
   // Bug A2 itself: the map's own description text shows up (it was
