@@ -53,9 +53,12 @@ test('convert a system into a module of an existing platform, carrying its relat
   // aliased onto the module) still resolves, even though the module itself
   // is now named "FT" — same "old name found by search" story
   // `golden-path-merge-elements.spec.ts` already establishes for a merge.
+  // The result row reads "SAP · FT" (moduleDisplayName's own "Platform ·
+  // Module" convention, applied to search results too) — the module's own
+  // element page heading still shows its bare name, unaffected.
   await goToModelHome(page);
   const searchBox = page.getByPlaceholder('Search or create a capability, system, or actor…');
   await searchBox.fill('Freight Tracker');
-  await page.getByRole('link', { name: 'FT', exact: true }).click();
+  await page.getByRole('link', { name: 'SAP · FT', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'FT' })).toBeVisible();
 });

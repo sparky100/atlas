@@ -4,6 +4,7 @@ import type { ElementType, UUID } from '../../../contracts/delta';
 import type { BranchRow } from '../../../db/types';
 import { useElementCreate } from '../../elements/useElementCreate';
 import { useElementSearchAdd } from '../../elements/useElementSearchAdd';
+import { moduleDisplayName } from '../../elements/moduleDisplayName';
 import { Button } from '../Button/Button';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
@@ -117,7 +118,7 @@ export function ElementSearchAdd({
             <li key={result.element.element_id}>
               <Link to={elementHref(result.element.element_id)} className={styles.resultRow}>
                 <ElementTypeGlyph type={result.element.element_type} />
-                <Text as="span">{result.element.name}</Text>
+                <Text as="span">{moduleDisplayName(result.element, result.parent)}</Text>
                 {result.owner && (
                   <Text as="span" tone="muted" size="sm">
                     owned by {result.owner.name}

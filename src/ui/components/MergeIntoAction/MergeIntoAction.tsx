@@ -3,6 +3,7 @@ import type { ElementsHeadRow } from '../../../contracts/rows';
 import type { UUID } from '../../../contracts/delta';
 import type { BranchRow } from '../../../db/types';
 import { useElementMerge } from '../../elements/useElementMerge';
+import { moduleDisplayName } from '../../elements/moduleDisplayName';
 import { useMergePreview } from '../../elements/useMergePreview';
 import { useRelationshipTargetSearch } from '../../elements/useRelationshipTargetSearch';
 import { mergeReparentEffectSentences, mergeRelationshipEffectSentences } from './mergeEffectSentences';
@@ -128,11 +129,11 @@ export function MergeIntoAction({
                     type="button"
                     className={styles.resultRow}
                     onClick={() => {
-                      setTarget({ elementId: result.element_id, name: result.name });
+                      setTarget({ elementId: result.element_id, name: moduleDisplayName(result, search.resultParents.get(result.element_id) ?? null) });
                     }}
                   >
                     <ElementTypeGlyph type={result.element_type} />
-                    <Text as="span">{result.name}</Text>
+                    <Text as="span">{moduleDisplayName(result, search.resultParents.get(result.element_id) ?? null)}</Text>
                   </button>
                 </li>
               ))}

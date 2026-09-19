@@ -1,14 +1,16 @@
 /**
  * "Platform · Module" — a bare module name ("PM", "FI") is ambiguous
- * without knowing whose module it is, the same reasoning
- * `landscapeModules.ts`'s own `withModuleLabels` already applies on the
- * landscape canvas. Pulled out of `RelationshipsSection.tsx` so it's
- * unit-testable without mounting a component, the same split
- * `relationshipRemovalEffect.ts` already uses.
+ * without knowing whose module it is. Pulled out of `RelationshipsSection.tsx`
+ * so it's unit-testable without mounting a component, the same split
+ * `relationshipRemovalEffect.ts` already uses; the naming itself is
+ * `moduleDisplayName`'s own (`src/ui/elements/moduleDisplayName.ts`), the
+ * one shared implementation every surface that can show a module name
+ * uses — this file's own job is just resolving `other`'s parent out of
+ * whatever map this page already has.
  */
 import type { UUID } from '../../../contracts/delta';
 import type { ElementsHeadRow } from '../../../contracts/rows';
-import { isPlatform } from '../../elements/systemKind';
+import { moduleDisplayName } from '../../elements/moduleDisplayName';
 
 /**
  * `other`'s own display name — "Platform · Module" when `other` is a
@@ -19,7 +21,6 @@ import { isPlatform } from '../../elements/systemKind';
  * looks anything up beyond that map.
  */
 export function endpointDisplayName(other: ElementsHeadRow, endpoints: ReadonlyMap<UUID, ElementsHeadRow>): string {
-  if (other.element_type !== 'container' || other.parent_id === null) return other.name;
-  const parent = endpoints.get(other.parent_id);
-  return parent && isPlatform(parent) ? `${parent.name} · ${other.name}` : other.name;
+  const parent = other.parent_id !== null ? (endpoints.get(other.parent_id) ?? null) : null;
+  return moduleDisplayName(other, parent);
 }

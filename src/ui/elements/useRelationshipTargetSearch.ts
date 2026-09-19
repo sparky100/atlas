@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { countMatches, loadSearchPoolForTypes, matchElements, type SearchPoolElement } from '../../db/elementSearch';
+import { getElementsByIds } from '../../db/elements';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -15,6 +16,8 @@ export interface UseRelationshipTargetSearchResult {
   results: ElementsHeadRow[];
   /** How many more real matches exist beyond `results` (`countMatches` minus what's shown) — a caller renders this so an empty or short `results` list reads as "keep typing to narrow," never "this doesn't exist." 0 when nothing was cut off. */
   moreCount: number;
+  /** Every container result's own parent, keyed by the container's own `element_id` — resolved once per pool load (every distinct parent among the *whole* pool, not just the currently-shown page of results), so `moduleDisplayName(result, resultParents.get(result.element_id) ?? null)` renders "Platform · Module" the same way every other surface that can show a container does. Empty when `targetTypes` never includes `container` at all, or a parent lookup fails (best-effort — same "a display enrichment failing shouldn't hide the match itself" stance `enrichElementMatches.ts` takes). */
+  resultParents: ReadonlyMap<UUID, ElementsHeadRow>;
 }
 
 /**
@@ -40,6 +43,7 @@ export function useRelationshipTargetSearch(commitId: UUID, modelId: UUID, targe
   const [pool, setPool] = useState<SearchPoolElement[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [resultParents, setResultParents] = useState<Map<UUID, ElementsHeadRow>>(new Map());
   const typesKey = targetTypes.join(',');
 
   useEffect(() => {
@@ -47,9 +51,34 @@ export function useRelationshipTargetSearch(commitId: UUID, modelId: UUID, targe
     let cancelled = false;
     setPool(null);
     setError(null);
+    setResultParents(new Map());
     loadSearchPoolForTypes(supabase, commitId, modelId, targetTypes)
       .then((loaded) => {
-        if (!cancelled) setPool(loaded);
+        if (cancelled) return;
+        setPool(loaded);
+        // Resolved once per pool load, for every container in the whole
+        // pool — not re-fetched per keystroke, and not scoped to whatever
+        // page of results a given query happens to show.
+        const containersWithParent = loaded.filter((p): p is SearchPoolElement & { element: ElementsHeadRow & { parent_id: UUID } } => p.element.element_type === 'container' && p.element.parent_id !== null);
+        const containerParentIds = [...new Set(containersWithParent.map((p) => p.element.parent_id))];
+        if (containerParentIds.length === 0) return;
+        getElementsByIds(supabase, commitId, containerParentIds)
+          .then((parentsById) => {
+            if (cancelled) return;
+            const byContainerId = new Map<UUID, ElementsHeadRow>();
+            for (const { element } of loaded) {
+              if (element.element_type !== 'container' || element.parent_id === null) continue;
+              const parent = parentsById.get(element.parent_id);
+              if (parent) byContainerId.set(element.element_id, parent);
+            }
+            setResultParents(byContainerId);
+          })
+          .catch(() => {
+            // Best-effort, same stance `enrichElementMatches.ts` takes: a
+            // display enrichment failing shouldn't hide the match itself,
+            // so this silently leaves every module's name bare rather than
+            // surfacing a second error state.
+          });
       })
       .catch((e: unknown) => {
         // S1 audit follow-up (item 15's own reportError rollout missed this one).
@@ -71,5 +100,5 @@ export function useRelationshipTargetSearch(commitId: UUID, modelId: UUID, targe
   const totalMatches = pool ? countMatches(pool, query, excludeElementId) : 0;
   const status: RelationshipTargetSearchStatus = error !== null ? 'error' : pool === null ? 'loading' : 'ready';
 
-  return { query, setQuery, status, error, results: matches, moreCount: Math.max(0, totalMatches - matches.length) };
+  return { query, setQuery, status, error, results: matches, moreCount: Math.max(0, totalMatches - matches.length), resultParents };
 }

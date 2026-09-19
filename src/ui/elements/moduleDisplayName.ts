@@ -1,0 +1,29 @@
+/**
+ * "Platform · Module" — the one place this naming convention is actually
+ * computed. A bare module name ("PM", "FI", "RE") is ambiguous on its own
+ * — the same short name recurs across different platforms — so a
+ * container whose parent is a live platform system reads as
+ * "{platform} · {module}" everywhere this product shows one: the
+ * landscape canvas (`useLandscape.ts`), the capability-map flat list
+ * (`useCapabilityLandscape.ts`, via `landscapeModules.ts`'s own
+ * `withModuleLabels`), the Relationships section
+ * (`relationshipEndpointLabel.ts`), and every search list a container can
+ * appear in (Home search, the "+ Add" element-creation control, and every
+ * relationship/retire/merge target picker). One implementation, so "the
+ * same convention" can never quietly drift into four slightly different
+ * ones.
+ */
+import type { ElementsHeadRow } from '../../contracts/rows';
+import { isPlatform } from './systemKind';
+
+/**
+ * `element`'s own display name — "{parent} · {element}" when `element` is
+ * a container whose given `parent` is a live platform system, otherwise
+ * just `element.name`. Never looks anything up itself; the caller already
+ * has (or knows how to resolve) `parent`, however it's scoped — an
+ * endpoints map, a batched parent lookup, or a single already-fetched row.
+ */
+export function moduleDisplayName(element: ElementsHeadRow, parent: ElementsHeadRow | null): string {
+  if (element.element_type !== 'container' || parent === null) return element.name;
+  return isPlatform(parent) ? `${parent.name} · ${element.name}` : element.name;
+}
