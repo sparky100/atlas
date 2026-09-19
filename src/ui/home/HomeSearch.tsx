@@ -7,6 +7,7 @@ import type { BranchRow, MemberRole } from '../../db/types';
 import { useElementCreate } from '../elements/useElementCreate';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { moduleDisplayName } from '../elements/moduleDisplayName';
+import { useRelationshipTargetSearch } from '../elements/useRelationshipTargetSearch';
 import { attributesRecord } from '../elements/attributesRecord';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -16,9 +17,16 @@ import { canCreateChangeBranch, canEditOnMain } from '../orgs/useMembership';
 import { defaultIntentForEntryPoint } from '../changes/branchIntent';
 import { CapabilitySupportsPicker } from './CapabilitySupportsPicker';
 import { ProposeChangePicker } from './ProposeChangePicker';
-import { HOME_SEARCH_CREATABLE_TYPES } from './homeSearchTypes';
+import { HOME_SEARCH_TYPES } from './homeSearchTypes';
 import { useHomeSearch } from './useHomeSearch';
 import styles from './HomeSearch.module.css';
+
+// A container has no other element to naturally exclude from its own
+// platform picker (unlike `useRelationshipTargetSearch`'s usual caller,
+// relating one *existing* element to another) — same "no real element to
+// exclude" sentinel `DecisionLinkPicker.tsx` already uses for the identical
+// reason.
+const NO_EXCLUSION: UUID = '00000000-0000-0000-0000-000000000000';
 
 export interface HomeSearchProps {
   modelId: UUID;
@@ -54,9 +62,15 @@ export interface HomeSearchProps {
  * immediate-create this control always had, since the flow's own required-
  * description reasoning ("what stops the model filling with named systems
  * nobody can describe") is system-specific and `actor` has no description
- * attribute to require (`attributeSchema.ts`'s `ACTOR_ORDER`). Decision 5's
- * branch handling (active ref, propose-a-change for a contributor at main)
- * applies to every type this control creates, not system alone.
+ * attribute to require (`attributeSchema.ts`'s `ACTOR_ORDER`). `container`
+ * has its own required step too — `showPlatformPicker`'s own sheet, a
+ * search-and-pick for which system this is a module of (ADR-001: a
+ * container's `parentId` can never be null) — reusing the same "search for
+ * the target system, no kind restriction" shape `ConvertToModuleAction.tsx`
+ * already establishes for the identical question asked a different way.
+ * Decision 5's branch handling (active ref, propose-a-change for a
+ * contributor at main) applies to every type this control creates, not
+ * system alone.
  */
 export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activeRef, editingBranch, orgSlug, modelSlug, autoFocus }: HomeSearchProps) {
   const navigate = useNavigate();
@@ -65,6 +79,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
   const [sheetOpen, setSheetOpen] = useState(false);
   const [description, setDescription] = useState('');
   const [capability, setCapability] = useState<{ id: UUID; name: string } | null>(null);
+  const [platform, setPlatform] = useState<{ id: UUID; name: string } | null>(null);
   const [proposedBranch, setProposedBranch] = useState<BranchRow | null>(null);
   // Bug fix: this used to hardcode `?ref=main` — an *existing* element
   // found by search always lives on main (search itself never varies
@@ -84,14 +99,22 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
     setSheetOpen(false);
     setDescription('');
     setCapability(null);
+    setPlatform(null);
   };
+
+  const showPlatformPicker = createType === 'container';
+  // Every other creatable type is top-level (ADR-001: `parentId` null) —
+  // only a container needs one, and only once `platform` is actually
+  // chosen (`showPlatformPicker`'s own sheet below gates `create` on that).
+  const parentId = showPlatformPicker ? (platform?.id ?? null) : null;
+  const platformSearch = useRelationshipTargetSearch(searchCommitId, modelId, ['system'], NO_EXCLUSION, showPlatformPicker && sheetOpen && platform === null);
 
   const { status: createStatus, error: createError, create } = useElementCreate({
     modelId,
     orgId,
     userId,
     elementType: createType,
-    parentId: null,
+    parentId,
     branch: writeBranch ?? PLACEHOLDER_BRANCH,
     expectedHeadCommitId: writeBranch?.head_commit_id ?? '',
     onCreated: (elementId) => {
@@ -180,7 +203,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
               setCreateType(e.target.value as ElementType);
             }}
           >
-            {HOME_SEARCH_CREATABLE_TYPES.map((type) => (
+            {HOME_SEARCH_TYPES.map((type) => (
               <option key={type} value={type}>
                 {type}
               </option>
@@ -190,10 +213,11 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
             variant="primary"
             onClick={() => {
               // Every path needs at least a resolved write branch; `system`
-              // additionally needs the description/capability sheet — both
-              // gate through `sheetOpen` so there is exactly one place
+              // additionally needs the description/capability sheet,
+              // `container` its own platform picker — every extra step
+              // gates through `sheetOpen` so there is exactly one place
               // (below) that decides what to show next.
-              if (showDescriptionSheet || (contributorAtMain && !proposedBranch)) setSheetOpen(true);
+              if (showDescriptionSheet || showPlatformPicker || (contributorAtMain && !proposedBranch)) setSheetOpen(true);
               else void create(search.query);
             }}
           >
@@ -210,9 +234,10 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
           defaultIntent={defaultIntentForEntryPoint('homeSearch')}
           onChosen={(branch) => {
             setProposedBranch(branch);
-            // A type with no description sheet of its own (capability,
-            // actor) is ready to create the moment a write branch exists.
-            if (!showDescriptionSheet) void create(search.query);
+            // A type with no further sheet of its own (capability, actor)
+            // is ready to create the moment a write branch exists; `system`
+            // and `container` still have their own required step next.
+            if (!showDescriptionSheet && !showPlatformPicker) void create(search.query);
           }}
           onCancel={resetSheet}
         />
@@ -261,6 +286,79 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
                 Skip capability
               </Button>
             )}
+            <Button variant="ghost" onClick={resetSheet} disabled={createStatus === 'creating'}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {search.showCreate && sheetOpen && showPlatformPicker && (!contributorAtMain || proposedBranch) && (
+        <div className={styles.sheet} data-testid="add-container-sheet">
+          {writeBranch?.kind === 'change' && (
+            <Text as="p" tone="muted" size="sm">
+              Adding to change: {writeBranch.title ?? writeBranch.name}
+            </Text>
+          )}
+          <Text as="label" size="sm">
+            Which platform is this a module of? (required)
+          </Text>
+          {platform ? (
+            <Text as="p" size="sm">
+              Module of <strong>{platform.name}</strong>.{' '}
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setPlatform(null);
+                }}
+                disabled={createStatus === 'creating'}
+              >
+                Change
+              </Button>
+            </Text>
+          ) : (
+            <div>
+              <input
+                type="text"
+                className={styles.input}
+                placeholder="Search for the platform this is a module of…"
+                value={platformSearch.query}
+                onChange={(e) => {
+                  platformSearch.setQuery(e.target.value);
+                }}
+              />
+              {platformSearch.status === 'loading' && (
+                <Text as="p" tone="muted" size="sm">
+                  Loading…
+                </Text>
+              )}
+              {platformSearch.results.length > 0 && (
+                <ul className={styles.results}>
+                  {platformSearch.results.map((result) => (
+                    <li key={result.element_id}>
+                      <button
+                        type="button"
+                        className={styles.resultRow}
+                        onClick={() => {
+                          setPlatform({ id: result.element_id, name: result.name });
+                        }}
+                      >
+                        <ElementTypeGlyph type={result.element_type} />
+                        <Text as="span">{result.name}</Text>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          <Text as="p" tone="faint" size="xs">
+            Written as manual · {userId ? 'you' : 'signed-in user'} · confidence 1.00.
+          </Text>
+          <div className={styles.actions}>
+            <Button variant="primary" disabled={createStatus === 'creating' || platform === null} onClick={() => void create(search.query)}>
+              {createStatus === 'creating' ? 'Creating…' : 'Create'}
+            </Button>
             <Button variant="ghost" onClick={resetSheet} disabled={createStatus === 'creating'}>
               Cancel
             </Button>

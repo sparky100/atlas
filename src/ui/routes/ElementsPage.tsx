@@ -7,16 +7,19 @@ import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ElementBrowseTable } from '../components/ElementBrowseTable/ElementBrowseTable';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useThreadCounts } from '../comments/useThreadCounts';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
+import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { refLabelOf } from '../../db/ref';
+import { HomeSearch } from '../home/HomeSearch';
 import { useModels } from '../models/useModels';
-import { canEditOnMain, canStartDecision, useMembership } from '../orgs/useMembership';
+import { canCreateChangeBranch, canEditOnMain, canStartDecision, useMembership } from '../orgs/useMembership';
 import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { useElementBrowse, type ElementBrowseFilter } from '../elements/useElementBrowse';
@@ -91,6 +94,13 @@ export function ElementsPage() {
   const canEdit = canEditOnMain(role);
   const [importOpen, setImportOpen] = useState(false);
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
+  // Same search-first "type a name, find it or create it" control the front
+  // doors use (`ModelHome.tsx`'s own `HomeSearch` wiring, verbatim) — a
+  // browse table is exactly where "does this already exist?" matters most,
+  // so it gets the identical duplicate-catching create path rather than a
+  // second, bespoke one.
+  const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
+  const canShowSearch = canCreateChangeBranch(role);
   // F1 ("custom attributes") PR4: read-only here, same reuse as
   // ElementPage.tsx's own PR3 wiring — any member can see these
   // (attribute_definitions_select's RLS), and this page only ever filters/
@@ -199,6 +209,21 @@ export function ElementsPage() {
           <Text as="h1" size="2xl">
             Elements
           </Text>
+          {canShowSearch && mainBranch && (
+            <Panel>
+              <HomeSearch
+                modelId={model.id}
+                orgId={organisation?.id ?? ''}
+                userId={userId}
+                role={role}
+                searchCommitId={mainBranch.head_commit_id}
+                activeRef={ref}
+                editingBranch={editingBranch}
+                orgSlug={organisation?.slug ?? ''}
+                modelSlug={model.slug}
+              />
+            </Panel>
+          )}
           <ElementBrowseTable
             state={state}
             orgSlug={organisation?.slug ?? ''}
