@@ -74,6 +74,16 @@ describe('System/container version (S1 item 11)', () => {
   });
 });
 
+describe('Actor description', () => {
+  it('is an optional, multiline text field, same as every other element type\'s own description', () => {
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.actor.find((f) => f.key === 'description')).toMatchObject({ label: 'Description', required: false, kind: 'text', multiline: true });
+  });
+
+  it('is never defaulted at create — only a required boolean/enum field gets a default', () => {
+    expect(defaultCreateAttributes('actor')).not.toHaveProperty('description');
+  });
+});
+
 describe('validateAttributeValue', () => {
   it('rejects clearing a required field', () => {
     expect(validateAttributeValue('system', 'lifecycleStatus', '')).toEqual({ ok: false, error: 'Lifecycle is required' });

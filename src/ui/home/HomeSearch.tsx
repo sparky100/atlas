@@ -61,9 +61,10 @@ export interface HomeSearchProps {
  * committing (decisions 7/8) — `capability`/`actor` keep the plainer
  * immediate-create this control always had, since the flow's own required-
  * description reasoning ("what stops the model filling with named systems
- * nobody can describe") is system-specific and `actor` has no description
- * attribute to require (`attributeSchema.ts`'s `ACTOR_ORDER`). `container`
- * has its own required step too — `showPlatformPicker`'s own sheet, a
+ * nobody can describe") is system-specific; an actor *can* carry a
+ * description too (`attributeSchema.ts`'s `ACTOR_ORDER`), it's just never
+ * required at creation the way a system's is. `container` has its own
+ * required step too — `showPlatformPicker`'s own sheet, a
  * search-and-pick for which system this is a module of (ADR-001: a
  * container's `parentId` can never be null) — reusing the same "search for
  * the target system, no kind restriction" shape `ConvertToModuleAction.tsx`
