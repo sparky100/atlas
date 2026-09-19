@@ -81,8 +81,6 @@ const LABEL_OVERHANG_MAX = 16;
 /** A column-group (left/right) label has no neighbouring tile to share width with — its own edge sits in open gap space — so it gets a fixed generous budget instead of a tile-span-derived one. */
 const COLUMN_LABEL_MAX_WIDTH = 140;
 
-/** Gap between the hub's own left/right edge and the nearest source/target tile — wide enough for one `COLUMN_LABEL_MAX_WIDTH` pill to sit centred in it with `LABEL_MARGIN` clearance from both the tile and the hub, so a single-edge neighbour's own label never reaches either. */
-const GAP_HUB_LR = COLUMN_LABEL_MAX_WIDTH + 2 * LABEL_MARGIN;
 /** Gap between the hub's own top/bottom edge and the nearest actor/two-way tile. */
 const GAP_HUB_TB = 64;
 /** Gap between two tiles stacked along a group's own stacking axis. */
@@ -99,6 +97,8 @@ export const LABEL_PILL_HEIGHT_1_LINE = 18;
 export const LABEL_PILL_HEIGHT_2_LINE = 30;
 /** Two pills closer than this in x, sharing a y band, count as colliding (`edgeLabelsCollide`) — crowded, not just touching. */
 const LABEL_MIN_GAP_X = 6;
+/** Distance between consecutive label slots in a column group's own multi-edge stack — wide enough that two full-`COLUMN_LABEL_MAX_WIDTH` pills never overlap, whatever their real text (`layoutColumn`'s own comment on why this differs from the row engine's much smaller `LABEL_PITCH`). */
+const COLUMN_LABEL_PITCH = COLUMN_LABEL_MAX_WIDTH + LABEL_MIN_GAP_X;
 
 export interface DiagramTile {
   elementId: UUID;
@@ -312,12 +312,21 @@ function flattenGroupEdges(placed: readonly PlacedTile[], edgesByNeighbour: Read
  */
 function layoutColumn(sign: -1 | 1, internalIds: readonly UUID[], externalIds: readonly UUID[], edgesByNeighbour: ReadonlyMap<UUID, LayoutEdge[]>, hub: DiagramTile): GroupResult {
   const { placed, span } = placeGroup(internalIds, externalIds, NODE_HEIGHT);
+  // A neighbour with more than one edge stacks that many label pills, each
+  // up to `COLUMN_LABEL_MAX_WIDTH` wide, along the gap — `COLUMN_LABEL_PITCH`
+  // spaces consecutive slots far enough apart that two full-width pills
+  // never overlap regardless of their real text, and the gap itself widens
+  // to fit however many slots this side's *most*-connected neighbour needs
+  // (mirroring how a row's own channel height grows with its own densest
+  // neighbour's label stack).
+  const maxEdgesPerNeighbour = Math.max(1, ...placed.map((p) => edgesByNeighbour.get(p.id)?.length ?? 1));
+  const gap = 2 * LABEL_MARGIN + COLUMN_LABEL_MAX_WIDTH + (maxEdgesPerNeighbour - 1) * COLUMN_LABEL_PITCH;
   const yStart = hub.y + (hub.h - span) / 2;
   const tileAt = new Map<UUID, DiagramTile>();
   const tiles: DiagramTile[] = placed.map((p) => {
     const tile: DiagramTile = {
       elementId: p.id,
-      x: sign === -1 ? hub.x - GAP_HUB_LR - NODE_WIDTH - p.band * (NODE_WIDTH + BAND_GAP) : hub.x + hub.w + GAP_HUB_LR + p.band * (NODE_WIDTH + BAND_GAP),
+      x: sign === -1 ? hub.x - gap - NODE_WIDTH - p.band * (NODE_WIDTH + BAND_GAP) : hub.x + hub.w + gap + p.band * (NODE_WIDTH + BAND_GAP),
       y: yStart + p.along,
       w: NODE_WIDTH,
       h: NODE_HEIGHT,
@@ -335,11 +344,11 @@ function layoutColumn(sign: -1 | 1, internalIds: readonly UUID[], externalIds: r
     const slot = Math.max(0, siblings.findIndex((s) => s.id === edge.id));
     const neighbourPortY = spreadAlong(tile.y, NODE_HEIGHT, slot, siblings.length);
     const hubPortY = spreadAlong(hub.y, hub.h, k, laneCount);
-    const laneX = sign === -1 ? hub.x - GAP_HUB_LR + spreadAlong(0, GAP_HUB_LR, k, laneCount) : hub.x + hub.w + spreadAlong(0, GAP_HUB_LR, k, laneCount);
+    const laneX = sign === -1 ? hub.x - gap + spreadAlong(0, gap, k, laneCount) : hub.x + hub.w + spreadAlong(0, gap, k, laneCount);
     const neighbourAnchor: Point = { x: sign === -1 ? tile.x + tile.w : tile.x, y: neighbourPortY };
     const hubAnchor: Point = { x: sign === -1 ? hub.x : hub.x + hub.w, y: hubPortY };
-    // Centred at least half of `COLUMN_LABEL_MAX_WIDTH` past the tile's own edge, so even a full-width pill clears the tile — `GAP_HUB_LR`'s own comment sizes the gap to give this (and the matching clearance from the hub) room.
-    const labelX = sign === -1 ? tile.x + tile.w + LABEL_MARGIN + COLUMN_LABEL_MAX_WIDTH / 2 + slot * LABEL_PITCH : tile.x - LABEL_MARGIN - COLUMN_LABEL_MAX_WIDTH / 2 - slot * LABEL_PITCH;
+    // Centred at least half of `COLUMN_LABEL_MAX_WIDTH` past the tile's own edge, so even a full-width pill clears the tile — `gap`'s own sizing above gives this (and the matching clearance from the hub, and from a sibling slot) room.
+    const labelX = sign === -1 ? tile.x + tile.w + LABEL_MARGIN + COLUMN_LABEL_MAX_WIDTH / 2 + slot * COLUMN_LABEL_PITCH : tile.x - LABEL_MARGIN - COLUMN_LABEL_MAX_WIDTH / 2 - slot * COLUMN_LABEL_PITCH;
     return {
       id: edge.id,
       neighbourId: edge.neighbourId,

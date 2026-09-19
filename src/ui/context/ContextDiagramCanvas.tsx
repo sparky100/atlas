@@ -570,6 +570,14 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
       data-edge-labels={edgeLabelsVisible ? 'visible' : 'hidden'}
       data-edge-labels-collide={labelsWouldCollide ? 'true' : 'false'}
       data-focused-element-id={focusedElementId ?? ''}
+      // Context layout v2, rework item 3: the number of *routed* edges — a
+      // two-way neighbour's own opposing pair merges into one, so this is
+      // lower than the raw relationship count whenever a bidirectional pair
+      // exists. Canvas pixels aren't Playwright-inspectable (this
+      // component's own module comment); this count is, and is the one
+      // DOM-observable proof a merge actually happened rather than drawing
+      // two separately routed lines.
+      data-edge-count={layout.edges.length}
     >
       <canvas
         ref={canvasRef}

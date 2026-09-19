@@ -270,15 +270,16 @@ describe('SAP PM context fixture — the standing density case (fixtures/sapCont
   const layout = pmLayout(1280);
   const measure = fixedWidthMeasurer(6);
 
-  it('is the scenario the fixture describes: 4 internal neighbours with 1–2 flows each, 1 external actor', () => {
+  it('is the scenario the fixture describes: 8 neighbours, 12 relationships, 1 external, exactly 1 two-way pair', () => {
     const internal = inputs.neighbours.filter((n) => !n.isExternal);
     const external = inputs.neighbours.filter((n) => n.isExternal);
-    expect(internal).toHaveLength(4);
+    expect(inputs.neighbours).toHaveLength(8);
+    expect(internal).toHaveLength(7);
     expect(external).toHaveLength(1);
-    for (const neighbourScenario of PM_CONTEXT_SCENARIO.neighbours.filter((n) => !n.isExternal)) {
-      expect(neighbourScenario.flows.length).toBeGreaterThanOrEqual(1);
-      expect(neighbourScenario.flows.length).toBeLessThanOrEqual(2);
-    }
+    expect(inputs.edges).toHaveLength(12);
+    const twoWay = PM_CONTEXT_SCENARIO.neighbours.filter((n) => new Set(n.flows.map((f) => f.direction)).size === 2);
+    expect(twoWay).toHaveLength(1);
+    expect(twoWay[0]?.key).toBe('field-service');
   });
 
   it('places every tile with no two tiles overlapping, hub included', () => {
@@ -298,11 +299,26 @@ describe('SAP PM context fixture — the standing density case (fixtures/sapCont
     }
   });
 
-  it('gives every edge its own attach point at both ends — no two edges share a segment', () => {
+  it('no two edges share a port on the hub tile (or on a neighbour tile)', () => {
     const hubAttach = layout.edges.map((e) => `${String(e.hubAnchor.x)} ${String(e.hubAnchor.y)}`);
     expect(new Set(hubAttach).size).toBe(hubAttach.length);
     const neighbourAttach = layout.edges.map((e) => `${String(e.neighbourAnchor.x)} ${String(e.neighbourAnchor.y)}`);
     expect(new Set(neighbourAttach).size).toBe(neighbourAttach.length);
+  });
+
+  it("field-service's own two-way pair renders as one edge, arrowheads at both ends, both verbs in one label — not two separately routed lines", () => {
+    const fieldServiceEdges = layout.edges.filter((e) => e.neighbourId === 'field-service');
+    expect(fieldServiceEdges).toHaveLength(1);
+    const [edge] = fieldServiceEdges;
+    if (!edge) throw new Error('expected field-service to have one routed edge');
+    expect(edge.arrowAtHub).toBe(true);
+    expect(edge.arrowAtNeighbour).toBe(true);
+    expect(edge.relationshipIds).toHaveLength(2);
+    expect(edge.label).toContain('dispatches work orders to');
+    expect(edge.label).toContain('returns job completion and timesheets to');
+    // 12 relationships in, 11 routed edges out — the only place the count drops is this one merge.
+    expect(inputs.edges).toHaveLength(12);
+    expect(layout.edges).toHaveLength(11);
   });
 
   it('no edge segment passes through the interior of any tile', () => {

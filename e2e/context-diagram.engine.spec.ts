@@ -90,7 +90,7 @@ test('SAP as a platform renders its own module tiles only — no edges, no label
 
   // Item 3: no canvas, no edges, no labels at the platform level at all —
   // the whole point of the structure-only page, even though PM (one of
-  // these same modules) has five real neighbours of its own.
+  // these same modules) has eight real neighbours of its own.
   await expect(page.getByRole('img', { name: /Context diagram/ })).toHaveCount(0);
   await expect(page.locator('[data-scale]')).toHaveCount(0);
   await expect(page.getByText(/uses →|used by|flows to|flows from/)).toHaveCount(0);
@@ -115,7 +115,7 @@ test('SAP as a platform renders its own module tiles only — no edges, no label
   expect(crumbText.indexOf('SAP')).toBeLessThan(crumbText.indexOf('PM'));
 });
 
-test("SAP PM's own Context page (a container, one of SAP's modules) renders its real neighbours with every label visible and non-colliding at 1280; Ofgem renders outside the boundary", async ({ page }) => {
+test("SAP PM's own Context page (a container, one of SAP's modules) renders its real neighbours with every label visible and non-colliding at 1280; Informatica renders outside the boundary", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const env = loadEnv();
   const fixture = await seedSapContextFixture(page, env, 'ctxpm');
@@ -136,9 +136,17 @@ test("SAP PM's own Context page (a container, one of SAP's modules) renders its 
   // The hub's own aria-label now reads "SAP · PM" — moduleDisplayName's
   // "Platform · Module" convention, applied to the Context diagram's hub
   // tile too (PM is one of SAP's own modules).
-  await expect(page.getByRole('img', { name: /Context diagram: SAP · PM and 5 connected/ })).toBeVisible();
+  await expect(page.getByRole('img', { name: /Context diagram: SAP · PM and 8 connected/ })).toBeVisible();
   await expect(canvasWrapper).toHaveAttribute('data-edge-labels-collide', 'false');
   await expect(canvasWrapper).toHaveAttribute('data-edge-labels', 'visible');
+  // Context layout v2, rework item 3: 12 relationships seeded, but
+  // field-service's own in/out pair merges into one routed edge — 11, not
+  // 12. Canvas pixels aren't Playwright-inspectable, so this DOM count is
+  // the proof the merge actually happened (contextDiagramLayout.test.ts's
+  // own "field-service's own two-way pair renders as one edge" test is the
+  // one that checks the geometry itself: no shared port, both verbs in one
+  // label, arrowheads at both ends).
+  await expect(canvasWrapper).toHaveAttribute('data-edge-count', '11');
   const labelsToggle = page.getByRole('button', { name: 'Show edge labels' });
   await expect(labelsToggle).toHaveAttribute('aria-pressed', 'true');
 
@@ -151,7 +159,7 @@ test("SAP PM's own Context page (a container, one of SAP's modules) renders its 
   await expect(canvasWrapper).toHaveAttribute('data-edge-labels', 'visible');
 });
 
-test("the same PM fixture on mobile lists every neighbour under its direction with every verb intact, Ofgem flagged external", async ({ page }) => {
+test("the same PM fixture on mobile lists every neighbour under its direction with every verb intact, Informatica flagged external", async ({ page }) => {
   const env = loadEnv();
   const fixture = await seedSapContextFixture(page, env, 'ctxpmm');
   const { orgSlug, modelSlug, moduleIdByCode, scenario } = fixture;
@@ -167,11 +175,11 @@ test("the same PM fixture on mobile lists every neighbour under its direction wi
     if (flow.relationshipType === 'flows_to') return flow.direction === 'out' ? 'Flows out' : 'Flows in';
     return flow.direction === 'out' ? 'Uses' : 'Used by';
   };
-  const expected = new Map<string, { name: string; label: string }[]>();
+  const expected = new Map<string, { name: string; label: string; isExternal: boolean }[]>();
   for (const neighbour of scenario.neighbours) {
     for (const flow of neighbour.flows) {
       const group = groupOf(neighbour, flow);
-      expected.set(group, [...(expected.get(group) ?? []), { name: neighbour.name, label: scenarioEdgeLabel(flow) }]);
+      expected.set(group, [...(expected.get(group) ?? []), { name: neighbour.name, label: scenarioEdgeLabel(flow), isExternal: neighbour.isExternal }]);
     }
   }
   for (const [group, rows] of expected) {
@@ -183,6 +191,7 @@ test("the same PM fixture on mobile lists every neighbour under its direction wi
       await expect(page.getByText(row.name, { exact: true }).first()).toBeVisible();
       await expect(page.getByText(row.label, { exact: false }).first()).toBeVisible();
     }
-    if (group === 'People') await expect(page.getByText('external', { exact: true }).first()).toBeVisible();
+    // Informatica (Context layout v2's own external neighbour) is external whichever direction group it lands in — not just a "People" case, now that the fixture's only external neighbour is a system.
+    if (rows.some((r) => r.isExternal)) await expect(page.getByText('external', { exact: true }).first()).toBeVisible();
   }
 });
