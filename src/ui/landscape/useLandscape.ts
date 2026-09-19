@@ -19,6 +19,7 @@ import type { ViewMode } from '../../db/viewMode';
 import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
 import { l1AncestorOf, loadCapabilityAncestry } from '../elements/capabilityDepth';
+import { moduleDisplayName } from '../elements/moduleDisplayName';
 import { isPlatform } from '../elements/systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -247,8 +248,8 @@ export function useLandscape(
       const platformsById = new Map(allSystems.filter((s) => isPlatform(s)).map((s) => [s.element_id, s]));
       const moduleNodes: ElementsHeadRow[] = [];
       for (const container of allContainers) {
-        const platform = container.parent_id !== null ? platformsById.get(container.parent_id) : undefined;
-        if (platform) moduleNodes.push({ ...container, name: `${platform.name} · ${container.name}` });
+        const platform = container.parent_id !== null ? (platformsById.get(container.parent_id) ?? null) : null;
+        if (platform) moduleNodes.push({ ...container, name: moduleDisplayName(container, platform) });
       }
       if (moduleNodes.length > 0) allSystems = [...allSystems, ...moduleNodes];
 

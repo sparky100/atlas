@@ -3,6 +3,7 @@ import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../../c
 import type { UUID } from '../../../contracts/delta';
 import type { BranchRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
+import { moduleDisplayName } from '../../elements/moduleDisplayName';
 import { useElementRetire, type RetireReplacement } from '../../elements/useElementRetire';
 import { useRelationshipTargetSearch } from '../../elements/useRelationshipTargetSearch';
 import { Button } from '../Button/Button';
@@ -128,12 +129,12 @@ export function RetireAction({
                     type="button"
                     className={styles.resultRow}
                     onClick={() => {
-                      setReplacement({ elementId: result.element_id, name: result.name });
+                      setReplacement({ elementId: result.element_id, name: moduleDisplayName(result, search.resultParents.get(result.element_id) ?? null) });
                       setPickingReplacement(false);
                     }}
                   >
                     <ElementTypeGlyph type={result.element_type} />
-                    <Text as="span">{result.name}</Text>
+                    <Text as="span">{moduleDisplayName(result, search.resultParents.get(result.element_id) ?? null)}</Text>
                   </button>
                 </li>
               ))}

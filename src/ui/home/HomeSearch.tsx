@@ -6,6 +6,7 @@ import { refParamOf, type Ref } from '../../db/ref';
 import type { BranchRow, MemberRole } from '../../db/types';
 import { useElementCreate } from '../elements/useElementCreate';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
+import { moduleDisplayName } from '../elements/moduleDisplayName';
 import { attributesRecord } from '../elements/attributesRecord';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -150,11 +151,10 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
               <li key={result.element.element_id}>
                 <Link to={elementHref(result.element.element_id)} className={styles.resultRow}>
                   <ElementTypeGlyph type={result.element.element_type} />
-                  <Text as="span">{result.element.name}</Text>
+                  {/* "Platform · Module" (moduleDisplayName) — the one shared naming convention every surface that can show a container uses, so a short, commonly-reused module name ("FI", "API Gateway") never reads as ambiguous or out of context. */}
+                  <Text as="span">{moduleDisplayName(result.element, result.parent)}</Text>
                   <Text as="span" tone="muted" size="sm">
                     {result.element.element_type}
-                    {/* A container's own parent platform/system — a short, commonly-reused module name ("FI", "API Gateway") is ambiguous without it, same "Parent: Finance" wording StructureSection.tsx's own structure line already uses. */}
-                    {result.parent ? ` · Parent: ${result.parent.name}` : ''}
                     {result.owner ? ` · ${result.owner.name}` : ''} · {result.relationshipCount} relationship{result.relationshipCount === 1 ? '' : 's'}
                   </Text>
                   {tone && typeof lifecycleStatus === 'string' && <Chip tone={tone}>{lifecycleStatus}</Chip>}

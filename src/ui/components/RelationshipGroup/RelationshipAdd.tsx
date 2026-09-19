@@ -4,6 +4,7 @@ import type { FactsRow, RelationshipsHeadRow } from '../../../contracts/rows';
 import type { RelationshipGroupSlot } from '../../../contracts/relationshipTypeRules';
 import type { BranchRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
+import { moduleDisplayName } from '../../elements/moduleDisplayName';
 import { isIntegrationPlatform } from '../../elements/systemKind';
 import { useRelationshipCreate, type RelationshipCreateDemotion } from '../../elements/useRelationshipCreate';
 import { useRelationshipTargetSearch } from '../../elements/useRelationshipTargetSearch';
@@ -462,9 +463,10 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
         <ul className={styles.results}>
           {availableResults.map((result) => (
             <li key={result.element_id}>
-              <button type="button" className={styles.resultRow} disabled={status === 'creating'} onClick={() => { pickResult({ elementId: result.element_id, name: result.name, elementType: result.element_type }); }}>
+              <button type="button" className={styles.resultRow} disabled={status === 'creating'} onClick={() => { pickResult({ elementId: result.element_id, name: moduleDisplayName(result, search.resultParents.get(result.element_id) ?? null), elementType: result.element_type }); }}>
                 <ElementTypeGlyph type={result.element_type} />
-                <Text as="span">{result.name}</Text>
+                {/* "Platform · Module" — freezes into `PendingTarget.name` at pick time, so every downstream confirmation/commit-title use of it stays qualified too. */}
+                <Text as="span">{moduleDisplayName(result, search.resultParents.get(result.element_id) ?? null)}</Text>
                 <Text as="span" tone="muted" size="sm">
                   {result.element_type}
                 </Text>

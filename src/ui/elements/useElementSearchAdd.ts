@@ -11,6 +11,8 @@ export interface SearchResultRow {
   relationshipCount: number;
   /** The `owns` relationship's primary actor into this element, if any (populated for a `system` or `container`, per `RELATIONSHIP_TYPE_RULES` — null for every other type, not specially cased). */
   owner: ElementsHeadRow | null;
+  /** A container's own parent platform/system, for `moduleDisplayName`'s own "Platform · Module" convention — `null` for every other type (`enrichElementMatches.ts`'s own `parent` field). */
+  parent: ElementsHeadRow | null;
 }
 
 export type ElementSearchStatus = 'loading' | 'ready' | 'error';
@@ -95,7 +97,7 @@ export function useElementSearchAdd(commitId: UUID, modelId: UUID, elementType: 
 
   const results: SearchResultRow[] = matches.map((element) => {
     const entry = enriched.get(element.element_id);
-    return { element, relationshipCount: entry?.relationshipCount ?? 0, owner: entry?.owner ?? null };
+    return { element, relationshipCount: entry?.relationshipCount ?? 0, owner: entry?.owner ?? null, parent: entry?.parent ?? null };
   });
 
   const status: ElementSearchStatus = poolError !== null ? 'error' : pool === null ? 'loading' : 'ready';
