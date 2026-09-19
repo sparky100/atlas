@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import { hasExactMatch, loadSearchPool, matchElements, type SearchPoolElement } from '../../db/elementSearch';
+import { countMatches, hasExactMatch, loadSearchPool, matchElements, type SearchPoolElement } from '../../db/elementSearch';
 import { enrichElementMatches, type MatchEnrichment } from './enrichElementMatches';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -29,6 +29,8 @@ export interface UseElementSearchAddResult {
    * (`hasExactMatch`, src/db/elementSearch.ts).
    */
   showCreate: boolean;
+  /** How many more real matches exist beyond `results` (`countMatches` minus what's shown) — rendered so a short/empty `results` list reads as "keep typing to narrow," not "safe to create" (a near-match past the display cap never suppresses `showCreate` on its own — only an exact match does). 0 when nothing was cut off. */
+  moreCount: number;
 }
 
 /**
@@ -102,6 +104,7 @@ export function useElementSearchAdd(commitId: UUID, modelId: UUID, elementType: 
   // (any of `results` above) never hides it on its own. See
   // src/db/elementSearch.ts's own `hasExactMatch` comment.
   const showCreate = status === 'ready' && query.trim().length > 0 && pool !== null && !hasExactMatch(pool, query);
+  const totalMatches = pool ? countMatches(pool, query) : 0;
 
-  return { query, setQuery, status, error: poolError, results, showCreate };
+  return { query, setQuery, status, error: poolError, results, showCreate, moreCount: Math.max(0, totalMatches - matches.length) };
 }

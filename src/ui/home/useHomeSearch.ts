@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import { loadSearchPoolForTypes, matchElements, type SearchPoolElement } from '../../db/elementSearch';
+import { countMatches, loadSearchPoolForTypes, matchElements, type SearchPoolElement } from '../../db/elementSearch';
 import { enrichElementMatches, type MatchEnrichment } from '../elements/enrichElementMatches';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -31,6 +31,8 @@ export interface UseHomeSearchResult {
    * when true (`HomeSearch.tsx`'s own JSX order).
    */
   showCreate: boolean;
+  /** How many more real matches exist beyond `results` (`countMatches` minus what's shown) — `HomeSearch.tsx` renders this so a short/empty `results` list reads as "keep typing to narrow," not "safe to create" (a near-match past the display cap never suppresses `showCreate` on its own — only an exact match does). 0 when nothing was cut off. */
+  moreCount: number;
 }
 
 /**
@@ -108,6 +110,7 @@ export function useHomeSearch(commitId: UUID, modelId: UUID): UseHomeSearchResul
   // legitimately different things, and a container was never a candidate
   // this "Create..." row offers in the first place.
   const showCreate = status === 'ready' && query.trim().length > 0 && pool !== null && !hasCreatableExactMatch(pool, query);
+  const totalMatches = pool ? countMatches(pool, query) : 0;
 
-  return { query, setQuery, status, error, results, showCreate };
+  return { query, setQuery, status, error, results, showCreate, moreCount: Math.max(0, totalMatches - matches.length) };
 }

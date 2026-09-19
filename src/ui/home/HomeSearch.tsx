@@ -165,6 +165,12 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
         </ul>
       )}
 
+      {search.moreCount > 0 && (
+        <Text as="p" tone="muted" size="sm">
+          {search.results.length} shown — {search.moreCount} more match{search.moreCount === 1 ? '' : 'es'}. Keep typing to narrow before creating a new one.
+        </Text>
+      )}
+
       {search.showCreate && !sheetOpen && canCreateChangeBranch(role) && (
         <div className={styles.createRow}>
           <select
