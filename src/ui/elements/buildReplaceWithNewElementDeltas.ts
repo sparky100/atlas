@@ -1,0 +1,199 @@
+import { defaultCreateAttributes } from '../../contracts/attributeSchema';
+import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
+import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../contracts/rows';
+import { describeEnvelope } from '../../engine/describeEnvelope';
+import type { BranchRow } from '../../db/types';
+import { attributesRecord } from './attributesRecord';
+
+export interface ReplaceWithNewElementInput {
+  /** The retiring element (A) — a system, or (platforms and modules) a container/module, same scope `useElementRetire.ts` already has. */
+  element: ElementsHeadRow;
+  facts: Map<string, FactsRow>;
+  /** A's own live relationships (`ElementPageData.relationships`) — same input `useElementRetire.ts` already takes, no new round trip. */
+  relationships: readonly RelationshipsHeadRow[];
+  relationshipFacts: ReadonlyMap<UUID, Map<string, FactsRow>>;
+  plannedEnd: string;
+  /** The new element's (B's) own name — everything else about B is left blank (`defaultCreateAttributes`'s own required-field defaults only), never copied from A: a replacement is usually a different real product (different vendor/version/hosting), so carrying A's values over could silently mislead. */
+  replacementName: string;
+  sourceId: UUID;
+  /** `useElementCreate.ts`'s own `defaultCreateAttributes` context — `lifecycleStatus` defaults to `active` on main, `planned` on a change branch. */
+  onMain: boolean;
+}
+
+export interface ReplaceWithNewElementResult {
+  deltas: Delta[];
+  newElementId: UUID;
+}
+
+/**
+ * "Replace A with a brand-new B" — the gap the existing "Retire… → replaced
+ * by" flow (`useElementRetire.ts`) can't close on its own: its own
+ * "replaced by" picker searches main's real materialised head only
+ * (`src/db/elementSearch.ts`'s own module comment, deliberate), so when B
+ * doesn't exist yet, the only path today is two separate changes — one to
+ * create and merge B, a second to retire A now that B is searchable.
+ *
+ * This closes that gap for the one case that never needed search at all:
+ * when B is being created as part of the *same* action, its id is known
+ * the instant it's created, so there's nothing to find. One commit:
+ * create B, retire A (`lifecycleStatus`/`plannedEnd`, identical to
+ * `useElementRetire.ts`), then transfer A's own edges onto B — its
+ * `supports` edges (same transfer `useElementRetire.ts` already does,
+ * `role: 'secondary'`, never a copy of the original role, for the same
+ * primary-collision reasoning that hook's own comment gives) **and**,
+ * unlike the existing-replacement case, its `uses`/`flows_to` edges too —
+ * safe to copy more freely here since a brand-new B has no relationships
+ * of its own yet to collide with (an existing replacement might).
+ *
+ * Deliberately out of scope, disclosed rather than silently dropped:
+ * `owns` edges (an actor's ownership of A) never transfer — a person
+ * doing this can add ownership on B separately; and a `uses`/`flows_to`
+ * edge naming A as its own `via` (A is an integration platform other
+ * flows route through, not itself an endpoint) is invisible here, since
+ * `relationships` only ever holds edges where A is `from`/`to` — the
+ * exact scope `ElementPageData.relationships` already has.
+ *
+ * Extracted as its own pure function (input in, deltas out, no I/O) rather
+ * than inlined in a hook the way `useElementRetire.ts` is — this case is
+ * meaningfully more complex (directional logic per relationship type), so
+ * it earns the same "call the real builder in a unit test" treatment
+ * `src/engine/mergeElements.ts`'s `buildMergeElementsDeltas` already gets
+ * for a comparably complex multi-delta operation.
+ */
+export function buildReplaceWithNewElementDeltas(input: ReplaceWithNewElementInput): ReplaceWithNewElementResult {
+  const { element, facts, relationships, relationshipFacts, plannedEnd, replacementName, sourceId, onMain } = input;
+  const deltas: Delta[] = [];
+  const newElementId = crypto.randomUUID();
+
+  // A module's own replacement is another module of the same platform —
+  // silently inheriting A's own parent (never asked for, per the same
+  // "no picker needed" call this design made for the replaced-by-existing
+  // case, since a module's platform essentially never changes on
+  // replacement) — a system's replacement has no parent at all (ADR-001).
+  const parentId = element.element_type === 'container' ? element.parent_id : null;
+  deltas.push({
+    kind: 'element.create',
+    id: crypto.randomUUID(),
+    elementId: newElementId,
+    elementType: element.element_type,
+    name: replacementName,
+    parentId,
+    attributes: defaultCreateAttributes(element.element_type, { onMain }),
+    sourceId,
+    confidence: 1,
+  } as Delta);
+
+  const currentLifecycleStatus = attributesRecord(element.attributes).lifecycleStatus;
+  if (currentLifecycleStatus !== 'retiring') {
+    deltas.push({
+      kind: 'element.update',
+      id: crypto.randomUUID(),
+      elementId: element.element_id,
+      elementType: element.element_type,
+      attribute: 'lifecycleStatus',
+      value: 'retiring',
+      previousDeltaId: facts.get('lifecycleStatus')?.delta_id ?? element.exists_delta_id,
+      sourceId,
+      confidence: 1,
+    } as Delta);
+  }
+
+  deltas.push({
+    kind: 'element.update',
+    id: crypto.randomUUID(),
+    elementId: element.element_id,
+    elementType: element.element_type,
+    attribute: 'plannedEnd',
+    value: plannedEnd,
+    previousDeltaId: facts.get('plannedEnd')?.delta_id ?? element.exists_delta_id,
+    sourceId,
+    confidence: 1,
+  } as Delta);
+
+  const previousDeltaFor = (relationshipId: UUID, existsDeltaId: UUID) => relationshipFacts.get(relationshipId)?.get('$exists')?.delta_id ?? existsDeltaId;
+
+  // Supports: A is always the `from` side (system/container → capability,
+  // ADR-000's own "platforms and modules" amendment) — same transfer
+  // `useElementRetire.ts` already builds.
+  for (const edge of relationships) {
+    if (edge.relationship_type !== 'supports' || edge.from_element_id !== element.element_id) continue;
+    deltas.push({
+      kind: 'relationship.retract',
+      id: crypto.randomUUID(),
+      relationshipId: edge.relationship_id,
+      relationshipType: 'supports',
+      previousDeltaId: previousDeltaFor(edge.relationship_id, edge.exists_delta_id),
+      sourceId,
+      confidence: 1,
+    });
+    const description = attributesRecord(edge.attributes).description;
+    deltas.push({
+      kind: 'relationship.create',
+      id: crypto.randomUUID(),
+      relationshipId: crypto.randomUUID(),
+      relationshipType: 'supports',
+      fromElementId: newElementId,
+      toElementId: edge.to_element_id,
+      attributes: typeof description === 'string' && description.trim() !== '' ? { role: 'secondary', description } : { role: 'secondary' },
+      sourceId,
+      confidence: 1,
+    });
+  }
+
+  // uses/flows_to: A can be either side of the edge — swap only the side
+  // A was on, leaving the other endpoint (and every other attribute —
+  // description, dataClassification, protocol, via) unchanged. No
+  // primary/secondary role to worry about here (RELATIONSHIP_TYPE_RULES
+  // only ever caps `supports`/`owns`), so this is a plain substitution.
+  for (const edge of relationships) {
+    if (edge.relationship_type !== 'uses' && edge.relationship_type !== 'flows_to') continue;
+    const aIsFrom = edge.from_element_id === element.element_id;
+    const aIsTo = edge.to_element_id === element.element_id;
+    if (!aIsFrom && !aIsTo) continue;
+    deltas.push({
+      kind: 'relationship.retract',
+      id: crypto.randomUUID(),
+      relationshipId: edge.relationship_id,
+      relationshipType: edge.relationship_type,
+      previousDeltaId: previousDeltaFor(edge.relationship_id, edge.exists_delta_id),
+      sourceId,
+      confidence: 1,
+    });
+    deltas.push({
+      kind: 'relationship.create',
+      id: crypto.randomUUID(),
+      relationshipId: crypto.randomUUID(),
+      relationshipType: edge.relationship_type,
+      fromElementId: aIsFrom ? newElementId : edge.from_element_id,
+      toElementId: aIsTo ? newElementId : edge.to_element_id,
+      attributes: edge.attributes,
+      sourceId,
+      confidence: 1,
+    } as Delta);
+  }
+
+  return { deltas, newElementId };
+}
+
+export interface ReplaceWithNewElementEnvelopeInput extends ReplaceWithNewElementInput {
+  branch: BranchRow;
+  expectedHeadCommitId: UUID;
+}
+
+/** `buildReplaceWithNewElementDeltas`'s own result, wrapped into a real `CommitEnvelope` — the one extra step `useReplaceWithNewElement.ts` needs before `commitToBranch`, split out so a unit test can call the pure half alone without constructing a branch. */
+export function buildReplaceWithNewElementEnvelope(input: ReplaceWithNewElementEnvelopeInput): { envelope: CommitEnvelope; newElementId: UUID } {
+  const { branch, expectedHeadCommitId, ...rest } = input;
+  const { deltas, newElementId } = buildReplaceWithNewElementDeltas(rest);
+  const nameLookup = (id: UUID) => (id === rest.element.element_id ? rest.element.name : id === newElementId ? rest.replacementName : undefined);
+  const envelope: CommitEnvelope = {
+    id: crypto.randomUUID(),
+    branchId: branch.id,
+    parentCommitId: expectedHeadCommitId,
+    mergedBranchHeadCommitId: null,
+    kind: 'manual',
+    title: describeEnvelope(deltas, nameLookup),
+    body: `Retire ${rest.element.name}, replaced by new ${rest.replacementName}`,
+    deltas,
+  };
+  return { envelope, newElementId };
+}
