@@ -153,7 +153,7 @@ It imports `src/contracts/*` and `src/capture/*` directly (K-15) — the parsers
 
 **LLM access.** `LlmClient` (`src/capture/llm/client.ts`) has one method, `complete(request): Promise<LlmResponse>`, where `request` is a Messages-API-shaped body. Two implementations, chosen by environment:
 
-- `ProxyLlmClient` — POSTs the body to `LLM_PROXY_URL` with `LLM_PROXY_KEY` and `x-atlas-org-id` (per-org cost attribution, ADR-014); the proxy is a pass-through to the Messages API.
+- `ProxyLlmClient` — POSTs the body to the deployed `llm-proxy` edge function, `Authorization: Bearer <token>` forwarded (the caller's own session JWT from the browser, or `capture-run`'s service-role key after its own JWT check) and `orgId` in the JSON body, matching the real, already-built E4 contract (`src/contracts/llmProxy.ts`) rather than an earlier `LLM_PROXY_KEY`/`x-atlas-org-id` sketch of it; the proxy is a pass-through to the Messages API, and every call is logged and rate-limited per org (ADR-014).
 - `DirectLlmClient` — `@anthropic-ai/sdk` with `ANTHROPIC_API_KEY`. Used when no proxy is configured and by the live evaluation run (§12.6).
 - `RecordedLlmClient` — replays `fixtures/**/llm/*.json` keyed by a hash of the request body; throws on a miss. Used by every unit test and by `pnpm capture:score` in replay mode. It is a test double for the network, not a stub for logic (rule 7): the extraction, grounding and matching code paths are identical.
 
@@ -201,7 +201,7 @@ export type ElementProposal<T extends ElementType = ElementType> = {
   kind: 'element';
   elementType: T;
   name: string;
-  parent: CandidateRef | null;                // required non-null for container/component; capability optional; system/actor null
+  parent: CandidateRef | null;                // required non-null for container; capability optional; system/actor null
   attributes: Partial<ElementAttributesByType[T]>;   // only keys the document asserts; never defaulted (see §5.4 for the two required-field exceptions)
 };
 
@@ -305,8 +305,8 @@ A workbook over 5,000 data rows, a PDF over 200 pages, text over 200,000 chars �
 | `externalOrganisation` | `externalOrganisation` | `Operated by`, `Third party` |
 | `hostingModel` | `System.hostingModel` (Prompt 7k item 1) | `Hosting model`, `Deployment model`, `On-prem/cloud` |
 | `hostingProvider` | `System.hostingProvider` (Prompt 7k item 1; free text, not the closed `hostingModel` set) | `Hosting provider`, `Data centre`, `Cloud provider` |
-| `technology` | `Container.technology` / `Component.technology` | `Technology`, `Platform`, `Stack` |
-| `parent` | container/component parent (system/container name) | `Parent system`, `Part of`, `System`, `Application` (on a Modules sheet) |
+| `technology` | `Container.technology` | `Technology`, `Platform`, `Stack` |
+| `parent` | container parent (system name) | `Parent system`, `Part of`, `System`, `Application` (on a Modules sheet) |
 | `owner` | Actor candidate (`team` unless the value looks like a person) + `owns` (`role: 'business'`) | `Owner`, `Business owner`, `Service owner`, `Accountable`, `Team` |
 | `ownerEmail` | `Actor.email` (person) | `Owner email`, `Contact` |
 | `technicalOwner` | Actor candidate (`team` unless the value looks like a person) + `owns` (`role: 'technical'`, Prompt 7k item 2 — parallel to `owner`, never the same header) | `Technical owner`, `IT owner`, `Engineering contact`, `Support team` |
@@ -319,7 +319,7 @@ A workbook over 5,000 data rows, a PDF over 200 pages, text over 200,000 chars �
 
 A synonym hit maps with confidence 1.0. Headers with no synonym hit go to **prompt A (§6.1)** — one call per sheet, with the unmapped headers, five sample rows, and the role list. The model returns a role per header with its own 0–1 confidence and a one-line reason; the pipeline clips LLM mapping confidence to ≤ 0.90 and records `LOW_MAPPING_CONFIDENCE` on every candidate from a column mapped below 0.70. A column mapped by the model to `name` overrides nothing: if the synonym table already found a `name` column, a second `name` becomes `ignore` with a note. A sheet with no `name` column after both passes is skipped (`SHEET_NO_NAME_COLUMN`).
 
-The sheet's *element type* is decided once per sheet: `system` by default; `container` when a `parent` column resolves to systems (the sheet's `parent` values match systems on main or on another sheet's candidates) or the sheet is named like `Modules`/`Components`/`Containers`/`Services`; `component` when `parent` resolves to containers; `capability` when the sheet is named like `Capabilities`/`Capability map` and has a level/parent structure; `actor` when the sheet is named like `Teams`/`Owners`/`Contacts`. The model is asked to confirm the sheet type in prompt A's response (`sheetType`) and its answer is used only when the code heuristics are undecided.
+The sheet's *element type* is decided once per sheet: `system` by default; `container` when a `parent` column resolves to systems (the sheet's `parent` values match systems on main or on another sheet's candidates) or the sheet is named like `Modules`/`Components`/`Containers`/`Services`; `capability` when the sheet is named like `Capabilities`/`Capability map` and has a level/parent structure; `actor` when the sheet is named like `Teams`/`Owners`/`Contacts`. The model is asked to confirm the sheet type in prompt A's response (`sheetType`) and its answer is used only when the code heuristics are undecided.
 
 **Step 3 — rows to candidates (code).** For each data row (stopping at the first fully blank run of 3 rows or a row whose `name` cell is `Total`/`Totals`/`Count`):
 
@@ -411,7 +411,7 @@ Effort: prompt A `medium`, prompt B `high`, prompt C `medium`. `max_tokens: 1600
 ```
 You map spreadsheet columns to a fixed set of roles for an enterprise-architecture model.
 
-The model has five element types: capability, system, container, component, actor. A spreadsheet
+The model has four element types: capability, system, container, actor. A spreadsheet
 sheet usually lists one type. The column roles you may assign are exactly:
 
   atlasId, sourceKey, name, description, vendor, lifecycleStatus, introduced, plannedEnd,
@@ -431,8 +431,8 @@ Role meanings:
 - externalOrganisation: who operates it, when external.
 - hostingModel: on-premises, private cloud, public cloud, SaaS, or hybrid — a closed set, not free text.
 - hostingProvider: the specific hosting provider, data centre or region, when named. Free text, distinct from hostingModel.
-- technology: platform or stack of a container or component.
-- parent: the system (for a container) or container (for a component) this row belongs to.
+- technology: platform or stack of a container.
+- parent: the system this container row belongs to.
 - owner: the team or person accountable for the row (its business owner).
 - ownerEmail: the owner's email.
 - technicalOwner: the team or person who runs the row day to day, when distinct from owner.
@@ -450,7 +450,7 @@ Rules:
   text and the sample values together.
 - Never assign name to more than one column; if two columns could be the name, give the second
   one sourceKey or description with a reason.
-- sheetType is your best reading of what one row of this sheet is: system, container, component,
+- sheetType is your best reading of what one row of this sheet is: system, container,
   capability, actor, or unknown.
 ```
 
@@ -486,12 +486,11 @@ Element types (with the attributes you may fill):
 - system: name, description, vendor, lifecycleStatus (planned|active|retiring|retired),
   isExternal (true|false), externalOrganisation, introduced (date), plannedEnd (date)
 - container: name, description, technology, parentName (the system it is part of), isExternal
-- component: name, description, technology, parentName (the container it is part of)
 - actor: name, subtype (person|team), email, orgUnit, isExternal, externalOrganisation
 
 Relationship types (from → to):
 - supports: system → capability. "The X system supports the Y function / service / area."
-- uses: system|container|component → system|container|component. A runtime dependency.
+- uses: system|container → system|container. A runtime dependency.
 - owns: actor → capability|system. Accountability: "owned by", "the X team are responsible for".
 - flows_to: system|container → system|container. Data or integration flow: "sends", "feeds",
   "exports to".
@@ -655,7 +654,6 @@ match(candidate, index) -> MatchOutcome
 |---|---|---|
 | system, actor | the type alone (SPEC §8) | — |
 | container | same parent system | `parent` ref → candidate in this run (then the *candidate's* eventual id is the context, which for level 3 means: only containers whose parent is an element that candidate matched to) or main element |
-| component | same parent container | as above |
 | capability | same parent capability (or both top-level) | `parent` ref, or `none` |
 
 An `unresolved` parent that resolves to nothing → the candidate is `invalid` (`PARENT_UNRESOLVED`) rather than matched without context. For a relationship endpoint, the same resolution applies; an unresolved endpoint makes the relationship candidate `invalid` (`ENDPOINT_UNRESOLVED`), never a silently created element (ADR-008 rule 4: never silently create).
@@ -878,7 +876,7 @@ Every fixture is deliberately messy in a *named* way; the expected outcome lists
 | 03 | `roundtrip-export` | CSV exported by Atlas itself: `Atlas ID, Name, Vendor, Lifecycle, …`, 15 rows; 2 rows carry an id that was merged away; 1 carries an id from another model | 15 systems on main with those ids; 2 `merged_id` aliases; facts with mixed sources | level 1 matching incl. `merged_id` resolution; `confirm` vs `update`; `conflict` strength rule | 12 `confirm` (values unchanged), 2 `update` (vendor changed, main's fact is a capture from 2 years ago), 1 `conflict` (lifecycle differs, main's fact is manual 1.0 dated last month), 2 `RESOLVED_THROUGH_MERGED_ID`, 1 `ATLAS_ID_NOT_FOUND` falling through to a level-3 match |
 | 04 | `duplicates-within` | CSV, 20 rows in which `PowerON`, `Power On`, `PowerOn (Enzen)` and `POWERON` appear as separate rows with partially disagreeing vendors | empty | intra-document grouping; `ROWS_DISAGREE`; alias proposals for every variant | 17 `new` systems (4 rows → 1 candidate); the PowerON candidate has 4 `attributeRefs` rows, a `ROWS_DISAGREE` warning on vendor, and 4 `name` alias proposals; no two `new` candidates share a normalised name |
 | 05 | `aliases-known` | CSV, 10 rows using old names (`Northgate Housing`, `SX3`, `iWorld`) | 10 systems on main under new names, with `name` aliases for the old ones; one alias string is within 0.7 trigram of a *different* system's name | level 2 beats level 3 (P-19) | 10 `confirm`/`update`, all `level: alias`; the trap row matches its alias's element, not the trigram neighbour; 0 `new` |
-| 06 | `containers-two-sheets` | XLSX: sheet `Systems` (6 rows) and sheet `Modules` (14 rows, `Module, Parent system, Technology`); `Portal` appears as a module under two different systems; one module names a parent not on either sheet | 3 of the 6 systems already on main, one with an existing `Portal` container | sheet type inference (`container` from `parent` column); cross-sheet parent resolution to candidates; context in level 3 (P-20); `PARENT_UNRESOLVED` | 3 `new` + 3 `confirm` systems; 12 containers: the `Portal` under the existing system is `confirm`, the `Portal` under a new system is `new` (never matched to the other); 1 `invalid` (`PARENT_UNRESOLVED "Legacy CRM"`); components none |
+| 06 | `containers-two-sheets` | XLSX: sheet `Systems` (6 rows) and sheet `Modules` (14 rows, `Module, Parent system, Technology`); `Portal` appears as a module under two different systems; one module names a parent not on either sheet | 3 of the 6 systems already on main, one with an existing `Portal` container | sheet type inference (`container` from `parent` column); cross-sheet parent resolution to candidates; context in level 3 (P-20); `PARENT_UNRESOLVED` | 3 `new` + 3 `confirm` systems; 12 containers: the `Portal` under the existing system is `confirm`, the `Portal` under a new system is `new` (never matched to the other); 1 `invalid` (`PARENT_UNRESOLVED "Legacy CRM"`) |
 | 07 | `merged-cells-and-junk` | XLSX, 60 rows: merged header cells across two rows, a totals row, 3 blank rows mid-table, dates as `Mar-19`, `2021`, `31/12/2027`, `12/31/2027`, a `Vendor` cell `Civica / Northgate`, `#REF!` in one cell, a "Notes" column with long prose | empty | parser robustness; date parsing table; `MULTI_VALUE_CELL`; `FORMULA_ERROR`; the totals row is not a system | 60 → 56 `new` systems (totals + 3 blanks excluded); dates parse to `2019-03-01` (ambiguous), `2021-01-01` (ambiguous), `2027-12-31` (exact, both spellings); warnings counted exactly; `rowFactor` 0.95 applied to the `#REF!` row |
 | 08 | `pdf-catalogue` | text PDF, 9 pages: a title page, a table of applications spanning pages 2–7 with repeating headers/footers, a narrative "Integration landscape" section on pages 8–9 stating flows ("The CRM sends nightly extracts to the data warehouse") and ownership | empty + seeded `nhs` capabilities | prompt B extraction per chunk; grounding (byte-exact and normalised); relationships from prose; cross-chunk endpoint resolution; page headers not extracted as systems | ≥ 24 of 26 catalogue systems as `new` with vendor and status (recall ≥ 0.92); 0 candidates named after the page footer; ≥ 4 `flows_to` and ≥ 3 `owns` from the narrative, each with a passage found on page 8 or 9; every `sourceRef` resolves; ≤ 2 `unsourced` |
 | 09 | `scanned` | image-only PDF, 3 pages | empty | `NO_TEXT_LAYER` | job fails at parse with `NO_TEXT_LAYER`; no branch, no source row, no candidates; `error` set; job retryable |

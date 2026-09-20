@@ -171,6 +171,20 @@ on). Returns `{ status: 'ok', text, inputTokens, outputTokens }` on
 success, or `{ status: 'error', message }` (400/401/403/429/500/503,
 matching the failure) otherwise.
 
+**F2 (full K1) additions, SPEC-capture.md §3.5/§6 (K-10).** Three optional
+request fields and two optional response fields, added without touching
+the shape above (`LLM_PROXY_CONTRACT_VERSION` bumped so a log row or
+cassette can tell which shape produced it):
+
+- `outputConfig?: { effort: 'low'|'medium'|'high'|'xhigh'|'max', format: { type: 'json_schema', schema } }` — asks the provider for schema-constrained JSON via its own `output_config`, instead of `responseFormat: 'json'`'s free-form hint.
+- `cacheControl?: boolean` — marks the joined system-role content as a stable, cache-controlled prefix (`cache_control: { type: 'ephemeral' }`).
+- `stream?: boolean` — asks the proxy to stream the generation from the provider internally, so a long prose-extraction call doesn't sit on one buffered upstream response long enough to time out. This call's own response to its caller is never `text/event-stream` either way — always one complete JSON body.
+- Response gains `stopReason?: string` (the provider's own stop reason — `end_turn`/`max_tokens`/`refusal`/…) and `cacheReadTokens?: number`.
+
+`src/capture/llm/client.ts`'s `ProxyLlmClient` is the one caller that sets
+all three request fields; every other caller (`send-invite-email`
+included) omits them and gets exactly the response it always did.
+
 ### Local development
 
 Same as `send-invite-email` above — `pnpm db:start` runs this locally too;
