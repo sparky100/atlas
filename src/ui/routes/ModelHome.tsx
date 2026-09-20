@@ -18,6 +18,7 @@ import { DirectorHome } from '../home/DirectorHome';
 import { HomeModeSwitch } from '../home/HomeModeSwitch';
 import { HomeSearch } from '../home/HomeSearch';
 import { useArchitectHome } from '../home/useArchitectHome';
+import { useArchitectHomeInsights } from '../home/useArchitectHomeInsights';
 import { useDirectorHome } from '../home/useDirectorHome';
 import { useHomeMode } from '../home/useHomeMode';
 import { useModels } from '../models/useModels';
@@ -79,11 +80,16 @@ function ArchitectDoor({
   modelSlug: string;
 }) {
   const architectState = useArchitectHome(modelId, userId);
+  // E8 item (4): Health findings/Recent activity load after first paint,
+  // in their own hook/state machine — `architectState` above (Review
+  // queue, My changes) is the only thing this door's own first paint
+  // waits on now; `useRouteTiming`'s own `ready` below reflects that.
+  const insightsState = useArchitectHomeInsights(modelId, userId);
   // E8 ("performance") phase 1: see DirectorDoor's own comment on sharing this route key.
   useRouteTiming('model-home', architectState.status === 'ready');
   if (architectState.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (architectState.status === 'error') return <Text as="p">{architectState.message}</Text>;
-  return <ArchitectHome data={architectState.data} role={role} orgSlug={orgSlug} modelSlug={modelSlug} />;
+  return <ArchitectHome data={architectState.data} insights={insightsState} role={role} orgSlug={orgSlug} modelSlug={modelSlug} />;
 }
 
 /**

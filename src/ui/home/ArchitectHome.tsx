@@ -23,11 +23,14 @@ import {
 import { canStartDecision } from '../orgs/useMembership';
 import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
 import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
-import type { ArchitectHomeData, RecentCommitRow } from './useArchitectHome';
+import type { ArchitectHomeData } from './useArchitectHome';
+import type { ArchitectHomeInsightsState, RecentCommitRow } from './useArchitectHomeInsights';
 import styles from './DoorHome.module.css';
 
 export interface ArchitectHomeProps {
   data: ArchitectHomeData;
+  /** E8 item (4): Health findings and Recent activity load after first paint, in their own state machine (`useArchitectHomeInsights.ts`) — this component renders `data`'s Review-queue/My-changes panels regardless of this state, and shows a muted "Loading…" in place of the two panels that need it. */
+  insights: ArchitectHomeInsightsState;
   /** Gates every "Start a decision →" card action below (`canStartDecision`) — omitted entirely, not shown disabled, for a viewer. */
   role: MemberRole | null;
   orgSlug: string;
@@ -136,8 +139,13 @@ function resolveCardAction(check: HealthCheck): FindingCardAction | null {
  *    (`gridAssuranceChecks`/`infoAssuranceChecks` below) rather than a
  *    second, parallel layout.
  */
-export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeProps) {
+export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: ArchitectHomeProps) {
   const now = new Date();
+  // E8 item (4): `null` while Health findings/Recent activity are still
+  // loading (or failed) — every array below built from it defaults to
+  // empty in that case, and the panels that show them render a muted
+  // "Loading…" instead, rather than an empty/misleadingly-clear state.
+  const insightsData = insights.status === 'ready' ? insights.data : null;
   const elementHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}`;
   // A commit's diff against its own parent (Sprint U4-1 B2) — main's genesis
   // commit has no parent to diff against, so it stays plain text below
@@ -166,12 +174,14 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
   // Q1, ADR-019) — a placeholder notice, not a real check yet, so it's
   // left out of this list and rendered as its own permanent line below
   // rather than something "N checks clear" could ever roll it into.
-  const healthChecks: HealthCheck[] = [
+  const healthChecks: HealthCheck[] = !insightsData
+    ? []
+    : [
     {
       key: 'unlinked-systems',
-      count: data.systemsWithoutCapability.length,
-      summary: `${String(data.systemsWithoutCapability.length)} ${plural(data.systemsWithoutCapability.length, 'system', 'systems')} not linked to a capability`,
-      items: elementItems(data.systemsWithoutCapability),
+      count: insightsData.systemsWithoutCapability.length,
+      summary: `${String(insightsData.systemsWithoutCapability.length)} ${plural(insightsData.systemsWithoutCapability.length, 'system', 'systems')} not linked to a capability`,
+      items: elementItems(insightsData.systemsWithoutCapability),
       severity: 'medium',
       browseHref: browseHref('unlinked-systems'),
       browseLabel: 'Review and link →',
@@ -183,9 +193,9 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       // credits a module's own supports edge), this only nudges that the
       // edge's likely home is one level down.
       key: 'platform-supports-move-to-module',
-      count: data.platformSupportsThatShouldMoveToModule.length,
-      summary: `${String(data.platformSupportsThatShouldMoveToModule.length)} platform supports edge${data.platformSupportsThatShouldMoveToModule.length === 1 ? '' : 's'} that could move to a module`,
-      items: elementItems(data.platformSupportsThatShouldMoveToModule),
+      count: insightsData.platformSupportsThatShouldMoveToModule.length,
+      summary: `${String(insightsData.platformSupportsThatShouldMoveToModule.length)} platform supports edge${insightsData.platformSupportsThatShouldMoveToModule.length === 1 ? '' : 's'} that could move to a module`,
+      items: elementItems(insightsData.platformSupportsThatShouldMoveToModule),
       severity: 'medium',
       browseHref: browseHref('platform-supports-move-to-module'),
       browseLabel: 'Review and move →',
@@ -196,16 +206,16 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       // (relationship-shaped, like unlabeledVerbRelationships below), so no
       // browseHref, same as that finding.
       key: 'flows-to-platform-instead-of-module',
-      count: data.flowsToPlatformInsteadOfModule.length,
-      summary: `${String(data.flowsToPlatformInsteadOfModule.length)} flow${data.flowsToPlatformInsteadOfModule.length === 1 ? '' : 's'} that could point at a module instead of the platform`,
-      items: platformFlowEndpointItems(data.flowsToPlatformInsteadOfModule),
+      count: insightsData.flowsToPlatformInsteadOfModule.length,
+      summary: `${String(insightsData.flowsToPlatformInsteadOfModule.length)} flow${insightsData.flowsToPlatformInsteadOfModule.length === 1 ? '' : 's'} that could point at a module instead of the platform`,
+      items: platformFlowEndpointItems(insightsData.flowsToPlatformInsteadOfModule),
       severity: 'medium',
     },
     {
       key: 'unowned-capabilities',
-      count: data.capabilitiesWithoutOwner.length,
-      summary: `${String(data.capabilitiesWithoutOwner.length)} ${plural(data.capabilitiesWithoutOwner.length, 'capability', 'capabilities')} with no owner`,
-      items: elementItems(data.capabilitiesWithoutOwner),
+      count: insightsData.capabilitiesWithoutOwner.length,
+      summary: `${String(insightsData.capabilitiesWithoutOwner.length)} ${plural(insightsData.capabilitiesWithoutOwner.length, 'capability', 'capabilities')} with no owner`,
+      items: elementItems(insightsData.capabilitiesWithoutOwner),
       // Informational: every capability without an owner, not just a
       // critical/essential one — that stricter, higher-stakes case is
       // Assurance's own `essential-no-technical-owner` finding below.
@@ -214,27 +224,27 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
     },
     {
       key: 'stale-attributes',
-      count: data.staleAttributes.staleFactCount,
+      count: insightsData.staleAttributes.staleFactCount,
       summary:
-        data.staleAttributes.staleFactCount > 0
-          ? `${String(data.staleAttributes.staleFactCount)} ${plural(data.staleAttributes.staleFactCount, 'attribute', 'attributes')} stale over 12 months — across ${String(data.staleAttributes.staleSystems.length)} ${plural(data.staleAttributes.staleSystems.length, 'system', 'systems')} · oldest ${String(data.staleAttributes.oldestAgeYears)}y`
+        insightsData.staleAttributes.staleFactCount > 0
+          ? `${String(insightsData.staleAttributes.staleFactCount)} ${plural(insightsData.staleAttributes.staleFactCount, 'attribute', 'attributes')} stale over 12 months — across ${String(insightsData.staleAttributes.staleSystems.length)} ${plural(insightsData.staleAttributes.staleSystems.length, 'system', 'systems')} · oldest ${String(insightsData.staleAttributes.oldestAgeYears)}y`
           : '0 attributes stale over 12 months',
-      items: elementItems(data.staleAttributes.staleSystems),
+      items: elementItems(insightsData.staleAttributes.staleSystems),
       severity: 'medium',
       browseHref: browseHref('stale-attributes'),
     },
     {
       key: 'unlabeled-relationships',
-      count: data.unlabeledVerbRelationships.length,
-      summary: `${String(data.unlabeledVerbRelationships.length)} ${plural(data.unlabeledVerbRelationships.length, 'relationship', 'relationships')} missing a label`,
-      items: unlabeledRelationshipItems(data.unlabeledVerbRelationships),
+      count: insightsData.unlabeledVerbRelationships.length,
+      summary: `${String(insightsData.unlabeledVerbRelationships.length)} ${plural(insightsData.unlabeledVerbRelationships.length, 'relationship', 'relationships')} missing a label`,
+      items: unlabeledRelationshipItems(insightsData.unlabeledVerbRelationships),
       severity: 'medium',
     },
     {
       key: 'no-technical-owner',
-      count: data.systemsWithoutTechnicalOwner.length,
-      summary: `${String(data.systemsWithoutTechnicalOwner.length)} ${plural(data.systemsWithoutTechnicalOwner.length, 'system', 'systems')} with no technical owner`,
-      items: elementItems(data.systemsWithoutTechnicalOwner),
+      count: insightsData.systemsWithoutTechnicalOwner.length,
+      summary: `${String(insightsData.systemsWithoutTechnicalOwner.length)} ${plural(insightsData.systemsWithoutTechnicalOwner.length, 'system', 'systems')} with no technical owner`,
+      items: elementItems(insightsData.systemsWithoutTechnicalOwner),
       // Informational: every system, not just one supporting an essential
       // function — that stricter case is `essential-no-technical-owner`
       // below (Assurance), which is high-severity.
@@ -243,9 +253,9 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
     },
     {
       key: 'critical-no-business-owner',
-      count: data.criticalSystemsWithoutBusinessOwner.length,
-      summary: `${String(data.criticalSystemsWithoutBusinessOwner.length)} critical ${plural(data.criticalSystemsWithoutBusinessOwner.length, 'system', 'systems')} with no business owner`,
-      items: elementItems(data.criticalSystemsWithoutBusinessOwner),
+      count: insightsData.criticalSystemsWithoutBusinessOwner.length,
+      summary: `${String(insightsData.criticalSystemsWithoutBusinessOwner.length)} critical ${plural(insightsData.criticalSystemsWithoutBusinessOwner.length, 'system', 'systems')} with no business owner`,
+      items: elementItems(insightsData.criticalSystemsWithoutBusinessOwner),
       severity: 'high',
       browseHref: browseHref('critical-no-business-owner'),
     },
@@ -256,9 +266,9 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       // filtered list instead, where each row carries its own pre-filled
       // action (`resolveCardAction`'s own doc comment).
       key: 'critical-exposed',
-      count: data.criticalExposedSystems.length,
-      summary: `${String(data.criticalExposedSystems.length)} critical ${plural(data.criticalExposedSystems.length, 'system', 'systems')} exposed with no planned replacement`,
-      items: elementItems(data.criticalExposedSystems),
+      count: insightsData.criticalExposedSystems.length,
+      summary: `${String(insightsData.criticalExposedSystems.length)} critical ${plural(insightsData.criticalExposedSystems.length, 'system', 'systems')} exposed with no planned replacement`,
+      items: elementItems(insightsData.criticalExposedSystems),
       severity: 'high',
       browseHref: browseHref('critical-exposed'),
       ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromCriticalExposedFinding({ id: item.id, name: item.label })) } : {}),
@@ -272,16 +282,16 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       // verb label is a lesser gap than a missing classification, so this
       // stays medium even though both concern the same boundary.
       key: 'boundary-crossings-missing-verb',
-      count: data.boundaryCrossingsMissingVerb.length,
-      summary: `${String(data.boundaryCrossingsMissingVerb.length)} boundary crossing${data.boundaryCrossingsMissingVerb.length === 1 ? '' : 's'} with no verb label`,
-      items: boundaryCrossingItems(data.boundaryCrossingsMissingVerb),
+      count: insightsData.boundaryCrossingsMissingVerb.length,
+      summary: `${String(insightsData.boundaryCrossingsMissingVerb.length)} boundary crossing${insightsData.boundaryCrossingsMissingVerb.length === 1 ? '' : 's'} with no verb label`,
+      items: boundaryCrossingItems(insightsData.boundaryCrossingsMissingVerb),
       severity: 'medium',
     },
     {
       key: 'unused-integration-platform',
-      count: data.unusedIntegrationPlatforms.length,
-      summary: `${String(data.unusedIntegrationPlatforms.length)} unused integration ${plural(data.unusedIntegrationPlatforms.length, 'platform', 'platforms')} (nothing flows via it)`,
-      items: elementItems(data.unusedIntegrationPlatforms),
+      count: insightsData.unusedIntegrationPlatforms.length,
+      summary: `${String(insightsData.unusedIntegrationPlatforms.length)} unused integration ${plural(insightsData.unusedIntegrationPlatforms.length, 'platform', 'platforms')} (nothing flows via it)`,
+      items: elementItems(insightsData.unusedIntegrationPlatforms),
       severity: 'medium',
       browseHref: browseHref('unused-integration-platform'),
       // Integration platform context prompt: "health finding 'integration
@@ -299,9 +309,9 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       // judgment call, not named in the agreed severity tiers (this check
       // didn't exist when those were agreed).
       key: 'poor-fit-no-replacement',
-      count: data.capabilitiesWithPoorFitPrimarySupporter.length,
-      summary: `${String(data.capabilitiesWithPoorFitPrimarySupporter.length)} ${plural(data.capabilitiesWithPoorFitPrimarySupporter.length, 'capability', 'capabilities')} whose primary supporter is rated a poor or adequate fit, with no planned replacement`,
-      items: elementItems(data.capabilitiesWithPoorFitPrimarySupporter),
+      count: insightsData.capabilitiesWithPoorFitPrimarySupporter.length,
+      summary: `${String(insightsData.capabilitiesWithPoorFitPrimarySupporter.length)} ${plural(insightsData.capabilitiesWithPoorFitPrimarySupporter.length, 'capability', 'capabilities')} whose primary supporter is rated a poor or adequate fit, with no planned replacement`,
+      items: elementItems(insightsData.capabilitiesWithPoorFitPrimarySupporter),
       // No `browseHref` — this filter has no browse-table home (same as
       // before this redesign, `itemAction`'s own predecessor never had one
       // either); a multi-item finding here gets no card action at all,
@@ -319,14 +329,14 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       // to an explicit `criticality: 'critical'` attribute the way
       // `critical-exposed`/`critical-support-end` are.
       key: 'capability-no-supporters',
-      count: data.capabilitiesWithNoSupporters.length,
-      summary: `${String(data.capabilitiesWithNoSupporters.length)} ${plural(data.capabilitiesWithNoSupporters.length, 'capability', 'capabilities')} with no known supporters`,
-      items: elementItems(data.capabilitiesWithNoSupporters),
+      count: insightsData.capabilitiesWithNoSupporters.length,
+      summary: `${String(insightsData.capabilitiesWithNoSupporters.length)} ${plural(insightsData.capabilitiesWithNoSupporters.length, 'capability', 'capabilities')} with no known supporters`,
+      items: elementItems(insightsData.capabilitiesWithNoSupporters),
       severity: 'medium',
       browseHref: browseHref('capability-no-supporters'),
       ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromCapabilityNoSupportersFinding({ id: item.id, name: item.label })) } : {}),
-    },
-  ];
+        },
+      ];
   const { active: activeHealthChecks, clear: clearHealthChecks } = partitionHealthChecks(healthChecks);
   // Item 3: informational findings never sit in the grid — they render as
   // single-line rows beneath it instead (`infoRows` below).
@@ -338,38 +348,40 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
   // under "Assurance" (S1 item 6), partitioned the same way as the group
   // above but kept independent of it (a clean Health findings group says
   // nothing about whether Assurance is also clean, and vice versa).
-  const assuranceChecks: HealthCheck[] = [
+  const assuranceChecks: HealthCheck[] = !insightsData
+    ? []
+    : [
     {
       key: 'essential-no-technical-owner',
-      count: data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length,
-      summary: `${String(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length)} ${plural(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length, 'system', 'systems')} supporting an essential function with no technical owner`,
-      items: elementItems(data.systemsSupportingEssentialFunctionWithoutTechnicalOwner),
+      count: insightsData.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length,
+      summary: `${String(insightsData.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length)} ${plural(insightsData.systemsSupportingEssentialFunctionWithoutTechnicalOwner.length, 'system', 'systems')} supporting an essential function with no technical owner`,
+      items: elementItems(insightsData.systemsSupportingEssentialFunctionWithoutTechnicalOwner),
       severity: 'high',
       browseHref: browseHref('essential-no-technical-owner'),
     },
     {
       key: 'boundary-crossings-missing-classification',
-      count: data.boundaryCrossingsMissingClassification.length,
-      summary: `${String(data.boundaryCrossingsMissingClassification.length)} boundary crossing${data.boundaryCrossingsMissingClassification.length === 1 ? '' : 's'} with no data classification`,
-      items: boundaryCrossingItems(data.boundaryCrossingsMissingClassification),
+      count: insightsData.boundaryCrossingsMissingClassification.length,
+      summary: `${String(insightsData.boundaryCrossingsMissingClassification.length)} boundary crossing${insightsData.boundaryCrossingsMissingClassification.length === 1 ? '' : 's'} with no data classification`,
+      items: boundaryCrossingItems(insightsData.boundaryCrossingsMissingClassification),
       severity: 'high',
     },
     {
       // One of the architect door's three decision-shaped findings — F3's
       // own named "SAP PM" golden path.
       key: 'critical-support-end',
-      count: data.criticalSystemsPastOrNearSupportEnd.length,
-      summary: `${String(data.criticalSystemsPastOrNearSupportEnd.length)} critical ${plural(data.criticalSystemsPastOrNearSupportEnd.length, 'system', 'systems')} past or near vendor support end`,
-      items: elementItems(data.criticalSystemsPastOrNearSupportEnd),
+      count: insightsData.criticalSystemsPastOrNearSupportEnd.length,
+      summary: `${String(insightsData.criticalSystemsPastOrNearSupportEnd.length)} critical ${plural(insightsData.criticalSystemsPastOrNearSupportEnd.length, 'system', 'systems')} past or near vendor support end`,
+      items: elementItems(insightsData.criticalSystemsPastOrNearSupportEnd),
       severity: 'high',
       browseHref: browseHref('critical-support-end'),
       ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromCriticalSupportEndFinding({ id: item.id, name: item.label })) } : {}),
     },
     {
       key: 'external-interfaces-missing-classification',
-      count: data.externalInterfacesMissingClassification.length,
-      summary: `${String(data.externalInterfacesMissingClassification.length)} external interface${data.externalInterfacesMissingClassification.length === 1 ? '' : 's'} with no data classification`,
-      items: externalInterfaceItems(data.externalInterfacesMissingClassification),
+      count: insightsData.externalInterfacesMissingClassification.length,
+      summary: `${String(insightsData.externalInterfacesMissingClassification.length)} external interface${insightsData.externalInterfacesMissingClassification.length === 1 ? '' : 's'} with no data classification`,
+      items: externalInterfaceItems(insightsData.externalInterfacesMissingClassification),
       severity: 'high',
       browseHref: externalInterfacesHref,
       browseLabel: 'View all →',
@@ -379,14 +391,14 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
       // comment, healthFindings.ts) — still one of the checks for "N
       // checks clear" purposes when nothing external has access at all.
       key: 'external-organisation-access',
-      count: data.externalOrganisationAccess.length,
-      summary: `${String(data.externalOrganisationAccess.length)} external ${plural(data.externalOrganisationAccess.length, 'organisation', 'organisations')} with access`,
-      items: externalOrganisationAccessItems(data.externalOrganisationAccess),
+      count: insightsData.externalOrganisationAccess.length,
+      summary: `${String(insightsData.externalOrganisationAccess.length)} external ${plural(insightsData.externalOrganisationAccess.length, 'organisation', 'organisations')} with access`,
+      items: externalOrganisationAccessItems(insightsData.externalOrganisationAccess),
       severity: 'informational',
       browseHref: externalInterfacesHref,
       browseLabel: 'View all →',
-    },
-  ];
+        },
+      ];
   const { active: activeAssuranceChecks, clear: clearAssuranceChecks } = partitionHealthChecks(assuranceChecks);
   const gridAssuranceChecks = activeAssuranceChecks.filter((c) => c.severity !== 'informational');
   const infoAssuranceChecks = activeAssuranceChecks.filter((c) => c.severity === 'informational');
@@ -458,7 +470,7 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
     );
   }
 
-  const { shown: shownActivity, rest: restActivity } = selectRecentActivity(data.recentCommits, 5);
+  const { shown: shownActivity, rest: restActivity } = selectRecentActivity(insightsData?.recentCommits ?? [], 5);
 
   function activityRow(group: GroupedActivityItem) {
     const { latest, count, subject } = group;
@@ -527,16 +539,16 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
           </Text>
         </div>
         <div className={styles.stat}>
-          <Text as="span" size="2xl" className={findingsNeedingAttentionCount > 0 ? styles.statWarn : undefined}>
-            {findingsNeedingAttentionCount}
+          <Text as="span" size="2xl" className={insightsData && findingsNeedingAttentionCount > 0 ? styles.statWarn : undefined}>
+            {insightsData ? findingsNeedingAttentionCount : '…'}
           </Text>
           <Text as="span" tone="muted" size="sm">
             finding{findingsNeedingAttentionCount === 1 ? '' : 's'} needing attention
           </Text>
         </div>
         <div className={styles.stat}>
-          <Text as="span" size="2xl" className={assuranceItemsCount > 0 ? styles.statWarn : undefined}>
-            {assuranceItemsCount}
+          <Text as="span" size="2xl" className={insightsData && assuranceItemsCount > 0 ? styles.statWarn : undefined}>
+            {insightsData ? assuranceItemsCount : '…'}
           </Text>
           <Text as="span" tone="muted" size="sm">
             assurance item{assuranceItemsCount === 1 ? '' : 's'}
@@ -582,31 +594,46 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
               </Text>
             </Link>
 
-            {findingGrid(gridHealthChecks)}
-            {(infoHealthChecks.length > 0 || activeHealthChecks.length > 0) && (
-              <div className={styles.infoRows}>
-                {infoRows(infoHealthChecks)}
-                {/* Not a real check (always 0 until Q1, ADR-019) — never
-                    part of `healthChecks` or its "N checks clear" collapse,
-                    but kept alongside the other findings rather than shown
-                    when every real check is already clean. */}
-                {activeHealthChecks.length > 0 && (
-                  <Text as="p" tone="faint" size="sm">
-                    {data.duplicatesCount} duplicates flagged — wired to 0 until Q1&rsquo;s matching pipeline can populate the standing duplicates report (ADR-019).
-                  </Text>
+            {/* E8 item (4): Health findings load after first paint
+                (`useArchitectHomeInsights.ts`) — everything below reads
+                `insightsData`, so it's all gated on that being ready. */}
+            {insights.status === 'error' ? (
+              <Text as="p" tone="muted" size="sm">
+                {insights.message}
+              </Text>
+            ) : !insightsData ? (
+              <Text as="p" tone="muted" size="sm">
+                Loading…
+              </Text>
+            ) : (
+              <>
+                {findingGrid(gridHealthChecks)}
+                {(infoHealthChecks.length > 0 || activeHealthChecks.length > 0) && (
+                  <div className={styles.infoRows}>
+                    {infoRows(infoHealthChecks)}
+                    {/* Not a real check (always 0 until Q1, ADR-019) — never
+                        part of `healthChecks` or its "N checks clear" collapse,
+                        but kept alongside the other findings rather than shown
+                        when every real check is already clean. */}
+                    {activeHealthChecks.length > 0 && (
+                      <Text as="p" tone="faint" size="sm">
+                        {insightsData.duplicatesCount} duplicates flagged — wired to 0 until Q1&rsquo;s matching pipeline can populate the standing duplicates report (ADR-019).
+                      </Text>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
-            {clearChecksSection(clearHealthChecks)}
+                {clearChecksSection(clearHealthChecks)}
 
-            {/* Item 5: Assurance keeps its own heading but uses the same
-                grid/info-rows shape as Health findings above. */}
-            <Text as="h3" size="lg" className={styles.subsectionTitle}>
-              Assurance
-            </Text>
-            {findingGrid(gridAssuranceChecks)}
-            {infoRows(infoAssuranceChecks)}
-            {clearChecksSection(clearAssuranceChecks)}
+                {/* Item 5: Assurance keeps its own heading but uses the same
+                    grid/info-rows shape as Health findings above. */}
+                <Text as="h3" size="lg" className={styles.subsectionTitle}>
+                  Assurance
+                </Text>
+                {findingGrid(gridAssuranceChecks)}
+                {infoRows(infoAssuranceChecks)}
+                {clearChecksSection(clearAssuranceChecks)}
+              </>
+            )}
           </Panel>
         </div>
 
@@ -637,7 +664,16 @@ export function ArchitectHome({ data, role, orgSlug, modelSlug }: ArchitectHomeP
             <Text as="h2" size="xl" className={styles.sectionTitle}>
               Recent activity
             </Text>
-            {data.recentCommits.length === 0 ? (
+            {/* E8 item (4): loads after first paint, same as Health findings above. */}
+            {insights.status === 'error' ? (
+              <Text as="p" tone="muted" size="sm">
+                {insights.message}
+              </Text>
+            ) : !insightsData ? (
+              <Text as="p" tone="muted" size="sm">
+                Loading…
+              </Text>
+            ) : insightsData.recentCommits.length === 0 ? (
               <EmptyState>No activity on main yet.</EmptyState>
             ) : (
               <>
