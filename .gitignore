@@ -14,6 +14,11 @@ test-results/
 supabase/.temp/
 supabase/.branches/
 
+# scoreCapture.ts --live's own raw cassette scratch output (SPEC-capture.md
+# §12.6) — reviewed by hand, then promoted into a fixture's own committed
+# llm/ directory; never committed here directly.
+.tmp/
+
 # Editor / OS
 .DS_Store
 *.log

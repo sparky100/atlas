@@ -23,6 +23,7 @@ import type { RecordedLlmCassette } from '../llm/client';
 import { RecordedLlmClient } from '../llm/client';
 import { buildMatchIndex, type MatchAliasInput } from '../matchIndex';
 import type { PreviousCandidateForDiff } from '../reimportDiff';
+import type { RunCaptureSource } from '../runCapture';
 import type { ElementsHeadRow } from '../../contracts/rows';
 
 const DEFAULT_SOURCE_ID = 'seed-source-0000-0000-0000-000000000000';
@@ -82,8 +83,8 @@ export interface FixtureModel {
 }
 
 export interface FixtureOptions {
-  inputKind: 'spreadsheet';
-  format: 'csv' | 'xlsx';
+  inputKind: 'spreadsheet' | 'pdf' | 'text';
+  format: 'csv' | 'xlsx' | 'pdf' | 'text';
   documentDate: string | null;
   /** §12.1's own `reimportOf: "<fixture id>"` names another fixture; this harness instead reads a hand-authored `previous.json` sitting alongside this fixture's own files when one is present (§9.2's own "synthetic previous job" — SPEC's own wording for fixture 03), which is simpler than actually re-running a second job to get one. Recorded here only for a human reading `options.json` to see the intent; `loadFixture` itself keys off `previous.json`'s presence, not this field. */
   reimportOf?: string;
@@ -98,7 +99,7 @@ export interface LoadedFixture {
   matchIndex: ReturnType<typeof buildMatchIndex>;
   keyToId: ReadonlyMap<string, UUID>;
   idToKey: ReadonlyMap<UUID, string>;
-  source: { format: 'csv'; text: string } | { format: 'xlsx'; bytes: ArrayBuffer };
+  source: RunCaptureSource;
   llmClient: RecordedLlmClient;
   /** §9.2 (PR9): present iff `previous.json` exists in the fixture directory — a hand-authored `PreviousCandidateForDiff[]` standing in for "the previous job's own accepted candidates," never derived by actually re-running a second job (SPEC's own "synthetic previous job" wording for fixture 03). */
   reimportPrevious?: PreviousCandidateForDiff[];
@@ -199,6 +200,14 @@ function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
 }
 
+/** §12.1's own `input.csv|xlsx` widened, PR13, to the PDF/pasted-text formats PR11 added: `input.pdf` (bytes) or `input.txt` (text) alongside the existing two. */
+function loadSource(dir: string, format: FixtureOptions['format']): RunCaptureSource {
+  if (format === 'csv') return { format: 'csv', text: readFileSync(join(dir, 'input.csv'), 'utf-8') };
+  if (format === 'xlsx') return { format: 'xlsx', bytes: bufferToArrayBuffer(readFileSync(join(dir, 'input.xlsx'))) };
+  if (format === 'pdf') return { format: 'pdf', bytes: bufferToArrayBuffer(readFileSync(join(dir, 'input.pdf'))) };
+  return { format: 'text', text: readFileSync(join(dir, 'input.txt'), 'utf-8') };
+}
+
 function loadLlmCassettes(llmDir: string): Map<string, RecordedLlmCassette> {
   const cassettes = new Map<string, RecordedLlmCassette>();
   if (!existsSync(llmDir)) return cassettes;
@@ -223,10 +232,7 @@ export function loadFixture(fixturesRoot: string, id: string): LoadedFixture {
   const matchIndex = buildMatchIndex(elementsHead, aliasInputsFromModel(model, keyToId));
   const idToKey = new Map<UUID, string>([...keyToId].map(([key, id_]) => [id_, key]));
 
-  const source: LoadedFixture['source'] =
-    options.format === 'csv'
-      ? { format: 'csv', text: readFileSync(join(dir, 'input.csv'), 'utf-8') }
-      : { format: 'xlsx', bytes: bufferToArrayBuffer(readFileSync(join(dir, 'input.xlsx'))) };
+  const source: LoadedFixture['source'] = loadSource(dir, options.format);
 
   const llmClient = new RecordedLlmClient({ cassettes: loadLlmCassettes(join(dir, 'llm')) });
 

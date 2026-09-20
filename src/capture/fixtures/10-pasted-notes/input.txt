@@ -1,0 +1,1 @@
+The housing team (Housing Digital) own the tenant portal, which Civica supply; it's due to be replaced by Q2 2027 when the new Open Housing platform goes live. Finance still run Agresso on-prem. Nobody could say who owns the data warehouse.

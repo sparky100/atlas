@@ -401,11 +401,25 @@ function resolveElementCandidate(candidate: RowCandidate, proposal: ElementPropo
 // Relationship resolution.
 // ---------------------------------------------------------------------------
 
-/** `uses`/`flows_to` endpoints may be system or container (§6.2's own prompt-B description); `owns`/`supports` endpoints are always already resolved (to a candidate seq or an existing main id) by `rowsToCandidates.ts`/`capabilityAssignment.ts` themselves — this list only matters for the `unresolved`-text case. */
+/**
+ * `uses`/`flows_to` endpoints may be system or container (§6.2's own
+ * prompt-B description). For a *sheet* row, `owns`/`supports` endpoints
+ * are always already resolved (to a candidate seq or an existing main id)
+ * by `rowsToCandidates.ts`/`capabilityAssignment.ts` themselves, so this
+ * list never actually gets consulted for them from that path — but
+ * `extractProse.ts` (PR11) leaves *every* relationship's own `from`/`to`
+ * as `{kind:'unresolved', text}` uniformly (§5.3: "resolved exactly as
+ * sheet unresolved refs are"), `owns`'s own actor `from` endpoint
+ * included, so `owns` genuinely needs `actor` in its own list too — one
+ * shared list per relationship type, not per end, since `resolveEndpointRef`
+ * doesn't distinguish `from` from `to` when it searches (searching one
+ * type bucket that doesn't contain a real hit is a no-op, never a false
+ * match against a different bucket).
+ */
 const ENDPOINT_TYPES_BY_RELATIONSHIP: Readonly<Record<RelationshipType, readonly ElementType[]>> = {
   supports: ['capability'],
   uses: ['system', 'container'],
-  owns: ['system', 'container', 'capability'],
+  owns: ['actor', 'system', 'container', 'capability'],
   flows_to: ['system', 'container'],
 };
 

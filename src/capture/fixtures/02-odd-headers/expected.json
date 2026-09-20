@@ -22,5 +22,6 @@
     "rel:supports:key:app 105→name:capability:environment:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-environment" },
     "rel:supports:key:app 106→name:capability:housing:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-housing" }
   },
-  "absent": []
+  "absent": [],
+  "live": { "minElementRecall": 0.95, "minElementPrecision": 0.95, "maxUnsourced": 0 }
 }
