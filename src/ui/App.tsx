@@ -23,6 +23,7 @@ import { RequireAuth } from './routes/RequireAuth';
 import { ResetPasswordPage } from './routes/ResetPasswordPage';
 import { ReviewQueuePage } from './routes/ReviewQueuePage';
 import { ReviewRequestPage } from './routes/ReviewRequestPage';
+import { RoadmapPage } from './routes/RoadmapPage';
 import { SignIn } from './routes/SignIn';
 import { VersionDiffPage } from './routes/VersionDiffPage';
 import { VersionsPage } from './routes/VersionsPage';
@@ -61,6 +62,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/elements" element={<ElementsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/landscape" element={<LandscapePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/capability-map" element={<CapabilityMapPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/roadmap" element={<RoadmapPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/context/:elementId" element={<ContextPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/container/:systemId" element={<ContainerPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/versions" element={<VersionsPage />} />
