@@ -17,6 +17,10 @@ describe('modelNavSectionFor', () => {
     expect(modelNavSectionFor('/container/abc')).toBe('landscape');
   });
 
+  it('matches the roadmap', () => {
+    expect(modelNavSectionFor('/roadmap')).toBe('roadmap');
+  });
+
   it('matches changes, list and detail', () => {
     expect(modelNavSectionFor('/changes')).toBe('changes');
     expect(modelNavSectionFor('/changes/abc')).toBe('changes');

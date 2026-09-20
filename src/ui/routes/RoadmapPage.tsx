@@ -1,0 +1,111 @@
+import { useParams, useSearchParams } from 'react-router';
+import { AppHeader } from '../components/AppHeader/AppHeader';
+import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { ModelNav } from '../components/ModelNav/ModelNav';
+import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { Text } from '../components/Text/Text';
+import { useAuth } from '../auth/useAuth';
+import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
+import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
+import { useMainBranch } from '../branches/useMainBranch';
+import { useSelectedRef } from '../branches/useSelectedRef';
+import { isViewingMode } from '../branches/viewingMode';
+import { useModels } from '../models/useModels';
+import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
+import { refLabelOf } from '../../db/ref';
+import { RoadmapFilterBar } from '../roadmap/RoadmapFilterBar';
+import { RoadmapView } from '../roadmap/RoadmapView';
+import { useRoadmap } from '../roadmap/useRoadmap';
+import { parseRoadmapFilters, roadmapFiltersToSearchParams } from '../roadmap/roadmapFilterParams';
+import type { RoadmapFilters } from '../roadmap/roadmapFilter';
+import type { RoadmapMode } from '../roadmap/roadmapEligibility';
+import styles from './RoadmapPage.module.css';
+
+function parseRoadmapMode(searchParams: URLSearchParams): RoadmapMode {
+  return searchParams.get('roadmapMode') === 'asIs' ? 'asIs' : 'toBe';
+}
+
+/**
+ * F5's own roadmap (R1, docs/prompts/atlas-prompt-pack.md) — the model's
+ * own systems, plotted by their `introduced`/`plannedEnd`/`supportEndsAt`,
+ * grouped by capability, with change markers from merged/planned branches.
+ * PR1's own data layer (`useRoadmap.ts`, `roadmapChangeEvents.ts`) does
+ * the real work; this page is chrome plus the filter/mode controls, the
+ * same shape `CapabilityMapPage.tsx`/`LandscapePage.tsx` already
+ * establish for a model-level view.
+ *
+ * Deliberately no add/edit affordance and no Inspector/comments-panel
+ * integration in this first pass — F5's own prompt names rows, bars,
+ * markers, filters, as-is/to-be and export, never element creation; the
+ * `ViewKind`/`CommentsPanel` wiring every other view has is a real,
+ * disclosed gap for a later pass, not an oversight (see the register).
+ */
+export function RoadmapPage() {
+  const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { ref } = useSelectedRef();
+  const viewing = isViewingMode(searchParams);
+  const { userId } = useAuth();
+
+  const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
+  const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
+  const model = models.find((m) => m.slug === modelSlug);
+  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
+
+  const { state } = useRoadmap(model?.id ?? '', organisation?.id ?? '', userId, ref, mainBranch?.head_commit_id ?? null);
+
+  const mode = parseRoadmapMode(searchParams);
+  const setMode = (next: RoadmapMode): void => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (next === 'asIs') nextParams.set('roadmapMode', 'asIs');
+    else nextParams.delete('roadmapMode');
+    setSearchParams(nextParams);
+  };
+
+  const filters = parseRoadmapFilters(searchParams);
+  const setFilters = (next: RoadmapFilters): void => {
+    setSearchParams(roadmapFiltersToSearchParams(next, searchParams));
+  };
+
+  if (orgLoading || modelsLoading || !model) {
+    return (
+      <div>
+        <AppHeader />
+        <div className={navStyles.body}>
+          <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+          <main className={styles.main}>
+            <Text tone="muted">Loading…</Text>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <AppHeader />
+      <div className={navStyles.body}>
+        <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+        <main className={styles.main}>
+          {viewing ? <ViewingBranchBanner activeRef={ref} /> : <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />}
+          <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabelOf(ref)} />
+          <div className={styles.header}>
+            <Text as="h1" size="2xl">
+              Roadmap
+            </Text>
+          </div>
+
+          {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+          {state.status === 'error' && <Text as="p">{state.message}</Text>}
+          {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
+          {state.status === 'ready' && (
+            <>
+              <RoadmapFilterBar filters={filters} onFiltersChange={setFilters} mode={mode} onModeChange={setMode} capabilitiesById={state.data.capabilitiesById} ownerActorsById={state.data.ownerActorsById} />
+              <RoadmapView groups={state.data.groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+            </>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
