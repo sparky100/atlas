@@ -24,4 +24,15 @@ export const queryKeys = {
   membership: (orgId: UUID | null, userId: UUID | null) => ['membership', orgId, userId] as const,
   ownProfile: (userId: string | null) => ['profile', 'own', userId] as const,
   orgMemberProfiles: (orgId: UUID | null) => ['profiles', 'forOrg', orgId] as const,
+  /**
+   * E8 item (2)'s "branch reads fold once per (branch, head) and cache" —
+   * content-addressed: a commit's own folded content never changes once it
+   * exists (deltas/commits are append-only, SPEC §2/§9), so unlike every
+   * other key in this file, nothing ever needs to invalidate this one —
+   * see `cachedBranchProjection.ts`'s own `staleTime: Infinity`. Keyed by
+   * `commitId` alone (not `branchId`): a branch's `head_commit_id` and an
+   * arbitrary `commit:` ref can name the exact same commit, and both
+   * should share one cache entry.
+   */
+  headAtCommit: (modelId: UUID | null, commitId: UUID | null) => ['headAtCommit', modelId, commitId] as const,
 };

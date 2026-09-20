@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import {
-  resolveBranchModeProjection,
   projectionActorsForLandscape,
   projectionContainersForLandscape,
   projectionElementsByIds,
@@ -18,6 +17,7 @@ import { getOrCreateModelView } from '../../db/views';
 import type { ViewMode } from '../../db/viewMode';
 import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
+import { resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
 import { l1AncestorOf, loadCapabilityAncestry } from '../elements/capabilityDepth';
 import { moduleDisplayName } from '../elements/moduleDisplayName';
 import { isPlatform } from '../elements/systemKind';
@@ -193,7 +193,7 @@ export function useLandscape(
           if (!cancelled) setState({ status: 'refNotFound' });
           return;
         }
-        const resolved = await resolveBranchModeProjection(supabase, currentModelId, branch, mode);
+        const resolved = await resolveBranchModeProjectionCached(supabase, currentModelId, branch, mode);
         if (!resolved) {
           if (!cancelled) setState({ status: 'refNotFound' });
           return;

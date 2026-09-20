@@ -1,8 +1,8 @@
 import type { Criticality, LifecycleStatus, UUID } from '../../contracts/delta';
-import { loadProjectionAtCommit } from '../../db/branchProjection';
 import type { Client } from '../../db/client';
 import { findBoundaryCrossings } from '../../db/healthFindings';
 import { oldestLifecycleStage, supportingSystemIds, worstCriticality } from '../capabilityMap/metrics';
+import { loadProjectionAtCommitCached } from '../query/cachedBranchProjection';
 
 export interface CapabilityComparisonMetrics {
   coverage: number;
@@ -22,17 +22,21 @@ export interface OptionComparisonRow {
 /**
  * F3's own comparison table (PR5) — genuinely new orchestration, not a new
  * algorithm: each row folds one commit in memory via
- * `branchProjection.ts`'s `loadProjectionAtCommit` (the same in-memory
- * fold `useLandscape.ts`/`useElementPage.ts` already use for a branch
- * ref), then re-runs `src/ui/capabilityMap/metrics.ts`'s own functions and
- * `findBoundaryCrossings` against that projected state — the exact same
- * functions every other capability-map/health-finding surface already
- * uses against the *live* head, just pointed at a different commit. The
- * `main` row and every option row go through this identical path, so
- * nothing here special-cases "the baseline" versus "an option."
+ * `cachedBranchProjection.ts`'s `loadProjectionAtCommitCached` (the same
+ * cached in-memory fold `useLandscape.ts`/`useElementPage.ts` already use
+ * for a branch ref), then re-runs `src/ui/capabilityMap/metrics.ts`'s own
+ * functions and `findBoundaryCrossings` against that projected state — the
+ * exact same functions every other capability-map/health-finding surface
+ * already uses against the *live* head, just pointed at a different
+ * commit. The `main` row and every option row go through this identical
+ * path, so nothing here special-cases "the baseline" versus "an option" —
+ * a real, if minor, inefficiency (the `main` row could read
+ * `elements_head`/`relationships_head` directly instead of folding), left
+ * as-is rather than special-cased here: E8 item (2) is about caching the
+ * fold this comparison already does, not changing which rows fold.
  */
 async function computeComparisonRow(supabase: Client, modelId: UUID, commitId: UUID, capabilityIds: readonly UUID[], branchId: UUID | null, label: string): Promise<OptionComparisonRow> {
-  const projection = await loadProjectionAtCommit(supabase, modelId, commitId);
+  const projection = await loadProjectionAtCommitCached(supabase, modelId, commitId);
   const elementsById = new Map(projection.elementsHead.map((e) => [e.element_id, e]));
   const supportsEdges = projection.relationshipsHead.filter((r) => r.relationship_type === 'supports');
 
