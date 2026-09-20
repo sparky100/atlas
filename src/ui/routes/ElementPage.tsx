@@ -290,6 +290,16 @@ export function ElementPage() {
                   setRetiring(false);
                   reloadAfterCommit();
                 }}
+                onReplacedWithNew={(newElementId) => {
+                  setRetiring(false);
+                  // A itself is still here, just retiring — but the new
+                  // replacement is what someone doing this almost
+                  // certainly wants to continue configuring next, the
+                  // same "navigate to what was just created" convention
+                  // `onCreated`/`onConverted`/`onMerged` all already use
+                  // on this page.
+                  void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/e/${newElementId}?${refQueryParam(ref, viewing)}`);
+                }}
                 onCancel={() => { setRetiring(false); }}
               />
             )}

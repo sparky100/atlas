@@ -3,9 +3,11 @@ import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../../c
 import type { UUID } from '../../../contracts/delta';
 import type { BranchRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
+import { buildReplaceWithNewElementDeltas } from '../../elements/buildReplaceWithNewElementDeltas';
 import { moduleDisplayName } from '../../elements/moduleDisplayName';
 import { useElementRetire, type RetireReplacement } from '../../elements/useElementRetire';
 import { useRelationshipTargetSearch } from '../../elements/useRelationshipTargetSearch';
+import { useReplaceWithNewElement } from '../../elements/useReplaceWithNewElement';
 import { Button } from '../Button/Button';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
@@ -24,6 +26,8 @@ export interface RetireActionProps {
   branch: BranchRow;
   expectedHeadCommitId: UUID;
   onRetired: () => void;
+  /** A brand-new replacement was created in the same commit (`buildReplaceWithNewElementDeltas.ts`'s own doc comment explains the gap this closes) — the caller almost certainly wants to navigate there, the same way `useElementCreate.ts`'s own `onCreated` already does, rather than reloading in place the way plain `onRetired` does (A itself is still here, just retiring — nothing to navigate away from for that case). */
+  onReplacedWithNew: (newElementId: UUID) => void;
   onCancel: () => void;
 }
 
@@ -35,6 +39,14 @@ export interface RetireActionProps {
  * and modules" own generalisation — excluding this element itself) whose
  * capability transfer is `useElementRetire`'s own job. See that hook's
  * doc comment for what the transfer does and doesn't attempt.
+ *
+ * A third mode, "+ Create new instead…", covers the case that picker can
+ * never reach: a replacement that doesn't exist yet at all. Its own search
+ * always reads main's real head (`src/db/elementSearch.ts`'s own module
+ * comment) — nothing you create in the *same* unmerged change is ever
+ * findable there. `useReplaceWithNewElement.ts`/`buildReplaceWithNewElementDeltas.ts`
+ * close that gap by creating the replacement and transferring A's own
+ * edges onto it in one commit, never searching for it at all.
  */
 export function RetireAction({
   modelId,
@@ -48,14 +60,19 @@ export function RetireAction({
   branch,
   expectedHeadCommitId,
   onRetired,
+  onReplacedWithNew,
   onCancel,
 }: RetireActionProps) {
   const currentPlannedEnd = attributesRecord(element.attributes).plannedEnd;
   const [plannedEnd, setPlannedEnd] = useState(typeof currentPlannedEnd === 'string' ? currentPlannedEnd : '');
   const [replacement, setReplacement] = useState<RetireReplacement | null>(null);
-  const [pickingReplacement, setPickingReplacement] = useState(false);
+  // 'none': nothing chosen yet, both options offered. 'searching': the
+  // existing-element picker. 'creating': the new "doesn't exist yet" mode.
+  const [mode, setMode] = useState<'none' | 'searching' | 'creating'>('none');
+  const [newReplacementName, setNewReplacementName] = useState('');
   const plannedEndId = useId();
-  const search = useRelationshipTargetSearch(searchCommitId, modelId, [element.element_type], element.element_id, pickingReplacement);
+  const newNameId = useId();
+  const search = useRelationshipTargetSearch(searchCommitId, modelId, [element.element_type], element.element_id, mode === 'searching');
   const searchPlaceholder = element.element_type === 'container' ? 'Search modules…' : 'Search systems…';
   const { status, error, retire } = useElementRetire({
     modelId,
@@ -69,6 +86,41 @@ export function RetireAction({
     expectedHeadCommitId,
     onRetired,
   });
+  const { status: replaceStatus, error: replaceError, replace } = useReplaceWithNewElement({
+    modelId,
+    orgId,
+    userId,
+    element,
+    facts,
+    relationships,
+    relationshipFacts,
+    branch,
+    expectedHeadCommitId,
+    onReplaced: onReplacedWithNew,
+  });
+  const busy = status === 'retiring' || replaceStatus === 'replacing';
+  // A cheap, real preview — never a hand-summarised approximation
+  // (CLAUDE.md rule 7) — computed by calling the same pure builder the
+  // actual commit uses, with a placeholder name/date that never leaves
+  // this component; only the counts are shown.
+  const previewCounts =
+    mode === 'creating' && newReplacementName.trim() !== ''
+      ? (() => {
+          const { deltas } = buildReplaceWithNewElementDeltas({
+            element,
+            facts,
+            relationships,
+            relationshipFacts,
+            plannedEnd: plannedEnd.trim() === '' ? '2099-01-01' : plannedEnd,
+            replacementName: newReplacementName.trim(),
+            sourceId: 'preview',
+            onMain: branch.kind === 'main',
+          });
+          const supportsCount = deltas.filter((d) => d.kind === 'relationship.create' && (d as unknown as { relationshipType: string }).relationshipType === 'supports').length;
+          const otherCount = deltas.filter((d) => d.kind === 'relationship.create').length - supportsCount;
+          return { supportsCount, otherCount };
+        })()
+      : null;
 
   return (
     <div className={styles.panel}>
@@ -98,12 +150,12 @@ export function RetireAction({
             onClick={() => {
               setReplacement(null);
             }}
-            disabled={status === 'retiring'}
+            disabled={busy}
           >
             Change
           </Button>
         </Text>
-      ) : pickingReplacement ? (
+      ) : mode === 'searching' ? (
         <div>
           <input
             // eslint-disable-next-line jsx-a11y/no-autofocus -- opening this picker is itself the request to type a search.
@@ -130,7 +182,7 @@ export function RetireAction({
                     className={styles.resultRow}
                     onClick={() => {
                       setReplacement({ elementId: result.element_id, name: moduleDisplayName(result, search.resultParents.get(result.element_id) ?? null) });
-                      setPickingReplacement(false);
+                      setMode('none');
                     }}
                   >
                     <ElementTypeGlyph type={result.element_type} />
@@ -140,37 +192,98 @@ export function RetireAction({
               ))}
             </ul>
           )}
+          <Text as="p" tone="faint" size="xs">
+            Doesn&apos;t exist yet?{' '}
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setMode('creating');
+              }}
+            >
+              Create new instead
+            </Button>
+          </Text>
           <Button
             variant="ghost"
             onClick={() => {
-              setPickingReplacement(false);
+              setMode('none');
             }}
           >
             Cancel search
           </Button>
         </div>
+      ) : mode === 'creating' ? (
+        <div>
+          <label htmlFor={newNameId}>
+            <Text as="span" size="sm" tone="muted">
+              {element.element_type === 'container' ? 'New module name' : 'New system name'}
+            </Text>
+          </label>
+          <input
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- opening this mode is itself the request to type a name.
+            autoFocus
+            id={newNameId}
+            type="text"
+            className={styles.input}
+            value={newReplacementName}
+            onChange={(e) => {
+              setNewReplacementName(e.target.value);
+            }}
+          />
+          {previewCounts && (
+            <Text as="p" tone="faint" size="xs">
+              This will create <strong>{newReplacementName.trim()}</strong>
+              {previewCounts.supportsCount > 0 ? `, transfer ${String(previewCounts.supportsCount)} supports edge${previewCounts.supportsCount === 1 ? '' : 's'}` : ''}
+              {previewCounts.otherCount > 0 ? `, ${String(previewCounts.otherCount)} uses/flows_to edge${previewCounts.otherCount === 1 ? '' : 's'}` : ''}, and retire &ldquo;{element.name}&rdquo;.
+            </Text>
+          )}
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setMode('none');
+              setNewReplacementName('');
+            }}
+            disabled={busy}
+          >
+            Cancel
+          </Button>
+        </div>
       ) : (
-        <Button
-          variant="ghost"
-          onClick={() => {
-            setPickingReplacement(true);
-          }}
-        >
-          + Replaced by…
-        </Button>
+        <div className={styles.actions}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setMode('searching');
+            }}
+          >
+            + Replaced by…
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setMode('creating');
+            }}
+          >
+            + Create new instead…
+          </Button>
+        </div>
       )}
 
       <div className={styles.actions}>
-        <Button variant="primary" onClick={() => void retire(plannedEnd, replacement)} disabled={status === 'retiring' || plannedEnd.trim() === ''}>
-          {status === 'retiring' ? 'Retiring…' : 'Retire'}
+        <Button
+          variant="primary"
+          onClick={() => (mode === 'creating' ? void replace(plannedEnd, newReplacementName) : void retire(plannedEnd, replacement))}
+          disabled={busy || plannedEnd.trim() === '' || (mode === 'creating' && newReplacementName.trim() === '')}
+        >
+          {busy ? 'Retiring…' : 'Retire'}
         </Button>
-        <Button variant="ghost" onClick={onCancel} disabled={status === 'retiring'}>
+        <Button variant="ghost" onClick={onCancel} disabled={busy}>
           Cancel
         </Button>
       </div>
-      {error !== null && (
+      {(error ?? replaceError) !== null && (
         <Text as="p" tone="default">
-          {error}
+          {error ?? replaceError}
         </Text>
       )}
     </div>
