@@ -12,10 +12,25 @@
   border-bottom: none;
 }
 
+/* `min-width: 0` — a grid item's own automatic minimum size (the same
+   mechanism a flex item has) otherwise floors this column at the actual
+   <input>/<select>/<textarea> element's intrinsic min-content width
+   (AttributeValueInput.module.css's own `width: 100%; max-width: 320px`
+   already correctly bounds the *max*, but can't shrink below that floor
+   on its own), pushing `.row`'s 60% track — and the page — wider than a
+   390-412px viewport. Same "grid/flex child needs an explicit min-width: 0
+   to shrink" convention this codebase already fixed once for exactly this
+   symptom (commit 84c0bbb, "Fix #39: 390px horizontal overflow on
+   model-scoped routes", ModelNav.module.css) and uses throughout
+   (Breadcrumb.module.css, ToastHost.module.css, LandscapePage.module.css,
+   among others). The read-only AttributeRow.module.css has this same
+   40%/60% grid shape but never needed this: plain text has no comparable
+   min-content floor. */
 .value {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
 }
 
 .error {
