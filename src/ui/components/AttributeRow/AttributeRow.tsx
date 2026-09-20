@@ -1,5 +1,6 @@
 import type { FactsRow } from '../../../contracts/rows';
 import type { SourceRow } from '../../../db/types';
+import { formatAttributeValue } from '../../elements/formatAttributeValue';
 import { FactBadge } from '../FactBadge/FactBadge';
 import { Text } from '../Text/Text';
 import styles from './AttributeRow.module.css';
@@ -9,13 +10,6 @@ export interface AttributeRowProps {
   required: boolean;
   fact: FactsRow | undefined;
   source: SourceRow | undefined;
-}
-
-function formatValue(value: FactsRow['value']): string {
-  if (value === null) return '';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'string' || typeof value === 'number') return String(value);
-  return JSON.stringify(value);
 }
 
 /**
@@ -32,7 +26,7 @@ export function AttributeRow({ label, required, fact, source }: AttributeRowProp
       </Text>
       {fact ? (
         <span className={styles.value}>
-          <Text as="span">{formatValue(fact.value)}</Text>
+          <Text as="span">{formatAttributeValue(fact.value)}</Text>
           <FactBadge fact={fact} source={source} />
         </span>
       ) : required ? (

@@ -526,7 +526,7 @@ export function ElementPage() {
                   <ChangesTouchingSection inFlightBranches={state.data.inFlightBranches} />
                 </CollapsibleSection>
                 <CollapsibleSection title="History">
-                  <HistoryTimeline history={state.data.history} />
+                  <HistoryTimeline history={state.data.history} elementId={state.data.element.element_id} relationshipEndpoints={state.data.relationshipEndpoints} />
                 </CollapsibleSection>
                 <CollapsibleSection title="Decisions" meta={`(${String(state.data.elementDecisions.length)})`}>
                   {/* "Why is this here" (prompt pack F3 PR6) — replaces the
