@@ -20,7 +20,6 @@ import { listBranchesByIds } from '../../db/branches';
 import { listDecisionLinksForDecision, listDecisionsLinkingElements } from '../../db/decisions';
 import { buildRelationshipParticipantsById } from '../components/HistoryTimeline/historyTimelineSummary';
 import {
-  loadProjectionAtCommit,
   projectionChildrenOf,
   projectionElementById,
   projectionElementsByIds,
@@ -31,6 +30,7 @@ import {
 import type { HeadProjection } from '../../engine/projection';
 import type { AliasRow, BranchRow, DecisionRow, SourceRow } from '../../db/types';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
+import { loadProjectionAtCommitCached } from '../query/cachedBranchProjection';
 import { attributesRecord } from './attributesRecord';
 import { capabilityLevel } from './capabilityDepth';
 import { containerParentIds } from './moduleDisplayName';
@@ -182,7 +182,7 @@ async function resolveElementSource(modelId: UUID, ref: Ref, mainCommitIdHint: U
   if (ref.kind === 'branch') {
     const branch = await resolveBranchRef(supabase, ref);
     if (!branch) return null;
-    const projection = await loadProjectionAtCommit(supabase, modelId, branch.head_commit_id);
+    const projection = await loadProjectionAtCommitCached(supabase, modelId, branch.head_commit_id);
     return projectionSource(branch.head_commit_id, projection);
   }
   if (ref.kind === 'commit') {
@@ -192,7 +192,7 @@ async function resolveElementSource(modelId: UUID, ref: Ref, mainCommitIdHint: U
     // rows for it — fold it in memory instead, exactly like a branch head.
     const commitId = await resolveRef(supabase, modelId, ref);
     if (!commitId) return null;
-    const projection = await loadProjectionAtCommit(supabase, modelId, commitId);
+    const projection = await loadProjectionAtCommitCached(supabase, modelId, commitId);
     return projectionSource(commitId, projection);
   }
   const commitId = ref.kind === 'main' && mainCommitIdHint ? mainCommitIdHint : await resolveRef(supabase, modelId, ref);

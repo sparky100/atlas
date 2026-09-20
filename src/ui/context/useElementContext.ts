@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import { projectionContainersForLandscape, projectionElementById, projectionElementsByIds, projectionFlowsViaElement, projectionRelationshipsForElement, projectionRelationshipsTouchingAny, resolveBranchModeProjection } from '../../db/branchProjection';
+import { projectionContainersForLandscape, projectionElementById, projectionElementsByIds, projectionFlowsViaElement, projectionRelationshipsForElement, projectionRelationshipsTouchingAny } from '../../db/branchProjection';
 import { getElementHead, getElementsByIds, listFlowsViaElement, listRelationshipsForElement } from '../../db/elements';
 import type { HeadProjection } from '../../engine/projection';
 import { listContainersForLandscape } from '../../db/landscape';
@@ -9,6 +9,7 @@ import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref
 import { listRelationshipsTouchingAny } from '../../db/structureView';
 import { getOrCreateScopedView } from '../../db/views';
 import type { ViewMode } from '../../db/viewMode';
+import { resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
 import type { VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
 import { computeContextGroup, computePlatformConnections, type ContextGroup, type PlatformConnection } from './contextGrouping';
@@ -126,7 +127,7 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
           if (!cancelled) setState({ status: 'refNotFound' });
           return;
         }
-        const resolved = await resolveBranchModeProjection(supabase, modelId, branch, mode);
+        const resolved = await resolveBranchModeProjectionCached(supabase, modelId, branch, mode);
         if (!resolved) {
           if (!cancelled) setState({ status: 'refNotFound' });
           return;

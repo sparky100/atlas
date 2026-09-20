@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ElementType, RelationshipType, UUID } from '../../contracts/delta';
-import { projectionChildrenOf, projectionElementById, projectionElementsByIds, projectionRelationshipsTouchingAny, resolveBranchModeProjection } from '../../db/branchProjection';
+import { projectionChildrenOf, projectionElementById, projectionElementsByIds, projectionRelationshipsTouchingAny } from '../../db/branchProjection';
 import { getElementHead, getElementsByIds, listChildrenOf } from '../../db/elements';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import { listRelationshipsTouchingAny } from '../../db/structureView';
@@ -8,6 +8,7 @@ import { getOrCreateScopedView } from '../../db/views';
 import type { ViewKind, ViewRow } from '../../db/types';
 import type { ViewMode } from '../../db/viewMode';
 import type { VersionDiff } from '../../engine/versionDiff';
+import { resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
 import { computeStructureGroup, type StructureGroup } from './structureGrouping';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -104,7 +105,7 @@ export function useStructureView(
           if (!cancelled) setState({ status: 'refNotFound' });
           return;
         }
-        const resolved = await resolveBranchModeProjection(supabase, modelId, branch, mode);
+        const resolved = await resolveBranchModeProjectionCached(supabase, modelId, branch, mode);
         if (!resolved) {
           if (!cancelled) setState({ status: 'refNotFound' });
           return;
