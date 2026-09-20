@@ -5,7 +5,7 @@ import { getMainBranch } from '../../db/branches';
 import { getCapabilityMap, listCapabilityMapItems, listSeedableCapabilityMaps, type CapabilityMapRow } from '../../db/capabilityMapTemplates';
 import { seedModelFromCapabilityMap } from '../../db/seedFromMap';
 import { reportError } from '../errors/errorBannerStore';
-import { invalidateModelHead } from '../query/invalidateModelHead';
+import { applyCommitToCache } from '../query/applyCommitToCache';
 import { supabase } from '../supabaseClient';
 
 export type CapabilityImportStatus = 'loadingMaps' | 'idle' | 'seeding';
@@ -100,8 +100,8 @@ export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabil
         }
 
         setStatus('idle');
-        // E8 item (1): seed_from_map always writes to main.
-        void invalidateModelHead(queryClient, modelId);
+        // E8 item (3): seed_from_map always writes to main — seed the cache with the head it already computed.
+        applyCommitToCache(queryClient, modelId, { id: main.id, kind: 'main' }, result.commitId, result.newHead);
         onImported();
       } catch (e) {
         setStatus('idle');
