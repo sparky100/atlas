@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import { projectionActorsForLandscape, projectionElementsByIds, projectionLandscapeEdges, resolveBranchModeProjection } from '../../db/branchProjection';
+import { projectionActorsForLandscape, projectionElementsByIds, projectionLandscapeEdges } from '../../db/branchProjection';
 import { listSupportsEdgesForCapabilities, listCapabilitiesForMap } from '../../db/capabilityMap';
 import { ownersByElementIdFromOwnsEdges, listOwnsEdges } from '../../db/elementBrowse';
 import { getElementsByIds } from '../../db/elements';
 import { listActorsForLandscape, listLandscapeEdges } from '../../db/landscape';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import type { ViewMode } from '../../db/viewMode';
+import { resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
 import { computeCapabilityLandscapeRows, type CapabilityLandscapeRows } from './capabilityLandscapeRows';
 import { capabilitySubtreeIds } from '../elements/capabilityDepth';
 import { computeCapabilityRollup, type CapabilityRollup } from '../capabilityMap/capabilityRollup';
@@ -80,7 +81,7 @@ export function useCapabilityLandscape(
           if (!cancelled) setState({ status: 'refNotFound' });
           return;
         }
-        const resolved = await resolveBranchModeProjection(supabase, currentModelId, branch, mode);
+        const resolved = await resolveBranchModeProjectionCached(supabase, currentModelId, branch, mode);
         if (!resolved) {
           if (!cancelled) setState({ status: 'refNotFound' });
           return;

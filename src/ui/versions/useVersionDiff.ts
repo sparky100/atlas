@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
-import { buildCommitLoader } from '../../db/commitLoader';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
-import { foldFromGenesis } from '../../engine/head';
 import { computeVersionDiff, type VersionDiff } from '../../engine/versionDiff';
 import { reportError } from '../errors/errorBannerStore';
+import { loadHeadAtCommitCached } from '../query/cachedBranchProjection';
 import { supabase } from '../supabaseClient';
 
 export interface VersionDiffData {
@@ -22,9 +21,16 @@ export type VersionDiffState =
 
 /**
  * Computes the version diff (UI-principles §6.2/§6.3) between two refs —
- * `toBe` (`?ref=`) and `asIs` (`?diff=`). One `buildCommitLoader` call
- * shared by both folds: they're commits on the *same* model, so this is
- * one round trip for commits/deltas, not two.
+ * `toBe` (`?ref=`) and `asIs` (`?diff=`). E8 item (2): both folds go
+ * through `loadHeadAtCommitCached`, cached by commit id — a repeat visit
+ * to the same diff, or a diff sharing one side with something another
+ * hook already folded (e.g. `toBe` also being the branch head an element
+ * page just opened), costs nothing beyond the cache lookup. This trades
+ * away the old version's own "one `buildCommitLoader` call for both
+ * folds" optimisation on a cold cache (each side now resolves its own
+ * loader independently) for the cache's own cross-call reuse — the same
+ * tradeoff `cachedBranchProjection.ts`'s own module comment makes for
+ * `resolveBranchModeProjectionCached`.
  */
 export function useVersionDiff(modelId: UUID, toBe: Ref, asIs: Ref): VersionDiffState {
   const [state, setState] = useState<VersionDiffState>({ status: 'loading' });
@@ -48,9 +54,10 @@ export function useVersionDiff(modelId: UUID, toBe: Ref, asIs: Ref): VersionDiff
         return;
       }
 
-      const loader = await buildCommitLoader(supabase, modelId);
-      const toBeHead = foldFromGenesis(toBeCommitId, loader);
-      const asIsHead = foldFromGenesis(asIsCommitId, loader);
+      const [toBeHead, asIsHead] = await Promise.all([
+        loadHeadAtCommitCached(supabase, modelId, toBeCommitId),
+        loadHeadAtCommitCached(supabase, modelId, asIsCommitId),
+      ]);
       const diff = computeVersionDiff(asIsHead, toBeHead);
 
       if (!cancelled) setState({ status: 'ready', data: { asIsCommitId, toBeCommitId, diff } });
