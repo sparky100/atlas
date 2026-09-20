@@ -27,6 +27,7 @@ import type { BrowseRow } from '../../db/elementBrowse';
 import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromCriticalExposedFinding, prefillFromCriticalSupportEndFinding } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { SpreadsheetImportDialog } from '../import/SpreadsheetImportDialog';
+import { useRouteTiming } from '../perf/useRouteTiming';
 import styles from './ElementsPage.module.css';
 
 const VALID_FILTERS: readonly ElementBrowseFilter[] = [
@@ -148,6 +149,8 @@ export function ElementsPage() {
   };
 
   const state = useElementBrowse(model?.id ?? '', filter, mainBranch?.head_commit_id ?? null);
+  // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment.
+  useRouteTiming('elements', state.status === 'ready');
   const onLinked = () => {
     reloadMainBranch();
     if (state.status === 'ready') state.reload();

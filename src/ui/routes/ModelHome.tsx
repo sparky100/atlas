@@ -23,6 +23,7 @@ import { useHomeMode } from '../home/useHomeMode';
 import { useModels } from '../models/useModels';
 import { canArchiveModel, canCreateChangeBranch, canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
+import { useRouteTiming } from '../perf/useRouteTiming';
 import styles from './ModelHome.module.css';
 
 /**
@@ -56,6 +57,8 @@ function DirectorDoor({
   mainCommitIdHint: UUID | null;
 }) {
   const directorState = useDirectorHome(modelId, orgId, mainCommitIdHint);
+  // E8 ("performance") phase 1: same route key as ArchitectDoor below — only one door ever mounts at a time (this file's own module comment), so they never race for the same marks.
+  useRouteTiming('model-home', directorState.status === 'ready');
   if (directorState.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (directorState.status === 'error') return <Text as="p">{directorState.message}</Text>;
   return <DirectorHome data={directorState.data} reload={directorState.reload} modelId={modelId} orgId={orgId} userId={userId} role={role} orgSlug={orgSlug} modelSlug={modelSlug} />;
@@ -76,6 +79,8 @@ function ArchitectDoor({
   modelSlug: string;
 }) {
   const architectState = useArchitectHome(modelId, userId);
+  // E8 ("performance") phase 1: see DirectorDoor's own comment on sharing this route key.
+  useRouteTiming('model-home', architectState.status === 'ready');
   if (architectState.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (architectState.status === 'error') return <Text as="p">{architectState.message}</Text>;
   return <ArchitectHome data={architectState.data} role={role} orgSlug={orgSlug} modelSlug={modelSlug} />;

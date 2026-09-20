@@ -15,6 +15,7 @@ import { useThreadCounts } from '../comments/useThreadCounts';
 import type { BranchIntent, BranchRow } from '../../db/types';
 import { branchStatusTone } from './branchStatus';
 import { dateFieldLabelForIntent, INTENT_LABEL, INTENT_OPTIONS, NEW_CHANGE_INTENT_OPTIONS } from './branchIntent';
+import { useRouteTiming } from '../perf/useRouteTiming';
 import { useChangeSummaries } from './useChangeSummaries';
 import { useChanges } from './useChanges';
 import styles from './ChangesView.module.css';
@@ -42,6 +43,8 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   const navigate = useNavigate();
   const { setRef } = useSelectedRef();
   const { status, branches, error, mainHeadCommitId, createChange } = useChanges(modelId, orgId, userId);
+  // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment. `useChanges`' own status has no 'ready' state; 'idle' is its own "loaded, no create-form submission in flight" — the data-complete signal here.
+  useRouteTiming('changes', status === 'idle');
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
