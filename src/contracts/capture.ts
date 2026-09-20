@@ -117,7 +117,11 @@ export type EvidenceWarning =
   | { code: 'ENUM_FUZZY'; cell: string; raw: string; parsedAs: string }
   | { code: 'PASSAGE_NORMALISED' }
   | { code: 'MULTI_VALUE_CELL'; cell: string }
-  | { code: 'LOW_MAPPING_CONFIDENCE'; column: string; confidence: number };
+  | { code: 'LOW_MAPPING_CONFIDENCE'; column: string; confidence: number }
+  /** §5.2's own intra-document duplicate collapsing: rows agreeing on a value keep it; where they don't, the first row's value is kept with this warning — the same `ENUM_FUZZY`-style shape, added here to close a gap between §5.2's body text (which names it) and this type's own first draft (which didn't). */
+  | { code: 'ROWS_DISAGREE'; cell: string }
+  /** §5.4: an enum cell matching neither the exact value nor the fuzzy synonym table — the attribute is omitted entirely (never a guess), this warning records the raw text for the passage. */
+  | { code: 'ENUM_UNPARSED'; cell: string; raw: string };
 
 export interface CandidateEvidence {
   sourceRef: SourceRef;
