@@ -32,15 +32,16 @@ import { queryKeys } from './keys';
  * moves; this tracks an immutable fact. `staleTime: Infinity` reflects
  * that literally, not as an approximation of "long enough."
  *
- * `queryClient.fetchQuery` (not `useQuery`) deliberately, since these
- * calls happen inside existing async data-loading functions
+ * `queryClient.query` (not `useQuery`) deliberately, since these calls
+ * happen inside existing async data-loading functions
  * (`useElementPage.ts`'s `resolveElementSource`, `useLandscape.ts`, etc.),
- * not React components — `fetchQuery` is the same cache, read and
- * populated imperatively, with the same request-deduplication for
- * concurrent callers asking for the same key.
+ * not React components — `query` is the same cache, read and populated
+ * imperatively, with the same request-deduplication for concurrent callers
+ * asking for the same key (it replaces the now-deprecated `fetchQuery`,
+ * same options shape).
  */
 export function loadHeadAtCommitCached(supabase: Client, modelId: UUID, commitId: UUID): Promise<Head> {
-  return queryClient.fetchQuery({
+  return queryClient.query({
     queryKey: queryKeys.headAtCommit(modelId, commitId),
     queryFn: async () => {
       const loader = await buildCommitLoader(supabase, modelId);
