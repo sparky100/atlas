@@ -1,5 +1,5 @@
 import type { UUID } from '../../contracts/delta';
-import type { RecentCommitRow } from './useArchitectHome';
+import type { RecentCommitRow } from './useArchitectHomeInsights';
 
 /**
  * S1 item 6: "Recent activity: five items, others' activity preferred,

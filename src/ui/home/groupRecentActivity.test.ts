@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CommitRow } from '../../contracts/rows';
-import type { RecentCommitRow } from './useArchitectHome';
+import type { RecentCommitRow } from './useArchitectHomeInsights';
 import { selectRecentActivity } from './groupRecentActivity';
 
 function commit(id: string, title: string, authorId: string): CommitRow {

@@ -339,7 +339,14 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // architect-door layout prompt's own `capability-no-supporters` check
   // (the third decision-shaped finding) — also zero here.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
-  await expect(page.getByRole('heading', { name: 'Health findings' })).toBeVisible();
+  // `exact: true`: this model's own title, "Health Findings Clean Test
+  // Model", contains "Health Findings" as a substring, so a non-exact
+  // match against the panel's own heading is ambiguous the moment both are
+  // on the page at once — E8 item (4) makes the panel heading itself paint
+  // sooner (no longer gated behind Health findings' own now-deferred data
+  // fetch), which turned what used to be a lucky, timing-dependent single
+  // match into a reliable strict-mode violation.
+  await expect(page.getByRole('heading', { name: 'Health findings', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
   const healthClear = page.getByRole('button', { name: '13 checks clear' });
   const assuranceClear = page.getByRole('button', { name: '5 checks clear' });
