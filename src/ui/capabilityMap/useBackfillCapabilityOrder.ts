@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { backfillCapabilityOrder } from '../../db/backfillCapabilityOrder';
-import { invalidateModelHead } from '../query/invalidateModelHead';
+import { applyCommitToCache } from '../query/applyCommitToCache';
 import { supabase } from '../supabaseClient';
 
 export type BackfillCapabilityOrderStatus = 'idle' | 'backfilling';
@@ -59,8 +59,8 @@ export function useBackfillCapabilityOrder(input: UseBackfillCapabilityOrderInpu
       }
       setMessage(result.kind === 'backfilled' ? `Backfilled order for ${String(result.backfilled)} capabilit${result.backfilled === 1 ? 'y' : 'ies'}.` : result.message);
       if (result.kind === 'backfilled') {
-        // E8 item (1): the backfill commit moves main's own head (this file's own doc comment).
-        void invalidateModelHead(queryClient, modelId);
+        // E8 item (3): the backfill commit moves main's own head (this file's own doc comment) — seed the cache with the head it already computed.
+        applyCommitToCache(queryClient, modelId, { id: result.branchId, kind: 'main' }, result.commitId, result.newHead);
         onBackfilled();
       }
     } catch (e) {

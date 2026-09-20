@@ -8,7 +8,7 @@ import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
-import { invalidateModelHead } from '../query/invalidateModelHead';
+import { applyCommitToCache } from '../query/applyCommitToCache';
 import { supabase } from '../supabaseClient';
 
 export type ElementCreateStatus = 'idle' | 'creating';
@@ -167,14 +167,15 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
         }
 
         setStatus('idle');
-        // E8 item (1): invalidate the shared cached main-branch head before
-        // navigating on — `onCreated` (`HomeSearch.tsx`) navigates straight
-        // to the new element's own page, which reads `mainBranch` from the
-        // same shared cache; without this, that page could render against
-        // whichever commit_id was cached before this one landed, and
-        // `elements_head` has zero rows for the new element at that stale
-        // commit (SPEC §1 S-2/P-6) — "This element is not present here."
-        void invalidateModelHead(queryClient, modelId);
+        // E8 item (3): seed the cache with the head this commit already
+        // computed before navigating on — `onCreated` (`HomeSearch.tsx`)
+        // navigates straight to the new element's own page, which reads
+        // `mainBranch`/`headAtCommit` from the same shared cache; without
+        // this, that page could render against whichever commit_id was
+        // cached before this one landed, and `elements_head` has zero rows
+        // for the new element at that stale commit (SPEC §1 S-2/P-6) —
+        // "This element is not present here."
+        applyCommitToCache(queryClient, modelId, branch, result.commitId, result.newHead);
         onCreated(elementId);
       } catch (e) {
         setStatus('idle');

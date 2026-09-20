@@ -7,7 +7,7 @@ import { listFactsForSubject } from '../../db/elements';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { describeEnvelope } from '../../engine/describeEnvelope';
-import { invalidateModelHead } from '../query/invalidateModelHead';
+import { applyCommitToCache } from '../query/applyCommitToCache';
 import { supabase } from '../supabaseClient';
 import { resolveOrders } from './resolveCapabilityOrders';
 
@@ -145,8 +145,8 @@ export function useCapabilityReorder(input: UseCapabilityReorderInput): UseCapab
         }
 
         setStatus('idle');
-        // E8 item (1): invalidates the shared main/editing-branch cache — see invalidateModelHead.ts's own comment.
-        void invalidateModelHead(queryClient, modelId);
+        // E8 item (3): seeds the cache with the head this commit already computed — see applyCommitToCache.ts's own comment.
+        applyCommitToCache(queryClient, modelId, branch, result.commitId, result.newHead);
         onReordered();
       } catch (e) {
         setStatus('idle');
