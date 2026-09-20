@@ -49,6 +49,7 @@ import { useElementEditor, type DraftValue } from '../elements/useElementEditor'
 import { useElementRename } from '../elements/useElementRename';
 import { ActorMemberPicker } from '../elements/ActorMemberPicker';
 import { isIntegrationPlatform, isPlatform } from '../elements/systemKind';
+import { useRouteTiming } from '../perf/useRouteTiming';
 import styles from './ElementPage.module.css';
 
 /**
@@ -130,6 +131,8 @@ export function ElementPage() {
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   // S1 item 15 (A2 remainder): same dedup hint as every other page here.
   const { state, reload } = useElementPage(model?.id ?? '', elementId ?? '', ref, mainBranch?.head_commit_id ?? null);
+  // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment.
+  useRouteTiming('element-detail', state.status === 'ready');
   // F1 ("custom attributes") PR3: this org's own definitions — read-only
   // here (any member, per attribute_definitions_select's RLS), filtered
   // below to the ones that actually apply to this element's type. Called

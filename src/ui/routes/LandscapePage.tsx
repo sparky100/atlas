@@ -52,6 +52,7 @@ import { lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
 import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import { parseCapabilityParam, zoomQueryString } from '../nav/zoomParams';
+import { useRouteTiming } from '../perf/useRouteTiming';
 import { SpreadsheetImportDialog } from '../import/SpreadsheetImportDialog';
 import { downloadImportPrompt } from '../import/downloadImportPrompt';
 import { supabase } from '../supabaseClient';
@@ -172,6 +173,8 @@ export function LandscapePage() {
   // feeds.
   const { state } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId === null, searchCommitId);
   const { state: capabilityLandscapeState } = useCapabilityLandscape(model?.id ?? null, ref, mode, capabilityId, searchCommitId);
+  // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment. Either hook's own `ready` covers this route (plain vs. capability-scoped), whichever is actually active.
+  useRouteTiming('landscape', capabilityId === null ? state.status === 'ready' : capabilityLandscapeState.status === 'ready');
   // V2 "landscape focus and filters": `?capabilities=`/`?lifecycle=`/
   // `?criticality=`/`?kind=`/`?domain=` — parsed fresh from `searchParams`
   // (itself stable across renders unless the URL's own query string

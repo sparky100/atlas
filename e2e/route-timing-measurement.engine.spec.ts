@@ -1,0 +1,298 @@
+/**
+ * E8 ("performance") phase 1: "First measure: timing log per route
+ * (resolve → first paint → data complete) and network waterfalls for six
+ * routes and three actions (add system, add relationship, save attribute)
+ * on the DNO model; numbers committed to docs/perf/2026-09.md."
+ *
+ * This spec is the measurement pass itself, not the later acceptance gate
+ * — E8's own wording puts "targets asserted in a Playwright timing spec"
+ * *after* "numbers committed", as a separate, later artifact once the
+ * data-layer/caching work (items 1-5) actually exists to hold a target
+ * against. Nothing here asserts a threshold; it seeds the DNO model
+ * (`e2e/fixtures/dnoFixture.ts`), walks the six routes and three actions,
+ * reads back `useRouteTiming.ts`'s own marks/measures plus each route's
+ * own network waterfall (`performance.getEntriesByType('resource')` —
+ * already exactly what "network waterfall" needs, no bespoke instrumentation
+ * required for that half), and writes the raw numbers straight to
+ * `docs/perf/2026-09.md` (generated, not hand-transcribed, so the
+ * committed numbers can never drift from what was actually measured).
+ *
+ * Same "needs a real Supabase" limitation as every other Playwright test
+ * in this repo.
+ */
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
+import { expect, test, type Page } from '@playwright/test';
+import { getMainBranch } from '../src/db/branches';
+import { createChangeBranch } from '../src/db/branches';
+import { createSupabaseClient } from '../src/db/client';
+import { createComment } from '../src/db/comments';
+import { commitToBranch } from '../src/db/commits';
+import { createModel } from '../src/db/models';
+import { createOrganisation } from '../src/db/organisations';
+import { loadEnv } from '../src/db/env';
+import { addUsesRelationship } from './fixtures/goldenPath';
+import { buildEnvelope, generateDnoFixture, openChangeEditDelta, SYSTEM_COUNT } from './fixtures/dnoFixture';
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const PERF_DOC_PATH = path.join(REPO_ROOT, 'docs', 'perf', '2026-09.md');
+
+interface RoutePerf {
+  routeKey: string;
+  label: string;
+  resolveToPaintMs: number | null;
+  paintToDataMs: number | null;
+  resolveToDataMs: number | null;
+  resourceCount: number;
+  resourceTotalBytes: number;
+  resourceTotalDurationMs: number;
+  slowestResource: { name: string; durationMs: number } | null;
+}
+
+interface ActionPerf {
+  actionKey: string;
+  label: string;
+  wallClockMs: number;
+}
+
+/** Reads `useRouteTiming.ts`'s own marks/measures for `routeKey`, plus every `fetch`/XHR resource observed since the caller last cleared resource timings — the route's own network waterfall. */
+async function readRoutePerf(page: Page, routeKey: string, label: string): Promise<RoutePerf> {
+  return page.evaluate(
+    ({ routeKey, label }) => {
+      const measure = (name: string) => performance.getEntriesByName(`atlas:${routeKey}:${name}`, 'measure')[0]?.duration ?? null;
+      const resources = performance
+        .getEntriesByType('resource')
+        .filter((r): r is PerformanceResourceTiming => 'initiatorType' in r && ((r as PerformanceResourceTiming).initiatorType === 'fetch' || (r as PerformanceResourceTiming).initiatorType === 'xmlhttprequest'));
+      const slowest = [...resources].sort((a, b) => b.duration - a.duration)[0];
+      return {
+        routeKey,
+        label,
+        resolveToPaintMs: measure('resolve-to-paint'),
+        paintToDataMs: measure('paint-to-data'),
+        resolveToDataMs: measure('resolve-to-data'),
+        resourceCount: resources.length,
+        resourceTotalBytes: resources.reduce((sum, r) => sum + r.transferSize, 0),
+        resourceTotalDurationMs: resources.reduce((sum, r) => sum + r.duration, 0),
+        slowestResource: slowest ? { name: slowest.name.replace(/^https?:\/\/[^/]+/, ''), durationMs: slowest.duration } : null,
+      };
+    },
+    { routeKey, label },
+  );
+}
+
+function fmtMs(value: number | null): string {
+  return value === null ? 'n/a' : `${value.toFixed(0)}ms`;
+}
+
+function fmtBytes(value: number): string {
+  return value < 1024 ? `${String(value)}B` : `${(value / 1024).toFixed(1)}KB`;
+}
+
+function renderReport(routes: RoutePerf[], actions: ActionPerf[]): string {
+  const routeRows = routes
+    .map((r) => `| ${r.label} | ${fmtMs(r.resolveToPaintMs)} | ${fmtMs(r.paintToDataMs)} | ${fmtMs(r.resolveToDataMs)} | ${String(r.resourceCount)} | ${fmtBytes(r.resourceTotalBytes)} | ${fmtMs(r.resourceTotalDurationMs)} | ${r.slowestResource ? `${r.slowestResource.name} (${fmtMs(r.slowestResource.durationMs)})` : 'n/a'} |`)
+    .join('\n');
+  const actionRows = actions.map((a) => `| ${a.label} | ${fmtMs(a.wallClockMs)} |`).join('\n');
+
+  return `# Performance baseline — 2026-09 (E8 phase 1)
+
+Generated by \`e2e/route-timing-measurement.engine.spec.ts\` against the DNO
+model (\`e2e/fixtures/dnoFixture.ts\`: ${String(SYSTEM_COUNT)} systems across
+a dozen real electricity-network capabilities, one open change, two
+comments — see that fixture's own module comment for the one deliberate
+simplification, a real open change rather than a genuine merge conflict).
+These are the **baseline numbers before** E8 items (1)-(5) (the shared
+data-layer, cached-head commit application, deferred non-critical panels,
+scoped realtime resync) — not yet gated by the 300ms/500ms targets, which
+apply once that work lands.
+
+## Routes: resolve → first paint → data complete
+
+Timings via \`useRouteTiming.ts\`'s own \`performance.mark\`/\`measure\` pairs.
+Network waterfall via \`performance.getEntriesByType('resource')\`, scoped to
+\`fetch\`/XHR requests observed between this route's own navigation and its
+data-complete mark.
+
+| Route | resolve→paint | paint→data | resolve→data (total) | requests | bytes | request time (sum) | slowest request |
+|---|---|---|---|---|---|---|---|
+${routeRows}
+
+## Actions: click → updated UI (wall clock)
+
+| Action | time |
+|---|---|
+${actionRows}
+
+## Reading this
+
+- "resolve→paint" is almost entirely client-side (route match + the
+  loading shell's own render) — a regression here points at bundle size or
+  a render-blocking import, not the network.
+- "paint→data" is this route's own data fetch — this is what E8 item (1)'s
+  shared data layer (org/model/branches/head/profiles cached once, not
+  re-fetched per page) and item (2) (main reads the projection, never
+  folds) are meant to shrink.
+- The action table's wall-clock time bundles the commit round-trip and
+  today's full-reload-on-commit pattern (\`reload()\` re-runs every fetch
+  from scratch — see \`CapabilityMapPage.tsx\`'s own \`reloadAll\`) — E8 item
+  (3)'s "apply the returned deltas to the cached head and re-render, then
+  revalidate in the background" is what should shrink this number
+  specifically, without touching the commit itself.
+`;
+}
+
+test('E8 phase 1: measure resolve/paint/data timing and network waterfalls across six routes and three actions on the DNO model', async ({ page }) => {
+  test.setTimeout(180_000);
+
+  const env = loadEnv();
+  const email = `perf-e8-${randomUUID()}@example.test`;
+  const password = `${randomUUID()}Aa1!`;
+
+  await page.goto('/sign-in');
+  await page.getByText("Don't have an account? Create one").click();
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('heading', { name: 'Your organisations' })).toBeVisible();
+
+  const signedIn = createSupabaseClient(env);
+  const { error: signInError } = await signedIn.auth.signInWithPassword({ email, password });
+  if (signInError) throw new Error(`perf-e8 fixture sign-in: ${signInError.message}`);
+  const { data: userData, error: getUserError } = await signedIn.auth.getUser();
+  if (getUserError) throw new Error(`perf-e8 fixture: could not read the signed-in user: ${getUserError.message}`);
+  const userId = userData.user.id;
+
+  const orgId = randomUUID();
+  const orgSlug = `perf-e8-${orgId.slice(0, 8)}`;
+  await createOrganisation(signedIn, { id: orgId, name: 'DNO (E8 perf baseline)', slug: orgSlug, createdBy: userId });
+
+  const modelId = randomUUID();
+  const modelSlug = `perf-e8-model-${modelId.slice(0, 8)}`;
+  await createModel(signedIn, { id: modelId, orgId, name: 'DNO', slug: modelSlug, createdBy: userId });
+
+  const main = await getMainBranch(signedIn, modelId);
+  if (!main) throw new Error('main branch was not auto-created');
+  const genesisCommitId = main.head_commit_id;
+  if (!genesisCommitId) throw new Error('main branch has no head commit (ADR-018 violation)');
+
+  const { error: sourceError } = await signedIn.from('sources').insert({ id: randomUUID(), org_id: orgId, model_id: modelId, kind: 'manual', name: 'Seed', user_id: userId, created_by: userId });
+  if (sourceError) throw new Error(`seed source: ${sourceError.message}`);
+  const { data: sourceRow } = await signedIn.from('sources').select('id').eq('model_id', modelId).eq('user_id', userId).single();
+  const seedSourceId = (sourceRow as { id: string }).id;
+
+  const fixture = generateDnoFixture(seedSourceId);
+  const seedEnvelope = buildEnvelope(main.id, genesisCommitId, `seed the DNO model (${String(SYSTEM_COUNT)} systems)`, fixture.deltas);
+  const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope: seedEnvelope });
+  if (!seedResult.ok) throw new Error(`seeding the DNO fixture: ${seedResult.message}`);
+
+  const { data: mainAfterSeed } = await signedIn.from('branches').select('head_commit_id').eq('id', main.id).single();
+  const headAfterSeed = (mainAfterSeed as { head_commit_id: string }).head_commit_id;
+
+  // "One open change" — see dnoFixture.ts's own module comment for why this
+  // is a real edit on an open branch, not a genuine merge conflict.
+  const changeBranch = await createChangeBranch(signedIn, { id: randomUUID(), orgId, modelId, name: 'vendor-refresh', title: 'Refresh System 01 vendor', createdBy: userId, mainHeadCommitId: headAfterSeed, intent: 'correct' });
+  const changeEnvelope = buildEnvelope(changeBranch.id, headAfterSeed, 'update System 01 vendor', [openChangeEditDelta(seedSourceId, fixture.systemIds[0] ?? '', fixture.firstSystemCreateDeltaId)]);
+  const changeResult = await commitToBranch(signedIn, { modelId, branchId: changeBranch.id, expectedHeadCommitId: headAfterSeed, envelope: changeEnvelope });
+  if (!changeResult.ok) throw new Error(`seeding the open change: ${changeResult.message}`);
+
+  // Two comments, on two different systems.
+  await createComment(signedIn, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: fixture.systemIds[1] ?? '', body: 'Is this vendor contract still current?', authorId: userId });
+  await createComment(signedIn, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: fixture.systemIds[2] ?? '', body: 'Confirmed with procurement — renewed through next year.', authorId: userId });
+
+  const routes: RoutePerf[] = [];
+  const actions: ActionPerf[] = [];
+
+  // Waits directly for `useRouteTiming.ts`'s own `data-complete` mark —
+  // the exact condition the hook's `ready` boolean reflects — rather than
+  // inferring readiness from a UI locator. An early try at this used
+  // per-route text/role locators instead, and it was the wrong call: a
+  // page-shell heading (ModelHome's title, Landscape's/Elements' own static
+  // headings) renders before the door/canvas/table's real data does, and a
+  // generic "no 'Loading…' text anywhere" check caught unrelated deferred
+  // panels (comment counts, recent activity) flickering their own loading
+  // state independently of this route's own readiness. Polling the mark
+  // itself has neither problem — it's the one signal this instrumentation
+  // exists to provide.
+  async function measure(routeKey: string, label: string, path: string): Promise<void> {
+    await page.evaluate(() => {
+      performance.clearResourceTimings();
+    });
+    await page.goto(path);
+    await page.waitForFunction((key) => performance.getEntriesByName(`atlas:${key}:data-complete`, 'mark').length > 0, routeKey, { timeout: 30_000 });
+    routes.push(await readRoutePerf(page, routeKey, label));
+  }
+
+  // --- Six routes ---
+  await measure('model-home', 'Model home', `/o/${orgSlug}/m/${modelSlug}`);
+  await measure('capability-map', 'Capability map', `/o/${orgSlug}/m/${modelSlug}/capability-map`);
+  await measure('landscape', 'Landscape', `/o/${orgSlug}/m/${modelSlug}/landscape`);
+  await measure('elements', 'Elements (browse)', `/o/${orgSlug}/m/${modelSlug}/elements`);
+  const firstSystemId = fixture.systemIds[3] ?? '';
+  await measure('element-detail', 'Element detail', `/o/${orgSlug}/m/${modelSlug}/e/${firstSystemId}`);
+  await measure('changes', 'Changes', `/o/${orgSlug}/m/${modelSlug}/changes`);
+
+  // --- Three actions: add system, add relationship, save attribute ---
+  // Already on an element page (Changes doesn't leave one) — navigate to a
+  // fresh system pair for the relationship add, main ref, edit rights.
+  const relSourceId = fixture.systemIds[4] ?? '';
+  const relTargetName = `System ${String(6).padStart(2, '0')}`; // fixture's own naming, index 5 (0-based) -> "…System 06".
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${relSourceId}?ref=main`);
+  await expect(page.getByRole('button', { name: 'Element actions' })).toBeVisible();
+  {
+    const t0 = Date.now();
+    await addUsesRelationship(page, relTargetName, 'reads status from');
+    await expect(page.getByRole('link', { name: new RegExp(relTargetName) })).toBeVisible();
+    actions.push({ actionKey: 'add-relationship', label: 'Add relationship (uses)', wallClockMs: Date.now() - t0 });
+  }
+
+  // Save attribute — the same "Edit -> fill -> Save" flow every other
+  // attribute-editing spec here already uses (e.g. retire-with-replacement.spec.ts).
+  // A reload first: the previous action just committed a `uses` edge onto
+  // this same element, moving its head — editing against the page's own
+  // now-stale in-memory copy would hit the real "this element changed
+  // since you loaded it" optimistic-concurrency guard, not a bug in this
+  // spec's own timing logic. Excluded from the measured window itself,
+  // same as every other route's own initial `page.goto`.
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Element actions' })).toBeVisible();
+  {
+    const t0 = Date.now();
+    await page.getByRole('button', { name: '✎ Edit' }).click();
+    await page.getByLabel('Vendor', { exact: true }).fill('Measured Vendor Co');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible();
+    actions.push({ actionKey: 'save-attribute', label: 'Save attribute (vendor)', wallClockMs: Date.now() - t0 });
+  }
+
+  // Add system — Home's own search-and-create flow.
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
+  await expect(page.getByRole('heading', { name: 'DNO' })).toBeVisible();
+  {
+    const newSystemName = `Perf Measured System ${randomUUID().slice(0, 8)}`;
+    const t0 = Date.now();
+    const searchBox = page.getByPlaceholder('Search or create a capability, system, or actor…');
+    await expect(searchBox).toBeVisible();
+    await searchBox.fill(newSystemName);
+    await page.getByRole('button', { name: `Create system "${newSystemName}"` }).click();
+    await expect(page.getByText('Description (required)')).toBeVisible();
+    await page.getByPlaceholder('One line — what this system is').fill('Added during the E8 perf measurement pass.');
+    await page.getByRole('button', { name: 'Skip capability' }).click();
+    await expect(page.getByRole('heading', { name: newSystemName })).toBeVisible({ timeout: 15_000 });
+    actions.push({ actionKey: 'add-system', label: 'Add system', wallClockMs: Date.now() - t0 });
+  }
+
+  const report = renderReport(routes, actions);
+  console.log(report);
+  const docsDir = path.dirname(PERF_DOC_PATH);
+  if (!existsSync(docsDir)) mkdirSync(docsDir, { recursive: true });
+  writeFileSync(PERF_DOC_PATH, report, 'utf8');
+
+  // Informational only (E8 phase 1 asserts nothing yet — see this file's
+  // own module comment) — a sanity floor that catches "the page never
+  // loaded at all" rather than a performance regression.
+  for (const route of routes) {
+    expect(route.resolveToDataMs, `${route.label}: no resolve-to-data measurement was recorded at all`).not.toBeNull();
+  }
+});

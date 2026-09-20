@@ -34,6 +34,7 @@ import { Inspector } from '../components/Inspector/Inspector';
 import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
 import { useHomeMode } from '../home/useHomeMode';
 import { downloadImportPrompt } from '../import/downloadImportPrompt';
+import { useRouteTiming } from '../perf/useRouteTiming';
 import { supabase } from '../supabaseClient';
 import styles from './CapabilityMapPage.module.css';
 
@@ -104,6 +105,8 @@ export function CapabilityMapPage() {
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
 
   const { state, reload } = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref, mainBranch?.head_commit_id ?? null);
+  // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment.
+  useRouteTiming('capability-map', state.status === 'ready');
   // S2 flow 1 bug fix: every mutation on this page (importing a starter
   // map, adding a capability, reordering one, backfilling order) commits
   // to main, moving its head — the caller must refresh `mainBranch` itself
