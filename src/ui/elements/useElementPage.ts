@@ -17,6 +17,7 @@ import {
 } from '../../db/elements';
 import { listBranchesByIds } from '../../db/branches';
 import { listDecisionLinksForDecision, listDecisionsLinkingElements } from '../../db/decisions';
+import { buildRelationshipParticipantsById } from '../components/HistoryTimeline/historyTimelineSummary';
 import {
   loadProjectionAtCommit,
   projectionChildrenOf,
@@ -45,7 +46,7 @@ export interface ElementPageData {
   capabilityLevel: number | null | undefined;
   children: ElementsHeadRow[];
   relationships: RelationshipsHeadRow[];
-  /** The other endpoint of each relationship in `relationships` — never this element itself. */
+  /** The other endpoint of each relationship in `relationships` — never this element itself. Also covers every endpoint `history`'s own relationship entries can name, live or since retracted (`HistoryTimeline.tsx`'s own `relationshipEndpoints` prop) — a superset, not a second map, since a `relationships`-only entry is a strict subset of everything `history` can ever reference. */
   relationshipEndpoints: Map<UUID, ElementsHeadRow>;
   relationshipFacts: Map<UUID, Map<string, FactsRow>>;
   aliases: AliasRow[];
@@ -297,11 +298,26 @@ export function useElementPage(
       // round trip. Harmless when a relationship has no `via` (nothing
       // added) or when it's already one of this element's own endpoints
       // elsewhere (`elementsByIds`/the `Map` it returns dedupe on id).
-      const otherEndpointIds = relationships.flatMap((rel) => {
-        const attrs = attributesRecord(rel.attributes);
-        const viaId = typeof attrs.via === 'string' ? [attrs.via] : [];
-        return [rel.from_element_id === elementId ? rel.to_element_id : rel.from_element_id, ...viaId];
-      });
+      //
+      // History's own need is folded in here too, not a second lookup:
+      // `HistoryTimeline.tsx`'s history entries name the *other* side of a
+      // relationship, live or since retracted — `relationships` above only
+      // ever covers today's live ones, so a retracted relationship's own
+      // endpoint (its capability/system is often still live, just no
+      // longer connected) needs resolving from `history` itself.
+      // `buildRelationshipParticipantsById` recovers both endpoints of
+      // every relationship in `history` from its own `relationship_create`
+      // row (that function's own doc comment explains why that row is
+      // always present) — this dedupes against `relationships`' own ids
+      // via the same `elementsByIds` Map, same as `via` above.
+      const historyEndpointIds = [...buildRelationshipParticipantsById(history).values()].flatMap((p) => [p.fromElementId, p.toElementId]);
+      const otherEndpointIds = relationships
+        .flatMap((rel) => {
+          const attrs = attributesRecord(rel.attributes);
+          const viaId = typeof attrs.via === 'string' ? [attrs.via] : [];
+          return [rel.from_element_id === elementId ? rel.to_element_id : rel.from_element_id, ...viaId];
+        })
+        .concat(historyEndpointIds);
       const [relationshipEndpoints, relationshipFactsList] = await Promise.all([
         source.elementsByIds(otherEndpointIds),
         Promise.all(relationships.map((rel) => source.facts(rel.relationship_id))),
