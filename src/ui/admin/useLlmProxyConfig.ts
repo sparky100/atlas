@@ -8,6 +8,28 @@ import { supabase } from '../supabaseClient';
 export const DEFAULT_LLM_PROXY_MODEL = 'claude-opus-5';
 export const DEFAULT_LLM_PROXY_RATE_LIMIT_PER_HOUR = 100;
 
+export interface LlmProxyModelOption {
+  id: string;
+  label: string;
+}
+
+/**
+ * The model choices `PlatformAdminView`'s picker offers. `llm-proxy` is
+ * Anthropic-only by deliberate design (`supabase/functions/llm-proxy/index.ts`'s
+ * own module comment: "narrowed in the port" from Des-Studio's multi-provider
+ * version) — there is no separate provider selector to build alongside this
+ * one, only a fixed "Anthropic" label. Held here by hand, same as
+ * `DEFAULT_LLM_PROXY_MODEL` above: nothing on the Postgres/Deno side of this
+ * boundary can share a TS constant, so this list needs updating by hand as
+ * new Claude models ship.
+ */
+export const LLM_PROXY_MODEL_OPTIONS: LlmProxyModelOption[] = [
+  { id: 'claude-opus-5', label: 'Claude Opus 5 (flagship)' },
+  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+  { id: 'claude-fable-5-1', label: 'Claude Fable 5.1' },
+];
+
 export type LlmProxyConfigStatus = 'loading' | 'idle' | 'saving' | 'error';
 
 export interface SaveLlmProxyConfigInput {

@@ -49,7 +49,7 @@ test('a platform admin can view and change LLM proxy settings from the user menu
   await page.getByRole('link', { name: 'Platform admin' }).click();
   await expect(page.getByRole('heading', { name: 'Platform admin' })).toBeVisible();
 
-  await page.getByLabel('Model').fill('claude-sonnet-5');
+  await page.getByLabel('Model').selectOption('claude-sonnet-5');
   await page.getByLabel(/Rate limit/).fill('42');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('LLM proxy settings saved')).toBeVisible();

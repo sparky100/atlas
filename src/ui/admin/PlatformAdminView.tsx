@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { useLlmProxyConfig } from './useLlmProxyConfig';
+import { LLM_PROXY_MODEL_OPTIONS, useLlmProxyConfig } from './useLlmProxyConfig';
 import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
@@ -14,13 +14,27 @@ import styles from './PlatformAdminView.module.css';
  * "API key set"/"API key not set" and an input labelled to make clear that
  * leaving it blank keeps whatever is already configured, never displaying
  * or round-tripping a live secret.
+ *
+ * Provider and Model are both pickers, not free text — same shape as
+ * `ModelSettingsView.tsx`'s own version-select convention. Provider is a
+ * single disabled option ("Anthropic"): `llm-proxy` is Anthropic-only by
+ * deliberate design (its own module comment), so a real multi-provider
+ * selector would offer choices the backend can't act on. Model's own
+ * options come from `LLM_PROXY_MODEL_OPTIONS`; if the currently-saved value
+ * isn't one of them (an older or since-retired model id), it's added as an
+ * extra option rather than silently replaced, so opening this form never
+ * itself changes what's live.
  */
 export function PlatformAdminView() {
   const { status, error, model, rateLimitPerHour, hasApiKey, setModel, setRateLimitPerHour, save } = useLlmProxyConfig();
   const [apiKeyInput, setApiKeyInput] = useState('');
+  const providerId = useId();
   const modelId = useId();
   const rateLimitId = useId();
   const apiKeyId = useId();
+  const modelOptions = LLM_PROXY_MODEL_OPTIONS.some((option) => option.id === model)
+    ? LLM_PROXY_MODEL_OPTIONS
+    : [{ id: model, label: `${model} (currently set)` }, ...LLM_PROXY_MODEL_OPTIONS];
 
   const submit = () => {
     const trimmedKey = apiKeyInput.trim();
@@ -54,20 +68,36 @@ export function PlatformAdminView() {
           }}
         >
           <div className={styles.field}>
+            <label htmlFor={providerId}>
+              <Text as="span" size="sm" tone="muted">
+                Provider
+              </Text>
+            </label>
+            <select id={providerId} className={styles.input} value="anthropic" disabled>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </div>
+
+          <div className={styles.field}>
             <label htmlFor={modelId}>
               <Text as="span" size="sm" tone="muted">
                 Model
               </Text>
             </label>
-            <input
+            <select
               id={modelId}
-              type="text"
               className={styles.input}
               value={model}
               onChange={(e) => {
                 setModel(e.target.value);
               }}
-            />
+            >
+              {modelOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className={styles.field}>
