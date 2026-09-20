@@ -11,8 +11,14 @@
   gap: var(--space-2);
 }
 
+/* `min-width: 0` alongside Inspector.module.css's own inherited
+   `overflow-wrap: break-word` (see that file's own comment) — needed here
+   specifically because `.selectionHeader`'s flex row otherwise still sizes
+   this item to an unbroken name's full un-wrapped width before wrapping
+   ever gets a chance to apply. */
 .selectionName {
   font-weight: 600;
+  min-width: 0;
 }
 
 .clearFocus {

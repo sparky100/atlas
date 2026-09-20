@@ -15,6 +15,20 @@
   background: var(--surface);
   max-height: 100%;
   overflow-y: auto;
+  /* A real element name/attribute value has no guaranteed word boundary (a
+     compound system name, an id, a URL) — without this, un-broken content
+     from any section overflows this fixed 300px width rather than
+     wrapping, visually clipped at the right edge since setting only
+     `overflow-y` here computes `overflow-x` to `auto` too, per the CSS
+     overflow spec's paired-axis rule (not `visible`) — a scrollbar nobody
+     expects to reach for, not a clip fix. Inherited, so it covers every
+     section's own text (Selection, Connections, Filters, Actions) from
+     this one shared shell rather than each view's own content module
+     repeating it. A flex-row item still needs its own `min-width: 0`
+     alongside this (e.g. `.selectionName` in each view's own content
+     module) — `overflow-wrap: break-word` alone doesn't shrink a flex
+     item's automatic minimum size, only `overflow-wrap: anywhere` does. */
+  overflow-wrap: break-word;
 }
 
 .header {
