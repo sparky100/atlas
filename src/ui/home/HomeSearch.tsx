@@ -224,6 +224,16 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
           >
             Create {createType} &quot;{search.query.trim()}&quot;
           </Button>
+          {/* This path skips straight to `create()` with no sheet of its own
+              (capability/actor, an already-resolved write branch) — the only
+              chance to say this before it's committed. `elementSearch.ts`'s
+              own module comment explains why creating on a change is
+              invisible to search, for anyone, until it merges. */}
+          {writeBranch?.kind === 'change' && (
+            <Text as="p" tone="faint" size="xs">
+              Won&apos;t be found by search until this change merges.
+            </Text>
+          )}
         </div>
       )}
 
@@ -247,9 +257,14 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
       {search.showCreate && sheetOpen && showDescriptionSheet && (!contributorAtMain || proposedBranch) && (
         <div className={styles.sheet} data-testid="add-system-sheet">
           {writeBranch?.kind === 'change' && (
-            <Text as="p" tone="muted" size="sm">
-              Adding to change: {writeBranch.title ?? writeBranch.name}
-            </Text>
+            <>
+              <Text as="p" tone="muted" size="sm">
+                Adding to change: {writeBranch.title ?? writeBranch.name}
+              </Text>
+              <Text as="p" tone="faint" size="xs">
+                Won&apos;t be found by search until this change merges.
+              </Text>
+            </>
           )}
           <Text as="label" size="sm">
             Description (required)
@@ -297,9 +312,14 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
       {search.showCreate && sheetOpen && showPlatformPicker && (!contributorAtMain || proposedBranch) && (
         <div className={styles.sheet} data-testid="add-container-sheet">
           {writeBranch?.kind === 'change' && (
-            <Text as="p" tone="muted" size="sm">
-              Adding to change: {writeBranch.title ?? writeBranch.name}
-            </Text>
+            <>
+              <Text as="p" tone="muted" size="sm">
+                Adding to change: {writeBranch.title ?? writeBranch.name}
+              </Text>
+              <Text as="p" tone="faint" size="xs">
+                Won&apos;t be found by search until this change merges.
+              </Text>
+            </>
           )}
           <Text as="label" size="sm">
             Which platform is this a module of? (required)
