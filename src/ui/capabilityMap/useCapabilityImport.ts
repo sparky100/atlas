@@ -1,9 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
 import { getCapabilityMap, listCapabilityMapItems, listSeedableCapabilityMaps, type CapabilityMapRow } from '../../db/capabilityMapTemplates';
 import { seedModelFromCapabilityMap } from '../../db/seedFromMap';
 import { reportError } from '../errors/errorBannerStore';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 
 export type CapabilityImportStatus = 'loadingMaps' | 'idle' | 'seeding';
@@ -38,6 +40,7 @@ export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabil
   const [status, setStatus] = useState<CapabilityImportStatus>('loadingMaps');
   const [maps, setMaps] = useState<CapabilityMapRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let cancelled = false;
@@ -97,13 +100,15 @@ export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabil
         }
 
         setStatus('idle');
+        // E8 item (1): seed_from_map always writes to main.
+        void invalidateModelHead(queryClient, modelId);
         onImported();
       } catch (e) {
         setStatus('idle');
         setError(e instanceof Error ? e.message : 'Could not import capability map.');
       }
     },
-    [modelId, userId, onImported],
+    [modelId, userId, onImported, queryClient],
   );
 
   return { status, maps, error, importMap };

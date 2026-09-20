@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
@@ -6,6 +7,7 @@ import { listFactsForSubject } from '../../db/elements';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { describeEnvelope } from '../../engine/describeEnvelope';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 import { resolveOrders } from './resolveCapabilityOrders';
 
@@ -73,6 +75,7 @@ export function useCapabilityReorder(input: UseCapabilityReorderInput): UseCapab
   const { modelId, orgId, userId, branch, expectedHeadCommitId, onReordered } = input;
   const [status, setStatus] = useState<CapabilityReorderStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const swap = useCallback(
     async (capability: ElementsHeadRow, neighbor: ElementsHeadRow, siblings: readonly ElementsHeadRow[]) => {
@@ -142,13 +145,15 @@ export function useCapabilityReorder(input: UseCapabilityReorderInput): UseCapab
         }
 
         setStatus('idle');
+        // E8 item (1): invalidates the shared main/editing-branch cache — see invalidateModelHead.ts's own comment.
+        void invalidateModelHead(queryClient, modelId);
         onReordered();
       } catch (e) {
         setStatus('idle');
         setError(e instanceof Error ? e.message : 'Could not reorder capabilities.');
       }
     },
-    [modelId, orgId, userId, branch, expectedHeadCommitId, onReordered],
+    [modelId, orgId, userId, branch, expectedHeadCommitId, onReordered, queryClient],
   );
 
   return { status, error, swap };

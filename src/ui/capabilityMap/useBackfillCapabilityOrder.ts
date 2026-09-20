@@ -1,6 +1,8 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { backfillCapabilityOrder } from '../../db/backfillCapabilityOrder';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 
 export type BackfillCapabilityOrderStatus = 'idle' | 'backfilling';
@@ -37,6 +39,7 @@ export function useBackfillCapabilityOrder(input: UseBackfillCapabilityOrderInpu
   const [status, setStatus] = useState<BackfillCapabilityOrderStatus>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const backfill = useCallback(async () => {
     if (!userId) {
@@ -55,12 +58,16 @@ export function useBackfillCapabilityOrder(input: UseBackfillCapabilityOrderInpu
         return;
       }
       setMessage(result.kind === 'backfilled' ? `Backfilled order for ${String(result.backfilled)} capabilit${result.backfilled === 1 ? 'y' : 'ies'}.` : result.message);
-      if (result.kind === 'backfilled') onBackfilled();
+      if (result.kind === 'backfilled') {
+        // E8 item (1): the backfill commit moves main's own head (this file's own doc comment).
+        void invalidateModelHead(queryClient, modelId);
+        onBackfilled();
+      }
     } catch (e) {
       setStatus('idle');
       setError(e instanceof Error ? e.message : 'Could not backfill capability order.');
     }
-  }, [modelId, userId, onBackfilled]);
+  }, [modelId, userId, onBackfilled, queryClient]);
 
   return { status, message, error, backfill };
 }

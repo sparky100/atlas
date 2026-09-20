@@ -1,7 +1,9 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { approveMergeRequest, mergeApprovedRequest } from '../../db/mergeRequests';
 import type { BranchRow, MergeRequestRow } from '../../db/types';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 
 export type ApproveAndMergeStatus = 'idle' | 'working';
@@ -28,6 +30,7 @@ export interface UseApproveAndMergeResult {
 export function useApproveAndMerge(modelId: UUID): UseApproveAndMergeResult {
   const [status, setStatus] = useState<ApproveAndMergeStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const approveAndMerge = useCallback(
     async (request: MergeRequestRow, branch: BranchRow): Promise<boolean> => {
@@ -55,6 +58,8 @@ export function useApproveAndMerge(modelId: UUID): UseApproveAndMergeResult {
           setError(result.message);
           return false;
         }
+        // E8 item (1): a merge always moves main's own head.
+        void invalidateModelHead(queryClient, modelId);
         return true;
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not approve and merge this change.');
@@ -63,7 +68,7 @@ export function useApproveAndMerge(modelId: UUID): UseApproveAndMergeResult {
         setStatus('idle');
       }
     },
-    [modelId],
+    [modelId, queryClient],
   );
 
   return { status, error, approveAndMerge };

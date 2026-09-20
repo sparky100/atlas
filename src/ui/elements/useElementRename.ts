@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
@@ -6,6 +7,7 @@ import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 import { reportToast } from '../toasts/toastStore';
 
@@ -51,6 +53,7 @@ export function useElementRename(input: UseElementRenameInput): UseElementRename
   const [status, setStatus] = useState<ElementRenameStatus>('idle');
   const [value, setValueState] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const startRenaming = useCallback(() => {
     setValueState(element.name);
@@ -139,12 +142,14 @@ export function useElementRename(input: UseElementRenameInput): UseElementRename
       setStatus('idle');
       // Item 2: see useElementEditor.ts's identical comment.
       if (branch.kind === 'change') reportToast(`Saved to change: ${branch.title ?? branch.name}`);
+      // E8 item (1): invalidates the shared main/editing-branch cache — see invalidateModelHead.ts's own comment.
+      void invalidateModelHead(queryClient, modelId);
       onSaved();
     } catch (e) {
       setStatus('renaming');
       setSubmitError(e instanceof Error ? e.message : 'Could not rename.');
     }
-  }, [value, element, facts, modelId, orgId, userId, branch, expectedHeadCommitId, onSaved]);
+  }, [value, element, facts, modelId, orgId, userId, branch, expectedHeadCommitId, onSaved, queryClient]);
 
   return { status, value, submitError, startRenaming, cancelRenaming, setValue, save };
 }

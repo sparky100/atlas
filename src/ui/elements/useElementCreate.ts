@@ -1,11 +1,14 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { defaultCreateAttributes } from '../../contracts/attributeSchema';
 import type { CommitEnvelope, Delta, ElementType, UUID } from '../../contracts/delta';
 import type { Json } from '../../contracts/rows';
+import { getBranch, getMainBranch } from '../../db/branches';
 import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 
 export type ElementCreateStatus = 'idle' | 'creating';
@@ -59,6 +62,7 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
   const { modelId, orgId, userId, elementType, parentId, branch, expectedHeadCommitId, onCreated } = input;
   const [status, setStatus] = useState<ElementCreateStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const create = useCallback(
     async (name: string, options?: CreateOptions) => {
@@ -75,6 +79,21 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
       setStatus('creating');
 
       try {
+        // E8 item (1) fallout: `expectedHeadCommitId` can be a few hundred
+        // ms stale — read from the shared cache, which may still be
+        // mid-refetch right after another action on this same branch just
+        // invalidated it (`invalidateModelHead.ts`'s own comment on why
+        // that refetch isn't awaited before the caller can act again). For
+        // an *edit*, that staleness is exactly what C13's conflict check
+        // should catch (the user's own draft was built against
+        // possibly-stale facts). A *create* has nothing to clobber — it
+        // only needs a valid parent commit to chain onto — so this
+        // resolves the branch's own current head fresh, right here, rather
+        // than trusting a prop that was merely "correct as of this
+        // component's last render."
+        const currentBranch = branch.kind === 'main' ? await getMainBranch(supabase, modelId) : await getBranch(supabase, branch.id);
+        const currentHeadCommitId = currentBranch?.head_commit_id ?? expectedHeadCommitId;
+
         const source = await getOrCreateManualSource(supabase, { id: crypto.randomUUID(), orgId, modelId, userId });
         const elementId = crypto.randomUUID();
 
@@ -128,7 +147,7 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
         const envelope: CommitEnvelope = {
           id: crypto.randomUUID(),
           branchId: branch.id,
-          parentCommitId: expectedHeadCommitId,
+          parentCommitId: currentHeadCommitId,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
           title: describeEnvelope(deltas, nameLookup),
@@ -136,7 +155,7 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
           deltas,
         };
 
-        const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });
+        const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId: currentHeadCommitId, envelope });
         if (!result.ok) {
           setStatus('idle');
           setError(
@@ -148,13 +167,21 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
         }
 
         setStatus('idle');
+        // E8 item (1): invalidate the shared cached main-branch head before
+        // navigating on — `onCreated` (`HomeSearch.tsx`) navigates straight
+        // to the new element's own page, which reads `mainBranch` from the
+        // same shared cache; without this, that page could render against
+        // whichever commit_id was cached before this one landed, and
+        // `elements_head` has zero rows for the new element at that stale
+        // commit (SPEC §1 S-2/P-6) — "This element is not present here."
+        void invalidateModelHead(queryClient, modelId);
         onCreated(elementId);
       } catch (e) {
         setStatus('idle');
         setError(e instanceof Error ? e.message : `Could not add ${elementType}.`);
       }
     },
-    [modelId, orgId, userId, elementType, parentId, branch, expectedHeadCommitId, onCreated],
+    [modelId, orgId, userId, elementType, parentId, branch, expectedHeadCommitId, onCreated, queryClient],
   );
 
   return { status, error, create };

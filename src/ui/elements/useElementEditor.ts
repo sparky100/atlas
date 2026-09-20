@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow, Json } from '../../contracts/rows';
@@ -6,6 +7,7 @@ import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 import { reportToast } from '../toasts/toastStore';
 
@@ -104,6 +106,7 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
   const [values, setValues] = useState<Record<string, DraftValue>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const startEditing = useCallback(() => {
     setValues(initialDraftValues(element, facts, customFields));
@@ -213,12 +216,14 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
       // for a change branch; an edit at `main` has nowhere else it could
       // have gone, so no toast is needed to say so.
       if (branch.kind === 'change') reportToast(`Saved to change: ${branch.title ?? branch.name}`);
+      // E8 item (1): invalidates the shared main/editing-branch cache — see invalidateModelHead.ts's own comment.
+      void invalidateModelHead(queryClient, modelId);
       onSaved();
     } catch (e) {
       setStatus('editing');
       setSubmitError(e instanceof Error ? e.message : 'Could not save.');
     }
-  }, [values, facts, customFields, element, modelId, orgId, userId, branch, expectedHeadCommitId, onSaved]);
+  }, [values, facts, customFields, element, modelId, orgId, userId, branch, expectedHeadCommitId, onSaved, queryClient]);
 
   return { status, values, fieldErrors, submitError, hasChanges, startEditing, cancelEditing, setValue, save };
 }

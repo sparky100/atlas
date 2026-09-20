@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
 import type { BranchRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
+import { invalidateModelHead } from '../query/invalidateModelHead';
+import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
 
 export interface UseMainBranchResult {
@@ -32,26 +34,27 @@ export interface UseMainBranchResult {
  * a model exists, but `head_commit_id` does, on every commit — `reload`
  * (added Sprint U4-1 A1) is how a caller keeps it current; see `reload`'s
  * own doc comment for why that matters beyond "the value looks stale."
+ *
+ * E8 item (1): backed by the shared `QueryClient` now (`src/ui/query/`) —
+ * `reload()` calls `invalidateModelHead`, which invalidates this exact
+ * query key, so *every* mounted component reading this model's main
+ * branch (not just the one that called `reload`) refetches, not only the
+ * caller's own local state. This is the real behavioural fix E8 item (1)
+ * is after: previously each page's own `useMainBranch(modelId)` call held
+ * fully independent state, so calling `reload()` from, say, ElementPage
+ * never refreshed CapabilityMapPage's own copy even if both were
+ * conceptually showing "the same model's main branch."
  */
 export function useMainBranch(modelId: UUID | null): UseMainBranchResult {
-  const [branch, setBranch] = useState<BranchRow | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [reloadToken, setReloadToken] = useState(0);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!modelId) {
-      setBranch(null);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    getMainBranch(supabase, modelId)
-      .then((row) => {
-        if (!cancelled) setBranch(row);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setBranch(null);
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.mainBranch(modelId),
+    queryFn: async () => {
+      if (!modelId) return null;
+      try {
+        return await getMainBranch(supabase, modelId);
+      } catch (e) {
         // Sprint U4-2a item 2: this used to swallow the failure entirely —
         // `branch` just stays `null`, indistinguishable from "this model
         // has no main branch yet" (which can't actually happen, ADR-018,
@@ -60,20 +63,17 @@ export function useMainBranch(modelId: UUID | null): UseMainBranchResult {
         // canEdit) — silently disabling all of that with no visible cause
         // is worse than a banner naming what failed.
         reportError("Couldn't load this model's main.", e);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [modelId, reloadToken]);
+        return null;
+      }
+    },
+    enabled: modelId !== null,
+  });
 
   return {
-    branch,
-    loading,
+    branch: data ?? null,
+    loading: isLoading,
     reload: () => {
-      setReloadToken((t) => t + 1);
+      if (modelId) void invalidateModelHead(queryClient, modelId);
     },
   };
 }

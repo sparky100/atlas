@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { getProfile } from '../../db/profiles';
 import type { ProfileRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
+import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
 
 export interface UseOwnProfileResult {
@@ -17,43 +19,42 @@ export interface UseOwnProfileResult {
   refresh: () => void;
 }
 
-/** The signed-in user's own `atlas.profiles` row. Used by `RequireAuth` for the Prompt 7h "first sign-in prompts for a display name" gate; any other page wanting "my own profile" (as opposed to `listProfilesByIds`' batch lookup for other people's) should use this too rather than re-querying. */
+/**
+ * The signed-in user's own `atlas.profiles` row. Used by `RequireAuth` for
+ * the Prompt 7h "first sign-in prompts for a display name" gate; any other
+ * page wanting "my own profile" (as opposed to `listProfilesByIds`' batch
+ * lookup for other people's) should use this too rather than re-querying.
+ *
+ * E8 item (1): shared-cache version — see `useOrganisationBySlug.ts`'s own
+ * comment for the general shape. `refresh()` now invalidates the one
+ * cache entry every caller of this hook shares, not just this component's
+ * own local state.
+ */
 export function useOwnProfile(userId: string | null): UseOwnProfileResult {
-  const [profile, setProfile] = useState<ProfileRow | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [generation, setGeneration] = useState(0);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!userId) {
-      setProfile(null);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    getProfile(supabase, userId)
-      .then((row) => {
-        if (!cancelled) setProfile(row);
-      })
-      .catch((e: unknown) => {
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.ownProfile(userId),
+    queryFn: async () => {
+      if (!userId) return null;
+      try {
+        return await getProfile(supabase, userId);
+      } catch (e) {
         // A failed lookup leaves `profile` at whatever it already was —
         // `RequireAuth`'s gate below treats "still loading" and "errored"
         // the same way (don't block the app on this) — but still reported
         // (S1 audit follow-up, same "silent fallback, still worth a trace"
         // shape `useBreadcrumbElement.ts` already established for item 15).
         reportError("Couldn't load your profile.", e);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, generation]);
+        return null;
+      }
+    },
+    enabled: userId !== null,
+  });
 
   const refresh = useCallback(() => {
-    setGeneration((g) => g + 1);
-  }, []);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.ownProfile(userId) });
+  }, [queryClient, userId]);
 
-  return { profile, loading, refresh };
+  return { profile: data ?? null, loading: isLoading, refresh };
 }

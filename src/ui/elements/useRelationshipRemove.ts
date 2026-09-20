@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { RelationshipsHeadRow } from '../../contracts/rows';
@@ -5,6 +6,7 @@ import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 import { reportToast } from '../toasts/toastStore';
 
@@ -64,6 +66,7 @@ export function useRelationshipRemove(input: UseRelationshipRemoveInput): UseRel
   const { modelId, orgId, userId, relationship, existsDeltaId, fromElementName, toElementName, branch, expectedHeadCommitId, onRemoved } = input;
   const [status, setStatus] = useState<RelationshipRemoveStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const remove = useCallback(async (promotion: RelationshipPromotion | null = null) => {
     if (!userId) {
@@ -142,12 +145,14 @@ export function useRelationshipRemove(input: UseRelationshipRemoveInput): UseRel
       setStatus('idle');
       // Item 2: see useElementEditor.ts's identical comment.
       if (branch.kind === 'change') reportToast(`Saved to change: ${branch.title ?? branch.name}`);
+      // E8 item (1): invalidates the shared main/editing-branch cache — see invalidateModelHead.ts's own comment.
+      void invalidateModelHead(queryClient, modelId);
       onRemoved();
     } catch (e) {
       setStatus('idle');
       setError(e instanceof Error ? e.message : 'Could not remove this relationship.');
     }
-  }, [modelId, orgId, userId, relationship, existsDeltaId, fromElementName, toElementName, branch, expectedHeadCommitId, onRemoved]);
+  }, [modelId, orgId, userId, relationship, existsDeltaId, fromElementName, toElementName, branch, expectedHeadCommitId, onRemoved, queryClient]);
 
   return { status, error, remove };
 }

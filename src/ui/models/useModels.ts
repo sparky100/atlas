@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { createModel, listModelsForOrg } from '../../db/models';
 import type { ModelRow } from '../../db/types';
 import type { UUID } from '../../contracts/delta';
 import { reportError } from '../errors/errorBannerStore';
+import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
 
 export interface UseModelsResult {
@@ -12,44 +14,34 @@ export interface UseModelsResult {
   createModel: (name: string, slug: string, createdBy: UUID) => Promise<ModelRow>;
 }
 
+/** E8 item (1): shared-cache version of this hook — see `useOrganisationBySlug.ts`'s own comment for the general shape. `createModel` still writes straight into the cached list via `setQueryData` (the same optimistic-append behaviour this hook already had) rather than a full refetch. */
 export function useModels(orgId: UUID | null): UseModelsResult {
-  const [models, setModels] = useState<ModelRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.modelsForOrg(orgId);
 
-  useEffect(() => {
-    if (!orgId) {
-      setModels([]);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    listModelsForOrg(supabase, orgId)
-      .then((rows) => {
-        if (!cancelled) setModels(rows);
-      })
-      .catch((e: unknown) => {
+  const { data, isLoading, error } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      if (!orgId) return [];
+      try {
+        return await listModelsForOrg(supabase, orgId);
+      } catch (e) {
         reportError("Couldn't load models.", e);
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load models');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [orgId]);
+        throw e;
+      }
+    },
+    enabled: orgId !== null,
+  });
 
   const create = useCallback(
     async (name: string, slug: string, createdBy: UUID) => {
       if (!orgId) throw new Error('useModels: cannot create a model without an organisation');
       const model = await createModel(supabase, { id: crypto.randomUUID(), orgId, name, slug, createdBy });
-      setModels((prev) => [...prev, model].sort((a, b) => a.name.localeCompare(b.name)));
+      queryClient.setQueryData(queryKey, (prev: ModelRow[] | undefined) => [...(prev ?? []), model].sort((a, b) => a.name.localeCompare(b.name)));
       return model;
     },
-    [orgId],
+    [orgId, queryClient, queryKey],
   );
 
-  return { models, loading, error, createModel: create };
+  return { models: data ?? [], loading: isLoading, error: error ? error.message : null, createModel: create };
 }
