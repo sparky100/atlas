@@ -1,0 +1,84 @@
+/*
+ * Second modal in the product — `SpreadsheetImportDialog.module.css`'s own
+ * backdrop/dialog/panel/header shape, duplicated rather than shared: two
+ * near-identical selector sets is cheaper here than a shared base this
+ * pair would otherwise be the only two callers of.
+ */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+  overflow-y: auto;
+  background: rgb(0 0 0 / 0.5);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 560px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.modeToggle {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.input,
+.textarea {
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input {
+  height: var(--row-height);
+}
+
+.textarea {
+  min-height: calc(var(--row-height) * 3);
+  resize: vertical;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}

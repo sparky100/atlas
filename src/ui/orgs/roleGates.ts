@@ -138,3 +138,8 @@ export function canChooseDecisionOption(role: MemberRole | null): boolean {
 export function canManageAttributeDefinitions(role: MemberRole | null): boolean {
   return role === 'owner';
 }
+
+/** F2 PR14: mirrors `capture_jobs_insert`'s RLS floor (`supabase/migrations/20260920010000_capture_jobs_and_candidates.sql`: `atlas.has_role(org_id, 'owner', 'architect', 'contributor')`) — same floor as `canCreateChangeBranch`, named separately since the two checks happen to coincide today but aren't the same rule. */
+export function canRunCapture(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'architect' || role === 'contributor';
+}
