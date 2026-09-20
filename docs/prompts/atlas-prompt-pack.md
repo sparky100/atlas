@@ -246,7 +246,6 @@ Prerequisites: S2. Profile the worst 5% of frames on the 2,000-system fixture be
 
 | Item | Why | Before |
 |---|---|---|
-| Delta-apply in SQL | 8.45 MB per edit at 2,000 elements; capture commits are large | F2 |
 | Typed Supabase client | H2 | any time |
 | Landscape p5 fps 30 → 45: profile worst frames first | R-perf | after S2 |
 
@@ -280,7 +279,6 @@ Every row has (or gets, in P1) a SPEC §11 row and an issue. A row leaves only w
 | Custom attributes | F1 | create |
 | F2-lite (#198–#204, #209) shipped a narrower reconciliation-only import — deterministic spreadsheet/CSV/JSON against a fixed column schema, two-tier matching, one commit on an ordinary change branch. K1's own LLM/PDF/pasted-text extraction, `capture_jobs`/`capture_candidates` + `capture-run` edge function, candidate-class review queue, capture-specific alias learning, and the ten-fixture scoring harness (`docs/SPEC-capture.md` §15) were not built | F2 (full K1) | create |
 | Starter-map upgrade flow (rides on full K1) | F2 (full K1) | create |
-| Delta-apply in SQL | before F2 | create |
 | Notification tray deep links (decision, version anchors) | F3 / F5 | create |
 | Value streams | F6 | create |
 | Drag-and-drop reorder | S-track when move buttons prove tedious | create |

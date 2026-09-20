@@ -6,6 +6,7 @@
  * live here, next to the repository code that's their only consumer.
  */
 import type { AttributeDefinitionKind } from '../contracts/attributeSchema';
+export type { CaptureJobRowShape as CaptureJobRow, CaptureCandidateRowShape as CaptureCandidateRow } from '../contracts/capture';
 import type { ElementType, UUID } from '../contracts/delta';
 import type { SourceKind } from '../contracts/sources';
 export type { AnchorType, CommentStatus, NotificationKind } from '../contracts/comments';
