@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { LLM_PROXY_MODEL_OPTIONS, useLlmProxyConfig } from './useLlmProxyConfig';
+import { LLM_PROXY_MODEL_OPTIONS, LLM_PROXY_PROVIDER_OPTIONS, useLlmProxyConfig } from './useLlmProxyConfig';
 import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
@@ -15,23 +15,30 @@ import styles from './PlatformAdminView.module.css';
  * leaving it blank keeps whatever is already configured, never displaying
  * or round-tripping a live secret.
  *
- * Provider and Model are both pickers, not free text — same shape as
- * `ModelSettingsView.tsx`'s own version-select convention. Provider is a
- * single disabled option ("Anthropic"): `llm-proxy` is Anthropic-only by
- * deliberate design (its own module comment), so a real multi-provider
- * selector would offer choices the backend can't act on. Model's own
- * options come from `LLM_PROXY_MODEL_OPTIONS`; if the currently-saved value
- * isn't one of them (an older or since-retired model id), it's added as an
- * extra option rather than silently replaced, so opening this form never
- * itself changes what's live.
+ * Provider and Model are both real, enabled pickers driven by
+ * `LLM_PROXY_PROVIDER_OPTIONS`/`LLM_PROXY_MODEL_OPTIONS` — same shape as
+ * `ModelSettingsView.tsx`'s own version-select convention, and deliberately
+ * not tied to Anthropic in the UI or the config schema even though
+ * `llm-proxy`'s own routing is Anthropic-only today (ADR-014's scope
+ * narrowing; `20260921020000_platform_llm_provider.sql`'s own module
+ * comment has the fuller reasoning). `LLM_PROXY_PROVIDER_OPTIONS` happens
+ * to hold one entry right now — adding a second provider's routing to
+ * `llm-proxy` and its own allow-list is the only other change a second
+ * choice here needs. For both pickers, if the currently-saved value isn't
+ * one of the listed options (an older or since-retired id), it's added as
+ * an extra option rather than silently replaced, so opening this form
+ * never itself changes what's live.
  */
 export function PlatformAdminView() {
-  const { status, error, model, rateLimitPerHour, hasApiKey, setModel, setRateLimitPerHour, save } = useLlmProxyConfig();
+  const { status, error, provider, model, rateLimitPerHour, hasApiKey, setProvider, setModel, setRateLimitPerHour, save } = useLlmProxyConfig();
   const [apiKeyInput, setApiKeyInput] = useState('');
   const providerId = useId();
   const modelId = useId();
   const rateLimitId = useId();
   const apiKeyId = useId();
+  const providerOptions = LLM_PROXY_PROVIDER_OPTIONS.some((option) => option.id === provider)
+    ? LLM_PROXY_PROVIDER_OPTIONS
+    : [{ id: provider, label: `${provider} (currently set)` }, ...LLM_PROXY_PROVIDER_OPTIONS];
   const modelOptions = LLM_PROXY_MODEL_OPTIONS.some((option) => option.id === model)
     ? LLM_PROXY_MODEL_OPTIONS
     : [{ id: model, label: `${model} (currently set)` }, ...LLM_PROXY_MODEL_OPTIONS];
@@ -73,8 +80,19 @@ export function PlatformAdminView() {
                 Provider
               </Text>
             </label>
-            <select id={providerId} className={styles.input} value="anthropic" disabled>
-              <option value="anthropic">Anthropic</option>
+            <select
+              id={providerId}
+              className={styles.input}
+              value={provider}
+              onChange={(e) => {
+                setProvider(e.target.value);
+              }}
+            >
+              {providerOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
 

@@ -137,15 +137,24 @@ Supabase SQL editor or `psql`, as the service role:
 
 ```sql
 insert into platform_config (key, value)
-values ('llm', '{"model": "claude-opus-5", "rateLimitPerHour": 100}'::jsonb)
+values ('llm', '{"provider": "anthropic", "model": "claude-opus-5", "rateLimitPerHour": 100}'::jsonb)
 on conflict (key) do update set value = excluded.value, updated_at = now();
 ```
 
-Any of `model` (string), `rateLimitPerHour` (number), or `apiKey` (string —
-overrides `ANTHROPIC_API_KEY` for every org) can be set; an absent field
-falls back to its own env var. Deleting the row (or never creating it)
-falls back to the env-var secrets above entirely — the function's original,
-pre-follow-up behaviour.
+Any of `provider` (string), `model` (string), `rateLimitPerHour` (number),
+or `apiKey` (string — overrides `ANTHROPIC_API_KEY` for every org) can be
+set; an absent field falls back to its own env var. Deleting the row (or
+never creating it) falls back to the env-var secrets above entirely — the
+function's original, pre-follow-up behaviour.
+
+`provider` is stored, and settable via `/platform-admin`'s own picker, even
+though this function's own routing (`callAnthropic`, above) only ever calls
+Anthropic — `atlas.set_platform_llm_config` (below) rejects anything but
+`'anthropic'`. The field exists so a second provider's config surface, if
+one is ever built, is an addition to an existing shape rather than a
+migration to introduce one — see `docs/ADR-000-foundations.md`'s ADR-014
+amendment and `20260921020000_platform_llm_provider.sql`'s own module
+comment for the reasoning.
 
 ### Calling it
 

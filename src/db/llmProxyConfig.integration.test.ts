@@ -62,47 +62,52 @@ describe('llm-proxy platform-admin RPCs against a real local Supabase', () => {
     const getResult = await getLlmProxyConfig(ordinaryUser.client);
     expect(getResult.status).toBe('error');
 
-    const setResult = await setLlmProxyConfig(ordinaryUser.client, { model: 'claude-opus-5', rateLimitPerHour: 50 });
+    const setResult = await setLlmProxyConfig(ordinaryUser.client, { provider: 'anthropic', model: 'claude-opus-5', rateLimitPerHour: 50 });
     expect(setResult.status).toBe('error');
   });
 
   it('an admin can set then get, and the raw API key never comes back', async () => {
-    const setResult = await setLlmProxyConfig(admin.client, { model: 'claude-opus-5', rateLimitPerHour: 75, apiKey: 'sk-ant-test-key' });
+    const setResult = await setLlmProxyConfig(admin.client, { provider: 'anthropic', model: 'claude-opus-5', rateLimitPerHour: 75, apiKey: 'sk-ant-test-key' });
     expect(setResult.status).toBe('ok');
 
     const getResult = await getLlmProxyConfig(admin.client);
-    expect(getResult).toEqual({ status: 'ok', config: { model: 'claude-opus-5', rateLimitPerHour: 75, hasApiKey: true } });
+    expect(getResult).toEqual({ status: 'ok', config: { provider: 'anthropic', model: 'claude-opus-5', rateLimitPerHour: 75, hasApiKey: true } });
   });
 
   it('omitting apiKey on a later set preserves the previously-set key (verified by peeking at the raw row with the service client — the app itself never does this)', async () => {
-    await setLlmProxyConfig(admin.client, { model: 'claude-opus-5', rateLimitPerHour: 75, apiKey: 'sk-ant-original' });
-    await setLlmProxyConfig(admin.client, { model: 'claude-sonnet-5', rateLimitPerHour: 90 });
+    await setLlmProxyConfig(admin.client, { provider: 'anthropic', model: 'claude-opus-5', rateLimitPerHour: 75, apiKey: 'sk-ant-original' });
+    await setLlmProxyConfig(admin.client, { provider: 'anthropic', model: 'claude-sonnet-5', rateLimitPerHour: 90 });
 
     const { data } = await service.from('platform_config').select('value').eq('key', 'llm').maybeSingle();
-    expect(data).toMatchObject({ value: { model: 'claude-sonnet-5', rateLimitPerHour: 90, apiKey: 'sk-ant-original' } });
+    expect(data).toMatchObject({ value: { provider: 'anthropic', model: 'claude-sonnet-5', rateLimitPerHour: 90, apiKey: 'sk-ant-original' } });
 
     const getResult = await getLlmProxyConfig(admin.client);
-    expect(getResult).toEqual({ status: 'ok', config: { model: 'claude-sonnet-5', rateLimitPerHour: 90, hasApiKey: true } });
+    expect(getResult).toEqual({ status: 'ok', config: { provider: 'anthropic', model: 'claude-sonnet-5', rateLimitPerHour: 90, hasApiKey: true } });
   });
 
   it('clearApiKey removes a previously-set key entirely', async () => {
-    await setLlmProxyConfig(admin.client, { model: 'claude-opus-5', rateLimitPerHour: 75, apiKey: 'sk-ant-original' });
-    await setLlmProxyConfig(admin.client, { model: 'claude-opus-5', rateLimitPerHour: 75, clearApiKey: true });
+    await setLlmProxyConfig(admin.client, { provider: 'anthropic', model: 'claude-opus-5', rateLimitPerHour: 75, apiKey: 'sk-ant-original' });
+    await setLlmProxyConfig(admin.client, { provider: 'anthropic', model: 'claude-opus-5', rateLimitPerHour: 75, clearApiKey: true });
 
     const getResult = await getLlmProxyConfig(admin.client);
-    expect(getResult).toEqual({ status: 'ok', config: { model: 'claude-opus-5', rateLimitPerHour: 75, hasApiKey: false } });
+    expect(getResult).toEqual({ status: 'ok', config: { provider: 'anthropic', model: 'claude-opus-5', rateLimitPerHour: 75, hasApiKey: false } });
 
     const { data } = await service.from('platform_config').select('value').eq('key', 'llm').maybeSingle();
     expect(data?.value).not.toHaveProperty('apiKey');
   });
 
-  it('get returns nulls and hasApiKey:false when no override row exists at all', async () => {
+  it('get returns "anthropic" (the only real provider) and nulls/hasApiKey:false when no override row exists at all', async () => {
     const getResult = await getLlmProxyConfig(admin.client);
-    expect(getResult).toEqual({ status: 'ok', config: { model: null, rateLimitPerHour: null, hasApiKey: false } });
+    expect(getResult).toEqual({ status: 'ok', config: { provider: 'anthropic', model: null, rateLimitPerHour: null, hasApiKey: false } });
   });
 
   it('rejects an empty model and a non-positive rate limit', async () => {
-    expect((await setLlmProxyConfig(admin.client, { model: '', rateLimitPerHour: 50 })).status).toBe('error');
-    expect((await setLlmProxyConfig(admin.client, { model: 'claude-opus-5', rateLimitPerHour: 0 })).status).toBe('error');
+    expect((await setLlmProxyConfig(admin.client, { provider: 'anthropic', model: '', rateLimitPerHour: 50 })).status).toBe('error');
+    expect((await setLlmProxyConfig(admin.client, { provider: 'anthropic', model: 'claude-opus-5', rateLimitPerHour: 0 })).status).toBe('error');
+  });
+
+  it('rejects a provider other than anthropic — the config schema allows one, but llm-proxy only routes to Anthropic today', async () => {
+    const setResult = await setLlmProxyConfig(admin.client, { provider: 'openai', model: 'claude-opus-5', rateLimitPerHour: 50 });
+    expect(setResult.status).toBe('error');
   });
 });
