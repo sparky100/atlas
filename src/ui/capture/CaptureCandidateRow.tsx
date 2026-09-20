@@ -165,6 +165,8 @@ export function CaptureCandidateRow({
         <Chip tone="neutral">{candidate.class}</Chip>
         <ConfidenceDots confidence={candidate.confidence} />
         {candidate.reimportStatus !== null && <Chip tone="neutral">{candidate.reimportStatus}</Chip>}
+        {/* PR16: a decided candidate's own state was previously visible only as "the Undo button appeared" — no chip actually named which decision was staged. Reads the same `decision !== null` state the Undo button already keys off (including `confirm`'s own system-default `accepted`, staged before any reviewer acts) rather than also checking `decidedBy` — `stageMany`'s own optimistic local update never sets `decidedBy` (a server-only column), so gating on it would make this chip lag one reload behind every other piece of this row's own feedback. */}
+        {candidate.decision !== null && <Chip tone={candidate.decision === 'rejected' ? 'neutral' : 'ok'}>{candidate.decision}</Chip>}
       </div>
 
       {parentLabel !== null && (
