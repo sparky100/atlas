@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import { validateAttributeValue } from '../../contracts/attributeSchema';
@@ -7,6 +8,7 @@ import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 import { reportToast } from '../toasts/toastStore';
 
@@ -82,6 +84,7 @@ export function useElementRetire(input: UseElementRetireInput): UseElementRetire
   const { modelId, orgId, userId, element, facts, relationships, relationshipFacts, branch, expectedHeadCommitId, onRetired } = input;
   const [status, setStatus] = useState<ElementRetireStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const retire = useCallback(
     async (plannedEnd: string, replacement: RetireReplacement | null) => {
@@ -200,13 +203,15 @@ export function useElementRetire(input: UseElementRetireInput): UseElementRetire
         setStatus('idle');
         // Item 2: see useElementEditor.ts's identical comment.
         if (branch.kind === 'change') reportToast(`Saved to change: ${branch.title ?? branch.name}`);
+        // E8 item (1): invalidates the shared main/editing-branch cache — see invalidateModelHead.ts's own comment.
+        void invalidateModelHead(queryClient, modelId);
         onRetired();
       } catch (e) {
         setStatus('idle');
         setError(e instanceof Error ? e.message : 'Could not retire.');
       }
     },
-    [element, facts, relationships, relationshipFacts, modelId, orgId, userId, branch, expectedHeadCommitId, onRetired],
+    [element, facts, relationships, relationshipFacts, modelId, orgId, userId, branch, expectedHeadCommitId, onRetired, queryClient],
   );
 
   return { status, error, retire };

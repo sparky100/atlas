@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, RelationshipType, UUID } from '../../contracts/delta';
 import type { Json } from '../../contracts/rows';
@@ -5,6 +6,7 @@ import { commitToBranch } from '../../db/commits';
 import { describeEnvelope, type NameLookup } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 import { reportToast } from '../toasts/toastStore';
 
@@ -80,6 +82,7 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
   const { modelId, orgId, userId, relationshipType, direction, elementId, elementName, branch, expectedHeadCommitId, onCreated } = input;
   const [status, setStatus] = useState<RelationshipCreateStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const create = useCallback(
     async (otherElementId: UUID, otherElementName: string, attributesOverride?: Record<string, Json>, demotion?: RelationshipCreateDemotion | null) => {
@@ -160,13 +163,15 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
         setStatus('idle');
         // Item 2: see useElementEditor.ts's identical comment.
         if (branch.kind === 'change') reportToast(`Saved to change: ${branch.title ?? branch.name}`);
+        // E8 item (1): invalidates the shared main/editing-branch cache — see invalidateModelHead.ts's own comment.
+        void invalidateModelHead(queryClient, modelId);
         onCreated();
       } catch (e) {
         setStatus('idle');
         setError(e instanceof Error ? e.message : 'Could not add relationship.');
       }
     },
-    [modelId, orgId, userId, relationshipType, direction, elementId, elementName, branch, expectedHeadCommitId, onCreated],
+    [modelId, orgId, userId, relationshipType, direction, elementId, elementName, branch, expectedHeadCommitId, onCreated, queryClient],
   );
 
   return { status, error, create };

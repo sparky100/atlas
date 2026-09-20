@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, RelationshipType, UUID } from '../../contracts/delta';
 import type { FactsRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
@@ -6,6 +7,7 @@ import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { attributesRecord } from './attributesRecord';
 import type { DraftValue } from './useElementEditor';
 import { supabase } from '../supabaseClient';
@@ -101,6 +103,7 @@ export function useRelationshipEditor(input: UseRelationshipEditorInput): UseRel
   const [values, setValues] = useState<Record<string, DraftValue>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const currentAttrs = attributesRecord(relationship.attributes);
   const isCurrentPrimary = relationship.relationship_type === 'supports' && currentAttrs.role === 'primary';
@@ -244,12 +247,14 @@ export function useRelationshipEditor(input: UseRelationshipEditorInput): UseRel
 
       setStatus('idle');
       if (branch.kind === 'change') reportToast(`Saved to change: ${branch.title ?? branch.name}`);
+      // E8 item (1): invalidates the shared main/editing-branch cache — see invalidateModelHead.ts's own comment.
+      void invalidateModelHead(queryClient, modelId);
       onSaved();
     } catch (e) {
       setStatus('editing');
       setSubmitError(e instanceof Error ? e.message : 'Could not save.');
     }
-  }, [values, facts, relationship, siblingSupportsRows, fieldEditable, modelId, orgId, userId, branch, expectedHeadCommitId, onSaved]);
+  }, [values, facts, relationship, siblingSupportsRows, fieldEditable, modelId, orgId, userId, branch, expectedHeadCommitId, onSaved, queryClient]);
 
   return { status, values, fieldErrors, submitError, hasChanges, fieldEditable, startEditing, cancelEditing, setValue, save };
 }

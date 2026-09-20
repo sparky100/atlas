@@ -1,9 +1,12 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
+import { getBranch, getMainBranch } from '../../db/branches';
 import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 import { nextSiblingOrder, type CapabilityMapTree } from './layout';
 
@@ -46,6 +49,7 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
   const { modelId, orgId, userId, branch, expectedHeadCommitId, tree, onCreated } = input;
   const [status, setStatus] = useState<CapabilityCreateStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const create = useCallback(
     async (name: string, parentId: UUID | null) => {
@@ -62,6 +66,12 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
       setStatus('creating');
 
       try {
+        // E8 item (1) fallout: see useElementCreate.ts's identical comment
+        // on why a pure create resolves the branch's own current head
+        // fresh, rather than trusting a possibly-stale cached prop.
+        const currentBranch = branch.kind === 'main' ? await getMainBranch(supabase, modelId) : await getBranch(supabase, branch.id);
+        const currentHeadCommitId = currentBranch?.head_commit_id ?? expectedHeadCommitId;
+
         const source = await getOrCreateManualSource(supabase, { id: crypto.randomUUID(), orgId, modelId, userId });
 
         const delta: Delta = {
@@ -80,7 +90,7 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
         const envelope: CommitEnvelope = {
           id: crypto.randomUUID(),
           branchId: branch.id,
-          parentCommitId: expectedHeadCommitId,
+          parentCommitId: currentHeadCommitId,
           mergedBranchHeadCommitId: null,
           kind: 'manual',
           // See useElementCreate.ts's identical comment: an element.create
@@ -90,7 +100,7 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
           deltas,
         };
 
-        const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });
+        const result = await commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId: currentHeadCommitId, envelope });
         if (!result.ok) {
           setStatus('idle');
           setError(
@@ -102,13 +112,15 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
         }
 
         setStatus('idle');
+        // E8 item (1): invalidates the shared main/editing-branch cache (invalidateModelHead.ts's own comment on why this is unconditional, not branch-kind-gated).
+        void invalidateModelHead(queryClient, modelId);
         onCreated();
       } catch (e) {
         setStatus('idle');
         setError(e instanceof Error ? e.message : 'Could not add capability.');
       }
     },
-    [modelId, orgId, userId, branch, expectedHeadCommitId, tree, onCreated],
+    [modelId, orgId, userId, branch, expectedHeadCommitId, tree, onCreated, queryClient],
   );
 
   return { status, error, create };

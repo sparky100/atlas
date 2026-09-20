@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { getMyMembership } from '../../db/organisations';
 import type { MemberRole } from '../../db/types';
 import type { UUID } from '../../contracts/delta';
 import { reportError } from '../errors/errorBannerStore';
+import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
 
 // Re-exported for every existing import site (`import { canEditOnMain, useMembership } from '../orgs/useMembership'`)
@@ -29,34 +30,24 @@ export interface UseMembershipResult {
   loading: boolean;
 }
 
-/** The signed-in user's own role in `orgId` — what the UI reads to decide what to show. RLS (not this hook) is the actual enforcement point. */
+/** The signed-in user's own role in `orgId` — what the UI reads to decide what to show. RLS (not this hook) is the actual enforcement point. E8 item (1): shared-cache version — see `useOrganisationBySlug.ts`'s own comment for the general shape. */
 export function useMembership(orgId: UUID | null, userId: UUID | null): UseMembershipResult {
-  const [role, setRole] = useState<MemberRole | null>(null);
-  const [loading, setLoading] = useState(true);
+  const enabled = orgId !== null && userId !== null;
 
-  useEffect(() => {
-    if (!orgId || !userId) {
-      setRole(null);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    getMyMembership(supabase, orgId, userId)
-      .then((row) => {
-        if (!cancelled) setRole(row?.role ?? null);
-      })
-      .catch((e: unknown) => {
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.membership(orgId, userId),
+    queryFn: async () => {
+      if (!orgId || !userId) return null;
+      try {
+        const row = await getMyMembership(supabase, orgId, userId);
+        return row?.role ?? null;
+      } catch (e) {
         reportError("Couldn't load your membership.", e);
-        if (!cancelled) setRole(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [orgId, userId]);
+        return null;
+      }
+    },
+    enabled,
+  });
 
-  return { role, loading };
+  return { role: data ?? null, loading: enabled ? isLoading : false };
 }

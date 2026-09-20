@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
@@ -8,6 +9,7 @@ import type { BranchRow } from '../../db/types';
 import { attributesRecord } from '../elements/attributesRecord';
 import { profileLabel } from '../comments/profileLabel';
 import { reportError } from '../errors/errorBannerStore';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { Button } from '../components/Button/Button';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
@@ -42,6 +44,7 @@ export function ActorMemberPicker({ modelId, orgId, userId, element, facts, bran
   const [selected, setSelected] = useState<string>(currentMemberId ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let cancelled = false;
@@ -92,6 +95,8 @@ export function ActorMemberPicker({ modelId, orgId, userId, element, facts, bran
         setError(result.reason === 'conflict' ? 'This element changed since you loaded it. Reload the page and try again.' : `Could not save: ${result.message}`);
         return;
       }
+      // E8 item (1): invalidates the shared main/editing-branch cache — see invalidateModelHead.ts's own comment.
+      void invalidateModelHead(queryClient, modelId);
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save.');

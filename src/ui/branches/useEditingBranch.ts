@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { UUID } from '../../contracts/delta';
 import { getBranch, getMainBranch } from '../../db/branches';
 import type { BranchRow } from '../../db/types';
 import type { Ref } from '../../db/ref';
 import { reportError } from '../errors/errorBannerStore';
+import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
 
 export interface UseEditingBranchResult {
@@ -36,39 +37,27 @@ export interface UseEditingBranchResult {
  * path to a change branch at all until this hook existed to pick the
  * right one.
  */
+/** E8 item (1): shared-cache version — see `useOrganisationBySlug.ts`'s own comment for the general shape. Not invalidated by `invalidateModelHead` (that file's own comment explains why a commit to `main` never touches this query); a `main`-ref reader still shares `useMainBranch`'s own cache entry via the identical key scheme, so the two stay consistent without this hook invalidating anything itself. */
 export function useEditingBranch(modelId: UUID | null, ref: Ref): UseEditingBranchResult {
-  const [branch, setBranch] = useState<BranchRow | null>(null);
-  const [loading, setLoading] = useState(true);
-  const branchIdIfAny = ref.kind === 'branch' ? ref.branchId : null;
+  const enabled = modelId !== null && ref.kind !== 'tag' && ref.kind !== 'commit';
 
-  useEffect(() => {
-    if (!modelId || ref.kind === 'tag' || ref.kind === 'commit') {
-      setBranch(null);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    const load = ref.kind === 'main' ? getMainBranch(supabase, modelId) : getBranch(supabase, branchIdIfAny ?? '');
-    load
-      .then((row) => {
-        if (!cancelled) setBranch(row);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setBranch(null);
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.editingBranch(modelId, ref),
+    queryFn: async () => {
+      if (!modelId || ref.kind === 'tag' || ref.kind === 'commit') return null;
+      try {
+        return await (ref.kind === 'main' ? getMainBranch(supabase, modelId) : getBranch(supabase, ref.branchId));
+      } catch (e) {
         // Sprint U4-2a item 2: same silent-swallow gap as useMainBranch.ts
         // — `branch: null` here means "nothing is editable," which every
         // caller's own `canEdit`/`canAdd` computation just quietly treats
         // as "no write controls," with no indication anything failed.
         reportError("Couldn't load the change to edit.", e);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [modelId, ref.kind, branchIdIfAny]);
+        return null;
+      }
+    },
+    enabled,
+  });
 
-  return { branch, loading };
+  return { branch: data ?? null, loading: enabled ? isLoading : false };
 }

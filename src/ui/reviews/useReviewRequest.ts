@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getBranch } from '../../db/branches';
@@ -21,6 +22,7 @@ import type { ReviewVerdict } from '../../db/types';
 import type { MergeReview } from '../../engine/merge';
 import type { FieldConflictChoice, StructuralChoice } from '../../engine/mergeResolution';
 import { reportError } from '../errors/errorBannerStore';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 
 /** `StructuralChoice`'s own key: a retraction choice is keyed by its element; a duplicate/cardinality pair choice by its own pair (order-independent — both sides of a pair should key to the same slot). */
@@ -108,6 +110,7 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
   // §10.2 P-18: this must survive a reload, which local-only state never
   // did before Sprint C2 step 7).
   const [pendingDismissals, setPendingDismissals] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let cancelled = false;
@@ -322,6 +325,8 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
       const branchTitle = state.branch.title ?? state.branch.name;
       const result = await mergeApprovedRequest(supabase, modelId, state.request.id, state.branch, `Merge: ${branchTitle}`);
       if (!result.ok) setActionError(result.message);
+      // E8 item (1): a successful merge always moves main's own head.
+      else void invalidateModelHead(queryClient, modelId);
       reload();
       return result;
     } catch (e) {
@@ -330,7 +335,7 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
     } finally {
       setActionStatus('idle');
     }
-  }, [state, modelId, reload]);
+  }, [state, modelId, reload, queryClient]);
 
   const fieldChoiceFor = useMemo(() => (subjectId: UUID, attribute: string) => fieldChoices.get(fieldChoiceKey(subjectId, attribute)), [fieldChoices]);
   const retractionChoiceFor = useMemo(() => (elementId: UUID) => {
