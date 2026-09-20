@@ -1,0 +1,7 @@
+{
+  "elements": [
+    { "key": "sys-crm", "type": "system", "id": "00000000-0000-0000-0000-000000000601", "name": "CRM", "attributes": { "lifecycleStatus": "active", "isExternal": false } },
+    { "key": "sys-billing", "type": "system", "id": "00000000-0000-0000-0000-000000000602", "name": "Billing", "attributes": { "lifecycleStatus": "active", "isExternal": false } },
+    { "key": "container-crm-portal", "type": "container", "id": "00000000-0000-0000-0000-000000000603", "name": "Portal", "parentKey": "sys-crm", "attributes": { "technology": "React", "isExternal": false } }
+  ]
+}

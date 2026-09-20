@@ -1,0 +1,44 @@
+{
+  "elements": [
+    { "key": "sys-crm", "type": "system", "id": "00000000-0000-0000-0000-000000000301", "name": "CRM", "attributes": { "vendor": "Acme", "lifecycleStatus": "active", "isExternal": false } },
+    {
+      "key": "sys-billing",
+      "type": "system",
+      "id": "00000000-0000-0000-0000-000000000302",
+      "name": "Billing",
+      "attributes": { "vendor": "Northgate", "lifecycleStatus": "active", "isExternal": false },
+      "overrides": [{ "attribute": "vendor", "value": "Northgate", "confidence": 0.7, "createdAt": "2024-01-01T00:00:00Z" }]
+    },
+    {
+      "key": "sys-hr",
+      "type": "system",
+      "id": "00000000-0000-0000-0000-000000000303",
+      "name": "HRPlatform",
+      "attributes": { "vendor": "SAP", "lifecycleStatus": "active", "isExternal": false },
+      "overrides": [{ "attribute": "lifecycleStatus", "value": "active", "confidence": 1, "createdAt": "2026-02-01T00:00:00Z", "sourceId": "manual-source-0000-0000-000000000000" }]
+    },
+    { "key": "sys-merged-a", "type": "system", "id": "00000000-0000-0000-0000-000000000304", "name": "PayHR", "attributes": { "vendor": "Zellis", "lifecycleStatus": "active", "isExternal": false } },
+    {
+      "key": "sys-merged-b",
+      "type": "system",
+      "id": "00000000-0000-0000-0000-000000000305",
+      "name": "AssetsPro",
+      "attributes": { "vendor": "OldVendor", "lifecycleStatus": "active", "isExternal": false },
+      "overrides": [{ "attribute": "vendor", "value": "OldVendor", "confidence": 0.7, "createdAt": "2024-01-01T00:00:00Z" }]
+    },
+    {
+      "key": "sys-other",
+      "type": "system",
+      "id": "00000000-0000-0000-0000-000000000306",
+      "name": "OtherSystem",
+      "attributes": { "vendor": "Legacy Corp", "lifecycleStatus": "active", "isExternal": false },
+      "overrides": [{ "attribute": "vendor", "value": "Legacy Corp", "confidence": 0.7, "createdAt": "2024-01-01T00:00:00Z" }]
+    },
+    { "key": "sys-gone-a", "type": "system", "id": "00000000-0000-0000-0000-000000000307", "name": "OldPortal", "attributes": { "vendor": "Civica", "lifecycleStatus": "active", "isExternal": false } },
+    { "key": "sys-gone-b", "type": "system", "id": "00000000-0000-0000-0000-000000000308", "name": "RetiredApp", "attributes": { "vendor": "Capita", "lifecycleStatus": "active", "isExternal": false } }
+  ],
+  "aliases": [
+    { "elementKey": "sys-merged-a", "type": "merged_id", "value": "00000000-0000-0000-0000-000000000398" },
+    { "elementKey": "sys-merged-b", "type": "merged_id", "value": "00000000-0000-0000-0000-000000000399" }
+  ]
+}

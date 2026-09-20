@@ -1,0 +1,8 @@
+{
+  "elements": [
+    { "key": "cap-housing", "type": "capability", "id": "00000000-0000-0000-0000-000000000101", "name": "Housing Services", "attributes": {} },
+    { "key": "cap-finance", "type": "capability", "id": "00000000-0000-0000-0000-000000000102", "name": "Financial Management", "attributes": {} },
+    { "key": "cap-education", "type": "capability", "id": "00000000-0000-0000-0000-000000000103", "name": "Education Services", "attributes": {} },
+    { "key": "cap-waste", "type": "capability", "id": "00000000-0000-0000-0000-000000000104", "name": "Waste and Environmental Services", "attributes": {} }
+  ]
+}

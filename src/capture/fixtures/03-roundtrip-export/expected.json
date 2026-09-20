@@ -1,0 +1,14 @@
+{
+  "job": { "status": "parsed" },
+  "candidates": {
+    "id:00000000-0000-0000-0000-000000000301": { "kind": "element", "class": "confirm", "elementType": "system", "matchLevel": "exact_id", "matchElement": "sys-crm", "attributes": { "vendor": "Acme", "lifecycleStatus": "active", "isExternal": false } },
+    "id:00000000-0000-0000-0000-000000000302": { "kind": "element", "class": "update", "elementType": "system", "matchLevel": "exact_id", "matchElement": "sys-billing", "attributes": { "vendor": "NewSupplier Ltd" } },
+    "id:00000000-0000-0000-0000-000000000303": { "kind": "element", "class": "conflict", "elementType": "system", "matchLevel": "exact_id", "matchElement": "sys-hr", "attributes": { "lifecycleStatus": "retiring" } },
+    "id:00000000-0000-0000-0000-000000000398": { "kind": "element", "class": "confirm", "elementType": "system", "matchLevel": "exact_id", "matchElement": "sys-merged-a", "attributes": { "vendor": "Zellis", "lifecycleStatus": "active", "isExternal": false } },
+    "id:00000000-0000-0000-0000-000000000399": { "kind": "element", "class": "update", "elementType": "system", "matchLevel": "exact_id", "matchElement": "sys-merged-b", "attributes": { "vendor": "NewVendor2" } },
+    "id:00000000-0000-0000-0000-000000000999": { "kind": "element", "class": "update", "elementType": "system", "matchLevel": "name_context", "matchElement": "sys-other", "attributes": { "vendor": "NewCorp" } },
+    "name:system:oldportal:": { "kind": "element", "class": "gone", "elementType": "system", "matchElement": "sys-gone-a", "confidence": { "min": 0.5, "max": 0.5 } },
+    "name:system:retiredapp:": { "kind": "element", "class": "gone", "elementType": "system", "matchElement": "sys-gone-b", "confidence": { "min": 0.5, "max": 0.5 } }
+  },
+  "absent": []
+}

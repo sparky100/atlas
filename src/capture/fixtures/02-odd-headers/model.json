@@ -1,0 +1,10 @@
+{
+  "elements": [
+    { "key": "cap-finance", "type": "capability", "id": "00000000-0000-0000-0000-000000000201", "name": "Finance", "attributes": {} },
+    { "key": "cap-hr", "type": "capability", "id": "00000000-0000-0000-0000-000000000202", "name": "HR", "attributes": {} },
+    { "key": "cap-property", "type": "capability", "id": "00000000-0000-0000-0000-000000000203", "name": "Property", "attributes": {} },
+    { "key": "cap-legal", "type": "capability", "id": "00000000-0000-0000-0000-000000000204", "name": "Legal", "attributes": {} },
+    { "key": "cap-environment", "type": "capability", "id": "00000000-0000-0000-0000-000000000205", "name": "Environment", "attributes": {} },
+    { "key": "cap-housing", "type": "capability", "id": "00000000-0000-0000-0000-000000000206", "name": "Housing", "attributes": {} }
+  ]
+}

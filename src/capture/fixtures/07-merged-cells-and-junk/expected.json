@@ -1,0 +1,12 @@
+{
+  "job": { "status": "parsed" },
+  "candidates": {
+    "name:system:appa:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Civica", "introduced": "2019-03-01" }, "warnings": ["AMBIGUOUS_DATE"] },
+    "name:system:appb:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Capita", "introduced": "2021-01-01" }, "warnings": ["AMBIGUOUS_DATE"] },
+    "name:system:appc:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Acme", "introduced": "2027-12-31" }, "warnings": [] },
+    "name:system:appd:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Acme", "introduced": "2027-12-31" }, "warnings": [] },
+    "name:system:appe:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Civica" }, "warnings": ["MULTI_VALUE_CELL"] },
+    "name:system:appf:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Acme" }, "warnings": ["FORMULA_ERROR"] }
+  },
+  "absent": ["name:system:total:", "name:system::"]
+}

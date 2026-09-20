@@ -51,6 +51,33 @@ describe('buildLlmProxyRequest', () => {
   });
 });
 
+describe('buildLlmProxyRequest — F2 (full K1) additions', () => {
+  const outputConfig = { effort: 'high' as const, format: { type: 'json_schema' as const, schema: { type: 'object' } } };
+
+  it('omits outputConfig/cacheControl/stream when not given, leaving every pre-existing caller unaffected', () => {
+    const request = buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }] });
+    expect(request).not.toHaveProperty('outputConfig');
+    expect(request).not.toHaveProperty('cacheControl');
+    expect(request).not.toHaveProperty('stream');
+  });
+
+  it('carries outputConfig through unchanged when given', () => {
+    const request = buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }], outputConfig });
+    expect(request.outputConfig).toEqual(outputConfig);
+  });
+
+  it('sets cacheControl/stream only when explicitly true', () => {
+    expect(buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }], cacheControl: true }).cacheControl).toBe(true);
+    expect(buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }], cacheControl: false })).not.toHaveProperty('cacheControl');
+    expect(buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }], stream: true }).stream).toBe(true);
+  });
+
+  it('produces something isValidLlmProxyRequest still accepts with every additive field set', () => {
+    const request = buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }], outputConfig, cacheControl: true, stream: true });
+    expect(isValidLlmProxyRequest(request)).toBe(true);
+  });
+});
+
 describe('isValidLlmProxyRequest', () => {
   it('rejects a request with zero messages', () => {
     expect(isValidLlmProxyRequest({ version: LLM_PROXY_CONTRACT_VERSION, messages: [], maxTokens: 100, responseFormat: 'text' })).toBe(false);

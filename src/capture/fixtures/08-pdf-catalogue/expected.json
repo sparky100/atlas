@@ -1,0 +1,22 @@
+{
+  "job": { "status": "parsed" },
+  "candidates": {
+    "name:system:crm system:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Acme Corp", "lifecycleStatus": "active" } },
+    "name:system:billing platform:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Northgate", "lifecycleStatus": "active" } },
+    "name:system:schoolsportal:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Capita", "lifecycleStatus": "planned" } },
+    "name:system:wastetrack:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Enzen", "lifecycleStatus": "active" } },
+    "name:system:housing register:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Civica", "lifecycleStatus": "active" } },
+    "name:system:revenues system:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Capita", "lifecycleStatus": "active" } },
+    "name:system:data warehouse:": { "kind": "element", "class": "new", "elementType": "system" },
+
+    "rel:flows_to:name:system:crm system:→name:system:data warehouse:": { "kind": "relationship", "class": "new", "relationshipType": "flows_to" },
+    "rel:flows_to:name:system:billing platform:→name:system:data warehouse:": { "kind": "relationship", "class": "new", "relationshipType": "flows_to" },
+    "rel:flows_to:name:system:wastetrack:→name:system:billing platform:": { "kind": "relationship", "class": "new", "relationshipType": "flows_to" },
+
+    "rel:owns:name:actor:housing team:→name:system:housing register:": { "kind": "relationship", "class": "new", "relationshipType": "owns" },
+    "rel:owns:name:actor:revenues team:→name:system:revenues system:": { "kind": "relationship", "class": "new", "relationshipType": "owns" },
+    "rel:owns:name:actor:education team:→name:system:schoolsportal:": { "kind": "relationship", "class": "new", "relationshipType": "owns" }
+  },
+  "absent": ["name:system:borsetshire council:", "name:actor:borsetshire council:", "name:system:application:"],
+  "live": { "minElementRecall": 0.85, "minElementPrecision": 0.85, "maxUnsourced": 2 }
+}

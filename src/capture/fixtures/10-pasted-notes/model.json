@@ -1,0 +1,7 @@
+{
+  "elements": [
+    { "key": "actor-housing-digital", "type": "actor", "id": "00000000-0000-0000-0000-000000000301", "name": "Housing Digital", "attributes": { "subtype": "team" } },
+    { "key": "sys-tenant-portal", "type": "system", "id": "00000000-0000-0000-0000-000000000302", "name": "Tenant Portal", "attributes": { "lifecycleStatus": "active", "isExternal": false } },
+    { "key": "sys-agresso", "type": "system", "id": "00000000-0000-0000-0000-000000000303", "name": "Agresso", "attributes": { "lifecycleStatus": "active" } }
+  ]
+}

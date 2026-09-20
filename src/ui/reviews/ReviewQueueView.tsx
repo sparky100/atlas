@@ -3,6 +3,9 @@ import { EmptyState } from '../components/EmptyState/EmptyState';
 import { LinkButton } from '../components/Button/LinkButton';
 import { Text } from '../components/Text/Text';
 import type { UUID } from '../../contracts/delta';
+import { useAuth } from '../auth/useAuth';
+import { captureJobStatusLabel, captureJobStatusTone } from '../capture/captureJobStatus';
+import { useCaptureJobs } from '../capture/useCaptureJob';
 import { cachedClassification } from './cachedClassification';
 import { mergeRequestStatusTone } from './mergeRequestStatus';
 import { useReviewQueue, type ReviewQueueRow } from './useReviewQueue';
@@ -10,40 +13,72 @@ import styles from './ReviewQueueView.module.css';
 
 export interface ReviewQueueViewProps {
   modelId: UUID;
+  orgId: UUID;
   orgSlug: string;
   modelSlug: string;
 }
 
 /**
  * The review queue's list (Sprint C1 step 7, UI-principles §2.4's `/review`
- * route): every open merge request on this model. Capture drafts are
- * UI-principles §5's other queue item kind — not built here (the capture
- * pipeline itself doesn't exist yet, ADR-004/SPEC §8's own deferral), so
- * this list is merge requests only, honestly labelled rather than padded
- * out with an empty second section.
+ * route): every open merge request on this model, plus (F2 "full K1" PR15)
+ * every capture job whose draft is `parsed` and still has undecided
+ * candidates — a "Capture drafts" section, shown only when one exists
+ * (honestly-labelled per this file's own original convention, rather than
+ * padding out an empty second section). `useCaptureJobs` (PR14) already
+ * gives every job on this model; this view just filters and links onward,
+ * rather than adding a second, capture-specific queue hook.
  */
-export function ReviewQueueView({ modelId, orgSlug, modelSlug }: ReviewQueueViewProps) {
+export function ReviewQueueView({ modelId, orgId, orgSlug, modelSlug }: ReviewQueueViewProps) {
   const state = useReviewQueue(modelId);
+  const { userId } = useAuth();
+  const { jobs: captureJobs } = useCaptureJobs(modelId, orgId, userId);
+  const captureDrafts = captureJobs.filter((j) => j.status === 'parsed');
 
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
-  if (state.rows.length === 0) {
-    return (
-      <div>
-        <EmptyState>No open merge requests. A change reaches this queue once its author submits it for review.</EmptyState>
-        <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes`} variant="secondary">
-          Changes →
-        </LinkButton>
-      </div>
-    );
-  }
 
   return (
-    <ul className={styles.list}>
-      {state.rows.map((row) => (
-        <QueueRow key={row.request.id} row={row} orgSlug={orgSlug} modelSlug={modelSlug} />
-      ))}
-    </ul>
+    <div>
+      {state.rows.length === 0 ? (
+        <div>
+          <EmptyState>No open merge requests. A change reaches this queue once its author submits it for review.</EmptyState>
+          <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes`} variant="secondary">
+            Changes →
+          </LinkButton>
+        </div>
+      ) : (
+        <ul className={styles.list}>
+          {state.rows.map((row) => (
+            <QueueRow key={row.request.id} row={row} orgSlug={orgSlug} modelSlug={modelSlug} />
+          ))}
+        </ul>
+      )}
+
+      {captureDrafts.length > 0 && (
+        <>
+          <Text as="h2" size="lg">
+            Capture drafts
+          </Text>
+          <ul className={styles.list}>
+            {captureDrafts.map((job) => (
+              <li key={job.id} className={styles.row}>
+                <div>
+                  <Text as="span" size="lg">
+                    {job.inputName}
+                  </Text>
+                  <div className={styles.rowMeta}>
+                    <Chip tone={captureJobStatusTone(job)}>{captureJobStatusLabel(job)}</Chip>
+                  </div>
+                </div>
+                <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/capture/${job.id}`} variant="secondary">
+                  Review →
+                </LinkButton>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
   );
 }
 

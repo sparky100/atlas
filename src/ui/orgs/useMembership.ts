@@ -22,6 +22,7 @@ export {
   canManageOrgSettings,
   canRestoreModel,
   canReviewMergeRequest,
+  canRunCapture,
   canStartDecision,
 } from './roleGates';
 

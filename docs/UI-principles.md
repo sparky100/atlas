@@ -198,10 +198,12 @@ A two-column key/value list, one row per attribute in `type_schemas` order, incl
 Every recorded value carries a **provenance badge** immediately to its right:
 
 ```
-Vendor        Northgate Public Services       [▤ 14mo · ●●○]
+Vendor        Northgate Public Services       [⚙ 14mo · ●●○]
 Lifecycle     active                          [👤 2mo · ●●●]
 Owner         → Housing Digital (team)        [▤ 14mo · ●●○]  (relationship, shown here read-only)
 ```
+
+**Amended (SPEC-capture.md K-1, F2 "full K1"):** the `Vendor` row above reads `⚙`, not `▤` — a capture run's own `sources` row is always `kind = 'capture_job'` (SPEC-data-model.md §3.6), never `spreadsheet`/`document`; those two kinds are reserved for a person transcribing by hand. This worked example originally showed `Vendor` as spreadsheet-sourced (`▤`); it's corrected here to show what a genuinely machine-extracted-then-reviewed fact reads as, since that distinction is exactly the point of having a separate glyph for it. `Owner`'s own `▤` is untouched — it illustrates the other case, a fact a person typed in from a spreadsheet directly, never through capture.
 
 Badge anatomy, fixed width so columns align:
 - **Source kind glyph**: `▤` spreadsheet, `▣` document/PDF, `🗣` interview, `👤` manual, `⚙` capture job, `⌂` template, `⇄` merge resolution. Glyphs are from the icon set, not emoji, in production.

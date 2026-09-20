@@ -1,0 +1,7 @@
+Application,Supplier,Status,Go-live,Business owner,Hosted,Service
+CRM,Acme,Live,01/03/2019,Housing Council Team,No,Housing Services
+Billing,Northgate,Live,01/06/2020,Finance Council Team,No,Financial Management
+SchoolsApp,Capita,Planned,,Education Council Team,No,Education Services
+WasteTrack,Enzen,Live,15/01/2021,Waste Council Team,No,Waste and Environmental Services
+HousingPortal,Civica,Live,01/09/2018,Housing Council Team,No,Manages temporary accommodation placements
+RevenuesSystem,Capita,Live,01/01/2017,Finance Council Team,,Handles council tax billing and collection

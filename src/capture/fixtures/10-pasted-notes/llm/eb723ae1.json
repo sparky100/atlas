@@ -1,0 +1,7 @@
+{
+  "text": "{\"elements\":[{\"elementType\":\"system\",\"name\":\"Tenant Portal\",\"namePassage\":\"the tenant portal\",\"nameConfidence\":0.9,\"parentName\":null,\"attributes\":[{\"key\":\"vendor\",\"value\":\"Civica\",\"passage\":\"Civica supply\",\"confidence\":0.85},{\"key\":\"plannedEnd\",\"value\":\"2027-04-01\",\"passage\":\"due to be replaced by Q2 2027\",\"confidence\":0.6}]},{\"elementType\":\"system\",\"name\":\"Open Housing\",\"namePassage\":\"Open Housing platform\",\"nameConfidence\":0.85,\"parentName\":null,\"attributes\":[{\"key\":\"lifecycleStatus\",\"value\":\"planned\",\"passage\":\"when the new Open Housing platform goes live\",\"confidence\":0.6}]},{\"elementType\":\"system\",\"name\":\"Data Warehouse\",\"namePassage\":\"the data warehouse\",\"nameConfidence\":0.8,\"parentName\":null,\"attributes\":[]},{\"elementType\":\"system\",\"name\":\"Agresso\",\"namePassage\":\"Agresso\",\"nameConfidence\":0.9,\"parentName\":null,\"attributes\":[{\"key\":\"isExternal\",\"value\":false,\"passage\":\"Agresso on-prem\",\"confidence\":0.7}]}],\"relationships\":[{\"relationshipType\":\"owns\",\"fromName\":\"Housing Digital\",\"toName\":\"Tenant Portal\",\"passage\":\"The housing team (Housing Digital) own the tenant portal\",\"confidence\":0.85,\"attributes\":[]}]}",
+  "stopReason": "end_turn",
+  "inputTokens": 420,
+  "outputTokens": 180,
+  "cacheReadTokens": 0
+}

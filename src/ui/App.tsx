@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { SelectedRefProvider } from './branches/SelectedRefProvider';
 import { BoundaryCrossingsPage } from './routes/BoundaryCrossingsPage';
 import { CapabilityMapPage } from './routes/CapabilityMapPage';
+import { CaptureJobListPage } from './routes/CaptureJobListPage';
+import { CaptureReviewPage } from './routes/CaptureReviewPage';
 import { ChangePage } from './routes/ChangePage';
 import { ChangesPage } from './routes/ChangesPage';
 import { ContainerPage } from './routes/ContainerPage';
@@ -66,6 +68,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/context/:elementId" element={<ContextPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/container/:systemId" element={<ContainerPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/versions" element={<VersionsPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/capture" element={<CaptureJobListPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/changes" element={<ChangesPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/changes/:branchId" element={<ChangePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/decisions" element={<DecisionsPage />} />
@@ -73,6 +76,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/diff" element={<VersionDiffPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/review" element={<ReviewQueuePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/review/:mergeRequestId" element={<ReviewRequestPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/review/capture/:jobId" element={<CaptureReviewPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/boundary-crossings" element={<BoundaryCrossingsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/external-interfaces" element={<ExternalInterfacesPage />} />
           </Route>

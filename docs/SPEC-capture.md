@@ -1,8 +1,8 @@
 # SPEC: Capture pipeline
 
-**Status:** Proposed (Prompt 10, 2026-09-11). **Amended 2026-09-20:** "F2-lite" (#198–#204, #209, shipped 2026-09-18) implements a narrower slice of this design — deterministic spreadsheet/CSV/JSON reconciliation against a fixed column schema, matched against main and folded into one commit on an ordinary change branch — outside this spec's own table/edge-function/candidate shape, and was never reconciled back into it at the time. This document still describes the full K1 design; §15 records what F2-lite does not cover.
+**Status:** Built (PR1–PR16, 2026-09-20). **History:** originally Proposed (Prompt 10, 2026-09-11). **Amended 2026-09-20 (mid-build):** "F2-lite" (#198–#204, #209, shipped 2026-09-18) had already implemented a narrower slice of this design — deterministic spreadsheet/CSV/JSON reconciliation against a fixed column schema, matched against main and folded into one commit on an ordinary change branch — outside this spec's own table/edge-function/candidate shape, and was never reconciled back into it at the time. **PR1–PR16 (2026-09-20) then built the full design this document describes, alongside F2-lite rather than in its place**: `src/ui/import/SpreadsheetImportDialog.tsx` (F2-lite's own upload dialog, reachable from the Elements page toolbar) is untouched and still the only path for F2-lite's own deterministic reconciliation flow; retiring it in favour of full K1's own upload flow (`src/ui/capture/UploadCaptureDialog.tsx`, reachable from the model nav's "Capture" section) is a follow-on decision this build did not make. §15 records what, if anything, is still genuinely deferred past PR16.
 **Depends on:** `docs/ADR-000-foundations.md` (ADR-001, ADR-004, ADR-007, ADR-008, ADR-014, ADR-015, ADR-019), `docs/SPEC-data-model.md` (§3.6 `sources`/`aliases`, §3.7 `capture_jobs`, §4 delta format, §5.3 who writes commits, §6.3 validation levels, §8 matching), `docs/UI-principles.md` §4.3 (provenance badge), §5 (review queue).
-**Builds:** Sprint K1 (Prompt 11). The pipeline is done when it passes §12's fixtures, not when the UI looks right.
+**Builds:** Sprint K1 (Prompt 11). Built — the pipeline passes §12's fixtures (01–07 fully; 08/10 with hand-authored cassettes; 09 replay-only by its own nature — `NO_TEXT_LAYER` fails before any LLM call; see `src/capture/fixtures/README.md` for the disclosed scope of what a hand-authored cassette can and can't stand in for). §13's own integration suites and `e2e/golden-path-capture-review.spec.ts` are written and reasoned through but not executed in this sandbox — no Docker/Supabase route here, the same standing limitation disclosed for every PR in this build; `pnpm db:start && pnpm test:integration` and `pnpm exec playwright test` run them for real.
 
 This document turns ADR-004 ("capture lands as draft branches"), ADR-007 (fact-level provenance) and SPEC §8 (matching) into a contract, prompts, algorithms and an evaluation harness precise enough to build and score against. Like `SPEC-data-model.md`, it contains no engine code: TypeScript is types only, SQL is DDL-shaped, algorithms are pseudocode. Where the ADR or the data-model spec left a choice open, this document makes it, and every such choice is listed in §1 so it can be challenged in one place. Four of them touch the schema or an ADR and are collected again in §14 as questions for the human — the design proceeds under the stated recommendation for each, and none is silently invented.
 
@@ -23,7 +23,7 @@ This document turns ADR-004 ("capture lands as draft branches"), ADR-007 (fact-l
 | K-9 | **Trigram similarity is implemented in TypeScript, pg_trgm-compatible, and checked against Postgres by an integration test (P-K2).** Postgres is queried through a POST RPC that returns raw hits; classification is pure `src/capture` code. | Rule 6: matching must be reproducible from inputs; §12's fixtures must run in `pnpm test` with no database. The `.in()` ceiling (rule 8) rules out sending 2,000 names as a GET filter — an RPC with a jsonb body is the same shape §9.4's `unresolved_comment_counts` already uses. |
 | K-10 | **LLM calls are made only by the `capture-run` edge function**, through the shared LLM proxy (ADR-014) when configured, otherwise directly with the Anthropic SDK behind the same `LlmClient` interface. Model `claude-opus-5` by default (`CAPTURE_MODEL`), structured outputs with a strict JSON schema, no prefill, `refusal` handled as a failure mode. Every response is logged with the job id; every fixture run replays recorded responses. | The browser never holds a key. Rule 6: the model's output is an *input* to the deterministic half of the pipeline, never something the pipeline's determinism rests on — recorded responses make the whole run reproducible, and a live run is scored separately (§12.6). |
 | K-11 | **Spreadsheets are extracted deterministically after one LLM call per sheet for column mapping** (and one batched call per 50 rows for capability assignment when a capability-shaped column exists). Row → candidate is code, not a prompt. PDF and pasted text are extracted by the LLM, per chunk, with a mandatory verbatim passage that the pipeline verifies against the extracted text. | A spreadsheet is already structured; asking a model to re-read 2,000 rows is slower, costlier and less reproducible than mapping the columns once. Prose has no structure to exploit, so the model does the reading — but never gets to invent its evidence. |
-| K-12 | **The `capture-run` function is step-driven and resumable**: each invocation does bounded work (≤ 60 s), persists `capture_jobs.progress`, and returns `{status: 'continue' | 'parsed' | 'failed'}`; the client re-invokes until done. No scheduler, no background queue. | Edge-function wall-clock limits make a 200-page PDF or a 5,000-row workbook a multi-invocation job. Persisting progress after every chunk also means a crash loses one chunk, not the run. |
+| K-12 | **The `capture-run` function is step-driven and resumable**: each invocation does bounded work (≤ 60 s), persists `capture_jobs.progress`, and returns `{status: 'continue' | 'parsed' | 'failed'}`; the client re-invokes until done. No scheduler, no background queue. **Narrowed in PR12, agreed with the human directly**: `runCapture()` (PR10/PR11) isn't internally chunked, and today's schema has nowhere to persist a partial candidate set between two invocations — so `src/capture/captureRunStep.ts` implements **job-level retry only**: one invocation runs parse→extract→match→write in full or fails outright (nothing is written until the one atomic `write_capture_draft` call, so a crash loses no data); `progress` still names the running phase but never advances `done`/`total`, and `{status: 'continue'}` is never actually returned. Chunk-level resumability (`progress.done`/`total` advancing mid-extract, matching this row's own original wording and the `RUN_INTERRUPTED` failure mode's "resuming from page 41") is deferred, not built. | Edge-function wall-clock limits make a 200-page PDF or a 5,000-row workbook a multi-invocation job. Persisting progress after every chunk also means a crash loses one chunk, not the run. |
 | K-13 | **`supports` proposals default to `role = 'secondary'`; a candidate becomes primary only when the target has no live primary on main *and* the candidate is the first (or only) such edge the row proposes. `owns` proposals get their `role` directly from which header matched them** (`owner` → `business`, `technicalOwner` → `technical`, Prompt 7k item 2) **— never a rank-based default** — a row proposing a second owner of the same role the target already has on main is `conflict`/`update`, not silently retried under a different role. | SPEC C17 rejects a second primary `supports` edge, or a second `owns` edge of the same role on the same target, at fold time, on every branch kind. Capture must never produce a draft commit `commit_deltas` refuses; a reviewer resolves the conflict (promotes to primary, or picks which owner keeps the role) on the element page if they want to. |
 | K-14 | **A `gone` candidate (present last run, absent this run) proposes retirement, staged as *undecided*, confidence 0.50.** Systems: `lifecycleStatus = 'retired'`; other types: `element.retract`. | Absence from a document is weak evidence — never an automatic retract (rule 5's spirit), never hidden either (UI §4.3: a gap made visible). Confidence 0.50 renders `●○○` so a reviewer sees it for what it is. |
 | K-15 | **Edge-function attribute validation imports `src/contracts` directly** (Deno import of the same TypeScript the client uses) rather than waiting for the `type_schemas` JSON-Schema generator. RT-5 stays deferred (SPEC §11). | SPEC §11 named K1's edge function as "the first consumer outside the TypeScript runtime" that would need the generator — but a Deno edge function *is* a TypeScript runtime. Importing the contract removes the need rather than meeting it; the generator can land when a non-TS consumer actually appears. |
@@ -153,7 +153,7 @@ It imports `src/contracts/*` and `src/capture/*` directly (K-15) — the parsers
 
 **LLM access.** `LlmClient` (`src/capture/llm/client.ts`) has one method, `complete(request): Promise<LlmResponse>`, where `request` is a Messages-API-shaped body. Two implementations, chosen by environment:
 
-- `ProxyLlmClient` — POSTs the body to `LLM_PROXY_URL` with `LLM_PROXY_KEY` and `x-atlas-org-id` (per-org cost attribution, ADR-014); the proxy is a pass-through to the Messages API.
+- `ProxyLlmClient` — POSTs the body to the deployed `llm-proxy` edge function, `Authorization: Bearer <token>` forwarded (the caller's own session JWT from the browser, or `capture-run`'s service-role key after its own JWT check) and `orgId` in the JSON body, matching the real, already-built E4 contract (`src/contracts/llmProxy.ts`) rather than an earlier `LLM_PROXY_KEY`/`x-atlas-org-id` sketch of it; the proxy is a pass-through to the Messages API, and every call is logged and rate-limited per org (ADR-014).
 - `DirectLlmClient` — `@anthropic-ai/sdk` with `ANTHROPIC_API_KEY`. Used when no proxy is configured and by the live evaluation run (§12.6).
 - `RecordedLlmClient` — replays `fixtures/**/llm/*.json` keyed by a hash of the request body; throws on a miss. Used by every unit test and by `pnpm capture:score` in replay mode. It is a test double for the network, not a stub for logic (rule 7): the extraction, grounding and matching code paths are identical.
 
@@ -201,7 +201,7 @@ export type ElementProposal<T extends ElementType = ElementType> = {
   kind: 'element';
   elementType: T;
   name: string;
-  parent: CandidateRef | null;                // required non-null for container/component; capability optional; system/actor null
+  parent: CandidateRef | null;                // required non-null for container; capability optional; system/actor null
   attributes: Partial<ElementAttributesByType[T]>;   // only keys the document asserts; never defaulted (see §5.4 for the two required-field exceptions)
 };
 
@@ -305,8 +305,8 @@ A workbook over 5,000 data rows, a PDF over 200 pages, text over 200,000 chars �
 | `externalOrganisation` | `externalOrganisation` | `Operated by`, `Third party` |
 | `hostingModel` | `System.hostingModel` (Prompt 7k item 1) | `Hosting model`, `Deployment model`, `On-prem/cloud` |
 | `hostingProvider` | `System.hostingProvider` (Prompt 7k item 1; free text, not the closed `hostingModel` set) | `Hosting provider`, `Data centre`, `Cloud provider` |
-| `technology` | `Container.technology` / `Component.technology` | `Technology`, `Platform`, `Stack` |
-| `parent` | container/component parent (system/container name) | `Parent system`, `Part of`, `System`, `Application` (on a Modules sheet) |
+| `technology` | `Container.technology` | `Technology`, `Platform`, `Stack` |
+| `parent` | container parent (system name) | `Parent system`, `Part of`, `System`, `Application` (on a Modules sheet) |
 | `owner` | Actor candidate (`team` unless the value looks like a person) + `owns` (`role: 'business'`) | `Owner`, `Business owner`, `Service owner`, `Accountable`, `Team` |
 | `ownerEmail` | `Actor.email` (person) | `Owner email`, `Contact` |
 | `technicalOwner` | Actor candidate (`team` unless the value looks like a person) + `owns` (`role: 'technical'`, Prompt 7k item 2 — parallel to `owner`, never the same header) | `Technical owner`, `IT owner`, `Engineering contact`, `Support team` |
@@ -319,7 +319,7 @@ A workbook over 5,000 data rows, a PDF over 200 pages, text over 200,000 chars �
 
 A synonym hit maps with confidence 1.0. Headers with no synonym hit go to **prompt A (§6.1)** — one call per sheet, with the unmapped headers, five sample rows, and the role list. The model returns a role per header with its own 0–1 confidence and a one-line reason; the pipeline clips LLM mapping confidence to ≤ 0.90 and records `LOW_MAPPING_CONFIDENCE` on every candidate from a column mapped below 0.70. A column mapped by the model to `name` overrides nothing: if the synonym table already found a `name` column, a second `name` becomes `ignore` with a note. A sheet with no `name` column after both passes is skipped (`SHEET_NO_NAME_COLUMN`).
 
-The sheet's *element type* is decided once per sheet: `system` by default; `container` when a `parent` column resolves to systems (the sheet's `parent` values match systems on main or on another sheet's candidates) or the sheet is named like `Modules`/`Components`/`Containers`/`Services`; `component` when `parent` resolves to containers; `capability` when the sheet is named like `Capabilities`/`Capability map` and has a level/parent structure; `actor` when the sheet is named like `Teams`/`Owners`/`Contacts`. The model is asked to confirm the sheet type in prompt A's response (`sheetType`) and its answer is used only when the code heuristics are undecided.
+The sheet's *element type* is decided once per sheet: `system` by default; `container` when a `parent` column resolves to systems (the sheet's `parent` values match systems on main or on another sheet's candidates) or the sheet is named like `Modules`/`Components`/`Containers`/`Services`; `capability` when the sheet is named like `Capabilities`/`Capability map` and has a level/parent structure; `actor` when the sheet is named like `Teams`/`Owners`/`Contacts`. The model is asked to confirm the sheet type in prompt A's response (`sheetType`) and its answer is used only when the code heuristics are undecided.
 
 **Step 3 — rows to candidates (code).** For each data row (stopping at the first fully blank run of 3 rows or a row whose `name` cell is `Total`/`Totals`/`Count`):
 
@@ -411,7 +411,7 @@ Effort: prompt A `medium`, prompt B `high`, prompt C `medium`. `max_tokens: 1600
 ```
 You map spreadsheet columns to a fixed set of roles for an enterprise-architecture model.
 
-The model has five element types: capability, system, container, component, actor. A spreadsheet
+The model has four element types: capability, system, container, actor. A spreadsheet
 sheet usually lists one type. The column roles you may assign are exactly:
 
   atlasId, sourceKey, name, description, vendor, lifecycleStatus, introduced, plannedEnd,
@@ -431,8 +431,8 @@ Role meanings:
 - externalOrganisation: who operates it, when external.
 - hostingModel: on-premises, private cloud, public cloud, SaaS, or hybrid — a closed set, not free text.
 - hostingProvider: the specific hosting provider, data centre or region, when named. Free text, distinct from hostingModel.
-- technology: platform or stack of a container or component.
-- parent: the system (for a container) or container (for a component) this row belongs to.
+- technology: platform or stack of a container.
+- parent: the system this container row belongs to.
 - owner: the team or person accountable for the row (its business owner).
 - ownerEmail: the owner's email.
 - technicalOwner: the team or person who runs the row day to day, when distinct from owner.
@@ -450,7 +450,7 @@ Rules:
   text and the sample values together.
 - Never assign name to more than one column; if two columns could be the name, give the second
   one sourceKey or description with a reason.
-- sheetType is your best reading of what one row of this sheet is: system, container, component,
+- sheetType is your best reading of what one row of this sheet is: system, container,
   capability, actor, or unknown.
 ```
 
@@ -486,12 +486,11 @@ Element types (with the attributes you may fill):
 - system: name, description, vendor, lifecycleStatus (planned|active|retiring|retired),
   isExternal (true|false), externalOrganisation, introduced (date), plannedEnd (date)
 - container: name, description, technology, parentName (the system it is part of), isExternal
-- component: name, description, technology, parentName (the container it is part of)
 - actor: name, subtype (person|team), email, orgUnit, isExternal, externalOrganisation
 
 Relationship types (from → to):
 - supports: system → capability. "The X system supports the Y function / service / area."
-- uses: system|container|component → system|container|component. A runtime dependency.
+- uses: system|container → system|container. A runtime dependency.
 - owns: actor → capability|system. Accountability: "owned by", "the X team are responsible for".
 - flows_to: system|container → system|container. Data or integration flow: "sends", "feeds",
   "exports to".
@@ -655,7 +654,6 @@ match(candidate, index) -> MatchOutcome
 |---|---|---|
 | system, actor | the type alone (SPEC §8) | — |
 | container | same parent system | `parent` ref → candidate in this run (then the *candidate's* eventual id is the context, which for level 3 means: only containers whose parent is an element that candidate matched to) or main element |
-| component | same parent container | as above |
 | capability | same parent capability (or both top-level) | `parent` ref, or `none` |
 
 An `unresolved` parent that resolves to nothing → the candidate is `invalid` (`PARENT_UNRESOLVED`) rather than matched without context. For a relationship endpoint, the same resolution applies; an unresolved endpoint makes the relationship candidate `invalid` (`ENDPOINT_UNRESOLVED`), never a silently created element (ADR-008 rule 4: never silently create).
@@ -878,7 +876,7 @@ Every fixture is deliberately messy in a *named* way; the expected outcome lists
 | 03 | `roundtrip-export` | CSV exported by Atlas itself: `Atlas ID, Name, Vendor, Lifecycle, …`, 15 rows; 2 rows carry an id that was merged away; 1 carries an id from another model | 15 systems on main with those ids; 2 `merged_id` aliases; facts with mixed sources | level 1 matching incl. `merged_id` resolution; `confirm` vs `update`; `conflict` strength rule | 12 `confirm` (values unchanged), 2 `update` (vendor changed, main's fact is a capture from 2 years ago), 1 `conflict` (lifecycle differs, main's fact is manual 1.0 dated last month), 2 `RESOLVED_THROUGH_MERGED_ID`, 1 `ATLAS_ID_NOT_FOUND` falling through to a level-3 match |
 | 04 | `duplicates-within` | CSV, 20 rows in which `PowerON`, `Power On`, `PowerOn (Enzen)` and `POWERON` appear as separate rows with partially disagreeing vendors | empty | intra-document grouping; `ROWS_DISAGREE`; alias proposals for every variant | 17 `new` systems (4 rows → 1 candidate); the PowerON candidate has 4 `attributeRefs` rows, a `ROWS_DISAGREE` warning on vendor, and 4 `name` alias proposals; no two `new` candidates share a normalised name |
 | 05 | `aliases-known` | CSV, 10 rows using old names (`Northgate Housing`, `SX3`, `iWorld`) | 10 systems on main under new names, with `name` aliases for the old ones; one alias string is within 0.7 trigram of a *different* system's name | level 2 beats level 3 (P-19) | 10 `confirm`/`update`, all `level: alias`; the trap row matches its alias's element, not the trigram neighbour; 0 `new` |
-| 06 | `containers-two-sheets` | XLSX: sheet `Systems` (6 rows) and sheet `Modules` (14 rows, `Module, Parent system, Technology`); `Portal` appears as a module under two different systems; one module names a parent not on either sheet | 3 of the 6 systems already on main, one with an existing `Portal` container | sheet type inference (`container` from `parent` column); cross-sheet parent resolution to candidates; context in level 3 (P-20); `PARENT_UNRESOLVED` | 3 `new` + 3 `confirm` systems; 12 containers: the `Portal` under the existing system is `confirm`, the `Portal` under a new system is `new` (never matched to the other); 1 `invalid` (`PARENT_UNRESOLVED "Legacy CRM"`); components none |
+| 06 | `containers-two-sheets` | XLSX: sheet `Systems` (6 rows) and sheet `Modules` (14 rows, `Module, Parent system, Technology`); `Portal` appears as a module under two different systems; one module names a parent not on either sheet | 3 of the 6 systems already on main, one with an existing `Portal` container | sheet type inference (`container` from `parent` column); cross-sheet parent resolution to candidates; context in level 3 (P-20); `PARENT_UNRESOLVED` | 3 `new` + 3 `confirm` systems; 12 containers: the `Portal` under the existing system is `confirm`, the `Portal` under a new system is `new` (never matched to the other); 1 `invalid` (`PARENT_UNRESOLVED "Legacy CRM"`) |
 | 07 | `merged-cells-and-junk` | XLSX, 60 rows: merged header cells across two rows, a totals row, 3 blank rows mid-table, dates as `Mar-19`, `2021`, `31/12/2027`, `12/31/2027`, a `Vendor` cell `Civica / Northgate`, `#REF!` in one cell, a "Notes" column with long prose | empty | parser robustness; date parsing table; `MULTI_VALUE_CELL`; `FORMULA_ERROR`; the totals row is not a system | 60 → 56 `new` systems (totals + 3 blanks excluded); dates parse to `2019-03-01` (ambiguous), `2021-01-01` (ambiguous), `2027-12-31` (exact, both spellings); warnings counted exactly; `rowFactor` 0.95 applied to the `#REF!` row |
 | 08 | `pdf-catalogue` | text PDF, 9 pages: a title page, a table of applications spanning pages 2–7 with repeating headers/footers, a narrative "Integration landscape" section on pages 8–9 stating flows ("The CRM sends nightly extracts to the data warehouse") and ownership | empty + seeded `nhs` capabilities | prompt B extraction per chunk; grounding (byte-exact and normalised); relationships from prose; cross-chunk endpoint resolution; page headers not extracted as systems | ≥ 24 of 26 catalogue systems as `new` with vendor and status (recall ≥ 0.92); 0 candidates named after the page footer; ≥ 4 `flows_to` and ≥ 3 `owns` from the narrative, each with a passage found on page 8 or 9; every `sourceRef` resolves; ≤ 2 `unsourced` |
 | 09 | `scanned` | image-only PDF, 3 pages | empty | `NO_TEXT_LAYER` | job fails at parse with `NO_TEXT_LAYER`; no branch, no source row, no candidates; `error` set; job retryable |
@@ -960,7 +958,7 @@ Cost of a live run is recorded in the same file; at K1's fixture sizes it is a f
 | P-K7 | Access: viewer sees zero `capture_jobs`/`capture_candidates`/draft-branch rows; contributor sees their org's; nobody with an application role can insert/update `capture_candidates` directly. |
 | P-K8 | Classification: for generated (candidate, main fact) pairs, `conflict` iff the value differs and main's fact is stronger by the §4.4 rule; `confirm` iff all values equal; `update` otherwise. |
 | P-19, P-20, P-21 | SPEC §10.5, now runnable. |
-| Playwright | `e2e/capture-review.spec.ts`: upload fixture 01, wait for `parsed`, open the queue, `a` on the first `new`, `t` choose a branch, `⌘/Ctrl+Enter`, assert the element exists on the branch's to-be view with a `⚙` badge; `r` on a `new`, reload, assert it is still rejected. Fixture 09: assert the failure message. |
+| Playwright | `e2e/golden-path-capture-review.spec.ts` (renamed from this row's own original `capture-review.spec.ts` at PR16 — CLAUDE.md's coverage rule and `playwright.config.ts`'s `chromium-390` project both key off the literal `golden-path-*.spec.ts` prefix, so an unprefixed name would silently never run at 390 and would not count as coverage at all): upload fixture 01, wait for `parsed`, open the queue, `a` on the first `new`, `t` choose a branch, `⌘/Ctrl+Enter`, assert the element exists on the branch's to-be view with a `⚙` badge; `r` on a `new`, reload, assert it is still rejected. Fixture 09: assert the failure message. |
 
 ---
 
@@ -978,15 +976,17 @@ Each is decided above under the stated recommendation, and the build proceeds on
 
 ## 15. Deferred
 
-| Item | Why not K1 | Target |
+The first six rows below were true when this section was written (mid-build, against F2-lite alone) and are kept as the historical record of what F2-lite didn't cover; each is now built, so its own "Target" column names the PR rather than "F2 (full K1)". Only "Starter-map upgrade flow" remains genuinely open past PR16.
+
+| Item | Why not K1 (as of the mid-build amendment) | Target |
 |---|---|---|
-| PDF and pasted-text extraction (§5.3, §6.2) | "F2-lite" (#198–#204, #209, 2026-09-18) covers spreadsheet/CSV/JSON only, against a fixed column schema — K1's other two input kinds need the LLM extraction path this scope didn't build | F2 (full K1) |
-| `capture_jobs`/`capture_candidates` tables and the `capture-run` edge function (§3.2, §3.3, §3.5) | F2-lite reuses an ordinary change branch and one coarse `RowOutcome` (`new`/`unchanged`/`changed`/`needs-pick`/`blocked`), not this spec's per-candidate table/class/edge-function shape | F2 (full K1) |
-| Candidate-class review queue built on the S1 review page (§10) | F2-lite reuses the existing change-branch banner/merge flow directly, not a queue keyed to `new`/`update`/`confirm`/`conflict`/`ambiguous`/`gone`/`invalid`/`unsourced` | F2 (full K1) |
-| Re-import diff with `row_key` lineage across runs (§9) | F2-lite's `notInFile.ts` compares once against the current model via `sources.import_touched_element_ids`, not `capture_jobs.reimport_of_job_id` chaining | F2 (full K1) |
-| Aliases learned from capture specifically (§7.6) | F2-lite's alias-on-confirm is a narrower, ad hoc version scoped to its own reconciliation flow, not matcher-level learning | F2 (full K1) |
-| Ten-fixture set and scoring script (§12) | this spec's own stated exit bar ("done when it passes the fixtures") — none exist; F2-lite was verified by unit/integration/e2e tests instead | F2 (full K1) |
-| Starter-map upgrade flow | rides on the full K1 pipeline, not on F2-lite's deterministic-file path (tracked separately in `docs/prompts/atlas-prompt-pack.md`'s own register) | F2 (full K1) |
+| PDF and pasted-text extraction (§5.3, §6.2) | "F2-lite" (#198–#204, #209, 2026-09-18) covers spreadsheet/CSV/JSON only, against a fixed column schema — K1's other two input kinds need the LLM extraction path this scope didn't build | done — PR11 |
+| `capture_jobs`/`capture_candidates` tables and the `capture-run` edge function (§3.2, §3.3, §3.5) | F2-lite reuses an ordinary change branch and one coarse `RowOutcome` (`new`/`unchanged`/`changed`/`needs-pick`/`blocked`), not this spec's per-candidate table/class/edge-function shape | done — PR1 (schema/contracts), PR12 (edge function) |
+| Candidate-class review queue built on the S1 review page (§10) | F2-lite reuses the existing change-branch banner/merge flow directly, not a queue keyed to `new`/`update`/`confirm`/`conflict`/`ambiguous`/`gone`/`invalid`/`unsourced` | done — PR15 (`edited` on an `invalid`/`unsourced` candidate is the one narrower-than-spec surface it ships with — see that PR's own disclosed gap: re-grounding needs the original document, which nothing in this pipeline retains past the one `capture-run` invocation) |
+| Re-import diff with `row_key` lineage across runs (§9) | F2-lite's `notInFile.ts` compares once against the current model via `sources.import_touched_element_ids`, not `capture_jobs.reimport_of_job_id` chaining | done — PR9 |
+| Aliases learned from capture specifically (§7.6) | F2-lite's alias-on-confirm is a narrower, ad hoc version scoped to its own reconciliation flow, not matcher-level learning | done — PR8 (`buildPromotionEnvelope.ts`), narrowed to what a persisted `CaptureCandidate` can express — see that PR's own disclosed gap on `source_system_key`/intra-document-group aliases |
+| Ten-fixture set and scoring script (§12) | this spec's own stated exit bar ("done when it passes the fixtures") — none exist; F2-lite was verified by unit/integration/e2e tests instead | done — PR10 (01–07), PR13 (08–10 + `pnpm capture:score --live`); fixture 08 itself still has no recorded cassette (needs a live Anthropic key this sandbox never had) and is honestly `SKIP`ped, not faked green |
+| Starter-map upgrade flow | rides on the full K1 pipeline, not on F2-lite's deterministic-file path (tracked separately in `docs/prompts/atlas-prompt-pack.md`'s own register) | F2 (full K1) is now built, so this is unblocked — still not started; a follow-on sprint, not part of PR1–16 |
 | OCR for scanned PDFs | a different pipeline stage (image → text) with its own error profile; `NO_TEXT_LAYER` names the gap honestly | unscheduled |
 | `.docx`, `.pptx`, email inputs | "spreadsheets, PDFs and text" is the brief; each is a parser plus nothing new downstream | after K1, on demand |
 | Batch API for large PDFs | 200 pages ≈ 20 calls; interactive latency is fine at K1's limits. Batches halve cost once runs are routinely large | K2 |

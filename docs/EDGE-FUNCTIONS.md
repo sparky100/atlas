@@ -171,6 +171,20 @@ on). Returns `{ status: 'ok', text, inputTokens, outputTokens }` on
 success, or `{ status: 'error', message }` (400/401/403/429/500/503,
 matching the failure) otherwise.
 
+**F2 (full K1) additions, SPEC-capture.md §3.5/§6 (K-10).** Three optional
+request fields and two optional response fields, added without touching
+the shape above (`LLM_PROXY_CONTRACT_VERSION` bumped so a log row or
+cassette can tell which shape produced it):
+
+- `outputConfig?: { effort: 'low'|'medium'|'high'|'xhigh'|'max', format: { type: 'json_schema', schema } }` — asks the provider for schema-constrained JSON via its own `output_config`, instead of `responseFormat: 'json'`'s free-form hint.
+- `cacheControl?: boolean` — marks the joined system-role content as a stable, cache-controlled prefix (`cache_control: { type: 'ephemeral' }`).
+- `stream?: boolean` — asks the proxy to stream the generation from the provider internally, so a long prose-extraction call doesn't sit on one buffered upstream response long enough to time out. This call's own response to its caller is never `text/event-stream` either way — always one complete JSON body.
+- Response gains `stopReason?: string` (the provider's own stop reason — `end_turn`/`max_tokens`/`refusal`/…) and `cacheReadTokens?: number`.
+
+`src/capture/llm/client.ts`'s `ProxyLlmClient` is the one caller that sets
+all three request fields; every other caller (`send-invite-email`
+included) omits them and gets exactly the response it always did.
+
 ### Local development
 
 Same as `send-invite-email` above — `pnpm db:start` runs this locally too;
@@ -192,3 +206,106 @@ no Docker route to a local Supabase to serve the function against in the
 first place. Confirm a real call once, against your own Anthropic key,
 before relying on this in production — and before F2 (capture) is built
 to depend on it.
+
+## `capture-run`
+
+F2 (full K1) PR12, SPEC-capture.md §3.5: runs the capture pipeline for one
+`capture_jobs` row — parse → extract → match → write. Invoked with
+`{jobId}` by the client (user JWT). Holds the service role, like
+`llm-proxy` above, for the same reason: writing `capture_candidates` and
+calling `atlas.write_capture_draft` needs it (see that RPC's own migration
+comment, `20260920030000_write_capture_draft.sql`). The real authorization
+check is still the caller's own forwarded session — `capture_jobs_select`'s
+RLS (contributor+ of the job's own org) is read with the caller's JWT
+*first*; only a row that comes back at all switches to service role for
+everything after (`supabase/functions/capture-run/index.ts`'s own module
+comment).
+
+Almost none of this function's own logic lives in `supabase/functions/capture-run/`
+itself — the step machine is `src/capture/captureRunStep.ts` (Vitest-tested
+against a fake dependency layer, no Deno runtime needed for that), and
+`supabase/functions/capture-run/db.ts` is a thin adapter wiring that step's
+injected dependencies to real Postgres/Storage/`llm-proxy` calls.
+`index.ts` itself is only auth + wiring, exactly like `llm-proxy`'s own
+split of "real logic vs. transport shim."
+
+**K-12's resumability, narrowed.** SPEC's K-12 asks for a step-driven
+function doing bounded (≤ 60 s) work per invocation, with
+`capture_jobs.progress` advancing per chunk so a crash resumes from the
+last completed one. `runCapture()` (PR10/PR11) isn't internally chunked
+that way, and there's nowhere in today's schema to stash a partial
+candidate set between two invocations. Agreed with the human on this PR's
+own planning turn: this function instead does **job-level retry only** —
+one invocation runs the whole pipeline or fails outright, and nothing is
+written to `branches`/`commits`/`deltas`/`capture_candidates` until the one
+atomic `write_capture_draft` call at the end, so a crash loses no data; a
+retry (calling this function again with the same `jobId`) simply reruns
+everything. `progress` still names the coarse phase running (`extract` or
+`write`) but never advances `done`/`total`, and `{status: 'continue'}` is
+never returned. See `captureRunStep.ts`'s own module comment for the full
+reasoning. The function is genuinely idempotent, though: calling it again
+on an already-`parsed`/`reviewed`/`discarded` job is a safe no-op.
+
+### One-time setup
+
+No new secrets beyond what `llm-proxy` already needs — this function calls
+that one internally (`ProxyLlmClient`, forwarding its own service-role key
+as the bearer token) rather than holding its own Anthropic key. Set
+`CAPTURE_RUN_LLM_DIRECT=true` (plus `ANTHROPIC_API_KEY` on *this* function)
+only if no `llm-proxy` is deployed yet and you want `capture-run` to call
+Anthropic directly (`DirectLlmClient`) instead.
+
+```sh
+supabase functions deploy capture-run
+```
+
+`SUPABASE_URL`/`SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` are provided
+automatically, as with every edge function above.
+
+### Calling it
+
+```
+POST /functions/v1/capture-run
+Authorization: Bearer <the caller's own session JWT>
+Content-Type: application/json
+
+{ "jobId": "…" }
+```
+
+Returns the step's own result verbatim (200 for `{status:'parsed'|'noop'}`,
+422 for `{status:'failed', error:{code,message}}` — one of §11's failure
+codes, e.g. `NO_USABLE_SHEET`, `INPUT_ENCRYPTED`, `LLM_REFUSAL`, or the
+disclosed catch-all `CAPTURE_RUN_FAILED` for anything else), 401/404/405/500
+for a request-level problem (missing auth, unknown/unauthorized job, wrong
+method, missing env config).
+
+### What this sprint could and couldn't verify
+
+`src/capture/captureRunStep.ts` (the step machine itself — idempotency,
+retry-after-failure, the §11 error-code classification, the whole
+parse→extract→match→write sequence against a fake dependency layer) is
+real, Vitest-covered code, run for real in this sandbox.
+`supabase/functions/capture-run/db.ts`/`index.ts` were **not** — same
+standing gap as `llm-proxy`/`send-invite-email` (no Docker route to a local
+Supabase here), plus two additional, PR12-specific risks worth calling out
+explicitly before a real deploy:
+
+- Every file under `src/` this function imports (`src/capture/*`,
+  `src/contracts/*`, `src/engine/*`) uses bundler-style extension-less
+  relative imports, which Deno doesn't resolve by default. This function's
+  own `deno.json` turns on the `sloppy-imports` unstable flag to cover
+  that, and maps `zod`/`xlsx`/`pdfjs-dist`/`@noble/hashes` to `npm:`
+  specifiers for the same reason `@anthropic-ai/sdk` already needed one
+  inside `src/capture/llm/client.ts`. Neither the flag nor the import map
+  has been exercised against a real Deno process.
+- `capture_jobs.input_ref`'s own stored shape
+  (`capture-inputs/{org}/{model}/{job}/{filename}`, per
+  `writeCaptureDraft.integration.test.ts`'s own fixture value) includes the
+  bucket name as a path segment, which `storage.objects` itself never
+  stores; `db.ts`'s `downloadInput` strips that prefix before calling
+  `.storage.from('capture-inputs').download(...)`. Confirmed against the
+  existing test's own literal string, not against a real upload.
+
+Confirm both against a real local Supabase (`pnpm db:start`,
+`supabase functions serve capture-run`) before relying on this in
+production, alongside `llm-proxy`'s own not-yet-confirmed live call.

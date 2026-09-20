@@ -1,0 +1,7 @@
+{
+  "text": "{\"sheetType\":\"system\",\"columns\":[{\"column\":\"B\",\"role\":\"vendor\",\"confidence\":0.85,\"reason\":\"Who supplies it names the product's supplier.\"},{\"column\":\"G\",\"role\":\"sourceKey\",\"confidence\":0.75,\"reason\":\"Ref no. looks like a stable per-application reference.\"},{\"column\":\"H\",\"role\":\"isExternal\",\"confidence\":0.65,\"reason\":\"Hosted where distinguishes internal from external hosting, though the header is ambiguous.\"}]}",
+  "stopReason": "end_turn",
+  "inputTokens": 300,
+  "outputTokens": 60,
+  "cacheReadTokens": 0
+}

@@ -1,0 +1,13 @@
+{
+  "job": { "status": "parsed" },
+  "candidates": {
+    "name:system:tenant portal:": { "kind": "element", "class": "update", "elementType": "system", "matchElement": "sys-tenant-portal", "attributes": { "vendor": "Civica", "plannedEnd": "2027-04-01" } },
+    "name:system:open housing:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "lifecycleStatus": "planned" } },
+    "name:system:data warehouse:": { "kind": "element", "class": "new", "elementType": "system" },
+    "name:system:agresso:": { "kind": "element", "class": "update", "elementType": "system", "matchElement": "sys-agresso", "attributes": { "isExternal": false } },
+
+    "rel:owns:name:actor:housing digital:→name:system:tenant portal:": { "kind": "relationship", "class": "new", "relationshipType": "owns", "matchFrom": "actor-housing-digital", "matchTo": "sys-tenant-portal", "attributes": { "role": "business" } }
+  },
+  "absent": [],
+  "live": { "minElementRecall": 0.9, "minElementPrecision": 0.9, "maxUnsourced": 1 }
+}

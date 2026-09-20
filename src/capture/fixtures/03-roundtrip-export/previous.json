@@ -1,0 +1,20 @@
+[
+  {
+    "rowKey": "name:system:oldportal:",
+    "kind": "element",
+    "elementType": "system",
+    "relationshipType": null,
+    "proposal": { "kind": "element", "elementType": "system", "name": "OldPortal", "parent": null, "attributes": {} },
+    "evidence": { "sourceRef": { "kind": "sheet", "sheet": "Applications", "range": "A99" }, "passage": "OldPortal | Civica | Live", "extractor": "sheet-mapping", "attributeConfidence": {}, "warnings": [] },
+    "decision": "accepted"
+  },
+  {
+    "rowKey": "name:system:retiredapp:",
+    "kind": "element",
+    "elementType": "system",
+    "relationshipType": null,
+    "proposal": { "kind": "element", "elementType": "system", "name": "RetiredApp", "parent": null, "attributes": {} },
+    "evidence": { "sourceRef": { "kind": "sheet", "sheet": "Applications", "range": "A100" }, "passage": "RetiredApp | Capita | Live", "extractor": "sheet-mapping", "attributeConfidence": {}, "warnings": [] },
+    "decision": "accepted"
+  }
+]

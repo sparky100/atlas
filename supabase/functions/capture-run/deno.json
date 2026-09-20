@@ -1,0 +1,12 @@
+{
+  "unstable": ["sloppy-imports"],
+  "imports": {
+    "zod": "npm:zod@4.5.0",
+    "xlsx": "npm:xlsx@0.18.5",
+    "pdfjs-dist": "npm:pdfjs-dist@4.10.38",
+    "pdfjs-dist/legacy/build/pdf.mjs": "npm:pdfjs-dist@4.10.38/legacy/build/pdf.mjs",
+    "@noble/hashes/sha2.js": "npm:@noble/hashes@2.4.0/sha2.js",
+    "@noble/hashes/utils.js": "npm:@noble/hashes@2.4.0/utils.js",
+    "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@0.127.0"
+  }
+}
