@@ -140,9 +140,16 @@ export function ElementSearchAdd({
       )}
 
       {search.showCreate && (
-        <Button variant="primary" disabled={createStatus === 'creating'} onClick={() => void create(search.query)}>
-          {createStatus === 'creating' ? 'Adding…' : `Create ${elementType} "${search.query.trim()}"`}
-        </Button>
+        <>
+          {branch.kind === 'change' && (
+            <Text as="p" tone="faint" size="xs">
+              Won&apos;t be found by search until this change merges.
+            </Text>
+          )}
+          <Button variant="primary" disabled={createStatus === 'creating'} onClick={() => void create(search.query)}>
+            {createStatus === 'creating' ? 'Adding…' : `Create ${elementType} "${search.query.trim()}"`}
+          </Button>
+        </>
       )}
 
       <div className={styles.actions}>

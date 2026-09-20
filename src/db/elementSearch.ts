@@ -20,6 +20,15 @@
  * actually lands (main, or the branch being edited) is a separate question,
  * answered by the caller's own branch/role resolution (`useEditingBranch`/
  * `canEditBranch`), not by this module.
+ *
+ * The corollary — the creator's own side of this, not just the searcher's
+ * (`HomeSearch.tsx`'s own "Searched against main, not this change" note
+ * already covered the latter): an element created on a change branch won't
+ * show up in *this* search itself, for anyone, until that branch merges.
+ * `ElementSearchAdd.tsx`/`HomeSearch.tsx` both surface a plain warning next
+ * to their own create action whenever the write target is a `change`
+ * branch, rather than letting someone discover the gap the hard way by
+ * searching for what they just added a moment ago.
  */
 import type { ElementType, UUID } from '../contracts/delta';
 import type { ElementsHeadRow } from '../contracts/rows';
