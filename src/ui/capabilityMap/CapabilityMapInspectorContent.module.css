@@ -39,8 +39,19 @@
   gap: var(--space-2);
 }
 
+/* A native <select> sizes its closed box to its widest *option*, not just
+   the one currently selected (Chromium/Firefox both do this, so the box
+   doesn't visibly resize as the user picks a shorter option) —
+   "Coverage (supporting-system count)", `metrics.ts`'s own longest
+   `COLOUR_BY_OPTIONS` label, is wider than the Inspector's fixed 300px
+   panel on its own. Without a cap here that pushes past the panel's right
+   edge exactly like a long name would (Inspector.module.css's own
+   `overflow-wrap` comment) — `max-width: 100%` is the fix for a
+   replaced/form-control element, where `overflow-wrap` (text-only) does
+   nothing. */
 .select {
   height: var(--row-height);
+  max-width: 100%;
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
   border: var(--border-width) solid var(--border-strong);
