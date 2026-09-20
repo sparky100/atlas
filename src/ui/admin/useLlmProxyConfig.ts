@@ -22,12 +22,26 @@ export interface LlmProxyModelOption {
  * `DEFAULT_LLM_PROXY_MODEL` above: nothing on the Postgres/Deno side of this
  * boundary can share a TS constant, so this list needs updating by hand as
  * new Claude models ship.
+ *
+ * Ids are the exact, complete strings the Anthropic API expects for a
+ * direct (non-Vertex) call — no date suffix (a prior version of this list
+ * mistakenly appended one to the Haiku id; dated-snapshot ids are a Vertex
+ * AI-only convention and are rejected here). Covers the current and prior
+ * generation so an org already relying on an older model can still select
+ * it after an upgrade, without needing a code change; excludes
+ * `claude-mythos-5-1` (Project Glasswing-only access, not generally
+ * available).
  */
 export const LLM_PROXY_MODEL_OPTIONS: LlmProxyModelOption[] = [
   { id: 'claude-opus-5', label: 'Claude Opus 5 (flagship)' },
   { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
-  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+  { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
   { id: 'claude-fable-5-1', label: 'Claude Fable 5.1' },
+  { id: 'claude-fable-5', label: 'Claude Fable 5' },
+  { id: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
+  { id: 'claude-opus-4-7', label: 'Claude Opus 4.7' },
+  { id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
 ];
 
 export type LlmProxyConfigStatus = 'loading' | 'idle' | 'saving' | 'error';
