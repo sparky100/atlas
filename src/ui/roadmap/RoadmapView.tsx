@@ -1,12 +1,12 @@
 import { Link } from 'react-router';
-import type { UUID } from '../../contracts/delta';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
-import { matchesRoadmapFilters, type RoadmapFilters } from './roadmapFilter';
+import type { RoadmapFilters } from './roadmapFilter';
 import { isRoadmapEligibleBranch, type RoadmapMode } from './roadmapEligibility';
 import { UNASSIGNED_GROUP_KEY, type RoadmapCapabilityGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
 import { computeRoadmapTimelineRange, percentAt, percentAtIso, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { changeDescription, computeRoadmapVisibleData, eventsForSystem } from './roadmapVisibleData';
 import styles from './RoadmapView.module.css';
 
 export interface RoadmapViewProps {
@@ -79,19 +79,6 @@ function RoadmapRow({ bar, events, range, orgSlug, modelSlug }: { bar: RoadmapLi
   );
 }
 
-function eventsForSystem(systemId: UUID, branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode): { event: RoadmapBranchEvents['events'][number]; branch: RoadmapBranchEvents['branch'] }[] {
-  const result: { event: RoadmapBranchEvents['events'][number]; branch: RoadmapBranchEvents['branch'] }[] = [];
-  for (const { branch, events } of branchEvents) {
-    if (!isRoadmapEligibleBranch(branch, mode)) continue;
-    for (const event of events) {
-      if (event.kind === 'add' && event.elementId === systemId) result.push({ event, branch });
-      else if (event.kind === 'retire' && event.elementId === systemId) result.push({ event, branch });
-      else if (event.kind === 'replace' && (event.fromSystemId === systemId || event.toSystemId === systemId)) result.push({ event, branch });
-    }
-  }
-  return result;
-}
-
 /** Quarter tick marks along the range — orientation for "time horizontal," not a precise axis (a roadmap reads by season/quarter, not by day). */
 function RoadmapAxis({ range }: { range: RoadmapTimelineRange }) {
   const ticks: { label: string; pct: number }[] = [];
@@ -111,12 +98,6 @@ function RoadmapAxis({ range }: { range: RoadmapTimelineRange }) {
       ))}
     </div>
   );
-}
-
-function changeDescription(event: RoadmapBranchEvents['events'][number]): string {
-  if (event.kind === 'add') return `${event.elementName} added`;
-  if (event.kind === 'retire') return `${event.elementName} retired`;
-  return `${event.fromSystemName} replaced by ${event.toSystemName} (${event.capabilityName})`;
 }
 
 /**
@@ -163,11 +144,7 @@ function RoadmapChangesList({ branchEvents, mode }: { branchEvents: readonly Roa
  * established for this app's other structural-reference views.
  */
 export function RoadmapView({ groups, branchEvents, mode, filters, orgSlug, modelSlug, now = new Date() }: RoadmapViewProps) {
-  const filteredGroups = groups
-    .map((group) => ({ ...group, bars: group.bars.filter((bar) => matchesRoadmapFilters(bar, group.key, filters, now)) }))
-    .filter((group) => group.bars.length > 0);
-
-  const eligibleEvents = branchEvents.filter(({ branch }) => isRoadmapEligibleBranch(branch, mode));
+  const { filteredGroups, eligibleEvents } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now);
   const range = computeRoadmapTimelineRange(allDatesFor(groups, branchEvents, mode), now);
 
   if (filteredGroups.length === 0 && eligibleEvents.length === 0) {

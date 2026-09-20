@@ -1,6 +1,7 @@
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { Button } from '../components/Button/Button';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
@@ -16,6 +17,7 @@ import { refLabelOf } from '../../db/ref';
 import { RoadmapFilterBar } from '../roadmap/RoadmapFilterBar';
 import { RoadmapView } from '../roadmap/RoadmapView';
 import { useRoadmap } from '../roadmap/useRoadmap';
+import { useRoadmapExport } from '../roadmap/useRoadmapExport';
 import { parseRoadmapFilters, roadmapFiltersToSearchParams } from '../roadmap/roadmapFilterParams';
 import type { RoadmapFilters } from '../roadmap/roadmapFilter';
 import type { RoadmapMode } from '../roadmap/roadmapEligibility';
@@ -67,6 +69,16 @@ export function RoadmapPage() {
     setSearchParams(roadmapFiltersToSearchParams(next, searchParams));
   };
 
+  const roadmapData = state.status === 'ready' ? state.data : null;
+  const roadmapExport = useRoadmapExport({
+    groups: roadmapData?.groups ?? [],
+    branchEvents: roadmapData?.branchEvents ?? [],
+    mode,
+    filters,
+    filenameBase: model?.name ?? 'roadmap',
+  });
+  const hasNothingToExport = roadmapData === null || (roadmapData.groups.length === 0 && roadmapData.branchEvents.length === 0);
+
   if (orgLoading || modelsLoading || !model) {
     return (
       <div>
@@ -93,7 +105,18 @@ export function RoadmapPage() {
             <Text as="h1" size="2xl">
               Roadmap
             </Text>
+            {state.status === 'ready' && (
+              <div className={styles.actions}>
+                <Button variant="secondary" disabled={hasNothingToExport} onClick={roadmapExport.exportCsv}>
+                  Export table
+                </Button>
+                <Button variant="secondary" disabled={hasNothingToExport} onClick={roadmapExport.exportPng}>
+                  Export PNG
+                </Button>
+              </div>
+            )}
           </div>
+          {roadmapExport.error !== null && <Text as="p">{roadmapExport.error}</Text>}
 
           {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
