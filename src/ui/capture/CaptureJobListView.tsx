@@ -5,8 +5,7 @@
  * action gated by role, loading/empty states, a list of rows with a status
  * chip) for the same reasons that file's own comment gives.
  *
- * No review queue exists yet (PR15) — a `parsed` job has nowhere to link to
- * yet, so it's shown as "Ready for review" text rather than a dead link.
+ * PR15 built the review queue — a `parsed` job links to it directly.
  */
 import { useState } from 'react';
 import type { UUID } from '../../contracts/delta';
@@ -14,6 +13,7 @@ import type { CaptureJob, CaptureJobProgress } from '../../contracts/capture';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
+import { LinkButton } from '../components/Button/LinkButton';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
@@ -25,6 +25,8 @@ import styles from './CaptureJobListView.module.css';
 export interface CaptureJobListViewProps {
   modelId: UUID;
   orgId: UUID;
+  orgSlug: string;
+  modelSlug: string;
   /** Contributor+ (`capture_jobs_insert`'s RLS) — omitted entirely, not shown disabled, matching every other role-gated action in this codebase. */
   canCreate: boolean;
 }
@@ -36,7 +38,7 @@ const PROGRESS_STAGE_LABEL: Record<CaptureJobProgress['stage'], string> = {
   write: 'Writing',
 };
 
-export function CaptureJobListView({ modelId, orgId, canCreate }: CaptureJobListViewProps) {
+export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCreate }: CaptureJobListViewProps) {
   const { userId } = useAuth();
   const { status, jobs, error, createJob, retryJob } = useCaptureJobs(modelId, orgId, userId);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -77,7 +79,7 @@ export function CaptureJobListView({ modelId, orgId, canCreate }: CaptureJobList
 
       <ul className={styles.list}>
         {jobs.map((job) => (
-          <CaptureJobRow key={job.id} job={job} onRetry={() => { retryJob(job.id); }} />
+          <CaptureJobRow key={job.id} job={job} orgSlug={orgSlug} modelSlug={modelSlug} onRetry={() => { retryJob(job.id); }} />
         ))}
       </ul>
 
@@ -97,7 +99,7 @@ export function CaptureJobListView({ modelId, orgId, canCreate }: CaptureJobList
   );
 }
 
-function CaptureJobRow({ job, onRetry }: { job: CaptureJob; onRetry: () => void }) {
+function CaptureJobRow({ job, orgSlug, modelSlug, onRetry }: { job: CaptureJob; orgSlug: string; modelSlug: string; onRetry: () => void }) {
   const isRunning = job.status === 'pending' && job.error === null;
   const isFailed = job.status === 'pending' && job.error !== null;
   return (
@@ -124,17 +126,19 @@ function CaptureJobRow({ job, onRetry }: { job: CaptureJob; onRetry: () => void 
             {job.error.message}
           </Text>
         )}
-        {job.status === 'parsed' && (
-          <Text as="p" tone="muted" size="sm">
-            Ready for review — the review queue isn&rsquo;t built yet.
-          </Text>
-        )}
       </div>
       {isFailed && (
         <div className={styles.rowActions}>
           <Button variant="secondary" onClick={onRetry}>
             Retry
           </Button>
+        </div>
+      )}
+      {job.status === 'parsed' && (
+        <div className={styles.rowActions}>
+          <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/capture/${job.id}`} variant="secondary">
+            Review →
+          </LinkButton>
         </div>
       )}
     </li>

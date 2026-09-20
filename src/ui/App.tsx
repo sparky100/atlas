@@ -3,6 +3,7 @@ import { SelectedRefProvider } from './branches/SelectedRefProvider';
 import { BoundaryCrossingsPage } from './routes/BoundaryCrossingsPage';
 import { CapabilityMapPage } from './routes/CapabilityMapPage';
 import { CaptureJobListPage } from './routes/CaptureJobListPage';
+import { CaptureReviewPage } from './routes/CaptureReviewPage';
 import { ChangePage } from './routes/ChangePage';
 import { ChangesPage } from './routes/ChangesPage';
 import { ContainerPage } from './routes/ContainerPage';
@@ -75,6 +76,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/diff" element={<VersionDiffPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/review" element={<ReviewQueuePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/review/:mergeRequestId" element={<ReviewRequestPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/review/capture/:jobId" element={<CaptureReviewPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/boundary-crossings" element={<BoundaryCrossingsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/external-interfaces" element={<ExternalInterfacesPage />} />
           </Route>

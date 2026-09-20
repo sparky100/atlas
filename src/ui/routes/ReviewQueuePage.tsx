@@ -20,7 +20,7 @@ export function ReviewQueuePage() {
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
 
-  if (orgLoading || modelsLoading || !model) {
+  if (orgLoading || modelsLoading || !model || !organisation) {
     return (
       <div>
         <AppHeader />
@@ -41,13 +41,13 @@ export function ReviewQueuePage() {
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
           <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />
-          <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel="Review queue" />
+          <Breadcrumb org={{ label: organisation.name, href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel="Review queue" />
           <div className={styles.header}>
             <Text as="h1" size="2xl">
               Review queue
             </Text>
           </div>
-          <ReviewQueueView modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
+          <ReviewQueueView modelId={model.id} orgId={organisation.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
         </main>
       </div>
     </div>

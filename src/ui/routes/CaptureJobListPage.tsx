@@ -61,7 +61,7 @@ export function CaptureJobListPage() {
               Capture
             </Text>
           </div>
-          <CaptureJobListView modelId={model.id} orgId={organisation?.id ?? ''} canCreate={canCreate} />
+          <CaptureJobListView modelId={model.id} orgId={organisation?.id ?? ''} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} />
         </main>
       </div>
     </div>

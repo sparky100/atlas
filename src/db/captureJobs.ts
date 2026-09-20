@@ -105,6 +105,14 @@ export async function listCaptureJobs(supabase: Client, modelId: UUID): Promise<
   return ((data as CaptureJobRow[] | null) ?? []).map(rowToWire);
 }
 
+/** One capture job by id — the review page's own header read (`capture_jobs_select`'s RLS: any member). `null` for an unknown or not-yet-visible id, never a thrown error, matching `getBranch`'s own convention. */
+export async function getCaptureJob(supabase: Client, jobId: UUID): Promise<CaptureJob | null> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.from('capture_jobs').select('*').eq('id', jobId).maybeSingle();
+  if (error) throw new Error(`getCaptureJob: ${error.message}`);
+  return data ? rowToWire(data as CaptureJobRow) : null;
+}
+
 /**
  * §9.3: "the client offers the most recent `parsed`/`reviewed` job with the
  * same `input_name` as the default" — looked up once the upload dialog
