@@ -41,6 +41,7 @@
  */
 import type { CommitEnvelope, Delta, UUID } from '../contracts/delta';
 import type { ElementsHeadRow } from '../contracts/rows';
+import type { Head } from '../engine/deltas';
 import { attributesRecord } from '../ui/elements/attributesRecord';
 import { getMainBranch } from './branches';
 import { listCapabilitiesForMap } from './capabilityMap';
@@ -121,7 +122,7 @@ export interface BackfillCapabilityOrderInput {
 // `backfilled: number` don't narrow cleanly on their own).
 export type BackfillCapabilityOrderResult =
   | { ok: true; kind: 'nothing-to-backfill'; message: string }
-  | { ok: true; kind: 'backfilled'; backfilled: number; commitId: UUID }
+  | { ok: true; kind: 'backfilled'; backfilled: number; commitId: UUID; branchId: UUID; newHead: Head }
   | { ok: false; message: string };
 
 /**
@@ -161,5 +162,5 @@ export async function backfillCapabilityOrder(supabase: Client, input: BackfillC
 
   const result = await commitToBranch(supabase, { modelId, branchId: main.id, expectedHeadCommitId: main.head_commit_id, envelope });
   if (!result.ok) return { ok: false, message: result.message };
-  return { ok: true, kind: 'backfilled', backfilled: candidates.length, commitId: result.commitId };
+  return { ok: true, kind: 'backfilled', backfilled: candidates.length, commitId: result.commitId, branchId: main.id, newHead: result.newHead };
 }

@@ -41,7 +41,7 @@
 import type { CapabilityMapItemRow } from './capabilityMapTemplates';
 import type { CapabilityAttributes, UUID } from '../contracts/delta';
 import type { Delta } from '../contracts/delta';
-import { cloneHead, emptyHead, fold } from '../engine/deltas';
+import { cloneHead, emptyHead, fold, type Head } from '../engine/deltas';
 import { headHash } from '../engine/head';
 import { serializeHeadProjection } from '../engine/projection';
 import type { Client } from './client';
@@ -127,7 +127,7 @@ export interface SeedModelFromCapabilityMapInput {
   items: readonly CapabilityMapItemRow[];
 }
 
-export type SeedResult = { ok: true; commitId: UUID } | { ok: false; message: string };
+export type SeedResult = { ok: true; commitId: UUID; newHead: Head } | { ok: false; message: string };
 
 /**
  * Folds `input.items` into a `template_seed` commit and persists it via
@@ -170,7 +170,7 @@ export async function seedModelFromCapabilityMap(supabase: Client, input: SeedMo
 
   if (error) return { ok: false, message: error.message };
   const commitRow = data as { id: UUID };
-  return { ok: true, commitId: commitRow.id };
+  return { ok: true, commitId: commitRow.id, newHead: head };
 }
 
 /**

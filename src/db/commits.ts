@@ -25,7 +25,7 @@
 import type { UUID } from '../contracts/delta';
 import { envelopeToDeltaRows, type CommitRow } from '../contracts/rows';
 import type { CommitEnvelope } from '../contracts/delta';
-import { cloneHead, fold } from '../engine/deltas';
+import { cloneHead, fold, type Head } from '../engine/deltas';
 import { foldFromGenesis, headHash } from '../engine/head';
 import { serializeHeadProjection } from '../engine/projection';
 import { getBranch } from './branches';
@@ -45,7 +45,14 @@ import { buildCommitLoader } from './commitLoader';
 const PENDING_AUTHOR_PLACEHOLDER: UUID = 'server-assigned';
 
 export type CommitResult =
-  | { ok: true; commitId: UUID }
+  /**
+   * `newHead` is the fold this call already computed locally (`newHead`
+   * below) to build the RPC payload — E8 item (3): a caller that wants to
+   * re-render against the committed result immediately, instead of
+   * waiting on a refetch, can seed its cache with this directly rather
+   * than re-folding or re-fetching something already known.
+   */
+  | { ok: true; commitId: UUID; newHead: Head }
   | { ok: false; reason: 'invalid'; message: string }
   | { ok: false; reason: 'conflict'; message: string };
 
@@ -226,5 +233,5 @@ export async function commitToBranch(supabase: Client, input: CommitToBranchInpu
   }
 
   const commitRow = data as CommitRow;
-  return { ok: true, commitId: commitRow.id };
+  return { ok: true, commitId: commitRow.id, newHead };
 }

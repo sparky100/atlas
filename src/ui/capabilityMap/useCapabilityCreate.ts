@@ -6,7 +6,7 @@ import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
-import { invalidateModelHead } from '../query/invalidateModelHead';
+import { applyCommitToCache } from '../query/applyCommitToCache';
 import { supabase } from '../supabaseClient';
 import { nextSiblingOrder, type CapabilityMapTree } from './layout';
 
@@ -112,8 +112,8 @@ export function useCapabilityCreate(input: UseCapabilityCreateInput): UseCapabil
         }
 
         setStatus('idle');
-        // E8 item (1): invalidates the shared main/editing-branch cache (invalidateModelHead.ts's own comment on why this is unconditional, not branch-kind-gated).
-        void invalidateModelHead(queryClient, modelId);
+        // E8 item (3): seeds the cache with the head this commit already computed — see applyCommitToCache.ts's own comment.
+        applyCommitToCache(queryClient, modelId, branch, result.commitId, result.newHead);
         onCreated();
       } catch (e) {
         setStatus('idle');

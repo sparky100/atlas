@@ -24,6 +24,7 @@
 import type { Delta, UUID } from '../contracts/delta';
 import { fromRefreshBranchResult, toRefreshBranchParams, type RefreshBranchCommitInput, type ResolvedConflictWireRow } from '../contracts/rows';
 import { listOwnDeltas } from '../engine/branch';
+import type { Head } from '../engine/deltas';
 import { foldFromGenesis, headHash } from '../engine/head';
 import { computeMergeReview, type MergeReview } from '../engine/merge';
 import {
@@ -39,7 +40,6 @@ import { createAlias, listAliasesForModel } from './aliases';
 import { getBranch, getMainBranch } from './branches';
 import type { Client } from './client';
 import { buildCommitLoader } from './commitLoader';
-import type { CommitResult } from './commits';
 import { getSourcesByIds } from './elements';
 import { clearPendingAliases, createMergeResolutionSource } from './sources';
 import type { BranchRow, MergeRequestRow } from './types';
@@ -146,7 +146,7 @@ export async function dismissIdentityPair(supabase: Client, mergeRequestId: UUID
   return data as MergeRequestRow;
 }
 
-export type MergeApprovedResult = { ok: true; commitId: UUID } | { ok: false; reason: 'refresh_required' | 'error'; message: string };
+export type MergeApprovedResult = { ok: true; commitId: UUID; newHead: Head } | { ok: false; reason: 'refresh_required' | 'error'; message: string };
 
 /**
  * `approved` -> `merged` (SPEC §7.4's final step, `atlas.merge_branch`).
@@ -214,7 +214,7 @@ export async function mergeApprovedRequest(supabase: Client, modelId: UUID, merg
     // reported as a merge failure it isn't.
   }
 
-  return { ok: true, commitId: (data as { id: UUID }).id };
+  return { ok: true, commitId: (data as { id: UUID }).id, newHead: mergedHead };
 }
 
 export interface PushRefreshInput {
@@ -245,7 +245,16 @@ export interface PushRefreshInput {
  * when any FIELD_CONFLICT key or blocking structural finding has no
  * matching choice.
  */
-export async function pushRefresh(supabase: Client, input: PushRefreshInput): Promise<CommitResult> {
+/**
+ * `atlas.refresh_branch` computes the merge commit's resulting head
+ * server-side (a real three-way merge of "ours"/"theirs"/base, ADR-021 §1.1
+ * — not a linear `fold` onto a known parent the way `commitToBranch`'s own
+ * payload-building fold is), so unlike `CommitResult` there's no locally-
+ * computed `Head` to hand back here for E8 item (3)'s cache-seeding to use.
+ */
+export type RefreshResult = { ok: true; commitId: UUID } | { ok: false; reason: 'invalid' | 'conflict'; message: string };
+
+export async function pushRefresh(supabase: Client, input: PushRefreshInput): Promise<RefreshResult> {
   const { modelId, orgId, userId, branch, mainHeadCommitId, review, choices, structuralChoices = [] } = input;
 
   const unresolvedFields = unresolvedFieldConflictKeys(review.threeWay.fields, choices);

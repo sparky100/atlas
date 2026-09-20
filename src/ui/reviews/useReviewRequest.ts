@@ -22,7 +22,7 @@ import type { ReviewVerdict } from '../../db/types';
 import type { MergeReview } from '../../engine/merge';
 import type { FieldConflictChoice, StructuralChoice } from '../../engine/mergeResolution';
 import { reportError } from '../errors/errorBannerStore';
-import { invalidateModelHead } from '../query/invalidateModelHead';
+import { applyCommitToCache } from '../query/applyCommitToCache';
 import { supabase } from '../supabaseClient';
 
 /** `StructuralChoice`'s own key: a retraction choice is keyed by its element; a duplicate/cardinality pair choice by its own pair (order-independent — both sides of a pair should key to the same slot). */
@@ -325,8 +325,8 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
       const branchTitle = state.branch.title ?? state.branch.name;
       const result = await mergeApprovedRequest(supabase, modelId, state.request.id, state.branch, `Merge: ${branchTitle}`);
       if (!result.ok) setActionError(result.message);
-      // E8 item (1): a successful merge always moves main's own head.
-      else void invalidateModelHead(queryClient, modelId);
+      // E8 item (3): a successful merge always moves main's own head — seed the cache with the head it already computed.
+      else applyCommitToCache(queryClient, modelId, { id: null, kind: 'main' }, result.commitId, result.newHead);
       reload();
       return result;
     } catch (e) {

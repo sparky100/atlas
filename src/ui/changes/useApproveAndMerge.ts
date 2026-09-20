@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { approveMergeRequest, mergeApprovedRequest } from '../../db/mergeRequests';
 import type { BranchRow, MergeRequestRow } from '../../db/types';
-import { invalidateModelHead } from '../query/invalidateModelHead';
+import { applyCommitToCache } from '../query/applyCommitToCache';
 import { supabase } from '../supabaseClient';
 
 export type ApproveAndMergeStatus = 'idle' | 'working';
@@ -58,8 +58,8 @@ export function useApproveAndMerge(modelId: UUID): UseApproveAndMergeResult {
           setError(result.message);
           return false;
         }
-        // E8 item (1): a merge always moves main's own head.
-        void invalidateModelHead(queryClient, modelId);
+        // E8 item (3): a merge always moves main's own head — seed the cache with the head it already computed.
+        applyCommitToCache(queryClient, modelId, { id: null, kind: 'main' }, result.commitId, result.newHead);
         return true;
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not approve and merge this change.');

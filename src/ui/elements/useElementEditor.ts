@@ -7,7 +7,7 @@ import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
-import { invalidateModelHead } from '../query/invalidateModelHead';
+import { applyCommitToCache } from '../query/applyCommitToCache';
 import { supabase } from '../supabaseClient';
 import { reportToast } from '../toasts/toastStore';
 
@@ -216,8 +216,8 @@ export function useElementEditor(input: UseElementEditorInput): UseElementEditor
       // for a change branch; an edit at `main` has nowhere else it could
       // have gone, so no toast is needed to say so.
       if (branch.kind === 'change') reportToast(`Saved to change: ${branch.title ?? branch.name}`);
-      // E8 item (1): invalidates the shared main/editing-branch cache — see invalidateModelHead.ts's own comment.
-      void invalidateModelHead(queryClient, modelId);
+      // E8 item (3): seeds the cache with the head this commit already computed — see applyCommitToCache.ts's own comment.
+      applyCommitToCache(queryClient, modelId, branch, result.commitId, result.newHead);
       onSaved();
     } catch (e) {
       setStatus('editing');
