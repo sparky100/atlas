@@ -11,7 +11,7 @@
  * on the shape by construction, not by two hand-kept definitions.
  */
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow, DeltaRow } from '../contracts/rows';
-import type { UUID } from '../contracts/delta';
+import type { Json, UUID } from '../contracts/delta';
 import { attributesRecord } from '../ui/elements/attributesRecord';
 import type { Client } from './client';
 import { assertInFilterSize } from './inFilterLimit';
@@ -131,6 +131,69 @@ export async function getElementsByIds(supabase: Client, commitId: UUID, element
     if (wanted.has(row.element_id)) result.set(row.element_id, row);
   }
   return result;
+}
+
+/**
+ * A possibly-retracted element's own name, recovered from `deltas` rather
+ * than `elements_head` — `HistoryTimeline.tsx`'s own fallback for a
+ * relationship whose other endpoint has itself since been retracted (so
+ * `getElementsByIds`, scoped to *live* elements at a commit, has nothing
+ * to return): `deltas` never deletes a row (CLAUDE.md rule 5), so the
+ * element's own `element_create` row — and any later rename, a
+ * `element_update` with `attribute: 'name'` (`useElementRename.ts`) —
+ * are both still there regardless of the element's current existence.
+ * Takes the latest of the two per id, so a renamed-then-retracted element
+ * still shows its last real name, not the one it was created with. A
+ * name-less result (should not happen — `name` is required at creation)
+ * is simply omitted, same "don't fabricate" spirit `getElementsByIds`
+ * already follows for an id with no row at all.
+ *
+ * Bounded the same way `listRelationshipHistoryForElement`'s own fan-out
+ * already is documented to be — one element's own relationship-history
+ * endpoints, not a list that grows with model size — so a real `.in()`
+ * (`getSourcesByIds`'s own identical shape) is the right call here, not
+ * the unfiltered-then-client-filter shape `getElementsByIds` uses for a
+ * genuinely commit-sized scan.
+ */
+export async function getElementNamesByIds(supabase: Client, modelId: UUID, elementIds: readonly UUID[]): Promise<Map<UUID, string>> {
+  if (elementIds.length === 0) return new Map();
+  assertInFilterSize('getElementNamesByIds', 'subject_id', elementIds);
+  // Routed through selectAll (SPEC §6.7: `deltas` is head-scoped, never a
+  // plain unpaginated `.select()`) even though the `.in()` above already
+  // bounds this to at most 50 ids — `headTableReads.test.ts` enforces the
+  // same rule regardless of how small a particular caller's result is.
+  // `subject_id` is a unique order within this query's own scope (at most
+  // one `element_create` per element); `(created_at, id)` likewise for the
+  // renames, `id` alone already being globally unique.
+  // The inline generics below use `,` rather than `;` between fields —
+  // `headTableReads.test.ts`'s own text-level scan (its module comment
+  // says as much) treats any `;` as a statement boundary, and TypeScript
+  // accepts either separator in an object type literal.
+  const [created, renamed] = await Promise.all([
+    selectAll<{ subject_id: UUID, name: string | null }>(
+      supabase.from('deltas').select('subject_id, name', { count: 'exact' }).eq('model_id', modelId).eq('kind', 'element_create').in('subject_id', elementIds).order('subject_id'),
+    ),
+    selectAll<{ subject_id: UUID, value: Json | null }>(
+      supabase
+        .from('deltas')
+        .select('subject_id, value, created_at, id', { count: 'exact' })
+        .eq('model_id', modelId)
+        .eq('kind', 'element_update')
+        .eq('attribute', 'name')
+        .in('subject_id', elementIds)
+        .order('created_at')
+        .order('id'),
+    ),
+  ]);
+  const names = new Map<UUID, string>();
+  for (const row of created) {
+    if (row.name) names.set(row.subject_id, row.name);
+  }
+  // Oldest first (the query's own order) — the last rename applied per id, in this loop, is its latest.
+  for (const row of renamed) {
+    if (typeof row.value === 'string') names.set(row.subject_id, row.value);
+  }
+  return names;
 }
 
 export async function getSourcesByIds(supabase: Client, sourceIds: readonly UUID[]): Promise<Map<UUID, SourceRow>> {

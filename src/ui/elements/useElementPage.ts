@@ -3,6 +3,7 @@ import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../cont
 import type { UUID } from '../../contracts/delta';
 import {
   getElementHead,
+  getElementNamesByIds,
   getElementsByIds,
   getSourcesByIds,
   listAliasesForElement,
@@ -46,8 +47,10 @@ export interface ElementPageData {
   capabilityLevel: number | null | undefined;
   children: ElementsHeadRow[];
   relationships: RelationshipsHeadRow[];
-  /** The other endpoint of each relationship in `relationships` — never this element itself. Also covers every endpoint `history`'s own relationship entries can name, live or since retracted (`HistoryTimeline.tsx`'s own `relationshipEndpoints` prop) — a superset, not a second map, since a `relationships`-only entry is a strict subset of everything `history` can ever reference. */
+  /** The other endpoint of each relationship in `relationships` — never this element itself. Also covers every *live* endpoint `history`'s own relationship entries can name, since retracted included (`HistoryTimeline.tsx`'s own `relationshipEndpoints` prop) — a superset, not a second map, since a `relationships`-only entry is a strict subset of everything `history` can ever reference. An endpoint that has itself since been retracted (no longer a live element at all, not just no longer connected) is never in here — see `retractedElementNames`. */
   relationshipEndpoints: Map<UUID, ElementsHeadRow>;
+  /** `historyEndpointIds` minus whatever `relationshipEndpoints` above already resolved — an element `elements_head`/a branch projection can never answer for (it's been retracted, so neither knows it), read instead from its own permanent `deltas` (`getElementNamesByIds`'s own doc comment). `HistoryTimeline.tsx`'s last-resort name source, before its own raw-id fallback. */
+  retractedElementNames: Map<UUID, string>;
   relationshipFacts: Map<UUID, Map<string, FactsRow>>;
   aliases: AliasRow[];
   aliasSources: Map<UUID, SourceRow>;
@@ -324,6 +327,17 @@ export function useElementPage(
       ]);
       const relationshipFacts = new Map(relationships.map((rel, i) => [rel.relationship_id, relationshipFactsList[i] ?? new Map<string, FactsRow>()]));
 
+      // History's own remaining gap: a `historyEndpointIds` id that isn't in
+      // `relationshipEndpoints` is one thing only — an element `source`
+      // (live-commit or projection alike) has no *current* row for, i.e.
+      // one that has itself since been retracted. `elements_head`/a
+      // projection only ever reflects live elements, so no `source` variant
+      // can ever answer this; `getElementNamesByIds` reads `deltas`
+      // directly instead (that function's own doc comment), the one place
+      // a retracted element's name is still guaranteed to exist.
+      const missingHistoryElementIds = [...new Set(historyEndpointIds)].filter((id) => !relationshipEndpoints.has(id));
+      const retractedElementNames = await getElementNamesByIds(supabase, modelId, missingHistoryElementIds);
+
       // A container endpoint's own parent platform — never itself a
       // relationship endpoint, so the from/to/via batch above never
       // includes it. `RelationshipsSection.tsx` wants "Platform · Module"
@@ -392,6 +406,7 @@ export function useElementPage(
             children,
             relationships,
             relationshipEndpoints,
+            retractedElementNames,
             relationshipFacts,
             aliases,
             aliasSources,
