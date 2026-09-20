@@ -1,0 +1,9 @@
+{
+  "job": { "status": "parsed" },
+  "candidates": {
+    "name:system:northgate housing:": { "kind": "element", "class": "confirm", "elementType": "system", "matchLevel": "alias", "matchElement": "sys-housing", "attributes": { "vendor": "Civica", "lifecycleStatus": "active", "isExternal": false } },
+    "name:system:sx3:": { "kind": "element", "class": "update", "elementType": "system", "matchLevel": "alias", "matchElement": "sys-sx3", "attributes": { "vendor": "Capita Advantage" } },
+    "name:system:iworld:": { "kind": "element", "class": "confirm", "elementType": "system", "matchLevel": "alias", "matchElement": "sys-iworld", "attributes": { "vendor": "IBS", "lifecycleStatus": "active", "isExternal": false } }
+  },
+  "absent": []
+}

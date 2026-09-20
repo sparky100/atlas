@@ -1,0 +1,7 @@
+{
+  "text": "{\"assignments\":[{\"seq\":4,\"capabilities\":[{\"code\":\"C1\",\"confidence\":0.9}]},{\"seq\":5,\"capabilities\":[{\"code\":\"C2\",\"confidence\":0.9}]}]}",
+  "stopReason": "end_turn",
+  "inputTokens": 400,
+  "outputTokens": 40,
+  "cacheReadTokens": 0
+}

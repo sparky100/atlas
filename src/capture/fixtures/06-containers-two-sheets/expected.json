@@ -1,0 +1,13 @@
+{
+  "job": { "status": "parsed" },
+  "candidates": {
+    "name:system:crm:": { "kind": "element", "class": "confirm", "elementType": "system", "matchElement": "sys-crm" },
+    "name:system:billing:": { "kind": "element", "class": "confirm", "elementType": "system", "matchElement": "sys-billing" },
+    "name:system:newapp:": { "kind": "element", "class": "new", "elementType": "system" },
+    "name:container:portal:crm": { "kind": "element", "class": "confirm", "elementType": "container", "matchLevel": "name_context", "matchElement": "container-crm-portal", "attributes": { "technology": "React" } },
+    "name:container:portal:newapp": { "kind": "element", "class": "new", "elementType": "container", "matchLevel": "none", "attributes": { "technology": "Angular" } },
+    "name:container:reports:billing": { "kind": "element", "class": "new", "elementType": "container", "attributes": { "technology": "SQL" } },
+    "name:container:sync:legacy crm": { "kind": "element", "class": "invalid", "elementType": "container", "warnings": ["PARENT_UNRESOLVED"] }
+  },
+  "absent": []
+}

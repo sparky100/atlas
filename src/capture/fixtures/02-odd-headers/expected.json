@@ -1,0 +1,26 @@
+{
+  "job": { "status": "parsed" },
+  "candidates": {
+    "key:app 101": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Civica", "lifecycleStatus": "active", "isExternal": false }, "confidence": { "min": 0.6, "max": 0.7 }, "warnings": ["ENUM_FUZZY", "LOW_MAPPING_CONFIDENCE"], "aliasProposals": [{ "type": "source_system_key", "value": "APP-101" }] },
+    "key:app 102": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Oracle", "lifecycleStatus": "retired", "plannedEnd": "2019-01-01", "isExternal": true, "externalOrganisation": "Managed Services Ltd" }, "confidence": { "min": 0.6, "max": 0.7 }, "warnings": ["ENUM_FUZZY", "LOW_MAPPING_CONFIDENCE"] },
+    "key:app 103": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Trace", "lifecycleStatus": "active", "isExternal": false } },
+    "key:app 104": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Iken", "lifecycleStatus": "active", "isExternal": false } },
+    "key:app 105": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Ubico", "lifecycleStatus": "active", "isExternal": true, "externalOrganisation": "Ubico Ltd" } },
+    "key:app 106": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Civica", "lifecycleStatus": "planned", "plannedEnd": "2027-01-01", "isExternal": false }, "warnings": [] },
+
+    "name:actor:sarah jones:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "person" } },
+    "name:actor:mark owen:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "person" } },
+    "name:actor:property services team:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "team" } },
+    "name:actor:legal services team:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "team" } },
+    "name:actor:waste services team:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "team" } },
+    "name:actor:repairs services team:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "team" } },
+
+    "rel:supports:key:app 101→name:capability:finance:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-finance" },
+    "rel:supports:key:app 102→name:capability:hr:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-hr" },
+    "rel:supports:key:app 103→name:capability:property:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-property" },
+    "rel:supports:key:app 104→name:capability:legal:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-legal" },
+    "rel:supports:key:app 105→name:capability:environment:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-environment" },
+    "rel:supports:key:app 106→name:capability:housing:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-housing" }
+  },
+  "absent": []
+}

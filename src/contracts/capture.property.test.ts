@@ -61,7 +61,7 @@ const evidenceArb: fc.Arbitrary<CandidateEvidence> = fc.record({
   passage: fc.string({ minLength: 1, maxLength: 60 }),
   extractor: fc.constantFrom('sheet-mapping', 'prose-llm', 'capability-llm', 'reimport-diff'),
   attributeConfidence: fc.dictionary(fc.string({ minLength: 1, maxLength: 12 }), confidence),
-  warnings: fc.array(fc.constantFrom({ code: 'PASSAGE_NORMALISED' as const }, { code: 'MULTI_VALUE_CELL' as const, cell: 'A1' })),
+  warnings: fc.array(fc.constantFrom({ code: 'PASSAGE_NORMALISED' as const }, { code: 'MULTI_VALUE_CELL' as const, cell: 'A1' }, { code: 'PARENT_UNRESOLVED' as const, text: 'Legacy CRM' }, { code: 'ENDPOINT_UNRESOLVED' as const, text: 'Legacy CRM', end: 'to' as const })),
 });
 
 const matchOutcomeArb: fc.Arbitrary<MatchOutcome> = fc.record(

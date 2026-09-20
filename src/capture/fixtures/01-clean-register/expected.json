@@ -1,0 +1,31 @@
+{
+  "job": { "status": "parsed" },
+  "candidates": {
+    "name:system:crm:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Acme", "lifecycleStatus": "active", "introduced": "2019-03-01", "isExternal": false }, "confidence": { "min": 0.9, "max": 0.95 }, "warnings": ["ENUM_FUZZY"] },
+    "name:system:billing:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Northgate", "lifecycleStatus": "active", "introduced": "2020-06-01", "isExternal": false }, "confidence": { "min": 0.9, "max": 0.95 } },
+    "name:system:schoolsapp:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Capita", "lifecycleStatus": "planned", "isExternal": false }, "confidence": { "min": 0.9, "max": 0.95 } },
+    "name:system:wastetrack:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Enzen", "lifecycleStatus": "active", "introduced": "2021-01-15", "isExternal": false }, "confidence": { "min": 0.9, "max": 0.95 } },
+    "name:system:housingportal:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Civica", "lifecycleStatus": "active", "isExternal": false }, "confidence": { "min": 0.9, "max": 0.95 } },
+    "name:system:revenuessystem:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Capita", "lifecycleStatus": "active", "isExternal": false }, "confidence": { "min": 0.55, "max": 0.65 } },
+
+    "name:actor:housing council team:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "team" } },
+    "name:actor:finance council team:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "team" } },
+    "name:actor:education council team:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "team" } },
+    "name:actor:waste council team:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "team" } },
+
+    "rel:owns:name:actor:housing council team:→name:system:crm:": { "kind": "relationship", "class": "new", "relationshipType": "owns", "attributes": { "role": "business" } },
+    "rel:owns:name:actor:finance council team:→name:system:billing:": { "kind": "relationship", "class": "new", "relationshipType": "owns", "attributes": { "role": "business" } },
+    "rel:owns:name:actor:education council team:→name:system:schoolsapp:": { "kind": "relationship", "class": "new", "relationshipType": "owns", "attributes": { "role": "business" } },
+    "rel:owns:name:actor:waste council team:→name:system:wastetrack:": { "kind": "relationship", "class": "new", "relationshipType": "owns", "attributes": { "role": "business" } },
+    "rel:owns:name:actor:housing council team:→name:system:housingportal:": { "kind": "relationship", "class": "new", "relationshipType": "owns", "attributes": { "role": "business" } },
+    "rel:owns:name:actor:finance council team:→name:system:revenuessystem:": { "kind": "relationship", "class": "new", "relationshipType": "owns", "attributes": { "role": "business" } },
+
+    "rel:supports:name:system:crm:→name:capability:housing services:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-housing", "attributes": { "role": "secondary" }, "confidence": { "min": 0.95, "max": 1 } },
+    "rel:supports:name:system:billing:→name:capability:financial management:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-finance", "attributes": { "role": "secondary" }, "confidence": { "min": 0.95, "max": 1 } },
+    "rel:supports:name:system:schoolsapp:→name:capability:education services:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-education", "attributes": { "role": "secondary" }, "confidence": { "min": 0.95, "max": 1 } },
+    "rel:supports:name:system:wastetrack:→name:capability:waste and environmental services:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-waste", "attributes": { "role": "secondary" }, "confidence": { "min": 0.95, "max": 1 } },
+    "rel:supports:name:system:housingportal:→name:capability:housing services:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-housing", "attributes": { "role": "secondary" }, "confidence": { "min": 0.85, "max": 0.9 } },
+    "rel:supports:name:system:revenuessystem:→name:capability:financial management:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-finance", "attributes": { "role": "secondary" }, "confidence": { "min": 0.85, "max": 0.9 } }
+  },
+  "absent": []
+}

@@ -34,7 +34,8 @@
     "backfill:capability-order": "tsx scripts/backfillCapabilityOrder.ts",
     "backfill:owns-role": "tsx scripts/backfillOwnsRole.ts",
     "sync:descriptions": "tsx scripts/syncDescriptionsFromMap.ts",
-    "strip:seed-codes": "tsx scripts/stripSeedCodes.ts"
+    "strip:seed-codes": "tsx scripts/stripSeedCodes.ts",
+    "capture:score": "tsx scripts/scoreCapture.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

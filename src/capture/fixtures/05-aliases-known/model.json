@@ -1,0 +1,20 @@
+{
+  "elements": [
+    { "key": "sys-housing", "type": "system", "id": "00000000-0000-0000-0000-000000000501", "name": "Housing Connect", "attributes": { "vendor": "Civica", "lifecycleStatus": "active", "isExternal": false } },
+    {
+      "key": "sys-sx3",
+      "type": "system",
+      "id": "00000000-0000-0000-0000-000000000502",
+      "name": "SX Three Platform",
+      "attributes": { "vendor": "Capita", "lifecycleStatus": "active", "isExternal": false },
+      "overrides": [{ "attribute": "vendor", "value": "Capita", "confidence": 0.7, "createdAt": "2024-01-01T00:00:00Z" }]
+    },
+    { "key": "sys-iworld", "type": "system", "id": "00000000-0000-0000-0000-000000000503", "name": "iWorld Next", "attributes": { "vendor": "IBS", "lifecycleStatus": "active", "isExternal": false } },
+    { "key": "sys-decoy", "type": "system", "id": "00000000-0000-0000-0000-000000000504", "name": "SX3000 Series", "attributes": { "vendor": "Siemens", "lifecycleStatus": "active", "isExternal": false } }
+  ],
+  "aliases": [
+    { "elementKey": "sys-housing", "type": "name", "value": "Northgate Housing" },
+    { "elementKey": "sys-sx3", "type": "name", "value": "SX3" },
+    { "elementKey": "sys-iworld", "type": "name", "value": "iWorld" }
+  ]
+}

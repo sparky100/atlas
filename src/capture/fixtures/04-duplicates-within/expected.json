@@ -1,0 +1,21 @@
+{
+  "job": { "status": "parsed" },
+  "candidates": {
+    "name:system:poweron:": {
+      "kind": "element",
+      "class": "new",
+      "elementType": "system",
+      "attributes": { "vendor": "Acme", "lifecycleStatus": "active", "isExternal": false },
+      "warnings": ["ROWS_DISAGREE"],
+      "aliasProposals": [
+        { "type": "name", "value": "PowerOn" },
+        { "type": "name", "value": "POWERON" },
+        { "type": "name", "value": "PowerOn Ltd" },
+        { "type": "name", "value": "PowerOn UK" }
+      ]
+    },
+    "name:system:billing:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Northgate" } },
+    "name:system:crm:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Acme" } }
+  },
+  "absent": ["name:system:poweron ltd:", "name:system:poweron uk:"]
+}

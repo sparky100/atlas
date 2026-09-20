@@ -156,3 +156,20 @@ describe('rowsToCandidates — container parent', () => {
     expect(element?.proposal.parent).toBeNull();
   });
 });
+
+describe('rowsToCandidates — formula-error cells', () => {
+  it('warns FORMULA_ERROR on the candidate even though the erroring cell reads as blank (no value is set for that attribute)', () => {
+    const headers = ['Application', 'Supplier'];
+    const { roles, nameColumnIndex } = resolveColumnRoles({ headers });
+    if (nameColumnIndex === null) throw new Error('test setup: no name column resolved');
+    const rawSheet: RawSheet = {
+      sheetName: 'Sheet1',
+      grid: [headers, ['CRM', '']],
+      cellMeta: new Map([['1,1', { formulaError: true }]]),
+    };
+    const result = rowsToCandidates({ sheetName: 'Sheet1', sheetType: 'system', headers, headerColumnRefs: ['A', 'B'], roles, nameColumnIndex, rawSheet, headerRowIndex: 0 });
+    const [element] = elementProposals(result);
+    expect(element?.proposal.attributes.vendor).toBeUndefined();
+    expect(result.candidates[0]?.evidence.warnings).toContainEqual({ code: 'FORMULA_ERROR', cell: 'B2' });
+  });
+});

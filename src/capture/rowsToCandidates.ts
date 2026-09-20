@@ -271,6 +271,10 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
       const baseWarnings = cellWarnings(meta, refText);
       const rowFactor = rowFactorFor(Boolean(meta?.merged) || Boolean(meta?.formulaError));
       const isFirst = !group.attributes.has(role);
+      /** `cellToString` (`parse/spreadsheet.ts`) reads a formula-error cell as `''` — indistinguishable from a genuinely blank one to every `if (raw === '') continue` guard below, which would otherwise let `FORMULA_ERROR` (already computed into `baseWarnings`, via `cellWarnings`) get discarded unused rather than ever reaching a candidate. Recorded on the element itself, since there is no parsed value for `recordAttribute` to attach it to. */
+      const bailOnBlank = (): void => {
+        if (meta?.formulaError) group.warnings.push({ code: 'FORMULA_ERROR', cell: refText });
+      };
 
       if (role === 'atlasId') {
         if (raw !== '') group.atlasId = raw;
@@ -291,14 +295,20 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
       }
 
       if (PLAIN_ATTRIBUTES.has(role)) {
-        if (raw === '') continue;
+        if (raw === '') {
+          bailOnBlank();
+          continue;
+        }
         const { value, multiValue } = collapseMultiValue(raw);
         const warnings = multiValue ? [...baseWarnings, { code: 'MULTI_VALUE_CELL', cell: refText } as const] : baseWarnings;
         recordAttribute(group, role, value, warnings, rowFactor, assignment.confidence, ref, isFirst);
         continue;
       }
       if (role === 'lifecycleStatus') {
-        if (raw === '') continue;
+        if (raw === '') {
+          bailOnBlank();
+          continue;
+        }
         const parsed = parseLifecycle(raw);
         if (!parsed) {
           group.warnings.push({ code: 'ENUM_UNPARSED', cell: refText, raw });
@@ -309,7 +319,10 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
         continue;
       }
       if (role === 'hostingModel') {
-        if (raw === '') continue;
+        if (raw === '') {
+          bailOnBlank();
+          continue;
+        }
         const parsed = parseHostingModel(raw);
         if (!parsed) {
           group.warnings.push({ code: 'ENUM_UNPARSED', cell: refText, raw });
@@ -320,7 +333,10 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
         continue;
       }
       if (role === 'introduced' || role === 'plannedEnd') {
-        if (raw === '') continue;
+        if (raw === '') {
+          bailOnBlank();
+          continue;
+        }
         const parsed = parseDate(raw);
         if (!parsed) continue;
         const warnings = parsed.ambiguous ? [...baseWarnings, { code: 'AMBIGUOUS_DATE', cell: refText, parsedAs: parsed.value } as const] : baseWarnings;
@@ -328,7 +344,10 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
         continue;
       }
       if (role === 'isExternal') {
-        if (raw === '') continue;
+        if (raw === '') {
+          bailOnBlank();
+          continue;
+        }
         const parsed = parseBool(raw);
         if (parsed === null) continue;
         recordAttribute(group, 'isExternal', parsed, baseWarnings, rowFactor, assignment.confidence, ref, isFirst);
