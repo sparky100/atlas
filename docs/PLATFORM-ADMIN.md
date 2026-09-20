@@ -8,9 +8,18 @@ A platform administrator is scoped to the whole deployment instead.
 ## What a platform admin can do today
 
 Exactly one thing: view and change `llm-proxy`'s own application-level
-settings (model, per-org rate-limit cap, optionally the Anthropic API key)
+settings (provider, model, per-org rate-limit cap, optionally the API key)
 at `/platform-admin`, reachable from the account menu once granted. Nothing
 else in this product checks platform-admin status yet.
+
+Provider is a real picker, not a label — `LLM_PROXY_PROVIDER_OPTIONS`
+(`src/ui/admin/useLlmProxyConfig.ts`) holds one entry today ("Anthropic"),
+matching what `llm-proxy` actually routes to, but it's the same
+data-driven shape as the Model picker beside it. This is deliberate: the
+config schema and this form shouldn't need to change the day a second
+provider's routing is actually built — only the option list and
+`llm-proxy`'s own routing would. See `docs/ADR-000-foundations.md`'s
+ADR-014 amendment.
 
 There is deliberately no UI to grant or revoke *other* platform admins —
 that's a real, named gap (CLAUDE.md rule 7), not silently implied to exist.
@@ -63,6 +72,11 @@ anyone else's.
   `has_api_key`. `atlas.set_platform_llm_config` leaves an existing key
   untouched unless a new one is supplied or `p_clear_api_key` is explicitly
   passed, so the UI never needs to display or round-trip a live secret.
+- `atlas.set_platform_llm_config` also rejects any `p_provider` other than
+  `'anthropic'` — the config shape has room for a second provider, but
+  nothing routes to one yet, and storing an id `llm-proxy` would silently
+  ignore is worse than refusing it outright.
 
-See `supabase/migrations/20260917030000_platform_admin.sql`'s own module
-comment for the full SQL and reasoning.
+See `supabase/migrations/20260917030000_platform_admin.sql` and
+`20260921020000_platform_llm_provider.sql`'s own module comments for the
+full SQL and reasoning.

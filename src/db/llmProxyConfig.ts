@@ -1,16 +1,23 @@
 /**
  * The platform-admin-only path into `platform_config`'s own `'llm'` row
- * (`supabase/migrations/20260917030000_platform_admin.sql`'s
+ * (`supabase/migrations/20260921020000_platform_llm_provider.sql`'s
  * `atlas.get_platform_llm_config`/`atlas.set_platform_llm_config`) — the
  * table itself has no RLS policy at all; these two `security definer`
  * RPCs are the only client-reachable way in, alongside the `llm-proxy`
  * edge function's own service-role client. Never returns the raw API key
  * — only whether one is set — so nothing here ever displays or
  * round-trips a live secret.
+ *
+ * `provider` is a real, stored field even though `llm-proxy` only routes
+ * to Anthropic today (ADR-014's own deliberate scope narrowing) — the RPC
+ * itself rejects anything but `'anthropic'`, so this isn't multi-provider
+ * support, just a config shape that won't need another migration the day
+ * a second provider's routing actually gets built.
  */
 import type { Client } from './client';
 
 export interface LlmProxyConfig {
+  provider: string | null;
   model: string | null;
   rateLimitPerHour: number | null;
   hasApiKey: boolean;
@@ -23,12 +30,13 @@ export async function getLlmProxyConfig(supabase: Client): Promise<GetLlmProxyCo
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.schema('atlas').rpc('get_platform_llm_config');
   if (error) return { status: 'error', message: error.message };
-  const row = (data as { model: string | null; rate_limit_per_hour: number | null; has_api_key: boolean }[] | null)?.[0];
-  if (!row) return { status: 'ok', config: { model: null, rateLimitPerHour: null, hasApiKey: false } };
-  return { status: 'ok', config: { model: row.model, rateLimitPerHour: row.rate_limit_per_hour, hasApiKey: row.has_api_key } };
+  const row = (data as { provider: string | null; model: string | null; rate_limit_per_hour: number | null; has_api_key: boolean }[] | null)?.[0];
+  if (!row) return { status: 'ok', config: { provider: null, model: null, rateLimitPerHour: null, hasApiKey: false } };
+  return { status: 'ok', config: { provider: row.provider, model: row.model, rateLimitPerHour: row.rate_limit_per_hour, hasApiKey: row.has_api_key } };
 }
 
 export interface SetLlmProxyConfigInput {
+  provider: string;
   model: string;
   rateLimitPerHour: number;
   /** Omit to leave the existing key (if any) untouched. */
@@ -41,6 +49,7 @@ export type SetLlmProxyConfigResult = { status: 'ok' } | { status: 'error'; mess
 
 export async function setLlmProxyConfig(supabase: Client, input: SetLlmProxyConfigInput): Promise<SetLlmProxyConfigResult> {
   const { error } = await supabase.schema('atlas').rpc('set_platform_llm_config', {
+    p_provider: input.provider,
     p_model: input.model,
     p_rate_limit_per_hour: input.rateLimitPerHour,
     p_api_key: input.apiKey ?? null,
