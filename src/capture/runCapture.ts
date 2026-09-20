@@ -1,13 +1,16 @@
 /**
- * F2 (full K1) PR10, SPEC-capture.md §2/§5/§7/§8 step 3 ("no DB write yet"):
- * the one function §12 requires — parse → extract → match → classify — for
- * spreadsheet/CSV input. Ties together every pure module PR1-PR9 already
- * built: parsing (`parse/*`), column mapping (`columnSynonyms`/`mapColumns`),
- * row extraction (`rowsToCandidates`), intra-document dedup
- * (`intraDocumentDedup`), capability assignment (`capabilityAssignment`),
- * matching (`match`/`matchIndex`), classification (`classify`), re-import
- * diff (`reimportDiff`), row keys (`rowKey`). `capture-run` (the edge
- * function, PR12) is the only caller that turns this function's output into
+ * F2 (full K1) PR10/PR11, SPEC-capture.md §2/§5/§7/§8 step 3 ("no DB write
+ * yet"): the one function §12 requires — parse → extract → match → classify
+ * — for every input kind (spreadsheet/CSV, PDF, pasted text). `runCapture()`
+ * dispatches on `source.format` to `runSheetCapture()` (PR1-PR9's modules:
+ * parsing (`parse/*`), column mapping (`columnSynonyms`/`mapColumns`), row
+ * extraction (`rowsToCandidates`), capability assignment
+ * (`capabilityAssignment`)) or `runProseCapture()` (PR11's own `parse/pdf`,
+ * `parse/pastedText`, `chunk`, `extractProse`) — both converge on the same
+ * `RowCandidate[]` currency and the same `classifyAndResolve()` (matching
+ * `match`/`matchIndex`, classification `classify`, re-import diff
+ * `reimportDiff`, row keys `rowKey`). `capture-run` (the edge function,
+ * PR12) is the only caller that turns this function's output into
  * `capture_jobs`/`capture_candidates` DB rows; this module knows nothing
  * about either table, which is why its own result type is `ResolvedCandidate`
  * rather than the persisted `CaptureCandidate` (no `id`/`orgId`/`jobId`/
@@ -15,9 +18,6 @@
  * a job row does).
  *
  * Scope, disclosed:
- * - Spreadsheet/CSV only (§12's own fixtures 01-07) — PDF and pasted text
- *   (§5.3) are PR11's own extractor, plumbed in behind this same
- *   `ResolvedCandidate` output shape.
  * - `aliasProposals` (§7.6): threaded through on every `ResolvedCandidate`
  *   (never dropped — `buildPromotionEnvelope.ts`'s own PR8 comment names
  *   this as "the orchestrator's own job (PR10) once it exists"), but not
@@ -26,16 +26,20 @@
  *   column or can be derived some other way is PR12's own decision, made
  *   together with wiring `write_capture_draft` for real; this module's job
  *   is only to make sure the data survives this far, not to persist it.
- * - `unsourced` never occurs here — grounding failure (§5.3) is a prose/PDF
- *   concept (PR11). `invalid` is narrowed to what a spreadsheet row can
- *   actually produce: an unresolved parent (`PARENT_UNRESOLVED`) or an
- *   unresolved relationship endpoint (`ENDPOINT_UNRESOLVED`) — required
- *   attributes and non-empty names are already guaranteed upstream
- *   (`rowsToCandidates.ts`'s own defaults; a blank-name row is never
- *   emitted as a candidate at all), and a within-run duplicate-triple
- *   collision (S-6, two rows proposing the exact same live edge) is rare
- *   enough at these fixture sizes to leave for a later PR rather than add
- *   here unexercised.
+ * - `unsourced` only ever comes from `runProseCapture()` — `RowCandidate.ungrounded`
+ *   (set by `extractProse.ts` when a fact's defining passage doesn't
+ *   ground) short-circuits `resolveElementCandidate`/`resolveRelationshipCandidate`
+ *   before any matching is attempted, the same early-return shape
+ *   `PARENT_UNRESOLVED` already has; a spreadsheet row is never `ungrounded`
+ *   (`rowsToCandidates.ts` never sets the flag). `invalid` is narrowed to
+ *   what either path can actually produce: an unresolved parent
+ *   (`PARENT_UNRESOLVED`) or an unresolved relationship endpoint
+ *   (`ENDPOINT_UNRESOLVED`) — required attributes and non-empty names are
+ *   already guaranteed upstream (`rowsToCandidates.ts`'s own defaults; a
+ *   blank-name row is never emitted as a candidate at all), and a
+ *   within-run duplicate-triple collision (S-6, two rows proposing the
+ *   exact same live edge) is rare enough at these fixture sizes to leave
+ *   for a later PR rather than add here unexercised.
  * - Capability assignment (§6.3) runs once across every sheet's own
  *   `capabilityRows` combined, appending its own `supports` candidates
  *   after every sheet's own element/actor/relationship candidates — §4.5's
@@ -49,21 +53,32 @@
  *   capability element at all (capture's own `capability` column role maps
  *   to a `supports` proposal via §6.3, never a capability sheet type in
  *   fixtures 01-07), so this narrowing has no observable effect here.
+ * - `INPUT_ENCRYPTED` (`runProseCapture()`'s own `PdfPasswordProtectedError`
+ *   branch) is reasoned through and unit-tested for the *parser*
+ *   (`parse/pdf.ts`'s own `isPasswordException`), but has no test at this
+ *   level — pdf-lib (the only PDF-writer this sandbox has) cannot produce an
+ *   encrypted PDF, so no real fixture exists to exercise the branch here;
+ *   the same disclosed gap `parse/pdf.test.ts` already names.
  */
 import type { CandidateClass, CandidateProposal, CandidateReimportStatus, CaptureAliasType, CaptureJobStats, ElementProposal, EvidenceWarning, MatchOutcome, RelationshipProposal } from '../contracts/capture';
 import type { CandidateEvidence } from '../contracts/capture';
 import type { ElementType, RelationshipType, UUID } from '../contracts/delta';
+import type { SourceRef } from '../contracts/sourceRef';
 import { factMapKey, type Head } from '../engine/deltas';
 import { assignCapabilities } from './capabilityAssignment';
+import { chunkPastedText, chunkPdfPages, type PdfChunk, type PdfChunkPageRange, type TextChunk } from './chunk';
 import type { ColumnRoleAssignment } from './columnSynonyms';
 import { classifyAttribute, classifyElement, classifyRelationship, type AttributeComparisonInput, type AttributeOutcome } from './classify';
 import { existenceConf, SHEET_CONFIDENCE_CAP } from './confidence';
+import { extractProseChunk } from './extractProse';
 import type { LlmClient } from './llm/client';
 import { mapSheetColumns } from './mapColumns';
 import { matchElement, resolveByTrigram, TOP_LEVEL_CONTEXT, type MatchContext } from './match';
 import type { MatchIndex } from './matchIndex';
 import { normaliseName } from './normalise';
 import { parseCsv } from './parse/csv';
+import { pageHasNoText, parsePdf, PdfParseError, PdfPasswordProtectedError } from './parse/pdf';
+import { parsePastedText } from './parse/pastedText';
 import { parseXlsxWorkbook, type ParsedSpreadsheetSheet } from './parse/spreadsheet';
 import { dedupeIntraDocumentCandidates } from './intraDocumentDedup';
 import { diffAgainstPreviousImport, type PreviousCandidateForDiff } from './reimportDiff';
@@ -72,7 +87,7 @@ import { rowsToCandidates, type CapabilityColumnRow, type RowCandidate } from '.
 
 export class RunCaptureError extends Error {}
 
-export type RunCaptureSource = { format: 'csv'; text: string } | { format: 'xlsx'; bytes: ArrayBuffer };
+export type RunCaptureSource = { format: 'csv'; text: string } | { format: 'xlsx'; bytes: ArrayBuffer } | { format: 'pdf'; bytes: ArrayBuffer } | { format: 'text'; text: string };
 
 export interface RunCaptureInput {
   inputName: string;
@@ -108,7 +123,7 @@ export interface ResolvedCandidate {
 
 export interface RunCaptureFailure {
   status: 'failed';
-  errorCode: 'NO_USABLE_SHEET' | 'INPUT_TOO_LARGE';
+  errorCode: 'NO_USABLE_SHEET' | 'INPUT_TOO_LARGE' | 'INPUT_ENCRYPTED' | 'INPUT_UNREADABLE' | 'NO_TEXT_LAYER';
   message: string;
 }
 
@@ -142,7 +157,7 @@ export function inferSheetType(sheetName: string, hasParentColumn: boolean, llmS
 // Parsing.
 // ---------------------------------------------------------------------------
 
-function parseSheets(source: RunCaptureSource, inputName: string): ParsedSpreadsheetSheet[] {
+function parseSheets(source: RunSheetCaptureInput['source'], inputName: string): ParsedSpreadsheetSheet[] {
   if (source.format === 'csv') {
     const baseName = inputName.replace(/\.[^./]+$/, '');
     return [parseCsv(source.text, baseName)];
@@ -318,6 +333,17 @@ interface ElementResolutionResult {
 
 /** Resolves one element candidate's own `parent` ref (system/actor never have one — `context` is unconditionally top-level for them per `match.ts`'s own `contextMatches`) and matches/classifies it against main. */
 function resolveElementCandidate(candidate: RowCandidate, proposal: ElementProposal, runIndex: RunElementIndex, resolvedSubjectBySeq: ReadonlyMap<number, UUID | null>, matchIndex: MatchIndex, mainHead: Head, sourceCapturedAt: string | null, mintId: () => UUID): ElementResolutionResult {
+  if (candidate.ungrounded) {
+    return {
+      class: 'unsourced',
+      match: { level: 'none', score: 0, similar: [], warnings: [] },
+      draftSubjectId: null,
+      attributes: proposal.attributes,
+      parentNameForRowKey: proposal.parent?.kind === 'unresolved' ? proposal.parent.text : null,
+      resolvedParentElementId: null,
+    };
+  }
+
   let contextElementId: MatchContext = TOP_LEVEL_CONTEXT;
   let parentNameForRowKey: string | null = null;
   let resolvedParentElementId: UUID | null = null;
@@ -422,6 +448,10 @@ function resolveRelationshipCandidate(
   sourceCapturedAt: string | null,
   mintId: () => UUID,
 ): RelationshipResolutionResult {
+  if (candidate.ungrounded) {
+    return { class: 'unsourced', match: NO_MATCH_OUTCOME, draftSubjectId: null, fromElementId: null, toElementId: null, attributes: proposal.attributes as Record<string, unknown>, extraWarnings: [] };
+  }
+
   const from = resolveEndpointRef(proposal.from, proposal.relationshipType, 'from', runIndex, resolvedSubjectBySeq, matchIndex);
   const to = resolveEndpointRef(proposal.to, proposal.relationshipType, 'to', runIndex, resolvedSubjectBySeq, matchIndex);
   const extraWarnings: EvidenceWarning[] = [from.warning, to.warning].filter((w): w is EvidenceWarning => w !== undefined);
@@ -480,7 +510,27 @@ function relationshipCandidateConfidence(attributeConfidence: Readonly<Record<st
 const MAX_ROWS = 5000;
 const SAMPLE_ROW_COUNT = 5;
 
+interface RunSheetCaptureInput extends Omit<RunCaptureInput, 'source'> {
+  source: { format: 'csv'; text: string } | { format: 'xlsx'; bytes: ArrayBuffer };
+}
+
+interface RunProseCaptureInput extends Omit<RunCaptureInput, 'source'> {
+  source: { format: 'pdf'; bytes: ArrayBuffer } | { format: 'text'; text: string };
+}
+
 export async function runCapture(input: RunCaptureInput): Promise<RunCaptureResult> {
+  const { source } = input;
+  if (source.format === 'pdf' || source.format === 'text') {
+    return runProseCapture({ ...input, source });
+  }
+  return runSheetCapture({ ...input, source });
+}
+
+// ---------------------------------------------------------------------------
+// Spreadsheet/CSV path (§5.2, §12's own fixtures 01-07).
+// ---------------------------------------------------------------------------
+
+async function runSheetCapture(input: RunSheetCaptureInput): Promise<RunCaptureResult> {
   const { inputName, source, documentDate, llmClient, matchIndex, mainHead, reimportPrevious, mintId } = input;
   const stats: Record<string, number> = {};
   const bumpStat = (key: string): void => { bump(stats, key); };
@@ -559,6 +609,81 @@ export async function runCapture(input: RunCaptureInput): Promise<RunCaptureResu
   }
 
   return classifyAndResolve(combined, matchIndex, mainHead, documentDate, reimportPrevious, mintId, stats);
+}
+
+// ---------------------------------------------------------------------------
+// PDF / pasted-text path (§5.3, §12's own fixtures 08-10 — PR13).
+// ---------------------------------------------------------------------------
+
+const MAX_PDF_PAGES = 200;
+const MAX_TEXT_CHARS = 200000;
+
+/** §5.3/§4.1: translates an offset pair within one `PdfChunk.text` back into a real page + page-local span — the page containing `start` decides the page; a passage that (rarely) crosses a page join is clamped to that same page's own end, since a `SourceRef.pdf` names exactly one page. `chunk.ts`'s own module comment names this translation as the caller's job. */
+function pdfChunkSourceRefFor(chunk: PdfChunk, start: number, end: number): SourceRef {
+  const range: PdfChunkPageRange | undefined = chunk.pageRanges.find((r) => start >= r.start && start < r.end) ?? chunk.pageRanges[chunk.pageRanges.length - 1];
+  if (!range) throw new RunCaptureError('pdfChunkSourceRefFor: internal — chunkPdfPages never produces a chunk with no page ranges.');
+  const clampedEnd = Math.max(Math.min(end, range.end), start);
+  return { kind: 'pdf', page: range.page, start: start - range.start, end: clampedEnd - range.start };
+}
+
+/** `TextChunk.start`/`end` are already offsets into the whole pasted-text document — no page structure to resolve. */
+function textChunkSourceRefFor(chunk: TextChunk, start: number, end: number): SourceRef {
+  return { kind: 'text', start: chunk.start + start, end: chunk.start + end };
+}
+
+type ProseChunkEntry = { kind: 'pdf'; chunk: PdfChunk } | { kind: 'text'; chunk: TextChunk };
+
+async function runProseCapture(input: RunProseCaptureInput): Promise<RunCaptureResult> {
+  const { inputName, source, llmClient, matchIndex, mainHead, documentDate, reimportPrevious, mintId } = input;
+  const stats: Record<string, number> = {};
+
+  let chunkEntries: ProseChunkEntry[];
+
+  if (source.format === 'pdf') {
+    let parsed;
+    try {
+      parsed = await parsePdf(source.bytes);
+    } catch (e) {
+      if (e instanceof PdfPasswordProtectedError) return { status: 'failed', errorCode: 'INPUT_ENCRYPTED', message: e.message };
+      if (e instanceof PdfParseError) return { status: 'failed', errorCode: 'INPUT_UNREADABLE', message: e.message };
+      throw e;
+    }
+    if (parsed.pages.length > MAX_PDF_PAGES) {
+      return { status: 'failed', errorCode: 'INPUT_TOO_LARGE', message: `PDF has more than ${String(MAX_PDF_PAGES)} pages (K-16).` };
+    }
+    if (parsed.pages.length > 0 && parsed.pages.every((p) => pageHasNoText(p))) {
+      return { status: 'failed', errorCode: 'NO_TEXT_LAYER', message: "This PDF is scanned. Capture can't read images yet (§15); export the text or paste it." };
+    }
+    chunkEntries = chunkPdfPages(parsed.pages.map((p) => ({ page: p.page, text: p.text }))).map((chunk) => ({ kind: 'pdf' as const, chunk }));
+  } else {
+    const parsedText = parsePastedText(source.text);
+    if (parsedText.charCount > MAX_TEXT_CHARS) {
+      return { status: 'failed', errorCode: 'INPUT_TOO_LARGE', message: `Pasted text has more than ${String(MAX_TEXT_CHARS)} characters (K-16).` };
+    }
+    chunkEntries = chunkPastedText(parsedText.text).map((chunk) => ({ kind: 'text' as const, chunk }));
+  }
+
+  let combined: RowCandidate[] = [];
+  let seqOffset = 0;
+  let priorElementNames: string[] = [];
+
+  for (const entry of chunkEntries) {
+    const location = entry.kind === 'pdf' ? ({ kind: 'pages', first: entry.chunk.firstPage, last: entry.chunk.lastPage, total: entry.chunk.totalPages } as const) : ({ kind: 'pastedText', start: entry.chunk.start, end: entry.chunk.end, total: entry.chunk.total } as const);
+    const sourceRefForOffset = entry.kind === 'pdf' ? (start: number, end: number): SourceRef => pdfChunkSourceRefFor(entry.chunk, start, end) : (start: number, end: number): SourceRef => textChunkSourceRefFor(entry.chunk, start, end);
+
+    // Each chunk's own prompt-B call names the previous chunks' own extracted element names (§6.2), so chunks are inherently sequential, not parallelisable.
+    const { candidates, elementNames } = await extractProseChunk({ llmClient, inputName, location, chunkText: entry.chunk.text, priorElementNames, sourceRefForOffset });
+
+    combined = combined.concat(candidates.map((c) => offsetRowCandidate(c, seqOffset)));
+    seqOffset += candidates.length;
+    priorElementNames = [...priorElementNames, ...elementNames];
+    bump(stats, 'chunks');
+  }
+
+  // §5.2's own "Intra-document duplicates" pass (`intraDocumentDedup.ts`) is extractor-agnostic — reused here across the whole document's own chunks, not per-chunk, since the same element can plausibly recur across chunk boundaries despite §6.2's own "do not re-emit" instruction to the model.
+  const { candidates: deduped } = dedupeIntraDocumentCandidates(combined);
+
+  return classifyAndResolve(deduped, matchIndex, mainHead, documentDate, reimportPrevious, mintId, stats);
 }
 
 // ---------------------------------------------------------------------------

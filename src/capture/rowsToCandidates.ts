@@ -53,6 +53,8 @@ export interface RowCandidate {
   viaHint?: string;
   /** §7.6 — proposed, never written here (PR8's own job). */
   aliasProposals: { type: CaptureAliasType; value: string }[];
+  /** §5.3 (PR11): the candidate's own defining passage (an element's `name`, or a relationship's own `passage`) failed to ground — the orchestrator classifies it `unsourced` before any matching is attempted, the same early-return shape `PARENT_UNRESOLVED` already gets. Never set by `rowsToCandidates.ts` itself (a sheet cell is never ungrounded). */
+  ungrounded?: boolean;
 }
 
 export interface RowsToCandidatesInput {
@@ -186,8 +188,8 @@ function actorGroupKey(name: string): string {
   return `actor|${normaliseName(name)}`;
 }
 
-/** §5.4's two defaults, applied only when the document didn't state the value at all. */
-function applyRequiredDefaults(elementType: ElementType, attributes: Record<string, unknown>, attributeConfidence: Record<string, number>, attributeRefs: Record<string, SourceRef>, rowRange: SourceRef): void {
+/** §5.4's two defaults, applied only when the document didn't state the value at all — shared by every extractor (sheet rows here; prose in `extractProse.ts`, PR11), since §5.4 sits after both §5.2 and §5.3 in the spec and states no per-extractor scope. */
+export function applyRequiredDefaults(elementType: ElementType, attributes: Record<string, unknown>, attributeConfidence: Record<string, number>, attributeRefs: Record<string, SourceRef>, rowRange: SourceRef): void {
   if (elementType === 'system' && attributes.lifecycleStatus === undefined) {
     attributes.lifecycleStatus = 'active';
     attributeConfidence.lifecycleStatus = DEFAULTED_ATTRIBUTE_CONFIDENCE;

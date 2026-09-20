@@ -1,7 +1,9 @@
+import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { emptyHead } from '../engine/deltas';
-import type { LlmClient, LlmResponse } from './llm/client';
+import { hashLlmRequest, RecordedLlmClient, type LlmClient, type LlmRequest, type LlmResponse } from './llm/client';
 import { buildMatchIndex } from './matchIndex';
+import { buildPromptBUserMessage, PROMPT_B_SCHEMA, PROMPT_B_SYSTEM, type PromptBChunkLocation } from './prompts/b';
 import { inferSheetType, runCapture, type RunCaptureSuccess } from './runCapture';
 
 const NEVER_CALLED_LLM: LlmClient = {
@@ -162,5 +164,102 @@ describe('runCapture — failure modes', () => {
     });
     expect(result.status).toBe('failed');
     if (result.status === 'failed') expect(result.errorCode).toBe('NO_USABLE_SHEET');
+  });
+});
+
+describe('runCapture — pasted text (PR11 prose path)', () => {
+  it('extracts a new system candidate from pasted text via prompt B, grounded against a text SourceRef', async () => {
+    const text = 'The CRM system is supplied by Acme Corp.';
+    const location: PromptBChunkLocation = { kind: 'pastedText', start: 0, end: text.length, total: text.length };
+    const userMessage = buildPromptBUserMessage({ inputName: 'notes.txt', location, chunkText: text });
+    const request: LlmRequest = { effort: 'high', system: PROMPT_B_SYSTEM, format: { type: 'json_schema', schema: PROMPT_B_SCHEMA }, messages: [{ role: 'user', content: userMessage }] };
+    const key = hashLlmRequest(request);
+    const responseBody = {
+      elements: [
+        {
+          elementType: 'system',
+          name: 'CRM',
+          namePassage: 'The CRM system',
+          nameConfidence: 0.9,
+          parentName: null,
+          attributes: [{ key: 'vendor', value: 'Acme Corp', passage: 'supplied by Acme Corp', confidence: 0.85 }],
+        },
+      ],
+      relationships: [],
+    };
+    const llmClient = new RecordedLlmClient({ cassettes: new Map([[key, { text: JSON.stringify(responseBody), stopReason: 'end_turn', inputTokens: 10, outputTokens: 10, cacheReadTokens: 0 }]]) });
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'notes.txt',
+        source: { format: 'text', text },
+        documentDate: '2026-01-01',
+        llmClient,
+        matchIndex: buildMatchIndex([], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    expect(result.candidates).toHaveLength(1);
+    const [candidate] = result.candidates;
+    expect(candidate?.kind).toBe('element');
+    expect(candidate?.elementType).toBe('system');
+    expect(candidate?.class).toBe('new');
+    expect(candidate?.proposal.kind === 'element' && candidate.proposal.name).toBe('CRM');
+    expect(candidate?.evidence.sourceRef).toEqual({ kind: 'text', start: 0, end: 14 });
+    expect(candidate?.evidence.extractor).toBe('prose-llm');
+  });
+
+  it('fails INPUT_TOO_LARGE for pasted text over the K-16 character limit, with no LLM call', async () => {
+    const text = 'x'.repeat(200001);
+    const result = await runCapture({
+      inputName: 'huge.txt',
+      source: { format: 'text', text },
+      documentDate: null,
+      llmClient: NEVER_CALLED_LLM,
+      matchIndex: buildMatchIndex([], []),
+      mainHead: emptyHead(),
+      mintId: mintIdFrom('el'),
+    });
+    expect(result.status).toBe('failed');
+    if (result.status === 'failed') expect(result.errorCode).toBe('INPUT_TOO_LARGE');
+  });
+});
+
+describe('runCapture — PDF (PR11 prose path)', () => {
+  it('fails NO_TEXT_LAYER for a scanned-looking PDF (every page under the non-whitespace threshold)', async () => {
+    const doc = await PDFDocument.create();
+    doc.addPage([400, 600]);
+    doc.addPage([400, 600]);
+    const bytes = await doc.save();
+    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+
+    const result = await runCapture({
+      inputName: 'scanned.pdf',
+      source: { format: 'pdf', bytes: buffer },
+      documentDate: null,
+      llmClient: NEVER_CALLED_LLM,
+      matchIndex: buildMatchIndex([], []),
+      mainHead: emptyHead(),
+      mintId: mintIdFrom('el'),
+    });
+    expect(result.status).toBe('failed');
+    if (result.status === 'failed') expect(result.errorCode).toBe('NO_TEXT_LAYER');
+  });
+
+  it('fails INPUT_UNREADABLE for bytes that are not a real PDF', async () => {
+    const buffer = new TextEncoder().encode('this is not a pdf').buffer;
+    const result = await runCapture({
+      inputName: 'garbage.pdf',
+      source: { format: 'pdf', bytes: buffer },
+      documentDate: null,
+      llmClient: NEVER_CALLED_LLM,
+      matchIndex: buildMatchIndex([], []),
+      mainHead: emptyHead(),
+      mintId: mintIdFrom('el'),
+    });
+    expect(result.status).toBe('failed');
+    if (result.status === 'failed') expect(result.errorCode).toBe('INPUT_UNREADABLE');
   });
 });

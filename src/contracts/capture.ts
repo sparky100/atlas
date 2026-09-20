@@ -125,7 +125,11 @@ export type EvidenceWarning =
   /** §7.4/§4.4 (PR10, `runCapture.ts`): a container/capability's own `parent` text resolved against neither this run's own candidates nor main — the candidate is `invalid`, never matched without context. */
   | { code: 'PARENT_UNRESOLVED'; text: string }
   /** §7.4/§4.4 (PR10): a relationship's own `from`/`to` (or, for `uses`/`flows_to`, `via`) endpoint text resolved against neither this run's own candidates nor main — the relationship candidate is `invalid` (never a silently-created element, ADR-008 rule 4). */
-  | { code: 'ENDPOINT_UNRESOLVED'; text: string; end: 'from' | 'to' | 'via' };
+  | { code: 'ENDPOINT_UNRESOLVED'; text: string; end: 'from' | 'to' | 'via' }
+  /** §5.3/§11 (PR11): a prose-extracted fact's own quoted `passage` was not found in the source chunk (byte-exact or normalised) — the fact is dropped from the proposal; `field` names what was lost (`'name'`, an attribute key, or `'relationship'` for a relationship's own top-level passage). Losing `'name'` (or a relationship's own passage) makes the whole candidate `unsourced` (`RowCandidate.ungrounded`). */
+  | { code: 'PASSAGE_NOT_FOUND'; field: string }
+  /** §6.2's own "`attributes[].key` is validated by code against the type's contract keys; an unknown key is dropped with a warning, never stored" — the spec names the rule but not this code's shape; named here the same way `PARENT_UNRESOLVED`/`ENDPOINT_UNRESOLVED` already extended §4.3's own minimal listing for a rule the prose text requires but the type's first draft didn't yet carry. */
+  | { code: 'UNKNOWN_ATTRIBUTE_KEY'; key: string };
 
 export interface CandidateEvidence {
   sourceRef: SourceRef;
