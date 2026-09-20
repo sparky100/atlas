@@ -1,8 +1,12 @@
 /**
- * F2 (full K1), SPEC-capture.md §5.5: the confidence formulas — every
- * machine-extracted value capped below human assertion (1.0, reserved by
- * ADR-007/UI §4.3 for a reviewer's own edit, never written here).
+ * F2 (full K1), SPEC-capture.md §5.5 (and §7.5's own `matchConf`, kept here
+ * rather than in `match.ts` so every confidence formula — and everything
+ * that composes them, `updateConf` included — lives in one module): the
+ * confidence formulas. Every machine-extracted value capped below human
+ * assertion (1.0, reserved by ADR-007/UI §4.3 for a reviewer's own edit,
+ * never written here).
  */
+import type { MatchOutcome } from '../contracts/capture';
 export const SHEET_CONFIDENCE_CAP = 0.95;
 export const PROSE_CONFIDENCE_CAP = 0.9;
 export const DEFAULTED_ATTRIBUTE_CONFIDENCE = 0.6;
@@ -75,4 +79,18 @@ export function existenceConf(attributeConfidences: readonly number[]): number {
 /** `updateConf(attr) = min(attrConf(attr), matchConf)` — §7.5's own match confidence caps how strongly an *update* to an already-matched element can be asserted. */
 export function updateConf(attrConfidence: number, matchConfidence: number): number {
   return Math.min(attrConfidence, matchConfidence);
+}
+
+/**
+ * §7.5's own `matchConf`: `exact_id`/`alias` are 0.95 flat (a real id or
+ * alias hit, never fuzzy); `name_context` rescales its own trigram `score`
+ * (0.60 identity threshold–1.00) onto 0.60–0.95 linearly. `'none'` only
+ * ever describes a `new` candidate, which never reaches `updateConf` at
+ * all (there is no main fact to update against) — 0 is a safe, unused
+ * floor for that case, not a value any real caller depends on.
+ */
+export function matchConfidenceFor(match: Pick<MatchOutcome, 'level' | 'score'>): number {
+  if (match.level === 'exact_id' || match.level === 'alias') return 0.95;
+  if (match.level === 'name_context') return 0.6 + (0.35 * (match.score - 0.6)) / 0.4;
+  return 0;
 }

@@ -3,6 +3,7 @@ import {
   clampMappingConfidence,
   existenceConf,
   groundingFactorFor,
+  matchConfidenceFor,
   parseFactorFor,
   proseAttrConf,
   rowFactorFor,
@@ -88,5 +89,22 @@ describe('updateConf', () => {
   it('is the minimum of the attribute confidence and the match confidence', () => {
     expect(updateConf(0.95, 0.6)).toBe(0.6);
     expect(updateConf(0.5, 0.95)).toBe(0.5);
+  });
+});
+
+describe('matchConfidenceFor', () => {
+  it('is 0.95 flat for exact_id and alias, regardless of score', () => {
+    expect(matchConfidenceFor({ level: 'exact_id', score: 1 })).toBe(0.95);
+    expect(matchConfidenceFor({ level: 'alias', score: 1 })).toBe(0.95);
+  });
+
+  it('rescales name_context linearly: 0.60 score -> 0.60, 1.00 score -> 0.95', () => {
+    expect(matchConfidenceFor({ level: 'name_context', score: 0.6 })).toBeCloseTo(0.6, 5);
+    expect(matchConfidenceFor({ level: 'name_context', score: 1 })).toBeCloseTo(0.95, 5);
+    expect(matchConfidenceFor({ level: 'name_context', score: 0.8 })).toBeCloseTo(0.775, 5);
+  });
+
+  it('is 0 for none — never a real caller (a \'new\' candidate never calls updateConf)', () => {
+    expect(matchConfidenceFor({ level: 'none', score: 0 })).toBe(0);
   });
 });
