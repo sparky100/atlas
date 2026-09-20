@@ -241,8 +241,6 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
     [group.hub.element_id, neighbourInputs, layoutWidthHint, edgeInputs],
   );
 
-  const labelById = useMemo(() => new Map(layout.edges.map((e) => [e.id, e.label])), [layout]);
-
   const fitToView = useCallback(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
@@ -479,11 +477,13 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
       setHoveredEdgeId(null);
       return;
     }
-    // Rework item 4: pointer on an edge highlights it and, when labels are hidden, reveals its verb in the tooltip.
+    // Rework item 4: pointer on an edge highlights it and, when labels are
+    // hidden, reveals its verb — the on-canvas pill itself (`pillsToDraw`'s
+    // own `edgeId === hoveredEdgeId` case below), not a second, redundant
+    // DOM tooltip showing the identical text right next to it.
     const edgeId = edgeAt(screenX, screenY);
     setHoveredEdgeId(edgeId);
-    const label = edgeId ? labelById.get(edgeId) : undefined;
-    setHover(edgeId && label && !edgeLabelsVisible ? { label, screenX, screenY } : null);
+    setHover(null);
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>): void {
@@ -496,12 +496,13 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
 
     const tile = tileAt(screenX, screenY);
     if (!tile) {
-      // Touch has no hover: a tap on an edge toggles that edge's label (rework item 4's "show on hover/tap").
+      // Touch has no hover: a tap on an edge toggles that edge's label
+      // (rework item 4's "show on hover/tap") — the on-canvas pill, not a
+      // second DOM tooltip (`handlePointerMove`'s own comment).
       const edgeId = edgeAt(screenX, screenY);
       const next = edgeId && edgeId !== hoveredEdgeId ? edgeId : null;
       setHoveredEdgeId(next);
-      const label = next ? labelById.get(next) : undefined;
-      setHover(next && label && !edgeLabelsVisible ? { label, screenX, screenY } : null);
+      setHover(null);
       // V2b: a background tap (not on a tile, not on an edge) clears the
       // current focus — same "empty canvas clears focus" convention
       // `LandscapeCanvas.tsx` already uses.
