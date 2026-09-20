@@ -1,6 +1,6 @@
 # SPEC: Capture pipeline
 
-**Status:** Proposed (Prompt 10, 2026-09-11)
+**Status:** Proposed (Prompt 10, 2026-09-11). **Amended 2026-09-20:** "F2-lite" (#198–#204, #209, shipped 2026-09-18) implements a narrower slice of this design — deterministic spreadsheet/CSV/JSON reconciliation against a fixed column schema, matched against main and folded into one commit on an ordinary change branch — outside this spec's own table/edge-function/candidate shape, and was never reconciled back into it at the time. This document still describes the full K1 design; §15 records what F2-lite does not cover.
 **Depends on:** `docs/ADR-000-foundations.md` (ADR-001, ADR-004, ADR-007, ADR-008, ADR-014, ADR-015, ADR-019), `docs/SPEC-data-model.md` (§3.6 `sources`/`aliases`, §3.7 `capture_jobs`, §4 delta format, §5.3 who writes commits, §6.3 validation levels, §8 matching), `docs/UI-principles.md` §4.3 (provenance badge), §5 (review queue).
 **Builds:** Sprint K1 (Prompt 11). The pipeline is done when it passes §12's fixtures, not when the UI looks right.
 
@@ -980,6 +980,13 @@ Each is decided above under the stated recommendation, and the build proceeds on
 
 | Item | Why not K1 | Target |
 |---|---|---|
+| PDF and pasted-text extraction (§5.3, §6.2) | "F2-lite" (#198–#204, #209, 2026-09-18) covers spreadsheet/CSV/JSON only, against a fixed column schema — K1's other two input kinds need the LLM extraction path this scope didn't build | F2 (full K1) |
+| `capture_jobs`/`capture_candidates` tables and the `capture-run` edge function (§3.2, §3.3, §3.5) | F2-lite reuses an ordinary change branch and one coarse `RowOutcome` (`new`/`unchanged`/`changed`/`needs-pick`/`blocked`), not this spec's per-candidate table/class/edge-function shape | F2 (full K1) |
+| Candidate-class review queue built on the S1 review page (§10) | F2-lite reuses the existing change-branch banner/merge flow directly, not a queue keyed to `new`/`update`/`confirm`/`conflict`/`ambiguous`/`gone`/`invalid`/`unsourced` | F2 (full K1) |
+| Re-import diff with `row_key` lineage across runs (§9) | F2-lite's `notInFile.ts` compares once against the current model via `sources.import_touched_element_ids`, not `capture_jobs.reimport_of_job_id` chaining | F2 (full K1) |
+| Aliases learned from capture specifically (§7.6) | F2-lite's alias-on-confirm is a narrower, ad hoc version scoped to its own reconciliation flow, not matcher-level learning | F2 (full K1) |
+| Ten-fixture set and scoring script (§12) | this spec's own stated exit bar ("done when it passes the fixtures") — none exist; F2-lite was verified by unit/integration/e2e tests instead | F2 (full K1) |
+| Starter-map upgrade flow | rides on the full K1 pipeline, not on F2-lite's deterministic-file path (tracked separately in `docs/prompts/atlas-prompt-pack.md`'s own register) | F2 (full K1) |
 | OCR for scanned PDFs | a different pipeline stage (image → text) with its own error profile; `NO_TEXT_LAYER` names the gap honestly | unscheduled |
 | `.docx`, `.pptx`, email inputs | "spreadsheets, PDFs and text" is the brief; each is a parser plus nothing new downstream | after K1, on demand |
 | Batch API for large PDFs | 200 pages ≈ 20 calls; interactive latency is fine at K1's limits. Batches halve cost once runs are routinely large | K2 |

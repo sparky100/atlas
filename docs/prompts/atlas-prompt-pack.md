@@ -278,7 +278,8 @@ Every row has (or gets, in P1) a SPEC §11 row and an issue. A row leaves only w
 | Context view as C4-style diagram | V1 | create |
 | C2 review-queue design pass (after first real partial acceptance) | after S2 | create |
 | Custom attributes | F1 | create |
-| Starter-map upgrade flow | F2 | create |
+| F2-lite (#198–#204, #209) shipped a narrower reconciliation-only import — deterministic spreadsheet/CSV/JSON against a fixed column schema, two-tier matching, one commit on an ordinary change branch. K1's own LLM/PDF/pasted-text extraction, `capture_jobs`/`capture_candidates` + `capture-run` edge function, candidate-class review queue, capture-specific alias learning, and the ten-fixture scoring harness (`docs/SPEC-capture.md` §15) were not built | F2 (full K1) | create |
+| Starter-map upgrade flow (rides on full K1) | F2 (full K1) | create |
 | Delta-apply in SQL | before F2 | create |
 | Roadmap | F5 | create |
 | Notification tray deep links (decision, version anchors) | F3 / F5 | create |
