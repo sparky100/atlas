@@ -59,6 +59,43 @@ function contextMatches(elementType: ElementType, context: MatchContext, candida
   return candidate.parent_id === context;
 }
 
+export type TrigramMatchResult = Pick<MatchOutcome, 'level' | 'elementId' | 'score' | 'similar' | 'ambiguous'>;
+
+/**
+ * The trigram-scoring half of level 3, factored out so a caller that isn't
+ * matching one already-typed, already-contexted candidate against the model
+ * (`matchElement` below) can still share the same threshold/ambiguity rules
+ * against a pool it built itself — `capabilityAssignment.ts`'s own §6.3
+ * capability search is exactly that: it searches every capability
+ * regardless of level/parent, never one context-filtered bucket, so it
+ * can't go through `matchElement`'s own `context` param at all.
+ */
+export function resolveByTrigram(name: string, pool: readonly ElementsHeadRow[]): TrigramMatchResult {
+  const normalisedName = normaliseName(name);
+  const scored = pool.map((el) => ({ el, score: trigramSimilarity(normalisedName, normaliseName(el.name)) }));
+  const hits = scored
+    .filter((s) => s.score >= IDENTITY_TRIGRAM_THRESHOLD)
+    .sort((a, b) => b.score - a.score || a.el.name.localeCompare(b.el.name) || a.el.element_id.localeCompare(b.el.element_id));
+  const similar = scored
+    .filter((s) => s.score >= SIMILAR_THRESHOLD && s.score < IDENTITY_TRIGRAM_THRESHOLD)
+    .map((s) => ({ elementId: s.el.element_id, name: s.el.name, score: s.score }));
+
+  if (hits.length === 0) return { level: 'none', score: 0, similar };
+
+  const best = hits[0];
+  if (!best) return { level: 'none', score: 0, similar };
+  const runnerUp = hits[1];
+  const isAmbiguous = runnerUp !== undefined && best.score - runnerUp.score < AMBIGUOUS_MARGIN;
+
+  return {
+    level: 'name_context',
+    elementId: best.el.element_id,
+    score: best.score,
+    similar,
+    ...(isAmbiguous ? { ambiguous: hits.slice(0, MAX_AMBIGUOUS).map((h) => ({ elementId: h.el.element_id, name: h.el.name, score: h.score })) } : {}),
+  };
+}
+
 export function matchElement(input: MatchElementInput, index: MatchIndex): MatchOutcome {
   const warnings: MatchOutcome['warnings'] = [];
 
@@ -87,28 +124,5 @@ export function matchElement(input: MatchElementInput, index: MatchIndex): Match
 
   // 3. name + type + context.
   const pool = (index.elementsByType.get(input.elementType) ?? []).filter((el) => contextMatches(input.elementType, input.context, el));
-  const normalisedName = normaliseName(input.name);
-  const scored = pool.map((el) => ({ el, score: trigramSimilarity(normalisedName, normaliseName(el.name)) }));
-  const hits = scored
-    .filter((s) => s.score >= IDENTITY_TRIGRAM_THRESHOLD)
-    .sort((a, b) => b.score - a.score || a.el.name.localeCompare(b.el.name) || a.el.element_id.localeCompare(b.el.element_id));
-  const similar = scored
-    .filter((s) => s.score >= SIMILAR_THRESHOLD && s.score < IDENTITY_TRIGRAM_THRESHOLD)
-    .map((s) => ({ elementId: s.el.element_id, name: s.el.name, score: s.score }));
-
-  if (hits.length === 0) return { level: 'none', score: 0, similar, warnings };
-
-  const best = hits[0];
-  if (!best) return { level: 'none', score: 0, similar, warnings };
-  const runnerUp = hits[1];
-  const isAmbiguous = runnerUp !== undefined && best.score - runnerUp.score < AMBIGUOUS_MARGIN;
-
-  return {
-    level: 'name_context',
-    elementId: best.el.element_id,
-    score: best.score,
-    similar,
-    warnings,
-    ...(isAmbiguous ? { ambiguous: hits.slice(0, MAX_AMBIGUOUS).map((h) => ({ elementId: h.el.element_id, name: h.el.name, score: h.score })) } : {}),
-  };
+  return { ...resolveByTrigram(input.name, pool), warnings };
 }

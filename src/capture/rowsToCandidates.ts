@@ -69,10 +69,19 @@ export interface RowsToCandidatesInput {
   headerRowIndex: number;
 }
 
+/** One system's own raw `capability`-column text — §6.3's own batch input (`capabilityAssignment.ts`, PR6). */
+export interface CapabilityColumnRow {
+  seq: number;
+  systemName: string;
+  description?: string;
+  capabilityText: string;
+  sourceRef: SourceRef;
+}
+
 export interface RowsToCandidatesResult {
   candidates: RowCandidate[];
-  /** Raw `capability`-column text, keyed by the element candidate's own `seq` — §6.3's own batch input, built later (PR6). Only present for a sheet with a mapped `capability` column. */
-  capabilityColumnText: ReadonlyMap<number, string>;
+  /** Only the element candidates from a sheet with a mapped `capability` column. */
+  capabilityRows: CapabilityColumnRow[];
 }
 
 type Role = PromptAColumnRole;
@@ -134,6 +143,7 @@ interface ElementGroup {
   atlasId?: UUID;
   sourceKeys: string[];
   capabilityColumnText?: string;
+  capabilityColumnRef?: SourceRef;
 }
 
 interface ActorGroup {
@@ -273,7 +283,10 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
         continue;
       }
       if (role === 'capability') {
-        if (raw !== '' && group.capabilityColumnText === undefined) group.capabilityColumnText = raw;
+        if (raw !== '' && group.capabilityColumnText === undefined) {
+          group.capabilityColumnText = raw;
+          group.capabilityColumnRef = ref;
+        }
         continue;
       }
 
@@ -366,7 +379,7 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
 
   // --- Phase 2: emit element candidates. ---
   const candidates: RowCandidate[] = [];
-  const capabilityColumnText = new Map<number, string>();
+  const capabilityRows: CapabilityColumnRow[] = [];
   let nextSeq = 0;
 
   for (const group of elementGroups.values()) {
@@ -408,7 +421,16 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
       aliasProposals,
     });
 
-    if (group.capabilityColumnText !== undefined) capabilityColumnText.set(group.seq, group.capabilityColumnText);
+    if (group.capabilityColumnText !== undefined && group.capabilityColumnRef !== undefined) {
+      const rowDescription = attributes.description;
+      capabilityRows.push({
+        seq: group.seq,
+        systemName: finalName,
+        ...(typeof rowDescription === 'string' ? { description: rowDescription } : {}),
+        capabilityText: group.capabilityColumnText,
+        sourceRef: group.capabilityColumnRef,
+      });
+    }
   }
 
   // --- Phase 3: emit actor candidates. ---
@@ -452,7 +474,7 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
     candidates.push({ seq: nextSeq++, proposal, evidence, ...(pending.viaText ? { viaHint: pending.viaText } : {}), aliasProposals: [] });
   }
 
-  return { candidates, capabilityColumnText };
+  return { candidates, capabilityRows };
 }
 
 /** Records an attribute's first-seen value, or (on a later duplicate row) checks agreement and warns `ROWS_DISAGREE` without overwriting the survivor's own first value — §5.2's own "union where rows agree, first row's value... where they don't" rule. */

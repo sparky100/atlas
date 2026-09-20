@@ -60,10 +60,10 @@ describe('rowsToCandidates — basic element extraction', () => {
     expect(candidate?.evidence.passage).toContain('Civica / Northgate');
   });
 
-  it('records raw capability-column text against the element\'s own seq, deferred for prompt C', () => {
+  it('records a capability-column row (system name, text, source ref) for prompt C, deferred to capabilityAssignment.ts', () => {
     const result = run(['Application', 'Business area'], [['CRM', 'Customer Service']]);
     const [candidate] = result.candidates;
-    expect(candidate ? result.capabilityColumnText.get(candidate.seq) : undefined).toBe('Customer Service');
+    expect(result.capabilityRows).toEqual([{ seq: candidate?.seq, systemName: 'CRM', capabilityText: 'Customer Service', sourceRef: { kind: 'sheet', sheet: 'Sheet1', range: 'B2' } }]);
   });
 
   it('skips a row whose name cell is blank', () => {
