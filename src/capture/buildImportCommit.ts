@@ -19,6 +19,7 @@
 import type { Delta, Json, UUID } from '../contracts/delta';
 import { defaultCreateAttributes } from '../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
+import { buildReplacesDelta } from '../engine/buildReplacesDelta';
 import { normalizeName } from '../engine/merge';
 import { ATTRIBUTE_COLUMNS, type ImportRow, type ImportRowAttributeKey } from './importRowSchema';
 import type { ImportChangeRow } from './importChangeRow';
@@ -625,13 +626,19 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
     // picker, verbatim: never `'primary'` (a collision this reconciliation
     // pass has no reliable way to rule out either), and every edge, not
     // just the primary one (the retiring element's own current capability
-    // set is exactly what's being handed off).
+    // set is exactly what's being handed off). Alongside the transfer, a
+    // real `replaces` edge (ADR-001 amendment, `buildReplacesDelta`) is
+    // written from the replacement to the retiring element — the same fact
+    // `useElementRetire.ts`'s own picker and `buildReplaceWithNewElementDeltas.ts`
+    // already record, via the identical shared helper, so every write path
+    // that can name a replacement converges on one delta shape.
     if (replacementId !== undefined) {
       const ownSupportsEdges = currentSupportsByElementId?.get(elementId) ?? [];
       for (const edge of ownSupportsEdges) {
         changeDeltas.push({ kind: 'relationship.retract', id: crypto.randomUUID(), relationshipId: edge.relationshipId, relationshipType: 'supports', previousDeltaId: relationshipFactsByRelationshipId.get(edge.relationshipId)?.get('$exists')?.delta_id ?? edge.existsDeltaId, sourceId, sourceRef: locator('replaced_by'), confidence: changeRow.confidence ?? 1 });
         changeDeltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'supports', fromElementId: replacementId, toElementId: edge.capabilityId, attributes: { role: 'secondary' }, sourceId, sourceRef: locator('replaced_by'), confidence: changeRow.confidence ?? 1 });
       }
+      changeDeltas.push(buildReplacesDelta(replacementId, elementId, sourceId, { sourceRef: locator('replaced_by'), confidence: changeRow.confidence ?? 1 }));
     }
 
     if (changeDeltas.length === 0) {
