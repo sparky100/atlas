@@ -278,7 +278,16 @@ describe('spreadsheet import (F2-lite, reconciliation) against a real local Supa
     const wasteCollectionId = systems.find((s) => s.name === 'Waste Collection')?.element_id;
     if (!wasteCollectionId) throw new Error('Waste Collection not found — expected from the earlier test in this file');
 
-    const nearMatchRows = [{ name: 'Waste Collectionn', description: 'Description of Waste Collection' }];
+    // The description here must differ from Waste Collection's own current
+    // value (set above, in the earlier test in this file) — a same-as pick
+    // whose only apparent change is the name produces an alias (never a
+    // delta) and, with no other field actually changing, zero deltas.
+    // useSpreadsheetImport.ts's own commit() correctly refuses to commit a
+    // zero-delta import ("Nothing to import"), which runImport doesn't
+    // replicate — this test's own point is the alias round-trip through a
+    // real commit/cancel cycle, not that guard, so the row needs a genuine
+    // second change alongside the alias.
+    const nearMatchRows = [{ name: 'Waste Collectionn', description: 'Updated description of Waste Collection' }];
     const resolutions = new Map<number, MatchResolution>([[2, wasteCollectionId]]);
     const { source, branch, final } = await runImport('pending-alias.csv', nearMatchRows, resolutions);
     expect(final.aliasesToWrite).toEqual([{ elementId: wasteCollectionId, aliasValue: 'Waste Collectionn' }]);

@@ -2,9 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { IDENTITY_TRIGRAM_THRESHOLD, trigramSimilarity } from './trigram';
 
 describe('trigramSimilarity', () => {
-  it('is 1 for identical strings, including two empty ones', () => {
+  it('is 1 for identical strings with at least one word', () => {
     expect(trigramSimilarity('billing service', 'billing service')).toBe(1);
-    expect(trigramSimilarity('', '')).toBe(1);
+  });
+
+  // Confirmed live against real Postgres: similarity('', '') and
+  // similarity('*', '*') are both 0, not 1 — a string with no alphanumeric
+  // characters has an empty trigram set, and pg_trgm defines an
+  // empty-over-empty union as 0 similarity even when the two source
+  // strings are byte-identical.
+  it('is 0 for two equal strings with no words at all', () => {
+    expect(trigramSimilarity('', '')).toBe(0);
+    expect(trigramSimilarity('*', '*')).toBe(0);
   });
 
   it('is symmetric', () => {
