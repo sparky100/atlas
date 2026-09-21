@@ -159,7 +159,7 @@ describe('deriveRoadmapChangeEvents', () => {
     expect(events).toEqual([]);
   });
 
-  it('pairs a module (Container) being replaced by a system into the same capability as a replacement arrow', () => {
+  it('ADR-001 amendment: does not synthesize a replacement from a module (Container) being coincidentally paired with a system into the same capability — proves the old heuristic is gone for modules too, not just systems', () => {
     const asIs = emptyHead();
     asIs.elements.set('bw', container('BW', 'sap'));
     asIs.elements.set('cap-1', capability('Reporting'));
@@ -173,17 +173,7 @@ describe('deriveRoadmapChangeEvents', () => {
     const deltas = [relationshipRetract('d1', 'rel-old', 'create-rel-old'), relationshipCreate('d2', 'rel-new', 'datasphere', 'cap-1')];
     const events = deriveRoadmapChangeEvents(deltas, asIs, toBe);
 
-    expect(events).toEqual([
-      {
-        kind: 'replace',
-        capabilityId: 'cap-1',
-        capabilityName: 'Reporting',
-        fromSystemId: 'bw',
-        fromSystemName: 'BW',
-        toSystemId: 'datasphere',
-        toSystemName: 'Datasphere',
-      },
-    ]);
+    expect(events).toEqual([]);
   });
 
   it('does not synthesize a replacement when a supports edge is only created, with no prior retract for the same capability', () => {

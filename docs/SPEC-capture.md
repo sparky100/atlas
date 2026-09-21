@@ -313,6 +313,7 @@ A workbook over 5,000 data rows, a PDF over 200 pages, text over 200,000 chars �
 | `capability` | `supports` proposal via §6.3 | `Business area`, `Service`, `Function`, `Capability`, `Directorate`, `Domain` |
 | `usesSystems` | `uses` proposals (multi-value) | `Depends on`, `Integrations`, `Interfaces with`, `Upstream` |
 | `flowsTo` | `flows_to` proposals (multi-value) | `Sends data to`, `Feeds`, `Downstream` |
+| `replacedBy` | `replaces` proposal (ADR-001 amendment) — direction reversed from `usesSystems`/`flowsTo`: the named system is `from` (the replacement), this row's own element is `to` (the retiring element) | `Replaced by`, `Superseded by`, `Migrated to`, `Successor` |
 | `integrationPlatform` | `via` on the row's own `usesSystems`/`flowsTo` proposals (Prompt 7k item 4 — a name resolved against candidates of `kind: 'integration_platform'` first, then main, same two-pass resolution `parent`/endpoint text already gets, §7.4) | `Via`, `Integration platform`, `Routed through`, `Middleware` |
 | `notes` | ignored, but shown in the passage | `Notes`, `Comments` |
 | `ignore` | ignored | anything the mapping says to ignore |
@@ -341,6 +342,7 @@ for role in mapped columns:
     technicalOwner: actorCandidate(raw) + RelationshipProposal(owns, from: actor, to: this, {role: 'technical'})
     capability: deferred to §6.3 (batched)
     usesSystems, flowsTo: split on ; , / newline → one RelationshipProposal per value, endpoint {kind:'unresolved', text}
+    replacedBy: split on ; , / newline → one RelationshipProposal(replaces) per value, from: {kind:'unresolved', text} (the named replacement), to: this row's own element — reversed from usesSystems/flowsTo; an unresolved reference is `invalid`/`ENDPOINT_UNRESOLVED` (§7.4), same as any other relationship endpoint, never a silently minted element
     integrationPlatform: attach {kind:'unresolved', text: raw} as `via` on every RelationshipProposal this row's usesSystems/flowsTo columns produced — resolved the same pass as their own endpoints (§7.4), against candidates of kind integration_platform first, then main
 passage = header cells + row cells joined ' | '
 sourceRef = sheet:{name}!{A}{row}:{lastCol}{row}; attributeRefs[role] = sheet:{name}!{col}{row}
@@ -416,7 +418,7 @@ sheet usually lists one type. The column roles you may assign are exactly:
 
   atlasId, sourceKey, name, description, vendor, lifecycleStatus, introduced, plannedEnd,
   isExternal, externalOrganisation, hostingModel, hostingProvider, technology, parent, owner,
-  ownerEmail, technicalOwner, capability, usesSystems, flowsTo, integrationPlatform, notes, ignore
+  ownerEmail, technicalOwner, capability, usesSystems, flowsTo, replacedBy, integrationPlatform, notes, ignore
 
 Role meanings:
 - atlasId: a UUID column written by this product's own export.
@@ -439,6 +441,7 @@ Role meanings:
 - capability: a business area, service, function or capability the system supports.
 - usesSystems: other systems this one depends on.
 - flowsTo: systems this one sends data to.
+- replacedBy: the system or module that is replacing this one, when the document names a successor.
 - integrationPlatform: the integration platform (ESB, API gateway, message bus) a usesSystems/flowsTo relationship in this row actually goes via, when named.
 - notes: commentary to show a reviewer but not to extract.
 - ignore: anything else (costs, risk scores, maturity ratings, project names, process steps —

@@ -172,9 +172,11 @@ interface PendingOwns {
 }
 
 interface PendingRelationship {
-  relationshipType: 'uses' | 'flows_to';
-  fromElementGroupKey: string;
-  toText: string;
+  relationshipType: 'uses' | 'flows_to' | 'replaces';
+  /** Whether this row's own element is the relationship's `from` or `to` side. `usesSystems`/`flowsTo` are always `'from'` (the row depends on / sends to the named text). `replacedBy` is `'to'` — ADR-001's convention is `from` = the replacement, `to` = the retiring element, and the named text is the replacement, this row's own element is the one retiring. */
+  rowSide: 'from' | 'to';
+  elementGroupKey: string;
+  text: string;
   viaText: string | undefined;
   ref: SourceRef;
   passage: string;
@@ -384,15 +386,17 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
         continue;
       }
 
-      if (role === 'usesSystems' || role === 'flowsTo') {
+      if (role === 'usesSystems' || role === 'flowsTo' || role === 'replacedBy') {
         if (raw === '') continue;
-        const relationshipType = role === 'usesSystems' ? 'uses' : 'flows_to';
-        const viaText = integrationColIndex >= 0 ? (row.cells[integrationColIndex] ?? '').trim() || undefined : undefined;
+        const relationshipType = role === 'usesSystems' ? 'uses' : role === 'flowsTo' ? 'flows_to' : 'replaces';
+        const rowSide: 'from' | 'to' = relationshipType === 'replaces' ? 'to' : 'from';
+        // `replaces` has no `via` (`ReplacesAttributes` carries only `description`) — an `integrationPlatform` column never applies to it.
+        const viaText = relationshipType === 'replaces' ? undefined : integrationColIndex >= 0 ? (row.cells[integrationColIndex] ?? '').trim() || undefined : undefined;
         for (const piece of raw
           .split(LIST_SPLIT_PATTERN)
           .map((p) => p.trim())
           .filter((p) => p !== '')) {
-          pendingRelationships.push({ relationshipType, fromElementGroupKey: key, toText: piece, viaText, ref, passage });
+          pendingRelationships.push({ relationshipType, rowSide, elementGroupKey: key, text: piece, viaText, ref, passage });
         }
       }
     }
@@ -488,9 +492,13 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
     candidates.push({ seq: nextSeq++, proposal, evidence, aliasProposals: [] });
   }
   for (const pending of pendingRelationships) {
-    const fromSeq = elementGroups.get(pending.fromElementGroupKey)?.seq;
-    if (fromSeq === undefined) continue;
-    const proposal: RelationshipProposal<'uses' | 'flows_to'> = { kind: 'relationship', relationshipType: pending.relationshipType, from: { kind: 'candidate', seq: fromSeq }, to: { kind: 'unresolved', text: pending.toText }, attributes: {} };
+    const rowSeq = elementGroups.get(pending.elementGroupKey)?.seq;
+    if (rowSeq === undefined) continue;
+    const rowEndpoint = { kind: 'candidate' as const, seq: rowSeq };
+    const textEndpoint = { kind: 'unresolved' as const, text: pending.text };
+    const from = pending.rowSide === 'from' ? rowEndpoint : textEndpoint;
+    const to = pending.rowSide === 'from' ? textEndpoint : rowEndpoint;
+    const proposal: RelationshipProposal<'uses' | 'flows_to' | 'replaces'> = { kind: 'relationship', relationshipType: pending.relationshipType, from, to, attributes: {} };
     const evidence: CandidateEvidence = { sourceRef: pending.ref, passage: pending.passage, extractor: 'sheet-mapping', attributeConfidence: {}, warnings: [] };
     candidates.push({ seq: nextSeq++, proposal, evidence, ...(pending.viaText ? { viaHint: pending.viaText } : {}), aliasProposals: [] });
   }
