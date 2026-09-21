@@ -23,6 +23,11 @@ function relationshipCreate(id: string, relationshipId: string, fromElementId: s
   return { kind: 'relationship.create', id, relationshipId, relationshipType: 'supports', fromElementId, toElementId, attributes: { role: 'secondary' }, sourceId: 'src', confidence: 1 };
 }
 
+/** ADR-001 amendment: a direct `replaces` edge — `fromElementId` is the replacement, `toElementId` is the retiring element (`buildReplacesDelta.ts`'s own convention). */
+function replacesCreate(id: string, relationshipId: string, fromElementId: string, toElementId: string): Delta {
+  return { kind: 'relationship.create', id, relationshipId, relationshipType: 'replaces', fromElementId, toElementId, attributes: {}, sourceId: 'src', confidence: 1 };
+}
+
 function system(name: string): ElementRow {
   return { elementType: 'system', name, parentId: null, attributes: {}, existsDeltaId: `create-${name}` };
 }
@@ -67,7 +72,28 @@ describe('deriveRoadmapChangeEvents', () => {
     expect(events).toEqual([]);
   });
 
-  it('pairs a supports retract and a supports create into the same capability as a replacement arrow', () => {
+  it('ADR-001 amendment: marks a direct replaces edge as a replacement arrow, capability-free — from is the replacement, to is the retiring element', () => {
+    const asIs = emptyHead();
+    asIs.elements.set('sys-old', system('Old System'));
+
+    const toBe = emptyHead();
+    toBe.elements.set('sys-old', system('Old System'));
+    toBe.elements.set('sys-new', system('New System'));
+
+    const events = deriveRoadmapChangeEvents([replacesCreate('d1', 'rel-1', 'sys-new', 'sys-old')], asIs, toBe);
+
+    expect(events).toEqual([
+      {
+        kind: 'replace',
+        fromSystemId: 'sys-new',
+        fromSystemName: 'New System',
+        toSystemId: 'sys-old',
+        toSystemName: 'Old System',
+      },
+    ]);
+  });
+
+  it('ADR-001 amendment: does not synthesize a replacement from a coincidental supports retract+create pairing with no real replaces edge — proves the old heuristic is gone, not supplemented', () => {
     const asIs = emptyHead();
     asIs.elements.set('sys-old', system('Old System'));
     asIs.elements.set('cap-1', capability('Housing'));
@@ -78,20 +104,12 @@ describe('deriveRoadmapChangeEvents', () => {
     toBe.elements.set('cap-1', capability('Housing'));
     toBe.relationships.set('rel-new', supports('sys-new', 'cap-1'));
 
+    // Two independent supports changes that happen to share a capability —
+    // exactly what the old heuristic used to (mis)read as a replacement.
     const deltas = [relationshipRetract('d1', 'rel-old', 'create-rel-old'), relationshipCreate('d2', 'rel-new', 'sys-new', 'cap-1')];
     const events = deriveRoadmapChangeEvents(deltas, asIs, toBe);
 
-    expect(events).toEqual([
-      {
-        kind: 'replace',
-        capabilityId: 'cap-1',
-        capabilityName: 'Housing',
-        fromSystemId: 'sys-old',
-        fromSystemName: 'Old System',
-        toSystemId: 'sys-new',
-        toSystemName: 'New System',
-      },
-    ]);
+    expect(events).toEqual([]);
   });
 
   it('does not synthesize a replacement when a supports edge is only retracted, with no matching create for the same capability', () => {

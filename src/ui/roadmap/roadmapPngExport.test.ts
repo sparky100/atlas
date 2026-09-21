@@ -90,6 +90,18 @@ describe('computeRoadmapPngPlan', () => {
     expect(plan.groups[0]?.rows[0]?.markers).toEqual([{ x: expect.any(Number) as number, kind: 'add' }]);
   });
 
+  it('ADR-001 amendment: places replaceFrom (retiring, drawn →) on the toSystemId row and replaceTo (replacement, drawn ←) on the fromSystemId row', () => {
+    const groups: RoadmapCapabilityGroup[] = [
+      { key: 'cap-1', capability: undefined, bars: [bar({ systemId: 'sys-old', name: 'Legacy CRM' }), bar({ systemId: 'sys-new', name: 'New CRM Platform' })] },
+    ];
+    const branchEvents: RoadmapBranchEvents[] = [{ branch: branch({ target_date: '2026-06-01' }), events: [{ kind: 'replace', fromSystemId: 'sys-new', fromSystemName: 'New CRM Platform', toSystemId: 'sys-old', toSystemName: 'Legacy CRM' }] }];
+    const range = computeRoadmapTimelineRange(['2025-01-01', '2026-12-01', '2026-06-01'], NOW);
+    const plan = computeRoadmapPngPlan(groups, branchEvents, 'toBe', EMPTY_ROADMAP_FILTERS, range, NOW);
+    const rows = plan.groups[0]?.rows ?? [];
+    expect(rows.find((r) => r.name === 'Legacy CRM')?.markers).toEqual([{ x: expect.any(Number) as number, kind: 'replaceFrom' }]);
+    expect(rows.find((r) => r.name === 'New CRM Platform')?.markers).toEqual([{ x: expect.any(Number) as number, kind: 'replaceTo' }]);
+  });
+
   it('excludes an as-is-ineligible branch\'s events from the changes list', () => {
     const branchEvents: RoadmapBranchEvents[] = [{ branch: branch({ status: 'in_review' }), events: [{ kind: 'add', elementId: 'sys-2', elementName: 'New CRM' }] }];
     const range = computeRoadmapTimelineRange(['2025-01-01'], NOW);
