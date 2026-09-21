@@ -68,19 +68,29 @@ export async function createAttributeDefinition(supabase: Client, input: CreateA
 }
 
 /** The one reorder primitive — a plain column write, owner-gated by RLS/grant, no guard trigger (no restrictive lifecycle state to gate *when*, per the migration's own comment). */
+// A blocked update under RLS isn't a Postgres error on its own — the
+// `attribute_definitions_update` policy's `using` clause just excludes the
+// row from the scan, so a bare `.update()` reports an ordinary zero-row
+// success. `.select('id')` and an explicit empty-result check turn that
+// into a real, throwable failure (found live: a non-owner's writes below
+// were silently resolving instead of rejecting).
+
 export async function setAttributeDefinitionOrder(supabase: Client, id: UUID, orderIndex: number): Promise<void> {
-  const { error } = await supabase.from('attribute_definitions').update({ order_index: orderIndex }).eq('id', id);
+  const { data, error } = await supabase.from('attribute_definitions').update({ order_index: orderIndex }).eq('id', id).select('id');
   if (error) throw new Error(`setAttributeDefinitionOrder: ${error.message}`);
+  if (!data || data.length === 0) throw new Error('setAttributeDefinitionOrder: not permitted or definition not found');
 }
 
 /** Soft-disable, mirroring `archiveModel`: hides the definition from future "add a value" pickers; a value already set on an element keeps rendering unchanged. */
 export async function deprecateAttributeDefinition(supabase: Client, id: UUID): Promise<void> {
-  const { error } = await supabase.from('attribute_definitions').update({ deprecated_at: new Date().toISOString() }).eq('id', id);
+  const { data, error } = await supabase.from('attribute_definitions').update({ deprecated_at: new Date().toISOString() }).eq('id', id).select('id');
   if (error) throw new Error(`deprecateAttributeDefinition: ${error.message}`);
+  if (!data || data.length === 0) throw new Error('deprecateAttributeDefinition: not permitted or definition not found');
 }
 
-/** The reverse of deprecate — same plain column write, mirroring `restoreModel`. */
+/** The reverse of deprecate — same plain column write, mirroring `restoreModel`. Same empty-result check as its sibling above; not separately reported as failing, but the same RLS silent-no-op risk applies. */
 export async function restoreAttributeDefinition(supabase: Client, id: UUID): Promise<void> {
-  const { error } = await supabase.from('attribute_definitions').update({ deprecated_at: null }).eq('id', id);
+  const { data, error } = await supabase.from('attribute_definitions').update({ deprecated_at: null }).eq('id', id).select('id');
   if (error) throw new Error(`restoreAttributeDefinition: ${error.message}`);
+  if (!data || data.length === 0) throw new Error('restoreAttributeDefinition: not permitted or definition not found');
 }

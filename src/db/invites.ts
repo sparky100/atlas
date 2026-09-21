@@ -49,10 +49,20 @@ export async function listInvites(supabase: Client, orgId: UUID): Promise<Invite
   return (data as InviteRow[] | null) ?? [];
 }
 
-/** Owner only (`invites_delete`'s RLS) — deletes the row outright, pending or already consumed; there's no soft-revoke state, same "delete means delete" the row itself already is (a consumed invite is history the `members` row it created now carries, not something this row alone needs to preserve). */
+/**
+ * Owner only (`invites_delete`'s RLS) — deletes the row outright, pending or already consumed; there's no soft-revoke state, same "delete means delete" the row itself already is (a consumed invite is history the `members` row it created now carries, not something this row alone needs to preserve).
+ *
+ * A blocked `DELETE` under RLS isn't a Postgres error — the `using` clause
+ * just excludes the row from the scan, so the statement matches zero rows
+ * and Postgres/PostgREST report an ordinary success. `.select('id')` and an
+ * explicit empty-result check turn that into a real, throwable failure
+ * (found live: a non-owner's revoke was silently resolving instead of
+ * rejecting).
+ */
 export async function revokeInvite(supabase: Client, id: UUID): Promise<void> {
-  const { error } = await supabase.from('invites').delete().eq('id', id);
+  const { data, error } = await supabase.from('invites').delete().eq('id', id).select('id');
   if (error) throw new Error(`revokeInvite: ${error.message}`);
+  if (!data || data.length === 0) throw new Error('revokeInvite: not permitted or already revoked');
 }
 
 export type SendInviteEmailResult = { status: 'sent' } | { status: 'error'; message: string };

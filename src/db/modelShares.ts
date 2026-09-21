@@ -33,9 +33,18 @@ export async function listSharesForModel(supabase: Client, modelId: UUID): Promi
 }
 
 /** Owner-only (`model_shares_delete`'s RLS) — revoke means delete, same "no soft-revoke state" stance `invites.ts`'s `revokeInvite` already takes; re-sharing later is a fresh row, not a resurrection. */
+/**
+ * A blocked delete under RLS isn't a Postgres error on its own — the
+ * `model_shares_delete` policy's `using` clause just excludes the row from
+ * the scan, so a bare `.delete()` reports an ordinary zero-row success.
+ * `.select('id')` and an explicit empty-result check turn that into a real,
+ * throwable failure (found live: another org's owner could "revoke" a
+ * share they don't own with no error).
+ */
 export async function revokeModelShare(supabase: Client, id: UUID): Promise<void> {
-  const { error } = await supabase.from('model_shares').delete().eq('id', id);
+  const { data, error } = await supabase.from('model_shares').delete().eq('id', id).select('id');
   if (error) throw new Error(`revokeModelShare: ${error.message}`);
+  if (!data || data.length === 0) throw new Error('revokeModelShare: not permitted or share not found');
 }
 
 export interface ModelSharedWithOrg {
