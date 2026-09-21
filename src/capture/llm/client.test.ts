@@ -37,6 +37,25 @@ describe('ProxyLlmClient', () => {
     expect(response).toEqual({ text: '{"ok":true}', stopReason: 'end_turn', inputTokens: 10, outputTokens: 5, cacheReadTokens: 3 });
   });
 
+  it('strips unsupported numeric bounds from the schema on the wire without mutating the caller\'s schema', async () => {
+    const fetchImpl = makeFetch({ status: 'ok', text: '{}', inputTokens: 1, outputTokens: 1, stopReason: 'end_turn' });
+    const client = new ProxyLlmClient({ proxyUrl: 'https://x', authToken: 't', orgId: 'o', fetchImpl });
+    const request: LlmRequest = {
+      ...BASE_REQUEST,
+      format: { type: 'json_schema', schema: { type: 'object', properties: { confidence: { type: 'number', minimum: 0, maximum: 1 } }, required: ['confidence'], additionalProperties: false } },
+    };
+
+    await client.complete(request);
+
+    const body = JSON.parse((fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0]?.[1]?.body as string) as Record<string, unknown>;
+    const sentSchema = (body.outputConfig as { format: { schema: Record<string, unknown> } }).format.schema;
+    expect(sentSchema).toEqual({ type: 'object', properties: { confidence: { type: 'number' } }, required: ['confidence'], additionalProperties: false });
+    // The caller's own schema is untouched, so a recorded cassette keyed on it still resolves.
+    const callerSchema = (request.format.schema as { properties: { confidence: Record<string, unknown> } }).properties.confidence;
+    expect(callerSchema).toHaveProperty('minimum', 0);
+    expect(callerSchema).toHaveProperty('maximum', 1);
+  });
+
   it('passes stream through only when the request opts in', async () => {
     const fetchImpl = makeFetch({ status: 'ok', text: 'x', inputTokens: 1, outputTokens: 1, stopReason: 'end_turn' });
     const client = new ProxyLlmClient({ proxyUrl: 'https://x', authToken: 't', orgId: 'o', fetchImpl });
@@ -142,6 +161,27 @@ describe('DirectLlmClient', () => {
       }),
     );
     expect(response).toEqual({ text: '{"ok":true}', stopReason: 'end_turn', inputTokens: 12, outputTokens: 6, cacheReadTokens: 4 });
+  });
+
+  it('strips unsupported numeric bounds from output_config.format.schema', async () => {
+    streamMock.mockReturnValue({
+      finalMessage: () => Promise.resolve({ content: [{ type: 'text', text: '{}' }], stop_reason: 'end_turn', usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: null } }),
+    });
+
+    const { DirectLlmClient } = await import('./client');
+    const client = new DirectLlmClient({ apiKey: 'sk-test' });
+    const request: LlmRequest = {
+      ...BASE_REQUEST,
+      format: { type: 'json_schema', schema: { type: 'object', properties: { confidence: { type: 'number', minimum: 0, maximum: 1 } }, required: ['confidence'] } },
+    };
+
+    await client.complete(request);
+
+    expect(streamMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        output_config: { effort: 'medium', format: { type: 'json_schema', schema: { type: 'object', properties: { confidence: { type: 'number' } }, required: ['confidence'] } } },
+      }),
+    );
   });
 
   it('throws LlmRefusalError on stop_reason refusal without reading content as output', async () => {

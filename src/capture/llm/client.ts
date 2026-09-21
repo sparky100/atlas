@@ -100,6 +100,40 @@ function finalizeResponse(raw: RawLlmResult): LlmResponse {
   return { text: raw.text, stopReason: raw.stopReason, inputTokens: raw.inputTokens, outputTokens: raw.outputTokens, cacheReadTokens: raw.cacheReadTokens };
 }
 
+/**
+ * JSON Schema keywords Anthropic's `output_config.format.schema` rejects
+ * outright (`minimum`/`maximum` and the other numeric/string-length bounds
+ * are a hard 400, not silently ignored — unlike OpenAI's silent non-
+ * enforcement). The capture prompts express `confidence` as
+ * `{type:'number', minimum:0, maximum:1}`; those bounds must be dropped on
+ * the wire. This is stripped non-mutatingly so the `as const` schema
+ * constants stay intact and — critically — `hashLlmRequest` keeps keying
+ * recorded cassettes on the *logical* (unstripped) schema, exactly as they
+ * were recorded. The [0, 1] range itself is still enforced locally by each
+ * prompt's own zod validation, never by this wire schema.
+ */
+const UNSUPPORTED_SCHEMA_KEYWORDS = new Set(['minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', 'minLength', 'maxLength']);
+
+function isPlainObjectSchema(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Returns a copy of `schema` with every unsupported keyword removed, recursing through `properties`/`items`/`anyOf`/`allOf`/`oneOf`. Arrays of primitives (`enum`, `required`, `type: ['string','null']`) pass through untouched. */
+function stripUnsupportedSchemaKeywords(schema: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (UNSUPPORTED_SCHEMA_KEYWORDS.has(key)) continue;
+    if (Array.isArray(value)) {
+      out[key] = (value as unknown[]).map((v) => (isPlainObjectSchema(v) ? stripUnsupportedSchemaKeywords(v) : v));
+    } else if (isPlainObjectSchema(value)) {
+      out[key] = stripUnsupportedSchemaKeywords(value);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 function toProxyMessages(request: LlmRequest): LlmProxyMessage[] {
   return [{ role: 'system', content: request.system }, ...request.messages.map((m) => ({ role: m.role, content: m.content }))];
 }
@@ -148,7 +182,7 @@ export class ProxyLlmClient implements LlmClient {
       messages: toProxyMessages(request),
       maxTokens: request.maxTokens ?? DEFAULT_CAPTURE_MAX_TOKENS,
       responseFormat: 'json',
-      outputConfig: { effort: request.effort, format: request.format },
+      outputConfig: { effort: request.effort, format: { type: 'json_schema', schema: stripUnsupportedSchemaKeywords(request.format.schema) } },
       cacheControl: true,
       ...(request.stream ? { stream: true } : {}),
     });
@@ -201,7 +235,7 @@ export class DirectLlmClient implements LlmClient {
       max_tokens: request.maxTokens ?? DEFAULT_CAPTURE_MAX_TOKENS,
       system: [{ type: 'text', text: request.system, cache_control: { type: 'ephemeral' } }],
       messages: request.messages.map((m) => ({ role: m.role, content: m.content })),
-      output_config: { effort: request.effort, format: { type: 'json_schema', schema: request.format.schema } },
+      output_config: { effort: request.effort, format: { type: 'json_schema', schema: stripUnsupportedSchemaKeywords(request.format.schema) } },
     });
     const message = await stream.finalMessage();
 
