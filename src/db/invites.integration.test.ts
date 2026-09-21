@@ -172,12 +172,12 @@ describe('invite by email against a real local Supabase', () => {
     // turns "matched nothing" into a real, checkable result (found live:
     // this assertion was passing against a silent no-op, not a rejection).
     const { data: architectData, error: architectError } = await architect.client.from('invites').update({ last_sent_at: now }).eq('id', created.invite.id).select('id');
-    expect(architectError !== null || (architectData?.length ?? 0) === 0).toBe(true);
+    expect(architectError !== null || architectData.length === 0).toBe(true);
 
     // The column grant is `last_sent_at` only — `role` (any other column)
     // must still be unwritable, matching this table's "never by a client
     // write" stance for everything except this one field.
     const { data: roleWriteData, error: roleWriteError } = await owner.client.from('invites').update({ role: 'owner' }).eq('id', created.invite.id).select('id');
-    expect(roleWriteError !== null || (roleWriteData?.length ?? 0) === 0).toBe(true);
+    expect(roleWriteError !== null || roleWriteData.length === 0).toBe(true);
   });
 });

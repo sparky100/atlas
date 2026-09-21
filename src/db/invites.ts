@@ -62,7 +62,7 @@ export async function listInvites(supabase: Client, orgId: UUID): Promise<Invite
 export async function revokeInvite(supabase: Client, id: UUID): Promise<void> {
   const { data, error } = await supabase.from('invites').delete().eq('id', id).select('id');
   if (error) throw new Error(`revokeInvite: ${error.message}`);
-  if (!data || data.length === 0) throw new Error('revokeInvite: not permitted or already revoked');
+  if (data.length === 0) throw new Error('revokeInvite: not permitted or already revoked');
 }
 
 export type SendInviteEmailResult = { status: 'sent' } | { status: 'error'; message: string };

@@ -44,7 +44,7 @@ export async function listSharesForModel(supabase: Client, modelId: UUID): Promi
 export async function revokeModelShare(supabase: Client, id: UUID): Promise<void> {
   const { data, error } = await supabase.from('model_shares').delete().eq('id', id).select('id');
   if (error) throw new Error(`revokeModelShare: ${error.message}`);
-  if (!data || data.length === 0) throw new Error('revokeModelShare: not permitted or share not found');
+  if (data.length === 0) throw new Error('revokeModelShare: not permitted or share not found');
 }
 
 export interface ModelSharedWithOrg {
