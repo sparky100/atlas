@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
+import { projectionElementsByIds } from '../../db/branchProjection';
 import { hasAnySystem, listSupportsEdgesForCapabilities, listCapabilitiesForMap } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
 import { listOwnsEdges } from '../../db/elementBrowse';
 import { computeSelfOwnedCapabilityIds } from '../../db/healthFindings';
-import { refParamOf, resolveRef, type Ref } from '../../db/ref';
+import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
+import type { ViewMode } from '../../db/viewMode';
+import { resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
 import { getOrCreateModelView } from '../../db/views';
 import type { ViewRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
@@ -48,12 +51,25 @@ export interface UseCapabilityMapResult {
  * the first place. `getOrCreateModelView` still records the `views` row
  * itself ("a view is a saved query", ADR-011), which is what a future
  * feature (per-user expand state, annotations) would hang off later.
+ *
+ * #244: a branch ref used to be resolved straight to its head commit via
+ * `resolveRef`, then queried against `elements_head`/`relationships_head`
+ * filtered by that commit id — but (per SPEC S-2, the same assumption
+ * `useLandscape.ts`/`useCapabilityLandscape.ts` already build around) a
+ * change branch's head is never materialised there, so the map silently
+ * showed empty/stale content for a branch ref instead of the branch's own
+ * state. Mirrors `useCapabilityLandscape.ts`'s main/tag-vs-branch split: a
+ * branch ref reads the already-folded arrays off
+ * `resolveBranchModeProjectionCached`'s `HeadProjection` and derives
+ * everything in memory; main/tag are unchanged, still the direct
+ * commit-scoped queries below.
  */
 export function useCapabilityMap(
   modelId: UUID,
   orgId: UUID,
   userId: UUID | null,
   ref: Ref,
+  mode: ViewMode,
   /** S1 item 15 (A2 remainder): the caller's own already-resolved main head commit id — same race-tolerant dedup shape `useStructureView.ts`'s own parameter comment explains. */
   mainCommitIdHint: UUID | null = null,
 ): UseCapabilityMapResult {
@@ -73,55 +89,105 @@ export function useCapabilityMap(
     setState({ status: 'loading' });
 
     async function load(): Promise<void> {
-      const commitId = ref.kind === 'main' && mainCommitIdHint ? mainCommitIdHint : await resolveRef(supabase, modelId, ref);
-      if (!commitId) {
-        if (!cancelled) setState({ status: 'refNotFound' });
-        return;
-      }
+      let commitId: UUID;
+      let capabilities: ElementsHeadRow[];
+      let hasSystems: boolean;
+      let supportsEdges: RelationshipsHeadRow[];
+      let systemsById: Map<UUID, ElementsHeadRow>;
+      let ownsEdges: RelationshipsHeadRow[];
+      let actorsById: Map<UUID, ElementsHeadRow>;
 
-      const [capabilities, hasSystems] = await Promise.all([listCapabilitiesForMap(supabase, commitId), hasAnySystem(supabase, commitId)]);
-      const capabilityIds = capabilities.map((c) => c.element_id);
-      const supportsEdges = await listSupportsEdgesForCapabilities(supabase, commitId, capabilityIds);
-      const systemIds = [...new Set(supportsEdges.map((edge) => edge.from_element_id))];
-      const systemsById = await getElementsByIds(supabase, commitId, systemIds);
+      if (ref.kind === 'branch') {
+        const branch = await resolveBranchRef(supabase, ref);
+        if (!branch) {
+          if (!cancelled) setState({ status: 'refNotFound' });
+          return;
+        }
+        const resolved = await resolveBranchModeProjectionCached(supabase, modelId, branch, mode);
+        if (!resolved) {
+          if (!cancelled) setState({ status: 'refNotFound' });
+          return;
+        }
+        const { projection } = resolved;
+        commitId = resolved.commitId;
+        capabilities = projection.elementsHead.filter((e) => e.element_type === 'capability');
+        hasSystems = projection.elementsHead.some((e) => e.element_type === 'system');
+        const capabilityIdSet = new Set(capabilities.map((c) => c.element_id));
+        supportsEdges = projection.relationshipsHead.filter((r) => r.relationship_type === 'supports' && capabilityIdSet.has(r.to_element_id));
+        const systemIds = [...new Set(supportsEdges.map((edge) => edge.from_element_id))];
+        systemsById = projectionElementsByIds(projection, systemIds);
 
-      // "Platforms and modules": a module (Container) supporting a
-      // capability may inherit its own unset lifecycle/criticality/hosting/
-      // domain from its platform (`effectiveModuleAttributes`'s own doc
-      // comment) — but the platform itself typically has no *direct*
-      // supports edge of its own, so it's usually missing from
-      // `systemsById` above. A second, small lookup for just those missing
-      // parent ids, then every module's own entry is replaced with its
-      // resolved-effective row; `metrics.ts` never needs to know any of
-      // this happened, since it only ever reads `.attributes` off whatever
-      // row `systemsById` hands it.
-      const missingPlatformIds = [
-        ...new Set(
-          [...systemsById.values()]
-            .filter((e): e is ElementsHeadRow & { parent_id: UUID } => e.element_type === 'container' && e.parent_id !== null && !systemsById.has(e.parent_id))
-            .map((e) => e.parent_id),
-        ),
-      ];
-      if (missingPlatformIds.length > 0) {
-        const platformsById = await getElementsByIds(supabase, commitId, missingPlatformIds);
-        for (const [id, row] of platformsById) systemsById.set(id, row);
-      }
-      for (const [id, row] of systemsById) {
-        if (row.element_type !== 'container' || row.parent_id === null) continue;
-        const platform = systemsById.get(row.parent_id);
-        if (platform) systemsById.set(id, effectiveModuleAttributes(row, platform));
+        const missingPlatformIds = [
+          ...new Set(
+            [...systemsById.values()]
+              .filter((e): e is ElementsHeadRow & { parent_id: UUID } => e.element_type === 'container' && e.parent_id !== null && !systemsById.has(e.parent_id))
+              .map((e) => e.parent_id),
+          ),
+        ];
+        if (missingPlatformIds.length > 0) {
+          const platformsById = projectionElementsByIds(projection, missingPlatformIds);
+          for (const [id, row] of platformsById) systemsById.set(id, row);
+        }
+        for (const [id, row] of systemsById) {
+          if (row.element_type !== 'container' || row.parent_id === null) continue;
+          const platform = systemsById.get(row.parent_id);
+          if (platform) systemsById.set(id, effectiveModuleAttributes(row, platform));
+        }
+
+        ownsEdges = projection.relationshipsHead.filter((r) => r.relationship_type === 'owns');
+        const ownerActorIds = [...new Set(ownsEdges.map((edge) => edge.from_element_id))];
+        actorsById = ownerActorIds.length > 0 ? projectionElementsByIds(projection, ownerActorIds) : new Map<UUID, ElementsHeadRow>();
+      } else {
+        const resolvedCommitId = ref.kind === 'main' && mainCommitIdHint ? mainCommitIdHint : await resolveRef(supabase, modelId, ref);
+        if (!resolvedCommitId) {
+          if (!cancelled) setState({ status: 'refNotFound' });
+          return;
+        }
+        commitId = resolvedCommitId;
+
+        const [caps, hasSys] = await Promise.all([listCapabilitiesForMap(supabase, commitId), hasAnySystem(supabase, commitId)]);
+        capabilities = caps;
+        hasSystems = hasSys;
+        const capabilityIds = capabilities.map((c) => c.element_id);
+        supportsEdges = await listSupportsEdgesForCapabilities(supabase, commitId, capabilityIds);
+        const systemIds = [...new Set(supportsEdges.map((edge) => edge.from_element_id))];
+        systemsById = await getElementsByIds(supabase, commitId, systemIds);
+
+        // "Platforms and modules": a module (Container) supporting a
+        // capability may inherit its own unset lifecycle/criticality/hosting/
+        // domain from its platform (`effectiveModuleAttributes`'s own doc
+        // comment) — but the platform itself typically has no *direct*
+        // supports edge of its own, so it's usually missing from
+        // `systemsById` above. A second, small lookup for just those missing
+        // parent ids, then every module's own entry is replaced with its
+        // resolved-effective row; `metrics.ts` never needs to know any of
+        // this happened, since it only ever reads `.attributes` off whatever
+        // row `systemsById` hands it.
+        const missingPlatformIds = [
+          ...new Set(
+            [...systemsById.values()]
+              .filter((e): e is ElementsHeadRow & { parent_id: UUID } => e.element_type === 'container' && e.parent_id !== null && !systemsById.has(e.parent_id))
+              .map((e) => e.parent_id),
+          ),
+        ];
+        if (missingPlatformIds.length > 0) {
+          const platformsById = await getElementsByIds(supabase, commitId, missingPlatformIds);
+          for (const [id, row] of platformsById) systemsById.set(id, row);
+        }
+        for (const [id, row] of systemsById) {
+          if (row.element_type !== 'container' || row.parent_id === null) continue;
+          const platform = systemsById.get(row.parent_id);
+          if (platform) systemsById.set(id, effectiveModuleAttributes(row, platform));
+        }
+
+        ownsEdges = await listOwnsEdges(supabase, commitId);
+        const ownerActorIds = [...new Set(ownsEdges.map((edge) => edge.from_element_id))];
+        actorsById = ownerActorIds.length > 0 ? await getElementsByIds(supabase, commitId, ownerActorIds) : new Map<UUID, ElementsHeadRow>();
       }
 
       const view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'capability_map', name: 'Capability map', createdBy: currentUserId });
       const tree = computeCapabilityMapTree(capabilities);
-      const ownsEdges = await listOwnsEdges(supabase, commitId);
       const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsEdges, ownsEdges);
-      // V2b's Inspector, Selection section: owner *names*, not just
-      // `selfOwnedIds`' own boolean — an `owns` edge's own `from` is
-      // always an actor (`relationshipTypeRules.ts`), so a second small
-      // lookup for just those ids, same shape as `missingPlatformIds` above.
-      const ownerActorIds = [...new Set(ownsEdges.map((edge) => edge.from_element_id))];
-      const actorsById = ownerActorIds.length > 0 ? await getElementsByIds(supabase, commitId, ownerActorIds) : new Map<UUID, ElementsHeadRow>();
 
       if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById } });
     }
@@ -136,7 +202,7 @@ export function useCapabilityMap(
     };
     // Same pitfall/fix as useElementPage.ts / useLandscape.ts: `refParam`
     // (a stable string) is the real dependency, not `ref` itself.
-  }, [modelId, orgId, userId, refParam, reloadToken, mainCommitIdHint]);
+  }, [modelId, orgId, userId, refParam, mode, reloadToken, mainCommitIdHint]);
 
   return {
     state,
