@@ -50,6 +50,10 @@ export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
  * is deliberately an attribute (`isExternal`) on System/Container/Actor, not
  * a fifth element type; "contains" is deliberately structural (`parentId`),
  * not a seventh relationship type — see ADR-001's Alternatives Rejected.
+ * A value stream (ADR-023/F6) is *not* the `business-process` exclusion:
+ * a stage is a label grouping the capabilities that deliver it, with no
+ * sequence, timing, actor or flow semantics — that ADR argues the
+ * distinction in full, and this list keeps the exclusion.
  */
 export const DELIBERATELY_NOT_MODELLED = [
   'business-process',

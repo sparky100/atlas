@@ -220,7 +220,7 @@ Rows by capability or system; time horizontal; lifecycle bars from `introduced`/
 
 ### F6 — value streams
 
-New ADR: value stream → stages, `enables` from capability to stage; one view; no other taxonomy change. Written and decided before any code.
+New ADR: value stream → stages, `enables` from capability to stage; one view; no other taxonomy change. Written and decided before any code. **ADR-023 (`docs/ADR-023-value-streams.md`) is that ADR** — Step 1 of the sprint, docs only; the build (contract/engine/migration, rollup and impact hop, the Value streams page plus the director "By outcome" toggle, roadmap group-by and capability-map/page surfaces, editing behind the "main or a correct-intent change" gate, starter-map content, JSON import, tests) follows it step by step, one PR each.
 
 ---
 

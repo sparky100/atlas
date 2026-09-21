@@ -58,8 +58,8 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | Type | Values |
 |---|---|
 | `member_role` | `owner`, `architect`, `contributor`, `viewer` |
-| `element_type` | `capability`, `system`, `container`, `actor` (S1 item 18 removed `component`, `20260913010000_remove_component_element_type.sql`; `deltas.element_type` itself moved from this enum to plain `text` in the same migration — that column's own historical rows are immutable, see the migration's own comment) |
-| `relationship_type` | `supports`, `uses`, `owns`, `flows_to` |
+| `element_type` | `capability`, `system`, `container`, `actor`, `value_stream` (S1 item 18 removed `component`, `20260913010000_remove_component_element_type.sql`; `deltas.element_type` itself moved from this enum to plain `text` in the same migration — that column's own historical rows are immutable, see the migration's own comment. ADR-023/F6 adds `value_stream` — a stream, or a stage when `parent_id` is set — via `alter type … add value`, the first addition to this enum since it was created) |
+| `relationship_type` | `supports`, `uses`, `owns`, `flows_to`, `enables` (ADR-023/F6: capability → stage, the first addition to this enum since it was created) |
 | `branch_kind` | `main`, `change`, `capture_draft` |
 | `branch_status` | `draft`, `proposed`, `in_review`, `approved`, `merged`, `rejected`, `archived` |
 | `commit_kind` | `genesis`, `manual`, `capture`, `merge`, `template_seed`, `preparation` (ADR-021 §2a amendment 1, C2b — written only by `atlas.refresh_branch`, never directly by a client, §5.1) |
@@ -248,6 +248,15 @@ Primary key `(relationship_type, from_type, to_type)`. No `org_id`; product cont
 | owns | actor | container | | 1 | |
 | flows_to | system | system | | | |
 | flows_to | container | container | | | |
+| enables | capability | value_stream | | | |
+
+**Amended (F6, ADR-023).** The `enables (capability, value_stream)` row
+admits the whole `value_stream` type because this table has never
+expressed anything finer than `(relationship_type, from_type, to_type)`;
+"a stage, never a stream" (the target's own `parent_id` must be non-null)
+is C22 (§5.2), an engine check alongside C18/C20, for the same reason
+"Platforms and modules" below kept its parent-kind rule out of this table.
+No cardinality in either direction.
 
 **Amended ("Platforms and modules").** The new `supports (container, capability)`
 row lets a `Container` support a capability directly — a platform system's own
@@ -698,7 +707,32 @@ Trigger: `level = 1` ⇔ `parent_code is null`; parent's level = level − 1.
 | `reviewed_by` | text | not null — a name, not a user id; reviewers are often external |
 | `reviewed_at` | date | not null |
 
-Seeding a model from a map (ADR-012) creates one `sources` row of kind `template` and one `template_seed` commit whose `element_create` deltas have `attributes.templateRef` set (plus `attributes.description`, copied from the map item's own description when it has one — Bug A2: this was silently dropped until Sprint U4-1, and `scripts/syncDescriptionsFromMap.ts`/its owner-action equivalent is the one-off fix for a model already seeded before then) and an `aliases` row of type `template_code` per element. `attributes.code` is deliberately **not** set at seed time (ADR-020, amended from the original "sets `attributes.code`/`attributes.templateRef`" wording this line carried) — it's an organisation's own optional reference now, not a copy of the template's code, which stays reachable via `templateRef` and the `template_code` alias alone.
+#### `capability_map_value_stream_items` (F6, ADR-023)
+
+A map's value streams and their stages — the content file's optional `valueStreams` section (`src/contracts/capabilityMapContent.ts`). Not rows of `capability_map_items`: that table's `level 1–3`/`parent_code` trigger and every reader of it assume capabilities.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `map_id` | uuid | → `capability_maps(id)` on delete cascade |
+| `code` | text | not null; `unique (map_id, code)` — the stream/stage's stable reference (its `template_code` alias once seeded), independent of `item_order` |
+| `parent_code` | text | nullable → `(map_id, code)`; null for a stream, a stream's code for a stage |
+| `name` | text | not null |
+| `description` | text | |
+| `item_order` | int | not null — display order among siblings |
+
+Trigger: a row whose `parent_code` is non-null must name a row whose own `parent_code` is null (depth two, the same rule C22 enforces on the seeded elements). Same immutability guard as `capability_map_items` once the map is published.
+
+#### `capability_map_value_stream_enables` (F6, ADR-023)
+
+| Column | Type | Constraints |
+|---|---|---|
+| `map_id` | uuid | → `capability_maps(id)` on delete cascade |
+| `stage_code` | text | not null → `capability_map_value_stream_items (map_id, code)`; must be a stage (trigger) |
+| `capability_code` | text | not null → `capability_map_items (map_id, code)` |
+
+Primary key `(map_id, stage_code, capability_code)`. The content file names the capability **by name** (a content author's vocabulary); `scripts/loadCapabilityMaps.ts` resolves it to `code` and refuses the file on zero or ambiguous matches, so this table only ever holds resolved codes.
+
+Seeding a model from a map (ADR-012) creates one `sources` row of kind `template` and one `template_seed` commit whose `element_create` deltas have `attributes.templateRef` set (plus `attributes.description`, copied from the map item's own description when it has one — Bug A2: this was silently dropped until Sprint U4-1, and `scripts/syncDescriptionsFromMap.ts`/its owner-action equivalent is the one-off fix for a model already seeded before then) and an `aliases` row of type `template_code` per element. `attributes.code` is deliberately **not** set at seed time (ADR-020, amended from the original "sets `attributes.code`/`attributes.templateRef`" wording this line carried) — it's an organisation's own optional reference now, not a copy of the template's code, which stays reachable via `templateRef` and the `template_code` alias alone. **F6 (ADR-023):** the same `template_seed` commit also carries one `element_create` per value stream and stage (`attributes.templateRef`/`order`, a `template_code` alias each, stages parented on their stream) and one `relationship_create` (`enables`) per resolved `capability_map_value_stream_enables` row — `atlas.seed_from_map` gains `p_relationships_head` for that, the parameter every other head-writing RPC already takes.
 
 **Sprint U4-1 C6: export the other direction, and seeding a draft.** A
 model's own tailored capability tree can become new starter content two
@@ -811,18 +845,20 @@ Kinds:
 
 ### 5.2 Invariants
 
-`COMMIT_INVARIANTS` in `delta.ts` is the list (C1–C21 as of ADR-021/C2b's own C21 — this list was already stale at C1–C17 before S1 item 11a's C20, having missed C18/C19; corrected here rather than left to drift further). They are checked in this order, and the first failure rejects the whole commit:
+`COMMIT_INVARIANTS` in `delta.ts` is the list (C1–C22 as of ADR-023/F6's own C22; C1–C21 as of ADR-021/C2b's own C21 — this list was already stale at C1–C17 before S1 item 11a's C20, having missed C18/C19; corrected here rather than left to drift further). They are checked in this order, and the first failure rejects the whole commit:
 
 1. Shape: C1, C2, C3, C14.
 2. Intra-commit: C4.
 3. Against history: C5 (id never used), C13 (parent is current head), C12 (source in model).
 4. Against parent head: C6 (previousDeltaId matches `facts`), C7 (exists/not-exists preconditions).
-5. Against resulting head: C8, C9, C10, C11, C15, C17 (Sprint U4-1: at most one primary `supports`/`owns` edge per anchor element), C18 (`via` references a live `integration_platform`), C20 (an external actor's `owns` role is always `service`), C21 (a `preparation`-kind commit carries only ADR-021 §3.3's preparation deltas).
+5. Against resulting head: C8, C9, C10, C11, C15, C17 (Sprint U4-1: at most one primary `supports`/`owns` edge per anchor element), C18 (`via` references a live `integration_platform`), C20 (an external actor's `owns` role is always `service`), C21 (a `preparation`-kind commit carries only ADR-021 §3.3's preparation deltas), C22 (a `value_stream`'s parent is a live parentless `value_stream`; an `enables` edge targets a stage).
 6. Validation level for the branch kind: C16 → §6.3.
 
 **C15 (amended, ADR-021 §6):** a merge commit's own deltas are exactly: one resolution per FIELD_CONFLICT key (as originally specified), plus — for a refresh resolving a blocking structural finding — the decision deltas ADR-021 §4 derives from the reviewer's choice (keep-retraction/keep-element cascade, duplicate-relationship survivor, cardinality primary/role pick), plus nothing else. Every blocking structural finding needs a choice before a refresh can be pushed (`unresolvedStructuralFindings`, extending the existing `unresolvedFieldConflictKeys` guard); a converged retraction (both sides retract the same element) is resolved implicitly by the builder and never needs one.
 
 **C21 (new, ADR-021 §6 — numbered here rather than "C18," the id the ADR's own early draft used before finding it already taken by the unrelated `via`/integration-platform check; see ADR-021 §2a amendment 3):** a `preparation`-kind commit contains only the deltas ADR-021 §3.3's preparation table derives from the findings — restores of elements the branch retracted and main touched, retracts of the branch's own relationships to elements main retracted, demotions of the branch's primaries that main's primaries collide with — and no other commit kind may carry them. Checked by the engine before `atlas.refresh_branch` is called; the RPC itself checks the kind, the adjacency (`M.parent_commit_id = P.id`) and the shared `merge_resolution` source.
+
+**C22 (new, ADR-023/F6):** two cross-entity checks `RELATIONSHIP_TYPE_RULES` can't express (§3.3), checked against the head as it stands when the delta is applied, at `create`/`update` and — matching C18 and C20's own convention — never re-run at `restore`: (a) an `element.create` of a `value_stream` with a non-null `parentId`, or an `element.update` of `parentId` on one, requires the parent to be a live `value_stream` whose own `parentId` is null (depth exactly two — a stage never has children); (b) a `relationship.create` of `enables` requires `toElementId` to be a live `value_stream` with a non-null `parentId` (a stage, never a stream). No database backstop, for C18's own reason: a cross-table dependency Postgres has no plain `CHECK` or index for, and engine-only enforcement is this taxonomy's accepted answer to that shape of rule.
 
 C6 is the one that turns concurrent editing into a rejected commit rather than a lost update. Two people editing the same attribute of the same element on the same branch: the second submit fails C6 and must re-read.
 
@@ -1435,6 +1471,8 @@ All property tests use generated inputs (fast-check or equivalent) with shrinkin
 | RT-11 | Comment anchored to an element → retract the element → the comment is still readable (rule 5) and flagged as anchored to a retracted subject; posting a *new* comment on an already-retracted element still succeeds (Sprint M1a). |
 | RT-12 | A comment body containing `@handle` → one `comment_mentions` row and one `notifications` row per resolved fellow-org member, none for a handle mentioning the comment's own author, none for a handle with no matching profile in the org (Sprint M1a). |
 | RT-13 | A reply to a thread → one `notifications` row (`kind = 'reply'`) per prior participant (root author plus anyone else who already replied), none for the replying author themselves; a reply that also `@mentions` a prior participant → exactly one notification for them (`kind = 'mention'`, not two) — "mention wins" (Sprint M1b, `src/db/comments.integration.test.ts`'s "a reply notifies the thread's other participants" test). |
+| RT-14 (ADR-023/F6) | RT-1/RT-2 with the generators widened to `value_stream` elements (stream and stage) and `enables` relationships: arbitrary `Delta` → JSON → `Delta` and `Delta` → `deltas` row → `Delta` deep-equal; an envelope creating a stream, a stage under it and an `enables` edge onto the stage commits through `atlas.commit_deltas` and reads back equal; the resulting `elements_head` row carries `element_type = 'value_stream'` and `relationships_head` `relationship_type = 'enables'` (the two widened enums). |
+| RT-15 (ADR-023/F6) | Arbitrary `valueStreams` content section → `capability_map_value_stream_items`/`capability_map_value_stream_enables` rows (via the loader's resolution of capability names to codes) → the same section, deep-equal modulo name→code resolution; a stage under a stage, an `enables` onto a stream, and an `enables` naming zero or two capabilities are each refused; the immutability guard rejects any write once the map is published. |
 
 ### 10.2 Properties — fold and materialisation
 
@@ -1499,6 +1537,12 @@ All property tests use generated inputs (fast-check or equivalent) with shrinkin
 | P-27 | Capability map upgrade: seed v1, rename and re-parent arbitrary items, publish v2 with arbitrary additions/renames; the computed upgrade diff matches every renamed item through its `template_code` alias and creates no duplicates. |
 | P-28 | `owns` cardinality: at most one `primary = true` owner per target survives V3; a second is a cardinality conflict at merge and a V3 failure on commit. |
 
+### 10.8 Properties — rollups
+
+| Id | Property |
+|---|---|
+| P-34 (ADR-023/F6) | Value-stream rollup: for an arbitrary head with streams, stages, capabilities at any level, `supports` edges with arbitrary supporter lifecycle states and planned replacements, and arbitrary `enables` edges — a stage's tone equals the worst (`warn > neutral > info > ok`) of its enabling capabilities' own `CapabilityTileData.tone` as `buildCapabilityTiles` computes them, or `neutral` when nothing enables it; a stream's tone equals the worst of its stages'; a stage's/stream's `fitForPurpose` equals the worst across the same set and is never an input to the tone; an inactive stream is computed identically to an active one. |
+
 A UI ticket may not be opened until RT-1…RT-9 and P-1…P-28 exist and pass locally (`pnpm test` — CLAUDE.md's "Verification (all local)": there is no test CI to pass in).
 
 ---
@@ -1532,6 +1576,7 @@ Sprint H1 item 12 (docs/AUDIT-2026-09-U2.md's own deferred-items review, §7.2):
 | ~~Assigned-review notification preference~~ | **Closed, Sprint F7 (follow-up commit, ahead of prompt pack F3a landing the underlying `review_assigned` notification kind mid-sprint).** Sprint F7 PR3 shipped `notify_on_mention`/`notify_on_reply` but named "assigned reviews" as inert — no `review_assigned` notification kind existed yet, so a toggle for it would have had nothing to control (CLAUDE.md rule 7). F3a's own `atlas.submit_merge_request`/`atlas.set_reviewers` landed that kind days later; `20260916010000_notify_on_review_assigned.sql` added `notify_on_review_assigned` (same default-`true`, gate-the-notification-not-the-record shape as the other two) and redefined both RPCs to check it before each `review_assigned` insert. The profile page's notification-preferences panel dropped its "not available yet" copy for a real third checkbox in the same commit. | — | — |
 | ~~Canvas "hollow" (all-resolved) comment marker, and the "Comments on this view" toolbar filter~~ | **Closed, M1 close-out item 1.** `atlas.thread_counts` (§9.4, `20260911010000_thread_counts.sql`) replaces `atlas.unresolved_comment_counts` with `(open_count, total_count)` per anchor, which is all the hollow marker ever needed — "has threads, all resolved" (`open_count = 0, total_count > 0`) is now told apart from "no threads at all" (still simply absent from the result). The toolbar filter ("comments on this view") shipped without the per-`view_kind` count this row originally assumed it would need: it dims any node with `total_count === 0` on the *current* view's own already-loaded anchor set, regardless of which `view_kind` a thread was originally raised from, rather than filtering to threads raised specifically in this view — a simpler, real behaviour ("does this system have any comment thread at all"), not the narrower one this row anticipated, and not worth a second RPC variant to build the narrower one instead. | — | — |
 | True drag-and-drop for capability map sibling reordering (Sprint U4-1 C1) | "Tailoring allows drag-to-reorder among siblings" ships as move buttons — left/right at L1, up/down at L2 — swapping `attributes.order` with an adjacent sibling, not a mouse drag gesture (`src/ui/capabilityMap/useCapabilityReorder.ts`'s own module comment: no drag-and-drop anywhere else in this codebase, no DnD library, and buttons stay keyboard-/screen-reader-operable, which a bare `draggable` element wouldn't be) | **U4-2** | Reviewed and accepted as the shipped behaviour for U4-1, not a gap to close before the item counts as done — the *effect* (a capability swaps places with an adjacent sibling) is identical either way. A real drag gesture is a genuine interaction upgrade once tailoring sees more day-to-day use, worth its own sprint rather than folded into C1 unreviewed. |
+| Custom attributes on `value_stream` (F6, ADR-023) | `attribute_definitions.applies_to` stays `capability`/`system`/`container`/`actor` (the `CHECK` in `20260914020000_attribute_definitions.sql`); a value stream or stage carries only its core attributes, and the org-settings definitions panel never offers the new type | **Unscheduled** | ADR-023's own Alternatives rejected: nothing in F6 asks for org-defined data on this layer, and widening the `CHECK` plus the panel is real, separable work — recorded so a later request picks up a known gap rather than an oversight. |
 | Undo for "Convert to a module of…" (`src/engine/convertSystemToModule.ts`) | Unlike a merge (`buildUndoMergeElementsDeltas`), converting a system to a module has no inverse commit builder and `ConvertToModuleAction.tsx`'s own save has no "Undo" action | **Unscheduled** | An explicit v1 scope call, not an oversight: reverting would mean recreating the original system id and re-pointing every carried-over relationship back, and it's a genuinely open question whether "undo" should restore the exact same system id or mint a fresh one — deferred rather than answered unprompted (CLAUDE.md's own "ask when a decision isn't covered" rule). A mis-conversion can still be corrected by hand today: create a new system with the dropped attributes restored, move its relationships across, retire or remove the module. |
 
 Everything else this document defers is named at its point of use, not repeated here: SPEC §2's `created_at` exceptions and §3.6's `capture_job_id` FK (pending `capture_jobs`, Sprint K1) are documentation of an absent dependency, not a scheduled follow-up in the sense this section means. §9's three `model_shares`-dependent RLS clauses (§9.2/§9.3/§9.5) are no longer in this category — Sprint F7 item 4 migrated all three (`supabase/migrations/20260916020000_model_shares.sql`).
