@@ -719,4 +719,55 @@ export function findCapabilitiesWithNoSupporters(
   return level1Capabilities.filter((capability) => computeCapabilityRollup(capability, allCapabilities, capabilitiesById, supportsEdges, selfOwnedIds).supportingSystemIds.length === 0);
 }
 
+/** All `replaces` edges at `commitId` — ADR-001 amendment's own health finding below, same shape as `listAllOwnsEdges` above. */
+export async function listAllReplacesEdges(supabase: Client, commitId: string): Promise<RelationshipsHeadRow[]> {
+  const query = supabase
+    .from('relationships_head')
+    .select('relationship_id, relationship_type, from_element_id, to_element_id, attributes, exists_delta_id', { count: 'exact' })
+    .eq('commit_id', commitId)
+    .eq('relationship_type', 'replaces')
+    .order('relationship_id');
+  return selectAll<RelationshipsHeadRow>(query);
+}
+
+export interface ReplacementWithoutDeparturePlan {
+  relationshipId: UUID;
+  /** The replacement — `replaces`' own `fromElementId`, ADR-001's "B replaces A" = `from: B, to: A` direction convention. Named explicitly here (not "target") since the edge's conventional `to` side is the *retiring* element, the opposite of what this finding is actually about. */
+  fromElementId: UUID;
+  /** The retiring element `fromElementId` is replacing — carried through only so the finding's own item label can show both ends of the edge, same as `BoundaryCrossing`/`UnlabeledVerbRelationship`. */
+  toElementId: UUID;
+  fromName: string;
+  toName: string;
+}
+
+/**
+ * ADR-001 amendment's own Assurance-adjacent finding (medium severity,
+ * per the design conversation): a `replaces` edge whose *replacement* —
+ * `fromElementId`, never the edge's own `toElementId` (the retiring
+ * element) — is itself `lifecycleStatus: 'active'` with no `plannedEnd`
+ * recorded. A replacement is routinely also a system with a real
+ * end-of-life some years out; recording one with no departure plan of its
+ * own is exactly the kind of untracked fact this product exists to
+ * catch — today's fix silently becoming tomorrow's forgotten legacy
+ * system, unflagged, is the failure mode. Deliberately independent of
+ * `findCriticalExposedSystems`/PR6's own exposure rule: this checks the
+ * replacement's own lifecycle, not whether the *retiring* element's
+ * capability still reads exposed.
+ */
+export function findReplacementsWithoutDeparturePlan(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): ReplacementWithoutDeparturePlan[] {
+  const result: ReplacementWithoutDeparturePlan[] = [];
+  for (const edge of edges) {
+    if (edge.relationship_type !== 'replaces') continue;
+    const replacement = elementsById.get(edge.from_element_id);
+    const retiring = elementsById.get(edge.to_element_id);
+    if (!replacement || !retiring) continue;
+    const attrs = attributesRecord(replacement.attributes);
+    if (attrs.lifecycleStatus !== 'active') continue;
+    const plannedEndValue = attrs.plannedEnd;
+    if (typeof plannedEndValue === 'string' && plannedEndValue.trim() !== '') continue;
+    result.push({ relationshipId: edge.relationship_id, fromElementId: replacement.element_id, toElementId: retiring.element_id, fromName: replacement.name, toName: retiring.name });
+  }
+  return result;
+}
+
 export { STALE_AFTER_MONTHS };

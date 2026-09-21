@@ -9,7 +9,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { MemberRole } from '../../db/types';
-import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, PlatformFlowEndpoint, UnlabeledVerbRelationship } from '../../db/healthFindings';
+import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, PlatformFlowEndpoint, ReplacementWithoutDeparturePlan, UnlabeledVerbRelationship } from '../../db/healthFindings';
 import { formatRelativeTime } from '../time';
 import { branchStatusTone } from '../changes/branchStatus';
 import {
@@ -69,6 +69,11 @@ function externalOrganisationAccessItems(access: readonly ExternalOrganisationAc
 /** S1 item 20's own nudge — relationship pairs again, same shape as `boundaryCrossingItems`. */
 function platformFlowEndpointItems(endpoints: readonly PlatformFlowEndpoint[]): HealthFindingItem[] {
   return endpoints.map((endpoint) => ({ id: endpoint.relationshipId, label: `${endpoint.fromName} → ${endpoint.toName}` }));
+}
+
+/** ADR-001 amendment — a `replaces` edge is a relationship pair too, same shape as `boundaryCrossingItems`; the label leads with the replacement (`fromName`), the side this finding is actually about. */
+function replacementWithoutDeparturePlanItems(replacements: readonly ReplacementWithoutDeparturePlan[]): HealthFindingItem[] {
+  return replacements.map((r) => ({ id: r.relationshipId, label: `${r.fromName} → ${r.toName}` }));
 }
 
 /** Item 4's own "titles truncated at ~60 chars" — an ellipsis, not a hard cut, and only ever applied to the display string (diff links/subjects below are built from the untruncated title). */
@@ -335,6 +340,17 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
       severity: 'medium',
       browseHref: browseHref('capability-no-supporters'),
       ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromCapabilityNoSupportersFinding({ id: item.id, name: item.label })) } : {}),
+    },
+    {
+      // ADR-001 amendment: relationship-shaped, no browse-table home (same
+      // as `boundary-crossings-missing-verb`/`flows-to-platform-instead-of-module`
+      // above) — a `replaces` edge whose own replacement has no departure
+      // plan of its own, medium per the design conversation.
+      key: 'replacement-without-departure-plan',
+      count: insightsData.replacementsWithoutDeparturePlan.length,
+      summary: `${String(insightsData.replacementsWithoutDeparturePlan.length)} replacement${insightsData.replacementsWithoutDeparturePlan.length === 1 ? '' : 's'} with no departure plan of its own`,
+      items: replacementWithoutDeparturePlanItems(insightsData.replacementsWithoutDeparturePlan),
+      severity: 'medium',
         },
       ];
   const { active: activeHealthChecks, clear: clearHealthChecks } = partitionHealthChecks(healthChecks);

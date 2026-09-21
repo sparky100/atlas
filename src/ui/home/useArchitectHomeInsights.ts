@@ -19,12 +19,14 @@ import {
   findExternalOrganisationAccess,
   findFlowsToPlatformInsteadOfModule,
   findPlatformSupportsThatShouldMoveToModule,
+  findReplacementsWithoutDeparturePlan,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
   findUnusedIntegrationPlatforms,
   listAllOwnsEdges,
+  listAllReplacesEdges,
   listAllUsesAndFlowsToEdges,
   listFactsForCommit,
   listUsesAndFlowsToEndpointElements,
@@ -32,6 +34,7 @@ import {
   type ExternalInterfaceCrossing,
   type ExternalOrganisationAccess,
   type PlatformFlowEndpoint,
+  type ReplacementWithoutDeparturePlan,
   type StaleAttributesFinding,
   type UnlabeledVerbRelationship,
 } from '../../db/healthFindings';
@@ -94,6 +97,8 @@ export interface ArchitectHomeInsightsData {
   capabilitiesWithPoorFitPrimarySupporter: ElementsHeadRow[];
   /** A third decision-shaped finding, alongside `criticalExposedSystems` and `criticalSystemsPastOrNearSupportEnd`: level-1 capabilities with zero supporting systems anywhere in their own subtree (`findCapabilitiesWithNoSupporters`'s own doc comment — the same "nothing recorded" classification the director door's weak-capability grid already flags). */
   capabilitiesWithNoSupporters: ElementsHeadRow[];
+  /** ADR-001 amendment: `replaces` edges whose own replacement has no departure plan of its own (`findReplacementsWithoutDeparturePlan`'s own doc comment). */
+  replacementsWithoutDeparturePlan: ReplacementWithoutDeparturePlan[];
 }
 
 export type ArchitectHomeInsightsState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeInsightsData };
@@ -127,7 +132,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         return;
       }
 
-      const [commits, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, plannedReplacements] = await Promise.all([
+      const [commits, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, plannedReplacements, replacesEdges] = await Promise.all([
         // S1 item 6: "recent activity" now groups consecutive same-subject
         // commits into one line and prefers others' activity when trimming
         // to five displayed items (groupRecentActivity.ts) — both can
@@ -156,6 +161,10 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         // approximation of it (`findCapabilitiesWithPoorFitPrimarySupporter`'s
         // own doc comment).
         loadPlannedReplacements(supabase, modelId),
+        // ADR-001 amendment's own "replacement with no departure plan"
+        // finding — its own edge type, not derived from `supportsEdges` or
+        // any of the other fetches above.
+        listAllReplacesEdges(supabase, main.head_commit_id),
       ]);
 
       const usesAndFlowsToEndpointsById = new Map([...usesAndFlowsToEndpoints, ...actors].map((el) => [el.element_id, el]));
@@ -228,6 +237,10 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             externalOrganisationAccess: findExternalOrganisationAccess(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             capabilitiesWithPoorFitPrimarySupporter: findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supportsEdges, groupPlannedReplacementsByCapability(plannedReplacements)),
             capabilitiesWithNoSupporters: findCapabilitiesWithNoSupporters(computeCapabilityMapTree(capabilities).l1.map((column) => column.capability), capabilities, supportsEdges, ownsEdges),
+            // `replaces` only ever touches a system or container
+            // (`relationshipTypeRules.ts`), both already in
+            // `usesAndFlowsToEndpointsById` — no separate lookup map needed.
+            replacementsWithoutDeparturePlan: findReplacementsWithoutDeparturePlan(replacesEdges, usesAndFlowsToEndpointsById),
           },
         });
       }
