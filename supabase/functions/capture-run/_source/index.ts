@@ -15,17 +15,27 @@
  *
  * This function itself is a thin transport shim by design — all the real
  * logic (the step machine, every dependency it needs) lives in
- * `src/capture/captureRunStep.ts` and `supabase/functions/capture-run/db.ts`,
- * so it's Vitest-testable without a Deno runtime at all (K-15). What's left
- * here (this file) has never been run against a real Deno process or a
- * real Supabase project in this sandbox — see `db.ts`'s own module comment
- * and `docs/EDGE-FUNCTIONS.md`'s section on this function for exactly what
- * is and isn't verified.
+ * `src/capture/captureRunStep.ts` and `supabase/functions/capture-run/_source/db.ts`,
+ * so it's Vitest-testable without a Deno runtime at all (K-15).
+ *
+ * **This is the hand-authored source, not what gets deployed.** Deno's edge
+ * runtime does not honour the `sloppy-imports` unstable flag during
+ * `supabase functions deploy`'s own graph-resolution step, so the
+ * extension-less relative imports below (and everywhere in the `src/`
+ * graph they reach into) fail to resolve there even though they resolve
+ * fine for Vite/Vitest and for `deno check` locally — confirmed against a
+ * real deploy attempt, not merely a disclosed risk. `scripts/bundleCaptureRunFunction.ts`
+ * (`pnpm functions:bundle:capture-run`) bundles this file plus everything
+ * it imports from `src/` into one flat, dependency-free
+ * `supabase/functions/capture-run/index.ts` (generated, gitignored) with
+ * only the `npm:`/URL specifiers left unresolved for Deno's own import map
+ * to handle. Run that before every deploy — see `docs/EDGE-FUNCTIONS.md`'s
+ * section on this function.
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.115.0';
-import { corsHeaders } from '../_shared/cors.ts';
+import { corsHeaders } from '../../_shared/cors.ts';
 import { buildRealCaptureRunDeps, readJob } from './db.ts';
-import { runCaptureRunStep } from '../../../src/capture/captureRunStep.ts';
+import { runCaptureRunStep } from '../../../../src/capture/captureRunStep.ts';
 
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

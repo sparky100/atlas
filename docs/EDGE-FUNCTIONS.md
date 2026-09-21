@@ -233,10 +233,32 @@ comment).
 Almost none of this function's own logic lives in `supabase/functions/capture-run/`
 itself — the step machine is `src/capture/captureRunStep.ts` (Vitest-tested
 against a fake dependency layer, no Deno runtime needed for that), and
-`supabase/functions/capture-run/db.ts` is a thin adapter wiring that step's
-injected dependencies to real Postgres/Storage/`llm-proxy` calls.
-`index.ts` itself is only auth + wiring, exactly like `llm-proxy`'s own
-split of "real logic vs. transport shim."
+`supabase/functions/capture-run/_source/db.ts` is a thin adapter wiring that
+step's injected dependencies to real Postgres/Storage/`llm-proxy` calls.
+`_source/index.ts` itself is only auth + wiring, exactly like `llm-proxy`'s
+own split of "real logic vs. transport shim."
+
+**The deployed `index.ts` is generated, not hand-authored.** A real deploy
+attempt confirmed the risk this section used to only disclose: Deno's edge
+runtime does not honour the `sloppy-imports` unstable flag during
+`supabase functions deploy`'s own graph-resolution step, so this function's
+extension-less relative imports into `src/capture`, `src/engine`, and
+`src/contracts` failed with `failed to create the graph … Module not
+found`, even with `deno.json`'s `"unstable": ["sloppy-imports"]` set — a
+known Supabase Edge Runtime limitation
+([supabase/cli#3426](https://github.com/supabase/cli/issues/3426),
+[supabase/edge-runtime#410](https://github.com/supabase/edge-runtime/issues/410)),
+not a bug specific to this function. The hand-authored source now lives at
+`supabase/functions/capture-run/_source/` (`index.ts`, `db.ts`); edit those.
+`scripts/bundleCaptureRunFunction.ts` uses esbuild to bundle `_source/index.ts`
+and everything it imports from `src/` into one flat, dependency-free
+`supabase/functions/capture-run/index.ts` — the file Deno actually loads —
+leaving only the npm packages `deno.json`'s `imports` map already resolves
+(plus the one `esm.sh` URL import) external. That generated file is
+gitignored; **run `pnpm functions:bundle:capture-run` (or the composite
+`pnpm functions:deploy:capture-run`, which bundles then deploys) before
+every deploy** — a stale or missing bundle means the deploy either fails
+the same way or ships whatever was bundled last, not what's in `_source/`.
 
 **K-12's resumability, narrowed.** SPEC's K-12 asks for a step-driven
 function doing bounded (≤ 60 s) work per invocation, with
@@ -265,8 +287,11 @@ only if no `llm-proxy` is deployed yet and you want `capture-run` to call
 Anthropic directly (`DirectLlmClient`) instead.
 
 ```sh
-supabase functions deploy capture-run
+pnpm functions:deploy:capture-run
 ```
+
+(equivalent to `pnpm functions:bundle:capture-run && supabase functions deploy capture-run`
+— see above for why the bundle step is required, not optional).
 
 `SUPABASE_URL`/`SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` are provided
 automatically, as with every edge function above.
@@ -294,19 +319,12 @@ method, missing env config).
 retry-after-failure, the §11 error-code classification, the whole
 parse→extract→match→write sequence against a fake dependency layer) is
 real, Vitest-covered code, run for real in this sandbox.
-`supabase/functions/capture-run/db.ts`/`index.ts` were **not** — same
-standing gap as `llm-proxy`/`send-invite-email` (no Docker route to a local
-Supabase here), plus two additional, PR12-specific risks worth calling out
-explicitly before a real deploy:
+`supabase/functions/capture-run/_source/db.ts`/`index.ts` were **not** —
+same standing gap as `llm-proxy`/`send-invite-email` (no Docker route to a
+local Supabase here). One of the two PR12-specific risks this section used
+to flag has since been hit for real and fixed (the extension-less-import
+resolution failure — see above); the other is still open:
 
-- Every file under `src/` this function imports (`src/capture/*`,
-  `src/contracts/*`, `src/engine/*`) uses bundler-style extension-less
-  relative imports, which Deno doesn't resolve by default. This function's
-  own `deno.json` turns on the `sloppy-imports` unstable flag to cover
-  that, and maps `zod`/`xlsx`/`pdfjs-dist`/`@noble/hashes` to `npm:`
-  specifiers for the same reason `@anthropic-ai/sdk` already needed one
-  inside `src/capture/llm/client.ts`. Neither the flag nor the import map
-  has been exercised against a real Deno process.
 - `capture_jobs.input_ref`'s own stored shape
   (`capture-inputs/{org}/{model}/{job}/{filename}`, per
   `writeCaptureDraft.integration.test.ts`'s own fixture value) includes the
@@ -315,6 +333,9 @@ explicitly before a real deploy:
   `.storage.from('capture-inputs').download(...)`. Confirmed against the
   existing test's own literal string, not against a real upload.
 
-Confirm both against a real local Supabase (`pnpm db:start`,
-`supabase functions serve capture-run`) before relying on this in
-production, alongside `llm-proxy`'s own not-yet-confirmed live call.
+Confirm that one against a real capture run in production, alongside
+`llm-proxy`'s own not-yet-confirmed live call. `scripts/bundleCaptureRunFunction.ts`
+itself has been run for real and produces a clean bundle (no unresolved
+specifiers); the deploy this section's bundling fix targets has not yet
+been re-attempted end to end after the fix — do that once before relying on
+this in production.

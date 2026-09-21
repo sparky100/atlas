@@ -15,30 +15,25 @@
  * Imports `src/contracts/*` and `src/engine/*` directly (K-15) — the row
  * shapes and the fold are the same TypeScript the unit tests exercise.
  *
- * **Deployment risk, disclosed (unverified — no Deno runtime in this
- * sandbox, the same standing gap `llm-proxy`/`send-invite-email` already
- * carry).** Every file this module transitively imports under `src/` uses
- * bundler-style extension-less relative imports (`from './delta'`, never
- * `'./delta.ts'` — Vite's own convention, not Deno's). This function's own
- * `deno.json` turns on Deno's `sloppy-imports` unstable flag specifically
- * so those resolve; `src/capture/*`'s own npm dependencies (`zod`, `xlsx`,
- * `pdfjs-dist`, `@noble/hashes`) are mapped to `npm:` specifiers in that
- * same file. Neither has been exercised against a real Deno runtime or a
- * real `supabase functions deploy` — confirm both actually resolve before
- * relying on this in production (see `docs/EDGE-FUNCTIONS.md`'s own section
- * on this function).
+ * **This is the hand-authored source, not what gets deployed** — see
+ * `_source/index.ts`'s own module comment: `pnpm functions:bundle:capture-run`
+ * bundles this file into the deployed `supabase/functions/capture-run/index.ts`,
+ * because Deno's edge runtime does not honour the `sloppy-imports` unstable
+ * flag this file's extension-less `src/` imports would otherwise need
+ * (confirmed against a real `supabase functions deploy` failure, not just a
+ * disclosed risk — `docs/EDGE-FUNCTIONS.md`'s section on this function).
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.115.0';
-import type { CaptureJobError, CaptureJobProgress, CaptureStatus } from '../../../src/contracts/capture.ts';
-import type { UUID } from '../../../src/contracts/delta.ts';
-import { fromDeltaRow, type CommitRow, type DeltaRow, type ElementsHeadRow } from '../../../src/contracts/rows.ts';
-import type { Head } from '../../../src/engine/deltas.ts';
-import { foldFromGenesis, type CommitLoader, type CommitNode } from '../../../src/engine/head.ts';
-import type { CaptureRunDeps, CaptureRunJob, WriteCaptureDraftInput, WriteCaptureDraftOutput } from '../../../src/capture/captureRunStep.ts';
-import { DirectLlmClient, ProxyLlmClient, type LlmClient } from '../../../src/capture/llm/client.ts';
-import { buildMatchIndex, type MatchAliasInput } from '../../../src/capture/matchIndex.ts';
-import type { PreviousCandidateForDiff } from '../../../src/capture/reimportDiff.ts';
-import type { RunCaptureSource } from '../../../src/capture/runCapture.ts';
+import type { CaptureJobError, CaptureJobProgress, CaptureStatus } from '../../../../src/contracts/capture.ts';
+import type { UUID } from '../../../../src/contracts/delta.ts';
+import { fromDeltaRow, type CommitRow, type DeltaRow, type ElementsHeadRow } from '../../../../src/contracts/rows.ts';
+import type { Head } from '../../../../src/engine/deltas.ts';
+import { foldFromGenesis, type CommitLoader, type CommitNode } from '../../../../src/engine/head.ts';
+import type { CaptureRunDeps, CaptureRunJob, WriteCaptureDraftInput, WriteCaptureDraftOutput } from '../../../../src/capture/captureRunStep.ts';
+import { DirectLlmClient, ProxyLlmClient, type LlmClient } from '../../../../src/capture/llm/client.ts';
+import { buildMatchIndex, type MatchAliasInput } from '../../../../src/capture/matchIndex.ts';
+import type { PreviousCandidateForDiff } from '../../../../src/capture/reimportDiff.ts';
+import type { RunCaptureSource } from '../../../../src/capture/runCapture.ts';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Deno runtime, no shared type-checking with src/ (see supabase/functions/llm-proxy/index.ts's own identical disables).
 type SupabaseClient = ReturnType<typeof createClient<any>>;

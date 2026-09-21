@@ -35,7 +35,9 @@
     "backfill:owns-role": "tsx scripts/backfillOwnsRole.ts",
     "sync:descriptions": "tsx scripts/syncDescriptionsFromMap.ts",
     "strip:seed-codes": "tsx scripts/stripSeedCodes.ts",
-    "capture:score": "tsx scripts/scoreCapture.ts"
+    "capture:score": "tsx scripts/scoreCapture.ts",
+    "functions:bundle:capture-run": "tsx scripts/bundleCaptureRunFunction.ts",
+    "functions:deploy:capture-run": "pnpm functions:bundle:capture-run && supabase functions deploy capture-run"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -52,6 +54,7 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "@vitejs/plugin-react": "6.1.1",
+    "esbuild": "0.28.2",
     "eslint": "^9.36.0",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react-hooks": "7.1.1",

@@ -14,6 +14,12 @@ test-results/
 supabase/.temp/
 supabase/.branches/
 
+# Generated edge function bundles (docs/EDGE-FUNCTIONS.md's `capture-run`
+# section) — built from supabase/functions/capture-run/_source/ by
+# `pnpm functions:bundle:capture-run` right before a deploy, never
+# hand-edited, so never worth reviewing as a diff.
+supabase/functions/capture-run/index.ts
+
 # scoreCapture.ts --live's own raw cassette scratch output (SPEC-capture.md
 # §12.6) — reviewed by hand, then promoted into a fixture's own committed
 # llm/ directory; never committed here directly.
