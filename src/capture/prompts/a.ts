@@ -13,7 +13,7 @@ sheet usually lists one type. The column roles you may assign are exactly:
 
   atlasId, sourceKey, name, description, vendor, lifecycleStatus, introduced, plannedEnd,
   isExternal, externalOrganisation, hostingModel, hostingProvider, technology, parent, owner,
-  ownerEmail, technicalOwner, capability, usesSystems, flowsTo, integrationPlatform, notes, ignore
+  ownerEmail, technicalOwner, capability, usesSystems, flowsTo, replacedBy, integrationPlatform, notes, ignore
 
 Role meanings:
 - atlasId: a UUID column written by this product's own export.
@@ -36,6 +36,7 @@ Role meanings:
 - capability: a business area, service, function or capability the system supports.
 - usesSystems: other systems this one depends on.
 - flowsTo: systems this one sends data to.
+- replacedBy: the system or module that is replacing this one, when the document names a successor.
 - integrationPlatform: the integration platform (ESB, API gateway, message bus) a usesSystems/flowsTo relationship in this row actually goes via, when named.
 - notes: commentary to show a reviewer but not to extract.
 - ignore: anything else (costs, risk scores, maturity ratings, project names, process steps —
@@ -71,6 +72,7 @@ export const PROMPT_A_COLUMN_ROLES = [
   'capability',
   'usesSystems',
   'flowsTo',
+  'replacedBy',
   'integrationPlatform',
   'notes',
   'ignore',

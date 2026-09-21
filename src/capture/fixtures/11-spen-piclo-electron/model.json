@@ -1,0 +1,12 @@
+{
+  "elements": [
+    {
+      "key": "sys-piclo",
+      "type": "system",
+      "id": "00000000-0000-0000-0000-000000001101",
+      "name": "Piclo",
+      "attributes": { "vendor": "Kaluza", "lifecycleStatus": "active", "isExternal": false },
+      "overrides": [{ "attribute": "lifecycleStatus", "value": "active", "confidence": 0.7, "createdAt": "2024-01-01T00:00:00Z" }]
+    }
+  ]
+}

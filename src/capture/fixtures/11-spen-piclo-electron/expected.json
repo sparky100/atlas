@@ -1,0 +1,9 @@
+{
+  "job": { "status": "parsed" },
+  "candidates": {
+    "name:system:electron:": { "kind": "element", "class": "new", "elementType": "system", "attributes": { "vendor": "Kaluza", "lifecycleStatus": "active", "isExternal": false } },
+    "name:system:piclo:": { "kind": "element", "class": "update", "elementType": "system", "matchLevel": "name_context", "matchElement": "sys-piclo", "attributes": { "lifecycleStatus": "retiring", "plannedEnd": "2026-07-01" } },
+    "rel:replaces:name:system:electron:→name:system:piclo:": { "kind": "relationship", "class": "new", "relationshipType": "replaces", "matchTo": "sys-piclo" }
+  },
+  "absent": []
+}
