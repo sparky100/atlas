@@ -162,6 +162,7 @@ const RELATIONSHIP_ATTRIBUTE_PARSERS: Readonly<Record<RelationshipType, Readonly
   uses: { description: parsePlainString },
   owns: { role: (raw) => parseEnumAttribute(raw, OWNS_ROLE_VALUES) },
   flows_to: { description: parsePlainString },
+  replaces: { description: parsePlainString },
 };
 
 // ---------------------------------------------------------------------------

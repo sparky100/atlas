@@ -80,6 +80,17 @@ export const RELATIONSHIP_TYPE_RULES: readonly RelationshipTypeRule[] = [
   // should be more restrictive than `uses` here.
   { relationshipType: 'flows_to', fromType: 'container', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'flows_to', fromType: 'system', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  // ADR-001 amendment ("replaces"): `fromType` is the replacement,
+  // `toType` is the retiring element — legal in all four system/container
+  // combinations, same promiscuity `uses`/`flows_to` already have. No
+  // cardinality cap in either direction: consolidation (several retiring
+  // elements sharing one replacement) and split (one retiring element with
+  // several replacements) are both ordinary many-to-many facts, not a
+  // primary/secondary-capped relationship like `supports`/`owns`.
+  { relationshipType: 'replaces', fromType: 'system', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  { relationshipType: 'replaces', fromType: 'system', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  { relationshipType: 'replaces', fromType: 'container', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  { relationshipType: 'replaces', fromType: 'container', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
 ] as const;
 
 /** The rule for a triple, or `undefined` if the triple isn't legal (C9/V3). */

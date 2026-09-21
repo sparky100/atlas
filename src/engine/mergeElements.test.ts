@@ -121,3 +121,97 @@ describe('buildMergeElementsDeltas: effect classification', () => {
     expect(effect).toEqual({ relationships: [], reparentedChildIds: [] });
   });
 });
+
+/**
+ * ADR-001 amendment ("replaces") — `buildMergeElementsDeltas` needed zero
+ * production changes for the new type: retract/self-loop-drop/duplicate-
+ * drop/repoint are already generic over `relationshipType`, and because
+ * `replaces` has no cardinality cap (`RELATIONSHIP_TYPE_RULES`'s own
+ * `maxPrimaryPerFrom`/`maxPrimaryPerTo: null` rows), the one type-specific
+ * branch in this file (the `supports`/`owns` primary-collision special
+ * case) is never reached for it. This proves that rather than asserting
+ * it: every case below is the exact `replaces` analogue of an existing
+ * `supports`/`owns`/`uses` case above, plus one case that would trip the
+ * `supports`-style collision branch if the type check above it were ever
+ * loosened.
+ */
+describe('buildMergeElementsDeltas: replaces edges', () => {
+  it('a replaces edge into the retiring element ("to" side) is repointed onto the survivor', () => {
+    const head = headFrom([
+      createElement('d-survivor', 'survivor', 'system', 'Survivor', null, SYSTEM_ATTRS),
+      createElement('d-loser', 'loser', 'system', 'Loser', null, SYSTEM_ATTRS),
+      createElement('d-replacement', 'replacement', 'system', 'Replacement', null, SYSTEM_ATTRS),
+      createRelationship('d-rel', 'rel-1', 'replaces', 'replacement', 'loser'),
+    ]);
+    const { effect } = buildMergeElementsDeltas(cloneHead(head), 'survivor', 'loser', SOURCE_ID, mintId);
+    expect(effect.relationships).toEqual([{ relationshipId: 'rel-1', relationshipType: 'replaces', otherElementId: 'replacement', loserSide: 'to', outcome: 'repointed' }]);
+  });
+
+  it('a replaces edge from the retiring replacement ("from" side) is repointed onto the survivor', () => {
+    const head = headFrom([
+      createElement('d-survivor', 'survivor', 'system', 'Survivor', null, SYSTEM_ATTRS),
+      createElement('d-loser', 'loser', 'system', 'Loser', null, SYSTEM_ATTRS),
+      createElement('d-retiring', 'retiring', 'system', 'Retiring', null, SYSTEM_ATTRS),
+      createRelationship('d-rel', 'rel-1', 'replaces', 'loser', 'retiring'),
+    ]);
+    const { effect } = buildMergeElementsDeltas(cloneHead(head), 'survivor', 'loser', SOURCE_ID, mintId);
+    expect(effect.relationships).toEqual([{ relationshipId: 'rel-1', relationshipType: 'replaces', otherElementId: 'retiring', loserSide: 'from', outcome: 'repointed' }]);
+  });
+
+  it('merging a retiring element into its own replacement drops the replaces edge as a self-loop', () => {
+    const head = headFrom([
+      createElement('d-replacement', 'replacement', 'system', 'Replacement', null, SYSTEM_ATTRS),
+      createElement('d-retiring', 'retiring', 'system', 'Retiring', null, SYSTEM_ATTRS),
+      createRelationship('d-rel', 'rel-1', 'replaces', 'replacement', 'retiring'),
+    ]);
+    // survivor = the replacement, loser = the retiring element it already replaces.
+    const { effect } = buildMergeElementsDeltas(cloneHead(head), 'replacement', 'retiring', SOURCE_ID, mintId);
+    expect(effect.relationships).toEqual([{ relationshipId: 'rel-1', relationshipType: 'replaces', otherElementId: 'replacement', loserSide: 'to', outcome: 'dropped-self-loop' }]);
+  });
+
+  it('a replaces edge that would duplicate one the survivor already has is dropped', () => {
+    const head = headFrom([
+      createElement('d-survivor', 'survivor', 'system', 'Survivor', null, SYSTEM_ATTRS),
+      createElement('d-loser', 'loser', 'system', 'Loser', null, SYSTEM_ATTRS),
+      createElement('d-target', 'target', 'system', 'Target', null, SYSTEM_ATTRS),
+      createRelationship('d-rel-survivor', 'rel-survivor', 'replaces', 'survivor', 'target'),
+      createRelationship('d-rel-loser', 'rel-loser', 'replaces', 'loser', 'target'),
+    ]);
+    const { effect } = buildMergeElementsDeltas(cloneHead(head), 'survivor', 'loser', SOURCE_ID, mintId);
+    expect(effect.relationships).toEqual([{ relationshipId: 'rel-loser', relationshipType: 'replaces', otherElementId: 'target', loserSide: 'from', outcome: 'dropped-duplicate' }]);
+  });
+
+  it('consolidation: two independently-retired elements sharing one replacement both repoint cleanly when the replacement itself merges into another element', () => {
+    const head = headFrom([
+      createElement('d-survivor', 'survivor', 'system', 'Survivor', null, SYSTEM_ATTRS),
+      createElement('d-loser', 'loser', 'system', 'Loser', null, SYSTEM_ATTRS),
+      createElement('d-retiring1', 'retiring1', 'system', 'Retiring 1', null, SYSTEM_ATTRS),
+      createElement('d-retiring2', 'retiring2', 'system', 'Retiring 2', null, SYSTEM_ATTRS),
+      createRelationship('d-rel1', 'rel-1', 'replaces', 'loser', 'retiring1'),
+      createRelationship('d-rel2', 'rel-2', 'replaces', 'loser', 'retiring2'),
+    ]);
+    const { effect } = buildMergeElementsDeltas(cloneHead(head), 'survivor', 'loser', SOURCE_ID, mintId);
+    expect(effect.relationships).toEqual([
+      { relationshipId: 'rel-1', relationshipType: 'replaces', otherElementId: 'retiring1', loserSide: 'from', outcome: 'repointed' },
+      { relationshipId: 'rel-2', relationshipType: 'replaces', otherElementId: 'retiring2', loserSide: 'from', outcome: 'repointed' },
+    ]);
+  });
+
+  it('never invokes the supports/owns-only cardinality-collision branch, even when a replaces edge carries a role-shaped attribute that would trip it for those types', () => {
+    const head = headFrom([
+      createElement('d-survivor', 'survivor', 'system', 'Survivor', null, SYSTEM_ATTRS),
+      createElement('d-loser', 'loser', 'system', 'Loser', null, SYSTEM_ATTRS),
+      createElement('d-target1', 'target1', 'system', 'Target 1', null, SYSTEM_ATTRS),
+      createElement('d-target2', 'target2', 'system', 'Target 2', null, SYSTEM_ATTRS),
+      // Neither ReplacesAttributes nor RELATIONSHIP_TYPE_RULES defines a
+      // `role` for `replaces` — this attribute is deliberately malformed
+      // input, present only to prove the merge engine's `supports`/`owns`
+      // branches are gated on `relationshipType`, not on the shape of
+      // `attributes`, and so never fire for `replaces` regardless.
+      createRelationship('d-rel-survivor', 'rel-survivor', 'replaces', 'survivor', 'target1', { role: 'primary' }),
+      createRelationship('d-rel-loser', 'rel-loser', 'replaces', 'loser', 'target2', { role: 'primary' }),
+    ]);
+    const { effect } = buildMergeElementsDeltas(cloneHead(head), 'survivor', 'loser', SOURCE_ID, mintId);
+    expect(effect.relationships).toEqual([{ relationshipId: 'rel-loser', relationshipType: 'replaces', otherElementId: 'target2', loserSide: 'from', outcome: 'repointed' }]);
+  });
+});

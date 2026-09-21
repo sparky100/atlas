@@ -33,7 +33,7 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 export const ELEMENT_TYPES = ['capability', 'system', 'container', 'actor'] as const;
 export type ElementType = (typeof ELEMENT_TYPES)[number];
 
-export const RELATIONSHIP_TYPES = ['supports', 'uses', 'owns', 'flows_to'] as const;
+export const RELATIONSHIP_TYPES = ['supports', 'uses', 'owns', 'flows_to', 'replaces'] as const;
 export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
 
 /**
@@ -322,12 +322,26 @@ export interface FlowsToAttributes {
   /** See `UsesAttributes.via`'s own doc comment — identical meaning and validation, `flows_to`'s own copy since each relationship type's attributes are their own interface. */
   via?: UUID;
 }
+/**
+ * ADR-001 amendment ("replaces"): `fromElementId` is the replacement,
+ * `toElementId` is the retiring element — "B replaces A" is `from: B, to: A`.
+ * No `role` (unlike `supports`/`owns` — nothing here caps at one primary
+ * per anchor; consolidation and split are both ordinary many-to-many), no
+ * `via` (a replacement isn't a flow with an intermediary). Optional
+ * `description` only, same free-text-rationale shape `supports`'s own
+ * `fitForPurposeNotes` and every other relationship type's `description`
+ * field already has.
+ */
+export interface ReplacesAttributes {
+  description?: string;
+}
 
 export interface RelationshipAttributesByType {
   supports: SupportsAttributes;
   uses: UsesAttributes;
   owns: OwnsAttributes;
   flows_to: FlowsToAttributes;
+  replaces: ReplacesAttributes;
 }
 
 // ---------------------------------------------------------------------------

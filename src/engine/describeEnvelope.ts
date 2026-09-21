@@ -41,6 +41,7 @@ const RELATIONSHIP_VERB: Record<RelationshipType, string> = {
   owns: 'owns',
   uses: 'uses',
   flows_to: 'flows to',
+  replaces: 'replaces',
 };
 
 /** camelCase -> "space separated lower case", for a relationship attribute key — relationships have no curated label schema the way `ATTRIBUTE_SCHEMA_BY_TYPE` gives elements (src/contracts/attributeSchema.ts), so this is the honest fallback rather than a hand-maintained list that drifts out of sync with `RelationshipAttributesByType`. */
