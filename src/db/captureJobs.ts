@@ -138,6 +138,37 @@ export async function findReimportCandidate(supabase: Client, modelId: UUID, inp
 export type InvokeCaptureRunResult = CaptureRunStepResult | { status: 'error'; message: string };
 
 /**
+ * A non-2xx edge-function response. supabase-js throws a `FunctionsHttpError`
+ * whose `.context` is the raw `Response`; `capture-run`'s own 422 body is
+ * `{status:'failed', error:{code,message}}` and a request-level failure is
+ * `{status:'error', message}`. Read that body so the real failure surfaces
+ * instead of the generic "Edge Function returned a non-2xx status code".
+ */
+async function invokeErrorBody(error: unknown): Promise<InvokeCaptureRunResult | null> {
+  const context = typeof error === 'object' && error !== null ? (error as { context?: unknown }).context : undefined;
+  if (!context || typeof (context as { json?: unknown }).json !== 'function') return null;
+  let body: unknown;
+  try {
+    body = await (context as { json: () => Promise<unknown> }).json();
+  } catch {
+    return null;
+  }
+  if (typeof body !== 'object' || body === null) return null;
+  const record = body as Record<string, unknown>;
+  if (record.status === 'failed') {
+    const e = record.error;
+    if (typeof e === 'object' && e !== null) {
+      const { code, message } = e as Record<string, unknown>;
+      if (typeof code === 'string' && typeof message === 'string') return { status: 'failed', error: { code, message } };
+    }
+  }
+  if (record.status === 'error' && typeof record.message === 'string') {
+    return { status: 'error', message: record.message };
+  }
+  return null;
+}
+
+/**
  * Invokes `capture-run` (the edge function, PR12) for one job. One
  * invocation runs the whole pipeline or fails outright
  * (`captureRunStep.ts`'s own K-12 narrowing note) — this call's own promise
@@ -150,6 +181,10 @@ export type InvokeCaptureRunResult = CaptureRunStepResult | { status: 'error'; m
 export async function invokeCaptureRun(supabase: Client, jobId: UUID): Promise<InvokeCaptureRunResult> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.functions.invoke('capture-run', { body: { jobId } });
-  if (error) return { status: 'error', message: error instanceof Error ? error.message : 'Could not reach the capture service.' };
+  if (error) {
+    const bodyError = await invokeErrorBody(error);
+    if (bodyError) return bodyError;
+    return { status: 'error', message: error instanceof Error ? error.message : 'Could not reach the capture service.' };
+  }
   return data as InvokeCaptureRunResult;
 }

@@ -280,8 +280,8 @@ on an already-`parsed`/`reviewed`/`discarded` job is a safe no-op.
 ### One-time setup
 
 No new secrets beyond what `llm-proxy` already needs — this function calls
-that one internally (`ProxyLlmClient`, forwarding its own service-role key
-as the bearer token) rather than holding its own Anthropic key. Set
+that one internally (`ProxyLlmClient`, forwarding the caller's own session
+JWT as the bearer token) rather than holding its own Anthropic key. Set
 `CAPTURE_RUN_LLM_DIRECT=true` (plus `ANTHROPIC_API_KEY` on *this* function)
 only if no `llm-proxy` is deployed yet and you want `capture-run` to call
 Anthropic directly (`DirectLlmClient`) instead.

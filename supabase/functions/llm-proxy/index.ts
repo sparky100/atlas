@@ -352,8 +352,12 @@ Deno.serve(async (req: Request) => {
     // session, exactly like send-invite-email's identical pattern) a
     // member of this org at all? `members_select`'s RLS means this simply
     // returns nothing for a non-member — no separate permission check to
-    // get wrong.
-    const { data: membership, error: membershipError } = await callerClient.from('members').select('user_id').eq('org_id', orgId).maybeSingle();
+    // get wrong. But that policy lets a member see *every* member of their
+    // org (not just their own row), so a plain `.maybeSingle()` would fail
+    // with PostgREST's "multiple rows" error for any org with more than one
+    // member — `.limit(1)` collapses it to "did any row come back", which is
+    // the question actually being asked.
+    const { data: membership, error: membershipError } = await callerClient.from('members').select('user_id').eq('org_id', orgId).limit(1).maybeSingle();
     if (membershipError) return jsonResponse({ status: 'error', message: `Could not verify membership: ${membershipError.message}` }, 500);
     if (!membership) return jsonResponse({ status: 'error', message: 'Not a member of this organisation.' }, 403);
 

@@ -268,22 +268,24 @@ export async function downloadInput(service: SupabaseClient, job: CaptureRunJob)
 
 // ---------------------------------------------------------------------------
 // §6/§3.5: the LLM client. Defaults to the deployed `llm-proxy` in this
-// same project, forwarding the service-role key as the bearer token
-// exactly as §3.5 describes ("capture-run's service-role key, forwarded
-// after capture-run's own JWT-based authorization already ran") — the real
-// contributor+ check already happened one layer up, in index.ts, against
-// the caller's own JWT. `CAPTURE_RUN_LLM_DIRECT=true` is an escape hatch
-// for an environment with no llm-proxy deployed yet (SPEC §3.5:
-// DirectLlmClient "used when no proxy is configured").
+// same project, forwarding the *caller's own session JWT* (not the
+// service-role key) as the bearer token — the proxy re-derives membership
+// from that forwarded session via `members_select`'s RLS, and a service-role
+// key is not a user-session JWT (it would fail that check with PostgREST's
+// "Expected 3 parts in JWT; got 1"). The real contributor+ check already
+// happened one layer up, in index.ts, against that same caller JWT.
+// `CAPTURE_RUN_LLM_DIRECT=true` is an escape hatch for an environment with
+// no llm-proxy deployed yet (SPEC §3.5: DirectLlmClient "used when no proxy
+// is configured").
 // ---------------------------------------------------------------------------
 
-export function buildLlmClient(supabaseUrl: string, serviceRoleKey: string, orgId: UUID): LlmClient {
+export function buildLlmClient(supabaseUrl: string, callerToken: string, orgId: UUID): LlmClient {
   if (Deno.env.get('CAPTURE_RUN_LLM_DIRECT') === 'true') {
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!apiKey) throw new Error('buildLlmClient: CAPTURE_RUN_LLM_DIRECT=true but ANTHROPIC_API_KEY is not set.');
     return new DirectLlmClient({ apiKey });
   }
-  return new ProxyLlmClient({ proxyUrl: `${supabaseUrl}/functions/v1/llm-proxy`, authToken: serviceRoleKey, orgId });
+  return new ProxyLlmClient({ proxyUrl: `${supabaseUrl}/functions/v1/llm-proxy`, authToken: callerToken, orgId });
 }
 
 // ---------------------------------------------------------------------------
@@ -311,6 +313,8 @@ export async function writeCaptureDraft(service: SupabaseClient, input: WriteCap
 export interface RealCaptureRunDepsConfig {
   supabaseUrl: string;
   serviceRoleKey: string;
+  /** The caller's own session JWT (the same one `index.ts` authorized with) — forwarded to `llm-proxy` so its membership check re-derives a real user, not a service-role token. */
+  callerToken: string;
   orgId: UUID;
   mintId: () => UUID;
 }
@@ -330,7 +334,7 @@ export function buildRealCaptureRunDeps(config: RealCaptureRunDepsConfig): Captu
     readReimportPrevious: (previousJobId) => readReimportPrevious(service, previousJobId),
     getOrCreateJobSource: (job, source) => getOrCreateJobSource(service, job, source, mintId),
     downloadInput: (job) => downloadInput(service, job),
-    llmClient: buildLlmClient(config.supabaseUrl, config.serviceRoleKey, config.orgId),
+    llmClient: buildLlmClient(config.supabaseUrl, config.callerToken, config.orgId),
     mintId,
     writeCaptureDraft: (input) => writeCaptureDraft(service, input),
   };

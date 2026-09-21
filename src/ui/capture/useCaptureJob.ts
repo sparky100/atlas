@@ -129,6 +129,9 @@ export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null):
           if (runResult.status === 'error') {
             setError(`The capture run didn't start: ${runResult.message}. Use Retry once you're ready to try again.`);
             reportError("Couldn't start the capture run.", new Error(runResult.message));
+          } else if (runResult.status === 'failed') {
+            setError(`The capture run failed: ${runResult.error.message}. Use Retry once you're ready to try again.`);
+            reportError("The capture run failed.", new Error(`${runResult.error.code}: ${runResult.error.message}`));
           }
           reload();
         });
@@ -151,6 +154,9 @@ export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null):
         if (result.status === 'error') {
           setError(`Retry didn't start: ${result.message}.`);
           reportError("Couldn't retry this capture run.", new Error(result.message));
+        } else if (result.status === 'failed') {
+          setError(`Retry failed: ${result.error.message}.`);
+          reportError("Retry of this capture run failed.", new Error(`${result.error.code}: ${result.error.message}`));
         }
         reload();
       });

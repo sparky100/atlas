@@ -110,10 +110,12 @@ export interface ProxyLlmClientConfig {
   /**
    * Forwarded as `Authorization: Bearer <authToken>` — the real check the
    * deployed `llm-proxy` performs (`supabase/functions/llm-proxy/index.ts`)
-   * is that this token's own session is a member of `orgId`. From the
-   * browser this is the caller's own session JWT; from `capture-run`
-   * (§3.5, PR12) it is that function's own service-role key, forwarded
-   * after `capture-run`'s own JWT-based authorization already ran.
+   * is that this token's own session is a member of `orgId`. In both cases
+   * it is the caller's own session JWT: directly from the browser, or from
+   * `capture-run` (§3.5, PR12) forwarded through after `capture-run`'s own
+   * JWT-based authorization already ran (never `capture-run`'s service-role
+   * key — that is not a user-session JWT and would fail the proxy's RLS
+   * membership check).
    *
    * (SPEC-capture.md §3.5's prose names a static `LLM_PROXY_KEY` header
    * and `x-atlas-org-id` — that predates the real, already-built E4

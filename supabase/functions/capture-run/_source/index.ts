@@ -75,8 +75,14 @@ Deno.serve(async (req: Request) => {
     const authorizedJob = await readJob(callerClient, jobId);
     if (!authorizedJob) return jsonResponse({ status: 'error', message: 'Capture job not found, or you are not a contributor+ member of its organisation.' }, 404);
 
-    // Step 2: service role for everything else.
-    const deps = buildRealCaptureRunDeps({ supabaseUrl, serviceRoleKey, orgId: authorizedJob.orgId, mintId: () => crypto.randomUUID() });
+    // Step 2: service role for everything else. The caller's own session JWT
+    // is forwarded through to llm-proxy — not the service-role key, which is
+    // not a user-session JWT and would fail the proxy's own RLS membership
+    // check ("Expected 3 parts in JWT; got 1"). The caller's contributor+
+    // membership was already verified in step 1 against this same JWT, and
+    // llm-proxy re-derives it the same way the browser path does.
+    const callerToken = authHeader.replace(/^Bearer\s+/i, '');
+    const deps = buildRealCaptureRunDeps({ supabaseUrl, serviceRoleKey, callerToken, orgId: authorizedJob.orgId, mintId: () => crypto.randomUUID() });
 
     // Step 3.
     const result = await runCaptureRunStep(deps, jobId);
