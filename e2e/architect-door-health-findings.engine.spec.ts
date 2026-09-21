@@ -335,9 +335,9 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // line, mirroring the old "No findings." x2 behaviour it replaces.
   // Assurance is 5, as of S1 item 11a's own two new checks (external
   // interfaces missing classification, external organisation access) —
-  // both zero on an element-less model. Health findings is 13, as of the
-  // architect-door layout prompt's own `capability-no-supporters` check
-  // (the third decision-shaped finding) — also zero here.
+  // both zero on an element-less model. Health findings is 14, as of
+  // ADR-001 amendment's own `replacement-without-departure-plan` check —
+  // also zero here.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // `exact: true`: this model's own title, "Health Findings Clean Test
   // Model", contains "Health Findings" as a substring, so a non-exact
@@ -348,7 +348,7 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // match into a reliable strict-mode violation.
   await expect(page.getByRole('heading', { name: 'Health findings', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
-  const healthClear = page.getByRole('button', { name: '13 checks clear' });
+  const healthClear = page.getByRole('button', { name: '14 checks clear' });
   const assuranceClear = page.getByRole('button', { name: '5 checks clear' });
   await expect(healthClear).toBeVisible();
   await expect(assuranceClear).toBeVisible();
@@ -361,15 +361,85 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   await expect(page.getByText(/duplicates flagged/)).toHaveCount(0);
 
   // Expanding the Health findings group's own line reveals each of its
-  // 13 checks' own "0 X" summary — including ones the panel above never
+  // 14 checks' own "0 X" summary — including ones the panel above never
   // showed a live example of.
   await healthClear.click();
   await expect(page.getByText('0 systems not linked to a capability', { exact: true })).toBeVisible();
   await expect(page.getByText('0 capabilities with no owner', { exact: true })).toBeVisible();
+  await expect(page.getByText('0 replacements with no departure plan of its own', { exact: true })).toBeVisible();
   // Assurance's own line is still collapsed — expanding one group doesn't
   // expand the other.
   await expect(page.getByText(/supporting an essential function/)).toHaveCount(0);
 
   await assuranceClear.click();
   await expect(page.getByText(/supporting an essential function with no technical owner/)).toBeVisible();
+});
+
+test('ADR-001 amendment: a replaces edge whose replacement has no departure plan of its own is flagged; one that already has a plannedEnd is not', async ({ page }) => {
+  const env = loadEnv();
+
+  const email = `healthfindings-replaces-${randomUUID()}@example.test`;
+  const password = `${randomUUID()}Aa1!`;
+
+  await page.goto('/sign-in');
+  await page.getByText("Don't have an account? Create one").click();
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('heading', { name: 'Your organisations' })).toBeVisible();
+
+  const signedIn = createSupabaseClient(env);
+  const { error: signInError } = await signedIn.auth.signInWithPassword({ email, password });
+  if (signInError) throw new Error(`health-findings replaces fixture sign-in: ${signInError.message}`);
+  const { data: userData, error: getUserError } = await signedIn.auth.getUser();
+  if (getUserError) throw new Error(`health-findings replaces fixture: could not read the signed-in user: ${getUserError.message}`);
+  const userId = userData.user.id;
+
+  const orgId = randomUUID();
+  const orgSlug = `healthfindings-replaces-${orgId.slice(0, 8)}`;
+  await createOrganisation(signedIn, { id: orgId, name: 'Health Findings Replaces Test Org', slug: orgSlug, createdBy: userId });
+
+  const modelId = randomUUID();
+  const modelSlug = `healthfindings-replaces-model-${modelId.slice(0, 8)}`;
+  await createModel(signedIn, { id: modelId, orgId, name: 'Health Findings Replaces Test Model', slug: modelSlug, createdBy: userId });
+
+  const main = await getMainBranch(signedIn, modelId);
+  if (!main) throw new Error('main branch was not auto-created');
+  const genesisCommitId = main.head_commit_id;
+
+  const { error: sourceError } = await signedIn.from('sources').insert({ id: randomUUID(), org_id: orgId, model_id: modelId, kind: 'manual', name: 'Seed', user_id: userId, created_by: userId });
+  if (sourceError) throw new Error(`seed source: ${sourceError.message}`);
+  const { data: sourceRow } = await signedIn.from('sources').select('id').eq('model_id', modelId).eq('user_id', userId).single();
+  const seedSourceId = (sourceRow as { id: string }).id;
+
+  const legacyId = randomUUID();
+  const noPlanReplacementId = randomUUID(); // active, no plannedEnd — flagged
+  const plannedReplacementId = randomUUID(); // active, has its own plannedEnd — not flagged
+  const anotherLegacyId = randomUUID();
+
+  const seedEnvelope: CommitEnvelope = {
+    id: randomUUID(),
+    branchId: main.id,
+    parentCommitId: genesisCommitId,
+    mergedBranchHeadCommitId: null,
+    kind: 'manual',
+    title: 'seed two replaces edges, one to a replacement with no departure plan',
+    body: null,
+    deltas: [
+      { kind: 'element.create', id: randomUUID(), elementId: legacyId, elementType: 'system', name: 'Legacy CRM', parentId: null, attributes: { lifecycleStatus: 'retiring', plannedEnd: '2027-01-01' }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: noPlanReplacementId, elementType: 'system', name: 'Undated Replacement', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: anotherLegacyId, elementType: 'system', name: 'Another Legacy System', parentId: null, attributes: { lifecycleStatus: 'retiring', plannedEnd: '2027-01-01' }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: plannedReplacementId, elementType: 'system', name: 'Planned Replacement', parentId: null, attributes: { lifecycleStatus: 'active', plannedEnd: '2033-01-01', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'replaces', fromElementId: noPlanReplacementId, toElementId: legacyId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'replaces', fromElementId: plannedReplacementId, toElementId: anotherLegacyId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
+    ],
+  };
+  const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope: seedEnvelope });
+  if (!seedResult.ok) throw new Error(`seeding health-findings replaces fixture: ${seedResult.message}`);
+
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
+  await expect(page.getByText('1 replacement with no departure plan of its own')).toBeVisible();
+  await expect(page.getByText('Undated Replacement → Legacy CRM')).toBeVisible();
+  // The other replaces edge's own replacement already has a plannedEnd — never named here.
+  await expect(page.getByText('Planned Replacement → Another Legacy System')).toHaveCount(0);
 });
