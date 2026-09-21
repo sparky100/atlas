@@ -574,15 +574,18 @@ export function findCriticalSystemsWithoutBusinessOwner(elements: readonly Eleme
  * planned replacement" — a system-level analogue of
  * `src/ui/capabilityMap/metrics.ts`'s own `lifecycleExposure` (a
  * capability-level rollup over its supporting systems); this reads a
- * system's own `plannedEnd` directly, no rollup needed. Same "no planned
- * replacement" simplification that file's module comment documents:
- * nothing today can record a planned replacement (UI-principles §10
- * decision 4's review-queue machinery doesn't exist yet), so that half of
- * the condition is vacuously true — this narrows correctly once it does,
- * not silently wrong now.
+ * system's own `plannedEnd` directly, no rollup needed. "No planned
+ * replacement" (ADR-001 amendment) now reads a real fact: a critical
+ * system with a live `replaces` edge into it (`replacedElementIds`, every
+ * such edge's own `to_element_id` — the retiring side) never counts as
+ * exposed, however near or past its own `plannedEnd`. Existence-only, same
+ * as `lifecycleExposure`'s own version of this check — the replacement's
+ * own lifecycle is `findReplacementsWithoutDeparturePlan`'s separate
+ * finding, not this one's job.
  */
-export function findCriticalExposedSystems(systems: readonly ElementsHeadRow[], now: Date = new Date()): ElementsHeadRow[] {
+export function findCriticalExposedSystems(systems: readonly ElementsHeadRow[], replacedElementIds: ReadonlySet<UUID>, now: Date = new Date()): ElementsHeadRow[] {
   return systems.filter((system) => {
+    if (replacedElementIds.has(system.element_id)) return false;
     const attrs = attributesRecord(system.attributes);
     if (attrs.criticality !== 'critical') return false;
     const plannedEndValue = attrs.plannedEnd;
