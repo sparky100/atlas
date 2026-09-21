@@ -239,6 +239,19 @@ export async function addSupportsRelationship(page: Page, capabilityNameMatch: s
   }
 }
 
+/**
+ * From an element page, "+ Add replaces" a system or module (ADR-001
+ * amendment) — always a plain pick, unlike `supports`/`uses`/`flows_to`/
+ * `owns`: `replaces` has no staged prompt of its own (no primary?, no verb
+ * phrase, no owner role), so the edge is created the instant the search
+ * result is clicked.
+ */
+export async function addReplacesRelationship(page: Page, targetNameMatch: string): Promise<void> {
+  await page.getByRole('button', { name: '+ Add replaces' }).click();
+  await page.getByPlaceholder('Search…').fill(targetNameMatch);
+  await page.getByRole('button', { name: new RegExp(targetNameMatch) }).click();
+}
+
 /** Rename the element on the currently-open element page, via the header's "⋯" menu — `element-rename.spec.ts`'s own locator convention (a bare `getByRole('textbox')` also matches the Comments composer, so this is scoped to `<header>`). */
 export async function renameElement(page: Page, newName: string): Promise<void> {
   await page.getByRole('button', { name: 'Element actions' }).click();
