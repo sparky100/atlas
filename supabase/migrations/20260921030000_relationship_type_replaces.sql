@@ -1,0 +1,22 @@
+-- ADR-001 amendment ("replaces"): a fourth relationship type, alongside
+-- supports/uses/owns/flows_to, recording that one system or module
+-- replaces another — directional, `from_element_id` is the replacement,
+-- `to_element_id` is the retiring element ("B replaces A" is
+-- `from: B, to: A`). See docs/ADR-000-foundations.md's ADR-001 amendment
+-- for the full reasoning (no cardinality cap, consolidation/split as
+-- ordinary many-to-many facts, and why this is new schema rather than a
+-- conversion of any existing data — there is no prior stored
+-- `replacedBy` anywhere in this schema).
+--
+-- This migration only adds the enum value. Postgres does not allow a new
+-- enum label to be referenced by name in the same transaction that adds
+-- it (ALTER TYPE ... ADD VALUE commits are visible only after the
+-- transaction commits) — same split this schema already used twice for
+-- `commit_kind` (20260906210000_commit_kind_genesis.sql,
+-- 20260913140000_preparation_commit_kind.sql). `RELATIONSHIP_TYPE_RULES`
+-- itself is a pure TS constant, never a migrated table (SPEC-data-model.md
+-- §3.3's own design note), so no second migration is needed here — the
+-- application-layer legality check is already covered by
+-- `src/contracts/relationshipTypeRules.ts`'s new rows.
+
+alter type relationship_type add value 'replaces';

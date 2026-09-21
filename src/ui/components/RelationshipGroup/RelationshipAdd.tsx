@@ -41,6 +41,7 @@ const DIRECTION_VERB: Record<RelationshipType, { outbound: string; inbound: stri
   owns: { outbound: 'owns', inbound: 'owned by' },
   uses: { outbound: 'uses', inbound: 'used by' },
   flows_to: { outbound: 'flows to', inbound: 'receives from' },
+  replaces: { outbound: 'replaces', inbound: 'replaced by' },
 };
 
 interface PendingTarget {

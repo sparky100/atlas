@@ -50,4 +50,29 @@ describe('RELATIONSHIP_TYPE_RULES', () => {
     expect(findRelationshipTypeRule('owns', 'system', 'container')).toBeUndefined();
     expect(findRelationshipTypeRule('owns', 'actor', 'actor')).toBeUndefined();
   });
+
+  it('ADR-001 amendment ("replaces"): legal in all four system/container combinations, same promiscuity uses/flows_to already have', () => {
+    expect(findRelationshipTypeRule('replaces', 'system', 'system')).toBeDefined();
+    expect(findRelationshipTypeRule('replaces', 'system', 'container')).toBeDefined();
+    expect(findRelationshipTypeRule('replaces', 'container', 'system')).toBeDefined();
+    expect(findRelationshipTypeRule('replaces', 'container', 'container')).toBeDefined();
+  });
+
+  it('replaces has no cardinality cap in either direction — consolidation and split are both ordinary many-to-many facts', () => {
+    for (const [fromType, toType] of [
+      ['system', 'system'],
+      ['system', 'container'],
+      ['container', 'system'],
+      ['container', 'container'],
+    ] as const) {
+      expect(findRelationshipTypeRule('replaces', fromType, toType)).toMatchObject({ maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null });
+    }
+  });
+
+  it('replaces never reaches a capability or an actor endpoint', () => {
+    expect(findRelationshipTypeRule('replaces', 'system', 'capability')).toBeUndefined();
+    expect(findRelationshipTypeRule('replaces', 'capability', 'system')).toBeUndefined();
+    expect(findRelationshipTypeRule('replaces', 'actor', 'system')).toBeUndefined();
+    expect(findRelationshipTypeRule('replaces', 'system', 'actor')).toBeUndefined();
+  });
 });

@@ -30,6 +30,11 @@ const DIRECTION_LABEL: Record<RelationshipType, { outbound: string; inbound: str
   owns: { outbound: 'owns', inbound: 'owned by' },
   uses: { outbound: 'uses', inbound: 'used by' },
   flows_to: { outbound: 'flows to', inbound: 'receives from' },
+  // ADR-001 amendment ("replaces") — not yet in DISPLAY_ORDER below, so this
+  // entry exists only to satisfy the exhaustive Record; the "Replaces"/
+  // "Replaced by" sections don't render on the element page until a later
+  // PR adds 'replaces' to DISPLAY_ORDER and covers the rendering behaviour.
+  replaces: { outbound: 'replaces', inbound: 'replaced by' },
 };
 
 /** Everything `RelationshipAdd` needs beyond the group slot itself and direction — one object so `RelationshipsSection`'s own prop list doesn't grow one entry per field every time the create path needs another. Omitted entirely (not passed disabled) when the caller hasn't established edit rights, same convention as `CapabilityMapView`'s `reorderCapability`. */

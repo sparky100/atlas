@@ -12,6 +12,7 @@ export const OUTBOUND_VERB: Record<RelationshipType, string> = {
   owns: 'owns',
   uses: 'uses',
   flows_to: 'flows to',
+  replaces: 'replaces',
 };
 
 export const INBOUND_VERB: Record<RelationshipType, string> = {
@@ -19,4 +20,5 @@ export const INBOUND_VERB: Record<RelationshipType, string> = {
   owns: 'owned by',
   uses: 'used by',
   flows_to: 'receives from',
+  replaces: 'replaced by',
 };

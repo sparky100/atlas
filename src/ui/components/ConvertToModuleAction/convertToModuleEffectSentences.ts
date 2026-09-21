@@ -19,6 +19,7 @@ const STILL_VERB: Record<RelationshipType, { from: string; to: string }> = {
   uses: { from: 'use', to: 'be used by' },
   owns: { from: 'own', to: 'be owned by' },
   flows_to: { from: 'flow to', to: 'receive from' },
+  replaces: { from: 'replace', to: 'be replaced by' },
 };
 
 /** "The new module will still {verb} {otherName}." — one line per relationship the conversion carries over unchanged (`buildConvertSystemToModuleDeltas`'s own module comment: every one of them carries over, nothing is ever dropped). */

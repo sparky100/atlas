@@ -57,11 +57,19 @@ const FLOWS_TO_META = {
 } satisfies Record<'description' | 'dataClassification' | 'protocol', AttributeFieldMeta>;
 const FLOWS_TO_ORDER = ['description', 'dataClassification', 'protocol'] as const;
 
+// ADR-001 amendment ("replaces"): no role, no via — a plain optional note,
+// same shape `supports`'s own free-text `description` field already has.
+const REPLACES_META = {
+  description: { label: 'Description', required: false, kind: 'text', multiline: true },
+} satisfies Record<'description', AttributeFieldMeta>;
+const REPLACES_ORDER = ['description'] as const;
+
 export const RELATIONSHIP_ATTRIBUTE_SCHEMA_BY_TYPE: Record<RelationshipType, readonly AttributeFieldSchema[]> = {
   supports: schemaOf(SUPPORTS_ORDER, SUPPORTS_META),
   uses: schemaOf(USES_ORDER, USES_META),
   owns: schemaOf(OWNS_ORDER, OWNS_META),
   flows_to: schemaOf(FLOWS_TO_ORDER, FLOWS_TO_META),
+  replaces: schemaOf(REPLACES_ORDER, REPLACES_META),
 };
 
 export function relationshipAttributeFieldSchema(relationshipType: RelationshipType, key: string): AttributeFieldSchema | undefined {

@@ -421,6 +421,9 @@ const ENDPOINT_TYPES_BY_RELATIONSHIP: Readonly<Record<RelationshipType, readonly
   uses: ['system', 'container'],
   owns: ['actor', 'system', 'container', 'capability'],
   flows_to: ['system', 'container'],
+  // ADR-001 amendment ("replaces") — legal endpoint types match
+  // RELATIONSHIP_TYPE_RULES' own system/container-to-system/container triples.
+  replaces: ['system', 'container'],
 };
 
 interface ResolvedEndpoint {
