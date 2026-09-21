@@ -37,6 +37,7 @@ import type { ElementsHeadRow } from '../contracts/rows';
 import { normalizeName } from '../engine/merge';
 import { IDENTITY_TRIGRAM_THRESHOLD, trigramSimilarity } from '../engine/trigram';
 import type { ImportRow } from './importRowSchema';
+import type { ImportValueStreamRow } from './importValueStreamRow';
 
 function systemKindOf(system: ElementsHeadRow): unknown {
   const attributes = system.attributes;
@@ -202,5 +203,61 @@ export function matchImportRows(input: MatchImportRowsInput): MatchedImportRow[]
     }
     const modulePool = toRefs(containers.filter((c) => c.parent_id === platform.element.elementId));
     return { row, match: matchRowIdentity(row.name, modulePool, aliasesByElementId), platform, capabilities, businessOwner, technicalOwner };
+  });
+}
+
+/**
+ * F6 (ADR-023): resolves a JSON import's `value_streams` section against
+ * the model's own value streams. Streams and stages are structural — a
+ * stream is matched by exact name (or alias) among the root `value_stream`s
+ * (`parent_id === null`), a stage by exact name within its *matched*
+ * stream's own stages. No fuzzy tier, no same-as/new picker: a name that
+ * doesn't match exactly is simply created new (the import itself is gated
+ * to a `correct`-intent change — ADR-023's own edit gate — so "create a
+ * stream the author wrote down" is the honest reading, not a risky
+ * near-match). Each stage's `enables` names resolve through the ordinary
+ * reference cascade (`resolveReference`: exact, then fuzzy auto-resolving a
+ * lone leader), the same rule a `capability` column already uses.
+ */
+export interface MatchedImportValueStreamStage {
+  name: string;
+  match: { kind: 'new' } | { kind: 'matched'; element: ExistingElementRef };
+  enables: { name: string; outcome: NameResolutionOutcome }[];
+}
+
+export interface MatchedImportValueStream {
+  rowNumber: number;
+  name: string;
+  match: { kind: 'new' } | { kind: 'matched'; element: ExistingElementRef };
+  stages: MatchedImportValueStreamStage[];
+}
+
+export function matchImportValueStreams(input: {
+  valueStreamRows: readonly ImportValueStreamRow[];
+  valueStreams: readonly ElementsHeadRow[];
+  capabilities: readonly ElementsHeadRow[];
+  aliasesByElementId: ReadonlyMap<UUID, readonly string[]>;
+}): MatchedImportValueStream[] {
+  const { valueStreamRows, valueStreams, capabilities, aliasesByElementId } = input;
+  const streamPool = valueStreams.filter((e) => e.parent_id === null);
+  const capabilityPool = toRefs(capabilities);
+
+  return valueStreamRows.map((row) => {
+    const streamMatches = exactMatches(row.name, toRefs(streamPool), aliasesByElementId);
+    const stream = streamMatches.length === 1 ? streamMatches[0] : undefined;
+    const match = stream !== undefined ? ({ kind: 'matched', element: stream } as const) : ({ kind: 'new' } as const);
+
+    const stagePool = match.kind === 'matched' ? valueStreams.filter((e) => e.parent_id === match.element.elementId) : [];
+    const stages = row.stages.map((stage): MatchedImportValueStreamStage => {
+      const stageMatches = exactMatches(stage.name, toRefs(stagePool), aliasesByElementId);
+      const matchedStage = stageMatches.length === 1 ? stageMatches[0] : undefined;
+      return {
+        name: stage.name,
+        match: matchedStage !== undefined ? ({ kind: 'matched', element: matchedStage } as const) : ({ kind: 'new' } as const),
+        enables: stage.enables.map((name) => ({ name, outcome: resolveReference(name, capabilityPool, aliasesByElementId) })),
+      };
+    });
+
+    return { rowNumber: row.rowNumber, name: row.name, match, stages };
   });
 }

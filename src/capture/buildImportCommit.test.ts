@@ -4,7 +4,7 @@ import type { ImportChangeRow } from './importChangeRow';
 import type { ImportRelationshipRow } from './importRelationshipRow';
 import type { ImportRow } from './importRowSchema';
 import type { CurrentSupportsEdge } from './buildImportCommit';
-import type { MatchedImportRow, NameResolutionOutcome } from './matchImportRows';
+import type { MatchedImportRow, MatchedImportValueStream, NameResolutionOutcome } from './matchImportRows';
 import { buildImportDeltas } from './buildImportCommit';
 
 const SOURCE_ID = 'source-1';
@@ -40,6 +40,8 @@ interface BuildOptions {
   currentUsesFlowsToEdges?: RelationshipsHeadRow[];
   relationshipFactsByRelationshipId?: Map<string, Map<string, FactsRow>>;
   changeRows?: ImportChangeRow[];
+  matchedValueStreams?: MatchedImportValueStream[];
+  currentEnablesEdges?: RelationshipsHeadRow[];
 }
 
 function build(matchedRows: MatchedImportRow[], options: BuildOptions = {}) {
@@ -59,6 +61,8 @@ function build(matchedRows: MatchedImportRow[], options: BuildOptions = {}) {
     currentUsesFlowsToEdges: options.currentUsesFlowsToEdges,
     relationshipFactsByRelationshipId: options.relationshipFactsByRelationshipId,
     changeRows: options.changeRows,
+    matchedValueStreams: options.matchedValueStreams,
+    currentEnablesEdges: options.currentEnablesEdges,
   });
 }
 
@@ -637,5 +641,70 @@ describe('buildImportDeltas — JSON import per-entry quote/confidence provenanc
     const { deltas } = build(matchedRows);
     const actorCreate = deltas.find((d) => d.kind === 'element.create' && d.elementType === 'actor');
     expect(actorCreate).toMatchObject({ confidence: 0.7, sourceRef: `${FILE_NAME} › row 2 › business_owner — "Jane Doe owns Northgate"` });
+  });
+});
+
+function matchedValueStream(rowNumber: number, name: string, stages: { name: string; enables: { name: string; outcome: NameResolutionOutcome }[] }[]): MatchedImportValueStream {
+  return { rowNumber, name, match: { kind: 'new' }, stages: stages.map((s) => ({ name: s.name, match: { kind: 'new' }, enables: s.enables })) };
+}
+
+function enablesEdge(from: string, to: string): RelationshipsHeadRow {
+  return { relationship_id: `e-${from}-${to}`, relationship_type: 'enables', from_element_id: from, to_element_id: to, attributes: {}, exists_delta_id: `e-${from}-${to}-create` };
+}
+
+describe('buildImportDeltas — value streams (F6/ADR-023)', () => {
+  it('creates a stream, its stages, and its enables edges, streams before stages before enables', () => {
+    const matched = [matchedValueStream(1, 'Getting Connected', [{ name: 'Apply', enables: [{ name: 'Connections', outcome: { kind: 'matched', element: { elementId: 'cap-1', name: 'Connections' } } }] }])];
+    const { valueStreamRows, deltas } = build([], { matchedValueStreams: matched });
+    expect(valueStreamRows).toEqual([{ rowNumber: 1, name: 'Getting Connected', outcome: 'new', warnings: [] }]);
+
+    const valueStreamCreates = deltas.filter((d) => d.kind === 'element.create' && d.elementType === 'value_stream');
+    expect(valueStreamCreates).toHaveLength(2);
+    expect(valueStreamCreates[0]).toMatchObject({ name: 'Getting Connected', parentId: null, attributes: { order: 10 } });
+    expect(valueStreamCreates[1]).toMatchObject({ name: 'Apply', parentId: valueStreamCreates[0]?.elementId, attributes: { order: 10 } });
+
+    const enableCreate = deltas.find((d) => d.kind === 'relationship.create' && d.relationshipType === 'enables');
+    expect(enableCreate).toMatchObject({ fromElementId: 'cap-1', toElementId: valueStreamCreates[1]?.elementId, attributes: {} });
+  });
+
+  it('matches an existing stream/stage and only creates the missing enables edges (never retracts)', () => {
+    const matched: MatchedImportValueStream[] = [
+      {
+        rowNumber: 1,
+        name: 'Getting Connected',
+        match: { kind: 'matched', element: { elementId: 'vs-1', name: 'Getting Connected' } },
+        stages: [
+          {
+            name: 'Apply',
+            match: { kind: 'matched', element: { elementId: 'stage-1', name: 'Apply' } },
+            enables: [
+              { name: 'Connections', outcome: { kind: 'matched', element: { elementId: 'cap-1', name: 'Connections' } } },
+              { name: 'Billing', outcome: { kind: 'matched', element: { elementId: 'cap-2', name: 'Billing' } } },
+            ],
+          },
+        ],
+      },
+    ];
+    const currentEnablesEdges = [enablesEdge('cap-1', 'stage-1')];
+    const { valueStreamRows, deltas } = build([], { matchedValueStreams: matched, currentEnablesEdges });
+    expect(valueStreamRows).toEqual([{ rowNumber: 1, name: 'Getting Connected', outcome: 'changed', warnings: [] }]);
+    const enableCreates = deltas.filter((d) => d.kind === 'relationship.create' && d.relationshipType === 'enables');
+    expect(enableCreates).toHaveLength(1);
+    expect(enableCreates[0]).toMatchObject({ fromElementId: 'cap-2', toElementId: 'stage-1' });
+  });
+
+  it('warns (but never blocks) on an unresolved or ambiguous enables name', () => {
+    const matched = [matchedValueStream(1, 'Stream', [{ name: 'Stage', enables: [{ name: 'Missing', outcome: { kind: 'new' } }, { name: 'Dup', outcome: { kind: 'ambiguous', candidates: [] } }] }])];
+    const { valueStreamRows } = build([], { matchedValueStreams: matched });
+    expect(valueStreamRows[0]?.warnings).toEqual(['enables "Missing" was not found — never created by an import.', 'enables "Dup" matched more than one existing capability — left unlinked.']);
+  });
+
+  it('is unchanged for a stream/stage whose enables are all already linked', () => {
+    const matched: MatchedImportValueStream[] = [
+      { rowNumber: 1, name: 'Getting Connected', match: { kind: 'matched', element: { elementId: 'vs-1', name: 'Getting Connected' } }, stages: [{ name: 'Apply', match: { kind: 'matched', element: { elementId: 'stage-1', name: 'Apply' } }, enables: [{ name: 'Connections', outcome: { kind: 'matched', element: { elementId: 'cap-1', name: 'Connections' } } }] }] },
+    ];
+    const { valueStreamRows, deltas } = build([], { matchedValueStreams: matched, currentEnablesEdges: [enablesEdge('cap-1', 'stage-1')] });
+    expect(valueStreamRows).toEqual([{ rowNumber: 1, name: 'Getting Connected', outcome: 'unchanged', warnings: [] }]);
+    expect(deltas).toHaveLength(0);
   });
 });

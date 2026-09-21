@@ -13,6 +13,7 @@ import * as XLSX from 'xlsx';
 import type { ImportChangeRow } from './importChangeRow';
 import { validateImportRelationshipRow, type ImportRelationshipRow, type ImportRelationshipRowResult } from './importRelationshipRow';
 import { validateImportRow, type ImportRow, type ImportRowResult } from './importRowSchema';
+import type { ImportValueStreamRow } from './importValueStreamRow';
 
 /** The one other sheet name this format recognises — case-sensitive, matching every other header/sheet name in this format. XLSX only: a plain CSV has no second sheet to carry one, so `relationshipRows`/`relationshipErrors` are always empty for a `.csv` file. */
 const RELATIONSHIPS_SHEET_NAME = 'Relationships';
@@ -35,6 +36,10 @@ export interface ParsedImportFile {
   changeRows: ImportChangeRow[];
   /** Every "changes" entry that didn't validate — always empty for a CSV/XLSX file. */
   changeErrors: { rowNumber: number; error: string }[];
+  /** F6 (ADR-023) JSON import's own "value_streams" section — always empty for a CSV/XLSX file, which has no such section. */
+  valueStreamRows: ImportValueStreamRow[];
+  /** Every "value_streams" entry that didn't validate — always empty for a CSV/XLSX file. */
+  valueStreamErrors: { rowNumber: number; error: string }[];
 }
 
 /** How many of the file's own raw rows the dialog's preview shows, before any matching/classification runs. Exported for `parseImportJson.ts`'s own identical preview need. */
@@ -107,5 +112,5 @@ export async function parseImportFile(file: File): Promise<ParsedImportFile> {
     });
   }
 
-  return { fileName: file.name, detectedColumns, previewRows: rawRows.slice(0, PREVIEW_ROW_COUNT), rows, errors, relationshipRows, relationshipErrors, changeRows: [], changeErrors: [] };
+  return { fileName: file.name, detectedColumns, previewRows: rawRows.slice(0, PREVIEW_ROW_COUNT), rows, errors, relationshipRows, relationshipErrors, changeRows: [], changeErrors: [], valueStreamRows: [], valueStreamErrors: [] };
 }

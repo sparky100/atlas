@@ -44,4 +44,11 @@ describe('buildImportPromptSchema', () => {
     expect(schema).toContain('changes');
     expect(schema).not.toContain('CSV');
   });
+
+  it('documents the value_streams section and its correction-intent consequence', () => {
+    const schema = buildImportPromptSchema();
+    expect(schema).toContain('value_streams');
+    expect(schema).toContain('enables');
+    expect(schema).toContain('correct');
+  });
 });

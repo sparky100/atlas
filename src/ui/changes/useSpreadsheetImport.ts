@@ -4,8 +4,9 @@ import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../cont
 import { buildImportDeltas, type CurrentSupportsEdge, type MatchResolution } from '../../capture/buildImportCommit';
 import type { ImportChangeRow } from '../../capture/importChangeRow';
 import type { ImportRelationshipRow } from '../../capture/importRelationshipRow';
+import type { ImportValueStreamRow } from '../../capture/importValueStreamRow';
 import { computeNotInFile, type NotInFileElement } from '../../capture/notInFile';
-import { matchImportRows, type MatchedImportRow } from '../../capture/matchImportRows';
+import { matchImportRows, matchImportValueStreams, type MatchedImportRow, type MatchedImportValueStream } from '../../capture/matchImportRows';
 import { ImportFileParseError, parseImportFile } from '../../capture/parseImportFile';
 import { parseImportJson } from '../../capture/parseImportJson';
 import { listAliasesForModel } from '../../db/aliases';
@@ -16,6 +17,7 @@ import { listAllUsesAndFlowsToEdges, listFactsForCommit } from '../../db/healthF
 import { listActorsForLandscape, listContainersForLandscape, listSystemsForLandscape } from '../../db/landscape';
 import { listAllSupportsEdges } from '../../db/modelHome';
 import { createSpreadsheetSource } from '../../db/sources';
+import { listAllEnablesEdges, listValueStreamElements } from '../../db/valueStreams';
 import { attributesRecord } from '../elements/attributesRecord';
 import { supabase } from '../supabaseClient';
 
@@ -38,6 +40,13 @@ export interface SpreadsheetImportReview {
   /** F2-lite JSON import's own "changes" section — always empty for a CSV/XLSX file. */
   changeRows: ImportChangeRow[];
   changeParseErrors: { rowNumber: number; error: string }[];
+  /** F6 (ADR-023) JSON import's own "value_streams" section — always empty for a CSV/XLSX file. */
+  valueStreamRows: ImportValueStreamRow[];
+  valueStreamParseErrors: { rowNumber: number; error: string }[];
+  /** The model's own value streams/enables (loaded once, at file-load time) — the pool `matchImportValueStreams` resolves the section against. */
+  valueStreams: ElementsHeadRow[];
+  enablesEdges: RelationshipsHeadRow[];
+  matchedValueStreams: MatchedImportValueStream[];
 }
 
 export interface UseSpreadsheetImportResult {
@@ -116,7 +125,7 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
         const parsed = file.name.toLowerCase().endsWith('.json') ? await parseImportJson(file) : await parseImportFile(file);
         const main = await getMainBranch(supabase, modelId);
         if (!main) throw new Error('This model has no main to import into.');
-        const [systems, containers, capabilities, loadedActors, loadedAliasesByElementId, allFacts, supportsEdges, usesFlowsToEdges] = await Promise.all([
+        const [systems, containers, capabilities, loadedActors, loadedAliasesByElementId, allFacts, supportsEdges, usesFlowsToEdges, valueStreams, enablesEdges] = await Promise.all([
           listSystemsForLandscape(supabase, main.head_commit_id),
           listContainersForLandscape(supabase, main.head_commit_id),
           listCapabilitiesForMap(supabase, main.head_commit_id),
@@ -125,8 +134,11 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
           listFactsForCommit(supabase, main.head_commit_id),
           listAllSupportsEdges(supabase, main.head_commit_id),
           listAllUsesAndFlowsToEdges(supabase, main.head_commit_id),
+          listValueStreamElements(supabase, main.head_commit_id),
+          listAllEnablesEdges(supabase, main.head_commit_id),
         ]);
         const matchedRows = matchImportRows({ rows: parsed.rows, systems, containers, capabilities, actors: loadedActors, aliasesByElementId: loadedAliasesByElementId });
+        const matchedValueStreams = matchImportValueStreams({ valueStreamRows: parsed.valueStreamRows, valueStreams, capabilities, aliasesByElementId: loadedAliasesByElementId });
 
         const facts = new Map<UUID, Map<string, FactsRow>>();
         const relationshipFacts = new Map<UUID, Map<string, FactsRow>>();
@@ -163,7 +175,7 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
         }
         setCurrentSupportsByElementId(supportsByElementId);
 
-        setReview({ fileName: parsed.fileName, detectedColumns: parsed.detectedColumns, previewRows: parsed.previewRows, matchedRows, parseErrors: parsed.errors, systems, containers, relationshipRows: parsed.relationshipRows, relationshipParseErrors: parsed.relationshipErrors, changeRows: parsed.changeRows, changeParseErrors: parsed.changeErrors });
+        setReview({ fileName: parsed.fileName, detectedColumns: parsed.detectedColumns, previewRows: parsed.previewRows, matchedRows, parseErrors: parsed.errors, systems, containers, relationshipRows: parsed.relationshipRows, relationshipParseErrors: parsed.relationshipErrors, changeRows: parsed.changeRows, changeParseErrors: parsed.changeErrors, valueStreamRows: parsed.valueStreamRows, valueStreamParseErrors: parsed.valueStreamErrors, valueStreams, enablesEdges, matchedValueStreams });
         setStatus('review');
       } catch (e) {
         const message = e instanceof ImportFileParseError ? e.message : e instanceof Error ? e.message : 'Could not read this file.';
@@ -219,6 +231,8 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
       currentUsesFlowsToEdges,
       relationshipFactsByRelationshipId,
       changeRows: review.changeRows.filter((r) => !excludedChangeRows.has(r.rowNumber)),
+      matchedValueStreams: review.matchedValueStreams,
+      currentEnablesEdges: review.enablesEdges,
     });
   }, [review, resolutions, factsByElementId, existsDeltaIdByElementId, currentSupportsByElementId, actors, aliasesByElementId, currentUsesFlowsToEdges, relationshipFactsByRelationshipId, excludedSystemRows, excludedRelationshipRows, excludedChangeRows]);
 
@@ -265,6 +279,12 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
         return null;
       }
 
+      // F6 (ADR-023): an import whose file carries a `value_streams` section
+      // is restating structure, so it must be a `correct`-intent change (the
+      // value-stream edit gate admits structural edits only inside a
+      // correction). A file with no such section is unchanged — a plain
+      // `record`, exactly as before.
+      const hasValueStreams = review.valueStreamRows.length > 0;
       const branch = await createChangeBranch(supabase, {
         id: crypto.randomUUID(),
         orgId,
@@ -273,7 +293,7 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
         title: `Imported from ${review.fileName}`,
         createdBy: userId,
         mainHeadCommitId: main.head_commit_id,
-        intent: 'record',
+        intent: hasValueStreams ? 'correct' : 'record',
       });
 
       const warnings = final.rows.flatMap((r) => r.warnings);

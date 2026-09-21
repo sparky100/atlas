@@ -18,6 +18,7 @@
 import { validateImportChangeRow, type ImportChangeRowResult } from './importChangeRow';
 import { validateImportRelationshipRow, type ImportRelationshipRowResult } from './importRelationshipRow';
 import { validateImportRow, type ImportRowResult } from './importRowSchema';
+import { validateImportValueStreamRow, type ImportValueStreamRowResult } from './importValueStreamRow';
 import { ImportFileParseError, PREVIEW_ROW_COUNT, type ParsedImportFile } from './parseImportFile';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -79,6 +80,21 @@ export async function parseImportJson(file: File): Promise<ParsedImportFile> {
     else changeErrors.push({ rowNumber: result.rowNumber, error: result.error });
   });
 
-  const detectedColumns = Object.keys(parsed).filter((key) => key === 'systems' || key === 'relationships' || key === 'changes');
-  return { fileName: file.name, detectedColumns, previewRows: rawSystems.slice(0, PREVIEW_ROW_COUNT) as Record<string, unknown>[], rows, errors, relationshipRows, relationshipErrors, changeRows, changeErrors };
+  // F6 (ADR-023): the optional "value_streams" section — one stream per
+  // entry, its stages and their `enables` capability names.
+  const rawValueStreams = Array.isArray(parsed.value_streams) ? parsed.value_streams : [];
+  const valueStreamRows: ParsedImportFile['valueStreamRows'] = [];
+  const valueStreamErrors: ParsedImportFile['valueStreamErrors'] = [];
+  rawValueStreams.forEach((raw: unknown, index) => {
+    if (!isPlainObject(raw)) {
+      valueStreamErrors.push({ rowNumber: index + 1, error: 'each "value_streams" entry must be an object' });
+      return;
+    }
+    const result: ImportValueStreamRowResult = validateImportValueStreamRow(raw, index + 1);
+    if (result.ok) valueStreamRows.push(result.row);
+    else valueStreamErrors.push({ rowNumber: result.rowNumber, error: result.error });
+  });
+
+  const detectedColumns = Object.keys(parsed).filter((key) => key === 'systems' || key === 'relationships' || key === 'changes' || key === 'value_streams');
+  return { fileName: file.name, detectedColumns, previewRows: rawSystems.slice(0, PREVIEW_ROW_COUNT) as Record<string, unknown>[], rows, errors, relationshipRows, relationshipErrors, changeRows, changeErrors, valueStreamRows, valueStreamErrors };
 }

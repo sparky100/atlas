@@ -98,6 +98,8 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
   const relationshipBlockedCount = relationshipRows.filter((r) => r.outcome.status === 'blocked').length;
   const changeRows = buildResult?.changeRows ?? [];
   const changeBlockedCount = changeRows.filter((r) => r.outcome.status === 'blocked').length;
+  const valueStreamRows = buildResult?.valueStreamRows ?? [];
+  const hasValueStreams = review !== null && review.valueStreamRows.length > 0;
   const canImport = rows.length > 0 && needsPickCount === 0 && blockedCount === 0 && relationshipBlockedCount === 0 && changeBlockedCount === 0;
   const totalBlockedCount = blockedCount + relationshipBlockedCount + changeBlockedCount;
 
@@ -125,7 +127,7 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
           </div>
 
           <Text as="p" tone="muted" size="sm">
-            One row per system, or a module (set <Text as="span" mono size="sm">platform</Text>). Columns: {IMPORT_COLUMNS.join(', ')} — only <Text as="span" mono size="sm">name</Text> is required. An XLSX file may also carry a "Relationships" sheet for <Text as="span" mono size="sm">uses</Text>/<Text as="span" mono size="sm">flows_to</Text> edges. A <Text as="span" mono size="sm">.json</Text> file uses the same reconciliation instead of sheets: <Text as="span" mono size="sm">{'{ systems, relationships, changes }'}</Text>, with <Text as="span" mono size="sm">changes</Text> an explicit retire/restore list for elements this file's own author already knows are being decommissioned or reinstated.
+            One row per system, or a module (set <Text as="span" mono size="sm">platform</Text>). Columns: {IMPORT_COLUMNS.join(', ')} — only <Text as="span" mono size="sm">name</Text> is required. An XLSX file may also carry a "Relationships" sheet for <Text as="span" mono size="sm">uses</Text>/<Text as="span" mono size="sm">flows_to</Text> edges. A <Text as="span" mono size="sm">.json</Text> file uses the same reconciliation instead of sheets: <Text as="span" mono size="sm">{'{ systems, relationships, changes, value_streams }'}</Text>, with <Text as="span" mono size="sm">changes</Text> an explicit retire/restore list and <Text as="span" mono size="sm">value_streams</Text> the outcome structure (imported as a correction).
           </Text>
           <div className={styles.templateLinks}>
             <Button variant="ghost" onClick={downloadTemplateCsv}>
@@ -167,6 +169,11 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
 
           {review && (status === 'review' || status === 'committing') && (
             <div className={styles.review}>
+              {hasValueStreams && (
+                <Text as="p" size="sm" tone="muted">
+                  This file declares value streams, so it will import as a <Text as="span" mono size="sm">correct</Text>-intent change — value-stream structure can only change in a correction (ADR-023).
+                </Text>
+              )}
               <CollapsibleSection title="Detected columns" defaultOpen={false}>
                 <Text as="p" size="sm" mono>
                   {review.detectedColumns.join(', ')}
@@ -401,6 +408,47 @@ export function SpreadsheetImportDialog({ open, onClose, modelId, orgId, userId,
                               </Text>
                               <Chip tone="neutral">Excluded</Chip>
                             </div>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                </CollapsibleSection>
+              )}
+
+              {valueStreamRows.length > 0 && (
+                <CollapsibleSection title="Value streams" meta={`(${String(valueStreamRows.length)})`}>
+                  <div className={styles.preview}>
+                    <div className={styles.counts}>
+                      <Chip tone="info">{valueStreamRows.filter((r) => r.outcome === 'new').length} new</Chip>
+                      <Chip tone="info">{valueStreamRows.filter((r) => r.outcome === 'changed').length} changed</Chip>
+                      <Chip tone="neutral">{valueStreamRows.filter((r) => r.outcome === 'unchanged').length} unchanged</Chip>
+                    </div>
+                    {review.valueStreamParseErrors.length > 0 && (
+                      <ul className={styles.rowList}>
+                        {review.valueStreamParseErrors.map((e) => (
+                          <li key={e.rowNumber}>
+                            <Text as="p" size="sm">
+                              Value streams entry {e.rowNumber}: {e.error}
+                            </Text>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <ul className={styles.rowList}>
+                      {valueStreamRows
+                        .filter((r) => r.outcome !== 'unchanged')
+                        .map((r) => (
+                          <li key={r.rowNumber} className={styles.row}>
+                            <div className={styles.rowMain}>
+                              <Text as="span">{r.name}</Text>
+                              {r.outcome === 'new' && <Chip tone="info">New</Chip>}
+                              {r.outcome === 'changed' && <Chip tone="info">Changed</Chip>}
+                            </div>
+                            {r.warnings.map((w) => (
+                              <Text as="p" size="sm" tone="muted" key={w}>
+                                {w}
+                              </Text>
+                            ))}
                           </li>
                         ))}
                     </ul>

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Json } from '../contracts/rows';
 import type { ElementsHeadRow } from '../contracts/rows';
 import type { ImportRow } from './importRowSchema';
-import { matchImportRows, type MatchImportRowsInput } from './matchImportRows';
+import type { ImportValueStreamRow } from './importValueStreamRow';
+import { matchImportRows, matchImportValueStreams, type MatchImportRowsInput } from './matchImportRows';
 
 function system(id: string, name: string, attributes: Record<string, Json> = {}): ElementsHeadRow {
   return { element_id: id, element_type: 'system', name, parent_id: null, attributes, exists_delta_id: `${id}-create` };
@@ -205,5 +206,46 @@ describe('matchImportRows — capability/owner references (auto-resolving cascad
   it('is new for an owner name matching no live actor — the caller creates one', () => {
     const [result] = match([row({ rowNumber: 2, name: 'Northgate', businessOwner: { name: 'Jane Doe', externalOrganisation: null } })], { actors: [] });
     expect(result?.businessOwner).toEqual({ kind: 'new' });
+  });
+});
+
+function valueStream(id: string, name: string, parentId: string | null): ElementsHeadRow {
+  return { element_id: id, element_type: 'value_stream', name, parent_id: parentId, attributes: {}, exists_delta_id: `${id}-create` };
+}
+function vsRow(rowNumber: number, name: string, stages: { name: string; enables: string[] }[]): ImportValueStreamRow {
+  return { rowNumber, name, stages };
+}
+
+describe('matchImportValueStreams (F6/ADR-023)', () => {
+  it('matches a stream by exact name among root value streams only', () => {
+    const valueStreams = [valueStream('vs-1', 'Getting Connected', null), valueStream('stage-1', 'Apply', 'vs-1')];
+    const [result] = matchImportValueStreams({ valueStreamRows: [vsRow(1, 'Getting Connected', [{ name: 'Apply', enables: [] }])], valueStreams, capabilities: [], aliasesByElementId: new Map() });
+    expect(result?.match).toEqual({ kind: 'matched', element: { elementId: 'vs-1', name: 'Getting Connected' } });
+  });
+
+  it('is new for a stream name that matches nothing (no fuzzy tier — structural)', () => {
+    const [result] = matchImportValueStreams({ valueStreamRows: [vsRow(1, 'Getting Connected', [{ name: 'Apply', enables: [] }])], valueStreams: [valueStream('vs-1', 'Getting Conected', null)], capabilities: [], aliasesByElementId: new Map() });
+    expect(result?.match).toEqual({ kind: 'new' });
+  });
+
+  it('matches a stage by name within its matched stream', () => {
+    const valueStreams = [valueStream('vs-1', 'Getting Connected', null), valueStream('stage-1', 'Apply', 'vs-1'), valueStream('other-stage', 'Apply', 'other-vs')];
+    const [result] = matchImportValueStreams({ valueStreamRows: [vsRow(1, 'Getting Connected', [{ name: 'Apply', enables: [] }])], valueStreams, capabilities: [], aliasesByElementId: new Map() });
+    expect(result?.stages[0]?.match).toEqual({ kind: 'matched', element: { elementId: 'stage-1', name: 'Apply' } });
+  });
+
+  it('treats every stage as new when its stream is new', () => {
+    const [result] = matchImportValueStreams({ valueStreamRows: [vsRow(1, 'New Stream', [{ name: 'Apply', enables: [] }])], valueStreams: [], capabilities: [], aliasesByElementId: new Map() });
+    expect(result?.stages[0]?.match).toEqual({ kind: 'new' });
+  });
+
+  it('resolves each enables name through the reference cascade, carrying the name alongside its outcome', () => {
+    const valueStreams = [valueStream('vs-1', 'Getting Connected', null)];
+    const capabilities = [capability('cap-1', 'Connections')];
+    const [result] = matchImportValueStreams({ valueStreamRows: [vsRow(1, 'Getting Connected', [{ name: 'Apply', enables: ['Connections', 'Missing'] }])], valueStreams, capabilities, aliasesByElementId: new Map() });
+    expect(result?.stages[0]?.enables).toEqual([
+      { name: 'Connections', outcome: { kind: 'matched', element: { elementId: 'cap-1', name: 'Connections' } } },
+      { name: 'Missing', outcome: { kind: 'new' } },
+    ]);
   });
 });

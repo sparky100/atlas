@@ -20,7 +20,7 @@ import { RELATIONSHIP_IMPORT_COLUMNS } from './importRelationshipRow';
 import { CHANGE_IMPORT_COLUMNS } from './importChangeRow';
 
 export function buildImportPromptSchema(): string {
-  return `The import file is a single JSON file with three top-level arrays — \`systems\`, \`relationships\`, and \`changes\`. Every entry in every array may also carry \`quote\` and \`confidence\`, described at the end.
+  return `The import file is a single JSON file with four top-level arrays — \`systems\`, \`relationships\`, \`changes\`, and \`value_streams\`. Every entry in \`systems\`/\`relationships\`/\`changes\` may also carry \`quote\` and \`confidence\`, described at the end.
 
 ### \`systems\` — one entry per system or module
 
@@ -63,7 +63,11 @@ Fields: \`${CHANGE_IMPORT_COLUMNS.join(', ')}\`
 
 Use \`changes\` only when you're told something is being decommissioned or reinstated on purpose — never guess that something no longer exists just because nobody mentioned it.
 
-### \`quote\`/\`confidence\` — on every entry, in all three arrays
+### \`value_streams\` (optional) — value streams and their stages
+
+One entry per value stream: \`{ name, stages: [{ name, enables: [...] }] }\`. \`name\` is the stream's name; each stage is a named step in that stream; each stage's \`enables\` names the capabilities (from the list below, spelled exactly) that deliver that stage — leave it an empty array if nothing clearly fits. This section restates the model's outcome structure, so a file that carries it imports as a \`correct\`-intent change. Only include a value stream you were actually told about; never invent one.
+
+### \`quote\`/\`confidence\` — on every \`systems\`, \`relationships\`, and \`changes\` entry
 
 Always include both, on every \`systems\`, \`relationships\`, and \`changes\` entry you produce:
 

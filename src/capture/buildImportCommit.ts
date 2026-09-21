@@ -23,7 +23,7 @@ import { normalizeName } from '../engine/merge';
 import { ATTRIBUTE_COLUMNS, type ImportRow, type ImportRowAttributeKey } from './importRowSchema';
 import type { ImportChangeRow } from './importChangeRow';
 import type { ImportRelationshipRow } from './importRelationshipRow';
-import { exactMatches, isIntegrationPlatformSystem, isPlatformSystem, toRefs, type ExistingElementRef, type MatchedImportRow, type NameResolutionOutcome } from './matchImportRows';
+import { exactMatches, isIntegrationPlatformSystem, isPlatformSystem, toRefs, type ExistingElementRef, type MatchedImportRow, type MatchedImportValueStream, type NameResolutionOutcome } from './matchImportRows';
 
 /**
  * The reviewer's own pick for one row's own `'undecided'` identity match —
@@ -79,6 +79,16 @@ export interface ChangeRowResult {
   outcome: ChangeRowOutcome;
 }
 
+/** F6 (ADR-023) JSON import — one "value_streams" entry's own outcome. `'new'` when the stream itself is created; `'changed'` when a matched stream gains stages or `enables` edges; `'unchanged'` otherwise. Never `'blocked'`/`'needs-pick'` — a stream/stage is matched by exact name or created, and an unresolved `enables` name is a warning, not a blocker (same stance as a `capability` column). */
+export type ValueStreamRowOutcome = 'new' | 'changed' | 'unchanged';
+
+export interface ValueStreamRowResult {
+  rowNumber: number;
+  name: string;
+  outcome: ValueStreamRowOutcome;
+  warnings: string[];
+}
+
 export interface BuildImportInput {
   matchedRows: readonly MatchedImportRow[];
   /** Keyed by `row.rowNumber` — only rows whose `match.kind === 'undecided'` need an entry. */
@@ -104,6 +114,10 @@ export interface BuildImportInput {
   relationshipFactsByRelationshipId?: ReadonlyMap<UUID, ReadonlyMap<string, FactsRow>> | undefined;
   /** F2-lite JSON import's own "changes" section — empty/omitted for a CSV/XLSX import, which has no such section. */
   changeRows?: readonly ImportChangeRow[] | undefined;
+  /** F6 (ADR-023): the matched value streams (`matchImportValueStreams`'s own output) — empty/omitted for a CSV/XLSX import, or a JSON import with no `value_streams` section. */
+  matchedValueStreams?: readonly MatchedImportValueStream[] | undefined;
+  /** Every live `enables` edge in the model — matched by `(from, to)` to tell a stage's own missing edge (create it) from one already present (leave it). */
+  currentEnablesEdges?: readonly RelationshipsHeadRow[] | undefined;
 }
 
 export interface BuildImportResult {
@@ -112,6 +126,8 @@ export interface BuildImportResult {
   relationshipRows: RelationshipRowResult[];
   /** F2-lite JSON import — one per `changeRows` input row, same order. Always empty for a CSV/XLSX import. */
   changeRows: ChangeRowResult[];
+  /** F6 (ADR-023) — one per `matchedValueStreams` input row, same order. Always empty for a CSV/XLSX import. */
+  valueStreamRows: ValueStreamRowResult[];
   deltas: Delta[];
   /** Every element id a non-`blocked` row resolved to (matched, same-as-picked, or newly minted — owners included) — `sources.import_touched_element_ids`'s own value, and the live "not in file" preview's own input (`notInFile.ts`). */
   touchedElementIds: UUID[];
@@ -322,6 +338,8 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
     currentUsesFlowsToEdges = [],
     relationshipFactsByRelationshipId = new Map<UUID, ReadonlyMap<string, FactsRow>>(),
     changeRows = [],
+    matchedValueStreams = [],
+    currentEnablesEdges = [],
   } = input;
 
   const deltas: Delta[] = [];
@@ -642,5 +660,71 @@ export function buildImportDeltas(input: BuildImportInput): BuildImportResult {
     pushResult({ status: 'applied', elementId });
   }
 
-  return { rows, relationshipRows: relationshipResults, changeRows: changeResults, deltas, touchedElementIds, aliasesToWrite };
+  // F6 (ADR-023): the "value_streams" section — structural, and gated to a
+  // `correct`-intent change by the caller (`useSpreadsheetImport.ts`), and
+  // never retracting anything: a stream/stage the file doesn't name is left
+  // alone, only missing streams/stages/enables edges are created. Streams
+  // first, then stages, then enables edges — C22 (a stage's parent is a
+  // stream; `enables` targets a stage) holds within the fold order.
+  const valueStreamResults: ValueStreamRowResult[] = [];
+  matchedValueStreams.forEach((matched, streamIndex) => {
+    const warnings: string[] = [];
+    const locator = makeLocator(fileName, matched.rowNumber, undefined);
+
+    let streamElementId: UUID;
+    let streamCreated = false;
+    if (matched.match.kind === 'new') {
+      streamCreated = true;
+      streamElementId = crypto.randomUUID();
+      touchedElementIds.push(streamElementId);
+      deltas.push({ kind: 'element.create', id: crypto.randomUUID(), elementId: streamElementId, elementType: 'value_stream', name: matched.name, parentId: null, attributes: { order: (streamIndex + 1) * 10 }, sourceId, sourceRef: locator('value_streams'), confidence: 1 });
+    } else {
+      streamElementId = matched.match.element.elementId;
+      touchedElementIds.push(streamElementId);
+    }
+
+    let createdStages = 0;
+    const stageElementIds: UUID[] = [];
+    matched.stages.forEach((stage, stageIndex) => {
+      let stageElementId: UUID;
+      if (stage.match.kind === 'new') {
+        createdStages++;
+        stageElementId = crypto.randomUUID();
+        touchedElementIds.push(stageElementId);
+        deltas.push({ kind: 'element.create', id: crypto.randomUUID(), elementId: stageElementId, elementType: 'value_stream', name: stage.name, parentId: streamElementId, attributes: { order: (stageIndex + 1) * 10 }, sourceId, sourceRef: locator('value_streams'), confidence: 1 });
+      } else {
+        stageElementId = stage.match.element.elementId;
+        touchedElementIds.push(stageElementId);
+      }
+      stageElementIds.push(stageElementId);
+    });
+
+    let createdEnables = 0;
+    matched.stages.forEach((stage, stageIndex) => {
+      const stageElementId = stageElementIds[stageIndex];
+      if (stageElementId === undefined) return;
+      for (const { name, outcome } of stage.enables) {
+        if (outcome.kind === 'matched') {
+          const capabilityId = outcome.element.elementId;
+          const alreadyLinked = currentEnablesEdges.some((e) => e.from_element_id === capabilityId && e.to_element_id === stageElementId);
+          if (!alreadyLinked) {
+            createdEnables++;
+            deltas.push({ kind: 'relationship.create', id: crypto.randomUUID(), relationshipId: crypto.randomUUID(), relationshipType: 'enables', fromElementId: capabilityId, toElementId: stageElementId, attributes: {}, sourceId, sourceRef: locator('enables'), confidence: 1 });
+          }
+        } else if (outcome.kind === 'new') {
+          warnings.push(`enables "${name}" was not found — never created by an import.`);
+        } else if (outcome.kind === 'ambiguous') {
+          warnings.push(`enables "${name}" matched more than one existing capability — left unlinked.`);
+        }
+        // `kind === 'none'` is unreachable here — an enables name is always a
+        // non-empty string, so `resolveReference` never returns it — handled
+        // as a no-op rather than a fallthrough.
+      }
+    });
+
+    const outcome: ValueStreamRowOutcome = streamCreated ? 'new' : createdStages > 0 || createdEnables > 0 ? 'changed' : 'unchanged';
+    valueStreamResults.push({ rowNumber: matched.rowNumber, name: matched.name, outcome, warnings });
+  });
+
+  return { rows, relationshipRows: relationshipResults, changeRows: changeResults, valueStreamRows: valueStreamResults, deltas, touchedElementIds, aliasesToWrite };
 }

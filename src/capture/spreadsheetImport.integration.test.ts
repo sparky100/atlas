@@ -34,9 +34,10 @@ import { approveMergeRequest, computeMergeReviewForBranch, mergeApprovedRequest,
 import { createModel } from '../db/models';
 import { createOrganisation } from '../db/organisations';
 import { createSpreadsheetSource, listSourcesForModel } from '../db/sources';
+import { listAllEnablesEdges, listValueStreamElements } from '../db/valueStreams';
 import { buildImportDeltas, type MatchResolution } from './buildImportCommit';
 import { validateImportRow } from './importRowSchema';
-import { matchImportRows } from './matchImportRows';
+import { matchImportRows, matchImportValueStreams } from './matchImportRows';
 import { parseImportJson } from './parseImportJson';
 
 const env = loadEnv();
@@ -137,8 +138,9 @@ describe('spreadsheet import (F2-lite, reconciliation) against a real local Supa
     expect(parsed.errors).toEqual([]);
     expect(parsed.relationshipErrors).toEqual([]);
     expect(parsed.changeErrors).toEqual([]);
+    expect(parsed.valueStreamErrors).toEqual([]);
 
-    const [systems, containers, capabilities, actors, aliasesByElementId, allFacts, usesFlowsToEdges] = await Promise.all([
+    const [systems, containers, capabilities, actors, aliasesByElementId, allFacts, usesFlowsToEdges, valueStreams, enablesEdges] = await Promise.all([
       listSystemsForLandscape(owner.client, main.head_commit_id),
       listContainersForLandscape(owner.client, main.head_commit_id),
       listCapabilitiesForMap(owner.client, main.head_commit_id),
@@ -146,8 +148,11 @@ describe('spreadsheet import (F2-lite, reconciliation) against a real local Supa
       listAliasesForModel(owner.client, modelId),
       listFactsForCommit(owner.client, main.head_commit_id),
       listAllUsesAndFlowsToEdges(owner.client, main.head_commit_id),
+      listValueStreamElements(owner.client, main.head_commit_id),
+      listAllEnablesEdges(owner.client, main.head_commit_id),
     ]);
     const matchedRows = matchImportRows({ rows: parsed.rows, systems, containers, capabilities, actors, aliasesByElementId });
+    const matchedValueStreams = matchImportValueStreams({ valueStreamRows: parsed.valueStreamRows, valueStreams, capabilities, aliasesByElementId });
 
     const factsByElementId = new Map<string, Map<string, FactsRow>>();
     const relationshipFactsByRelationshipId = new Map<string, Map<string, FactsRow>>();
@@ -164,7 +169,7 @@ describe('spreadsheet import (F2-lite, reconciliation) against a real local Supa
     }
     const existsDeltaIdByElementId = new Map([...systems, ...containers].map((e) => [e.element_id, e.exists_delta_id]));
 
-    const buildInput = { matchedRows, resolutions, fileName, factsByElementId, existsDeltaIdByElementId, relationshipRows: parsed.relationshipRows, systems, containers, actors, aliasesByElementId, currentUsesFlowsToEdges: usesFlowsToEdges, relationshipFactsByRelationshipId, changeRows: parsed.changeRows };
+    const buildInput = { matchedRows, resolutions, fileName, factsByElementId, existsDeltaIdByElementId, relationshipRows: parsed.relationshipRows, systems, containers, actors, aliasesByElementId, currentUsesFlowsToEdges: usesFlowsToEdges, relationshipFactsByRelationshipId, changeRows: parsed.changeRows, matchedValueStreams, currentEnablesEdges: enablesEdges };
     const final = buildImportDeltas({ ...buildInput, sourceId: 'placeholder' });
     expect(final.rows.some((r) => r.outcome.status === 'needs-pick' || r.outcome.status === 'blocked')).toBe(false);
     expect(final.relationshipRows.some((r) => r.outcome.status === 'blocked')).toBe(false);
@@ -176,7 +181,11 @@ describe('spreadsheet import (F2-lite, reconciliation) against a real local Supa
     // than the ones already written to source.touchedElementIds.
     const rebuilt = { ...final, deltas: final.deltas.map((d) => ({ ...d, sourceId: source.id })) };
 
-    const branch = await createChangeBranch(owner.client, { id: randomUUID(), orgId, modelId, name: `import-${fileName.replace(/\.[^./]+$/, '')}-${randomUUID().slice(0, 8)}`, title: `Imported from ${fileName}`, createdBy: owner.id, mainHeadCommitId: main.head_commit_id, intent: 'record' });
+    // F6 (ADR-023): an import carrying a `value_streams` section is a
+    // `correct`-intent change (the value-stream edit gate admits structural
+    // edits only inside a correction).
+    const intent = parsed.valueStreamRows.length > 0 ? 'correct' : 'record';
+    const branch = await createChangeBranch(owner.client, { id: randomUUID(), orgId, modelId, name: `import-${fileName.replace(/\.[^./]+$/, '')}-${randomUUID().slice(0, 8)}`, title: `Imported from ${fileName}`, createdBy: owner.id, mainHeadCommitId: main.head_commit_id, intent });
     const envelope: CommitEnvelope = { id: randomUUID(), branchId: branch.id, parentCommitId: branch.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title: `Import from ${fileName}`, body: null, deltas: rebuilt.deltas };
     const commitResult = await commitToBranch(owner.client, { modelId, branchId: branch.id, expectedHeadCommitId: branch.head_commit_id, envelope });
     if (!commitResult.ok) throw new Error(`commit: ${commitResult.message}`);
@@ -334,5 +343,33 @@ describe('spreadsheet import (F2-lite, reconciliation) against a real local Supa
     const northgateId = systemsAfterMerge.find((s) => s.name === 'Northgate')?.element_id;
     const riversidePaymentsId = systemsAfterMerge.find((s) => s.name === 'Riverside Payments')?.element_id;
     expect(edgesAfterMerge.some((e) => e.relationship_type === 'uses' && e.from_element_id === northgateId && e.to_element_id === riversidePaymentsId)).toBe(true);
+  });
+
+  it('F6 value streams: a value_streams section imports as a correct-intent change and lands the stream and its stage', async () => {
+    const main = await getMainBranch(owner.client, modelId);
+    if (!main) throw new Error('main branch not found');
+
+    const jsonBody = {
+      systems: [{ name: 'Northgate' }],
+      value_streams: [{ name: 'Getting Connected', stages: [{ name: 'Apply & Quote', enables: [] }] }],
+    };
+    const { branch, final } = await runJsonImport('import-value-streams.json', jsonBody, new Map());
+    expect(final.valueStreamRows).toEqual([{ rowNumber: 1, name: 'Getting Connected', outcome: 'new', warnings: [] }]);
+
+    // The branch is `correct`-intent — the value-stream edit gate admits
+    // structural edits only inside a correction.
+    const branchRow = await getBranch(owner.client, branch.id);
+    expect(branchRow?.intent).toBe('correct');
+
+    await submitApproveAndMerge(branch.id);
+
+    const mainAfterMerge = await getMainBranch(owner.client, modelId);
+    if (!mainAfterMerge) throw new Error('main not found after merge');
+    const valueStreams = await listValueStreamElements(owner.client, mainAfterMerge.head_commit_id);
+    const stream = valueStreams.find((e) => e.parent_id === null && e.name === 'Getting Connected');
+    expect(stream).toBeDefined();
+    const stage = valueStreams.find((e) => e.parent_id === stream?.element_id && e.name === 'Apply & Quote');
+    expect(stage).toBeDefined();
+    expect(stage?.element_type).toBe('value_stream');
   });
 });
