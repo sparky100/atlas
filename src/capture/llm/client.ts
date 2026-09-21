@@ -235,7 +235,11 @@ export class DirectLlmClient implements LlmClient {
       max_tokens: request.maxTokens ?? DEFAULT_CAPTURE_MAX_TOKENS,
       system: [{ type: 'text', text: request.system, cache_control: { type: 'ephemeral' } }],
       messages: request.messages.map((m) => ({ role: m.role, content: m.content })),
-      output_config: { effort: request.effort, format: { type: 'json_schema', schema: stripUnsupportedSchemaKeywords(request.format.schema) } },
+      // `effort` is deliberately omitted (see the same drop in llm-proxy's
+      // `buildAnthropicBody`): the model in use rejects `output_config.effort`,
+      // and the default thinking depth is what the pipeline wants. The value
+      // still lives on `request.effort` for `hashLlmRequest` (cassette keys).
+      output_config: { format: { type: 'json_schema', schema: stripUnsupportedSchemaKeywords(request.format.schema) } },
     });
     const message = await stream.finalMessage();
 

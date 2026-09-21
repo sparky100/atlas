@@ -138,7 +138,7 @@ describe('DirectLlmClient', () => {
     streamMock.mockReset();
   });
 
-  it('builds the Messages API request with cache-controlled system, output_config effort/format, and resolves via finalMessage', async () => {
+  it('builds the Messages API request with cache-controlled system, output_config format (no effort — the model rejects it), and resolves via finalMessage', async () => {
     streamMock.mockReturnValue({
       finalMessage: () =>
         Promise.resolve({
@@ -157,7 +157,7 @@ describe('DirectLlmClient', () => {
         model: DEFAULT_CAPTURE_MODEL,
         max_tokens: DEFAULT_CAPTURE_MAX_TOKENS,
         system: [{ type: 'text', text: 'You are a careful clerk.', cache_control: { type: 'ephemeral' } }],
-        output_config: { effort: 'medium', format: { type: 'json_schema', schema: { type: 'object' } } },
+        output_config: { format: { type: 'json_schema', schema: { type: 'object' } } },
       }),
     );
     expect(response).toEqual({ text: '{"ok":true}', stopReason: 'end_turn', inputTokens: 12, outputTokens: 6, cacheReadTokens: 4 });
@@ -179,7 +179,7 @@ describe('DirectLlmClient', () => {
 
     expect(streamMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        output_config: { effort: 'medium', format: { type: 'json_schema', schema: { type: 'object', properties: { confidence: { type: 'number' } }, required: ['confidence'] } } },
+        output_config: { format: { type: 'json_schema', schema: { type: 'object', properties: { confidence: { type: 'number' } }, required: ['confidence'] } } },
       }),
     );
   });

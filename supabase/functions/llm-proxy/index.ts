@@ -149,7 +149,13 @@ function buildAnthropicBody(request: ProxyRequestBody, model: string, stream: bo
 
   const body: Record<string, unknown> = { model, system, messages: userMessages, max_tokens: request.maxTokens, stream };
   if (request.outputConfig) {
-    body.output_config = { effort: request.outputConfig.effort, format: request.outputConfig.format };
+    // `effort` is deliberately not forwarded: the model in use does not
+    // support `output_config.effort` (the API rejects it with a 400 — "This
+    // model does not support the effort parameter"), and the model's default
+    // thinking depth is what the capture pipeline wants anyway. The value
+    // still arrives here as part of the client↔proxy contract and the
+    // cassette request hash; it is just dropped at this Anthropic boundary.
+    body.output_config = { format: request.outputConfig.format };
   }
   return body;
 }
