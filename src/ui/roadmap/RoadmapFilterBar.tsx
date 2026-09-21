@@ -2,6 +2,7 @@ import type { Criticality, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { Chip } from '../components/Chip/Chip';
 import { EMPTY_ROADMAP_FILTERS, hasActiveRoadmapFilters, type RoadmapFilters } from './roadmapFilter';
+import { type RoadmapGroupBy } from './roadmapFilterParams';
 import type { RoadmapMode } from './roadmapEligibility';
 import styles from './RoadmapFilterBar.module.css';
 
@@ -17,6 +18,9 @@ export interface RoadmapFilterBarProps {
   onFiltersChange: (filters: RoadmapFilters) => void;
   mode: RoadmapMode;
   onModeChange: (mode: RoadmapMode) => void;
+  /** F6 Step 6: which grouping the timeline shows — capability (default) or value stream. */
+  groupBy: RoadmapGroupBy;
+  onGroupByChange: (groupBy: RoadmapGroupBy) => void;
   capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>;
   ownerActorsById: ReadonlyMap<UUID, ElementsHeadRow>;
 }
@@ -68,7 +72,7 @@ function FacetDisclosure<T extends string>({ title, values, options, onToggle }:
  * own fork; this picks which *set of branches* the whole roadmap
  * includes (`roadmapEligibility.ts`'s own module comment).
  */
-export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange, capabilitiesById, ownerActorsById }: RoadmapFilterBarProps) {
+export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange, groupBy, onGroupByChange, capabilitiesById, ownerActorsById }: RoadmapFilterBarProps) {
   const active = hasActiveRoadmapFilters(filters);
   const capabilityOptions = [...capabilitiesById.values()].map((c) => ({ value: c.element_id, label: c.name })).sort((a, b) => a.label.localeCompare(b.label));
   const ownerOptions = [...ownerActorsById.values()].map((a) => ({ value: a.element_id, label: a.name })).sort((a, b) => a.label.localeCompare(b.label));
@@ -81,6 +85,14 @@ export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange,
         </button>
         <button type="button" className={mode === 'toBe' ? styles.modeActive : styles.mode} aria-pressed={mode === 'toBe'} onClick={() => { onModeChange('toBe'); }}>
           To-be
+        </button>
+      </div>
+      <div className={styles.modeToggle} role="group" aria-label="Roadmap grouping">
+        <button type="button" className={groupBy === 'capability' ? styles.modeActive : styles.mode} aria-pressed={groupBy === 'capability'} onClick={() => { onGroupByChange('capability'); }}>
+          By capability
+        </button>
+        <button type="button" className={groupBy === 'valueStream' ? styles.modeActive : styles.mode} aria-pressed={groupBy === 'valueStream'} onClick={() => { onGroupByChange('valueStream'); }}>
+          By value stream
         </button>
       </div>
       <div className={styles.facets} aria-label="Roadmap filters">

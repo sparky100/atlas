@@ -35,4 +35,16 @@ describe('endpointDisplayName', () => {
     const module = el({ element_type: 'container', name: 'PM', parent_id: null });
     expect(endpointDisplayName(module, new Map())).toBe('PM');
   });
+
+  it('prefixes a stage with its own parent stream’s name', () => {
+    const stream = el({ element_id: 'vs-1', element_type: 'value_stream', name: 'Customer Outcomes' });
+    const stage = el({ element_id: 'st-1', element_type: 'value_stream', name: 'Getting Connected', parent_id: 'vs-1' });
+    const endpoints = new Map([['vs-1', stream]]);
+    expect(endpointDisplayName(stage, endpoints)).toBe('Customer Outcomes · Getting Connected');
+  });
+
+  it('leaves a stage’s own name bare when its parent stream isn’t in the endpoints map', () => {
+    const stage = el({ element_id: 'st-1', element_type: 'value_stream', name: 'Getting Connected', parent_id: 'vs-1' });
+    expect(endpointDisplayName(stage, new Map())).toBe('Getting Connected');
+  });
 });

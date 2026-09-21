@@ -16,7 +16,7 @@
  */
 import type { RoadmapMode } from './roadmapEligibility';
 import type { RoadmapFilters } from './roadmapFilter';
-import { UNASSIGNED_GROUP_KEY, type RoadmapCapabilityGroup } from './roadmapLifecycleRows';
+import { type RoadmapGroup } from './roadmapLifecycleRows';
 import { percentAt, percentAtIso, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { changeDescription, computeRoadmapVisibleData, eventsForSystem } from './roadmapVisibleData';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
@@ -95,8 +95,8 @@ function axisTicks(range: RoadmapTimelineRange): { label: string; x: number }[] 
   return ticks;
 }
 
-function groupLabelOf(group: Pick<RoadmapCapabilityGroup, 'key' | 'capability'>): string {
-  return group.key === UNASSIGNED_GROUP_KEY ? 'Unassigned' : (group.capability?.name ?? 'Unassigned');
+function groupLabelOf(group: Pick<RoadmapGroup, 'label'>): string {
+  return group.label;
 }
 
 /** Same event-to-marker mapping `RoadmapRow` draws in the DOM, in pixel space. */
@@ -114,7 +114,7 @@ function markersForBar(systemId: string, branchEvents: readonly RoadmapBranchEve
 }
 
 /** The pure pixel layout — everything `drawRoadmapPng` needs to paint, computed once so the sizing math is unit-testable without a canvas. */
-export function computeRoadmapPngPlan(groups: readonly RoadmapCapabilityGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode, filters: RoadmapFilters, range: RoadmapTimelineRange, now: Date): RoadmapPngPlan {
+export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode, filters: RoadmapFilters, range: RoadmapTimelineRange, now: Date): RoadmapPngPlan {
   const { filteredGroups, eligibleEvents } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now);
 
   let cursor = PADDING;

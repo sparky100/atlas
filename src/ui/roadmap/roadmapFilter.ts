@@ -38,11 +38,13 @@ function isSupportEndingSoon(bar: RoadmapLifecycleBar, now: Date): boolean {
 }
 
 /**
- * `groupKey` is the bar's own capability group key (`RoadmapCapabilityGroup.key`,
- * `UNASSIGNED_GROUP_KEY` included) — the capability facet matches against
- * group membership the same way the landscape's own capability filter
- * matches lane membership, not against some other, unrelated per-bar
- * capability field.
+ * `groupKey` is the bar's own capability-facet key — `RoadmapLifecycleBar.capabilityKey`
+ * (the level-1 capability reached via its primary `supports` edge) when
+ * set, else the group key the caller fell back to (`UNASSIGNED_GROUP_KEY`
+ * included) — so the capability facet matches the bar's own capability
+ * identically under capability and value-stream grouping, the same way the
+ * landscape's own capability filter matches lane membership, not some
+ * other, unrelated per-bar capability field.
  */
 export function matchesRoadmapFilters(bar: RoadmapLifecycleBar, groupKey: string, filters: RoadmapFilters, now: Date = new Date()): boolean {
   if (filters.capabilityIds.length > 0 && !filters.capabilityIds.includes(groupKey)) return false;

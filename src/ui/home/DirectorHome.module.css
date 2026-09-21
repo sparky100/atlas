@@ -21,6 +21,15 @@
   white-space: nowrap;
 }
 
+/* F6 Step 6: the director door's own "By capability / By outcome" toggle —
+   same two-button segmented shape HomeModeSwitch.tsx uses, only for which
+   weakness reading to show rather than which door. */
+.viewToggle {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
 /* Visual pass item 3: bold beyond whatever the browser's own <h2>/<h3>
    default happens to be, so a heading reads clearly heavier than the
    card body text under it rather than "too close in weight". */

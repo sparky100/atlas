@@ -41,6 +41,8 @@ export interface CapabilityMapEditContext {
 export interface CapabilityMapViewProps {
   tree: CapabilityMapTree;
   supportsEdges: RelationshipsHeadRow[];
+  /** F6 Step 6: every live `enables` edge at this ref — "enables N stages" beside a domain/card's own supporting-system count (silent at zero, rule 7). */
+  enablesEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
   /** Capability rollup: every capability at this ref, every level — the input `capabilityRollup.ts`'s subtree walk needs; `tree` is the same set already nested, kept flat here too since a tree shape isn't what that walk wants. */
   capabilities: ElementsHeadRow[];
@@ -159,6 +161,7 @@ export interface CapabilityMapViewProps {
 export function CapabilityMapView({
   tree,
   supportsEdges,
+  enablesEdges,
   systemsById,
   capabilities,
   selfOwnedIds,
@@ -194,6 +197,9 @@ export function CapabilityMapView({
 
   // Capability rollup's own ancestor-walk input (`isCapabilityOwnedWithAncestry`) — built once per render rather than inside each domain.
   const capabilitiesById = new Map(capabilities.map((c) => [c.element_id, c]));
+  // F6 Step 6: how many stages each capability enables (`enables` edges' own `from_element_id`), counted once for every domain/card rather than re-walking `enablesEdges` per row.
+  const enablesCountById = new Map<UUID, number>();
+  for (const edge of enablesEdges) enablesCountById.set(edge.from_element_id, (enablesCountById.get(edge.from_element_id) ?? 0) + 1);
 
   return (
     <div>
@@ -223,6 +229,7 @@ export function CapabilityMapView({
               threadCounts={threadCounts}
               onCommentMarkerClick={onCommentMarkerClick}
               onInspectClick={onInspectClick}
+              enablesCountById={enablesCountById}
             />
           ))}
         </div>
@@ -268,6 +275,16 @@ export function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, ref
         {count} system{count === 1 ? '' : 's'} →
       </Text>
     </Link>
+  );
+}
+
+/** F6 Step 6: "enables N stages" — a quiet fact next to a capability's own supporting-system count, silent at zero (rule 7: an absent fact is shown absent). */
+function EnablesStagesCount({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <Text as="span" size="sm" tone="muted">
+      enables {count} stage{count === 1 ? '' : 's'}
+    </Text>
   );
 }
 
@@ -348,6 +365,7 @@ function DomainSection({
   threadCounts,
   onCommentMarkerClick,
   onInspectClick,
+  enablesCountById,
 }: {
   column: L1Column;
   colourBy: ColourByMode;
@@ -371,6 +389,7 @@ function DomainSection({
   threadCounts: ReadonlyMap<UUID, ThreadCount> | undefined;
   onCommentMarkerClick: ((capabilityId: UUID) => void) | undefined;
   onInspectClick: ((capabilityId: UUID) => void) | undefined;
+  enablesCountById: ReadonlyMap<UUID, number>;
 }) {
   const panelId = useId();
   // Capability rollup (Sprint U4-2, "capability rollup", decided): a
@@ -439,6 +458,7 @@ function DomainSection({
               </Text>
             </Link>
             <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+            <EnablesStagesCount count={enablesCountById.get(column.capability.element_id) ?? 0} />
             {onInspectClick && <InspectButton name={column.capability.name} onClick={() => { onInspectClick(column.capability.element_id); }} />}
             {reorderCapability && <ReorderButtons elementType="capability" element={column.capability} previous={previousSibling} next={nextSibling} siblings={siblings} context={reorderCapability} />}
           </div>
@@ -462,6 +482,7 @@ function DomainSection({
                 threadCounts={threadCounts}
                 onCommentMarkerClick={onCommentMarkerClick}
                 onInspectClick={onInspectClick}
+                enablesCountById={enablesCountById}
               />
             ))}
           </div>
@@ -509,6 +530,7 @@ function CapabilityRow({
   threadCounts,
   onCommentMarkerClick,
   onInspectClick,
+  enablesCountById,
   nested = false,
 }: {
   card: L2Card;
@@ -528,6 +550,7 @@ function CapabilityRow({
   threadCounts: ReadonlyMap<UUID, ThreadCount> | undefined;
   onCommentMarkerClick: ((capabilityId: UUID) => void) | undefined;
   onInspectClick: ((capabilityId: UUID) => void) | undefined;
+  enablesCountById: ReadonlyMap<UUID, number>;
   /** `true` for an L3 row rendered inside its own L2 parent's expanded list — indented, no expand toggle of its own (L3 has no further children). */
   nested?: boolean;
 }) {
@@ -544,6 +567,7 @@ function CapabilityRow({
           </Text>
         </Link>
         <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
+        <EnablesStagesCount count={enablesCountById.get(card.capability.element_id) ?? 0} />
       </div>
       <div className={styles.cardSecondary}>
         {/* Coverage mode's own label is always the same "supporting systems"/"no supporting systems" non-value — the real count already sits beside the name above (`LandscapeZoomLink`), so it's never shown for that one mode; every other colour-by mode's label is a real, distinct fact and still shows here. */}
@@ -578,6 +602,7 @@ function CapabilityRow({
               threadCounts={threadCounts}
               onCommentMarkerClick={onCommentMarkerClick}
               onInspectClick={onInspectClick}
+              enablesCountById={enablesCountById}
               nested
             />
           ))}

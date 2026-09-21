@@ -18,6 +18,15 @@
  * pass (Landscape's own fallback exists for canvas placement, where every
  * system needs *some* lane; a roadmap row has no such placement
  * requirement).
+ *
+ * F6 Step 6 (ADR-023) adds a second grouping mode, `groupBarsByValueStream`:
+ * the same bars, grouped by the value stream(s) a system's primary
+ * capability enables (system → primary `supports` capability → `enables`
+ * → stage → stream) rather than by capability. A system whose primary
+ * capability enables stages in two streams appears in *both* groups (the
+ * one bar object repeated — bars are read-only), and a system reachable
+ * from no stream falls into `UNASSIGNED_GROUP_KEY`, exactly as the
+ * capability grouping does when there is no primary edge.
  */
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
@@ -40,15 +49,21 @@ export interface RoadmapLifecycleBar {
   lifecycleStatus: string | undefined;
   /** Every actor with a live `owns` edge onto this system, any role — the roadmap's own owner filter matches against this, not a specific role (unlike `ownersByRole.ts`'s Inspector-panel grouping, which cares which role each owner holds). */
   ownerActorIds: UUID[];
+  /** The bar's own level-1 capability id (via its primary `supports` edge), or `undefined` when it has none — the capability *filter facet* matches against this rather than the group key, so it behaves identically under capability and value-stream grouping. */
+  capabilityKey?: UUID;
 }
 
-export interface RoadmapCapabilityGroup {
-  /** A capability id, or `UNASSIGNED_GROUP_KEY`. */
+export interface RoadmapGroup {
+  /** A capability id, a value-stream id, or `UNASSIGNED_GROUP_KEY`. */
   key: string;
-  /** `undefined` only for `UNASSIGNED_GROUP_KEY`. */
-  capability: ElementsHeadRow | undefined;
+  /** The group's display name — the capability/stream's own name, or `'Unassigned'` for `UNASSIGNED_GROUP_KEY`. */
+  label: string;
+  /** The group header's element-page link, or `null` for `UNASSIGNED_GROUP_KEY` (which has no page). */
+  href: string | null;
   bars: RoadmapLifecycleBar[];
 }
+
+type ElementHref = (id: UUID) => string;
 
 function primarySupportsCapabilityId(systemId: UUID, supportsEdges: readonly RelationshipsHeadRow[]): UUID | null {
   for (const edge of supportsEdges) {
@@ -81,19 +96,38 @@ function lifecycleBarOf(system: ElementsHeadRow, ownsEdges: readonly Relationshi
   };
 }
 
+/** Adds `bar` to the group identified by `key`, creating it on first use — shared by both grouping modes so the "unassigned last, alphabetical otherwise" ordering is defined once. */
+function pushBar(groups: Map<string, RoadmapGroup>, key: string, label: string, href: string | null, bar: RoadmapLifecycleBar): void {
+  const group = groups.get(key) ?? { key, label, href, bars: [] };
+  group.bars.push(bar);
+  groups.set(key, group);
+}
+
+/** Bars sorted by name within each group, groups sorted `UNASSIGNED` last then alphabetically by label. */
+function finishGroups(groups: Map<string, RoadmapGroup>): RoadmapGroup[] {
+  for (const group of groups.values()) group.bars.sort((a, b) => a.name.localeCompare(b.name));
+  return [...groups.values()].sort((a, b) => {
+    if (a.key === UNASSIGNED_GROUP_KEY) return 1;
+    if (b.key === UNASSIGNED_GROUP_KEY) return -1;
+    return a.label.localeCompare(b.label);
+  });
+}
+
 /**
  * @param systems Every system and module in scope (`roadmapModules.ts`'s own `systemsAndModulesFor`; already filtered by whatever ref/branch the caller is viewing).
  * @param supportsEdges Every live `supports` edge in scope — used only to find each system's own primary capability for grouping, not for the bar's own dates.
  * @param ownsEdges Every live `owns` edge in scope — used only for the owner filter (any role; see `RoadmapLifecycleBar.ownerActorIds`).
  * @param capabilitiesById Every capability in scope, keyed by id — `l1AncestorOf`'s own input shape.
+ * @param elementHref Builds a group header's element-page link from its id.
  */
 export function groupRoadmapLifecycleBars(
   systems: readonly ElementsHeadRow[],
   supportsEdges: readonly RelationshipsHeadRow[],
   ownsEdges: readonly RelationshipsHeadRow[],
   capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>,
-): RoadmapCapabilityGroup[] {
-  const groups = new Map<string, RoadmapCapabilityGroup>();
+  elementHref: ElementHref,
+): RoadmapGroup[] {
+  const groups = new Map<string, RoadmapGroup>();
 
   for (const system of systems) {
     const bar = lifecycleBarOf(system, ownsEdges);
@@ -101,18 +135,66 @@ export function groupRoadmapLifecycleBars(
 
     const primaryCapabilityId = primarySupportsCapabilityId(system.element_id, supportsEdges);
     const l1 = primaryCapabilityId !== null ? l1AncestorOf(primaryCapabilityId, capabilitiesById) : null;
+    if (l1 !== null) bar.capabilityKey = l1.element_id;
     const key = l1?.element_id ?? UNASSIGNED_GROUP_KEY;
-
-    const group = groups.get(key) ?? { key, capability: l1 ?? undefined, bars: [] };
-    group.bars.push(bar);
-    groups.set(key, group);
+    pushBar(groups, key, l1?.name ?? 'Unassigned', l1 ? elementHref(l1.element_id) : null, bar);
   }
 
-  for (const group of groups.values()) group.bars.sort((a, b) => a.name.localeCompare(b.name));
+  return finishGroups(groups);
+}
 
-  return [...groups.values()].sort((a, b) => {
-    if (a.key === UNASSIGNED_GROUP_KEY) return 1;
-    if (b.key === UNASSIGNED_GROUP_KEY) return -1;
-    return (a.capability?.name ?? '').localeCompare(b.capability?.name ?? '');
-  });
+/**
+ * F6 Step 6 (ADR-023 "Views" item 3): the same bars as
+ * `groupRoadmapLifecycleBars`, grouped by value stream instead of
+ * capability. Each system groups under every stream reachable from its
+ * primary `supports` capability's own `enables` edges (capability →
+ * stage, then the stage's parent stream) — so a system whose primary
+ * capability enables stages in two streams appears in both. A system with
+ * no primary capability, or whose primary capability enables no stage,
+ * falls into `UNASSIGNED_GROUP_KEY`.
+ *
+ * @param valueStreamsById Every `value_stream` element in scope (streams
+ *   and stages both), keyed by id — an `enables` edge's `to_element_id` is
+ *   a stage, whose `parent_id` is its stream.
+ * @param enablesEdges Every live `enables` edge in scope.
+ */
+export function groupBarsByValueStream(
+  systems: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  ownsEdges: readonly RelationshipsHeadRow[],
+  capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>,
+  valueStreamsById: ReadonlyMap<UUID, ElementsHeadRow>,
+  enablesEdges: readonly RelationshipsHeadRow[],
+  elementHref: ElementHref,
+): RoadmapGroup[] {
+  const groups = new Map<string, RoadmapGroup>();
+
+  for (const system of systems) {
+    const bar = lifecycleBarOf(system, ownsEdges);
+    if (!bar) continue;
+
+    const primaryCapabilityId = primarySupportsCapabilityId(system.element_id, supportsEdges);
+    const l1 = primaryCapabilityId !== null ? l1AncestorOf(primaryCapabilityId, capabilitiesById) : null;
+    if (l1 !== null) bar.capabilityKey = l1.element_id;
+
+    const streamIds = new Set<UUID>();
+    if (primaryCapabilityId !== null) {
+      for (const edge of enablesEdges) {
+        if (edge.from_element_id !== primaryCapabilityId) continue;
+        const stage = valueStreamsById.get(edge.to_element_id);
+        if (stage !== undefined && stage.parent_id !== null) streamIds.add(stage.parent_id);
+      }
+    }
+
+    if (streamIds.size === 0) {
+      pushBar(groups, UNASSIGNED_GROUP_KEY, 'Unassigned', null, bar);
+      continue;
+    }
+    for (const streamId of streamIds) {
+      const stream = valueStreamsById.get(streamId);
+      pushBar(groups, streamId, stream?.name ?? 'Unassigned', stream ? elementHref(streamId) : null, bar);
+    }
+  }
+
+  return finishGroups(groups);
 }

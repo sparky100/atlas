@@ -17,6 +17,7 @@ import { attributesRecord } from '../elements/attributesRecord';
 import { decisionPrefillToSearchParams, prefillFromWeakCapability } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { ProposeChangePicker } from './ProposeChangePicker';
+import { ValueStreamsOutcomeView } from '../valueStreams/ValueStreamsOutcomeView';
 import { canCreateChangeBranch, canStartDecision } from '../orgs/useMembership';
 import type { CapabilityTileData } from '../../db/modelHome';
 import type { DirectorHomeData } from './useDirectorHome';
@@ -32,6 +33,8 @@ export interface DirectorHomeProps {
   role: MemberRole | null;
   orgSlug: string;
   modelSlug: string;
+  /** The director door's own already-resolved main head commit id — passed straight to `ValueStreamsOutcomeView` (the "By outcome" reading) the same way `useDirectorHome` already uses it. */
+  mainCommitIdHint: UUID | null;
 }
 
 /**
@@ -45,7 +48,7 @@ export interface DirectorHomeProps {
  * title/search chrome stays the existing shared header rather than a
  * director-only redesign of it, to avoid touching the architect door).
  */
-export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSlug, modelSlug }: DirectorHomeProps) {
+export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSlug, modelSlug, mainCommitIdHint }: DirectorHomeProps) {
   const capabilityMapHref = `/o/${orgSlug}/m/${modelSlug}/capability-map`;
   // Prompt pack F0: which entry point (if either) is currently open, and
   // therefore which intent the picker it opens should default to —
@@ -53,6 +56,10 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
   // booleans, since only one of "Propose a change"/"What happened" can be
   // open at a time.
   const [changeEntryIntent, setChangeEntryIntent] = useState<BranchIntent | null>(null);
+  // F6 Step 6 (ADR-023 "Views" item 2): the director door's own "By
+  // capability / By outcome" toggle — plain unpersisted component state
+  // (the "route via platforms" precedent), not a `user_preferences` column.
+  const [weaknessView, setWeaknessView] = useState<'capability' | 'outcome'>('capability');
   const navigate = useNavigate();
   const canPropose = canCreateChangeBranch(role);
 
@@ -92,38 +99,53 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
             </Text>
           </Link>
         </div>
-        {/* Visual pass item 4: these are the first thing a director should
-            read, so they get the same big-number/muted-label stat
-            treatment ArchitectHome.tsx's own Review queue count already
-            uses — a Chip communicates state at a glance, not "read me
-            first". Colour still carries the tone (green/plain when 0). */}
-        <div className={styles.statsRow}>
-          <div className={styles.stat}>
-            <Text as="span" size="2xl" className={data.exposedCount > 0 ? styles.statWarn : undefined}>
-              {data.exposedCount}
-            </Text>{' '}
-            <Text as="span" tone="muted" size="sm">
-              {data.exposedCount === 1 ? 'capability' : 'capabilities'} exposed
-            </Text>
-          </div>
-          <div className={styles.stat}>
-            <Text as="span" size="2xl" className={data.unrecordedCount > 0 ? styles.statNeutral : undefined}>
-              {data.unrecordedCount}
-            </Text>{' '}
-            <Text as="span" tone="muted" size="sm">
-              with nothing recorded
-            </Text>
-          </div>
+        <div className={styles.viewToggle} role="group" aria-label="Weakness view">
+          <Button variant={weaknessView === 'capability' ? 'primary' : 'ghost'} onClick={() => { setWeaknessView('capability'); }} aria-pressed={weaknessView === 'capability'}>
+            By capability
+          </Button>
+          <Button variant={weaknessView === 'outcome' ? 'primary' : 'ghost'} onClick={() => { setWeaknessView('outcome'); }} aria-pressed={weaknessView === 'outcome'}>
+            By outcome
+          </Button>
         </div>
+        {weaknessView === 'capability' && (
+          <>
+            {/* Visual pass item 4: these are the first thing a director should
+                read, so they get the same big-number/muted-label stat
+                treatment ArchitectHome.tsx's own Review queue count already
+                uses — a Chip communicates state at a glance, not "read me
+                first". Colour still carries the tone (green/plain when 0). */}
+            <div className={styles.statsRow}>
+              <div className={styles.stat}>
+                <Text as="span" size="2xl" className={data.exposedCount > 0 ? styles.statWarn : undefined}>
+                  {data.exposedCount}
+                </Text>{' '}
+                <Text as="span" tone="muted" size="sm">
+                  {data.exposedCount === 1 ? 'capability' : 'capabilities'} exposed
+                </Text>
+              </div>
+              <div className={styles.stat}>
+                <Text as="span" size="2xl" className={data.unrecordedCount > 0 ? styles.statNeutral : undefined}>
+                  {data.unrecordedCount}
+                </Text>{' '}
+                <Text as="span" tone="muted" size="sm">
+                  with nothing recorded
+                </Text>
+              </div>
+            </div>
 
-        <div className={styles.tileGrid}>
-          {weakTiles.map((tile) => (
-            <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised role={role} />
-          ))}
-          {healthyTiles.map((tile) => (
-            <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised={false} role={role} />
-          ))}
-        </div>
+            <div className={styles.tileGrid}>
+              {weakTiles.map((tile) => (
+                <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised role={role} />
+              ))}
+              {healthyTiles.map((tile) => (
+                <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised={false} role={role} />
+              ))}
+            </div>
+          </>
+        )}
+        {weaknessView === 'outcome' && (
+          <ValueStreamsOutcomeView modelId={modelId} orgSlug={orgSlug} modelSlug={modelSlug} mainCommitIdHint={mainCommitIdHint} />
+        )}
       </section>
 
       <div className={styles.lowerRow}>

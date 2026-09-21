@@ -12,14 +12,14 @@ import { sanitizeForFilename } from '../elements/elementExport';
 import { reportError } from '../errors/errorBannerStore';
 import { isRoadmapEligibleBranch, type RoadmapMode } from './roadmapEligibility';
 import type { RoadmapFilters } from './roadmapFilter';
-import type { RoadmapCapabilityGroup } from './roadmapLifecycleRows';
+import type { RoadmapGroup } from './roadmapLifecycleRows';
 import { roadmapToCsv } from './roadmapExport';
 import { computeRoadmapPngPlan, roadmapPngPlanToDataUrl } from './roadmapPngExport';
 import { computeRoadmapTimelineRange, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { computeRoadmapVisibleData } from './roadmapVisibleData';
 
 export interface UseRoadmapExportInput {
-  groups: readonly RoadmapCapabilityGroup[];
+  groups: readonly RoadmapGroup[];
   branchEvents: readonly RoadmapBranchEvents[];
   mode: RoadmapMode;
   filters: RoadmapFilters;
@@ -50,7 +50,7 @@ function downloadBlob(blob: Blob, filename: string): void {
 }
 
 /** Same `allDatesFor` shape `RoadmapView.tsx` computes, so the exported timeline range matches what's on screen exactly. */
-function allDatesFor(groups: readonly RoadmapCapabilityGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode): (string | undefined)[] {
+function allDatesFor(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode): (string | undefined)[] {
   const dates: (string | undefined)[] = [];
   for (const group of groups) {
     for (const bar of group.bars) dates.push(bar.introduced, bar.plannedEnd, bar.supportEndsAt);

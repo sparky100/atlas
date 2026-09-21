@@ -4,13 +4,13 @@ import { Text } from '../components/Text/Text';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import type { RoadmapFilters } from './roadmapFilter';
 import { isRoadmapEligibleBranch, type RoadmapMode } from './roadmapEligibility';
-import { UNASSIGNED_GROUP_KEY, type RoadmapCapabilityGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
+import { type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
 import { computeRoadmapTimelineRange, percentAt, percentAtIso, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { changeDescription, computeRoadmapVisibleData, eventsForSystem } from './roadmapVisibleData';
 import styles from './RoadmapView.module.css';
 
 export interface RoadmapViewProps {
-  groups: readonly RoadmapCapabilityGroup[];
+  groups: readonly RoadmapGroup[];
   branchEvents: readonly RoadmapBranchEvents[];
   mode: RoadmapMode;
   filters: RoadmapFilters;
@@ -19,7 +19,7 @@ export interface RoadmapViewProps {
   now?: Date;
 }
 
-function allDatesFor(groups: readonly RoadmapCapabilityGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode): (string | undefined)[] {
+function allDatesFor(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode): (string | undefined)[] {
   const dates: (string | undefined)[] = [];
   for (const group of groups) {
     for (const bar of group.bars) {
@@ -159,10 +159,18 @@ export function RoadmapView({ groups, branchEvents, mode, filters, orgSlug, mode
           <div role="list" aria-label="Capability domains">
             {filteredGroups.map((group) => (
               <div key={group.key} className={styles.group} role="listitem">
-                <Text as="h2" size="md" className={styles.groupHeader}>
-                  {group.key === UNASSIGNED_GROUP_KEY ? 'Unassigned' : (group.capability?.name ?? 'Unassigned')}
-                </Text>
-                <div role="list" aria-label={`${group.key === UNASSIGNED_GROUP_KEY ? 'Unassigned' : (group.capability?.name ?? 'Unassigned')} systems`}>
+                {group.href !== null ? (
+                  <Link to={group.href}>
+                    <Text as="h2" size="md" className={styles.groupHeader}>
+                      {group.label}
+                    </Text>
+                  </Link>
+                ) : (
+                  <Text as="h2" size="md" className={styles.groupHeader}>
+                    {group.label}
+                  </Text>
+                )}
+                <div role="list" aria-label={`${group.label} systems`}>
                   {group.bars.map((bar) => (
                     <div key={bar.systemId} role="listitem">
                       <RoadmapRow bar={bar} events={eventsForSystem(bar.systemId, branchEvents, mode)} range={range} orgSlug={orgSlug} modelSlug={modelSlug} />

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
-import { groupRoadmapLifecycleBars, UNASSIGNED_GROUP_KEY } from './roadmapLifecycleRows';
+import { groupBarsByValueStream, groupRoadmapLifecycleBars, UNASSIGNED_GROUP_KEY } from './roadmapLifecycleRows';
+
+const href = (id: string): string => `/e/${id}`;
 
 function capability(id: string, name: string, parentId: string | null = null): ElementsHeadRow {
   return { element_id: id, element_type: 'capability', name, parent_id: parentId, attributes: {}, exists_delta_id: `d-${id}` };
@@ -10,9 +12,17 @@ function system(id: string, name: string, attrs: Record<string, Json> = {}): Ele
   return { element_id: id, element_type: 'system', name, parent_id: null, attributes: attrs, exists_delta_id: `d-${id}` };
 }
 
+function valueStream(id: string, name: string, parentId: string | null = null): ElementsHeadRow {
+  return { element_id: id, element_type: 'value_stream', name, parent_id: parentId, attributes: {}, exists_delta_id: `d-${id}` };
+}
+
 function supports(systemId: string, capabilityId: string, role?: string): RelationshipsHeadRow {
   const attrs: Record<string, Json> = role === undefined ? {} : { role };
   return { relationship_id: `r-${systemId}-${capabilityId}`, relationship_type: 'supports', from_element_id: systemId, to_element_id: capabilityId, attributes: attrs, exists_delta_id: `d-r-${systemId}` };
+}
+
+function enables(capabilityId: string, stageId: string): RelationshipsHeadRow {
+  return { relationship_id: `e-${capabilityId}-${stageId}`, relationship_type: 'enables', from_element_id: capabilityId, to_element_id: stageId, attributes: {}, exists_delta_id: `d-e-${capabilityId}` };
 }
 
 function owns(actorId: string, systemId: string): RelationshipsHeadRow {
@@ -21,13 +31,13 @@ function owns(actorId: string, systemId: string): RelationshipsHeadRow {
 
 describe('groupRoadmapLifecycleBars', () => {
   it('drops a system with none of the three lifecycle dates recorded', () => {
-    const groups = groupRoadmapLifecycleBars([system('sys-1', 'No Dates')], [], [], new Map());
+    const groups = groupRoadmapLifecycleBars([system('sys-1', 'No Dates')], [], [], new Map(), href);
     expect(groups).toEqual([]);
   });
 
   it('includes a system with at least one of the three dates recorded', () => {
     const sys = system('sys-1', 'Housing Portal', { introduced: '2020-01-01', plannedEnd: '2028-01-01', supportEndsAt: '2026-06-01' });
-    const groups = groupRoadmapLifecycleBars([sys], [], [], new Map());
+    const groups = groupRoadmapLifecycleBars([sys], [], [], new Map(), href);
     expect(groups).toHaveLength(1);
     expect(groups[0]?.bars[0]).toMatchObject({ systemId: 'sys-1', introduced: '2020-01-01', plannedEnd: '2028-01-01', supportEndsAt: '2026-06-01' });
   });
@@ -38,20 +48,22 @@ describe('groupRoadmapLifecycleBars', () => {
       ['cap-l2', capability('cap-l2', 'Housing', 'cap-l1')],
     ]);
     const sys = system('sys-1', 'Housing Portal', { introduced: '2020-01-01' });
-    const groups = groupRoadmapLifecycleBars([sys], [supports('sys-1', 'cap-l2', 'primary')], [], capsById);
+    const groups = groupRoadmapLifecycleBars([sys], [supports('sys-1', 'cap-l2', 'primary')], [], capsById, href);
     expect(groups).toHaveLength(1);
     expect(groups[0]?.key).toBe('cap-l1');
-    expect(groups[0]?.capability?.name).toBe('Digital Services');
+    expect(groups[0]?.label).toBe('Digital Services');
+    expect(groups[0]?.href).toBe('/e/cap-l1');
   });
 
   it('falls into the unassigned group when no supports edge is marked primary', () => {
     const capsById = new Map([['cap-1', capability('cap-1', 'Digital Services')]]);
     const sys = system('sys-1', 'Housing Portal', { introduced: '2020-01-01' });
     // A secondary-only edge, deliberately not marked primary.
-    const groups = groupRoadmapLifecycleBars([sys], [supports('sys-1', 'cap-1', 'secondary')], [], capsById);
+    const groups = groupRoadmapLifecycleBars([sys], [supports('sys-1', 'cap-1', 'secondary')], [], capsById, href);
     expect(groups).toHaveLength(1);
     expect(groups[0]?.key).toBe(UNASSIGNED_GROUP_KEY);
-    expect(groups[0]?.capability).toBeUndefined();
+    expect(groups[0]?.label).toBe('Unassigned');
+    expect(groups[0]?.href).toBeNull();
   });
 
   it('sorts the unassigned group last, real groups alphabetically by capability name', () => {
@@ -61,13 +73,60 @@ describe('groupRoadmapLifecycleBars', () => {
     ]);
     const systems = [system('sys-z', 'Z System', { introduced: '2020-01-01' }), system('sys-a', 'A System', { introduced: '2020-01-01' }), system('sys-u', 'Unassigned System', { introduced: '2020-01-01' })];
     const edges = [supports('sys-z', 'cap-z', 'primary'), supports('sys-a', 'cap-a', 'primary')];
-    const groups = groupRoadmapLifecycleBars(systems, edges, [], capsById);
+    const groups = groupRoadmapLifecycleBars(systems, edges, [], capsById, href);
     expect(groups.map((g) => g.key)).toEqual(['cap-a', 'cap-z', UNASSIGNED_GROUP_KEY]);
   });
 
   it('collects every owner actor id for a system\'s own owner filter', () => {
     const sys = system('sys-1', 'Housing Portal', { introduced: '2020-01-01' });
-    const groups = groupRoadmapLifecycleBars([sys], [], [owns('actor-1', 'sys-1'), owns('actor-2', 'sys-1')], new Map());
+    const groups = groupRoadmapLifecycleBars([sys], [], [owns('actor-1', 'sys-1'), owns('actor-2', 'sys-1')], new Map(), href);
     expect(groups[0]?.bars[0]?.ownerActorIds).toEqual(['actor-1', 'actor-2']);
+  });
+
+  it('sets each bar\'s capabilityKey to its own level-1 capability id', () => {
+    const capsById = new Map([['cap-1', capability('cap-1', 'Digital Services')]]);
+    const sys = system('sys-1', 'Portal', { introduced: '2020-01-01' });
+    const groups = groupRoadmapLifecycleBars([sys], [supports('sys-1', 'cap-1', 'primary')], [], capsById, href);
+    expect(groups[0]?.bars[0]?.capabilityKey).toBe('cap-1');
+  });
+});
+
+describe('groupBarsByValueStream', () => {
+  it('groups a system under the stream its primary capability enables', () => {
+    const capsById = new Map([['cap-1', capability('cap-1', 'Digital Services')]]);
+    const valueStreamsById = new Map([
+      ['stream-1', valueStream('stream-1', 'Customer Outcomes')],
+      ['stage-1', valueStream('stage-1', 'Getting Connected', 'stream-1')],
+    ]);
+    const sys = system('sys-1', 'Portal', { introduced: '2020-01-01' });
+    const groups = groupBarsByValueStream([sys], [supports('sys-1', 'cap-1', 'primary')], [], capsById, valueStreamsById, [enables('cap-1', 'stage-1')], href);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.key).toBe('stream-1');
+    expect(groups[0]?.label).toBe('Customer Outcomes');
+    expect(groups[0]?.href).toBe('/e/stream-1');
+    expect(groups[0]?.bars[0]?.capabilityKey).toBe('cap-1');
+  });
+
+  it('shows a system in both streams when its capability enables stages in two', () => {
+    const capsById = new Map([['cap-1', capability('cap-1', 'Digital Services')]]);
+    const valueStreamsById = new Map([
+      ['stream-1', valueStream('stream-1', 'Alpha Stream')],
+      ['stream-2', valueStream('stream-2', 'Beta Stream')],
+      ['stage-1', valueStream('stage-1', 's1', 'stream-1')],
+      ['stage-2', valueStream('stage-2', 's2', 'stream-2')],
+    ]);
+    const sys = system('sys-1', 'Portal', { introduced: '2020-01-01' });
+    const groups = groupBarsByValueStream([sys], [supports('sys-1', 'cap-1', 'primary')], [], capsById, valueStreamsById, [enables('cap-1', 'stage-1'), enables('cap-1', 'stage-2')], href);
+    expect(groups.map((g) => g.key)).toEqual(['stream-1', 'stream-2']);
+  });
+
+  it('falls into the unassigned group when the primary capability enables no stage', () => {
+    const capsById = new Map([['cap-1', capability('cap-1', 'Digital Services')]]);
+    const sys = system('sys-1', 'Portal', { introduced: '2020-01-01' });
+    const groups = groupBarsByValueStream([sys], [supports('sys-1', 'cap-1', 'primary')], [], capsById, new Map(), [], href);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.key).toBe(UNASSIGNED_GROUP_KEY);
+    expect(groups[0]?.label).toBe('Unassigned');
+    expect(groups[0]?.href).toBeNull();
   });
 });

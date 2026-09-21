@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
 import { EMPTY_ROADMAP_FILTERS, type RoadmapFilters } from './roadmapFilter';
-import type { RoadmapCapabilityGroup, RoadmapLifecycleBar } from './roadmapLifecycleRows';
+import type { RoadmapGroup, RoadmapLifecycleBar } from './roadmapLifecycleRows';
 import { computeRoadmapVisibleData } from './roadmapVisibleData';
 
 const NOW = new Date('2026-06-15T00:00:00Z');
@@ -20,8 +20,8 @@ function bar(overrides: Partial<RoadmapLifecycleBar> = {}): RoadmapLifecycleBar 
   };
 }
 
-function group(overrides: Partial<RoadmapCapabilityGroup> = {}): RoadmapCapabilityGroup {
-  return { key: 'cap-1', capability: undefined, bars: [bar()], ...overrides };
+function group(overrides: Partial<RoadmapGroup> = {}): RoadmapGroup {
+  return { key: 'cap-1', label: 'Cap 1', href: null, bars: [bar()], ...overrides };
 }
 
 function branch(overrides: Partial<BranchRow> = {}): BranchRow {

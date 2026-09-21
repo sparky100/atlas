@@ -22,5 +22,9 @@ import { moduleDisplayName } from '../../elements/moduleDisplayName';
  */
 export function endpointDisplayName(other: ElementsHeadRow, endpoints: ReadonlyMap<UUID, ElementsHeadRow>): string {
   const parent = other.parent_id !== null ? (endpoints.get(other.parent_id) ?? null) : null;
+  // F6 Step 6: a stage (a value_stream with a parent) reads "Stream · Stage",
+  // the same "parent · child" convention a module gets ("Platform · Module")
+  // — only its parent is its own stream, not a container's platform.
+  if (other.element_type === 'value_stream' && parent !== null) return `${parent.name} · ${other.name}`;
   return moduleDisplayName(other, parent);
 }

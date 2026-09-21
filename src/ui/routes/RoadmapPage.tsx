@@ -18,7 +18,7 @@ import { RoadmapFilterBar } from '../roadmap/RoadmapFilterBar';
 import { RoadmapView } from '../roadmap/RoadmapView';
 import { useRoadmap } from '../roadmap/useRoadmap';
 import { useRoadmapExport } from '../roadmap/useRoadmapExport';
-import { parseRoadmapFilters, roadmapFiltersToSearchParams } from '../roadmap/roadmapFilterParams';
+import { parseRoadmapFilters, roadmapFiltersToSearchParams, parseRoadmapGroupBy, roadmapGroupByToSearchParams, type RoadmapGroupBy } from '../roadmap/roadmapFilterParams';
 import type { RoadmapFilters } from '../roadmap/roadmapFilter';
 import type { RoadmapMode } from '../roadmap/roadmapEligibility';
 import styles from './RoadmapPage.module.css';
@@ -54,7 +54,7 @@ export function RoadmapPage() {
   const model = models.find((m) => m.slug === modelSlug);
   const { branch: mainBranch } = useMainBranch(model?.id ?? null);
 
-  const { state } = useRoadmap(model?.id ?? '', organisation?.id ?? '', userId, ref, mainBranch?.head_commit_id ?? null);
+  const { state } = useRoadmap(model?.id ?? '', organisation?.id ?? '', userId, ref, organisation?.slug ?? '', model?.slug ?? '', mainBranch?.head_commit_id ?? null);
 
   const mode = parseRoadmapMode(searchParams);
   const setMode = (next: RoadmapMode): void => {
@@ -69,15 +69,23 @@ export function RoadmapPage() {
     setSearchParams(roadmapFiltersToSearchParams(next, searchParams));
   };
 
+  const groupBy = parseRoadmapGroupBy(searchParams);
+  const setGroupBy = (next: RoadmapGroupBy): void => {
+    setSearchParams(roadmapGroupByToSearchParams(next, searchParams));
+  };
+
   const roadmapData = state.status === 'ready' ? state.data : null;
+  // F6 Step 6: the same bars, grouped by capability or value stream — both
+  // were computed by `useRoadmap`, so switching the toggle never refetches.
+  const groups = groupBy === 'valueStream' ? (roadmapData?.valueStreamGroups ?? []) : (roadmapData?.groups ?? []);
   const roadmapExport = useRoadmapExport({
-    groups: roadmapData?.groups ?? [],
+    groups,
     branchEvents: roadmapData?.branchEvents ?? [],
     mode,
     filters,
     filenameBase: model?.name ?? 'roadmap',
   });
-  const hasNothingToExport = roadmapData === null || (roadmapData.groups.length === 0 && roadmapData.branchEvents.length === 0);
+  const hasNothingToExport = roadmapData === null || (groups.length === 0 && roadmapData.branchEvents.length === 0);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -123,8 +131,8 @@ export function RoadmapPage() {
           {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
           {state.status === 'ready' && (
             <>
-              <RoadmapFilterBar filters={filters} onFiltersChange={setFilters} mode={mode} onModeChange={setMode} capabilitiesById={state.data.capabilitiesById} ownerActorsById={state.data.ownerActorsById} />
-              <RoadmapView groups={state.data.groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+              <RoadmapFilterBar filters={filters} onFiltersChange={setFilters} mode={mode} onModeChange={setMode} groupBy={groupBy} onGroupByChange={setGroupBy} capabilitiesById={state.data.capabilitiesById} ownerActorsById={state.data.ownerActorsById} />
+              <RoadmapView groups={groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
             </>
           )}
         </main>

@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Text } from '../components/Text/Text';
@@ -14,8 +15,12 @@ const TONE_LABEL: Record<ValueStreamTone, string> = {
 
 export interface ValueStreamsViewProps {
   rows: readonly ValueStreamRow[];
-  selectedStageId: UUID | null;
-  onInspectStage: (stageId: UUID) => void;
+  selectedStageId?: UUID | null;
+  onInspectStage?: (stageId: UUID) => void;
+  /** F6 Step 6 (director door "By outcome"): a compact, read-only rendering where a stage tile links out to its own element page instead of opening the shared Inspector. */
+  compact?: boolean;
+  /** Required in `compact` mode — builds each stage tile's own element-page href. */
+  elementHref?: (id: UUID) => string;
 }
 
 /**
@@ -33,7 +38,7 @@ export interface ValueStreamsViewProps {
  * "collapsed, not hidden" treatment `RelationshipsSection.tsx`'s own
  * retracted rows use elsewhere in this codebase.
  */
-export function ValueStreamsView({ rows, selectedStageId, onInspectStage }: ValueStreamsViewProps) {
+export function ValueStreamsView({ rows, selectedStageId, onInspectStage, compact, elementHref }: ValueStreamsViewProps) {
   const active = rows.filter((row) => !row.inactive);
   const inactive = rows.filter((row) => row.inactive);
 
@@ -48,13 +53,13 @@ export function ValueStreamsView({ rows, selectedStageId, onInspectStage }: Valu
   return (
     <div className={styles.streams}>
       {active.map((row) => (
-        <StreamRow key={row.stream.element_id} row={row} selectedStageId={selectedStageId} onInspectStage={onInspectStage} />
+        <StreamRow key={row.stream.element_id} row={row} selectedStageId={selectedStageId} onInspectStage={onInspectStage} compact={compact} elementHref={elementHref} />
       ))}
       {inactive.length > 0 && (
         <CollapsibleSection title={`Inactive (${String(inactive.length)})`} defaultOpen={false}>
           <div className={styles.streams}>
             {inactive.map((row) => (
-              <StreamRow key={row.stream.element_id} row={row} selectedStageId={selectedStageId} onInspectStage={onInspectStage} />
+              <StreamRow key={row.stream.element_id} row={row} selectedStageId={selectedStageId} onInspectStage={onInspectStage} compact={compact} elementHref={elementHref} />
             ))}
           </div>
         </CollapsibleSection>
@@ -63,7 +68,7 @@ export function ValueStreamsView({ rows, selectedStageId, onInspectStage }: Valu
   );
 }
 
-function StreamRow({ row, selectedStageId, onInspectStage }: { row: ValueStreamRow; selectedStageId: UUID | null; onInspectStage: (stageId: UUID) => void }) {
+function StreamRow({ row, selectedStageId, onInspectStage, compact, elementHref }: { row: ValueStreamRow; selectedStageId: UUID | null | undefined; onInspectStage: ((stageId: UUID) => void) | undefined; compact: boolean | undefined; elementHref: ((id: UUID) => string) | undefined }) {
   return (
     <div className={styles.streamRow}>
       <div className={styles.streamHeader}>
@@ -83,25 +88,39 @@ function StreamRow({ row, selectedStageId, onInspectStage }: { row: ValueStreamR
             No stages recorded.
           </Text>
         ) : (
-          row.stages.map((stage) => (
-            <button
-              key={stage.stage.element_id}
-              type="button"
-              className={styles.stageTile}
-              data-selected={selectedStageId === stage.stage.element_id ? 'true' : undefined}
-              onClick={() => {
-                onInspectStage(stage.stage.element_id);
-              }}
-            >
-              <span className={styles.factDot} data-tone={stage.tone} aria-hidden="true" />
-              <Text as="span" size="sm" className={styles.stageName}>
-                {stage.stage.name}
-              </Text>
-              <Text as="span" size="xs" tone="muted">
-                {TONE_LABEL[stage.tone]}
-              </Text>
-            </button>
-          ))
+          row.stages.map((stage) => {
+            const inner = (
+              <>
+                <span className={styles.factDot} data-tone={stage.tone} aria-hidden="true" />
+                <Text as="span" size="sm" className={styles.stageName}>
+                  {stage.stage.name}
+                </Text>
+                <Text as="span" size="xs" tone="muted">
+                  {TONE_LABEL[stage.tone]}
+                </Text>
+              </>
+            );
+            if (compact && elementHref) {
+              return (
+                <Link key={stage.stage.element_id} to={elementHref(stage.stage.element_id)} className={styles.stageTile}>
+                  {inner}
+                </Link>
+              );
+            }
+            return (
+              <button
+                key={stage.stage.element_id}
+                type="button"
+                className={styles.stageTile}
+                data-selected={selectedStageId === stage.stage.element_id ? 'true' : undefined}
+                onClick={() => {
+                  onInspectStage?.(stage.stage.element_id);
+                }}
+              >
+                {inner}
+              </button>
+            );
+          })
         )}
       </div>
     </div>

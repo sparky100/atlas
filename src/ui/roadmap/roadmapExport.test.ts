@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import { roadmapToCsv } from './roadmapExport';
-import { UNASSIGNED_GROUP_KEY, type RoadmapCapabilityGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
+import { UNASSIGNED_GROUP_KEY, type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
 
 function bar(overrides: Partial<RoadmapLifecycleBar> = {}): RoadmapLifecycleBar {
   return {
@@ -46,7 +46,7 @@ function branch(overrides: Partial<BranchRow> = {}): BranchRow {
 
 describe('roadmapToCsv', () => {
   it('emits a header row and one lifecycle row per bar, named by its group', () => {
-    const groups: RoadmapCapabilityGroup[] = [{ key: 'cap-1', capability: { element_id: 'cap-1', name: 'Customer Contact' } as never, bars: [bar()] }];
+    const groups: RoadmapGroup[] = [{ key: 'cap-1', label: 'Customer Contact', href: '/e/cap-1', bars: [bar()] }];
     const csv = roadmapToCsv(groups, []);
     const lines = csv.split('\r\n');
     expect(lines[0]).toBe('Type,Capability,System,Introduced,Planned end,Support ends,Criticality,Lifecycle status,Date,Description');
@@ -54,7 +54,7 @@ describe('roadmapToCsv', () => {
   });
 
   it('labels an unassigned group\'s row "Unassigned"', () => {
-    const groups: RoadmapCapabilityGroup[] = [{ key: UNASSIGNED_GROUP_KEY, capability: undefined, bars: [bar()] }];
+    const groups: RoadmapGroup[] = [{ key: UNASSIGNED_GROUP_KEY, label: 'Unassigned', href: null, bars: [bar()] }];
     const csv = roadmapToCsv(groups, []);
     expect(csv.split('\r\n')[1]).toContain('Lifecycle,Unassigned,Legacy CRM');
   });

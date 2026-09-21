@@ -9,16 +9,19 @@ import type { UUID } from '../../contracts/delta';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import { isRoadmapEligibleBranch, type RoadmapMode } from './roadmapEligibility';
 import { matchesRoadmapFilters, type RoadmapFilters } from './roadmapFilter';
-import type { RoadmapCapabilityGroup } from './roadmapLifecycleRows';
+import type { RoadmapGroup } from './roadmapLifecycleRows';
 
 export interface RoadmapVisibleData {
-  filteredGroups: readonly RoadmapCapabilityGroup[];
+  filteredGroups: readonly RoadmapGroup[];
   eligibleEvents: readonly RoadmapBranchEvents[];
 }
 
-export function computeRoadmapVisibleData(groups: readonly RoadmapCapabilityGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode, filters: RoadmapFilters, now: Date): RoadmapVisibleData {
+export function computeRoadmapVisibleData(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode, filters: RoadmapFilters, now: Date): RoadmapVisibleData {
   const filteredGroups = groups
-    .map((group) => ({ ...group, bars: group.bars.filter((bar) => matchesRoadmapFilters(bar, group.key, filters, now)) }))
+    // The capability facet matches the bar's own level-1 capability, not the
+    // group key — the same bar groups under a stream id in value-stream mode,
+    // so `group.key` is no longer the right thing to filter capabilities on.
+    .map((group) => ({ ...group, bars: group.bars.filter((bar) => matchesRoadmapFilters(bar, bar.capabilityKey ?? group.key, filters, now)) }))
     .filter((group) => group.bars.length > 0);
   const eligibleEvents = branchEvents.filter(({ branch }) => isRoadmapEligibleBranch(branch, mode));
   return { filteredGroups, eligibleEvents };

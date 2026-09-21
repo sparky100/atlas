@@ -44,3 +44,18 @@ export function roadmapFiltersToSearchParams(filters: RoadmapFilters, prev: URLS
   else next.delete('supportEnding');
   return next;
 }
+
+/** F6 Step 6 (ADR-023 "Views" item 3): which grouping the roadmap shows — `?groupBy=valueStream` opts into value streams, anything else is the capability default. A separate param from the `RoadmapFilters` facets, like `?roadmapMode=`, because it's a view mode, not a filter. */
+export type RoadmapGroupBy = 'capability' | 'valueStream';
+
+export function parseRoadmapGroupBy(searchParams: URLSearchParams): RoadmapGroupBy {
+  return searchParams.get('groupBy') === 'valueStream' ? 'valueStream' : 'capability';
+}
+
+/** Copy-then-mutate, same convention as `roadmapFiltersToSearchParams` — the capability default deletes the param rather than writing a hollow `?groupBy=capability` marker. */
+export function roadmapGroupByToSearchParams(groupBy: RoadmapGroupBy, prev: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(prev);
+  if (groupBy === 'valueStream') next.set('groupBy', 'valueStream');
+  else next.delete('groupBy');
+  return next;
+}

@@ -51,6 +51,22 @@ export function containerParentIds(elements: Iterable<ElementsHeadRow>): UUID[] 
 }
 
 /**
+ * Every value_stream stage's own parent stream id among `elements` — the
+ * same batch `containerParentIds` collects for a module's platform, but
+ * for a stage's stream ("Stream · Stage", `endpointDisplayName`'s own
+ * value_stream case). A stage's parent stream is never itself a
+ * relationship endpoint, so the from/to/via batch never includes it and
+ * this is always a second, small, targeted lookup.
+ */
+export function valueStreamParentIds(elements: Iterable<ElementsHeadRow>): UUID[] {
+  const ids = new Set<UUID>();
+  for (const element of elements) {
+    if (element.element_type === 'value_stream' && element.parent_id !== null) ids.add(element.parent_id);
+  }
+  return [...ids];
+}
+
+/**
  * `moduleDisplayName(element, parent)`, `parent` looked up from
  * `elementsById` by `element.parent_id` — the common shape every caller
  * with a plain "every element I might need, by id" map already has (once

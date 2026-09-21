@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_ROADMAP_FILTERS } from './roadmapFilter';
-import { parseRoadmapFilters, roadmapFiltersToSearchParams } from './roadmapFilterParams';
+import { parseRoadmapFilters, roadmapFiltersToSearchParams, parseRoadmapGroupBy, roadmapGroupByToSearchParams } from './roadmapFilterParams';
 
 describe('parseRoadmapFilters', () => {
   it('returns the shared empty-filters constant when nothing is set', () => {
@@ -44,5 +44,30 @@ describe('roadmapFiltersToSearchParams', () => {
     const prev = new URLSearchParams('capabilities=cap-1');
     roadmapFiltersToSearchParams(EMPTY_ROADMAP_FILTERS, prev);
     expect(prev.get('capabilities')).toBe('cap-1');
+  });
+});
+
+describe('parseRoadmapGroupBy', () => {
+  it('defaults to capability for an absent or unknown value', () => {
+    expect(parseRoadmapGroupBy(new URLSearchParams())).toBe('capability');
+    expect(parseRoadmapGroupBy(new URLSearchParams('groupBy=capability'))).toBe('capability');
+    expect(parseRoadmapGroupBy(new URLSearchParams('groupBy=bogus'))).toBe('capability');
+  });
+
+  it('reads groupBy=valueStream as valueStream', () => {
+    expect(parseRoadmapGroupBy(new URLSearchParams('groupBy=valueStream'))).toBe('valueStream');
+  });
+});
+
+describe('roadmapGroupByToSearchParams', () => {
+  it('writes valueStream, and deletes the param for the capability default', () => {
+    expect(roadmapGroupByToSearchParams('valueStream', new URLSearchParams()).get('groupBy')).toBe('valueStream');
+    expect(roadmapGroupByToSearchParams('capability', new URLSearchParams('groupBy=valueStream')).has('groupBy')).toBe(false);
+  });
+
+  it('never mutates the previous URLSearchParams in place', () => {
+    const prev = new URLSearchParams('groupBy=valueStream');
+    roadmapGroupByToSearchParams('capability', prev);
+    expect(prev.get('groupBy')).toBe('valueStream');
   });
 });

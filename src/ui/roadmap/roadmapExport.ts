@@ -10,7 +10,7 @@
  * is no per-type column drift to reconcile the way element export has
  * across capability/system/container/actor.
  */
-import { UNASSIGNED_GROUP_KEY, type RoadmapCapabilityGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
+import { type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
 import { changeDescription } from './roadmapVisibleData';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 
@@ -25,8 +25,8 @@ function csvRow(cells: readonly string[]): string {
   return cells.map(csvCell).join(',');
 }
 
-function groupNameOf(group: Pick<RoadmapCapabilityGroup, 'key' | 'capability'>): string {
-  return group.key === UNASSIGNED_GROUP_KEY ? 'Unassigned' : (group.capability?.name ?? 'Unassigned');
+function groupNameOf(group: Pick<RoadmapGroup, 'label'>): string {
+  return group.label;
 }
 
 function lifecycleRow(groupName: string, bar: RoadmapLifecycleBar): string[] {
@@ -55,7 +55,7 @@ function changeRow(branchEvents: RoadmapBranchEvents): string[][] {
 }
 
 /** RFC 4180 CSV of the visible roadmap — lifecycle rows first (grouped as shown), then change events sorted by date, matching the on-screen order of `RoadmapView`/`RoadmapChangesList`. */
-export function roadmapToCsv(filteredGroups: readonly RoadmapCapabilityGroup[], eligibleEvents: readonly RoadmapBranchEvents[]): string {
+export function roadmapToCsv(filteredGroups: readonly RoadmapGroup[], eligibleEvents: readonly RoadmapBranchEvents[]): string {
   const lines = [csvRow(HEADER)];
 
   for (const group of filteredGroups) {

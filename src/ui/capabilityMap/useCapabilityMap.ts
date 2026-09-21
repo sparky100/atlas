@@ -6,6 +6,7 @@ import { hasAnySystem, listSupportsEdgesForCapabilities, listCapabilitiesForMap 
 import { getElementsByIds } from '../../db/elements';
 import { listOwnsEdges } from '../../db/elementBrowse';
 import { computeSelfOwnedCapabilityIds } from '../../db/healthFindings';
+import { listAllEnablesEdges } from '../../db/valueStreams';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import type { ViewMode } from '../../db/viewMode';
 import { resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
@@ -32,6 +33,8 @@ export interface CapabilityMapData {
   ownsEdges: RelationshipsHeadRow[];
   /** Every actor referenced as an `owns` edge's own `from` (`relationshipTypeRules.ts`: an owner is always an actor) — resolved once here so the Inspector's Selection section can show owner *names*, not just `selfOwnedIds`' own boolean. */
   actorsById: Map<UUID, ElementsHeadRow>;
+  /** F6 Step 6: every live `enables` edge at this ref (capability → stage) — "enables N stages" on a domain/card, and the capability page's own outbound "Enables" group. */
+  enablesEdges: RelationshipsHeadRow[];
 }
 
 export type CapabilityMapState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: CapabilityMapData };
@@ -96,6 +99,7 @@ export function useCapabilityMap(
       let systemsById: Map<UUID, ElementsHeadRow>;
       let ownsEdges: RelationshipsHeadRow[];
       let actorsById: Map<UUID, ElementsHeadRow>;
+      let enablesEdges: RelationshipsHeadRow[];
 
       if (ref.kind === 'branch') {
         const branch = await resolveBranchRef(supabase, ref);
@@ -135,6 +139,7 @@ export function useCapabilityMap(
         }
 
         ownsEdges = projection.relationshipsHead.filter((r) => r.relationship_type === 'owns');
+        enablesEdges = projection.relationshipsHead.filter((r) => r.relationship_type === 'enables');
         const ownerActorIds = [...new Set(ownsEdges.map((edge) => edge.from_element_id))];
         actorsById = ownerActorIds.length > 0 ? projectionElementsByIds(projection, ownerActorIds) : new Map<UUID, ElementsHeadRow>();
       } else {
@@ -181,6 +186,7 @@ export function useCapabilityMap(
         }
 
         ownsEdges = await listOwnsEdges(supabase, commitId);
+        enablesEdges = await listAllEnablesEdges(supabase, commitId);
         const ownerActorIds = [...new Set(ownsEdges.map((edge) => edge.from_element_id))];
         actorsById = ownerActorIds.length > 0 ? await getElementsByIds(supabase, commitId, ownerActorIds) : new Map<UUID, ElementsHeadRow>();
       }
@@ -189,7 +195,7 @@ export function useCapabilityMap(
       const tree = computeCapabilityMapTree(capabilities);
       const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsEdges, ownsEdges);
 
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById, enablesEdges } });
     }
 
     load().catch((e: unknown) => {

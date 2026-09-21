@@ -33,7 +33,7 @@ import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref
 import { loadProjectionAtCommitCached } from '../query/cachedBranchProjection';
 import { attributesRecord } from './attributesRecord';
 import { capabilityLevel } from './capabilityDepth';
-import { containerParentIds } from './moduleDisplayName';
+import { containerParentIds, valueStreamParentIds } from './moduleDisplayName';
 import { isIntegrationPlatform, isPlatform } from './systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -345,8 +345,12 @@ export function useElementPage(
       // own `withModuleLabels` already uses), which needs the parent's
       // name; folded into this same map (never a second one — the section
       // only ever does one `endpoints.get(id)` lookup regardless of why a
-      // row is in there) once fetched.
-      const relationshipEndpointParentIds = containerParentIds(relationshipEndpoints.values());
+      // row is in there) once fetched. F6 Step 6 adds the same fold for a
+      // value_stream stage's own parent stream ("Stream · Stage").
+      const relationshipEndpointParentIds = [
+        ...containerParentIds(relationshipEndpoints.values()),
+        ...valueStreamParentIds(relationshipEndpoints.values()),
+      ];
       if (relationshipEndpointParentIds.length > 0) {
         const parents = await source.elementsByIds(relationshipEndpointParentIds);
         for (const [id, row] of parents) relationshipEndpoints.set(id, row);

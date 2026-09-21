@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import { EMPTY_ROADMAP_FILTERS, type RoadmapFilters } from './roadmapFilter';
-import { UNASSIGNED_GROUP_KEY, type RoadmapCapabilityGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
+import { UNASSIGNED_GROUP_KEY, type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
 import { computeRoadmapPngPlan } from './roadmapPngExport';
 import { computeRoadmapTimelineRange } from './roadmapTimelineScale';
 
@@ -50,7 +50,7 @@ function branch(overrides: Partial<BranchRow> = {}): BranchRow {
 
 describe('computeRoadmapPngPlan', () => {
   it('lays out one row per bar, taller for more rows and groups', () => {
-    const groups: RoadmapCapabilityGroup[] = [{ key: 'cap-1', capability: { element_id: 'cap-1', name: 'Customer Contact' } as never, bars: [bar()] }];
+    const groups: RoadmapGroup[] = [{ key: 'cap-1', label: 'Customer Contact', href: '/e/cap-1', bars: [bar()] }];
     const range = computeRoadmapTimelineRange(['2025-01-01', '2026-12-01'], NOW);
     const plan = computeRoadmapPngPlan(groups, [], 'toBe', EMPTY_ROADMAP_FILTERS, range, NOW);
     expect(plan.groups).toHaveLength(1);
@@ -63,14 +63,14 @@ describe('computeRoadmapPngPlan', () => {
   });
 
   it('labels an unassigned group "Unassigned"', () => {
-    const groups: RoadmapCapabilityGroup[] = [{ key: UNASSIGNED_GROUP_KEY, capability: undefined, bars: [bar()] }];
+    const groups: RoadmapGroup[] = [{ key: UNASSIGNED_GROUP_KEY, label: 'Unassigned', href: null, bars: [bar()] }];
     const range = computeRoadmapTimelineRange(['2025-01-01'], NOW);
     const plan = computeRoadmapPngPlan(groups, [], 'toBe', EMPTY_ROADMAP_FILTERS, range, NOW);
     expect(plan.groups[0]?.label).toBe('Unassigned');
   });
 
   it('omits the axis and groups entirely once every group is filtered out, but still lays out the changes list', () => {
-    const groups: RoadmapCapabilityGroup[] = [{ key: 'cap-1', capability: undefined, bars: [bar()] }];
+    const groups: RoadmapGroup[] = [{ key: 'cap-1', label: 'Cap 1', href: null, bars: [bar()] }];
     const filters: RoadmapFilters = { ...EMPTY_ROADMAP_FILTERS, capabilityIds: ['cap-does-not-match'] };
     const branchEvents: RoadmapBranchEvents[] = [{ branch: branch(), events: [{ kind: 'add', elementId: 'sys-2', elementName: 'New CRM' }] }];
     const range = computeRoadmapTimelineRange(['2025-01-01'], NOW);
@@ -83,7 +83,7 @@ describe('computeRoadmapPngPlan', () => {
   });
 
   it('places an add marker on the added system\'s own row', () => {
-    const groups: RoadmapCapabilityGroup[] = [{ key: 'cap-1', capability: undefined, bars: [bar({ systemId: 'sys-2', name: 'New CRM' })] }];
+    const groups: RoadmapGroup[] = [{ key: 'cap-1', label: 'Cap 1', href: null, bars: [bar({ systemId: 'sys-2', name: 'New CRM' })] }];
     const branchEvents: RoadmapBranchEvents[] = [{ branch: branch({ target_date: '2026-06-01' }), events: [{ kind: 'add', elementId: 'sys-2', elementName: 'New CRM' }] }];
     const range = computeRoadmapTimelineRange(['2025-01-01', '2026-12-01', '2026-06-01'], NOW);
     const plan = computeRoadmapPngPlan(groups, branchEvents, 'toBe', EMPTY_ROADMAP_FILTERS, range, NOW);

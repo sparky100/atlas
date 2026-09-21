@@ -322,6 +322,7 @@ export function CapabilityMapPage() {
               <CapabilityMapView
                 tree={state.data.tree}
                 supportsEdges={state.data.supportsEdges}
+                enablesEdges={state.data.enablesEdges}
                 systemsById={state.data.systemsById}
                 capabilities={state.data.capabilities}
                 selfOwnedIds={state.data.selfOwnedIds}
