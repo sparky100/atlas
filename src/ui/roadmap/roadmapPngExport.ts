@@ -108,7 +108,13 @@ function markersForBar(systemId: string, branchEvents: readonly RoadmapBranchEve
     const x = xAt(pct);
     if (event.kind === 'add') markers.push({ x, kind: 'add' });
     else if (event.kind === 'retire') markers.push({ x, kind: 'retire' });
-    else markers.push({ x, kind: event.fromSystemId === systemId ? 'replaceFrom' : 'replaceTo' });
+    // ADR-001 amendment: `fromSystemId` is the replacement, `toSystemId` is
+    // the retiring element (`buildReplacesDelta.ts`'s own "B replaces A" =
+    // `from: B, to: A` convention) — the opposite of this marker kind's own
+    // naming, so the retiring bar (`toSystemId`) is `replaceFrom` (drawn
+    // '→', RoadmapView.tsx's own matching flip) and the replacement bar
+    // (`fromSystemId`) is `replaceTo` (drawn '←').
+    else markers.push({ x, kind: event.fromSystemId === systemId ? 'replaceTo' : 'replaceFrom' });
   }
   return markers;
 }

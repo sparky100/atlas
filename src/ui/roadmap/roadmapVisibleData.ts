@@ -24,11 +24,19 @@ export function computeRoadmapVisibleData(groups: readonly RoadmapCapabilityGrou
   return { filteredGroups, eligibleEvents };
 }
 
-/** The one description string for a change event — shared by `RoadmapChangesList`'s on-screen row and the CSV/PNG export's own change row, so the wording can't drift between what's shown and what's exported. */
+/**
+ * The one description string for a change event — shared by
+ * `RoadmapChangesList`'s on-screen row and the CSV/PNG export's own change
+ * row, so the wording can't drift between what's shown and what's
+ * exported. ADR-001 amendment: `fromSystemId` is the replacement,
+ * `toSystemId` is the retiring element (`buildReplacesDelta.ts`'s own
+ * "B replaces A" = `from: B, to: A` convention) — "A replaced by B" reads
+ * `toSystemName` first, `fromSystemName` second.
+ */
 export function changeDescription(event: RoadmapBranchEvents['events'][number]): string {
   if (event.kind === 'add') return `${event.elementName} added`;
   if (event.kind === 'retire') return `${event.elementName} retired`;
-  return `${event.fromSystemName} replaced by ${event.toSystemName} (${event.capabilityName})`;
+  return `${event.toSystemName} replaced by ${event.fromSystemName}`;
 }
 
 export interface RoadmapSystemEvent {

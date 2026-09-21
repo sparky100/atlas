@@ -3,22 +3,22 @@
  * arrows" (docs/prompts/atlas-prompt-pack.md). Derived directly from a
  * merged change's own deltas — the same low-level `listOwnDeltas`/
  * `foldFromGenesis` pair `src/db/changeSummary.ts` already uses for the
- * change page, not that module's own already-summarized output: a
- * `relationship.retract` delta carries only its own `relationshipId`
- * (relationships are immutable — "to re-point, retract and create," SPEC),
- * never the endpoints it used to have, so recovering "which system, which
- * capability" needs the as-is head's own row, not a display string
- * already flattened into "supports A → B" text.
+ * change page, not that module's own already-summarized output.
  *
- * "Replacement" here is exactly `useElementRetire.ts`'s own shape
- * (UI-principles decision 4, "planned replacement requires a retract
- * delta in the same approved change"): a `supports` edge retracted from
- * an old system into a capability, and a `supports` edge created from a
- * *different* system into that *same* capability, both in the one
- * change's own deltas. Nothing beyond that pairing is inferred — a
- * retract with no matching create for the same capability is a bare
- * removal (no marker of its own here; the retiring system's own "retire"
- * marker already covers it), never guessed at as a replacement.
+ * "Replacement" here (ADR-001 amendment) is a direct read of every
+ * `replaces`-typed `relationship.create` delta the change's own deltas
+ * contain — `fromElementId` is the replacement, `toElementId` is the
+ * retiring element (`buildReplacesDelta.ts`'s own "B replaces A" = `from:
+ * B, to: A` convention), one arrow per edge. This used to be a heuristic:
+ * a `supports` edge retracted from an old system into a capability paired
+ * with a `supports` edge created from a *different* system into that
+ * *same* capability, both in the one change's own deltas — coincidental
+ * by construction (two independent supports changes that happen to share
+ * a capability were indistinguishable from a real replacement), and
+ * deleted outright once a real `replaces` edge existed to read instead,
+ * not kept as a fallback. A `replaces` edge carries no capability at all
+ * — it is a direct system-to-system fact — so `RoadmapReplacementArrow`
+ * no longer carries `capabilityId`/`capabilityName` either.
  */
 import type { Delta, UUID } from '../contracts/delta';
 import { listOwnDeltas, type BranchFork } from '../engine/branch';
@@ -42,8 +42,6 @@ export interface RoadmapRetireMarker {
 
 export interface RoadmapReplacementArrow {
   kind: 'replace';
-  capabilityId: UUID;
-  capabilityName: string;
   fromSystemId: UUID;
   fromSystemName: string;
   toSystemId: UUID;
@@ -58,15 +56,11 @@ function elementNameOf(head: Head, fallbackHead: Head, elementId: UUID): string 
 
 /**
  * @param ownDeltas This change's own deltas (`listOwnDeltas`'s dependency order) — every delta the branch itself contributed, never main's.
- * @param asIsHead Folded at the branch's base commit — resolves what a retract used to point at.
- * @param toBeHead Folded at the branch's head commit — resolves what a create points at, and every element's current name.
+ * @param asIsHead Folded at the branch's base commit — `elementNameOf`'s own fallback, for a name that only ever existed before this change.
+ * @param toBeHead Folded at the branch's head commit — every element's current name, the primary lookup.
  */
 export function deriveRoadmapChangeEvents(ownDeltas: readonly Delta[], asIsHead: Head, toBeHead: Head): RoadmapChangeEvent[] {
   const events: RoadmapChangeEvent[] = [];
-
-  // Capability id -> the one system this change's own deltas retracted from it / created into it.
-  const supportsRetractedFrom = new Map<UUID, UUID>();
-  const supportsCreatedTo = new Map<UUID, UUID>();
 
   for (const delta of ownDeltas) {
     // `system` or `container` (a platform module — "platforms and modules"
@@ -83,29 +77,15 @@ export function deriveRoadmapChangeEvents(ownDeltas: readonly Delta[], asIsHead:
       continue;
     }
 
-    if (delta.kind === 'relationship.retract') {
-      const rel = asIsHead.relationships.get(delta.relationshipId);
-      if (rel?.relationshipType === 'supports') supportsRetractedFrom.set(rel.toElementId, rel.fromElementId);
-      continue;
+    if (delta.kind === 'relationship.create' && delta.relationshipType === 'replaces') {
+      events.push({
+        kind: 'replace',
+        fromSystemId: delta.fromElementId,
+        fromSystemName: elementNameOf(toBeHead, asIsHead, delta.fromElementId),
+        toSystemId: delta.toElementId,
+        toSystemName: elementNameOf(toBeHead, asIsHead, delta.toElementId),
+      });
     }
-
-    if (delta.kind === 'relationship.create' && delta.relationshipType === 'supports') {
-      supportsCreatedTo.set(delta.toElementId, delta.fromElementId);
-    }
-  }
-
-  for (const [capabilityId, oldSystemId] of supportsRetractedFrom) {
-    const newSystemId = supportsCreatedTo.get(capabilityId);
-    if (newSystemId === undefined || newSystemId === oldSystemId) continue;
-    events.push({
-      kind: 'replace',
-      capabilityId,
-      capabilityName: elementNameOf(toBeHead, asIsHead, capabilityId),
-      fromSystemId: oldSystemId,
-      fromSystemName: elementNameOf(asIsHead, toBeHead, oldSystemId),
-      toSystemId: newSystemId,
-      toSystemName: elementNameOf(toBeHead, asIsHead, newSystemId),
-    });
   }
 
   return events;

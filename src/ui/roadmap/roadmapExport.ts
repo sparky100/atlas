@@ -50,7 +50,13 @@ function changeRow(branchEvents: RoadmapBranchEvents): string[][] {
   return events.map((event) => {
     if (event.kind === 'add') return ['Change', '', event.elementName, '', '', '', '', '', date, changeDescription(event)];
     if (event.kind === 'retire') return ['Change', '', event.elementName, '', '', '', '', '', date, changeDescription(event)];
-    return ['Change', event.capabilityName, event.toSystemName, '', '', '', '', '', date, changeDescription(event)];
+    // ADR-001 amendment: a replaces edge is a direct system-to-system fact
+    // with no capability mediating it — the Capability column is blank
+    // here, same as the add/retire rows above. `fromSystemName` (the
+    // replacement — `buildReplacesDelta.ts`'s own convention) is the
+    // System column's own value, same system this row named before PR7's
+    // field-meaning flip.
+    return ['Change', '', event.fromSystemName, '', '', '', '', '', date, changeDescription(event)];
   });
 }
 
