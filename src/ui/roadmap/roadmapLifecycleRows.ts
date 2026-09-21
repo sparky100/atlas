@@ -82,7 +82,7 @@ function lifecycleBarOf(system: ElementsHeadRow, ownsEdges: readonly Relationshi
 }
 
 /**
- * @param systems Every system in scope (already filtered by whatever ref/branch the caller is viewing).
+ * @param systems Every system and module in scope (`roadmapModules.ts`'s own `systemsAndModulesFor`; already filtered by whatever ref/branch the caller is viewing).
  * @param supportsEdges Every live `supports` edge in scope — used only to find each system's own primary capability for grouping, not for the bar's own dates.
  * @param ownsEdges Every live `owns` edge in scope — used only for the owner filter (any role; see `RoadmapLifecycleBar.ownerActorIds`).
  * @param capabilitiesById Every capability in scope, keyed by id — `l1AncestorOf`'s own input shape.

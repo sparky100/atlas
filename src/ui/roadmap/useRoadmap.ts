@@ -11,6 +11,7 @@ import { loadRoadmapChangeEventsForModel, type RoadmapBranchEvents } from '../..
 import { reportError } from '../errors/errorBannerStore';
 import { isRoadmapEligibleBranch } from './roadmapEligibility';
 import { groupRoadmapLifecycleBars, type RoadmapCapabilityGroup } from './roadmapLifecycleRows';
+import { systemsAndModulesFor } from './roadmapModules';
 import { supabase } from '../supabaseClient';
 
 export interface RoadmapData {
@@ -64,14 +65,14 @@ export function useRoadmap(modelId: UUID, orgId: UUID, userId: UUID | null, ref:
       }
 
       const allElements = await listAllElements(supabase, commitId);
-      const systems = allElements.filter((e) => e.element_type === 'system');
+      const systemsAndModules = systemsAndModulesFor(allElements);
       const capabilities = allElements.filter((e) => e.element_type === 'capability');
       const capabilitiesById = new Map(capabilities.map((c) => [c.element_id, c]));
       const capabilityIds = capabilities.map((c) => c.element_id);
 
       const [supportsEdges, ownsEdges, changeBranches] = await Promise.all([listSupportsEdgesForCapabilities(supabase, commitId, capabilityIds), listOwnsEdges(supabase, commitId), listChangeBranches(supabase, modelId)]);
 
-      const groups = groupRoadmapLifecycleBars(systems, supportsEdges, ownsEdges, capabilitiesById);
+      const groups = groupRoadmapLifecycleBars(systemsAndModules, supportsEdges, ownsEdges, capabilitiesById);
 
       const ownerActorIds = [...new Set(ownsEdges.map((edge) => edge.from_element_id))];
       const ownerActorsById = ownerActorIds.length > 0 ? await getElementsByIds(supabase, commitId, ownerActorIds) : new Map<UUID, ElementsHeadRow>();
