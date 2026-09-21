@@ -92,6 +92,17 @@ export interface ElementHeaderProps {
    */
   onConvertToModule?: (() => void) | undefined;
   /**
+   * ADR-023/F6's "a stream is deactivated, never deleted" — a value stream
+   * only (never a stage; a stage follows its own stream), same
+   * omitted-not-disabled convention, gated the same structural-edit way
+   * `onRetire`/`onMerge` already are. Mutually exclusive with
+   * `onReactivate` in practice — the caller passes whichever the stream's
+   * own current `inactive` flag makes sense, never both.
+   */
+  onDeactivate?: (() => void) | undefined;
+  /** The inverse of `onDeactivate` above — offered only when the stream is currently inactive. */
+  onReactivate?: (() => void) | undefined;
+  /**
    * Sticky ref close-out: "Contributors see 'read-only: under review' on
    * elements of a Proposed change." — the explanation `onEdit`'s own
    * omitted-not-disabled convention never gave: neither `onEdit` nor
@@ -155,7 +166,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, readOnlyReason, contextHref }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, contextHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
@@ -325,6 +336,30 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onPro
                 }}
               >
                 <Text as="span">Convert to a module of…</Text>
+              </button>
+            )}
+            {onDeactivate && (
+              <button
+                type="button"
+                className={styles.menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDeactivate();
+                }}
+              >
+                <Text as="span">Deactivate…</Text>
+              </button>
+            )}
+            {onReactivate && (
+              <button
+                type="button"
+                className={styles.menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onReactivate();
+                }}
+              >
+                <Text as="span">Reactivate…</Text>
               </button>
             )}
             {onRemoveFromModel && (

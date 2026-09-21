@@ -1,0 +1,63 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stageRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.detail {
+  padding: var(--space-2) var(--space-3);
+  border-left: var(--border-width) solid var(--border);
+  margin-left: var(--space-2);
+}
+
+.factIndicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 0 auto;
+}
+
+.factDot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex: 0 0 auto;
+}
+
+.factDot[data-tone='ok'] {
+  background: var(--status-ok);
+}
+.factDot[data-tone='warn'] {
+  background: var(--status-warn);
+}
+.factDot[data-tone='info'] {
+  background: var(--status-info);
+}
+.factDot[data-tone='neutral'] {
+  background: var(--status-neutral);
+}
