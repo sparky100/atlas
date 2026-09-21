@@ -32,12 +32,20 @@ describe('buildReplaceWithNewElementDeltas', () => {
       onMain: true,
     });
 
-    expect(deltas.map((d) => d.kind)).toEqual(['element.create', 'element.update', 'element.update']);
+    expect(deltas.map((d) => d.kind)).toEqual(['element.create', 'element.update', 'element.update', 'relationship.create']);
     const create = deltas[0] as { elementId: string; elementType: string; name: string; parentId: string | null };
     expect(create.elementId).toBe(newElementId);
     expect(create.elementType).toBe('system');
     expect(create.name).toBe('New System');
     expect(create.parentId).toBeNull();
+
+    // ADR-001 amendment: a `replaces` edge from the new element to the old
+    // one is written every time, even with nothing else to transfer.
+    const replaces = deltas[3] as unknown as { relationshipType: string; fromElementId: string; toElementId: string; attributes: Record<string, unknown> };
+    expect(replaces.relationshipType).toBe('replaces');
+    expect(replaces.fromElementId).toBe(newElementId);
+    expect(replaces.toElementId).toBe('a');
+    expect(replaces.attributes).toEqual({});
   });
 
   it('skips the lifecycleStatus delta when the element is already retiring', () => {
@@ -53,7 +61,7 @@ describe('buildReplaceWithNewElementDeltas', () => {
       onMain: true,
     });
 
-    expect(deltas.map((d) => d.kind)).toEqual(['element.create', 'element.update']);
+    expect(deltas.map((d) => d.kind)).toEqual(['element.create', 'element.update', 'relationship.create']);
     expect((deltas[1] as { attribute: string }).attribute).toBe('plannedEnd');
   });
 
@@ -141,11 +149,11 @@ describe('buildReplaceWithNewElementDeltas', () => {
     expect(created.attributes).toEqual({ description: 'sends readings to', dataClassification: 'official' });
   });
 
-  it('never transfers an owns edge, or a relationship where A is neither endpoint', () => {
+  it('never transfers an owns edge, or a relationship where A is neither endpoint — the only relationship.create is the replaces edge', () => {
     const a = system('a', 'Old System');
     const ownsEdge = rel('r4', 'owns', 'actor-1', 'a', { role: 'business' });
     const unrelatedEdge = rel('r5', 'uses', 'x', 'y');
-    const { deltas } = buildReplaceWithNewElementDeltas({
+    const { deltas, newElementId } = buildReplaceWithNewElementDeltas({
       element: a,
       facts: NO_FACTS,
       relationships: [ownsEdge, unrelatedEdge],
@@ -156,6 +164,11 @@ describe('buildReplaceWithNewElementDeltas', () => {
       onMain: true,
     });
 
-    expect(deltas.some((d) => d.kind === 'relationship.retract' || d.kind === 'relationship.create')).toBe(false);
+    expect(deltas.some((d) => d.kind === 'relationship.retract')).toBe(false);
+    const relationshipCreates = deltas.filter((d) => d.kind === 'relationship.create') as unknown as { relationshipType: string; fromElementId: string; toElementId: string }[];
+    expect(relationshipCreates).toHaveLength(1);
+    expect(relationshipCreates[0]?.relationshipType).toBe('replaces');
+    expect(relationshipCreates[0]?.fromElementId).toBe(newElementId);
+    expect(relationshipCreates[0]?.toElementId).toBe('a');
   });
 });
