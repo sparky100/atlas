@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
 import { EMPTY_ROADMAP_FILTERS, type RoadmapFilters } from './roadmapFilter';
 import type { RoadmapCapabilityGroup, RoadmapLifecycleBar } from './roadmapLifecycleRows';
-import { computeRoadmapVisibleData } from './roadmapVisibleData';
+import { changeDescription, computeRoadmapVisibleData } from './roadmapVisibleData';
 
 const NOW = new Date('2026-06-15T00:00:00Z');
 
@@ -77,5 +77,19 @@ describe('computeRoadmapVisibleData', () => {
     const filters: RoadmapFilters = { ...EMPTY_ROADMAP_FILTERS, criticalities: ['critical'] };
     const { filteredGroups } = computeRoadmapVisibleData(groups, [], 'toBe', filters, NOW);
     expect(filteredGroups[0]?.bars.map((b) => b.systemId)).toEqual(['a']);
+  });
+});
+
+describe('changeDescription', () => {
+  it('describes an add event', () => {
+    expect(changeDescription({ kind: 'add', elementId: 'sys-1', elementName: 'New CRM' })).toBe('New CRM added');
+  });
+
+  it('describes a retire event', () => {
+    expect(changeDescription({ kind: 'retire', elementId: 'sys-1', elementName: 'Legacy CRM' })).toBe('Legacy CRM retired');
+  });
+
+  it('ADR-001 amendment: describes a replace event with no capability clause — a replaces edge is a direct system-to-system fact', () => {
+    expect(changeDescription({ kind: 'replace', fromSystemId: 'sys-2', fromSystemName: 'New CRM Platform', toSystemId: 'sys-1', toSystemName: 'Legacy CRM' })).toBe('Legacy CRM replaced by New CRM Platform');
   });
 });
