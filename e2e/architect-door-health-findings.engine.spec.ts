@@ -473,9 +473,9 @@ test('ADR-001 amendment: a replaces edge whose replacement has no departure plan
     title: 'seed two replaces edges, one to a replacement with no departure plan',
     body: null,
     deltas: [
-      { kind: 'element.create', id: randomUUID(), elementId: legacyId, elementType: 'system', name: 'Legacy CRM', parentId: null, attributes: { lifecycleStatus: 'retiring', plannedEnd: '2027-01-01' }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: legacyId, elementType: 'system', name: 'Legacy CRM', parentId: null, attributes: { lifecycleStatus: 'retiring', plannedEnd: '2027-01-01', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: noPlanReplacementId, elementType: 'system', name: 'Undated Replacement', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
-      { kind: 'element.create', id: randomUUID(), elementId: anotherLegacyId, elementType: 'system', name: 'Another Legacy System', parentId: null, attributes: { lifecycleStatus: 'retiring', plannedEnd: '2027-01-01' }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: anotherLegacyId, elementType: 'system', name: 'Another Legacy System', parentId: null, attributes: { lifecycleStatus: 'retiring', plannedEnd: '2027-01-01', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: plannedReplacementId, elementType: 'system', name: 'Planned Replacement', parentId: null, attributes: { lifecycleStatus: 'active', plannedEnd: '2033-01-01', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'replaces', fromElementId: noPlanReplacementId, toElementId: legacyId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
       { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'replaces', fromElementId: plannedReplacementId, toElementId: anotherLegacyId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
