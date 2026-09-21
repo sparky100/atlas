@@ -23,17 +23,17 @@ import styles from './RelationshipsSection.module.css';
 
 // Fixed display order (UI-principles §4.4) — distinct from RELATIONSHIP_TYPES'
 // wire-contract listing order, which doesn't itself mandate a UI order.
-const DISPLAY_ORDER: RelationshipType[] = ['supports', 'owns', 'uses', 'flows_to'];
+// "Replaces"/"Replaced by" (ADR-001 amendment) sits last — a lifecycle fact
+// about the element's own retirement/succession, read after every
+// structural relationship (supports/owns/uses/flows_to) rather than
+// alongside them.
+const DISPLAY_ORDER: RelationshipType[] = ['supports', 'owns', 'uses', 'flows_to', 'replaces'];
 
 const DIRECTION_LABEL: Record<RelationshipType, { outbound: string; inbound: string }> = {
   supports: { outbound: 'supports', inbound: 'supported by' },
   owns: { outbound: 'owns', inbound: 'owned by' },
   uses: { outbound: 'uses', inbound: 'used by' },
   flows_to: { outbound: 'flows to', inbound: 'receives from' },
-  // ADR-001 amendment ("replaces") — not yet in DISPLAY_ORDER below, so this
-  // entry exists only to satisfy the exhaustive Record; the "Replaces"/
-  // "Replaced by" sections don't render on the element page until a later
-  // PR adds 'replaces' to DISPLAY_ORDER and covers the rendering behaviour.
   replaces: { outbound: 'replaces', inbound: 'replaced by' },
 };
 
