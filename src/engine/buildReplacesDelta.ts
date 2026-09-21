@@ -1,5 +1,13 @@
 import type { Delta, ReplacesAttributes, UUID } from '../contracts/delta';
 
+export interface BuildReplacesDeltaOptions {
+  attributes?: ReplacesAttributes;
+  /** Locator inside the source (`Provenance.sourceRef`) — omitted (not set at all) when the caller has none, the same convention `Provenance` itself documents. */
+  sourceRef?: string;
+  /** Defaults to 1 (a manual edit's own confidence) — a caller with its own per-row confidence (F2-lite import, the capture pipeline) passes it through instead. */
+  confidence?: number;
+}
+
 /**
  * ADR-001 amendment: one `replaces` `relationship.create` delta —
  * `fromElementId` is the replacement, `toElementId` is the retiring
@@ -11,7 +19,8 @@ import type { Delta, ReplacesAttributes, UUID } from '../contracts/delta';
  * the capture pipeline) calls this same function, so they converge on one
  * delta shape by construction rather than by convention.
  */
-export function buildReplacesDelta(fromElementId: UUID, toElementId: UUID, sourceId: UUID, attributes: ReplacesAttributes = {}): Delta {
+export function buildReplacesDelta(fromElementId: UUID, toElementId: UUID, sourceId: UUID, options: BuildReplacesDeltaOptions = {}): Delta {
+  const { attributes = {}, sourceRef, confidence = 1 } = options;
   return {
     kind: 'relationship.create',
     id: crypto.randomUUID(),
@@ -21,6 +30,7 @@ export function buildReplacesDelta(fromElementId: UUID, toElementId: UUID, sourc
     toElementId,
     attributes,
     sourceId,
-    confidence: 1,
+    ...(sourceRef !== undefined ? { sourceRef } : {}),
+    confidence,
   };
 }

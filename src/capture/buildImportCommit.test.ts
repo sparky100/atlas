@@ -543,6 +543,8 @@ describe('buildImportDeltas — JSON import "changes" section', () => {
         expect.objectContaining({ kind: 'relationship.create', relationshipType: 'supports', fromElementId: 'electron-1', toElementId: 'cap-1', attributes: { role: 'secondary' } }),
         expect.objectContaining({ kind: 'relationship.retract', relationshipId: 'rel-2', previousDeltaId: 'd-exists-2' }),
         expect.objectContaining({ kind: 'relationship.create', relationshipType: 'supports', fromElementId: 'electron-1', toElementId: 'cap-2', attributes: { role: 'secondary' } }),
+        // ADR-001 amendment: a real `replaces` edge alongside the supports transfer — from the replacement to the retiring element.
+        expect.objectContaining({ kind: 'relationship.create', relationshipType: 'replaces', fromElementId: 'electron-1', toElementId: 'legacy-1', attributes: {} }),
       ]);
       expect(results).toEqual([{ rowNumber: 1, name: 'Legacy CRM', action: 'retire', reason: null, outcome: { status: 'applied', elementId: 'legacy-1' } }]);
     });
@@ -562,6 +564,7 @@ describe('buildImportDeltas — JSON import "changes" section', () => {
       const create = deltas.find((d) => d.kind === 'element.create');
       if (create?.kind !== 'element.create') throw new Error('expected an element.create delta');
       expect(deltas.find((d) => d.kind === 'relationship.create' && d.relationshipType === 'supports')).toMatchObject({ fromElementId: create.elementId, toElementId: 'cap-1', attributes: { role: 'secondary' } });
+      expect(deltas.find((d) => d.kind === 'relationship.create' && d.relationshipType === 'replaces')).toMatchObject({ fromElementId: create.elementId, toElementId: 'legacy-1' });
       expect(results[0]?.outcome).toEqual({ status: 'applied', elementId: 'legacy-1' });
     });
 
@@ -576,6 +579,10 @@ describe('buildImportDeltas — JSON import "changes" section', () => {
       // Piclo's own capability link lands on Piclo itself (its own row said so) — never transferred, since there's no pre-existing edge for the changes pass to find and move.
       expect(deltas.find((d) => d.kind === 'relationship.create' && d.relationshipType === 'supports')).toMatchObject({ fromElementId: piclo.elementId, toElementId: 'cap-1' });
       expect(deltas.some((d) => d.kind === 'relationship.retract')).toBe(false);
+      // The `replaces` edge itself is written regardless — it records the replacement fact, not a capability transfer, so it isn't gated on there being anything to transfer.
+      const electron = deltas.find((d) => d.kind === 'element.create' && d.name === 'Electron Platform');
+      if (electron?.kind !== 'element.create') throw new Error('expected Electron Platform’s own element.create delta');
+      expect(deltas.find((d) => d.kind === 'relationship.create' && d.relationshipType === 'replaces')).toMatchObject({ fromElementId: electron.elementId, toElementId: piclo.elementId });
       expect(results[0]?.outcome).toMatchObject({ status: 'applied' });
     });
 
@@ -630,6 +637,23 @@ describe('buildImportDeltas — JSON import per-entry quote/confidence provenanc
     const factsByElementId = new Map([['sys-1', new Map([['lifecycleStatus', fact('d-lifecycle', 'active')]])]]);
     const { deltas } = build([], { systems, factsByElementId, existsDeltaIdByElementId: new Map([['sys-1', 'sys-1-create']]), changeRows: [changeRow({ rowNumber: 1, name: 'Legacy CRM', action: 'retire', quote: 'CRM was decommissioned in March', confidence: 0.9 })] });
     expect(deltas[0]).toMatchObject({ confidence: 0.9, sourceRef: `${FILE_NAME} › row 1 › retire — "CRM was decommissioned in March"` });
+  });
+
+  it('carries confidence/quote onto the replaces edge a replaced_by entry writes', () => {
+    const systems = [system('legacy-1', 'Legacy CRM'), system('electron-1', 'Electron')];
+    const factsByElementId = new Map([['legacy-1', new Map([['lifecycleStatus', fact('d-lifecycle', 'active')]])]]);
+    const { deltas } = build([], {
+      systems,
+      factsByElementId,
+      existsDeltaIdByElementId: new Map([['legacy-1', 'legacy-1-create'], ['electron-1', 'electron-1-create']]),
+      changeRows: [changeRow({ rowNumber: 1, name: 'Legacy CRM', action: 'retire', replacedBy: 'Electron', quote: 'CRM was decommissioned in favour of Electron', confidence: 0.85 })],
+    });
+    expect(deltas.find((d) => d.kind === 'relationship.create' && d.relationshipType === 'replaces')).toMatchObject({
+      fromElementId: 'electron-1',
+      toElementId: 'legacy-1',
+      confidence: 0.85,
+      sourceRef: `${FILE_NAME} › row 1 › replaced_by — "CRM was decommissioned in favour of Electron"`,
+    });
   });
 
   it('carries confidence/quote from the mentioning row onto the new actor this import mints for an unresolved owner', () => {
