@@ -15,7 +15,7 @@ import type { CommitEnvelope, Delta } from '../src/contracts/delta';
 import { getBranch } from '../src/db/branches';
 import { commitToBranch } from '../src/db/commits';
 import { loadEnv } from '../src/db/env';
-import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { addArchitectMember, bootstrapChangeBranchFixture, submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
 
 function seedSystemDelta(elementId: string, name: string, sourceId: string): Delta {
   return { kind: 'element.create', id: randomUUID(), elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId, confidence: 1 };
@@ -24,7 +24,12 @@ function seedSystemDelta(elementId: string, name: string, sourceId: string): Del
 test('a record change merges in one click from its own page and never appears in /review; a propose change is unaffected', async ({ page }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'reviewweight', 'Ledger Service');
-  const { signedIn: owner, orgSlug, modelId, modelSlug, seedSourceId } = fixture;
+  const { signedIn: owner, userId, orgId, orgSlug, modelId, modelSlug, seedSourceId } = fixture;
+  // F3a's own architect floor (see addArchitectMember's own doc comment) —
+  // only the propose half below actually needs it (record/correct stay on
+  // the single-approver path), but adding it once up front is simpler than
+  // gating it, and a second, unused member doesn't affect the record half.
+  await addArchitectMember(env, orgId, userId);
 
   // 1. Record: "What happened" (F0's own record-default entry point).
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
@@ -112,7 +117,7 @@ test('a record change merges in one click from its own page and never appears in
   if (!proposeSeedResult.ok) throw new Error(`reviewweight fixture: seeding the propose branch: ${proposeSeedResult.message}`);
 
   await page.reload();
-  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await submitForReviewWithReviewers(page, false);
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/review`);

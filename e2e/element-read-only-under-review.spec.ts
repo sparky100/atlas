@@ -15,12 +15,14 @@ import { getBranch } from '../src/db/branches';
 import { createSupabaseClient } from '../src/db/client';
 import { commitToBranch } from '../src/db/commits';
 import { loadEnv } from '../src/db/env';
-import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { addArchitectMember, bootstrapChangeBranchFixture, submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
 
 test('a contributor sees "Read-only: under review" on an element of a Proposed change, not Edit or Propose a change', async ({ page, browser }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'readonlyreview', 'Ledger Service');
   const { signedIn: owner, userId: ownerId, orgId, orgSlug, modelId, modelSlug, seedSourceId } = fixture;
+  // F3a's own architect floor — see addArchitectMember's own doc comment.
+  await addArchitectMember(env, orgId, ownerId);
 
   // 1. Owner creates the change (lands inside) and seeds one delta on it
   // directly — `useSubmitForReview` refuses an empty change, and this test
@@ -46,7 +48,7 @@ test('a contributor sees "Read-only: under review" on an element of a Proposed c
   if (!seedResult.ok) throw new Error(`under-review fixture: seeding a delta: ${seedResult.message}`);
 
   // 2. Submit for review — the branch leaves `draft`.
-  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await submitForReviewWithReviewers(page, false);
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
 
   // 3. A contributor, added directly (`members_insert`'s RLS lets an owner

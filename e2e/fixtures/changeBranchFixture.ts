@@ -14,7 +14,7 @@ import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import type { CommitEnvelope } from '../../src/contracts/delta';
 import { getMainBranch } from '../../src/db/branches';
-import { createSupabaseClient, type Client } from '../../src/db/client';
+import { createServiceRoleClient, createSupabaseClient, type Client } from '../../src/db/client';
 import { commitToBranch } from '../../src/db/commits';
 import type { Env } from '../../src/db/env';
 import { createModel } from '../../src/db/models';
@@ -36,6 +36,50 @@ export interface ChangeBranchFixture {
   seedCommitId: string;
   /** The `element.create` delta's own id — a conflict scenario diverging two sides from the same fact needs this as `previousDeltaId`. */
   createDeltaId: string;
+}
+
+/**
+ * F3a's own architect floor (`atlas.submit_merge_request`'s
+ * `v_min_architects`, default 1): a propose/explore-intent submit needs a
+ * real reviewer set including at least one architect member. This
+ * fixture's own owner can't become one themselves (an org must always keep
+ * its sole owner — `org-settings-members.engine.spec.ts`'s own precedent,
+ * refusing exactly that self-demotion), so a caller whose scenario submits
+ * a propose/explore change for review calls this once, after
+ * `bootstrapChangeBranchFixture`, to add a second, real member purely to
+ * satisfy that floor — inserted directly as service role rather than
+ * through the invite-and-accept UI flow these backend-driven specs have no
+ * second `page` for.
+ */
+export async function addArchitectMember(env: Env, orgId: string, invitedBy: string): Promise<string> {
+  const service = createServiceRoleClient(env);
+  const { data: created, error: createError } = await service.auth.admin.createUser({ email: `architect-${randomUUID()}@example.test`, password: `${randomUUID()}Aa1!`, email_confirm: true });
+  if (createError) throw new Error(`addArchitectMember: create user: ${createError.message}`);
+  const { error: memberError } = await service.from('members').insert({ org_id: orgId, user_id: created.user.id, role: 'architect', invited_by: invitedBy });
+  if (memberError) throw new Error(`addArchitectMember: add member: ${memberError.message}`);
+  return created.user.id;
+}
+
+/**
+ * Clicks "Submit for review", then (for a propose/explore-intent branch)
+ * the `ReviewerPicker` panel that opens below the same button — its own
+ * derived set already pre-checks the org's architect (`deriveReviewers.ts`'s
+ * `pickArchitect`), so nothing further is needed there. `includeSelf`
+ * additionally checks the caller's own signed-in user (the org owner, from
+ * `bootstrapChangeBranchFixture` + `addArchitectMember` — exactly two
+ * members at this point) when a later step needs them to actually cast a
+ * verdict (`atlas.set_review_verdict`'s own "you are not a reviewer on
+ * this request" check) — their own row is the only *unchecked* checkbox
+ * in that two-member case, so no display name is needed to find it.
+ * `.last()` on the second click: the outer trigger button keeps the same
+ * label and stays mounted once the picker opens.
+ */
+export async function submitForReviewWithReviewers(page: Page, includeSelf: boolean): Promise<void> {
+  await page.getByRole('button', { name: 'Submit for review' }).click();
+  if (includeSelf) {
+    await page.getByRole('checkbox', { checked: false }).first().check();
+  }
+  await page.getByRole('button', { name: 'Submit for review' }).last().click();
 }
 
 /**

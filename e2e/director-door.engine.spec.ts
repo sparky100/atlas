@@ -16,6 +16,7 @@ import { createTag } from '../src/db/tags';
 import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
+import { addArchitectMember } from './fixtures/changeBranchFixture';
 
 function createSystem(id: string, elementId: string, name: string, lifecycleStatus: LifecycleStatus, sourceId: string): Delta {
   return { kind: 'element.create', id, elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus, isExternal: false }, sourceId, confidence: 1 };
@@ -44,6 +45,14 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
   const orgId = randomUUID();
   const orgSlug = `directordoor-${orgId.slice(0, 8)}`;
   await createOrganisation(signedIn, { id: orgId, name: 'Director Door Test Org', slug: orgSlug, createdBy: userId });
+
+  // F3a's own architect floor (`atlas.submit_merge_request`'s
+  // `v_min_architects`, default 1): the propose-intent submit below needs a
+  // real reviewer set including an architect — nothing else in this test
+  // drives that member's own session (`approve_merge_request`'s own gate,
+  // used below, is independent of the reviewer set — just owner/architect
+  // role).
+  const architectUserId = await addArchitectMember(env, orgId, userId);
 
   const modelId = randomUUID();
   const modelSlug = `directordoor-model-${modelId.slice(0, 8)}`;
@@ -130,7 +139,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
   if (!replacementResult.ok) throw new Error(`replacement branch commit failed: ${replacementResult.message}`);
 
   const requestId = randomUUID();
-  const { error: submitError } = await signedIn.schema('atlas').rpc('submit_merge_request', { p_id: requestId, p_branch_id: replacementBranch.id, p_classification: { hasBlockingConflict: false } });
+  const { error: submitError } = await signedIn.schema('atlas').rpc('submit_merge_request', { p_id: requestId, p_branch_id: replacementBranch.id, p_classification: { hasBlockingConflict: false }, p_reviewers: [{ user_id: architectUserId, required: true }] });
   if (submitError) throw new Error(`submit_merge_request: ${submitError.message}`);
   const { error: approveError } = await signedIn.schema('atlas').rpc('approve_merge_request', { p_merge_request_id: requestId });
   if (approveError) throw new Error(`approve_merge_request: ${approveError.message}`);

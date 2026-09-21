@@ -19,7 +19,7 @@ import type { CommitEnvelope, Delta } from '../src/contracts/delta';
 import { getBranch, getMainBranch } from '../src/db/branches';
 import { commitToBranch } from '../src/db/commits';
 import { loadEnv } from '../src/db/env';
-import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { addArchitectMember, bootstrapChangeBranchFixture, submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
 
 function makeCapability(id: string, elementId: string, name: string, sourceId: string): Delta {
   return { kind: 'element.create', id, elementId, elementType: 'capability', name, parentId: null, attributes: {}, sourceId, confidence: 1 };
@@ -34,7 +34,11 @@ function makeSupports(id: string, relationshipId: string, fromElementId: string,
 test('add three options to a decision, compare them, choose one; the chosen option flips to propose and merges through the ordinary review path; the others show cancelled', async ({ page }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'decisioncompare', 'Ledger Service');
-  const { signedIn: owner, orgSlug, modelId, modelSlug, systemId, seedSourceId } = fixture;
+  const { signedIn: owner, orgId, userId, orgSlug, modelId, modelSlug, systemId, seedSourceId } = fixture;
+  // F3a's own architect floor — see addArchitectMember's own doc comment.
+  // Chosen decision options flip to propose intent (below), so the owner
+  // needs to be in the reviewer set too: they cast the approve verdict.
+  await addArchitectMember(env, orgId, userId);
 
   // A capability the decision will concern, with the fixture's own system
   // already supporting it — the comparison table's one real row.
@@ -133,7 +137,7 @@ test('add three options to a decision, compare them, choose one; the chosen opti
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${optionBBranchId}`);
   await expect(page.getByRole('heading', { name: /^Proposing: Option 2/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await submitForReviewWithReviewers(page, true);
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
   const approveButton = page.getByRole('button', { name: 'Approve' });
   await expect(approveButton).toBeEnabled();

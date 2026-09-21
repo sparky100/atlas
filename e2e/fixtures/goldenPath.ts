@@ -40,6 +40,8 @@ export interface GoldenPathOrgModel {
   modelName: string;
   orgSlug: string;
   modelSlug: string;
+  /** The signed-up owner's own display name (`ReviewerPicker.tsx`'s member list shows this label) — a caller that needs to pick the owner out of that list by name, rather than by role, needs this since it's otherwise randomised and never surfaced. */
+  ownerDisplayName: string;
 }
 
 /**
@@ -64,7 +66,8 @@ export async function signUpCreateOrgAndModel(page: Page, prefix: string): Promi
   await page.getByRole('button', { name: 'Create' }).click();
 
   await expect(page.getByRole('heading', { name: 'What should we call you?' })).toBeVisible();
-  await page.getByLabel('Display name').fill(`${prefix} Owner ${randomUUID().slice(0, 8)}`);
+  const ownerDisplayName = `${prefix} Owner ${randomUUID().slice(0, 8)}`;
+  await page.getByLabel('Display name').fill(ownerDisplayName);
   await page.getByRole('button', { name: 'Continue' }).click();
 
   const orgLink = page.getByRole('link', { name: orgName });
@@ -84,7 +87,7 @@ export async function signUpCreateOrgAndModel(page: Page, prefix: string): Promi
   const modelSlugMatch = /\/o\/[^/]+\/m\/([^/?]+)/.exec(page.url());
   if (!modelSlugMatch?.[1]) throw new Error(`could not read the model slug out of ${page.url()}`);
 
-  return { orgName, modelName, orgSlug: orgSlugMatch[1], modelSlug: modelSlugMatch[1] };
+  return { orgName, modelName, orgSlug: orgSlugMatch[1], modelSlug: modelSlugMatch[1], ownerDisplayName };
 }
 
 /**

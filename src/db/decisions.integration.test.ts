@@ -295,8 +295,17 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       await expect(chooseDecisionOption(bob.client, decision.id, option.id, 'a contributor should not be able to choose')).rejects.toThrow();
       await service.auth.admin.deleteUser(bob.id);
 
+      // F3a's own architect floor (`atlas.submit_merge_request`'s own
+      // `v_min_architects`, default 1): an explore-intent option submit
+      // needs a real reviewer set including an architect — created purely
+      // to satisfy that floor for this one submit.
+      const architect = await createSignedInUser('decisions-architect');
+      const { error: architectError } = await alice.client.from('members').insert({ org_id: orgId, user_id: architect.id, role: 'architect', invited_by: alice.id });
+      if (architectError) throw new Error(`inviting architect: ${architectError.message}`);
+
       // Submit the option for review — it leaves 'draft', so it's no longer a legal choice even though it's still linked.
-      await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: randomUUID(), p_branch_id: option.id, p_classification: {} });
+      const { error: submitError } = await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: randomUUID(), p_branch_id: option.id, p_classification: {}, p_reviewers: [{ user_id: architect.id, required: true }] });
+      if (submitError) throw new Error(`submit_merge_request: ${submitError.message}`);
       await expect(chooseDecisionOption(alice.client, decision.id, option.id, 'no longer a draft')).rejects.toThrow();
     });
   });

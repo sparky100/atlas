@@ -46,6 +46,7 @@ function makeSystem(id: string, elementId: string, name: string, sourceId: strin
 
 describe('review queue hardening against a real local Supabase (Sprint C2 step 7)', () => {
   let alice: { id: string; client: Client };
+  let architect: { id: string; client: Client };
   let orgId: string;
   let modelId: string;
   let sourceId: string;
@@ -58,10 +59,22 @@ describe('review queue hardening against a real local Supabase (Sprint C2 step 7
     await createModel(alice.client, { id: modelId, orgId, name: 'Review Hardening Test Model', slug: `reviewhardening-model-${modelId.slice(0, 8)}`, createdBy: alice.id });
     const source = await getOrCreateManualSource(alice.client, { id: randomUUID(), orgId, modelId, userId: alice.id });
     sourceId = source.id;
+
+    // F3a's own architect floor (`atlas.submit_merge_request`'s
+    // `v_min_architects`, default 1): a propose-intent submit needs a real
+    // reviewer set including at least one architect member — alice is the
+    // org's sole owner and can't become one herself (an org must always
+    // keep its owner), so this second user exists purely to satisfy that
+    // floor, inserted directly as service role rather than through the
+    // invite-and-accept UI flow this test has no `page` for.
+    architect = await createSignedInUser('reviewhardening-architect');
+    const { error: memberError } = await service.from('members').insert({ org_id: orgId, user_id: architect.id, role: 'architect', invited_by: alice.id });
+    if (memberError) throw new Error(`add architect member: ${memberError.message}`);
   });
 
   afterAll(async () => {
     await service.auth.admin.deleteUser(alice.id);
+    await service.auth.admin.deleteUser(architect.id);
   });
 
   it('P-18: an identity-pair dismissal persists across a fresh fetch, and dismissing the same pair twice is a no-op', async () => {
@@ -96,7 +109,7 @@ describe('review queue hardening against a real local Supabase (Sprint C2 step 7
     expect(identityFinding).toBeDefined();
 
     const requestId = randomUUID();
-    const request = await submitMergeRequest(alice.client, requestId, branch.id, computed.review);
+    const request = await submitMergeRequest(alice.client, requestId, branch.id, computed.review, [{ userId: architect.id, required: true }]);
     expect(request.dismissed_identity_pairs).toEqual([]);
 
     const pairKey = [identityFinding?.subjectId, identityFinding?.relatedSubjectId].sort().join(' ');
