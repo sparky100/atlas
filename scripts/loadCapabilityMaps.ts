@@ -122,6 +122,13 @@ async function loadOne(supabase: ReturnType<typeof createServiceRoleClient>, fil
   if (deleteItemsError) throw new Error(`${label}: ${deleteItemsError.message}`);
   const { error: deleteSourcesError } = await supabase.from('capability_map_sources').delete().eq('map_id', mapId);
   if (deleteSourcesError) throw new Error(`${label}: ${deleteSourcesError.message}`);
+  // F6 (ADR-023): value streams are part of the same wholesale replace —
+  // enables first (their FK cascades anyway, but explicit is clearer), then
+  // the streams/stages.
+  const { error: deleteValueStreamEnablesError } = await supabase.from('capability_map_value_stream_enables').delete().eq('map_id', mapId);
+  if (deleteValueStreamEnablesError) throw new Error(`${label}: ${deleteValueStreamEnablesError.message}`);
+  const { error: deleteValueStreamItemsError } = await supabase.from('capability_map_value_stream_items').delete().eq('map_id', mapId);
+  if (deleteValueStreamItemsError) throw new Error(`${label}: ${deleteValueStreamItemsError.message}`);
 
   // Two passes: every item gets an id first, then rows are built once
   // every code→id is known, so a child's parent_code can resolve to a
@@ -161,6 +168,38 @@ async function loadOne(supabase: ReturnType<typeof createServiceRoleClient>, fil
     if (insertSourcesError) throw new Error(`${label}: ${insertSourcesError.message}`);
   }
 
+  // F6 (ADR-023): value streams and their `enables` edges. `enables` names
+  // capabilities by *name* (the brief's own wording) — resolved here to the
+  // item code just written above; the parser's superRefine already refused
+  // zero/ambiguous matches, so a miss here is unreachable rather than a
+  // possible input. Streams first (parent_code null), then stages, so
+  // guard_capability_map_value_stream_item_depth always finds the parent.
+  if (content.valueStreams.length > 0) {
+    const itemCodeByName = new Map(content.items.map((item) => [item.name, item.code]));
+
+    const valueStreamRows = content.valueStreams.flatMap((stream) => [
+      { id: randomUUID(), map_id: mapId, code: stream.code, parent_code: null, name: stream.name, description: stream.description ?? null, item_order: stream.order },
+      ...stream.stages.map((stage) => ({ id: randomUUID(), map_id: mapId, code: stage.code, parent_code: stream.code, name: stage.name, description: stage.description ?? null, item_order: stage.order })),
+    ]);
+    valueStreamRows.sort((a, b) => (a.parent_code === null ? -1 : 1) - (b.parent_code === null ? -1 : 1));
+    const { error: insertValueStreamsError } = await supabase.from('capability_map_value_stream_items').insert(valueStreamRows);
+    if (insertValueStreamsError) throw new Error(`${label}: ${insertValueStreamsError.message}`);
+
+    const enablesRows = content.valueStreams.flatMap((stream) =>
+      stream.stages.flatMap((stage) =>
+        stage.enables.map((name) => {
+          const capabilityCode = itemCodeByName.get(name);
+          if (capabilityCode === undefined) throw new Error(`${label}: value stream "${stream.code}" stage "${stage.code}": enables "${name}" matches no capability name`);
+          return { map_id: mapId, stage_code: stage.code, capability_code: capabilityCode };
+        }),
+      ),
+    );
+    if (enablesRows.length > 0) {
+      const { error: insertEnablesError } = await supabase.from('capability_map_value_stream_enables').insert(enablesRows);
+      if (insertEnablesError) throw new Error(`${label}: ${insertEnablesError.message}`);
+    }
+  }
+
   // Now that capability_map_items/sources are written, move the row to
   // its real target status — never before now, per this function's own
   // comment above. A no-op update (content.status already matches
@@ -174,7 +213,8 @@ async function loadOne(supabase: ReturnType<typeof createServiceRoleClient>, fil
     if (statusError) throw new Error(`${label}: ${statusError.message}`);
   }
 
-  console.log(`${label}: loaded ${String(itemRows.length)} item(s), ${String(content.sources.length)} source(s) into ${content.sector} v${String(content.version)}`);
+  const valueStreamCount = content.valueStreams.reduce((total, stream) => total + 1 + stream.stages.length, 0);
+  console.log(`${label}: loaded ${String(itemRows.length)} item(s), ${String(valueStreamCount)} value stream(s)/stage(s), ${String(content.sources.length)} source(s) into ${content.sector} v${String(content.version)}`);
 }
 
 async function main(): Promise<void> {

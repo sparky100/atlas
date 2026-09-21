@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { buildCapabilityMapExport, exportPendingReviewPlaceholder, todayIsoDate } from './exportCapabilityMap';
-import type { ElementsHeadRow, Json } from '../contracts/rows';
+import { buildCapabilityMapExport, buildValueStreamExport, exportPendingReviewPlaceholder, todayIsoDate } from './exportCapabilityMap';
+import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../contracts/rows';
 
 function capability(id: string, name: string, parentId: string | null, attributes: Record<string, Json> = {}): ElementsHeadRow {
   return { element_id: id, element_type: 'capability', name, parent_id: parentId, attributes, exists_delta_id: `d-${id}` };
+}
+
+function valueStreamEl(id: string, name: string, parentId: string | null): ElementsHeadRow {
+  return { element_id: id, element_type: 'value_stream', name, parent_id: parentId, attributes: {}, exists_delta_id: `d-${id}` };
+}
+
+function enablesEdge(id: string, fromId: string, toId: string): RelationshipsHeadRow {
+  return { relationship_id: id, relationship_type: 'enables', from_element_id: fromId, to_element_id: toId, attributes: {}, exists_delta_id: `d-${id}` };
 }
 
 const SOURCE = { citation: 'Exported from Atlas model "Test Model" (test-org/test-model)', reviewedBy: exportPendingReviewPlaceholder('Test Model'), reviewedAt: '2026-01-01' };
@@ -62,6 +70,31 @@ describe('buildCapabilityMapExport (Sprint U4-1 C6)', () => {
     expect(content.status).toBe('draft');
     expect(content.sourceDescription).toBe('Exported on 2026-01-01.');
     expect(content.sources).toEqual([SOURCE]);
+  });
+});
+
+describe('buildValueStreamExport (F6/ADR-023)', () => {
+  it('round-trips streams, stages and enables, resolved to capability names', () => {
+    const capabilitiesById = new Map([['cap-1', capability('cap-1', 'Connections', null)]]);
+    const valueStreams = [valueStreamEl('vs1', 'Getting Connected', null), valueStreamEl('vs1.1', 'Connect', 'vs1')];
+    const enables = [enablesEdge('e1', 'cap-1', 'vs1.1')];
+    const out = buildValueStreamExport(valueStreams, enables, capabilitiesById);
+    expect(out).toEqual([
+      {
+        code: 'vs1',
+        name: 'Getting Connected',
+        description: undefined,
+        order: 10,
+        stages: [{ code: 'vs1.1', name: 'Connect', description: undefined, order: 10, enables: ['Connections'] }],
+      },
+    ]);
+  });
+
+  it('omits an enables name whose capability is not in the map', () => {
+    const capabilitiesById = new Map<string, ElementsHeadRow>();
+    const valueStreams = [valueStreamEl('vs1', 'Stream', null), valueStreamEl('vs1.1', 'Stage', 'vs1')];
+    const enables = [enablesEdge('e1', 'cap-missing', 'vs1.1')];
+    expect(buildValueStreamExport(valueStreams, enables, capabilitiesById)[0]?.stages[0]?.enables).toEqual([]);
   });
 });
 

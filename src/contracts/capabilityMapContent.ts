@@ -58,6 +58,46 @@ const sourceSchema = z.object({
   reviewedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'reviewedAt must be YYYY-MM-DD'),
 });
 
+/**
+ * F6 (ADR-023, SPEC §3.10): one of a starter map's value streams. `code`
+ * is the stable reference id (like a capability item's own `code`, it
+ * becomes a seeded element's `template_code` alias); `order` is display
+ * order among sibling streams, the same multiples-of-ten convention items
+ * use. A stream's stages are its children (`stages`), depth exactly two —
+ * a stage never has stages of its own.
+ */
+const valueStreamStageSchema = z.object({
+  code: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  order: z.number().int(),
+  /**
+   * The capabilities that deliver this stage, named by capability *name*
+   * (not `code`) — a content author thinks in names; the loader resolves
+   * each to a `capability_map_items.code`, failing loudly on zero or
+   * ambiguous matches (superRefine below + the loader both check).
+   */
+  enables: z.array(z.string().min(1)),
+});
+
+const valueStreamSchema = z.object({
+  code: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  order: z.number().int(),
+  stages: z.array(valueStreamStageSchema),
+});
+
+/** A deterministic "did you mean" hint for a value-stream `enables` name that matches no capability — case-only mismatch first, then capabilities sharing a word (a content author's most likely slip is a spelling/plural drift, not a wholly unrelated name). */
+function nearMissHint(name: string, items: readonly { name: string }[]): string {
+  const normalized = name.trim().toLowerCase();
+  const ciMatch = items.find((i) => i.name.trim().toLowerCase() === normalized);
+  if (ciMatch) return ` (case differs from "${ciMatch.name}")`;
+  const words = normalized.split(/\s+/).filter((w) => w.length > 3);
+  const candidates = items.filter((i) => words.some((w) => i.name.toLowerCase().includes(w))).map((i) => i.name).slice(0, 3);
+  return candidates.length > 0 ? ` (near matches: ${candidates.join(', ')})` : '';
+}
+
 export const capabilityMapContentSchema = z
   .object({
     sector: sectorSchema,
@@ -82,6 +122,8 @@ export const capabilityMapContentSchema = z
     sourceDescription: z.string().min(1),
     sources: z.array(sourceSchema),
     items: z.array(itemSchema).min(1),
+    /** F6 (ADR-023): a map's value streams, defaulting to `[]` so every pre-F6 content file stays valid without editing. */
+    valueStreams: z.array(valueStreamSchema).default([]),
   })
   .superRefine((content, ctx) => {
     const codes = new Set(content.items.map((item) => item.code));
@@ -113,10 +155,53 @@ export const capabilityMapContentSchema = z
       seenOrders.add(item.order);
       orderCollisions.set(item.parentCode, seenOrders);
     }
+
+    // F6 (ADR-023): value streams — codes unique across the whole map
+    // (streams and stages share `capability_map_value_stream_items`'s own
+    // `(map_id, code)` uniqueness), `order` unique among sibling streams
+    // and among a stream's own stages, and every `enables` name resolves to
+    // exactly one capability name.
+    const valueStreamCodes = new Set<string>();
+    const streamOrders = new Set<number>();
+    for (const stream of content.valueStreams) {
+      if (valueStreamCodes.has(stream.code)) {
+        ctx.addIssue({ code: 'custom', message: `value stream "${stream.code}": code is already used by another value stream or stage` });
+      }
+      valueStreamCodes.add(stream.code);
+      if (streamOrders.has(stream.order)) {
+        ctx.addIssue({ code: 'custom', message: `value stream "${stream.code}": order ${String(stream.order)} is already used by another stream` });
+      }
+      streamOrders.add(stream.order);
+
+      const stageCodes = new Set<string>();
+      const stageOrders = new Set<number>();
+      for (const stage of stream.stages) {
+        if (valueStreamCodes.has(stage.code) || stageCodes.has(stage.code)) {
+          ctx.addIssue({ code: 'custom', message: `value stream "${stream.code}" stage "${stage.code}": code is already used elsewhere in this map` });
+        }
+        stageCodes.add(stage.code);
+        valueStreamCodes.add(stage.code);
+        if (stageOrders.has(stage.order)) {
+          ctx.addIssue({ code: 'custom', message: `value stream "${stream.code}": stage order ${String(stage.order)} is already used by another stage in this stream` });
+        }
+        stageOrders.add(stage.order);
+
+        for (const name of stage.enables) {
+          const matches = content.items.filter((item) => item.name === name);
+          if (matches.length === 0) {
+            ctx.addIssue({ code: 'custom', message: `value stream "${stream.code}" stage "${stage.code}": enables "${name}" matches no capability name${nearMissHint(name, content.items)}` });
+          } else if (matches.length > 1) {
+            ctx.addIssue({ code: 'custom', message: `value stream "${stream.code}" stage "${stage.code}": enables "${name}" is ambiguous — ${String(matches.length)} capabilities share that name` });
+          }
+        }
+      }
+    }
   });
 
 export type CapabilityMapItemContent = z.infer<typeof itemSchema>;
 export type CapabilityMapSourceContent = z.infer<typeof sourceSchema>;
+export type CapabilityMapValueStreamStageContent = z.infer<typeof valueStreamStageSchema>;
+export type CapabilityMapValueStreamContent = z.infer<typeof valueStreamSchema>;
 export type CapabilityMapContent = z.infer<typeof capabilityMapContentSchema>;
 
 /** Throws a single `Error` listing every problem found, rather than the first one — a content file worth flagging is usually worth flagging completely in one pass. */

@@ -38,8 +38,9 @@
  * the real head itself and rejects if it has moved since, the same
  * optimistic-concurrency shape as every other write here.
  */
-import type { CapabilityMapItemRow } from './capabilityMapTemplates';
-import type { CapabilityAttributes, UUID } from '../contracts/delta';
+import type { CapabilityMapItemRow, CapabilityMapValueStreamEnablesRow, CapabilityMapValueStreamItemRow } from './capabilityMapTemplates';
+import { listCapabilityMapValueStreamEnables, listCapabilityMapValueStreamItems } from './capabilityMapTemplates';
+import type { CapabilityAttributes, ValueStreamAttributes, UUID } from '../contracts/delta';
 import type { Delta } from '../contracts/delta';
 import { cloneHead, emptyHead, fold, type Head } from '../engine/deltas';
 import { headHash } from '../engine/head';
@@ -75,6 +76,8 @@ export function buildSeedDeltas(
   items: readonly CapabilityMapItemRow[],
   sourceId: UUID,
   mintId: () => UUID = () => crypto.randomUUID(),
+  valueStreams: readonly CapabilityMapValueStreamItemRow[] = [],
+  enables: readonly CapabilityMapValueStreamEnablesRow[] = [],
 ): { deltas: Delta[]; aliases: SeedAlias[] } {
   const elementIdByCode = new Map(items.map((item) => [item.code, mintId()]));
   const sorted = [...items].sort((a, b) => a.level - b.level);
@@ -111,6 +114,55 @@ export function buildSeedDeltas(
     aliases.push({ id: mintId(), elementId, aliasValue: item.code });
   }
 
+  // F6 (ADR-023): value streams seed alongside capabilities — streams
+  // first (parent_code null), then stages (parent_code = their stream),
+  // then the `enables` edges once every stage exists, so C22 (a stage's
+  // parent is a stream; `enables` targets a stage) holds within the commit.
+  const valueStreamIdByCode = new Map(valueStreams.map((vs) => [vs.code, mintId()]));
+  const sortedValueStreams = [...valueStreams].sort((a, b) => (a.parent_code === null ? -1 : 1) - (b.parent_code === null ? -1 : 1));
+  for (const vs of sortedValueStreams) {
+    const elementId = valueStreamIdByCode.get(vs.code);
+    if (!elementId) throw new Error(`buildSeedDeltas: no minted id for value stream code "${vs.code}"`);
+    const parentId = vs.parent_code === null ? null : (valueStreamIdByCode.get(vs.parent_code) ?? null);
+    if (vs.parent_code !== null && parentId === null) {
+      throw new Error(`buildSeedDeltas: value stream "${vs.code}" names parent "${vs.parent_code}", which is not among the value streams given`);
+    }
+
+    const attributes: ValueStreamAttributes = { templateRef: vs.id, order: vs.item_order };
+    const description = vs.description?.trim();
+    if (description) attributes.description = description;
+    deltas.push({
+      kind: 'element.create',
+      id: mintId(),
+      elementId,
+      elementType: 'value_stream',
+      name: vs.name,
+      parentId,
+      attributes,
+      sourceId,
+      confidence: 1,
+    });
+    aliases.push({ id: mintId(), elementId, aliasValue: vs.code });
+  }
+
+  for (const edge of enables) {
+    const fromElementId = elementIdByCode.get(edge.capability_code);
+    if (!fromElementId) throw new Error(`buildSeedDeltas: enables names capability_code "${edge.capability_code}", which is not among the items given`);
+    const toElementId = valueStreamIdByCode.get(edge.stage_code);
+    if (!toElementId) throw new Error(`buildSeedDeltas: enables names stage_code "${edge.stage_code}", which is not among the value streams given`);
+    deltas.push({
+      kind: 'relationship.create',
+      id: mintId(),
+      relationshipId: mintId(),
+      relationshipType: 'enables',
+      fromElementId,
+      toElementId,
+      attributes: {},
+      sourceId,
+      confidence: 1,
+    });
+  }
+
   return { deltas, aliases };
 }
 
@@ -144,7 +196,14 @@ export async function seedModelFromCapabilityMap(supabase: Client, input: SeedMo
 
   const commitId = crypto.randomUUID();
   const sourceId = crypto.randomUUID();
-  const { deltas, aliases } = buildSeedDeltas(items, sourceId);
+  // F6 (ADR-023): a map may also carry value streams and their `enables`
+  // edges — fetched here (never passed by the caller) so every existing
+  // caller seeds a map's full content, not just its capabilities.
+  const [valueStreams, enables] = await Promise.all([
+    listCapabilityMapValueStreamItems(supabase, capabilityMapId),
+    listCapabilityMapValueStreamEnables(supabase, capabilityMapId),
+  ]);
+  const { deltas, aliases } = buildSeedDeltas(items, sourceId, () => crypto.randomUUID(), valueStreams, enables);
 
   const head = fold(cloneHead(emptyHead()), deltas, { authorId, createdAt: new Date().toISOString() });
   const projection = serializeHeadProjection(head);
@@ -177,39 +236,62 @@ export async function seedModelFromCapabilityMap(supabase: Client, input: SeedMo
 }
 
 /**
- * `Delta` (an `element.create`, always, for this flow) → the jsonb shape
- * `atlas.seed_from_map` inserts into `deltas` verbatim — the same
- * subset-of-`DeltaRow` mapping src/db/commits.ts uses for `commit_deltas`,
- * reproduced here rather than shared because this flow only ever has one
- * delta kind and doesn't need `envelopeToDeltaRows`'s full generality (it
- * has no `CommitEnvelope` to convert — `seed_from_map` takes no
- * `parentCommitId`/`mergedBranchHeadCommitId` at all, genesis has neither) —
- * `commit_id` isn't part of the row itself: `seed_from_map` inserts every
- * delta under its own `p_commit_id` parameter, not a per-row value.
+ * `Delta` → the jsonb shape `atlas.seed_from_map` inserts into `deltas`
+ * verbatim — the same subset-of-`DeltaRow` mapping src/db/commits.ts uses
+ * for `commit_deltas`, reproduced here rather than shared because this flow
+ * only ever has two delta kinds (`element.create`, and — F6/ADR-023 —
+ * `relationship.create` for an `enables` edge) and doesn't need
+ * `envelopeToDeltaRows`'s full generality (it has no `CommitEnvelope` to
+ * convert — `seed_from_map` takes no `parentCommitId`/
+ * `mergedBranchHeadCommitId` at all, genesis has neither) — `commit_id`
+ * isn't part of the row itself: `seed_from_map` inserts every delta under
+ * its own `p_commit_id` parameter, not a per-row value.
  *
- * `previous_delta_id: null` throughout: every delta here is an
- * `element.create`, which never has a prior fact to reference regardless
- * of whether its commit's own parent is a genesis commit or something
- * later.
+ * `previous_delta_id: null` throughout: every delta here is a create (an
+ * `element.create` or `relationship.create`), which never has a prior fact
+ * to reference regardless of whether its commit's own parent is a genesis
+ * commit or something later.
  */
 function deltaToRpcRow(delta: Delta): Record<string, unknown> {
-  if (delta.kind !== 'element.create') throw new Error(`deltaToRpcRow: seeding only ever produces element.create deltas, got ${delta.kind}`);
-  return {
-    id: delta.id,
-    kind: 'element_create',
-    subject_id: delta.elementId,
-    attribute: '$exists',
-    element_type: delta.elementType,
-    relationship_type: null,
-    name: delta.name,
-    parent_id: delta.parentId,
-    from_element_id: null,
-    to_element_id: null,
-    value: delta.attributes,
-    previous_delta_id: null,
-    source_id: delta.sourceId,
-    source_ref: delta.sourceRef ?? null,
-    effective_date: delta.effectiveDate ?? null,
-    confidence: delta.confidence,
-  };
+  if (delta.kind === 'element.create') {
+    return {
+      id: delta.id,
+      kind: 'element_create',
+      subject_id: delta.elementId,
+      attribute: '$exists',
+      element_type: delta.elementType,
+      relationship_type: null,
+      name: delta.name,
+      parent_id: delta.parentId,
+      from_element_id: null,
+      to_element_id: null,
+      value: delta.attributes,
+      previous_delta_id: null,
+      source_id: delta.sourceId,
+      source_ref: delta.sourceRef ?? null,
+      effective_date: delta.effectiveDate ?? null,
+      confidence: delta.confidence,
+    };
+  }
+  if (delta.kind === 'relationship.create') {
+    return {
+      id: delta.id,
+      kind: 'relationship_create',
+      subject_id: delta.relationshipId,
+      attribute: '$exists',
+      element_type: null,
+      relationship_type: delta.relationshipType,
+      name: null,
+      parent_id: null,
+      from_element_id: delta.fromElementId,
+      to_element_id: delta.toElementId,
+      value: delta.attributes,
+      previous_delta_id: null,
+      source_id: delta.sourceId,
+      source_ref: delta.sourceRef ?? null,
+      effective_date: delta.effectiveDate ?? null,
+      confidence: delta.confidence,
+    };
+  }
+  throw new Error(`deltaToRpcRow: seeding only ever produces element.create / relationship.create deltas, got ${delta.kind}`);
 }

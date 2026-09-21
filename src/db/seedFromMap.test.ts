@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementCreate } from '../contracts/delta';
-import type { CapabilityMapItemRow } from './capabilityMapTemplates';
+import type { CapabilityMapItemRow, CapabilityMapValueStreamEnablesRow, CapabilityMapValueStreamItemRow } from './capabilityMapTemplates';
 import { buildSeedDeltas } from './seedFromMap';
 
 function item(overrides: Partial<CapabilityMapItemRow> & Pick<CapabilityMapItemRow, 'code' | 'name' | 'level' | 'parent_code'>): CapabilityMapItemRow {
@@ -11,6 +11,14 @@ function item(overrides: Partial<CapabilityMapItemRow> & Pick<CapabilityMapItemR
     item_order: 10,
     ...overrides,
   };
+}
+
+function vsItem(overrides: Partial<CapabilityMapValueStreamItemRow> & Pick<CapabilityMapValueStreamItemRow, 'code' | 'name' | 'parent_code'>): CapabilityMapValueStreamItemRow {
+  return { id: `vs-${overrides.code}`, map_id: 'map-1', description: null, item_order: 10, ...overrides };
+}
+
+function enablesRow(stage_code: string, capability_code: string): CapabilityMapValueStreamEnablesRow {
+  return { map_id: 'map-1', stage_code, capability_code };
 }
 
 /** Every delta this flow ever builds is `element.create` — asserted once here so every test below can index into `.elementId`/`.attributes`/etc. without re-narrowing. */
@@ -114,5 +122,54 @@ describe('buildSeedDeltas', () => {
 
   it('returns nothing for an empty item list', () => {
     expect(buildSeedDeltas([], 'source-1')).toEqual({ deltas: [], aliases: [] });
+  });
+});
+
+describe('buildSeedDeltas value streams (F6/ADR-023)', () => {
+  it('creates value_stream elements, streams before stages, with templateRef/order and no code', () => {
+    const items = [item({ code: '1', name: 'Root', level: 1, parent_code: null })];
+    const streams = [
+      vsItem({ code: 'vs1', name: 'Customer Outcomes', parent_code: null, item_order: 10 }),
+      vsItem({ code: 'vs1.1', name: 'Getting Connected', parent_code: 'vs1', item_order: 10 }),
+    ];
+    const { deltas } = buildSeedDeltas(items, 'source-1', undefined, streams, []);
+    const valueStreams = deltas.filter((d) => d.kind === 'element.create' && d.elementType === 'value_stream');
+    expect(valueStreams).toHaveLength(2);
+    expect(valueStreams[0]?.name).toBe('Customer Outcomes');
+    expect(valueStreams[0]?.parentId).toBeNull();
+    expect(valueStreams[1]?.name).toBe('Getting Connected');
+    expect(valueStreams[1]?.parentId).toBe(valueStreams[0]?.elementId);
+    expect(valueStreams[0]?.attributes).toEqual({ templateRef: 'vs-vs1', order: 10 });
+    expect(valueStreams[0]?.attributes).not.toHaveProperty('code');
+  });
+
+  it('creates enables relationship.create deltas resolving capability and stage codes to minted ids', () => {
+    const items = [item({ code: '1', name: 'Connections', level: 1, parent_code: null })];
+    const streams = [
+      vsItem({ code: 'vs1', name: 'Getting Connected', parent_code: null }),
+      vsItem({ code: 'vs1.1', name: 'Connect', parent_code: 'vs1' }),
+    ];
+    const { deltas, aliases } = buildSeedDeltas(items, 'source-1', undefined, streams, [enablesRow('vs1.1', '1')]);
+    const rel = deltas.find((d) => d.kind === 'relationship.create');
+    if (!rel) throw new Error('expected a relationship.create delta');
+    expect(rel.relationshipType).toBe('enables');
+    const capabilityId = aliases.find((a) => a.aliasValue === '1')?.elementId;
+    const stageId = aliases.find((a) => a.aliasValue === 'vs1.1')?.elementId;
+    expect(rel.fromElementId).toBe(capabilityId);
+    expect(rel.toElementId).toBe(stageId);
+    expect(rel.attributes).toEqual({});
+  });
+
+  it('rejects an enables row naming an unknown capability or stage code', () => {
+    const items = [item({ code: '1', name: 'Root', level: 1, parent_code: null })];
+    const streams = [vsItem({ code: 'vs1', name: 'Stream', parent_code: null }), vsItem({ code: 'vs1.1', name: 'Stage', parent_code: 'vs1' })];
+    expect(() => buildSeedDeltas(items, 'source-1', undefined, streams, [enablesRow('vs1.1', 'missing')])).toThrow(/capability_code "missing"/);
+    expect(() => buildSeedDeltas(items, 'source-1', undefined, streams, [enablesRow('missing', '1')])).toThrow(/stage_code "missing"/);
+  });
+
+  it('rejects a stage whose parent_code names no value stream in the set', () => {
+    const items = [item({ code: '1', name: 'Root', level: 1, parent_code: null })];
+    const streams = [vsItem({ code: 'vs1.1', name: 'Orphan Stage', parent_code: 'missing' })];
+    expect(() => buildSeedDeltas(items, 'source-1', undefined, streams, [])).toThrow(/names parent "missing"/);
   });
 });

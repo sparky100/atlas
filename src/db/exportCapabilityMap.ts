@@ -30,11 +30,13 @@
  */
 import { computeCapabilityMapTree } from '../ui/capabilityMap/layout';
 import { attributesRecord } from '../ui/elements/attributesRecord';
-import type { CapabilityMapContent, CapabilityMapItemContent, CapabilityMapSourceContent, Sector } from '../contracts/capabilityMapContent';
-import type { ElementsHeadRow } from '../contracts/rows';
+import { compareBySiblingOrder } from '../ui/elements/siblingOrder';
+import type { CapabilityMapContent, CapabilityMapItemContent, CapabilityMapSourceContent, CapabilityMapValueStreamContent, Sector } from '../contracts/capabilityMapContent';
+import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { UUID } from '../contracts/delta';
 import { getMainBranch } from './branches';
 import { listCapabilitiesForMap } from './capabilityMap';
+import { listAllEnablesEdges, listValueStreamElements } from './valueStreams';
 import type { Client } from './client';
 
 export interface BuildCapabilityMapExportInput {
@@ -58,6 +60,44 @@ function itemFrom(capability: ElementsHeadRow, code: string, parentCode: string 
   };
 }
 
+/** `description` if it's a real, non-whitespace string, else `undefined` — the same "presence only" convention `itemFrom` uses for capabilities. */
+function valueStreamDescriptionOf(element: ElementsHeadRow): string | undefined {
+  const description = attributesRecord(element.attributes).description;
+  return typeof description === 'string' && description.trim() !== '' ? description : undefined;
+}
+
+/**
+ * F6 (ADR-023): the value-stream half of an export. Streams first (in
+ * display order), stages under each (display order), each stage's `enables`
+ * resolved to the *name* of the capability that enables it — the same
+ * by-name shape the content schema (`capabilityMapContent.ts`) and loader
+ * use, so a CLI-exported file and a hand-authored file are identical.
+ * Fresh `vs1`/`vs1.1` codes, generated from position exactly like `items`'
+ * own `1`/`1.1` codes, never copied from any `attributes.templateRef`.
+ */
+export function buildValueStreamExport(valueStreams: readonly ElementsHeadRow[], enablesEdges: readonly RelationshipsHeadRow[], capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>): CapabilityMapValueStreamContent[] {
+  const streams = valueStreams.filter((e) => e.parent_id === null).sort(compareBySiblingOrder);
+  return streams.map((stream, streamIndex) => {
+    const stages = valueStreams.filter((e) => e.parent_id === stream.element_id).sort(compareBySiblingOrder);
+    return {
+      code: `vs${String(streamIndex + 1)}`,
+      name: stream.name,
+      description: valueStreamDescriptionOf(stream),
+      order: (streamIndex + 1) * 10,
+      stages: stages.map((stage, stageIndex) => ({
+        code: `vs${String(streamIndex + 1)}.${String(stageIndex + 1)}`,
+        name: stage.name,
+        description: valueStreamDescriptionOf(stage),
+        order: (stageIndex + 1) * 10,
+        enables: enablesEdges
+          .filter((edge) => edge.to_element_id === stage.element_id)
+          .map((edge) => capabilitiesById.get(edge.from_element_id)?.name)
+          .filter((name): name is string => name !== undefined),
+      })),
+    };
+  });
+}
+
 /**
  * Pure builder, independently testable: every capability at a commit ->
  * `CapabilityMapContent`. Order values are multiples of ten within each
@@ -68,7 +108,12 @@ function itemFrom(capability: ElementsHeadRow, code: string, parentCode: string 
  * above — is this model's own tailoring history, not something a fresh
  * starter map should carry forward verbatim).
  */
-export function buildCapabilityMapExport(capabilities: readonly ElementsHeadRow[], input: BuildCapabilityMapExportInput): CapabilityMapContent {
+export function buildCapabilityMapExport(
+  capabilities: readonly ElementsHeadRow[],
+  input: BuildCapabilityMapExportInput,
+  valueStreams: readonly ElementsHeadRow[] = [],
+  enablesEdges: readonly RelationshipsHeadRow[] = [],
+): CapabilityMapContent {
   const tree = computeCapabilityMapTree(capabilities);
   const items: CapabilityMapItemContent[] = [];
 
@@ -94,6 +139,7 @@ export function buildCapabilityMapExport(capabilities: readonly ElementsHeadRow[
     sourceDescription: input.sourceDescription,
     sources: [input.source],
     items,
+    valueStreams: buildValueStreamExport(valueStreams, enablesEdges, new Map(capabilities.map((c) => [c.element_id, c]))),
   };
 }
 
@@ -131,6 +177,12 @@ export async function exportCapabilityMap(supabase: Client, input: ExportCapabil
   const capabilities = await listCapabilitiesForMap(supabase, main.head_commit_id);
   if (capabilities.length === 0) throw new Error('this model has no capabilities to export');
 
+  // F6 (ADR-023): value streams and their `enables` edges round-trip too.
+  const [valueStreams, enablesEdges] = await Promise.all([
+    listValueStreamElements(supabase, main.head_commit_id),
+    listAllEnablesEdges(supabase, main.head_commit_id),
+  ]);
+
   const now = input.now ?? new Date();
   const reviewedAt = todayIsoDate(now);
   return buildCapabilityMapExport(capabilities, {
@@ -150,10 +202,51 @@ export async function exportCapabilityMap(supabase: Client, input: ExportCapabil
       reviewedBy: exportPendingReviewPlaceholder(input.modelName),
       reviewedAt,
     },
-  });
+  }, valueStreams, enablesEdges);
 }
 
 export type ExportCapabilityMapAsDraftResult = { ok: true; mapId: UUID; content: CapabilityMapContent } | { ok: false; message: string };
+
+/** The DB row shape `atlas.export_capability_map_as_draft` inserts into `capability_map_value_stream_items`. */
+export interface ExportValueStreamItemRow {
+  code: string;
+  parent_code: string | null;
+  name: string;
+  description: string | null;
+  item_order: number;
+}
+
+/** The DB row shape `atlas.export_capability_map_as_draft` inserts into `capability_map_value_stream_enables` — `capability_code` already resolved from the content file's by-name `enables` to a `capability_map_items.code`. */
+export interface ExportValueStreamEnablesRow {
+  stage_code: string;
+  capability_code: string;
+}
+
+/**
+ * F6 (ADR-023): converts a `CapabilityMapContent`'s `valueStreams`
+ * (whose `enables` names capabilities by *name*, per the content schema)
+ * into the resolved DB-row shapes the export RPC inserts — each `enables`
+ * name resolved to the one capability `code` in `content.items` that bears
+ * it (already guaranteed unique by `capabilityMapContent.ts`'s own
+ * superRefine, so a missing match here is a bug, not a possible input).
+ */
+export function valueStreamRowsFrom(content: CapabilityMapContent): { items: ExportValueStreamItemRow[]; enables: ExportValueStreamEnablesRow[] } {
+  const codeByName = new Map(content.items.map((item) => [item.name, item.code]));
+  const items: ExportValueStreamItemRow[] = [];
+  const enables: ExportValueStreamEnablesRow[] = [];
+  for (const stream of content.valueStreams) {
+    items.push({ code: stream.code, parent_code: null, name: stream.name, description: stream.description ?? null, item_order: stream.order });
+    for (const stage of stream.stages) {
+      items.push({ code: stage.code, parent_code: stream.code, name: stage.name, description: stage.description ?? null, item_order: stage.order });
+      for (const name of stage.enables) {
+        const code = codeByName.get(name);
+        if (code === undefined) throw new Error(`valueStreamRowsFrom: enables name "${name}" matches no item code`);
+        enables.push({ stage_code: stage.code, capability_code: code });
+      }
+    }
+  }
+  return { items, enables };
+}
 
 /**
  * The owner-only "Export as starter map" UI action (`useExportCapabilityMap.ts`):
@@ -168,6 +261,7 @@ export type ExportCapabilityMapAsDraftResult = { ok: true; mapId: UUID; content:
  */
 export async function exportCapabilityMapAsDraft(supabase: Client, input: ExportCapabilityMapInput): Promise<ExportCapabilityMapAsDraftResult> {
   const content = await exportCapabilityMap(supabase, input);
+  const valueStreams = valueStreamRowsFrom(content);
 
   // .schema('atlas'): this RPC lives in the atlas schema (SPEC §2), not
   // public — see src/db/commits.ts's own note on why this is required.
@@ -181,6 +275,8 @@ export async function exportCapabilityMapAsDraft(supabase: Client, input: Export
     p_source_description: content.sourceDescription,
     p_items: content.items,
     p_sources: content.sources,
+    p_value_stream_items: valueStreams.items,
+    p_value_stream_enables: valueStreams.enables,
   } satisfies Record<string, unknown>);
 
   if (error) return { ok: false, message: error.message };

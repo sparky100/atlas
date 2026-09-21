@@ -39,7 +39,7 @@ import { loadEnv } from '../src/db/env';
 import { getOrganisationBySlug } from '../src/db/organisations';
 import { getModelBySlug } from '../src/db/models';
 import { exportCapabilityMap } from '../src/db/exportCapabilityMap';
-import { parseCapabilityMapContent, SECTORS, type CapabilityMapContent, type CapabilityMapItemContent, type CapabilityMapSourceContent } from '../src/contracts/capabilityMapContent';
+import { parseCapabilityMapContent, SECTORS, type CapabilityMapContent, type CapabilityMapItemContent, type CapabilityMapSourceContent, type CapabilityMapValueStreamContent, type CapabilityMapValueStreamStageContent } from '../src/contracts/capabilityMapContent';
 import { isCliEntrypoint } from './isCliEntrypoint';
 import { regenerateCapabilityMapsReviewDoc } from './reviewCapabilityMaps';
 
@@ -65,6 +65,28 @@ function serializeItem(item: CapabilityMapItemContent): string {
   return `{ ${parts.join(', ')} }`;
 }
 
+function serializeValueStreamStage(stage: CapabilityMapValueStreamStageContent): string {
+  const parts = [
+    `"code": ${JSON.stringify(stage.code)}`,
+    `"name": ${JSON.stringify(stage.name)}`,
+    `"order": ${String(stage.order)}`,
+    `"enables": [${stage.enables.map((n) => JSON.stringify(n)).join(', ')}]`,
+  ];
+  if (stage.description !== undefined) parts.push(`"description": ${JSON.stringify(stage.description)}`);
+  return `{ ${parts.join(', ')} }`;
+}
+
+function serializeValueStream(stream: CapabilityMapValueStreamContent): string {
+  const parts = [
+    `"code": ${JSON.stringify(stream.code)}`,
+    `"name": ${JSON.stringify(stream.name)}`,
+    `"order": ${String(stream.order)}`,
+    `"stages": [${stream.stages.map((stage) => serializeValueStreamStage(stage)).join(', ')}]`,
+  ];
+  if (stream.description !== undefined) parts.push(`"description": ${JSON.stringify(stream.description)}`);
+  return `{ ${parts.join(', ')} }`;
+}
+
 /** Matches this repo's own hand-authored formatting exactly (content/capability-maps/*.json): 2-space indent, one compact single-line object per source/item — not `JSON.stringify(..., null, 2)`, which would spread each item across many lines and produce a much noisier diff for anyone reviewing the export. */
 export function serializeCapabilityMapContent(content: CapabilityMapContent): string {
   const lines: string[] = [
@@ -84,7 +106,15 @@ export function serializeCapabilityMapContent(content: CapabilityMapContent): st
   content.items.forEach((item, i) => {
     lines.push(`    ${serializeItem(item)}${i < content.items.length - 1 ? ',' : ''}`);
   });
-  lines.push('  ]', '}');
+  if (content.valueStreams.length > 0) {
+    lines.push('  ],', '  "valueStreams": [');
+    content.valueStreams.forEach((stream, i) => {
+      lines.push(`    ${serializeValueStream(stream)}${i < content.valueStreams.length - 1 ? ',' : ''}`);
+    });
+    lines.push('  ]', '}');
+  } else {
+    lines.push('  ]', '}');
+  }
   return lines.join('\n') + '\n';
 }
 

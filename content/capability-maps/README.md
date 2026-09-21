@@ -55,6 +55,34 @@ Adding a sector is one edit there plus its tests, not a migration.
 }
 ```
 
+## Value streams (F6)
+
+A map may also carry a `valueStreams` array (`[]` when absent, so every
+pre-F6 map stays valid). Each stream is one outcome, grouped into stages;
+each stage names the capabilities that deliver it by capability **name**
+(not code) — the loader resolves those names to `capability_map_items.code`:
+
+```json
+"valueStreams": [
+  { "code": "vs1", "name": "Getting Connected", "order": 10, "stages": [
+    { "code": "vs1.1", "name": "Apply & Quote", "order": 10, "enables": ["Connection Quotations"] }
+  ] }
+]
+```
+
+Rules the parser enforces for value streams (mirrored by
+`capability_map_value_stream_items`'s own triggers):
+
+- `valueStreams` codes are unique across the whole map — streams and
+  stages share one code space, matching `capability_map_value_stream_items`'s
+  `(map_id, code)` uniqueness.
+- A stage is exactly one level below its stream (a stream has `stages`,
+  never a `parentCode` of its own; a stage never has stages).
+- `order` is unique among sibling streams and among a stream's own stages.
+- Every `enables` name must match exactly one capability `name` in
+  `items` — the parser refuses zero or ambiguous matches (a miss is
+  reported with its near-matches).
+
 Rules the parser enforces (and `capability_map_items`'s own
 `atlas.guard_capability_map_item_level` trigger mirrors, so a file that
 passes the parser can't fail the database):

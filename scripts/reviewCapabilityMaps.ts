@@ -179,6 +179,21 @@ function renderTree(content: CapabilityMapContent): string[] {
   return lines;
 }
 
+/** F6 (ADR-023): each stream and its stages, in display order, with the capability *names* that enable each stage — so a reviewer sees which capabilities a stage claims to group without having to cross-reference codes. */
+function renderValueStreams(content: CapabilityMapContent): string[] {
+  if (content.valueStreams.length === 0) return [];
+  const lines: string[] = ['Value streams:', ''];
+  for (const stream of [...content.valueStreams].sort((a, b) => a.order - b.order)) {
+    lines.push(`### ${stream.code}. ${stream.name}`, '', stream.description ?? '_No definition._', '');
+    for (const stage of [...stream.stages].sort((a, b) => a.order - b.order)) {
+      const enables = stage.enables.length > 0 ? stage.enables.join(', ') : '_nothing recorded_';
+      lines.push(`- **${stage.code} ${stage.name}** — ${stage.description ?? '_No definition._'} — enabled by ${enables}`);
+    }
+    lines.push('');
+  }
+  return lines;
+}
+
 function renderMatrix(maps: LoadedMap[]): string[] {
   const sectors = maps.map((m) => m.content.sector);
   const level1Names = [...new Set(maps.flatMap((m) => m.content.items.filter((i) => i.level === 1).map((i) => i.name)))].sort((a, b) => a.localeCompare(b));
@@ -212,6 +227,7 @@ function render(maps: LoadedMap[]): string {
       out.push('');
     }
     out.push(...renderTree(map.content));
+    out.push(...renderValueStreams(map.content));
   }
 
   out.push('## 2. Level-1 cross-sector matrix', '', 'Rows are every distinct level-1 name across all maps; a ✓ means that map has a level-1 capability with exactly that name. Identical wording across a row is the shared-capability rule working; near-duplicates on adjacent rows are worth a look.', '', ...renderMatrix(maps), '');
