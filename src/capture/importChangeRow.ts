@@ -22,7 +22,11 @@
  * the exact same shape and reasoning `useElementRetire.ts`'s own
  * "replaced by" picker already uses (never `'primary'` — promoting one
  * could collide with a primary edge the replacement already has elsewhere,
- * which this reconciliation pass has no reliable way to rule out either).
+ * which this reconciliation pass has no reliable way to rule out either),
+ * and writes a real `replaces` edge (ADR-001 amendment) from the
+ * replacement to the retiring element via the same `buildReplacesDelta`
+ * helper `useElementRetire.ts` and `buildReplaceWithNewElementDeltas.ts`
+ * already call.
  *
  * `quote`/`confidence` — optional per-entry provenance an AI-authored
  * import can attach to any of the three sections alike (`importRowSchema.ts`/
