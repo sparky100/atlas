@@ -42,6 +42,8 @@ export interface CapabilityMapViewProps {
   tree: CapabilityMapTree;
   supportsEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
+  /** Every system id with a live `replaces` edge already pointing at it (ADR-001 amendment) — `lifecycleExposure`'s own "no planned replacement" half, computed once by the caller from its own `replaces`-edge fetch. */
+  replacedSystemIds: ReadonlySet<UUID>;
   /** Capability rollup: every capability at this ref, every level — the input `capabilityRollup.ts`'s subtree walk needs; `tree` is the same set already nested, kept flat here too since a tree shape isn't what that walk wants. */
   capabilities: ElementsHeadRow[];
   /** Capability rollup's owner-coverage input — `src/db/healthFindings.ts`'s `computeSelfOwnedCapabilityIds` result, computed once by the caller. */
@@ -160,6 +162,7 @@ export function CapabilityMapView({
   tree,
   supportsEdges,
   systemsById,
+  replacedSystemIds,
   capabilities,
   selfOwnedIds,
   colourBy,
@@ -206,6 +209,7 @@ export function CapabilityMapView({
               colourBy={colourBy}
               supportsEdges={supportsEdges}
               systemsById={systemsById}
+              replacedSystemIds={replacedSystemIds}
               capabilities={capabilities}
               capabilitiesById={capabilitiesById}
               selfOwnedIds={selfOwnedIds}
@@ -374,6 +378,7 @@ function DomainSection({
   colourBy,
   supportsEdges,
   systemsById,
+  replacedSystemIds,
   capabilities,
   capabilitiesById,
   selfOwnedIds,
@@ -396,6 +401,7 @@ function DomainSection({
   colourBy: ColourByMode;
   supportsEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
+  replacedSystemIds: ReadonlySet<UUID>;
   capabilities: ElementsHeadRow[];
   capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>;
   selfOwnedIds: ReadonlySet<UUID>;
@@ -422,7 +428,7 @@ function DomainSection({
   // L2/L3 descendant), deduped by system.
   const rollup = computeCapabilityRollup(column.capability, capabilities, capabilitiesById, supportsEdges, selfOwnedIds);
   const count = rollup.supportingSystemIds.length;
-  const aggregateColour = aggregateTileColourFor(colourBy, rollup.subtreeCapabilityIds, supportsEdges, systemsById);
+  const aggregateColour = aggregateTileColourFor(colourBy, rollup.subtreeCapabilityIds, supportsEdges, systemsById, replacedSystemIds);
   const segments = domainCoverageSegments(rollup.subtreeCapabilityIds, rollup.subtreeSupportsEdges);
 
   return (
@@ -493,6 +499,7 @@ function DomainSection({
                 colourBy={colourBy}
                 supportsEdges={supportsEdges}
                 systemsById={systemsById}
+                replacedSystemIds={replacedSystemIds}
                 orgSlug={orgSlug}
                 modelSlug={modelSlug}
                 refParam={refParam}
@@ -540,6 +547,7 @@ function CapabilityRow({
   colourBy,
   supportsEdges,
   systemsById,
+  replacedSystemIds,
   orgSlug,
   modelSlug,
   refParam,
@@ -558,6 +566,7 @@ function CapabilityRow({
   colourBy: ColourByMode;
   supportsEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
+  replacedSystemIds: ReadonlySet<UUID>;
   orgSlug: string;
   modelSlug: string;
   refParam: string;
@@ -574,7 +583,7 @@ function CapabilityRow({
   /** `true` for an L3 row rendered inside its own L2 parent's expanded list — indented, no expand toggle of its own (L3 has no further children). */
   nested?: boolean;
 }) {
-  const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById);
+  const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById, replacedSystemIds);
   const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
   const marker = commentMarkerFor(threadCounts, card.capability.element_id);
 
@@ -609,6 +618,7 @@ function CapabilityRow({
               colourBy={colourBy}
               supportsEdges={supportsEdges}
               systemsById={systemsById}
+              replacedSystemIds={replacedSystemIds}
               orgSlug={orgSlug}
               modelSlug={modelSlug}
               refParam={refParam}
