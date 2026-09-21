@@ -39,6 +39,7 @@ const COLUMN_SYNONYMS_RAW: Readonly<Record<PromptAColumnRole, readonly string[]>
   capability: ['Business area', 'Service', 'Function', 'Capability', 'Directorate', 'Domain'],
   usesSystems: ['Depends on', 'Integrations', 'Interfaces with', 'Upstream'],
   flowsTo: ['Sends data to', 'Feeds', 'Downstream'],
+  replacedBy: ['Replaced by', 'Superseded by', 'Migrated to', 'Successor'],
   integrationPlatform: ['Via', 'Integration platform', 'Routed through', 'Middleware'],
   notes: ['Notes', 'Comments'],
   ignore: [],
