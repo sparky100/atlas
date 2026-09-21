@@ -104,7 +104,13 @@ describe('spreadsheet import (F2-lite, reconciliation) against a real local Supa
     // `pending_aliases`, never written immediately — `submitApproveAndMerge`
     // below is what actually applies it, via `mergeApprovedRequest`.
     const source = await createSpreadsheetSource(owner.client, { id: randomUUID(), orgId, modelId, createdBy: owner.id, fileName, touchedElementIds: final.touchedElementIds, pendingAliases: final.aliasesToWrite });
-    const rebuilt = buildImportDeltas({ matchedRows, resolutions, fileName, sourceId: source.id, factsByElementId, existsDeltaIdByElementId });
+    // `sourceId` is purely a provenance tag on each delta (never branched on
+    // inside buildImportDeltas) — patch it in place rather than calling
+    // buildImportDeltas a second time. A second call would mint a fresh
+    // random element id for every 'new' row all over again, producing a
+    // *different* set of element ids than the ones already written to
+    // source.touchedElementIds above.
+    const rebuilt = { ...final, deltas: final.deltas.map((d) => ({ ...d, sourceId: source.id })) };
 
     const branch = await createChangeBranch(owner.client, { id: randomUUID(), orgId, modelId, name: `import-${fileName.replace(/\.[^./]+$/, '')}-${randomUUID().slice(0, 8)}`, title: `Imported from ${fileName}`, createdBy: owner.id, mainHeadCommitId: main.head_commit_id, intent: 'record' });
     const envelope: CommitEnvelope = { id: randomUUID(), branchId: branch.id, parentCommitId: branch.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title: `Import from ${fileName}`, body: null, deltas: rebuilt.deltas };
@@ -165,7 +171,10 @@ describe('spreadsheet import (F2-lite, reconciliation) against a real local Supa
     expect(final.changeRows.some((r) => r.outcome.status === 'blocked')).toBe(false);
 
     const source = await createSpreadsheetSource(owner.client, { id: randomUUID(), orgId, modelId, createdBy: owner.id, fileName, touchedElementIds: final.touchedElementIds, pendingAliases: final.aliasesToWrite });
-    const rebuilt = buildImportDeltas({ ...buildInput, sourceId: source.id });
+    // Same fix as runImport above: patch sourceId in place instead of a
+    // second buildImportDeltas call, which would mint different element ids
+    // than the ones already written to source.touchedElementIds.
+    const rebuilt = { ...final, deltas: final.deltas.map((d) => ({ ...d, sourceId: source.id })) };
 
     const branch = await createChangeBranch(owner.client, { id: randomUUID(), orgId, modelId, name: `import-${fileName.replace(/\.[^./]+$/, '')}-${randomUUID().slice(0, 8)}`, title: `Imported from ${fileName}`, createdBy: owner.id, mainHeadCommitId: main.head_commit_id, intent: 'record' });
     const envelope: CommitEnvelope = { id: randomUUID(), branchId: branch.id, parentCommitId: branch.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title: `Import from ${fileName}`, body: null, deltas: rebuilt.deltas };

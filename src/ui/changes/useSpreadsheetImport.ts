@@ -247,27 +247,18 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
       // correct here, before the source row even exists.
       const source = await createSpreadsheetSource(supabase, { id: crypto.randomUUID(), orgId, modelId, createdBy: userId, fileName: review.fileName, touchedElementIds: buildResult.touchedElementIds, pendingAliases: buildResult.aliasesToWrite });
       // `buildResult` was computed with a placeholder `sourceId` (real
-      // `sources` row didn't exist yet, and rebuilding it would just be the
-      // same pure computation over unchanged inputs) — the deltas' own
-      // `sourceId` needs the real row's id, so every delta is rebuilt once
-      // more, now that it exists.
-      const final = buildImportDeltas({
-        matchedRows: review.matchedRows.filter((m) => !excludedSystemRows.has(m.row.rowNumber)),
-        resolutions,
-        fileName: review.fileName,
-        sourceId: source.id,
-        factsByElementId,
-        existsDeltaIdByElementId,
-        currentSupportsByElementId,
-        relationshipRows: review.relationshipRows.filter((r) => !excludedRelationshipRows.has(r.rowNumber)),
-        systems: review.systems,
-        containers: review.containers,
-        actors,
-        aliasesByElementId,
-        currentUsesFlowsToEdges,
-        relationshipFactsByRelationshipId,
-        changeRows: review.changeRows.filter((r) => !excludedChangeRows.has(r.rowNumber)),
-      });
+      // `sources` row didn't exist yet) — every delta's own `sourceId` needs
+      // the real row's id now that it exists. `sourceId` is purely a
+      // provenance tag on each delta (never branched on inside
+      // `buildImportDeltas`), so this patches it in place rather than
+      // calling `buildImportDeltas` a second time: a second call would mint
+      // a fresh random element id for every 'new' row all over again,
+      // producing a *different* set of element ids than the ones already
+      // written to `source.touchedElementIds` above (found live: the two
+      // builds' ids were completely disjoint, so a later import's own "not
+      // in file" reasoning misread real, previously-imported elements as
+      // absent).
+      const final = { ...buildResult, deltas: buildResult.deltas.map((d) => ({ ...d, sourceId: source.id })) };
       if (final.deltas.length === 0) {
         setError('Nothing to import — every row was already up to date.');
         setStatus('review');
@@ -305,7 +296,7 @@ export function useSpreadsheetImport(modelId: UUID, orgId: UUID, userId: UUID | 
       setStatus('review');
       return null;
     }
-  }, [review, resolutions, buildResult, modelId, orgId, userId, factsByElementId, existsDeltaIdByElementId, currentSupportsByElementId, actors, aliasesByElementId, currentUsesFlowsToEdges, relationshipFactsByRelationshipId, excludedSystemRows, excludedRelationshipRows, excludedChangeRows]);
+  }, [review, buildResult, modelId, orgId, userId]);
 
   const reset = useCallback(() => {
     setStatus('idle');

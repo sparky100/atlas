@@ -11,7 +11,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { captureCandidateWireToRow, type CaptureCandidate } from '../contracts/capture';
+import { captureCandidateRowToWire, captureCandidateWireToRow, type CaptureCandidate, type CaptureCandidateRowShape } from '../contracts/capture';
 import { envelopeToDeltaRows } from '../contracts/rows';
 import type { UUID } from '../contracts/delta';
 import { createChangeBranch, getBranch, getMainBranch } from '../db/branches';
@@ -111,7 +111,6 @@ describe('stage_capture_decisions / apply_capture_decisions against a real local
 
     const branchId = randomUUID();
     const commitId = randomUUID();
-    let nextDeltaId = 0;
     const { envelope, draftDeltaIdsBySeq } = buildCaptureDraftEnvelope({
       commitId,
       branchId,
@@ -122,7 +121,11 @@ describe('stage_capture_decisions / apply_capture_decisions against a real local
       effectiveDate: '2026-02-01',
       mainHead,
       candidates: [newCandidate],
-      mintId: () => `delta-${String((nextDeltaId += 1))}-${randomUUID()}`,
+      // write_capture_draft casts each delta's id straight to uuid — this
+      // used to mint a debug-friendly "delta-N-<uuid>" string instead of a
+      // plain uuid, which the RPC rejected outright. Match production
+      // wiring (supabase/functions/capture-run/index.ts's own mintId).
+      mintId: () => randomUUID(),
     });
 
     const finishedCandidate: CaptureCandidate = { ...newCandidate, draftDeltaIds: draftDeltaIdsBySeq.get(0) ?? [] };
@@ -167,7 +170,7 @@ describe('stage_capture_decisions / apply_capture_decisions against a real local
 
     const { data: draftCandidateRows, error: draftCandidateError } = await owner.client.from('capture_candidates').select('*').eq('job_id', jobId).order('seq');
     if (draftCandidateError) throw new Error(draftCandidateError.message);
-    const candidates = draftCandidateRows as unknown as CaptureCandidate[]; // real row->wire conversion omitted for brevity — reasoned through, not executed.
+    const candidates = (draftCandidateRows as unknown as CaptureCandidateRowShape[]).map(captureCandidateRowToWire);
 
      
     const { error: stageError } = await contributor.client.schema('atlas').rpc('stage_capture_decisions', {
@@ -183,10 +186,15 @@ describe('stage_capture_decisions / apply_capture_decisions against a real local
 
     const draftHead = await loadCaptureDraftHead(owner.client, modelId, draftBranchId);
     const { head: targetHead, headCommitId: targetHeadCommitId } = await loadTargetBranchHead(owner.client, modelId, targetBranchId);
-    const reviewerSource = await getOrCreateManualSource(owner.client, { id: randomUUID(), orgId, modelId, userId: contributor.id });
+    // sources_insert's RLS requires created_by = auth.uid() AND user_id =
+    // auth.uid() for a manual source — the acting client must match the
+    // userId being written (same fix as pipeline.integration.test.ts's own
+    // equivalent call).
+    const reviewerSource = await getOrCreateManualSource(contributor.client, { id: randomUUID(), orgId, modelId, userId: contributor.id });
 
-    let nextMinted = 0;
-    const mintId = () => `promoted-${String((nextMinted += 1))}-${randomUUID()}`;
+    // apply_capture_decisions also casts each delta's id straight to uuid —
+    // same D1 fix as buildCaptureDraftEnvelope's own mintId above.
+    const mintId = () => randomUUID();
     const { deltas, promotedSubjectIdBySeq, aliasRows, resolvedConflicts } = buildPromotionEnvelope({
       candidates: [{ ...candidates[0], decision: 'accepted' } as CaptureCandidate],
       draftHead,

@@ -28,7 +28,7 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { captureCandidateWireToRow, type CaptureCandidate } from '../contracts/capture';
+import { captureCandidateRowToWire, captureCandidateWireToRow, type CaptureCandidate, type CaptureCandidateRowShape } from '../contracts/capture';
 import type { UUID } from '../contracts/delta';
 import { envelopeToDeltaRows } from '../contracts/rows';
 import { createChangeBranch, getBranch, getMainBranch } from '../db/branches';
@@ -248,7 +248,7 @@ describe.each(FIXTURE_IDS)('capture pipeline against a real local Supabase — f
     // (d) stage every non-invalid/unsourced candidate as accepted, apply onto a fresh change branch.
     const { data: draftCandidateRows, error: readBackError } = await owner.client.from('capture_candidates').select('*').eq('job_id', jobId).order('seq');
     if (readBackError) throw new Error(readBackError.message);
-    const draftCandidates = draftCandidateRows as unknown as (CaptureCandidate & { id: UUID })[]; // real row->wire conversion omitted here — reasoned through, not executed (see writeCaptureDraft.integration.test.ts's own equivalent note).
+    const draftCandidates = (draftCandidateRows as unknown as CaptureCandidateRowShape[]).map(captureCandidateRowToWire);
     const promotable = draftCandidates.filter((c) => c.class !== 'invalid' && c.class !== 'unsourced');
 
     const { error: stageError } = await contributor.client.schema('atlas').rpc('stage_capture_decisions', {
@@ -262,7 +262,11 @@ describe.each(FIXTURE_IDS)('capture pipeline against a real local Supabase — f
 
     const promotedDraftHead = await loadCaptureDraftHead(owner.client, modelId, branchId);
     const { head: targetHead, headCommitId: targetHeadCommitId } = await loadTargetBranchHead(owner.client, modelId, targetBranchId);
-    const reviewerSource = await getOrCreateManualSource(owner.client, { id: randomUUID(), orgId, modelId, userId: contributor.id });
+    // sources_insert's RLS requires created_by = auth.uid() AND user_id =
+    // auth.uid() for a manual source — the acting client must match the
+    // userId being written (the contributor promoting this candidate), not
+    // the owner who happens to be driving the rest of this test.
+    const reviewerSource = await getOrCreateManualSource(contributor.client, { id: randomUUID(), orgId, modelId, userId: contributor.id });
 
     const acceptedCandidates: CaptureCandidate[] = promotable.map((c) => ({ ...c, decision: 'accepted' }));
     const promotion = buildPromotionEnvelope({ candidates: acceptedCandidates, draftHead: promotedDraftHead, targetHead, reviewerSourceId: reviewerSource.id, mintId: randomUUID });
