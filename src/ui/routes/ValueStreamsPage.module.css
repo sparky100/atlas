@@ -4,6 +4,15 @@
   margin: 0 auto;
 }
 
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
 /* The stream list plus the shared Inspector, side by side — same
    flex-row/first-child-grows shape `CapabilityMapPage.module.css`'s own
    `.mapRow` already uses for the identical pairing. */

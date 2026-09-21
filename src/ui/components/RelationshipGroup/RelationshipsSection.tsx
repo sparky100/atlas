@@ -86,6 +86,20 @@ export interface RelationshipsSectionProps {
   removeRelationship?: RelationshipsSectionRemoveConfig | undefined;
   /** Relationship attribute editing, general — omitted entirely (not shown disabled) when the caller hasn't established edit rights, same convention as `addRelationship`/`removeRelationship`. */
   editRelationship?: RelationshipsSectionEditConfig | undefined;
+  /**
+   * F6 (ADR-023): `enables` is structural — a narrower gate
+   * (`canEditValueStreamStructure`) than this page's general edit rights,
+   * which is all `addRelationship`/`removeRelationship` above otherwise
+   * express. When given, these two override `addRelationship`/
+   * `removeRelationship` specifically for the `enables` group (both
+   * directions — a capability's own "Enables" and a stage's own "Enabled
+   * by"); every other relationship type is unaffected. Omitted entirely
+   * (not shown disabled) when the caller's own `enables`-specific gate
+   * fails, even while the general config still allows adding a `supports`/
+   * `owns`/`uses`/`flows_to` edge on the very same page.
+   */
+  enablesAddRelationship?: RelationshipsSectionAddConfig | undefined;
+  enablesRemoveRelationship?: RelationshipsSectionRemoveConfig | undefined;
   /** The other element id of a relationship just added in this session (Handoff — Flow: Add a system, step 7's `just added` chip) — cleared by the caller once acknowledged, not by this component. */
   justAddedElementId?: UUID | null;
 }
@@ -124,19 +138,26 @@ export function RelationshipsSection({
   addRelationship,
   removeRelationship,
   editRelationship,
+  enablesAddRelationship,
+  enablesRemoveRelationship,
   justAddedElementId = null,
 }: RelationshipsSectionProps) {
   const outboundSlots = new Map(outboundRelationshipGroups(elementType).map((slot) => [slot.relationshipType, slot]));
   const inboundSlots = new Map(inboundRelationshipGroups(elementType).map((slot) => [slot.relationshipType, slot]));
 
   const groups = DISPLAY_ORDER.map((type) => {
+    // F6 (ADR-023): `enables`' own narrower, structural-edit gate replaces
+    // the general one for this type alone — see `enablesAddRelationship`'s
+    // own doc comment.
+    const groupAddRelationship = type === 'enables' ? enablesAddRelationship : addRelationship;
+    const groupRemoveRelationship = type === 'enables' ? enablesRemoveRelationship : removeRelationship;
     const outboundRows = relationships.filter((r) => r.relationship_type === type && r.from_element_id === elementId);
     const inboundRows = relationships.filter((r) => r.relationship_type === type && r.to_element_id === elementId);
     const outboundSlot = outboundSlots.get(type);
     const inboundSlot = inboundSlots.get(type);
-    const showOutbound = outboundRows.length > 0 || (addRelationship !== undefined && outboundSlot !== undefined);
-    const showInbound = inboundRows.length > 0 || (addRelationship !== undefined && inboundSlot !== undefined);
-    return { type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound };
+    const showOutbound = outboundRows.length > 0 || (groupAddRelationship !== undefined && outboundSlot !== undefined);
+    const showInbound = inboundRows.length > 0 || (groupAddRelationship !== undefined && inboundSlot !== undefined);
+    return { type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound, groupAddRelationship, groupRemoveRelationship };
   }).filter((group) => group.showOutbound || group.showInbound);
 
   if (groups.length === 0) {
@@ -145,7 +166,7 @@ export function RelationshipsSection({
 
   return (
     <div>
-      {groups.map(({ type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound }) => (
+      {groups.map(({ type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound, groupAddRelationship, groupRemoveRelationship }) => (
         <div key={type} className={styles.typeGroup}>
           {showOutbound && (
             <RelationshipDirectionGroup
@@ -161,8 +182,8 @@ export function RelationshipsSection({
               endpoints={endpoints}
               relationshipFacts={relationshipFacts}
               sources={sources}
-              addRelationship={addRelationship}
-              removeRelationship={removeRelationship}
+              addRelationship={groupAddRelationship}
+              removeRelationship={groupRemoveRelationship}
               editRelationship={editRelationship}
               justAddedElementId={justAddedElementId}
             />
@@ -181,8 +202,8 @@ export function RelationshipsSection({
               endpoints={endpoints}
               relationshipFacts={relationshipFacts}
               sources={sources}
-              addRelationship={addRelationship}
-              removeRelationship={removeRelationship}
+              addRelationship={groupAddRelationship}
+              removeRelationship={groupRemoveRelationship}
               editRelationship={editRelationship}
               justAddedElementId={justAddedElementId}
             />

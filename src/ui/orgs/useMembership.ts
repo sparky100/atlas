@@ -19,6 +19,7 @@ export {
   canDeleteModel,
   canEditBranch,
   canEditOnMain,
+  canEditValueStreamStructure,
   canManageOrgSettings,
   canRestoreModel,
   canReviewMergeRequest,
