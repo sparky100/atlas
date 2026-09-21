@@ -21,6 +21,7 @@
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import { attributesRecord } from '../elements/attributesRecord';
+import { compareBySiblingOrder } from '../elements/siblingOrder';
 
 export interface L3Tile {
   capability: ElementsHeadRow;
@@ -47,32 +48,6 @@ export interface CapabilityMapTree {
   orphans: ElementsHeadRow[];
 }
 
-/** Splits a dotted code (`"2.10"`) into comparable numeric groups so `2.2` sorts before `2.10` — a plain string compare would put `2.10` first. Falls back to string comparison wherever a segment isn't numeric. */
-function compareCodes(a: string, b: string): number {
-  const as = a.split('.');
-  const bs = b.split('.');
-  const len = Math.max(as.length, bs.length);
-  for (let i = 0; i < len; i++) {
-    const av = as[i] ?? '';
-    const bv = bs[i] ?? '';
-    const an = Number(av);
-    const bn = Number(bv);
-    if (av !== '' && bv !== '' && Number.isFinite(an) && Number.isFinite(bn) && an !== bn) return an - bn;
-    if (av !== bv) return av.localeCompare(bv);
-  }
-  return 0;
-}
-
-function codeOf(capability: ElementsHeadRow): string | null {
-  const code = attributesRecord(capability.attributes).code;
-  return typeof code === 'string' && code !== '' ? code : null;
-}
-
-function orderOf(capability: ElementsHeadRow): number | null {
-  const order = attributesRecord(capability.attributes).order;
-  return typeof order === 'number' ? order : null;
-}
-
 /**
  * Deterministic order: by `attributes.order` (Sprint U4-1 C1) when both
  * tiles have one — this is what actually puts a sector map's own
@@ -89,26 +64,14 @@ function orderOf(capability: ElementsHeadRow): number | null {
  * or, S1 item 13, the first time someone moves it via `useCapabilityReorder`'s
  * own on-the-fly `resolveOrders` — so a gap like that can't jump a
  * capability ahead of ones someone deliberately placed.
+ *
+ * A thin re-export (F6/ADR-023): the comparator itself was never actually
+ * capability-specific (it only ever read `order`/`code`/`name`/`element_id`
+ * off a plain `ElementsHeadRow`), so it now lives in
+ * `src/ui/elements/siblingOrder.ts`'s `compareBySiblingOrder`, shared with
+ * value-stream stage ordering — this name stays for every existing caller.
  */
-export function compareCapabilities(a: ElementsHeadRow, b: ElementsHeadRow): number {
-  const orderA = orderOf(a);
-  const orderB = orderOf(b);
-  if (orderA !== null && orderB !== null) {
-    if (orderA !== orderB) return orderA - orderB;
-  } else if (orderA !== null) {
-    return -1;
-  } else if (orderB !== null) {
-    return 1;
-  }
-
-  const codeA = codeOf(a);
-  const codeB = codeOf(b);
-  if (codeA !== null && codeB !== null) {
-    const byCode = compareCodes(codeA, codeB);
-    if (byCode !== 0) return byCode;
-  }
-  return a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id);
-}
+export const compareCapabilities = compareBySiblingOrder;
 
 /**
  * The order a newly-added capability under `parentId` should get (Sprint

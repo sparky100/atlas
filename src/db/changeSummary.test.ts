@@ -27,6 +27,14 @@ function supports(fromElementId: string, toElementId: string): RelationshipRow {
   return { relationshipType: 'supports', fromElementId, toElementId, attributes: {}, existsDeltaId: 'create-supports' };
 }
 
+function valueStream(name: string, parentId: string | null): ElementRow {
+  return { elementType: 'value_stream', name, parentId, attributes: {}, existsDeltaId: `create-${name}` };
+}
+
+function enables(fromElementId: string, toElementId: string): RelationshipRow {
+  return { relationshipType: 'enables', fromElementId, toElementId, attributes: {}, existsDeltaId: 'create-enables' };
+}
+
 describe('summarizeOwnDeltas', () => {
   it('groups a subject\'s own deltas together, named from the to-be side', () => {
     const asIs = emptyHead();
@@ -107,5 +115,40 @@ describe('summarizeOwnDeltas', () => {
     const result = summarizeOwnDeltas(deltas, asIs, toBe);
 
     expect(result.affectedCapabilities).toHaveLength(0);
+  });
+
+  it('F6 (ADR-023): finds affected value streams via an affected capability\'s own enables edge onto a stage', () => {
+    const asIs = emptyHead();
+    asIs.elements.set('sys-a', system('Alpha'));
+
+    const toBe = emptyHead();
+    toBe.elements.set('sys-a', system('Alpha Renamed'));
+    toBe.elements.set('cap-1', capability('Housing'));
+    toBe.relationships.set('rel-1', supports('sys-a', 'cap-1'));
+    toBe.elements.set('vs-1', valueStream('Getting Connected', null));
+    toBe.elements.set('st-1', valueStream('Apply', 'vs-1'));
+    toBe.relationships.set('rel-2', enables('cap-1', 'st-1'));
+
+    const deltas = [elementUpdate('d1', 'sys-a', 'Alpha Renamed', 'create-1')];
+    const result = summarizeOwnDeltas(deltas, asIs, toBe);
+
+    expect(result.affectedValueStreams).toHaveLength(1);
+    expect(result.affectedValueStreams[0]).toMatchObject({ stream: { element_id: 'vs-1', name: 'Getting Connected' } });
+    expect(result.affectedValueStreams[0]?.stages).toMatchObject([{ stage: { element_id: 'st-1' }, viaCapabilities: [{ element_id: 'cap-1' }] }]);
+  });
+
+  it('F6 (ADR-023): ignores an enables edge from a capability this change never reaches', () => {
+    const asIs = emptyHead();
+    const toBe = emptyHead();
+    toBe.elements.set('cap-unreached', capability('Unreached'));
+    toBe.elements.set('vs-1', valueStream('Getting Connected', null));
+    toBe.elements.set('st-1', valueStream('Apply', 'vs-1'));
+    toBe.relationships.set('rel-1', enables('cap-unreached', 'st-1'));
+    toBe.elements.set('sys-b', system('Beta'));
+
+    const deltas = [elementCreate('d1', 'sys-b', 'Beta')];
+    const result = summarizeOwnDeltas(deltas, asIs, toBe);
+
+    expect(result.affectedValueStreams).toHaveLength(0);
   });
 });

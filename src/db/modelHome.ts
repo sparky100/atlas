@@ -10,7 +10,7 @@
  * the top). Those stay real gaps, not faked — see each component's own
  * comment for exactly what's deferred and why.
  */
-import type { UUID } from '../contracts/delta';
+import type { FitForPurpose, UUID } from '../contracts/delta';
 import type { CommitRow, DeltaRow, ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
 import { attributesRecord } from '../ui/elements/attributesRecord';
 import { computeCapabilityRollup } from '../ui/capabilityMap/capabilityRollup';
@@ -232,6 +232,8 @@ export interface CapabilityTileData {
   supportedCapabilityCount: number;
   /** Same rollup's `totalCapabilityCount` — the fraction's denominator. */
   totalCapabilityCount: number;
+  /** F6 (ADR-023): same rollup's `fitForPurpose` — worst-of across this capability's own subtree, surfaced here (unused by the director door itself) so `src/ui/valueStreams/valueStreamRollup.ts` can roll it up a second time, across a stage's/stream's own enabling capabilities, without a second read of `supports` edges. */
+  fitForPurpose: FitForPurpose | null;
   /** Same rollup's `isOwned` — this capability or any ancestor has an owner. */
   isOwned: boolean;
 }
@@ -309,6 +311,7 @@ export function buildCapabilityTiles(
       supportedCapabilityCount: rollup.supportedCapabilityCount,
       totalCapabilityCount: rollup.totalCapabilityCount,
       isOwned: rollup.isOwned,
+      fitForPurpose: rollup.fitForPurpose,
     };
   });
 }
