@@ -104,7 +104,10 @@ export function CapabilityMapPage() {
   const canEdit = ref.kind === 'main' && canEditOnMain(role);
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
 
-  const { state, reload } = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref, mainBranch?.head_commit_id ?? null);
+  // #244: no As-is/To-be/Diff selector on this page (unlike LandscapePage's
+  // `?mode=` control) — always the branch's own current state, the same
+  // default `parseViewMode` itself falls back to when `?mode=` is absent.
+  const { state, reload } = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref, 'toBe', mainBranch?.head_commit_id ?? null);
   // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment.
   useRouteTiming('capability-map', state.status === 'ready');
   // S2 flow 1 bug fix: every mutation on this page (importing a starter

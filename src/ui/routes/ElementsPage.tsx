@@ -65,10 +65,13 @@ function parseCustomFilterValue(kind: AttributeDefinitionKind, raw: string): Jso
 
 /**
  * The element browse table's route (Sprint U3b) — "reachable from both
- * doors": `ModelHome.tsx` links here, and this page itself always reads
- * `main` (browsing is a director/architect-door affordance, not a
- * branch-scoped view; open an element from here to edit it at whatever
- * ref that page supports).
+ * doors": `ModelHome.tsx` links here. #244: this page used to always read
+ * `main` regardless of the selected ref, so a branch's own additions/edits
+ * never showed up here — it now reads whatever ref is selected, same as
+ * every other branch-aware page (`useElementBrowse.ts`'s own module
+ * comment has the mechanism). Always the branch's own current state
+ * (`'toBe'`) — this page has no As-is/To-be/Diff selector of its own,
+ * same choice `CapabilityMapPage.tsx` makes for the same reason.
  *
  * Sprint U4-1 B3 adds `?filter=`: the architect door's Health findings
  * panel links here pre-filtered to a finding (`ArchitectHome.tsx`'s own
@@ -148,7 +151,7 @@ export function ElementsPage() {
     setSearchParams(params);
   };
 
-  const state = useElementBrowse(model?.id ?? '', filter, mainBranch?.head_commit_id ?? null);
+  const state = useElementBrowse(model?.id ?? '', ref, 'toBe', filter, mainBranch?.head_commit_id ?? null);
   // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment.
   useRouteTiming('elements', state.status === 'ready');
   const onLinked = () => {
@@ -243,8 +246,14 @@ export function ElementsPage() {
                     modelId: model.id,
                     orgId: organisation?.id ?? '',
                     userId,
-                    branch: mainBranch,
-                    expectedHeadCommitId: mainBranch.head_commit_id,
+                    // #244: this used to hardcode `mainBranch` as the write
+                    // target regardless of the selected ref — the same
+                    // editing-branch fallback `HomeSearch` already uses
+                    // (`editingBranch`, falling back to `mainBranch` only
+                    // when on main), so this page has one consistent write
+                    // target rather than two.
+                    branch: editingBranch ?? mainBranch,
+                    expectedHeadCommitId: (editingBranch ?? mainBranch).head_commit_id,
                     onLinked,
                   }
                 : undefined

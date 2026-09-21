@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
-import type { ElementsHeadRow, Json } from '../../contracts/rows';
-import { listAllElements, loadOwnersByElementId, lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
+import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
+import { listAllElements, loadOwnersByElementId, ownersByElementIdFromOwnsEdges, lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
 import { attributesRecord } from './attributesRecord';
 import { compareCustomAttributeValues, sortKeyEquals, type ElementBrowseSortKey } from './elementBrowseSort';
 import { moduleDisplayName } from './moduleDisplayName';
@@ -23,11 +23,13 @@ import {
 } from '../../db/healthFindings';
 import { listAllSupportsEdges } from '../../db/modelHome';
 import { computeCapabilityMapTree } from '../capabilityMap/layout';
-import { resolveRef } from '../../db/ref';
+import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
+import type { ViewMode } from '../../db/viewMode';
+import { resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
-export type ElementBrowseStatus = 'loading' | 'error' | 'ready';
+export type ElementBrowseStatus = 'loading' | 'error' | 'refNotFound' | 'ready';
 // `ElementBrowseSortKey`/`sortKeyEquals`/`compareCustomAttributeValues` now
 // live in `./elementBrowseSort` (see that file's own module comment for
 // why) — re-exported here so every existing import site (`ElementsPage.tsx`,
@@ -70,6 +72,7 @@ export type ElementBrowseFilter =
 export type ElementBrowseState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
+  | { status: 'refNotFound' }
   | {
       status: 'ready';
       rows: BrowseRow[];
@@ -125,12 +128,28 @@ function compareRows(a: BrowseRow, b: BrowseRow, key: ElementBrowseSortKey): num
  * second, driftable one. `supports`/`owns` edges are always fetched now
  * (cheap, commit-scoped bulk reads, same shape `listAllElements` already
  * is) — `facts` (can be large, CLAUDE.md rule 8's own caution) only when
- * `filter === 'stale-attributes'` actually asks for it.
+ * `filter === 'stale-attributes'` actually asks for it, for the main/tag
+ * arm below.
+ *
+ * #244: used to read `main` unconditionally regardless of the page's own
+ * selected ref, so a branch's own additions/edits never showed up here.
+ * Mirrors `useCapabilityLandscape.ts`'s main/tag-vs-branch split: a branch
+ * ref reads the already-folded arrays off
+ * `resolveBranchModeProjectionCached`'s `HeadProjection` and derives every
+ * filter in memory (all of them are already `relationship_type`/
+ * `element_type` equality filters over an already-in-memory array, never
+ * an id-list `.in()` — CLAUDE.md rule 8 doesn't apply here) — the whole
+ * projection is already in memory once resolved, so unlike the main/tag
+ * arm's "only fetch facts/uses-flows_to when the filter needs them"
+ * laziness, the branch arm derives everything unconditionally; main/tag
+ * are unchanged, still the direct commit-scoped queries below.
  */
 export function useElementBrowse(
   modelId: UUID,
+  ref: Ref,
+  mode: ViewMode,
   filter: ElementBrowseFilter = null,
-  /** S1 item 15 (A2 remainder): the caller's own already-resolved main head commit id — this hook only ever reads `main`, same shape `useDirectorHome.ts`'s own parameter comment explains. */
+  /** S1 item 15 (A2 remainder): the caller's own already-resolved main head commit id — same race-tolerant dedup shape `useDirectorHome.ts`'s own parameter comment explains, for the main/tag arm below. */
   mainCommitIdHint: UUID | null = null,
 ): ElementBrowseState {
   const [status, setStatus] = useState<ElementBrowseStatus>('loading');
@@ -147,6 +166,7 @@ export function useElementBrowse(
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<ElementBrowseSortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const refParam = refParamOf(ref);
 
   useEffect(() => {
     if (!modelId) return undefined;
@@ -154,22 +174,59 @@ export function useElementBrowse(
     setStatus('loading');
 
     async function load(): Promise<void> {
-      const resolvedCommitId = mainCommitIdHint ?? (await resolveRef(supabase, modelId, { kind: 'main' }));
-      if (!resolvedCommitId) {
-        if (!cancelled) {
-          setError('This model has no commits yet.');
-          setStatus('error');
-        }
-        return;
-      }
+      let resolvedCommitId: UUID;
+      let elements: ElementsHeadRow[];
+      let supportsEdges: RelationshipsHeadRow[];
+      let ownsEdges: RelationshipsHeadRow[];
+      let ownersByElementId: Map<UUID, ElementsHeadRow>;
+      /** Deferred so the common filter logic below can `await` it only for the two filters that actually need it — a real query for main/tag, an already-in-memory filter for a branch ref (see this hook's own module comment). */
+      let getFacts: () => Promise<FactsRow[]>;
+      let getUsesAndFlowsToEdges: () => Promise<RelationshipsHeadRow[]>;
 
-      const [elements, supportsEdges, ownsEdges] = await Promise.all([
-        listAllElements(supabase, resolvedCommitId),
-        listAllSupportsEdges(supabase, resolvedCommitId),
-        listAllOwnsEdges(supabase, resolvedCommitId),
-      ]);
+      if (ref.kind === 'branch') {
+        const branch = await resolveBranchRef(supabase, ref);
+        if (!branch) {
+          if (!cancelled) setStatus('refNotFound');
+          return;
+        }
+        const resolved = await resolveBranchModeProjectionCached(supabase, modelId, branch, mode);
+        if (!resolved) {
+          if (!cancelled) setStatus('refNotFound');
+          return;
+        }
+        const { projection } = resolved;
+        resolvedCommitId = resolved.commitId;
+        elements = projection.elementsHead;
+        supportsEdges = projection.relationshipsHead.filter((r) => r.relationship_type === 'supports');
+        ownsEdges = projection.relationshipsHead.filter((r) => r.relationship_type === 'owns');
+        const elementsByIdForOwners = new Map<UUID, ElementsHeadRow>(elements.map((e) => [e.element_id, e]));
+        ownersByElementId = ownersByElementIdFromOwnsEdges(ownsEdges, elementsByIdForOwners);
+        getFacts = () => Promise.resolve(projection.facts);
+        getUsesAndFlowsToEdges = () => Promise.resolve(projection.relationshipsHead.filter((r) => r.relationship_type === 'uses' || r.relationship_type === 'flows_to'));
+      } else {
+        const commitId = ref.kind === 'main' && mainCommitIdHint ? mainCommitIdHint : await resolveRef(supabase, modelId, ref);
+        if (!commitId) {
+          if (!cancelled) {
+            setError('This model has no commits yet.');
+            setStatus('error');
+          }
+          return;
+        }
+        resolvedCommitId = commitId;
+        const [loadedElements, loadedSupportsEdges, loadedOwnsEdges] = await Promise.all([
+          listAllElements(supabase, commitId),
+          listAllSupportsEdges(supabase, commitId),
+          listAllOwnsEdges(supabase, commitId),
+        ]);
+        elements = loadedElements;
+        supportsEdges = loadedSupportsEdges;
+        ownsEdges = loadedOwnsEdges;
+        const elementsByIdForOwners = new Map<UUID, ElementsHeadRow>(elements.map((e) => [e.element_id, e]));
+        ownersByElementId = await loadOwnersByElementId(supabase, commitId, elementsByIdForOwners);
+        getFacts = () => listFactsForCommit(supabase, commitId);
+        getUsesAndFlowsToEdges = () => listAllUsesAndFlowsToEdges(supabase, commitId);
+      }
       const elementsById = new Map<UUID, ElementsHeadRow>(elements.map((e) => [e.element_id, e]));
-      const ownersByElementId = await loadOwnersByElementId(supabase, resolvedCommitId, elementsById);
 
       let ids: Set<UUID> | null = null;
       if (filter === 'unlinked-systems') {
@@ -185,7 +242,7 @@ export function useElementBrowse(
         ids = new Set(findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
       } else if (filter === 'stale-attributes') {
         const systems = elements.filter((e) => e.element_type === 'system');
-        const facts = await listFactsForCommit(supabase, resolvedCommitId);
+        const facts = await getFacts();
         ids = new Set(computeStaleAttributesFinding(facts, systems).staleSystems.map((e) => e.element_id));
       } else if (filter === 'no-technical-owner') {
         const systems = elements.filter((e) => e.element_type === 'system');
@@ -200,7 +257,7 @@ export function useElementBrowse(
         ids = new Set(findCriticalExposedSystems(systems).map((e) => e.element_id));
       } else if (filter === 'unused-integration-platform') {
         const systems = elements.filter((e) => e.element_type === 'system');
-        const usesAndFlowsToEdges = await listAllUsesAndFlowsToEdges(supabase, resolvedCommitId);
+        const usesAndFlowsToEdges = await getUsesAndFlowsToEdges();
         ids = new Set(findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges).map((e) => e.element_id));
       } else if (filter === 'essential-no-technical-owner') {
         const systems = elements.filter((e) => e.element_type === 'system');
@@ -245,7 +302,10 @@ export function useElementBrowse(
     return () => {
       cancelled = true;
     };
-  }, [modelId, filter, reloadToken, mainCommitIdHint]);
+    // `ref`'s string form (`refParam`, computed above) is the real
+    // dependency, not `ref` itself — same pitfall/fix as
+    // useCapabilityLandscape.ts/useLandscape.ts.
+  }, [modelId, refParam, mode, filter, reloadToken, mainCommitIdHint]);
 
   const setSort = (key: ElementBrowseSortKey) => {
     if (sortKeyEquals(key, sortKey)) {
@@ -270,6 +330,7 @@ export function useElementBrowse(
   }, [loaded, typeFilter, query, sortKey, sortDirection]);
 
   if (status === 'error') return { status: 'error', message: error ?? 'Failed to load elements.' };
+  if (status === 'refNotFound') return { status: 'refNotFound' };
   if (status === 'loading' || !loaded) return { status: 'loading' };
   return {
     status: 'ready',
