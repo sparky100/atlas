@@ -152,7 +152,16 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   // stays a UI-level guard (never offer what would fail) rather than a
   // confusing engine error the reviewer has no obvious way to act on.
   const existingOtherIds = new Set(existingRows.map((row) => (direction === 'outbound' ? row.to_element_id : row.from_element_id)));
-  const availableResults = search.results.filter((result) => !existingOtherIds.has(result.element_id));
+  // F6 (ADR-023): a capability's own outbound `enables` slot searches
+  // `value_stream` elements (`slot.targetTypes`, from `RELATIONSHIP_TYPE_RULES`),
+  // which is every stream *and* stage — C22 restricts the edge itself to a
+  // stage (a `value_stream` with a non-null `parent_id`), so a stream is
+  // filtered out here, client-side, rather than ever offered and rejected
+  // at commit time. The inbound direction (a stage's own "enabled by"
+  // picker) already only ever searches `capability` elements — nothing to
+  // narrow there.
+  const isEnablesStageSlot = slot.relationshipType === 'enables' && direction === 'outbound';
+  const availableResults = search.results.filter((result) => !existingOtherIds.has(result.element_id)).filter((result) => !isEnablesStageSlot || result.parent_id !== null);
   const needsLabel = slot.relationshipType === 'uses' || slot.relationshipType === 'flows_to';
   // Only mounted (its own fetch enabled) for uses/flows_to slots — see this
   // hook's own `enabled` doc comment for why every other slot on the same

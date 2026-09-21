@@ -11,8 +11,8 @@ import { Text } from '../components/Text/Text';
 import { computeCapabilityRollup } from './capabilityRollup';
 import { domainCoverageSegments, domainCoverageSummary, domainSystemsCountText } from './domainSummary';
 import { aggregateTileColourFor, supportingSystemIds, tileColourFor, type ColourByMode } from './metrics';
+import { ReorderButtons } from '../components/ReorderButtons/ReorderButtons';
 import type { CapabilityMapTree, L1Column, L2Card } from './layout';
-import { useCapabilityReorder } from './useCapabilityReorder';
 import styles from './CapabilityMapView.module.css';
 
 /** M1 close-out item 2's own marker shape, derived once per row from the caller's raw `{ open, total }` — `undefined` (no marker at all) for a capability with no comment thread. */
@@ -287,49 +287,6 @@ function InspectButton({ name, onClick }: { name: string; onClick: () => void })
 }
 
 /**
- * Sprint U4-1 C1's "drag-to-reorder among siblings" (`useCapabilityReorder`'s
- * own module comment explains why buttons, not a mouse drag). `previous`/
- * `next` are this capability's immediate siblings in display order
- * (`compareCapabilities`) — `undefined` at either end of the list, which
- * disables the matching button rather than wrapping around; that's the
- * only reason a button is ever disabled here. Mounted only when the
- * caller has edit rights (`DomainSection`/`CapabilityRow` render this
- * conditionally on `reorderCapability`, never with `context` missing).
- */
-function ReorderButtons({
-  capability,
-  previous,
-  next,
-  siblings,
-  context,
-}: {
-  capability: ElementsHeadRow;
-  previous: ElementsHeadRow | undefined;
-  next: ElementsHeadRow | undefined;
-  /** S1 item 13: the full sibling group in display order — `useCapabilityReorder`'s own `swap`/`resolveOrders` comment explains why this is what lets a swap succeed even when `capability` or its neighbor has no `order` yet, instead of refusing. */
-  siblings: readonly ElementsHeadRow[];
-  context: CapabilityMapEditContext & { onReordered: () => void };
-}) {
-  const { status, error, swap } = useCapabilityReorder(context);
-
-  return (
-    <span className={styles.reorderButtons}>
-      <button type="button" aria-label={`Move ${capability.name} up`} disabled={previous === undefined || status === 'reordering'} onClick={() => { if (previous) void swap(capability, previous, siblings); }}>
-        ↑
-      </button>
-      <button type="button" aria-label={`Move ${capability.name} down`} disabled={next === undefined || status === 'reordering'} onClick={() => { if (next) void swap(capability, next, siblings); }}>
-        ↓
-      </button>
-      {error !== null && (
-        <Text as="span" size="xs">
-          {error}
-        </Text>
-      )}
-    </span>
-  );
-}
-
-/**
  * One quiet fact-with-text zone — the shared shape every informational
  * indicator in this redesigned view uses (a domain's coverage/colour-by
  * state, a row's own colour-by tone, "no owner"): a small dot or line in
@@ -483,7 +440,7 @@ function DomainSection({
             </Link>
             <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
             {onInspectClick && <InspectButton name={column.capability.name} onClick={() => { onInspectClick(column.capability.element_id); }} />}
-            {reorderCapability && <ReorderButtons capability={column.capability} previous={previousSibling} next={nextSibling} siblings={siblings} context={reorderCapability} />}
+            {reorderCapability && <ReorderButtons elementType="capability" element={column.capability} previous={previousSibling} next={nextSibling} siblings={siblings} context={reorderCapability} />}
           </div>
           <div className={styles.cardGrid} role="list" aria-label={`${column.capability.name} capabilities`}>
             {column.l2.map((card, index) => (
@@ -598,7 +555,7 @@ function CapabilityRow({
           </button>
         )}
         {onInspectClick && <InspectButton name={card.capability.name} onClick={() => { onInspectClick(card.capability.element_id); }} />}
-        {reorderCapability && <ReorderButtons capability={card.capability} previous={previousSibling} next={nextSibling} siblings={siblings} context={reorderCapability} />}
+        {reorderCapability && <ReorderButtons elementType="capability" element={card.capability} previous={previousSibling} next={nextSibling} siblings={siblings} context={reorderCapability} />}
       </div>
       {!nested && expanded && card.l3.length > 0 && (
         <div className={styles.l3List}>

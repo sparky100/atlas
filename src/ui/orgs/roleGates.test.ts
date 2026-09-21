@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
-import { canApproveOrMergeRequest, canArchiveModel, canDeleteModel, canEditBranch, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
+import { canApproveOrMergeRequest, canArchiveModel, canDeleteModel, canEditBranch, canEditValueStreamStructure, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
   return {
@@ -112,6 +112,41 @@ describe('canManageOrgSettings', () => {
     expect(canManageOrgSettings('contributor')).toBe(false);
     expect(canManageOrgSettings('viewer')).toBe(false);
     expect(canManageOrgSettings(null)).toBe(false);
+  });
+});
+
+describe('canEditValueStreamStructure', () => {
+  it('main: owner/architect only, same as canEditOnMain', () => {
+    const main = branch({ kind: 'main' });
+    expect(canEditValueStreamStructure('owner', main)).toBe(true);
+    expect(canEditValueStreamStructure('architect', main)).toBe(true);
+    expect(canEditValueStreamStructure('contributor', main)).toBe(false);
+    expect(canEditValueStreamStructure(null, main)).toBe(false);
+  });
+
+  it('a draft, correct-intent change: owner/architect/contributor, same floor as canEditBranch', () => {
+    const correct = branch({ kind: 'change', status: 'draft', intent: 'correct' });
+    expect(canEditValueStreamStructure('owner', correct)).toBe(true);
+    expect(canEditValueStreamStructure('contributor', correct)).toBe(true);
+    expect(canEditValueStreamStructure('viewer', correct)).toBe(false);
+  });
+
+  it('a draft change with any other intent is refused, even for an owner (ADR-023: structural edits need a correction, not a proposal)', () => {
+    for (const intent of ['propose', 'record', 'explore'] as const) {
+      const change = branch({ kind: 'change', status: 'draft', intent });
+      expect(canEditValueStreamStructure('owner', change)).toBe(false);
+      expect(canEditValueStreamStructure('architect', change)).toBe(false);
+    }
+  });
+
+  it('a correct-intent change under review (not draft) is refused, same as canEditBranch', () => {
+    const underReview = branch({ kind: 'change', status: 'proposed', intent: 'correct' });
+    expect(canEditValueStreamStructure('owner', underReview)).toBe(false);
+  });
+
+  it('a capture_draft branch is never editable this way', () => {
+    const captureDraft = branch({ kind: 'capture_draft', status: 'draft', intent: 'correct' });
+    expect(canEditValueStreamStructure('owner', captureDraft)).toBe(false);
   });
 });
 

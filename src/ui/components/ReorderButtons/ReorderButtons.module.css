@@ -1,0 +1,19 @@
+.reorderButtons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.reorderButtons > button {
+  background: none;
+  border: none;
+  padding: var(--space-1);
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.reorderButtons > button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}

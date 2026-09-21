@@ -139,6 +139,28 @@ export function canManageAttributeDefinitions(role: MemberRole | null): boolean 
   return role === 'owner';
 }
 
+/**
+ * F6 (ADR-023, Decision 1): value streams are the most stable layer of the
+ * model — structural edits (creating/reparenting a stream or stage,
+ * reordering stages, adding/removing an `enables` edge) only ever happen on
+ * `main`, or inside a `correct`-intent change (the "an architect reviewed
+ * this correction" step the single-approver merge already gives `correct`
+ * changes — no new approval machinery). A `propose`/`record`/`explore`
+ * change branch, however editable it otherwise is, gets none of these
+ * affordances — `ValueStreamGateNotice.tsx` is the message that replaces
+ * them. This is UI-only, never engine-enforced (ADR-023: `branches.intent`
+ * is a workflow concept `src/engine` deliberately never reads,
+ * `branchIntent.ts`'s own module comment) — every write this gate hides
+ * still goes through the ordinary `canEditBranch`/RLS checks underneath it.
+ * A stream's own non-structural fields (`description`) aren't gated by
+ * this — only the structural affordances named above are.
+ */
+export function canEditValueStreamStructure(role: MemberRole | null, branch: BranchRow): boolean {
+  if (branch.kind === 'main') return canEditOnMain(role);
+  if (branch.kind === 'change') return branch.intent === 'correct' && canEditBranch(role, branch);
+  return false;
+}
+
 /** F2 PR14: mirrors `capture_jobs_insert`'s RLS floor (`supabase/migrations/20260920010000_capture_jobs_and_candidates.sql`: `atlas.has_role(org_id, 'owner', 'architect', 'contributor')`) — same floor as `canCreateChangeBranch`, named separately since the two checks happen to coincide today but aren't the same rule. */
 export function canRunCapture(role: MemberRole | null): boolean {
   return role === 'owner' || role === 'architect' || role === 'contributor';

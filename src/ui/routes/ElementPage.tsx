@@ -29,6 +29,7 @@ import { RetireAction } from '../components/RetireAction/RetireAction';
 import { StructureSection } from '../components/StructureSection/StructureSection';
 import { Text } from '../components/Text/Text';
 import { ValueStreamDeactivateAction } from '../components/ValueStreamDeactivateAction/ValueStreamDeactivateAction';
+import { ValueStreamGateNotice } from '../components/ValueStreamGateNotice/ValueStreamGateNotice';
 import { ValueStreamImpactSection } from '../components/ValueStreamImpactSection/ValueStreamImpactSection';
 import { ValueStreamStagesSection } from '../components/ValueStreamStagesSection/ValueStreamStagesSection';
 import { useAuth } from '../auth/useAuth';
@@ -41,7 +42,7 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
-import { canCreateChangeBranch, canEditBranch, useMembership } from '../orgs/useMembership';
+import { canCreateChangeBranch, canEditBranch, canEditValueStreamStructure, useMembership } from '../orgs/useMembership';
 import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { refLabelOf, refParamOf, refQueryParam } from '../../db/ref';
@@ -170,6 +171,14 @@ export function ElementPage() {
   // itself reuses `state.data.commitId`, already established below.
   const searchCommitId = mainBranch?.head_commit_id ?? null;
   const canAddRelationship = canEdit && searchCommitId !== null;
+  // F6 (ADR-023): value-stream structure (a stream's Deactivate…/
+  // Reactivate…/"+ Add stage"/stage reorder, and an `enables` edge either
+  // direction) needs `canEditValueStreamStructure`'s own narrower "main or
+  // a correct-intent change" gate, not the plain `canEdit` above — a
+  // capability page can otherwise be fully editable on a `propose` change
+  // while still refusing its own "Enables" group.
+  const canEditValueStream = !viewing && editingBranch !== null && canEditValueStreamStructure(role, editingBranch);
+  const canAddEnablesRelationship = canEditValueStream && searchCommitId !== null;
 
   // Sprint U4-1 A1: any commit made from this page — a relationship, an
   // attribute edit, a capability tailoring action — can move `main`'s head,
@@ -290,12 +299,12 @@ export function ElementPage() {
               onMerge={canEdit && state.data.element.element_type !== 'value_stream' ? () => { setMerging(true); } : undefined}
               onConvertToModule={canEdit && state.data.element.element_type === 'system' && state.data.children.length === 0 ? () => { setConverting(true); } : undefined}
               onDeactivate={
-                canEdit && state.data.element.element_type === 'value_stream' && state.data.element.parent_id === null && attributesRecord(state.data.element.attributes).inactive !== true
+                canEditValueStream && state.data.element.element_type === 'value_stream' && state.data.element.parent_id === null && attributesRecord(state.data.element.attributes).inactive !== true
                   ? () => { setDeactivatePanel('deactivate'); }
                   : undefined
               }
               onReactivate={
-                canEdit && state.data.element.element_type === 'value_stream' && state.data.element.parent_id === null && attributesRecord(state.data.element.attributes).inactive === true
+                canEditValueStream && state.data.element.element_type === 'value_stream' && state.data.element.parent_id === null && attributesRecord(state.data.element.attributes).inactive === true
                   ? () => { setDeactivatePanel('reactivate'); }
                   : undefined
               }
@@ -543,6 +552,35 @@ export function ElementPage() {
                           }
                         : undefined
                     }
+                    enablesAddRelationship={
+                      canAddEnablesRelationship
+                        ? {
+                            modelId: model.id,
+                            orgId: organisation?.id ?? '',
+                            userId,
+                            elementName: state.data.element.name,
+                            searchCommitId,
+                            branch: editingBranch,
+                            expectedHeadCommitId: state.data.commitId,
+                            onCreated: (otherElementId) => {
+                              setJustAddedElementId(otherElementId);
+                              reloadAfterCommit();
+                            },
+                          }
+                        : undefined
+                    }
+                    enablesRemoveRelationship={
+                      canAddEnablesRelationship
+                        ? {
+                            modelId: model.id,
+                            orgId: organisation?.id ?? '',
+                            userId,
+                            branch: editingBranch,
+                            expectedHeadCommitId: state.data.commitId,
+                            onRemoved: reloadAfterCommit,
+                          }
+                        : undefined
+                    }
                   />
                 </CollapsibleSection>
                 <CollapsibleSection title="Structure">
@@ -550,7 +588,35 @@ export function ElementPage() {
                 </CollapsibleSection>
                 {state.data.element.element_type === 'value_stream' && state.data.element.parent_id === null && (
                   <CollapsibleSection title="Stages" meta={`(${String(state.data.children.length)})`}>
-                    <ValueStreamStagesSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} stages={state.data.children} />
+                    <ValueStreamStagesSection
+                      orgSlug={organisation?.slug ?? ''}
+                      modelSlug={model.slug}
+                      stages={state.data.children}
+                      reorderContext={
+                        canEditValueStream
+                          ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: editingBranch, expectedHeadCommitId: state.data.commitId, onReordered: reloadAfterCommit }
+                          : undefined
+                      }
+                    />
+                    {canEditValueStream && searchCommitId ? (
+                      <ElementSearchAdd
+                        elementType="value_stream"
+                        buttonLabel="+ Add stage"
+                        parentId={state.data.element.element_id}
+                        modelId={model.id}
+                        orgId={organisation?.id ?? ''}
+                        userId={userId}
+                        searchCommitId={searchCommitId}
+                        branch={editingBranch}
+                        expectedHeadCommitId={state.data.commitId}
+                        orgSlug={organisation?.slug ?? ''}
+                        modelSlug={model.slug}
+                        refParam={refParamOf(ref)}
+                        onCreated={reloadAfterCommit}
+                      />
+                    ) : (
+                      canEdit && <ValueStreamGateNotice orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+                    )}
                   </CollapsibleSection>
                 )}
                 {isImpactEligible && (
