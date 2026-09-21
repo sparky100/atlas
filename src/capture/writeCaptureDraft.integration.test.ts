@@ -150,7 +150,6 @@ describe('write_capture_draft / discard_capture_job against a real local Supabas
       createdAt: new Date().toISOString(),
     };
 
-    let nextDeltaId = 0;
     const { envelope, draftDeltaIdsBySeq } = buildCaptureDraftEnvelope({
       commitId,
       branchId,
@@ -161,7 +160,11 @@ describe('write_capture_draft / discard_capture_job against a real local Supabas
       effectiveDate: '2026-02-01',
       mainHead,
       candidates: [candidateBase],
-      mintId: () => `delta-${String((nextDeltaId += 1))}-${randomUUID()}`,
+      // write_capture_draft casts each delta's id straight to uuid — this
+      // used to mint a debug-friendly "delta-N-<uuid>" string instead of a
+      // plain uuid, which the RPC rejected outright. Match production
+      // wiring (supabase/functions/capture-run/index.ts's own mintId).
+      mintId: () => randomUUID(),
     });
 
     const finishedCandidate: CaptureCandidate = { ...candidateBase, draftDeltaIds: draftDeltaIdsBySeq.get(0) ?? [] };
