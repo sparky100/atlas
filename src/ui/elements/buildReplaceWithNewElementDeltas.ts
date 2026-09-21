@@ -1,6 +1,7 @@
 import { defaultCreateAttributes } from '../../contracts/attributeSchema';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../contracts/rows';
+import { buildReplacesDelta } from '../../engine/buildReplacesDelta';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import type { BranchRow } from '../../db/types';
 import { attributesRecord } from './attributesRecord';
@@ -43,7 +44,9 @@ export interface ReplaceWithNewElementResult {
  * primary-collision reasoning that hook's own comment gives) **and**,
  * unlike the existing-replacement case, its `uses`/`flows_to` edges too —
  * safe to copy more freely here since a brand-new B has no relationships
- * of its own yet to collide with (an existing replacement might).
+ * of its own yet to collide with (an existing replacement might) — plus
+ * the same `replaces` edge (ADR-001 amendment, `buildReplacesDelta`, B
+ * replaces A) `useElementRetire.ts`'s own "replaced by" picker now writes.
  *
  * Deliberately out of scope, disclosed rather than silently dropped:
  * `owns` edges (an actor's ownership of A) never transfer — a person
@@ -171,6 +174,8 @@ export function buildReplaceWithNewElementDeltas(input: ReplaceWithNewElementInp
       confidence: 1,
     } as Delta);
   }
+
+  deltas.push(buildReplacesDelta(newElementId, element.element_id, sourceId));
 
   return { deltas, newElementId };
 }

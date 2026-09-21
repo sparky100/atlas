@@ -5,6 +5,7 @@ import { validateAttributeValue } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { attributesRecord } from './attributesRecord';
 import { commitToBranch } from '../../db/commits';
+import { buildReplacesDelta } from '../../engine/buildReplacesDelta';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
@@ -52,11 +53,13 @@ export interface UseElementRetireInput {
  * `ContainerAttributes` now carries `lifecycleStatus`/`plannedEnd` too):
  * sets `lifecycleStatus: 'retiring'` and `plannedEnd` via the same
  * `element.update` shape `useElementEditor.ts` already uses (no new engine
- * primitive), plus an optional "replaced by" picker that transfers the
+ * primitive), plus an optional "replaced by" picker that (a) transfers the
  * retiring element's own `supports` edges to the replacement, one
  * capability at a time, in the *same* commit — old edge retracted, new
- * edge created `role: 'secondary'`. This is what actually clears a
- * capability's "lifecycle exposure" colour-by
+ * edge created `role: 'secondary'` — and (b) records the replacement
+ * itself as a first-class fact: a `replaces` edge (ADR-001 amendment,
+ * `buildReplacesDelta`) from the replacement to the retiring element. (a)
+ * is what actually clears a capability's "lifecycle exposure" colour-by
  * (`src/ui/capabilityMap/metrics.ts`'s `lifecycleExposure`): that check
  * reads every *live* `supports` edge into a capability, so leaving the
  * retiring element's own edge in place would keep the capability reading
@@ -170,6 +173,8 @@ export function useElementRetire(input: UseElementRetireInput): UseElementRetire
               confidence: 1,
             });
           }
+
+          deltas.push(buildReplacesDelta(replacement.elementId, element.element_id, source.id));
         }
 
         if (deltas.length === 0) {

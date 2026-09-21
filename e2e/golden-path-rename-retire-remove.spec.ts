@@ -33,6 +33,16 @@ test('rename a system, retire another with a replacement, remove a third from th
   await expect(page.getByText(/Replaced by/)).toBeVisible();
   await expect(page.getByText('retiring', { exact: true }).first()).toBeVisible();
 
+  // ADR-001 amendment: retiring with a replacement also writes a real
+  // `replaces` edge (from the replacement to the retiring element) — still
+  // on "Legacy Billing System"'s own page here, so this is its "replaced by"
+  // side; following the row's own link over to "New Billing Platform"
+  // confirms the outbound "replaces" side too.
+  await expect(page.getByRole('heading', { name: 'replaced by (1)' })).toBeVisible();
+  await page.getByRole('link', { name: 'New Billing Platform' }).click();
+  await expect(page.getByRole('heading', { name: 'replaces (1)' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Legacy Billing System' })).toBeVisible();
+
   // 3. Remove from the model.
   await goToModelHome(page);
   await addSystemFromHome(page, { name: 'Throwaway System', description: 'The system to be removed.' });

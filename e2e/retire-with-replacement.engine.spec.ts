@@ -73,8 +73,12 @@ test('retiring a system with a replacement transfers its supports edges and clea
   // 3. The replacement now supports Billing (a real relationship link, not
   // just its own name happening to contain the word); the capability's own
   // exposure has cleared — the replacement has no plannedEnd of its own.
+  // ADR-001 amendment: it also carries a real `replaces` edge back to the
+  // retiring system, not just the transferred supports edge.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${replacementId}?ref=main`);
   await expect(page.getByRole('link', { name: 'Billing', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'replaces (1)' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Legacy Billing System' })).toBeVisible();
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await page.getByLabel('Colour by').selectOption('metric:lifecycleExposure');
