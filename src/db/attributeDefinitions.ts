@@ -78,19 +78,19 @@ export async function createAttributeDefinition(supabase: Client, input: CreateA
 export async function setAttributeDefinitionOrder(supabase: Client, id: UUID, orderIndex: number): Promise<void> {
   const { data, error } = await supabase.from('attribute_definitions').update({ order_index: orderIndex }).eq('id', id).select('id');
   if (error) throw new Error(`setAttributeDefinitionOrder: ${error.message}`);
-  if (!data || data.length === 0) throw new Error('setAttributeDefinitionOrder: not permitted or definition not found');
+  if (data.length === 0) throw new Error('setAttributeDefinitionOrder: not permitted or definition not found');
 }
 
 /** Soft-disable, mirroring `archiveModel`: hides the definition from future "add a value" pickers; a value already set on an element keeps rendering unchanged. */
 export async function deprecateAttributeDefinition(supabase: Client, id: UUID): Promise<void> {
   const { data, error } = await supabase.from('attribute_definitions').update({ deprecated_at: new Date().toISOString() }).eq('id', id).select('id');
   if (error) throw new Error(`deprecateAttributeDefinition: ${error.message}`);
-  if (!data || data.length === 0) throw new Error('deprecateAttributeDefinition: not permitted or definition not found');
+  if (data.length === 0) throw new Error('deprecateAttributeDefinition: not permitted or definition not found');
 }
 
 /** The reverse of deprecate — same plain column write, mirroring `restoreModel`. Same empty-result check as its sibling above; not separately reported as failing, but the same RLS silent-no-op risk applies. */
 export async function restoreAttributeDefinition(supabase: Client, id: UUID): Promise<void> {
   const { data, error } = await supabase.from('attribute_definitions').update({ deprecated_at: null }).eq('id', id).select('id');
   if (error) throw new Error(`restoreAttributeDefinition: ${error.message}`);
-  if (!data || data.length === 0) throw new Error('restoreAttributeDefinition: not permitted or definition not found');
+  if (data.length === 0) throw new Error('restoreAttributeDefinition: not permitted or definition not found');
 }
