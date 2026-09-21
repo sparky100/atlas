@@ -69,12 +69,16 @@ export function deriveRoadmapChangeEvents(ownDeltas: readonly Delta[], asIsHead:
   const supportsCreatedTo = new Map<UUID, UUID>();
 
   for (const delta of ownDeltas) {
-    if (delta.kind === 'element.create' && delta.elementType === 'system') {
+    // `system` or `container` (a platform module — "platforms and modules"
+    // can carry `lifecycleStatus`/`plannedEnd` same as a system, per
+    // `roadmapLifecycleRows.ts`'s own module comment) — a module being
+    // added or retired is exactly as roadmap-meaningful as a system.
+    if (delta.kind === 'element.create' && (delta.elementType === 'system' || delta.elementType === 'container')) {
       events.push({ kind: 'add', elementId: delta.elementId, elementName: delta.name });
       continue;
     }
 
-    if (delta.kind === 'element.update' && delta.elementType === 'system' && delta.attribute === 'lifecycleStatus' && delta.value === 'retiring') {
+    if (delta.kind === 'element.update' && (delta.elementType === 'system' || delta.elementType === 'container') && delta.attribute === 'lifecycleStatus' && delta.value === 'retiring') {
       events.push({ kind: 'retire', elementId: delta.elementId, elementName: elementNameOf(toBeHead, asIsHead, delta.elementId) });
       continue;
     }

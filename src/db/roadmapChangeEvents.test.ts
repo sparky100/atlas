@@ -7,8 +7,16 @@ function elementCreate(id: string, elementId: string, name: string): Delta {
   return { kind: 'element.create', id, elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: 'src', confidence: 1 };
 }
 
+function containerCreate(id: string, elementId: string, name: string, parentId: string): Delta {
+  return { kind: 'element.create', id, elementId, elementType: 'container', name, parentId, attributes: { isExternal: false }, sourceId: 'src', confidence: 1 };
+}
+
 function retireUpdate(id: string, elementId: string, previousDeltaId: string): Delta {
   return { kind: 'element.update', id, elementId, elementType: 'system', attribute: 'lifecycleStatus', value: 'retiring', previousDeltaId, sourceId: 'src', confidence: 1 };
+}
+
+function containerRetireUpdate(id: string, elementId: string, previousDeltaId: string): Delta {
+  return { kind: 'element.update', id, elementId, elementType: 'container', attribute: 'lifecycleStatus', value: 'retiring', previousDeltaId, sourceId: 'src', confidence: 1 };
 }
 
 function otherUpdate(id: string, elementId: string, previousDeltaId: string): Delta {
@@ -25,6 +33,10 @@ function relationshipCreate(id: string, relationshipId: string, fromElementId: s
 
 function system(name: string): ElementRow {
   return { elementType: 'system', name, parentId: null, attributes: {}, existsDeltaId: `create-${name}` };
+}
+
+function container(name: string, parentId: string | null = null): ElementRow {
+  return { elementType: 'container', name, parentId, attributes: {}, existsDeltaId: `create-${name}` };
 }
 
 function capability(name: string): ElementRow {
@@ -55,6 +67,29 @@ describe('deriveRoadmapChangeEvents', () => {
     const events = deriveRoadmapChangeEvents([retireUpdate('d1', 'sys-1', 'create-1'), otherUpdate('d2', 'sys-1', 'd1')], asIs, toBe);
 
     expect(events).toEqual([{ kind: 'retire', elementId: 'sys-1', elementName: 'Legacy System' }]);
+  });
+
+  it('marks a new module (Container) as an add event — "platforms and modules" carry the same lifecycle facts a system does', () => {
+    const asIs = emptyHead();
+    asIs.elements.set('sap', system('SAP'));
+    const toBe = emptyHead();
+    toBe.elements.set('sap', system('SAP'));
+    toBe.elements.set('mod-new', container('New Module', 'sap'));
+
+    const events = deriveRoadmapChangeEvents([containerCreate('d1', 'mod-new', 'New Module', 'sap')], asIs, toBe);
+
+    expect(events).toEqual([{ kind: 'add', elementId: 'mod-new', elementName: 'New Module' }]);
+  });
+
+  it('marks a module\'s lifecycleStatus update to "retiring" as a retire event, same as a system\'s', () => {
+    const asIs = emptyHead();
+    asIs.elements.set('bw', container('BW', 'sap'));
+    const toBe = emptyHead();
+    toBe.elements.set('bw', container('BW', 'sap'));
+
+    const events = deriveRoadmapChangeEvents([containerRetireUpdate('d1', 'bw', 'create-1')], asIs, toBe);
+
+    expect(events).toEqual([{ kind: 'retire', elementId: 'bw', elementName: 'BW' }]);
   });
 
   it('does not mark a bare update on an unrelated attribute as a retire', () => {
@@ -104,6 +139,33 @@ describe('deriveRoadmapChangeEvents', () => {
     const events = deriveRoadmapChangeEvents([relationshipRetract('d1', 'rel-old', 'create-rel-old')], asIs, toBe);
 
     expect(events).toEqual([]);
+  });
+
+  it('pairs a module (Container) being replaced by a system into the same capability as a replacement arrow', () => {
+    const asIs = emptyHead();
+    asIs.elements.set('bw', container('BW', 'sap'));
+    asIs.elements.set('cap-1', capability('Reporting'));
+    asIs.relationships.set('rel-old', supports('bw', 'cap-1'));
+
+    const toBe = emptyHead();
+    toBe.elements.set('datasphere', system('Datasphere'));
+    toBe.elements.set('cap-1', capability('Reporting'));
+    toBe.relationships.set('rel-new', supports('datasphere', 'cap-1'));
+
+    const deltas = [relationshipRetract('d1', 'rel-old', 'create-rel-old'), relationshipCreate('d2', 'rel-new', 'datasphere', 'cap-1')];
+    const events = deriveRoadmapChangeEvents(deltas, asIs, toBe);
+
+    expect(events).toEqual([
+      {
+        kind: 'replace',
+        capabilityId: 'cap-1',
+        capabilityName: 'Reporting',
+        fromSystemId: 'bw',
+        fromSystemName: 'BW',
+        toSystemId: 'datasphere',
+        toSystemName: 'Datasphere',
+      },
+    ]);
   });
 
   it('does not synthesize a replacement when a supports edge is only created, with no prior retract for the same capability', () => {
