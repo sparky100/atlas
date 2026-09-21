@@ -28,6 +28,7 @@ import {
   type SystemKind,
   type UsesAttributes,
   type UUID,
+  type ValueStreamAttributes,
   factKeyOf,
   subjectOf,
 } from './delta';
@@ -84,6 +85,11 @@ const actorAttributes: fc.Arbitrary<ActorAttributes> = fc.record(
   { subtype: fc.constantFrom('person' as const, 'team' as const, 'organisation' as const), description: fc.string(), email: fc.string(), orgUnit: fc.string(), isExternal: fc.boolean(), externalOrganisation: fc.string(), memberId: uuid },
   { requiredKeys: ['subtype', 'isExternal'] },
 );
+// F6 (ADR-023): every key optional — a stream and a stage share this shape.
+const valueStreamAttributes: fc.Arbitrary<ValueStreamAttributes> = fc.record(
+  { description: fc.string(), templateRef: uuid, order: fc.integer({ min: 0, max: 1000 }), inactive: fc.boolean(), inactiveSince: isoDate, inactiveReason: fc.string() },
+  { requiredKeys: [] },
+);
 
 const supportsAttributes: fc.Arbitrary<SupportsAttributes> = fc.record(
   {
@@ -118,6 +124,11 @@ const elementCreateArb: fc.Arbitrary<Delta> = fc.oneof(
   fc.tuple(provenanceBase, uuid, fc.string({ minLength: 1, maxLength: 40 }), fc.option(uuid, { nil: null }), actorAttributes).map(
     ([base, elementId, name, parentId, attributes]) =>
       ({ ...base, kind: 'element.create', elementId, elementType: 'actor', name, parentId, attributes }) satisfies Delta,
+  ),
+  // F6: `parentId` null for a stream, set for a stage — both wire shapes round-trip.
+  fc.tuple(provenanceBase, uuid, fc.string({ minLength: 1, maxLength: 40 }), fc.option(uuid, { nil: null }), valueStreamAttributes).map(
+    ([base, elementId, name, parentId, attributes]) =>
+      ({ ...base, kind: 'element.create', elementId, elementType: 'value_stream', name, parentId, attributes }) satisfies Delta,
   ),
 );
 
@@ -188,6 +199,12 @@ const relationshipCreateArb: fc.Arbitrary<Delta> = fc.oneof(
   fc.tuple(provenanceBase, uuid, uuid, uuid, flowsToAttributes).map(
     ([base, relationshipId, fromElementId, toElementId, attributes]) =>
       ({ ...base, kind: 'relationship.create', relationshipId, relationshipType: 'flows_to', fromElementId, toElementId, attributes }) satisfies Delta,
+  ),
+  // F6 (ADR-023): `enables` has no attributes at all — always `{}` — and
+  // therefore no `relationship.update` arm below (there is no key to update).
+  fc.tuple(provenanceBase, uuid, uuid, uuid).map(
+    ([base, relationshipId, fromElementId, toElementId]) =>
+      ({ ...base, kind: 'relationship.create', relationshipId, relationshipType: 'enables', fromElementId, toElementId, attributes: {} }) satisfies Delta,
   ),
 );
 

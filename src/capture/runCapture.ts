@@ -302,6 +302,11 @@ const REQUIRED_ATTRIBUTES_BY_TYPE: Readonly<Record<ElementType, readonly string[
   container: ['isExternal'],
   actor: ['subtype', 'isExternal'],
   capability: [],
+  // F6 (ADR-023): capture never proposes a value stream or stage — the
+  // layer is edited on main or in a correction only, and PROMPT_B_ELEMENT_TYPES
+  // (prompts/b.ts) deliberately still lists four types. Present because
+  // this Record is exhaustive over ElementType, inert in practice.
+  value_stream: [],
 };
 
 function attributeComparisons(attributes: Readonly<Record<string, unknown>>, attributeConfidence: Readonly<Record<string, number>>, subjectId: UUID | undefined, mainHead: Head, sourceCapturedAt: string | null): Map<string, AttributeComparisonInput> {
@@ -424,6 +429,9 @@ const ENDPOINT_TYPES_BY_RELATIONSHIP: Readonly<Record<RelationshipType, readonly
   // ADR-001 amendment ("replaces") — legal endpoint types match
   // RELATIONSHIP_TYPE_RULES' own system/container-to-system/container triples.
   replaces: ['system', 'container'],
+  // F6 (ADR-023): never proposed by capture (see REQUIRED_ATTRIBUTES_BY_TYPE's
+  // own value_stream note) — listed because this Record is exhaustive.
+  enables: ['capability', 'value_stream'],
 };
 
 interface ResolvedEndpoint {

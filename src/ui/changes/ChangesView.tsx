@@ -367,6 +367,24 @@ function ChangeRow({
             ))}
           </ul>
         )}
+        {/* F6/ADR-023: same compact glyph+name+link shape as the capabilities
+            list above, stream-only — this card list has no room for the
+            fuller stage/capability breakdown `ChangeView.tsx`'s own panel
+            gives. */}
+        {summary && summary.affectedValueStreams.length > 0 && (
+          <ul className={styles.affectedCapabilities}>
+            {summary.affectedValueStreams.map(({ stream }) => (
+              <li key={stream.element_id}>
+                <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${stream.element_id}`} className={styles.affectedCapabilityLink}>
+                  <ElementTypeGlyph type="value_stream" />
+                  <Text as="span" size="sm">
+                    {stream.name}
+                  </Text>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`} variant="secondary">
         Open →

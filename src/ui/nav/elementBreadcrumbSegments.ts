@@ -36,5 +36,16 @@ export function elementBreadcrumbSegments(element: ElementsHeadRow, parent: Elem
     }
     case 'actor':
       return [];
+    case 'value_stream': {
+      // F6 (ADR-023): the layer's own view is the Value streams page (Step 4
+      // of the F6 sprint builds the route; the href is fixed here so this
+      // file isn't touched twice). A stage adds its stream as one more
+      // segment, the same "parent contributes a segment" shape a container
+      // uses for its platform — pointing at the stream's own element page,
+      // where its stages are listed.
+      const segments: BreadcrumbSegment[] = [{ label: 'Value streams', href: `${base}/value-streams${query}` }];
+      if (parent) segments.push({ label: parent.name, href: `${base}/e/${parent.element_id}${query}` });
+      return segments;
+    }
   }
 }

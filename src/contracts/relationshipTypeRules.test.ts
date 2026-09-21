@@ -75,4 +75,19 @@ describe('RELATIONSHIP_TYPE_RULES', () => {
     expect(findRelationshipTypeRule('replaces', 'actor', 'system')).toBeUndefined();
     expect(findRelationshipTypeRule('replaces', 'system', 'actor')).toBeUndefined();
   });
+
+  it('F6 (ADR-023): a capability enables a value stream (stage — the finer rule is C22, not this table), with no cardinality cap either way', () => {
+    expect(findRelationshipTypeRule('enables', 'capability', 'value_stream')).toBeDefined();
+    expect(findRelationshipTypeRule('enables', 'capability', 'value_stream')).toMatchObject({ maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null });
+  });
+
+  it('F6 (ADR-023): enables is the only relationship a value stream takes part in, and only a capability can be its source', () => {
+    expect(findRelationshipTypeRule('enables', 'system', 'value_stream')).toBeUndefined();
+    expect(findRelationshipTypeRule('enables', 'capability', 'capability')).toBeUndefined();
+    expect(findRelationshipTypeRule('enables', 'value_stream', 'capability')).toBeUndefined();
+    expect(findRelationshipTypeRule('supports', 'system', 'value_stream')).toBeUndefined();
+    expect(findRelationshipTypeRule('owns', 'actor', 'value_stream')).toBeUndefined();
+    expect(findRelationshipTypeRule('uses', 'value_stream', 'system')).toBeUndefined();
+    expect(findRelationshipTypeRule('flows_to', 'system', 'value_stream')).toBeUndefined();
+  });
 });

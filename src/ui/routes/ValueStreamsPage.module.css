@@ -1,0 +1,19 @@
+.main {
+  padding: var(--space-8);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* The stream list plus the shared Inspector, side by side — same
+   flex-row/first-child-grows shape `CapabilityMapPage.module.css`'s own
+   `.mapRow` already uses for the identical pairing. */
+.row {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.row > *:first-child {
+  flex: 1;
+  min-width: 0;
+}

@@ -89,6 +89,17 @@ export function prefillFromCapabilityNoSupportersFinding(capability: { id: UUID;
   };
 }
 
+/** F6's own "tap a weak stage" entry point (the Value streams page's inspector, and the element page for a stage) — same shape and reasoning as `prefillFromWeakCapability` above, `toneLabel` being the same word the stage tile's own tone-as-text already shows. */
+export function prefillFromWeakStage(stage: { id: UUID; name: string }, toneLabel: string): DecisionPrefill {
+  return {
+    title: `What improves ${stage.name}?`,
+    statement: `${stage.name} shows ${toneLabel} — a decision is needed on how to strengthen the capabilities that enable it.`,
+    sourceFindingKey: 'weak-stage',
+    linkedElementId: stage.id,
+    linkedElementName: stage.name,
+  };
+}
+
 /** Appended to a `/decisions` href — `URLSearchParams` handles the encoding, so callers never need to. */
 export function decisionPrefillToSearchParams(prefill: DecisionPrefill): URLSearchParams {
   const params = new URLSearchParams();

@@ -16,6 +16,7 @@ import { branchStatusTone } from '../changes/branchStatus';
 import { profileLabel } from '../comments/profileLabel';
 import { canChooseDecisionOption, canCreateChangeBranch } from '../orgs/useMembership';
 import { useMembers } from '../orgs/useMembers';
+import type { ValueStreamTone } from '../valueStreams/valueStreamRollup';
 import { decisionStatusTone } from './decisionStatus';
 import { exportDecisionAsAdrMarkdown } from './exportDecisionAsAdr';
 import type { DecisionPageState } from './useDecision';
@@ -263,39 +264,59 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           </div>
         )}
 
-        {comparison.status === 'ready' && concernedCapabilityIds.length > 0 && (
-          <div className={styles.tableWrap}>
-            <table className={styles.comparisonTable}>
-              <thead>
-                <tr>
-                  <th>Capability</th>
-                  <th>{comparison.main.label}</th>
-                  {comparison.options.map((o) => (
-                    <th key={o.branchId}>{o.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {concernedCapabilityIds.map((capabilityId) => (
-                  <tr key={capabilityId}>
-                    <td>{linkedElementsById.get(capabilityId)?.name ?? capabilityId}</td>
-                    <td>{formatCapabilityMetrics(comparison.main.metricsByCapabilityId.get(capabilityId))}</td>
+        {comparison.status === 'ready' && concernedCapabilityIds.length > 0 && (() => {
+          // F6/ADR-023: every stream reached at *any* row (main or an
+          // option) — a stream absent from one option's own `affectedValueStreams`
+          // genuinely means "not reached there" (`—`), not a value to hide
+          // the whole row over, since a different option reaching it is
+          // exactly the comparison this table exists to show.
+          const allValueStreamRows = [...comparison.main.affectedValueStreams, ...comparison.options.flatMap((o) => o.affectedValueStreams)];
+          const streamNameById = new Map(allValueStreamRows.map((r) => [r.stream.element_id, r.stream.name]));
+          const streamIds = [...streamNameById.keys()].sort((a, b) => (streamNameById.get(a) ?? '').localeCompare(streamNameById.get(b) ?? ''));
+
+          return (
+            <div className={styles.tableWrap}>
+              <table className={styles.comparisonTable}>
+                <thead>
+                  <tr>
+                    <th>Capability</th>
+                    <th>{comparison.main.label}</th>
                     {comparison.options.map((o) => (
-                      <td key={o.branchId}>{formatCapabilityMetrics(o.metricsByCapabilityId.get(capabilityId))}</td>
+                      <th key={o.branchId}>{o.label}</th>
                     ))}
                   </tr>
-                ))}
-                <tr>
-                  <td>Boundary crossings (model-wide)</td>
-                  <td>{comparison.main.boundaryCrossingCount}</td>
-                  {comparison.options.map((o) => (
-                    <td key={o.branchId}>{o.boundaryCrossingCount}</td>
+                </thead>
+                <tbody>
+                  {concernedCapabilityIds.map((capabilityId) => (
+                    <tr key={capabilityId}>
+                      <td>{linkedElementsById.get(capabilityId)?.name ?? capabilityId}</td>
+                      <td>{formatCapabilityMetrics(comparison.main.metricsByCapabilityId.get(capabilityId))}</td>
+                      {comparison.options.map((o) => (
+                        <td key={o.branchId}>{formatCapabilityMetrics(o.metricsByCapabilityId.get(capabilityId))}</td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
+                  <tr>
+                    <td>Boundary crossings (model-wide)</td>
+                    <td>{comparison.main.boundaryCrossingCount}</td>
+                    {comparison.options.map((o) => (
+                      <td key={o.branchId}>{o.boundaryCrossingCount}</td>
+                    ))}
+                  </tr>
+                  {streamIds.map((streamId) => (
+                    <tr key={streamId}>
+                      <td>Affected value stream: {streamNameById.get(streamId)}</td>
+                      <td>{formatValueStreamTone(comparison.main.affectedValueStreams.find((r) => r.stream.element_id === streamId)?.tone)}</td>
+                      {comparison.options.map((o) => (
+                        <td key={o.branchId}>{formatValueStreamTone(o.affectedValueStreams.find((r) => r.stream.element_id === streamId)?.tone)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
         {comparison.status === 'loading' && (
           <Text as="p" tone="muted" size="sm">
             Comparing…
@@ -396,4 +417,16 @@ function formatCapabilityMetrics(metrics: { coverage: number; oldestLifecycleSta
   if (metrics.oldestLifecycleStage) parts.push(metrics.oldestLifecycleStage);
   if (metrics.criticality) parts.push(metrics.criticality);
   return parts.join(' · ');
+}
+
+/** F6/ADR-023: this cell's own tone word, plain text (never colour-only, §8.7) — same labels `ValueStreamsView.tsx`/`ValueStreamInspectorContent.tsx` already use for the identical tone. `—` for an option that doesn't reach this stream at all (`ValueStreamComparisonRow`'s own doc comment: absence is real, not a blank to hide). */
+const VALUE_STREAM_TONE_LABEL: Record<ValueStreamTone, string> = {
+  ok: 'no known exposure',
+  warn: 'lifecycle exposure',
+  info: 'replacement planned',
+  neutral: 'nothing recorded',
+};
+
+function formatValueStreamTone(tone: ValueStreamTone | undefined): string {
+  return tone === undefined ? '—' : VALUE_STREAM_TONE_LABEL[tone];
 }

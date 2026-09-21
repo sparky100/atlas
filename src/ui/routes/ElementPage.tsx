@@ -28,6 +28,9 @@ import { RemoveFromModelAction } from '../components/RemoveFromModelAction/Remov
 import { RetireAction } from '../components/RetireAction/RetireAction';
 import { StructureSection } from '../components/StructureSection/StructureSection';
 import { Text } from '../components/Text/Text';
+import { ValueStreamDeactivateAction } from '../components/ValueStreamDeactivateAction/ValueStreamDeactivateAction';
+import { ValueStreamImpactSection } from '../components/ValueStreamImpactSection/ValueStreamImpactSection';
+import { ValueStreamStagesSection } from '../components/ValueStreamStagesSection/ValueStreamStagesSection';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
@@ -48,8 +51,10 @@ import { useElementPage } from '../elements/useElementPage';
 import { useElementEditor, type DraftValue } from '../elements/useElementEditor';
 import { useElementRename } from '../elements/useElementRename';
 import { ActorMemberPicker } from '../elements/ActorMemberPicker';
+import { attributesRecord } from '../elements/attributesRecord';
 import { isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { useRouteTiming } from '../perf/useRouteTiming';
+import { useValueStreamImpact } from '../valueStreams/useValueStreamImpact';
 import styles from './ElementPage.module.css';
 
 /**
@@ -120,6 +125,10 @@ export function ElementPage() {
   const [merging, setMerging] = useState(false);
   // "Convert to a module of…" — same inline-panel convention as `merging` above.
   const [converting, setConverting] = useState(false);
+  // ADR-023/F6's "Deactivate…"/"Reactivate…" — same inline-panel
+  // convention, one panel covering both directions (`ValueStreamDeactivateAction`'s
+  // own `mode` prop) rather than two separate booleans.
+  const [deactivatePanel, setDeactivatePanel] = useState<'deactivate' | 'reactivate' | null>(null);
   const navigate = useNavigate();
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
@@ -182,6 +191,18 @@ export function ElementPage() {
   // under that key (`customFieldsForDisplay` below) — "a value already set
   // keeps rendering... unchanged."
   const elementType = data?.element.element_type;
+  // ADR-023/F6's "Impact" section (system/container/capability pages): a
+  // capability page's own id, alone; a system/container page's own
+  // `supports` edges, already loaded here (`data.relationships`/
+  // `data.relationshipEndpoints`) — `useValueStreamImpact.ts` only fetches
+  // the `enables`/`value_stream` half of the hop this doesn't already have.
+  const isImpactEligible = elementType === 'system' || elementType === 'container' || elementType === 'capability';
+  const impactCapabilityIds: UUID[] =
+    elementType === 'capability' && data
+      ? [data.element.element_id]
+      : (data?.relationships.filter((r) => r.relationship_type === 'supports' && r.from_element_id === data.element.element_id).map((r) => r.to_element_id) ?? []);
+  const impactCapabilitiesById: ReadonlyMap<UUID, ElementsHeadRow> = elementType === 'capability' && data ? new Map([[data.element.element_id, data.element]]) : (data?.relationshipEndpoints ?? new Map());
+  const valueStreamImpact = useValueStreamImpact(model?.id ?? null, ref, mainBranch?.head_commit_id ?? null, isImpactEligible, impactCapabilityIds, impactCapabilitiesById);
   const applicableDefinitions = elementType ? attributeDefinitions.filter((d) => d.applies_to.includes(elementType)) : [];
   const customFieldsForEditing: AttributeFieldSchema[] = applicableDefinitions.filter((d) => d.deprecated_at === null).map(attributeDefinitionToFieldSchema);
   const customFieldsForDisplay: AttributeFieldSchema[] = applicableDefinitions
@@ -265,9 +286,19 @@ export function ElementPage() {
               readOnlyReason={underReview ? 'Read-only: under review' : undefined}
               rename={canEdit ? rename : undefined}
               onRetire={canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') ? () => { setRetiring(true); } : undefined}
-              onRemoveFromModel={canEdit && state.data.children.length === 0 ? () => { setRemovingFromModel(true); } : undefined}
-              onMerge={canEdit ? () => { setMerging(true); } : undefined}
+              onRemoveFromModel={canEdit && state.data.element.element_type !== 'value_stream' && state.data.children.length === 0 ? () => { setRemovingFromModel(true); } : undefined}
+              onMerge={canEdit && state.data.element.element_type !== 'value_stream' ? () => { setMerging(true); } : undefined}
               onConvertToModule={canEdit && state.data.element.element_type === 'system' && state.data.children.length === 0 ? () => { setConverting(true); } : undefined}
+              onDeactivate={
+                canEdit && state.data.element.element_type === 'value_stream' && state.data.element.parent_id === null && attributesRecord(state.data.element.attributes).inactive !== true
+                  ? () => { setDeactivatePanel('deactivate'); }
+                  : undefined
+              }
+              onReactivate={
+                canEdit && state.data.element.element_type === 'value_stream' && state.data.element.parent_id === null && attributesRecord(state.data.element.attributes).inactive === true
+                  ? () => { setDeactivatePanel('reactivate'); }
+                  : undefined
+              }
               contextHref={
                 state.data.element.element_type === 'system' || state.data.element.element_type === 'container'
                   ? `/o/${orgSlug ?? ''}/m/${model.slug}/context/${state.data.element.element_id}?${refQueryParam(ref, viewing)}`
@@ -362,6 +393,23 @@ export function ElementPage() {
                   void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/e/${newContainerId}?${refQueryParam(ref, viewing)}`);
                 }}
                 onCancel={() => { setConverting(false); }}
+              />
+            )}
+            {deactivatePanel && state.data.element.element_type === 'value_stream' && (
+              <ValueStreamDeactivateAction
+                modelId={model.id}
+                orgId={organisation?.id ?? ''}
+                userId={userId}
+                element={state.data.element}
+                facts={state.data.facts}
+                branch={editingBranch ?? PLACEHOLDER_BRANCH}
+                expectedHeadCommitId={state.data.commitId}
+                mode={deactivatePanel}
+                onChanged={() => {
+                  setDeactivatePanel(null);
+                  reloadAfterCommit();
+                }}
+                onCancel={() => { setDeactivatePanel(null); }}
               />
             )}
             {proposingChange && (
@@ -500,6 +548,21 @@ export function ElementPage() {
                 <CollapsibleSection title="Structure">
                   <StructureSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} parent={state.data.parent} capabilityLevel={state.data.capabilityLevel} children={state.data.children} />
                 </CollapsibleSection>
+                {state.data.element.element_type === 'value_stream' && state.data.element.parent_id === null && (
+                  <CollapsibleSection title="Stages" meta={`(${String(state.data.children.length)})`}>
+                    <ValueStreamStagesSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} stages={state.data.children} />
+                  </CollapsibleSection>
+                )}
+                {isImpactEligible && (
+                  <CollapsibleSection title="Impact" meta={valueStreamImpact.status === 'ready' ? `(${String(valueStreamImpact.affected.length)})` : undefined}>
+                    {valueStreamImpact.status === 'loading' && (
+                      <Text as="p" tone="muted" size="sm">
+                        Loading…
+                      </Text>
+                    )}
+                    {valueStreamImpact.status === 'ready' && <ValueStreamImpactSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} affected={valueStreamImpact.affected} />}
+                  </CollapsibleSection>
+                )}
                 {state.data.element.element_type === 'system' && isIntegrationPlatform(state.data.element) && (
                   <CollapsibleSection title="Flows via this platform" meta={`(${String(state.data.flowsViaThisPlatform.length)})`}>
                     <PlatformFlowsSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} flows={state.data.flowsViaThisPlatform} endpoints={state.data.flowsViaThisPlatformEndpoints} />

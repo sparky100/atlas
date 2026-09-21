@@ -11,11 +11,12 @@
  */
 import type { Delta, ElementType, RelationshipType, UUID } from '../contracts/delta';
 import { subjectOf } from '../contracts/delta';
-import type { ElementsHeadRow } from '../contracts/rows';
+import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
 import { listOwnDeltas, type BranchFork } from '../engine/branch';
 import { describeEnvelope, type NameLookup } from '../engine/describeEnvelope';
-import type { ElementRow, Head } from '../engine/deltas';
+import type { ElementRow, Head, RelationshipRow } from '../engine/deltas';
 import { foldFromGenesis } from '../engine/head';
+import { type AffectedValueStream, valueStreamsReachedFrom } from '../ui/valueStreams/impactTraversal';
 import { buildCommitLoader } from './commitLoader';
 import type { Client } from './client';
 import { getSourcesByIds, listInFlightBranchesTouchingSubjects } from './elements';
@@ -43,12 +44,18 @@ export interface ChangeSummary {
   /** Empty when the branch has made no commits of its own yet (freshly created, still equal to main). */
   subjects: ChangeSubjectSummary[];
   affectedCapabilities: AffectedCapability[];
+  /** F6 (ADR-023): the impact hop's own one more step — every value-stream stage/stream a touched capability (direct or via a touched system's `supports` edge) enables. */
+  affectedValueStreams: AffectedValueStream[];
   otherOpenChanges: BranchRow[];
   sourcesById: Map<UUID, SourceRow>;
 }
 
 function elementRow(elementId: UUID, row: ElementRow): ElementsHeadRow {
   return { element_id: elementId, element_type: row.elementType, name: row.name, parent_id: row.parentId, attributes: row.attributes, exists_delta_id: row.existsDeltaId };
+}
+
+function relationshipRow(relationshipId: UUID, row: RelationshipRow): RelationshipsHeadRow {
+  return { relationship_id: relationshipId, relationship_type: row.relationshipType, from_element_id: row.fromElementId, to_element_id: row.toElementId, attributes: row.attributes, exists_delta_id: row.existsDeltaId };
 }
 
 function elementName(head: Head, fallbackHead: Head, elementId: UUID): string {
@@ -64,6 +71,7 @@ function subjectTypeOf(delta: Delta): ChangeSubject {
 export interface ChangeSummaryCore {
   subjects: ChangeSubjectSummary[];
   affectedCapabilities: AffectedCapability[];
+  affectedValueStreams: AffectedValueStream[];
 }
 
 /**
@@ -125,7 +133,24 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
   }
   affectedCapabilities.sort((a, b) => a.capability.name.localeCompare(b.capability.name));
 
-  return { subjects, affectedCapabilities };
+  // F6 (ADR-023): the one more hop, over the to-be head — an affected
+  // capability (direct or via-system, above) reaching a stage it enables,
+  // grouped by the stage's own stream. `elementsById`/`enablesEdges` are
+  // built from the same `toBeHead` this function already reads throughout,
+  // not a second fetch.
+  const elementsById = new Map<UUID, ElementsHeadRow>();
+  for (const [id, row] of toBeHead.elements) elementsById.set(id, elementRow(id, row));
+  const enablesEdges: RelationshipsHeadRow[] = [];
+  for (const [id, row] of toBeHead.relationships) {
+    if (row.relationshipType === 'enables') enablesEdges.push(relationshipRow(id, row));
+  }
+  const affectedValueStreams = valueStreamsReachedFrom(
+    affectedCapabilities.map((ac) => ac.capability.element_id),
+    elementsById,
+    enablesEdges,
+  );
+
+  return { subjects, affectedCapabilities, affectedValueStreams };
 }
 
 export async function loadChangeSummary(supabase: Client, modelId: UUID, branch: BranchRow): Promise<ChangeSummary | null> {
@@ -136,12 +161,12 @@ export async function loadChangeSummary(supabase: Client, modelId: UUID, branch:
   const ownDeltas = listOwnDeltas(fork, loader);
 
   if (ownDeltas.length === 0) {
-    return { subjects: [], affectedCapabilities: [], otherOpenChanges: [], sourcesById: new Map() };
+    return { subjects: [], affectedCapabilities: [], affectedValueStreams: [], otherOpenChanges: [], sourcesById: new Map() };
   }
 
   const toBeHead = foldFromGenesis(branch.head_commit_id, loader);
   const asIsHead = foldFromGenesis(branch.base_commit_id, loader);
-  const { subjects, affectedCapabilities } = summarizeOwnDeltas(ownDeltas, asIsHead, toBeHead);
+  const { subjects, affectedCapabilities, affectedValueStreams } = summarizeOwnDeltas(ownDeltas, asIsHead, toBeHead);
 
   const subjectIds = subjects.map((s) => s.subjectId);
   const [otherOpenChanges, sourcesById] = await Promise.all([
@@ -149,7 +174,7 @@ export async function loadChangeSummary(supabase: Client, modelId: UUID, branch:
     getSourcesByIds(supabase, [...new Set(ownDeltas.map((d) => d.sourceId))]),
   ]);
 
-  return { subjects, affectedCapabilities, otherOpenChanges, sourcesById };
+  return { subjects, affectedCapabilities, affectedValueStreams, otherOpenChanges, sourcesById };
 }
 
 export interface ChangeListSummary extends ChangeSummaryCore {
@@ -190,7 +215,7 @@ export async function loadChangeSummariesForModel(supabase: Client, modelId: UUI
     const fork: BranchFork = { baseCommitId: branch.base_commit_id, headCommitId: branch.head_commit_id };
     const ownDeltas = listOwnDeltas(fork, loader);
     if (ownDeltas.length === 0) {
-      result.set(branch.id, { subjects: [], affectedCapabilities: [], description: 'No changes yet' });
+      result.set(branch.id, { subjects: [], affectedCapabilities: [], affectedValueStreams: [], description: 'No changes yet' });
       continue;
     }
 
@@ -205,7 +230,7 @@ export async function loadChangeSummariesForModel(supabase: Client, modelId: UUI
     try {
       const toBeHead = foldFromGenesis(branch.head_commit_id, loader);
       const asIsHead = foldFromGenesis(branch.base_commit_id, loader);
-      const { subjects, affectedCapabilities } = summarizeOwnDeltas(ownDeltas, asIsHead, toBeHead);
+      const { subjects, affectedCapabilities, affectedValueStreams } = summarizeOwnDeltas(ownDeltas, asIsHead, toBeHead);
       // Every element in either head, not just this branch's own touched
       // subjects — a `relationship.create` delta's endpoint is frequently a
       // pre-existing element nothing else on this branch touched, and
@@ -213,7 +238,7 @@ export async function loadChangeSummariesForModel(supabase: Client, modelId: UUI
       // id falls back to "(unknown)" rather than guessing.
       const nameLookup: NameLookup = (id) => toBeHead.elements.get(id)?.name ?? asIsHead.elements.get(id)?.name;
       const description = describeEnvelope(ownDeltas, nameLookup);
-      result.set(branch.id, { subjects, affectedCapabilities, description });
+      result.set(branch.id, { subjects, affectedCapabilities, affectedValueStreams, description });
     } catch {
       continue;
     }

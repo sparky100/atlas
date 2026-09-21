@@ -27,6 +27,7 @@ import { ReviewQueuePage } from './routes/ReviewQueuePage';
 import { ReviewRequestPage } from './routes/ReviewRequestPage';
 import { RoadmapPage } from './routes/RoadmapPage';
 import { SignIn } from './routes/SignIn';
+import { ValueStreamsPage } from './routes/ValueStreamsPage';
 import { VersionDiffPage } from './routes/VersionDiffPage';
 import { VersionsPage } from './routes/VersionsPage';
 
@@ -65,6 +66,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/landscape" element={<LandscapePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/capability-map" element={<CapabilityMapPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/roadmap" element={<RoadmapPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/value-streams" element={<ValueStreamsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/context/:elementId" element={<ContextPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/container/:systemId" element={<ContainerPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/versions" element={<VersionsPage />} />

@@ -319,7 +319,11 @@ export function fromDeltaRow(row: DeltaRow): Delta {
         ...base,
         kind,
         relationshipId: row.subject_id,
-        relationshipType,
+        // F6 (ADR-023): `enables` has no attributes, so no `relationship.update`
+        // variant exists for it (`RelationshipAttributeKey<'enables'>` is
+        // `never`) — a stored row of this kind can never legitimately carry
+        // it. This narrowing mirrors the type, not a runtime possibility.
+        relationshipType: relationshipType as Exclude<typeof relationshipType, 'enables'>,
         attribute: row.attribute as never,
         value: row.value as never,
         previousDeltaId,

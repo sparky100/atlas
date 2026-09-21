@@ -36,13 +36,14 @@ export interface ExportColumn {
 }
 
 /** A stable element-type order for the union columns and the per-type sheets. */
-export const EXPORT_TYPES: readonly ElementType[] = ['capability', 'system', 'container', 'actor'];
+export const EXPORT_TYPES: readonly ElementType[] = ['capability', 'system', 'container', 'actor', 'value_stream'];
 
 const TYPE_SHEET_LABEL: Record<ElementType, string> = {
   capability: 'Capabilities',
   system: 'Systems',
   container: 'Containers',
   actor: 'Actors',
+  value_stream: 'Value streams',
 };
 
 export function typeSheetLabel(type: ElementType): string {

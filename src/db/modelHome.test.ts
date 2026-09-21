@@ -115,7 +115,7 @@ describe('buildCapabilityTiles', () => {
     const caps = [capability('cap-1')];
     const tiles = buildCapabilityTiles(caps, caps, [], new Map(), [], new Set());
     expect(tiles).toEqual([
-      { capability: capability('cap-1'), supportingSystems: [], exposedSystems: [], tone: 'neutral', supportedCapabilityCount: 0, totalCapabilityCount: 1, isOwned: false },
+      { capability: capability('cap-1'), supportingSystems: [], exposedSystems: [], tone: 'neutral', supportedCapabilityCount: 0, totalCapabilityCount: 1, isOwned: false, fitForPurpose: null },
     ]);
   });
 

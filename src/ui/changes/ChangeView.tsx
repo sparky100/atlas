@@ -592,6 +592,43 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
 
       <Panel>
         <Text as="h2" size="lg">
+          Affected value streams
+        </Text>
+        {summaryState.status === 'ready' && summaryState.summary.affectedValueStreams.length === 0 && <EmptyState>No value stream is affected by this change yet.</EmptyState>}
+        {summaryState.status === 'ready' && summaryState.summary.affectedValueStreams.length > 0 && (
+          <ul className={styles.capabilityList}>
+            {summaryState.summary.affectedValueStreams.map(({ stream, stages }) => (
+              <li key={stream.element_id}>
+                <div className={styles.subjectTitle}>
+                  <ElementTypeGlyph type="value_stream" />
+                  <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${stream.element_id}`}>
+                    <Text as="span">{stream.name}</Text>
+                  </Link>
+                </div>
+                <ul className={styles.capabilityList}>
+                  {stages.map(({ stage, viaCapabilities }) => (
+                    <li key={stage.element_id}>
+                      <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${stage.element_id}`}>
+                        <Text as="span" size="sm">
+                          {stage.name}
+                        </Text>
+                      </Link>
+                      {viaCapabilities.length > 0 && (
+                        <Text as="p" tone="muted" size="sm">
+                          via {viaCapabilities.map((c) => c.name).join(', ')}
+                        </Text>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel>
+        <Text as="h2" size="lg">
           Other open changes touching the same elements
         </Text>
         {summaryState.status === 'ready' && summaryState.summary.otherOpenChanges.length === 0 && <EmptyState>No other open change touches the same elements.</EmptyState>}

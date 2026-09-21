@@ -5,6 +5,10 @@ const GLYPH: Record<ElementType, string> = {
   system: '▣',
   container: '▢',
   actor: '◉', // overridden for subtype 'team' below
+  // F6 (ADR-023): a value stream or stage — a right-pointing triangle, the
+  // "stages left to right" reading of the layer, distinct from the square
+  // family (system/container/capability) and the circle family (actor).
+  value_stream: '▷',
 };
 
 const ACTOR_GLYPH: Record<ActorSubtype, string> = {

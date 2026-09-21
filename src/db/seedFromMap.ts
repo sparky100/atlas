@@ -163,6 +163,9 @@ export async function seedModelFromCapabilityMap(supabase: Client, input: SeedMo
     p_source_name: `Capability map seed: ${sector} v${String(version)}`,
     p_deltas: deltas.map((delta) => deltaToRpcRow(delta)),
     p_elements_head: projection.elementsHead,
+    // F6 (ADR-023): `20260921070000_value_streams.sql` — `[]` until a map
+    // carries value streams and this seeder emits their `enables` edges.
+    p_relationships_head: projection.relationshipsHead,
     p_facts: projection.facts,
     p_aliases: aliases.map((alias) => ({ id: alias.id, element_id: alias.elementId, alias_value: alias.aliasValue, confidence: 1 })),
     p_head_hash: headHash(head),

@@ -70,6 +70,11 @@ export const RELATIONSHIP_ATTRIBUTE_SCHEMA_BY_TYPE: Record<RelationshipType, rea
   owns: schemaOf(OWNS_ORDER, OWNS_META),
   flows_to: schemaOf(FLOWS_TO_ORDER, FLOWS_TO_META),
   replaces: schemaOf(REPLACES_ORDER, REPLACES_META),
+  // F6 (ADR-023): `enables` has no attributes at all (`EnablesAttributes`,
+  // delta.ts) — `relationshipAttributeFieldSchema` returning `undefined`
+  // for any key, and `validateRelationshipAttributeValue` refusing it, is
+  // the correct behaviour for this type, not a gap.
+  enables: [],
 };
 
 export function relationshipAttributeFieldSchema(relationshipType: RelationshipType, key: string): AttributeFieldSchema | undefined {

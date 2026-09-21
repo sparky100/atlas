@@ -30,10 +30,10 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 // Taxonomy (ADR-001)
 // ---------------------------------------------------------------------------
 
-export const ELEMENT_TYPES = ['capability', 'system', 'container', 'actor'] as const;
+export const ELEMENT_TYPES = ['capability', 'system', 'container', 'actor', 'value_stream'] as const;
 export type ElementType = (typeof ELEMENT_TYPES)[number];
 
-export const RELATIONSHIP_TYPES = ['supports', 'uses', 'owns', 'flows_to', 'replaces'] as const;
+export const RELATIONSHIP_TYPES = ['supports', 'uses', 'owns', 'flows_to', 'replaces', 'enables'] as const;
 export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
 
 /**
@@ -50,6 +50,10 @@ export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
  * is deliberately an attribute (`isExternal`) on System/Container/Actor, not
  * a fifth element type; "contains" is deliberately structural (`parentId`),
  * not a seventh relationship type — see ADR-001's Alternatives Rejected.
+ * A value stream (ADR-023/F6) is *not* the `business-process` exclusion:
+ * a stage is a label grouping the capabilities that deliver it, with no
+ * sequence, timing, actor or flow semantics — that ADR argues the
+ * distinction in full, and this list keeps the exclusion.
  */
 export const DELIBERATELY_NOT_MODELLED = [
   'business-process',
@@ -276,11 +280,37 @@ export interface ActorAttributes {
   memberId?: UUID;
 }
 
+/**
+ * F6 (ADR-023): a value stream, or one of its stages — the same type either
+ * way, told apart only by `parentId` (a stream has none; a stage's is its
+ * stream; depth is exactly two, C22). A stage is a label grouping the
+ * capabilities that deliver it (`enables`, capability → stage): no
+ * lifecycle, no owner, no timing — deliberately none of the fields that
+ * would make this ADR-001's "business process" non-type.
+ */
+export interface ValueStreamAttributes {
+  description?: string;
+  /** `capability_map_value_stream_items.id` this stream/stage was seeded from — the same map provenance a capability's `templateRef` carries. */
+  templateRef?: UUID;
+  /** Display order among siblings (a stage among its stream's stages, a stream among streams) — same convention as `CapabilityAttributes.order`, written by the reorder control only. */
+  order?: number;
+  /**
+   * ADR-023: a stream is deactivated, never retracted. The three fields
+   * below are set together by the Deactivate action (stream only — a
+   * stage follows its stream) and cleared together by Reactivate; never
+   * edited by hand in the attribute form. Absent reads as active.
+   */
+  inactive?: boolean;
+  inactiveSince?: ISODate;
+  inactiveReason?: string;
+}
+
 export interface ElementAttributesByType {
   capability: CapabilityAttributes;
   system: SystemAttributes;
   container: ContainerAttributes;
   actor: ActorAttributes;
+  value_stream: ValueStreamAttributes;
 }
 
 /** Attributes stored in `relationships_head.attributes` (jsonb). Endpoints are immutable and are not attributes. */
@@ -336,12 +366,25 @@ export interface ReplacesAttributes {
   description?: string;
 }
 
+/**
+ * F6 (ADR-023): `enables`, capability → stage — "this capability is one of
+ * those that deliver this stage." The first relationship type with no
+ * attributes at all: `RelationshipAttributeKey<'enables'>` is `never`, so
+ * no `relationship.update` variant exists for it, by design. The
+ * "a stage, never a stream" half of the endpoint rule is C22
+ * (`src/engine/deltas.ts`), since `RELATIONSHIP_TYPE_RULES` only speaks in
+ * element types.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- deliberately empty; see the doc comment.
+export interface EnablesAttributes {}
+
 export interface RelationshipAttributesByType {
   supports: SupportsAttributes;
   uses: UsesAttributes;
   owns: OwnsAttributes;
   flows_to: FlowsToAttributes;
   replaces: ReplacesAttributes;
+  enables: EnablesAttributes;
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +442,7 @@ export type ElementCreate<T extends ElementType = ElementType> = T extends Eleme
       elementId: UUID;
       elementType: T;
       name: string;
-      /** Structural parent (ADR-001). Required non-null for container; null for top-level capability, system, actor. */
+      /** Structural parent (ADR-001). Required non-null for container; null for top-level capability, system, actor; for a value_stream, null for a stream and the stream's own id for a stage (ADR-023, C22). */
       parentId: UUID | null;
       attributes: ElementAttributesByType[T];
     }
@@ -659,6 +702,10 @@ export const COMMIT_INVARIANTS = [
   {
     id: 'C21',
     text: "a preparation-kind commit (ADR-021 §2a amendment 1/§6, C2b — numbered C21 rather than the ADR's original draft \"C18,\" which collided with the unrelated C18 above once this was actually built, ADR-021 §2a amendment 3) contains only the deltas ADR-021 §3.3's preparation table derives from the findings — restores of elements the branch retracted and main touched, retracts of the branch's own relationships to elements main retracted, demotions/retractions of the branch's primaries that main's primaries collide with — and no other commit kind may carry them. Written only by atlas.refresh_branch, immediately before the merge commit that follows it, sharing its merge_resolution source; never by a client directly, same restriction as genesis.",
+  },
+  {
+    id: 'C22',
+    text: "value streams (ADR-023/F6), two cross-entity checks RELATIONSHIP_TYPE_RULES can't express, each against the head as it stands when the delta is applied: (a) element.create of a value_stream with a non-null parentId, or element.update of parentId on one to a non-null value — the parent is a live value_stream whose own parentId is null (a stream has stages; a stage has nothing below it; nothing but a value stream contains one); (b) relationship.create of enables — toElementId is a live value_stream with a non-null parentId (a stage, never a stream). Not re-checked at element.restore/relationship.restore, matching C18's/C20's own convention. This is the value_stream-specific enforcement of what C11 states generically (C11 itself still has no generic engine implementation); no database backstop, for C18's own reason — a cross-row dependency Postgres has no plain CHECK for.",
   },
 ] as const;
 
