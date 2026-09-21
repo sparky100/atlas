@@ -323,6 +323,7 @@ export function CapabilityMapPage() {
                 tree={state.data.tree}
                 supportsEdges={state.data.supportsEdges}
                 systemsById={state.data.systemsById}
+                replacedSystemIds={state.data.replacedSystemIds}
                 capabilities={state.data.capabilities}
                 selfOwnedIds={state.data.selfOwnedIds}
                 colourBy={colourBy}

@@ -5,7 +5,7 @@ import { projectionElementsByIds } from '../../db/branchProjection';
 import { hasAnySystem, listSupportsEdgesForCapabilities, listCapabilitiesForMap } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
 import { listOwnsEdges } from '../../db/elementBrowse';
-import { computeSelfOwnedCapabilityIds } from '../../db/healthFindings';
+import { computeSelfOwnedCapabilityIds, listAllReplacesEdges } from '../../db/healthFindings';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import type { ViewMode } from '../../db/viewMode';
 import { resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
@@ -22,6 +22,8 @@ export interface CapabilityMapData {
   tree: CapabilityMapTree;
   supportsEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
+  /** ADR-001 amendment: every element id with a live `replaces` edge already pointing at it (`to_element_id` — the retiring side) — `lifecycleExposure`'s own "no planned replacement" half, `metrics.ts`. */
+  replacedSystemIds: ReadonlySet<UUID>;
   /** Sprint U4-1 C4: the model-wide answer, not derived from `systemsById` above — see `hasAnySystem`'s own comment for why those are different facts. */
   hasSystems: boolean;
   /** Every capability at this ref, every level — `tree` is the same set already nested into L1/L2/L3; kept flat here too since the capability rollup (`capabilityRollup.ts`) needs a plain list/map to walk subtrees and resolve ancestors, not the tree shape. */
@@ -94,6 +96,7 @@ export function useCapabilityMap(
       let hasSystems: boolean;
       let supportsEdges: RelationshipsHeadRow[];
       let systemsById: Map<UUID, ElementsHeadRow>;
+      let replacedSystemIds: ReadonlySet<UUID>;
       let ownsEdges: RelationshipsHeadRow[];
       let actorsById: Map<UUID, ElementsHeadRow>;
 
@@ -137,6 +140,8 @@ export function useCapabilityMap(
         ownsEdges = projection.relationshipsHead.filter((r) => r.relationship_type === 'owns');
         const ownerActorIds = [...new Set(ownsEdges.map((edge) => edge.from_element_id))];
         actorsById = ownerActorIds.length > 0 ? projectionElementsByIds(projection, ownerActorIds) : new Map<UUID, ElementsHeadRow>();
+
+        replacedSystemIds = new Set(projection.relationshipsHead.filter((r) => r.relationship_type === 'replaces').map((r) => r.to_element_id));
       } else {
         const resolvedCommitId = ref.kind === 'main' && mainCommitIdHint ? mainCommitIdHint : await resolveRef(supabase, modelId, ref);
         if (!resolvedCommitId) {
@@ -180,16 +185,19 @@ export function useCapabilityMap(
           if (platform) systemsById.set(id, effectiveModuleAttributes(row, platform));
         }
 
-        ownsEdges = await listOwnsEdges(supabase, commitId);
+        const [ownsEdgesResult, replacesEdges] = await Promise.all([listOwnsEdges(supabase, commitId), listAllReplacesEdges(supabase, commitId)]);
+        ownsEdges = ownsEdgesResult;
         const ownerActorIds = [...new Set(ownsEdges.map((edge) => edge.from_element_id))];
         actorsById = ownerActorIds.length > 0 ? await getElementsByIds(supabase, commitId, ownerActorIds) : new Map<UUID, ElementsHeadRow>();
+
+        replacedSystemIds = new Set(replacesEdges.map((edge) => edge.to_element_id));
       }
 
       const view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'capability_map', name: 'Capability map', createdBy: currentUserId });
       const tree = computeCapabilityMapTree(capabilities);
       const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsEdges, ownsEdges);
 
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, replacedSystemIds, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById } });
     }
 
     load().catch((e: unknown) => {

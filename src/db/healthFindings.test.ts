@@ -377,30 +377,41 @@ describe('findCriticalSystemsWithoutBusinessOwner (Prompt 7k item 1)', () => {
 
 describe('findCriticalExposedSystems (Prompt 7k item 1)', () => {
   const now = new Date('2026-06-15T00:00:00Z');
+  const NO_REPLACED: ReadonlySet<string> = new Set();
 
   it('flags a critical system whose plannedEnd falls within STALE_AFTER_MONTHS (12)', () => {
     const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2027-01-01' })]; // ~6.5 months out
-    expect(findCriticalExposedSystems(systems, now).map((s) => s.element_id)).toEqual(['sys-1']);
+    expect(findCriticalExposedSystems(systems, NO_REPLACED, now).map((s) => s.element_id)).toEqual(['sys-1']);
   });
 
   it('flags a critical system already past its planned end (more exposed, not less)', () => {
     const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2026-01-01' })];
-    expect(findCriticalExposedSystems(systems, now).map((s) => s.element_id)).toEqual(['sys-1']);
+    expect(findCriticalExposedSystems(systems, NO_REPLACED, now).map((s) => s.element_id)).toEqual(['sys-1']);
   });
 
   it('does not flag a non-critical system with the same near plannedEnd', () => {
     const systems = [system('sys-1', { criticality: 'medium', plannedEnd: '2027-01-01' })];
-    expect(findCriticalExposedSystems(systems, now)).toEqual([]);
+    expect(findCriticalExposedSystems(systems, NO_REPLACED, now)).toEqual([]);
   });
 
   it('does not flag a critical system whose plannedEnd is well beyond the 12-month horizon', () => {
     const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2030-01-01' })];
-    expect(findCriticalExposedSystems(systems, now)).toEqual([]);
+    expect(findCriticalExposedSystems(systems, NO_REPLACED, now)).toEqual([]);
   });
 
   it('does not flag a critical system with no plannedEnd at all', () => {
     const systems = [system('sys-1', { criticality: 'critical' })];
-    expect(findCriticalExposedSystems(systems, now)).toEqual([]);
+    expect(findCriticalExposedSystems(systems, NO_REPLACED, now)).toEqual([]);
+  });
+
+  it('ADR-001 amendment: does not flag a critical exposed system with a live replaces edge already pointing at it', () => {
+    const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2026-01-01' })];
+    expect(findCriticalExposedSystems(systems, new Set(['sys-1']), now)).toEqual([]);
+  });
+
+  it('ADR-001 amendment: a replaces edge into a different system does not clear this one\'s own exposure', () => {
+    const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2026-01-01' })];
+    expect(findCriticalExposedSystems(systems, new Set(['sys-2']), now).map((s) => s.element_id)).toEqual(['sys-1']);
   });
 });
 

@@ -34,13 +34,14 @@
  *   a supporting system whose `plannedEnd` falls within
  *   `STALE_AFTER_MONTHS` (reusing the one global threshold, not a second
  *   one invented for this) and has no planned replacement. "No planned
- *   replacement" is UI-principles §10 decision 4's own definition — a
- *   retract delta in the same approved change — which needs the review
- *   queue/decision machinery Sprint U2 doesn't build; until that exists,
- *   nothing can ever record a planned replacement, so that half of the
- *   condition is vacuously true today. This is a documented, honest
- *   simplification (the condition narrows correctly once replacement
- *   tracking exists), not a silently wrong implementation.
+ *   replacement" (ADR-001 amendment) now reads a real fact: a supporting
+ *   system with a live `replaces` edge into it (`to_element_id = system`
+ *   — the system is the retiring side) never counts as exposed, however
+ *   near or past its own `plannedEnd`. Existence-only: the replacement's
+ *   *own* lifecycle is a separate concern — a replacement with no
+ *   departure plan of its own is `findReplacementsWithoutDeparturePlan`'s
+ *   own health finding (`src/db/healthFindings.ts`), not this metric's
+ *   job to also flag.
  * - **Criticality** (`criticality`): the most-severe `criticality` value
  *   (`low` < `medium` < `high` < `critical`) among a capability's
  *   supporting systems — worst-of, the same shape as oldest-lifecycle-
@@ -194,11 +195,14 @@ function plannedEndOf(system: ElementsHeadRow): Date | null {
 /**
  * `true` when any supporting system's `plannedEnd` falls within
  * `STALE_AFTER_MONTHS` of `now` — including one already overdue, which is
- * more exposed still, not less. See the module comment for why "no
- * planned replacement" isn't (yet) a separate check.
+ * more exposed still, not less — **and** that system has no live
+ * `replaces` edge already pointing at it (`replacedSystemIds`, ADR-001
+ * amendment). See the module comment for the "no planned replacement"
+ * half of this metric's own definition.
  */
-export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): boolean {
+export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, replacedSystemIds: ReadonlySet<UUID>, now: Date = new Date()): boolean {
   for (const systemId of supportingSystemIds(capabilityId, supportsEdges)) {
+    if (replacedSystemIds.has(systemId)) continue;
     const system = systemsById.get(systemId);
     if (!system) continue;
     const plannedEnd = plannedEndOf(system);
@@ -207,8 +211,8 @@ export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly Re
   return false;
 }
 
-/** The tone+label a tile should show for the selected colour-by mode — `mode: 'none'` always returns no tone and no label. */
-export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): TileColour {
+/** The tone+label a tile should show for the selected colour-by mode — `mode: 'none'` always returns no tone and no label. `replacedSystemIds` is only ever read by `metric:lifecycleExposure` (`lifecycleExposure`'s own doc comment). */
+export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, replacedSystemIds: ReadonlySet<UUID>): TileColour {
   switch (mode) {
     case 'none':
       return { tone: undefined, label: undefined };
@@ -227,7 +231,7 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
       return stage === null ? { tone: undefined, label: undefined } : { tone: LIFECYCLE_TONE[stage], label: stage };
     }
     case 'metric:lifecycleExposure': {
-      const exposed = lifecycleExposure(capabilityId, supportsEdges, systemsById);
+      const exposed = lifecycleExposure(capabilityId, supportsEdges, systemsById, replacedSystemIds);
       return exposed ? { tone: 'danger', label: 'exposed' } : { tone: undefined, label: undefined };
     }
     case 'metric:criticality': {
@@ -280,7 +284,7 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
  * plain id list rather than this file taking a dependency on `layout.ts`'s
  * tree shape.
  */
-export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityIds: readonly UUID[], supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): TileColour {
+export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityIds: readonly UUID[], supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, replacedSystemIds: ReadonlySet<UUID>): TileColour {
   if (descendantCapabilityIds.length === 0) return { tone: undefined, label: undefined };
   switch (mode) {
     case 'none':
@@ -298,7 +302,7 @@ export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityI
       return worst === null ? { tone: undefined, label: undefined } : { tone: LIFECYCLE_TONE[worst], label: worst };
     }
     case 'metric:lifecycleExposure': {
-      const exposed = descendantCapabilityIds.some((id) => lifecycleExposure(id, supportsEdges, systemsById));
+      const exposed = descendantCapabilityIds.some((id) => lifecycleExposure(id, supportsEdges, systemsById, replacedSystemIds));
       return exposed ? { tone: 'danger', label: 'exposed' } : { tone: undefined, label: undefined };
     }
     case 'metric:criticality': {

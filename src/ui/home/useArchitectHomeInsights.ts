@@ -168,6 +168,11 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
       ]);
 
       const usesAndFlowsToEndpointsById = new Map([...usesAndFlowsToEndpoints, ...actors].map((el) => [el.element_id, el]));
+      // ADR-001 amendment: every element id with a live `replaces` edge
+      // already pointing at it — `findCriticalExposedSystems`'s own "no
+      // planned replacement" half, computed once here from the same
+      // `replacesEdges` fetch `replacementsWithoutDeparturePlan` uses.
+      const replacedElementIds = new Set(replacesEdges.map((edge) => edge.to_element_id));
       // S1 item 19: `usesAndFlowsToEndpoints` is already every system and
       // container in the model (`listUsesAndFlowsToEndpointElements`'s own
       // doc comment), so a platform's own modules are already in hand here
@@ -227,7 +232,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             // exactly as real a finding as a system missing one.
             systemsWithoutTechnicalOwner: findSystemsWithoutTechnicalOwner([...systems, ...containers], ownsEdges),
             criticalSystemsWithoutBusinessOwner: findCriticalSystemsWithoutBusinessOwner([...systems, ...containers], ownsEdges),
-            criticalExposedSystems: findCriticalExposedSystems(systems),
+            criticalExposedSystems: findCriticalExposedSystems(systems, replacedElementIds),
             boundaryCrossingsMissingVerb: findBoundaryCrossingsMissingVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges),
             systemsSupportingEssentialFunctionWithoutTechnicalOwner: findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...systems, ...containers], capabilities, supportsEdges, ownsEdges),
