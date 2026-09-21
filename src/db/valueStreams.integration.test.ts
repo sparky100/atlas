@@ -1,7 +1,7 @@
 /**
  * RT-14 (SPEC-data-model.md §10.1, ADR-023/F6): the two widened enums —
  * `element_type` + 'value_stream', `relationship_type` + 'enables'
- * (`supabase/migrations/20260921060000_value_streams.sql`) — exercised
+ * (`supabase/migrations/20260921070000_value_streams.sql`) — exercised
  * through the real commit path: one envelope creating a stream, a stage
  * under it and an `enables` edge from a capability onto the stage goes
  * through `commitToBranch` → `atlas.commit_deltas`, and the materialised

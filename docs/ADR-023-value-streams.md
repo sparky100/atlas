@@ -1,6 +1,6 @@
 # ADR-023: Value streams — one element type, one relationship type
 
-**Status:** Proposed 2026-09-21 — Step 1 of the F6 sprint (prompt pack F6: "written and decided before any code"); approved for build the same day. Step 2 carries the migration, `supabase/migrations/20260921060000_value_streams.sql`; this ADR becomes Accepted when that PR merges to `main`.
+**Status:** Proposed 2026-09-21 — Step 1 of the F6 sprint (prompt pack F6: "written and decided before any code"); approved for build the same day. Step 2 carries the migration, `supabase/migrations/20260921070000_value_streams.sql`; this ADR becomes Accepted when that PR merges to `main`.
 **Numbering:** ADR-022 is the current highest (`docs/ADR-022-decisions-schema.md`), so this is ADR-023. `docs/ADR-000-foundations.md`'s own index gains a one-line pointer to this file, per that document's established convention for ADR-021 and every later one.
 **Depends on:** ADR-001 (`docs/ADR-000-foundations.md`, the taxonomy this ADR extends — including its "explicit non-types" list, which this ADR has to argue against), ADR-007 (per-fact provenance — why `enables` is a relationship, not a list attribute), ADR-012 (starter maps — value streams become part of a sector map's content), ADR-013/022 (decisions — "affected value streams" on a comparison row), F0 (`branches.intent` — the edit gate is expressed in intents), F5 (roadmap — the group-by this ADR adds a second mode to).
 

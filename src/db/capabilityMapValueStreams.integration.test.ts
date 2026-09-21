@@ -1,6 +1,6 @@
 /**
  * RT-15 (SPEC-data-model.md §10.1, ADR-023/F6): the two starter-map
- * content tables `supabase/migrations/20260921060000_value_streams.sql`
+ * content tables `supabase/migrations/20260921070000_value_streams.sql`
  * adds — `capability_map_value_stream_items` and
  * `capability_map_value_stream_enables` — written the way
  * `scripts/loadCapabilityMaps.ts` will write them (Step 7 of the F6

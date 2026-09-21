@@ -93,7 +93,7 @@ export async function listCapabilityMapItems(supabase: Client, mapId: UUID): Pro
   return data as CapabilityMapItemRow[];
 }
 
-/** F6 (ADR-023, SPEC §3.10): a starter map's value stream (`parent_code` null) or one of its stages (`parent_code` = the stream's code) — `20260921060000_value_streams.sql`. */
+/** F6 (ADR-023, SPEC §3.10): a starter map's value stream (`parent_code` null) or one of its stages (`parent_code` = the stream's code) — `20260921070000_value_streams.sql`. */
 export interface CapabilityMapValueStreamItemRow {
   id: UUID;
   map_id: UUID;

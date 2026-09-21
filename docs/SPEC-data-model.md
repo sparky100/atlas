@@ -58,7 +58,7 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | Type | Values |
 |---|---|
 | `member_role` | `owner`, `architect`, `contributor`, `viewer` |
-| `element_type` | `capability`, `system`, `container`, `actor`, `value_stream` (S1 item 18 removed `component`, `20260913010000_remove_component_element_type.sql`; `deltas.element_type` itself moved from this enum to plain `text` in the same migration — that column's own historical rows are immutable, see the migration's own comment. ADR-023/F6 adds `value_stream` — a stream, or a stage when `parent_id` is set — via `alter type … add value` in `20260921060000_value_streams.sql`, the first addition to this enum since it was created) |
+| `element_type` | `capability`, `system`, `container`, `actor`, `value_stream` (S1 item 18 removed `component`, `20260913010000_remove_component_element_type.sql`; `deltas.element_type` itself moved from this enum to plain `text` in the same migration — that column's own historical rows are immutable, see the migration's own comment. ADR-023/F6 adds `value_stream` — a stream, or a stage when `parent_id` is set — via `alter type … add value` in `20260921070000_value_streams.sql`, the first addition to this enum since it was created) |
 | `relationship_type` | `supports`, `uses`, `owns`, `flows_to`, `replaces` (ADR-001's "replaces" amendment, `20260921030000_relationship_type_replaces.sql`: from = the replacement, to = the retiring element), `enables` (ADR-023/F6: capability → stage) |
 | `branch_kind` | `main`, `change`, `capture_draft` |
 | `branch_status` | `draft`, `proposed`, `in_review`, `approved`, `merged`, `rejected`, `archived` |
