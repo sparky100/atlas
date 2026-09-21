@@ -16,6 +16,7 @@ import {
   findExternalOrganisationAccess,
   findFlowsToPlatformInsteadOfModule,
   findPlatformSupportsThatShouldMoveToModule,
+  findReplacementsWithoutDeparturePlan,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
@@ -946,5 +947,58 @@ describe('findCapabilitiesWithNoSupporters (per-item-actions prompt)', () => {
     const other = capability('cap-other');
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-other', { role: 'secondary' })];
     expect(findCapabilitiesWithNoSupporters([root], [root, other], supports, []).map((c) => c.element_id)).toEqual(['cap-root']);
+  });
+});
+
+describe('findReplacementsWithoutDeparturePlan (ADR-001 amendment)', () => {
+  it('flags a replaces edge whose replacement is active with no plannedEnd of its own', () => {
+    const elementsById = new Map([
+      ['legacy-1', system('legacy-1', { lifecycleStatus: 'retiring' })],
+      ['electron-1', system('electron-1', { lifecycleStatus: 'active' })],
+    ]);
+    const edges = [relationship('r1', 'replaces', 'electron-1', 'legacy-1')];
+    expect(findReplacementsWithoutDeparturePlan(edges, elementsById)).toEqual([
+      { relationshipId: 'r1', fromElementId: 'electron-1', toElementId: 'legacy-1', fromName: 'System electron-1', toName: 'System legacy-1' },
+    ]);
+  });
+
+  it('does not flag a replacement that already has its own plannedEnd', () => {
+    const elementsById = new Map([
+      ['legacy-1', system('legacy-1', { lifecycleStatus: 'retiring' })],
+      ['electron-1', system('electron-1', { lifecycleStatus: 'active', plannedEnd: '2032-01-01' })],
+    ]);
+    const edges = [relationship('r1', 'replaces', 'electron-1', 'legacy-1')];
+    expect(findReplacementsWithoutDeparturePlan(edges, elementsById)).toEqual([]);
+  });
+
+  it('does not flag a replacement that is itself already retiring/retired — a departure plan already exists, just as a lifecycle change rather than a plannedEnd on a still-active element', () => {
+    const elementsById = new Map([
+      ['legacy-1', system('legacy-1', { lifecycleStatus: 'retiring' })],
+      ['electron-1', system('electron-1', { lifecycleStatus: 'retiring' })],
+    ]);
+    const edges = [relationship('r1', 'replaces', 'electron-1', 'legacy-1')];
+    expect(findReplacementsWithoutDeparturePlan(edges, elementsById)).toEqual([]);
+  });
+
+  it('ignores every other relationship type — only replaces edges are read', () => {
+    const elementsById = new Map([
+      ['legacy-1', system('legacy-1')],
+      ['cap-1', capability('cap-1')],
+    ]);
+    const edges = [relationship('r1', 'supports', 'legacy-1', 'cap-1', { role: 'primary' })];
+    expect(findReplacementsWithoutDeparturePlan(edges, elementsById)).toEqual([]);
+  });
+
+  it('checks the replacement side (fromElementId), never the retiring element\'s own lifecycle fields', () => {
+    // The retiring element ('legacy-1') itself has no plannedEnd set here —
+    // if this function mistakenly read the `to` side instead of `from`, it
+    // would flag this edge; it must not, since the replacement itself
+    // ('electron-1') does have one.
+    const elementsById = new Map([
+      ['legacy-1', system('legacy-1', { lifecycleStatus: 'retiring' })],
+      ['electron-1', system('electron-1', { lifecycleStatus: 'active', plannedEnd: '2032-01-01' })],
+    ]);
+    const edges = [relationship('r1', 'replaces', 'electron-1', 'legacy-1')];
+    expect(findReplacementsWithoutDeparturePlan(edges, elementsById)).toEqual([]);
   });
 });
