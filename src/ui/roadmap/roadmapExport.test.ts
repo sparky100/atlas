@@ -68,13 +68,15 @@ describe('roadmapToCsv', () => {
     expect(lines[1]).toBe('Change,,Legacy CRM,,,,,,2026-06-01,Legacy CRM retired');
   });
 
-  it('names the capability and both systems on a replacement row', () => {
+  it('names both systems on a replacement row, with a blank Capability column (ADR-001 amendment: a replaces edge is capability-free)', () => {
+    // fromSystemId is the replacement, toSystemId is the retiring element
+    // (`buildReplacesDelta.ts`'s own "B replaces A" = `from: B, to: A` convention).
     const events: RoadmapBranchEvents = {
       branch: branch(),
-      events: [{ kind: 'replace', capabilityId: 'cap-1', capabilityName: 'Customer Contact', fromSystemId: 'sys-1', fromSystemName: 'Legacy CRM', toSystemId: 'sys-2', toSystemName: 'New CRM Platform' }],
+      events: [{ kind: 'replace', fromSystemId: 'sys-2', fromSystemName: 'New CRM Platform', toSystemId: 'sys-1', toSystemName: 'Legacy CRM' }],
     };
     const csv = roadmapToCsv([], [events]);
-    expect(csv.split('\r\n')[1]).toBe('Change,Customer Contact,New CRM Platform,,,,,,2026-01-15,Legacy CRM replaced by New CRM Platform (Customer Contact)');
+    expect(csv.split('\r\n')[1]).toBe('Change,,New CRM Platform,,,,,,2026-01-15,Legacy CRM replaced by New CRM Platform');
   });
 
   it('quotes a description containing a comma', () => {

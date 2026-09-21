@@ -67,10 +67,17 @@ function RoadmapRow({ bar, events, range, orgSlug, modelSlug }: { bar: RoadmapLi
           if (event.kind === 'retire') {
             return <span key={key} className={styles.marker} data-kind="retire" style={{ left: `${String(pct)}%` }} title={`Retired — ${branch.title ?? branch.name}`} aria-hidden="true" />;
           }
+          // ADR-001 amendment: `fromSystemId` is the replacement, `toSystemId`
+          // is the retiring element (`buildReplacesDelta.ts`'s own "B
+          // replaces A" = `from: B, to: A` convention) — the opposite of
+          // this marker's own pre-PR7 fields, where `from` meant the
+          // retiring system. `isFrom` here means "this bar is the
+          // replacement," so its own tooltip/glyph read the other way
+          // round from before.
           const isFrom = event.fromSystemId === bar.systemId;
           return (
-            <span key={key} className={styles.marker} data-kind="replace" style={{ left: `${String(pct)}%` }} title={isFrom ? `Replaced by ${event.toSystemName} — ${branch.title ?? branch.name}` : `Replaces ${event.fromSystemName} — ${branch.title ?? branch.name}`} aria-hidden="true">
-              {isFrom ? '→' : '←'}
+            <span key={key} className={styles.marker} data-kind="replace" style={{ left: `${String(pct)}%` }} title={isFrom ? `Replaces ${event.toSystemName} — ${branch.title ?? branch.name}` : `Replaced by ${event.fromSystemName} — ${branch.title ?? branch.name}`} aria-hidden="true">
+              {isFrom ? '←' : '→'}
             </span>
           );
         })}

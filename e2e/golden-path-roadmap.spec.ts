@@ -8,12 +8,14 @@
  * kind `isRoadmapEligibleBranch` ever shows a marker for — see
  * `roadmapEligibility.ts`'s own module comment).
  *
- * The replacement system deliberately supports the capability *before*
- * being retired: `useElementRetire.ts`'s own "replaced by" picker only
- * transfers a `supports` edge the retiring system already has — retiring
- * a system with no capability at all produces no `relationship.retract`/
- * `.create` pair for `deriveRoadmapChangeEvents` to pair into a
- * replacement marker.
+ * The replacement system supports the capability before being retired so
+ * this same change also demonstrates the (unrelated) `supports`-edge
+ * transfer `useElementRetire.ts`'s "replaced by" picker does alongside the
+ * real `replaces` edge (ADR-001 amendment) — but the roadmap's own
+ * replacement arrow (`deriveRoadmapChangeEvents`, `src/db/roadmapChangeEvents.ts`)
+ * reads that `replaces` edge directly now, not a `supports` retract/create
+ * pairing, so the arrow itself no longer depends on there being a
+ * capability at all.
  */
 import { expect, test } from '@playwright/test';
 import { addCapability, addSystemFromHome, goToModelHome, retireElement, signUpCreateOrgAndModel } from './fixtures/goldenPath';
@@ -78,5 +80,7 @@ test('a retire-and-replace change, once merged, appears as an arrow on the roadm
   await expect(page.getByRole('heading', { name: 'Roadmap' })).toBeVisible();
   await expect(page.getByText(quarterLabelDaysFromNow(120))).toBeVisible();
   await expect(page.locator('[data-kind="replace"]').first()).toBeVisible();
-  await expect(page.getByText('Legacy CRM replaced by New CRM Platform (Customer Contact)')).toBeVisible();
+  // ADR-001 amendment: no capability clause — a replaces edge is a direct
+  // system-to-system fact, read straight off the change's own delta.
+  await expect(page.getByText('Legacy CRM replaced by New CRM Platform')).toBeVisible();
 });
