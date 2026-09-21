@@ -23,6 +23,7 @@ import type { MergeReview } from '../../engine/merge';
 import type { FieldConflictChoice, StructuralChoice } from '../../engine/mergeResolution';
 import { reportError } from '../errors/errorBannerStore';
 import { applyCommitToCache } from '../query/applyCommitToCache';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 
 /** `StructuralChoice`'s own key: a retraction choice is keyed by its element; a duplicate/cardinality pair choice by its own pair (order-independent — both sides of a pair should key to the same slot). */
@@ -231,6 +232,13 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
         setActionError(commitResult.message);
         return;
       }
+      // #245: pushRefresh computes its result via a real server-side
+      // three-way merge, not a client-side fold, so there's no newHead to
+      // seed applyCommitToCache with the way `merge` above does — but it
+      // still moves this branch's own head, same as any other
+      // commit-producing action, so every other cached read of it needs
+      // invalidating too.
+      void invalidateModelHead(queryClient, modelId);
       const refreshedBranch = await getBranch(supabase, branch.id);
       if (!refreshedBranch) {
         setActionError('The change disappeared while refreshing.');

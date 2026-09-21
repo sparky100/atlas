@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { dismissIdentityPairOnBranch, getBranch } from '../../db/branches';
@@ -6,6 +7,7 @@ import type { BranchRow } from '../../db/types';
 import type { MergeReview } from '../../engine/merge';
 import type { FieldConflictChoice, StructuralChoice } from '../../engine/mergeResolution';
 import { reportError } from '../errors/errorBannerStore';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 
 /** `StructuralChoice`'s own key: a retraction choice is keyed by its element; a duplicate/cardinality pair choice by its own pair (order-independent — both sides of a pair should key to the same slot). */
@@ -36,6 +38,7 @@ function fieldChoiceKey(subjectId: UUID, attribute: string): string {
  * See src/ui/changes/ChangeView.tsx's own comment on that division.
  */
 export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID | null, onRebased: () => void) {
+  const queryClient = useQueryClient();
   const [state, setState] = useState<BranchRebaseState>({ status: 'loading' });
   const [reloadToken, setReloadToken] = useState(0);
   const [actionStatus, setActionStatus] = useState<ActionStatus>('idle');
@@ -124,6 +127,11 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
         setActionError(result.message);
         return;
       }
+      // #245: same gap as useReviewRequest.ts's own pushRefreshAndResubmit —
+      // pushRefresh moves this branch's own head via a real server-side
+      // three-way merge (no newHead to seed applyCommitToCache with), but
+      // every other cached read of this branch still needs invalidating.
+      void invalidateModelHead(queryClient, modelId);
       const refreshed = await getBranch(supabase, branch.id);
       if (!refreshed) {
         setActionError('The change disappeared while rebasing.');
@@ -135,7 +143,7 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
     } finally {
       setActionStatus('idle');
     }
-  }, [state, modelId, branch, userId, fieldChoices, structuralChoices, onRebased]);
+  }, [state, modelId, branch, userId, fieldChoices, structuralChoices, onRebased, queryClient]);
 
   const fieldChoiceFor = useMemo(() => (subjectId: UUID, attribute: string) => fieldChoices.get(fieldChoiceKey(subjectId, attribute)), [fieldChoices]);
   const retractionChoiceFor = useMemo(() => (elementId: UUID) => {
