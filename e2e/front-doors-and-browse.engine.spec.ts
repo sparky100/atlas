@@ -148,7 +148,10 @@ test('front doors and browse: both doors render for a seeded model, switching pe
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/elements`);
   await expect(page.getByRole('link', { name: /Billing/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Payment Gateway/ })).toBeVisible();
-  await page.getByRole('combobox').selectOption('capability');
+  // Scoped by accessible name: the browse table's own "Custom attribute"
+  // picker (F1 PR4) added a second combobox on this page since this
+  // assertion was written.
+  await page.getByRole('combobox', { name: 'Element type' }).selectOption('capability');
   await expect(page.getByRole('link', { name: /Payment Gateway/ })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Billing/ })).toBeVisible();
 

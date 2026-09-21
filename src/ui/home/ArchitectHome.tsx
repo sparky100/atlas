@@ -533,7 +533,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
         <div className={styles.stat}>
           <Text as="span" size="2xl">
             {data.reviewQueueCount}
-          </Text>
+          </Text>{' '}
           <Text as="span" tone="muted" size="sm">
             review queue
           </Text>
@@ -541,7 +541,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
         <div className={styles.stat}>
           <Text as="span" size="2xl" className={insightsData && findingsNeedingAttentionCount > 0 ? styles.statWarn : undefined}>
             {insightsData ? findingsNeedingAttentionCount : '…'}
-          </Text>
+          </Text>{' '}
           <Text as="span" tone="muted" size="sm">
             finding{findingsNeedingAttentionCount === 1 ? '' : 's'} needing attention
           </Text>
@@ -549,7 +549,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
         <div className={styles.stat}>
           <Text as="span" size="2xl" className={insightsData && assuranceItemsCount > 0 ? styles.statWarn : undefined}>
             {insightsData ? assuranceItemsCount : '…'}
-          </Text>
+          </Text>{' '}
           <Text as="span" tone="muted" size="sm">
             assurance item{assuranceItemsCount === 1 ? '' : 's'}
           </Text>
@@ -557,7 +557,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
         <div className={styles.stat}>
           <Text as="span" size="2xl">
             {data.myOpenBranches.length}
-          </Text>
+          </Text>{' '}
           <Text as="span" tone="muted" size="sm">
             open change{data.myOpenBranches.length === 1 ? '' : 's'} of mine
           </Text>
@@ -581,7 +581,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
             )}
           </Panel>
 
-          <Panel>
+          <Panel data-testid="health-findings-panel">
             <Text as="h2" size="xl" className={styles.sectionTitle}>
               Health findings
             </Text>
