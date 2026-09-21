@@ -113,26 +113,45 @@ test('architect door: health findings name systems with no capability, capabilit
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // The org's creator is its owner, so the default door is already architect.
   await expect(page.getByRole('heading', { name: 'Health findings' })).toBeVisible();
+  // Scoped to the Health findings panel itself for every "must not appear"
+  // check below — Recent activity (elsewhere on this door) links every
+  // element the seeding commit touched, regardless of finding status, so a
+  // page-wide toHaveCount(0) can collide with it there.
+  const healthFindingsPanel = page.getByTestId('health-findings-panel');
 
-  await expect(page.getByText('1 system not linked to a capability')).toBeVisible();
-  await expect(page.getByText('Orphan System', { exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Review and link/ })).toBeVisible();
+  // consumerSystemId/labeledTargetSystemId (seeded below for B5's own
+  // "unlabeled uses edge" finding) also have no supports edge of their own
+  // — they legitimately qualify for this finding too, alongside
+  // orphanSystemId, so the real count here is 3, not 1.
+  await expect(healthFindingsPanel.getByText('3 systems not linked to a capability')).toBeVisible();
+  // FindingCard's own names line joins multiple items into one text node
+  // ("A, B, C") rather than rendering each as separate text — scoped to
+  // the paragraph carrying this finding's own "Review and link →" action
+  // (unique to it) and checked by substring, not per-name exact matches.
+  const unlinkedSystemsNamesLine = healthFindingsPanel.locator('p').filter({ has: page.getByRole('link', { name: 'Review and link →' }) });
+  await expect(unlinkedSystemsNamesLine).toContainText('Orphan System');
+  await expect(unlinkedSystemsNamesLine).toContainText('Consumer System');
+  await expect(unlinkedSystemsNamesLine).toContainText('Labeled Consumer System');
 
-  await expect(page.getByText('1 capability with no owner')).toBeVisible();
-  await expect(page.getByText('Unowned Capability', { exact: true })).toBeVisible();
+  // A single-item finding renders via ArchitectHome's own "info row" shape
+  // (one combined line: "<summary> — <name> · <action>"), not FindingCard's
+  // two-paragraph one — "Unowned Capability" is a substring of that
+  // combined text, never its own exact text node.
+  await expect(healthFindingsPanel.getByText('1 capability with no owner')).toBeVisible();
+  await expect(healthFindingsPanel.getByText('Unowned Capability')).toBeVisible();
   // The owned capability must not appear in the no-owner finding.
-  await expect(page.getByText('Owned Capability', { exact: true })).toHaveCount(0);
+  await expect(healthFindingsPanel.getByText('Owned Capability', { exact: true })).toHaveCount(0);
 
-  await expect(page.getByText('1 attribute stale over 12 months')).toBeVisible();
-  await expect(page.getByText(/across 1 system · oldest \dy/)).toBeVisible();
+  await expect(healthFindingsPanel.getByText('1 attribute stale over 12 months')).toBeVisible();
+  await expect(healthFindingsPanel.getByText(/across 1 system · oldest \dy/)).toBeVisible();
 
   // Sprint U4-1 B5's finding: exactly the one unlabeled edge, named by its
   // endpoints — the labeled one must not appear here.
-  await expect(page.getByText('1 relationship missing a label')).toBeVisible();
-  await expect(page.getByText('Consumer System → Well Owned System')).toBeVisible();
-  await expect(page.getByText('Labeled Consumer System → Well Owned System')).toHaveCount(0);
+  await expect(healthFindingsPanel.getByText('1 relationship missing a label')).toBeVisible();
+  await expect(healthFindingsPanel.getByText('Consumer System → Well Owned System')).toBeVisible();
+  await expect(healthFindingsPanel.getByText('Labeled Consumer System → Well Owned System')).toHaveCount(0);
 
-  await expect(page.getByText('0 duplicates flagged')).toBeVisible();
+  await expect(healthFindingsPanel.getByText('0 duplicates flagged')).toBeVisible();
 });
 
 test('architect-door layout prompt: a finding with more than three items collapses to "and N more" on its own card, with a browse-table link to the full list', async ({ page }) => {
@@ -210,16 +229,32 @@ test('architect-door layout prompt: a finding with more than three items collaps
   // mechanism at all (Sprint U4-1 B3's old "Show all" accordion is
   // retired); the rest are only ever reachable via the card's own browse
   // link into the full, unfiltered-by-count element table.
-  await expect(page.getByText('System 01, System 02, System 03, and 19 more')).toBeVisible();
-  await expect(page.getByText('System 22', { exact: true })).toHaveCount(0);
+  //
+  // Scoped to the unlinked-systems card's own names line (the `<p>`
+  // containing its "Review and link →" action, unique to this finding) —
+  // every one of these 22 systems also lacks a technical owner, so the
+  // no-technical-owner finding's own card shows the identical collapsed
+  // name list, and a bare page-wide getByText collides with it.
+  const unlinkedSystemsNamesLine = page.locator('p').filter({ has: page.getByRole('link', { name: 'Review and link →' }) });
+  await expect(unlinkedSystemsNamesLine).toContainText('System 01, System 02, System 03, and 19 more');
+  // Scoped to the Health findings panel: Recent activity (elsewhere on this
+  // door) links every one of the 22 seeded systems, including System 22 —
+  // a page-wide "not present" check collides with it there, even though
+  // neither finding card's own collapsed names line ever shows it.
+  const healthFindingsPanel = page.getByTestId('health-findings-panel');
+  await expect(healthFindingsPanel.getByText('System 22', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Show all' })).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Review and link →' }).click();
 
-  // The browse table itself shows every one of the 22, unpaginated.
+  // The browse table itself shows every one of the 22, unpaginated. Each
+  // row's own link accessible name is "system System NN" (its type glyph's
+  // label prefixed to the name), not the bare name — same non-exact match
+  // convention front-doors-and-browse.engine.spec.ts's own row-link
+  // assertions already use.
   await expect(page).toHaveURL(/\/elements\?filter=unlinked-systems/);
-  await expect(page.getByRole('link', { name: 'System 01', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'System 22', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /System 01/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /System 22/ })).toBeVisible();
 });
 
 test('Sprint U4-1 B3: capability ownership inherits from an owned ancestor; an unowned subtree lists only its highest unowned ancestor', async ({ page }) => {
@@ -289,14 +324,26 @@ test('Sprint U4-1 B3: capability ownership inherits from an owned ancestor; an u
   if (!seedResult.ok) throw new Error(`seeding health-findings ownership fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
-  await expect(page.getByText('1 capability with no owner')).toBeVisible();
+  // Scoped to the Health findings panel itself — Recent activity (elsewhere
+  // on this door) links every element the seeding commit touched,
+  // regardless of ownership status, so a page-wide "not present" assertion
+  // for Unowned Child/Owned Root/Owned Root Child collides with it there.
+  const healthFindingsPanel = page.getByTestId('health-findings-panel');
   // Only the highest unowned ancestor is listed — its child is implied, not
-  // a second entry.
-  await expect(page.getByText('Unowned Root', { exact: true })).toBeVisible();
-  await expect(page.getByText('Unowned Child', { exact: true })).toHaveCount(0);
+  // a second entry. A single-item finding renders via ArchitectHome's own
+  // "info row" shape (one combined line: "<summary> — <name> ·
+  // <action>") — "Unowned Root" is a substring of that combined text, not
+  // its own exact text node, so this can't be an exact match; and it's not
+  // even a unique substring within the panel (the unrelated
+  // "capabilities with no known supporters" finding also names "Unowned
+  // Root"), so anchor on the "1 capability with no owner" row specifically.
+  const unownedCapabilityRow = healthFindingsPanel.getByText(/^1 capability with no owner/);
+  await expect(unownedCapabilityRow).toBeVisible();
+  await expect(unownedCapabilityRow).toContainText('Unowned Root');
+  await expect(healthFindingsPanel.getByText('Unowned Child', { exact: true })).toHaveCount(0);
   // The owned root's own child inherits ownership and is never flagged.
-  await expect(page.getByText('Owned Root', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('Owned Root Child', { exact: true })).toHaveCount(0);
+  await expect(healthFindingsPanel.getByText('Owned Root', { exact: true })).toHaveCount(0);
+  await expect(healthFindingsPanel.getByText('Owned Root Child', { exact: true })).toHaveCount(0);
 });
 
 test('S1 item 7: a model with nothing to flag collapses each group to one "N checks clear" line, expanding to each check\'s own line', async ({ page }) => {

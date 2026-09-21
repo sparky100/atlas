@@ -101,7 +101,7 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
           <div className={styles.stat}>
             <Text as="span" size="2xl" className={data.exposedCount > 0 ? styles.statWarn : undefined}>
               {data.exposedCount}
-            </Text>
+            </Text>{' '}
             <Text as="span" tone="muted" size="sm">
               {data.exposedCount === 1 ? 'capability' : 'capabilities'} exposed
             </Text>
@@ -109,7 +109,7 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
           <div className={styles.stat}>
             <Text as="span" size="2xl" className={data.unrecordedCount > 0 ? styles.statNeutral : undefined}>
               {data.unrecordedCount}
-            </Text>
+            </Text>{' '}
             <Text as="span" tone="muted" size="sm">
               with nothing recorded
             </Text>
