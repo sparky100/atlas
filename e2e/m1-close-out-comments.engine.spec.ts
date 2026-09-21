@@ -25,12 +25,20 @@ import { createSupabaseClient } from '../src/db/client';
 import { commitToBranch } from '../src/db/commits';
 import { loadEnv } from '../src/db/env';
 import { getProfile } from '../src/db/profiles';
-import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { addArchitectMember, bootstrapChangeBranchFixture, submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
 
 test('comment on a branch-only element, merge the change, see the comment on main; mentioning a member notifies their tray', async ({ page, browser }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'm1closeout', 'Existing System');
   const { signedIn: owner, userId: ownerId, orgId, orgSlug, modelId, modelSlug, seedSourceId } = fixture;
+  // F3a's own architect floor — see addArchitectMember's own doc comment.
+  // The owner needs to be in the reviewer set too: they cast the approve
+  // verdict below. `submitForReviewWithReviewers`'s own "first unchecked
+  // checkbox" trick still finds the owner correctly with bob (a third,
+  // non-architect member, added below) also in the org — the owner is
+  // always the earliest-joined member (`listMembers`'s own `order('joined_at')`),
+  // so their row is always first regardless of how many others exist.
+  await addArchitectMember(env, orgId, ownerId);
 
   // A second real member, in their own browser session — the mention
   // target whose own tray this test checks. Added directly (`members_insert`'s
@@ -142,7 +150,7 @@ test('comment on a branch-only element, merge the change, see the comment on mai
   // Back to the change's own page — step 2 above left `page` on the
   // element page instead.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
-  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await submitForReviewWithReviewers(page, true);
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
   await expect(page.getByText('pending', { exact: true })).toBeVisible();
   const approveButton = page.getByRole('button', { name: 'Approve' });

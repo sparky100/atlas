@@ -20,7 +20,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   // stage of a change's own lifecycle — comfortably exceeds Playwright's
   // 30s default under load; not flaky, just long.
   test.slow();
-  const { orgName } = await signUpCreateOrgAndModel(page, 'goldenpath5');
+  const { orgName, ownerDisplayName } = await signUpCreateOrgAndModel(page, 'goldenpath5');
 
   // The system this change targets — created before the proposer's own
   // session ever mounts Home: `useHomeSearch.ts` loads its search pool
@@ -35,10 +35,23 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
 
   // The org's own creator (owner) will act as reviewer; a second, invited
   // member (contributor) proposes the change — the propose-a-change entry
-  // point only appears for a contributor at main.
+  // point only appears for a contributor at main. F3a's own architect floor
+  // (`atlas.submit_merge_request`'s `v_min_architects`, default 1) means a
+  // propose-intent submit also needs a real architect member in the org —
+  // the owner can't become one themselves (an org must always keep its sole
+  // owner, `org-settings-members.engine.spec.ts`'s own precedent), so a
+  // third member is invited purely to exist as that architect; nothing else
+  // in this test drives their own session beyond accepting the invite.
   const proposerEmail = `goldenpath5-proposer-${String(Date.now())}@example.test`;
   const proposerDisplayName = 'Priya Proposer';
+  const architectEmail = `goldenpath5-architect-${String(Date.now())}@example.test`;
   await inviteMemberFromHome(page, orgName, proposerEmail, 'contributor');
+  await inviteMemberFromHome(page, orgName, architectEmail, 'architect');
+
+  const architectContext = await browser.newContext();
+  const architectPage = await architectContext.newPage();
+  await acceptInviteViaSignUp(architectPage, architectEmail, 'Alex Architect');
+  await architectContext.close();
 
   const proposerContext = await browser.newContext();
   const proposerPage = await proposerContext.newPage();
@@ -94,7 +107,18 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   await proposerPage.getByRole('button', { name: 'Edit in this change' }).click();
   await expect(proposerPage.getByText(`Editing in change: ${changeName}`)).toBeVisible();
 
+  // F3a: a propose-intent branch opens the reviewer picker instead of
+  // submitting on this one click (`ChangeView.tsx`'s own `isMultiReviewerIntent`
+  // branch) — the derived set (`deriveReviewers.ts`) already pre-checks the
+  // invited architect (the only real candidate: nothing here maps an owner
+  // actor to a member), but not the owner, who still needs to be in the
+  // picked set to cast a verdict later (`atlas.set_review_verdict`'s own
+  // "you are not a reviewer on this request" check) — checked explicitly.
+  // `.last()`: the outer trigger button keeps the same label and stays
+  // mounted once the picker opens below it.
   await proposerPage.getByRole('button', { name: 'Submit for review' }).click();
+  await proposerPage.getByLabel(ownerDisplayName).check();
+  await proposerPage.getByRole('button', { name: 'Submit for review' }).last().click();
   await expect(proposerPage.getByText('pending', { exact: true })).toBeVisible();
 
   // 4. Reviewer (the owner) views To-be, then requests changes. `page` is

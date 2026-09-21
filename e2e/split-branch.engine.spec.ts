@@ -16,12 +16,16 @@ import type { CommitEnvelope } from '../src/contracts/delta';
 import { getBranch } from '../src/db/branches';
 import { commitToBranch } from '../src/db/commits';
 import { loadEnv } from '../src/db/env';
-import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { addArchitectMember, bootstrapChangeBranchFixture, submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
 
 test('review queue split: accept one of two independent systems, preview, split, merge — the other stays behind on the original branch', async ({ page }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'splitreview', 'Existing System');
-  const { signedIn, orgSlug, modelSlug, modelId, seedSourceId } = fixture;
+  const { signedIn, userId, orgId, orgSlug, modelSlug, modelId, seedSourceId } = fixture;
+  // F3a's own architect floor — see addArchitectMember's own doc comment.
+  // `split_branch` (below) only needs owner/architect role, not reviewer
+  // membership, so the owner doesn't need to be in the picked set too.
+  await addArchitectMember(env, orgId, userId);
 
   // 1. Create the change branch through the real "Changes" form.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
@@ -60,7 +64,7 @@ test('review queue split: accept one of two independent systems, preview, split,
 
   // 2. Submit for review.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
-  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await submitForReviewWithReviewers(page, false);
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
 
   // 3. The split panel: two clean changes to choose between.

@@ -139,5 +139,7 @@ test('capability map: two-level tree with an orphan, L2→L3 expand, orphan flag
   await page.getByLabel('Colour by').selectOption({ label: 'None' });
   await expect(page.getByText('active', { exact: true })).toHaveCount(0);
   await page.getByLabel('Colour by').selectOption({ label: 'Oldest lifecycle stage' });
-  await expect(page.getByText('active', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('list', { name: 'Digital Services capabilities' }).getByText('active', { exact: true })
+  ).toBeVisible();
 });

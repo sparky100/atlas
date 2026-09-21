@@ -24,12 +24,17 @@ import type { CommitEnvelope } from '../src/contracts/delta';
 import { createChangeBranch } from '../src/db/branches';
 import { commitToBranch } from '../src/db/commits';
 import { loadEnv } from '../src/db/env';
-import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { addArchitectMember, bootstrapChangeBranchFixture, submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
 
 test('create a change, edit it on its own branch, view it, submit, approve, and merge', async ({ page }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'cbmerge', 'Billing Service');
-  const { orgSlug, modelSlug, systemId } = fixture;
+  const { orgId, userId, orgSlug, modelSlug, systemId } = fixture;
+  // F3a's own architect floor — see addArchitectMember's own doc comment.
+  // The owner needs to be in the reviewer set too: they cast the approve
+  // verdict below (`isMultiReviewer` path, `ReviewRequestView.tsx`'s own
+  // `rr.castVerdict`), which needs them to actually be one.
+  await addArchitectMember(env, orgId, userId);
 
   // 1. Create the change branch through the real "Changes" form.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
@@ -105,7 +110,7 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   await expect(page.getByText('vendor → Acme Corp')).toBeVisible();
 
   // 6. Submit for review (Sprint C1 step 7) — lands on the review request's own page.
-  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await submitForReviewWithReviewers(page, true);
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
   await expect(page.getByText('pending', { exact: true })).toBeVisible();
 

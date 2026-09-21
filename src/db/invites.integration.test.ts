@@ -160,7 +160,11 @@ describe('invite by email against a real local Supabase', () => {
     expect(ownerError).toBeNull();
 
     const invites = await listInvites(owner.client, orgId);
-    expect(invites.find((i) => i.id === created.invite.id)?.last_sent_at).toBe(now);
+    // Postgres returns a `timestamptz` as `...+00:00`, not the `Z`-suffixed
+    // ISO form `now` itself is — compare as `Date`s, not exact strings.
+    const roundTripped = invites.find((i) => i.id === created.invite.id)?.last_sent_at;
+    expect(roundTripped).not.toBeUndefined();
+    expect(new Date(roundTripped ?? '').getTime()).toBe(new Date(now).getTime());
 
     const { error: architectError } = await architect.client.from('invites').update({ last_sent_at: now }).eq('id', created.invite.id);
     expect(architectError).not.toBeNull();

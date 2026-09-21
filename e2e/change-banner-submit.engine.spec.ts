@@ -12,12 +12,14 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { loadEnv } from '../src/db/env';
-import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { addArchitectMember, bootstrapChangeBranchFixture, submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
 
 test('submitting for review from the banner on an element page (not the change page) proposes the change', async ({ page }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'bannersubmit', 'Ledger Service');
-  const { orgSlug, modelSlug, systemId } = fixture;
+  const { orgId, userId, orgSlug, modelSlug, systemId } = fixture;
+  // F3a's own architect floor — see addArchitectMember's own doc comment.
+  await addArchitectMember(env, orgId, userId);
 
   // 1. Owner creates a change from the Changes list — this already selects
   // it as the session ref and lands on the change's own page (ChangesView's
@@ -41,7 +43,7 @@ test('submitting for review from the banner on an element page (not the change p
   // 3. The banner's own "Submit for review" — not the change page's copy —
   // finishes the change from right here.
   await expect(page.getByText(`Editing in change: ${changeName}`)).toBeVisible();
-  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await submitForReviewWithReviewers(page, false);
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
   await expect(page.getByText('pending', { exact: true })).toBeVisible();
 

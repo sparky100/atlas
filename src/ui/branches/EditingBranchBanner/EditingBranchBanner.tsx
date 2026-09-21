@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { UUID } from '../../../contracts/delta';
 import type { Ref } from '../../../db/ref';
 import type { ViewMode } from '../../../db/viewMode';
 import { Button } from '../../components/Button/Button';
 import { Text } from '../../components/Text/Text';
+import { ReviewerPicker } from '../../changes/ReviewerPicker';
 import { useSubmitForReview } from '../../changes/useSubmitForReview';
 import { useEditingBranch } from '../useEditingBranch';
 import { useSelectedRef } from '../useSelectedRef';
@@ -84,6 +86,14 @@ export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, sh
   // same fetch rather than a second one.
   const { branch } = useEditingBranch(activeRef.kind === 'branch' ? modelId : null, activeRef);
   const submission = useSubmitForReview(modelId, branch);
+  const [pickingReviewers, setPickingReviewers] = useState(false);
+  // F3a: propose/explore carry a reviewer set at submit; record/correct
+  // stay on the single-approver path (no picker) — the exact same split
+  // `ChangeView.tsx`'s own copy of this button already makes; this one
+  // used to skip it entirely and always submit with no reviewers, which
+  // made submitting a propose/explore change from anywhere but the
+  // change's own page fail outright ("this change needs a reviewer set").
+  const isMultiReviewerIntent = branch !== null && (branch.intent === 'propose' || branch.intent === 'explore');
 
   if (activeRef.kind !== 'branch') return null;
 
@@ -113,14 +123,22 @@ export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, sh
     clearRef();
   };
 
+  const afterSubmitted = (mergeRequestId: UUID) => {
+    // Only clear the session's own selection if this branch was actually
+    // it — a reviewer or bystander submitting from a change page they
+    // weren't editing in has nothing of their own to reset.
+    if (ref.kind === 'branch' && ref.branchId === activeRef.branchId) clearRef();
+    void navigate(`/o/${orgSlug}/m/${modelSlug}/review/${mergeRequestId}`);
+  };
+
   const submitForReview = () => {
+    if (isMultiReviewerIntent) {
+      setPickingReviewers(true);
+      return;
+    }
     void submission.submit().then((mergeRequestId) => {
       if (!mergeRequestId) return;
-      // Only clear the session's own selection if this branch was actually
-      // it — a reviewer or bystander submitting from a change page they
-      // weren't editing in has nothing of their own to reset.
-      if (ref.kind === 'branch' && ref.branchId === activeRef.branchId) clearRef();
-      void navigate(`/o/${orgSlug}/m/${modelSlug}/review/${mergeRequestId}`);
+      afterSubmitted(mergeRequestId);
     });
   };
 
@@ -151,6 +169,24 @@ export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, sh
         <Text as="p" size="sm">
           {submission.error}
         </Text>
+      )}
+      {showSubmitForReview && pickingReviewers && branch !== null && (
+        <ReviewerPicker
+          orgId={branch.org_id}
+          modelId={modelId}
+          branch={branch}
+          submitting={submission.status === 'submitting'}
+          onCancel={() => {
+            setPickingReviewers(false);
+          }}
+          onSubmit={(reviewers) => {
+            void submission.submit(reviewers).then((mergeRequestId) => {
+              if (!mergeRequestId) return;
+              setPickingReviewers(false);
+              afterSubmitted(mergeRequestId);
+            });
+          }}
+        />
       )}
     </div>
   );

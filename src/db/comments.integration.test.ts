@@ -62,6 +62,7 @@ describe('comments, mentions, notifications, and realtime against a real local S
   let bob: TestUser; // contributor
   let carol: TestUser; // viewer
   let dave: TestUser; // a second contributor, for the resolve-permission matrix
+  let architect: TestUser; // F3a's own architect floor — see its own insert below
   let orgId: string;
   let modelId: string;
   let aliceManualSourceId: string;
@@ -72,6 +73,7 @@ describe('comments, mentions, notifications, and realtime against a real local S
     bob = await createSignedInUser('bob');
     carol = await createSignedInUser('carol');
     dave = await createSignedInUser('dave');
+    architect = await createSignedInUser('architect');
 
     orgId = randomUUID();
     await createOrganisation(alice.client, { id: orgId, name: 'Comments Test Org', slug: `comments-test-${orgId.slice(0, 8)}`, createdBy: alice.id });
@@ -88,6 +90,11 @@ describe('comments, mentions, notifications, and realtime against a real local S
     if (inviteCarolError) throw new Error(`invite carol: ${inviteCarolError.message}`);
     const { error: inviteDaveError } = await alice.client.from('members').insert({ org_id: orgId, user_id: dave.id, role: 'contributor', invited_by: alice.id });
     if (inviteDaveError) throw new Error(`invite dave: ${inviteDaveError.message}`);
+    // F3a's own architect floor (`atlas.submit_merge_request`'s own
+    // `v_min_architects`, default 1): a propose-intent submit elsewhere in
+    // this file needs a real reviewer set including an architect.
+    const { error: inviteArchitectError } = await alice.client.from('members').insert({ org_id: orgId, user_id: architect.id, role: 'architect', invited_by: alice.id });
+    if (inviteArchitectError) throw new Error(`invite architect: ${inviteArchitectError.message}`);
 
     // atlas.ensure_profile fires on the `members` insert above — bob's
     // handle is derived from his own generated email, not something this
@@ -325,7 +332,7 @@ describe('comments, mentions, notifications, and realtime against a real local S
     // open, unresolved thread is still sitting here when the merge below
     // succeeds; atlas.merge_branch never looks at `comments` at all.
     const requestId = randomUUID();
-    const { error: submitError } = await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: requestId, p_branch_id: branch.id, p_classification: { hasBlockingConflict: false } });
+    const { error: submitError } = await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: requestId, p_branch_id: branch.id, p_classification: { hasBlockingConflict: false }, p_reviewers: [{ user_id: architect.id, required: true }] });
     expect(submitError).toBeNull();
     const { error: approveError } = await alice.client.schema('atlas').rpc('approve_merge_request', { p_merge_request_id: requestId });
     expect(approveError).toBeNull();

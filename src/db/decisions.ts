@@ -130,10 +130,20 @@ export async function listDecisionsLinkingElements(supabase: Client, elementIds:
   const decisionIds = [...new Set(linkRows.map((l) => l.decision_id))];
   const decisions = await Promise.all(decisionIds.map((id) => getDecision(supabase, id)));
   const decisionsById = new Map(decisions.filter((d): d is DecisionRow => d !== null).map((d) => [d.id, d]));
-  return linkRows.flatMap((link) => {
+  // One entry per decision, not per matching link row — a decision linked
+  // to two of `elementIds` at once (e.g. a capability and its own parent,
+  // both named) would otherwise appear twice for the same decision.
+  // `linkedElementId` keeps whichever match came first; nothing downstream
+  // needs more than one representative id per decision.
+  const seen = new Set<UUID>();
+  const result: ElementDecisionLink[] = [];
+  for (const link of linkRows) {
     const decision = decisionsById.get(link.decision_id);
-    return decision ? [{ decision, linkedElementId: link.linked_id }] : [];
-  });
+    if (!decision || seen.has(decision.id)) continue;
+    seen.add(decision.id);
+    result.push({ decision, linkedElementId: link.linked_id });
+  }
+  return result;
 }
 
 /**

@@ -41,6 +41,7 @@ describe('cancel a change against a real local Supabase', () => {
   let owner: TestUser;
   let contributor: TestUser;
   let bystander: TestUser;
+  let architect: TestUser;
   let orgId: string;
   let modelId: string;
 
@@ -48,12 +49,17 @@ describe('cancel a change against a real local Supabase', () => {
     owner = await createSignedInUser('cancelchange-owner');
     contributor = await createSignedInUser('cancelchange-contributor');
     bystander = await createSignedInUser('cancelchange-bystander');
+    architect = await createSignedInUser('cancelchange-architect');
 
     orgId = randomUUID();
     await createOrganisation(owner.client, { id: orgId, name: 'Cancel Change Test Org', slug: `cancelchange-${orgId.slice(0, 8)}`, createdBy: owner.id });
     const { error: memberError } = await owner.client.from('members').insert([
       { org_id: orgId, user_id: contributor.id, role: 'contributor', invited_by: owner.id },
       { org_id: orgId, user_id: bystander.id, role: 'contributor', invited_by: owner.id },
+      // F3a's own architect floor (`atlas.submit_merge_request`'s own
+      // `v_min_architects`, default 1): the propose-intent submit below
+      // needs a real reviewer set including an architect.
+      { org_id: orgId, user_id: architect.id, role: 'architect', invited_by: owner.id },
     ]);
     if (memberError) throw new Error(`add members: ${memberError.message}`);
 
@@ -103,7 +109,7 @@ describe('cancel a change against a real local Supabase', () => {
     if (!branch) throw new Error('branch missing');
     const computed = await computeMergeReviewForBranch(contributor.client, modelId, branch);
     if (!computed) throw new Error('nothing to submit — branch has no commits of its own');
-    await submitMergeRequest(contributor.client, randomUUID(), branchId, computed.review);
+    await submitMergeRequest(contributor.client, randomUUID(), branchId, computed.review, [{ userId: architect.id, required: true }]);
 
     const beforeCancel = await listOpenMergeRequestsForModel(owner.client, modelId);
     expect(beforeCancel.some((r) => r.branch_id === branchId)).toBe(true);

@@ -23,12 +23,14 @@ import type { CommitEnvelope, Delta } from '../src/contracts/delta';
 import { getBranch } from '../src/db/branches';
 import { commitToBranch } from '../src/db/commits';
 import { loadEnv } from '../src/db/env';
-import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { addArchitectMember, bootstrapChangeBranchFixture, submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
 
 test('submitting for review on one tab resets the active ref on another open tab, over realtime', async ({ page, context }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'realtimereset', 'Ledger Service');
-  const { signedIn, modelId, orgSlug, modelSlug, seedSourceId } = fixture;
+  const { signedIn, orgId, userId, modelId, orgSlug, modelSlug, seedSourceId } = fixture;
+  // F3a's own architect floor — see addArchitectMember's own doc comment.
+  await addArchitectMember(env, orgId, userId);
 
   // 1. Tab 1: create the change through the real form — lands inside it.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
@@ -66,7 +68,7 @@ test('submitting for review on one tab resets the active ref on another open tab
   await expect(page2.getByText(`Editing in change: ${changeTitle}`)).toBeVisible();
 
   // 3. Tab 1 submits for review — the branch leaves `draft`.
-  await page.getByRole('button', { name: 'Submit for review' }).click();
+  await submitForReviewWithReviewers(page, false);
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
 
   // 4. Tab 2, untouched since step 2, reacts to the same `branches` row

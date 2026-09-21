@@ -27,12 +27,16 @@ import { createChangeBranch, getBranch } from '../src/db/branches';
 import { loadEnv } from '../src/db/env';
 import { commitToBranch } from '../src/db/commits';
 import { computeMergeReviewForBranch, submitMergeRequest } from '../src/db/mergeRequests';
-import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { addArchitectMember, bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
 
 test('a field conflict renders with its three-way context, resolves with one click, and the chosen value survives the merge', async ({ page }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'fieldconflict', 'Payments Service');
   const { signedIn, orgId, orgSlug, modelId, modelSlug, userId, main, seedCommitId, createDeltaId, seedSourceId, systemId } = fixture;
+  // F3a's own architect floor — see addArchitectMember's own doc comment.
+  // The owner (userId) is included in the reviewer set too: they cast the
+  // approve verdict below, which needs them to actually be one.
+  const architectUserId = await addArchitectMember(env, orgId, userId);
 
   // The change branch: forks at the seed commit, then edits vendor independently of main.
   const branchId = randomUUID();
@@ -75,7 +79,10 @@ test('a field conflict renders with its three-way context, resolves with one cli
   if (!computed) throw new Error('computeMergeReviewForBranch returned null');
   expect(computed.review.classification.hasBlockingConflict).toBe(true);
   const mergeRequestId = randomUUID();
-  await submitMergeRequest(signedIn, mergeRequestId, branchId, computed.review);
+  await submitMergeRequest(signedIn, mergeRequestId, branchId, computed.review, [
+    { userId, required: true },
+    { userId: architectUserId, required: true },
+  ]);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/review/${mergeRequestId}`);
 

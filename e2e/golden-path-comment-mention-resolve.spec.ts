@@ -7,6 +7,7 @@
  * for its own, narrower purpose.
  */
 import { expect, test } from '@playwright/test';
+import { submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
 import { acceptInviteViaSignUp, addSystemFromHome, goToModelHome, inviteMemberFromHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 test('comment on an element from a change\'s view, mention a member, see it in their tray, resolve after merge', async ({ page, browser }) => {
@@ -16,9 +17,22 @@ test('comment on an element from a change\'s view, mention a member, see it in t
   const bobDisplayName = 'Bob Reviewer';
   await inviteMemberFromHome(page, orgName, bobEmail, 'contributor');
 
+  // F3a's own architect floor (`atlas.submit_merge_request`'s own
+  // `v_min_architects`, default 1): the propose-intent submit below needs a
+  // real reviewer set including an architect — invited the same real way
+  // as bob, purely to exist as a member; nothing else in this test drives
+  // their own session.
+  const architectEmail = `goldenpath8-architect-${String(Date.now())}@example.test`;
+  await inviteMemberFromHome(page, orgName, architectEmail, 'architect');
+
   const bobContext = await browser.newContext();
   const bobPage = await bobContext.newPage();
   await acceptInviteViaSignUp(bobPage, bobEmail, bobDisplayName);
+
+  const architectContext = await browser.newContext();
+  const architectPage = await architectContext.newPage();
+  await acceptInviteViaSignUp(architectPage, architectEmail, 'Alex Architect');
+  await architectContext.close();
 
   // Back as the owner: into the model, a change, and a draft-only system.
   // `inviteMemberFromHome` leaves `page` on Org settings, not OrgHome.
@@ -62,8 +76,12 @@ test('comment on an element from a change\'s view, mention a member, see it in t
   await bobPage.getByRole('button', { name: /Notifications/ }).click({ timeout: 15_000 });
   await expect(bobPage.getByText('mentioned you', { exact: false })).toBeVisible();
 
-  // Submit, approve, merge.
-  await page.getByRole('button', { name: 'Submit for review' }).click();
+  // Submit, approve, merge. `submitForReviewWithReviewers`'s own "first
+  // unchecked checkbox" trick finds the owner even with bob (a contributor,
+  // also unchecked) also in the org — the owner is always the earliest-
+  // joined member (`listMembers`'s own `order('joined_at')`), so their row
+  // is always first regardless of how many others exist.
+  await submitForReviewWithReviewers(page, true);
   await expect(page.getByText('pending', { exact: true })).toBeVisible();
   const approveButton = page.getByRole('button', { name: 'Approve' });
   await expect(approveButton).toBeEnabled();
