@@ -23,6 +23,7 @@ const EFFECT_VERB: Record<RelationshipType, { outbound: string; inbound: string 
   uses: { outbound: 'use', inbound: 'be used by' },
   flows_to: { outbound: 'flow to', inbound: 'receive from' },
   replaces: { outbound: 'replace', inbound: 'be replaced by' },
+  enables: { outbound: 'enable', inbound: 'be enabled by' },
 };
 
 /** `"{elementName} will no longer {verb} {otherName}."` — always shown, regardless of relationship type or direction. */

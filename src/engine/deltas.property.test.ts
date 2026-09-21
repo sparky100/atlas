@@ -609,26 +609,46 @@ describe('C9: relationship.create enforces RELATIONSHIP_TYPE_RULES', () => {
         return { isExternal: false };
       case 'actor':
         return { subtype: 'person', isExternal: false };
+      case 'value_stream':
+        return {};
     }
   }
 
-  function elementCreateDelta(id: UUID, elementId: UUID, elementType: ElementType): Delta {
+  function elementCreateDelta(id: UUID, elementId: UUID, elementType: ElementType, parentId: UUID | null = null): Delta {
     return {
       kind: 'element.create',
       id,
       elementId,
       elementType,
       name: `Fixture ${elementType}`,
-      parentId: null,
+      parentId,
       attributes: minimalAttributesFor(elementType) as never,
       sourceId: 'src',
       confidence: 1,
     };
   }
 
-  /** A head with one `fromType` element (`from-el`) and one `toType` element (`to-el`) already created — what C9 needs to look their types up. */
+  /**
+   * A head with one `fromType` element (`from-el`) and one `toType` element
+   * (`to-el`) already created — what C9 needs to look their types up. A
+   * `value_stream` endpoint is created as a *stage* (parented on a stream
+   * created first): C22 only admits `enables` onto a stage, and this fixture
+   * exists to exercise C9's triple check, not C22 — which has its own
+   * describe block below.
+   */
   function headWithEndpoints(fromType: ElementType, toType: ElementType): Head {
-    return fold(emptyHead(), [elementCreateDelta('d-from', 'from-el', fromType), elementCreateDelta('d-to', 'to-el', toType)], ctx);
+    const deltas: Delta[] = [];
+    const endpoint = (deltaId: UUID, elementId: UUID, elementType: ElementType): void => {
+      if (elementType === 'value_stream') {
+        deltas.push(elementCreateDelta(`${deltaId}-stream`, `${elementId}-stream`, 'value_stream'));
+        deltas.push(elementCreateDelta(deltaId, elementId, 'value_stream', `${elementId}-stream`));
+      } else {
+        deltas.push(elementCreateDelta(deltaId, elementId, elementType));
+      }
+    };
+    endpoint('d-from', 'from-el', fromType);
+    endpoint('d-to', 'to-el', toType);
+    return fold(emptyHead(), deltas, ctx);
   }
 
   function relationshipCreateDelta(relationshipType: RelationshipType): Delta {
@@ -1069,5 +1089,88 @@ describe('C20 (S1 item 11a): owns.role from an external actor must be "service"'
     const retracted = fold(created, [{ kind: 'relationship.retract', id: 'd-retract', relationshipId: 'rel-1', relationshipType: 'owns', previousDeltaId: 'd-rel-1', sourceId: 'src', confidence: 1 }], ctx);
     const restore: Delta = { kind: 'relationship.restore', id: 'd-restore', relationshipId: 'rel-1', relationshipType: 'owns', previousDeltaId: 'd-retract', sourceId: 'src', confidence: 1 };
     expect(() => fold(retracted, [restore], ctx)).not.toThrow();
+  });
+});
+
+describe('C22 (ADR-023/F6): a value_stream sits under a top-level stream or nothing; enables targets a stage, never a stream', () => {
+  function elementCreate(id: UUID, elementId: UUID, elementType: ElementType, name: string, parentId: UUID | null = null): Delta {
+    const attributes = elementType === 'system' ? { lifecycleStatus: 'active', isExternal: false } : {};
+    return { kind: 'element.create', id, elementId, elementType, name, parentId, attributes: attributes as never, sourceId: 'src', confidence: 1 };
+  }
+
+  /** One stream (`vs-1`), one stage under it (`st-1`), one capability (`cap-1`). */
+  function streamStageAndCapability(): Head {
+    return fold(
+      emptyHead(),
+      [
+        elementCreate('d-vs-1', 'vs-1', 'value_stream', 'Getting Connected'),
+        elementCreate('d-st-1', 'st-1', 'value_stream', 'Apply', 'vs-1'),
+        elementCreate('d-cap-1', 'cap-1', 'capability', 'Connections'),
+      ],
+      ctx,
+    );
+  }
+
+  function enablesCreate(relationshipId: UUID, toElementId: UUID): Delta {
+    return { kind: 'relationship.create', id: `d-${relationshipId}`, relationshipId, relationshipType: 'enables', fromElementId: 'cap-1', toElementId, attributes: {}, sourceId: 'src', confidence: 1 };
+  }
+
+  function reparent(id: UUID, elementId: UUID, previousDeltaId: UUID, value: UUID | null): Delta {
+    return { kind: 'element.update', id, elementId, elementType: 'value_stream', attribute: 'parentId', value, previousDeltaId, sourceId: 'src', confidence: 1 };
+  }
+
+  it('accepts a stage under a stream, and enables from a capability onto that stage', () => {
+    const head = streamStageAndCapability();
+    expect(() => fold(head, [enablesCreate('rel-1', 'st-1')], ctx)).not.toThrow();
+  });
+
+  it('rejects enables onto a stream (no parent), naming C22 — C9 alone would have let it through', () => {
+    const head = streamStageAndCapability();
+    const attempt = () => fold(head, [enablesCreate('rel-1', 'vs-1')], ctx);
+    expect(attempt).toThrow(EngineError);
+    expect(attempt).toThrow(/C22/);
+  });
+
+  it('rejects a stage under a stage — a value stream has exactly two levels', () => {
+    const head = streamStageAndCapability();
+    const attempt = () => fold(head, [elementCreate('d-st-2', 'st-2', 'value_stream', 'Sub-stage', 'st-1')], ctx);
+    expect(attempt).toThrow(EngineError);
+    expect(attempt).toThrow(/C22/);
+  });
+
+  it('rejects a value_stream parented on anything that is not a value stream, or on nothing that exists', () => {
+    const head = streamStageAndCapability();
+    expect(() => fold(head, [elementCreate('d-vs-2', 'vs-2', 'value_stream', 'Under a capability', 'cap-1')], ctx)).toThrow(/C22/);
+    expect(() => fold(streamStageAndCapability(), [elementCreate('d-vs-3', 'vs-3', 'value_stream', 'Under nothing', 'missing')], ctx)).toThrow(/C22/);
+  });
+
+  it('element.update parentId: re-parenting a stage onto another stream is accepted; onto a stage is rejected; clearing it (stage becomes a stream) is accepted', () => {
+    const withSecondStream = fold(streamStageAndCapability(), [elementCreate('d-vs-2', 'vs-2', 'value_stream', 'Customer Experience')], ctx);
+    expect(() => fold(cloneHead(withSecondStream), [reparent('d-move-1', 'st-1', 'd-st-1', 'vs-2')], ctx)).not.toThrow();
+
+    const withSecondStage = fold(cloneHead(withSecondStream), [elementCreate('d-st-2', 'st-2', 'value_stream', 'Quote', 'vs-2')], ctx);
+    expect(() => fold(cloneHead(withSecondStage), [reparent('d-move-2', 'st-1', 'd-st-1', 'st-2')], ctx)).toThrow(/C22/);
+
+    expect(() => fold(cloneHead(withSecondStream), [reparent('d-move-3', 'st-1', 'd-st-1', null)], ctx)).not.toThrow();
+  });
+
+  it('element.restore: a stage whose stream was retracted meanwhile is restored without re-checking C22, matching C18/C20', () => {
+    const head = streamStageAndCapability();
+    // The stage goes first (it has no relationships), then its stream —
+    // C8's relationship half is enforced inline; its children half is not.
+    const retracted = fold(
+      head,
+      [
+        { kind: 'element.retract', id: 'd-retract-st', elementId: 'st-1', elementType: 'value_stream', previousDeltaId: 'd-st-1', sourceId: 'src', confidence: 1 },
+        { kind: 'element.retract', id: 'd-retract-vs', elementId: 'vs-1', elementType: 'value_stream', previousDeltaId: 'd-vs-1', sourceId: 'src', confidence: 1 },
+      ],
+      ctx,
+    );
+    const restore: Delta = { kind: 'element.restore', id: 'd-restore-st', elementId: 'st-1', elementType: 'value_stream', previousDeltaId: 'd-retract-st', sourceId: 'src', confidence: 1 };
+    // `fold` mutates its head — fold a clone for the throw check, then once
+    // more for the parent assertion.
+    expect(() => fold(cloneHead(retracted), [restore], ctx)).not.toThrow();
+    const restored = fold(retracted, [restore], ctx);
+    expect(restored.elements.get('st-1')?.parentId).toBe('vs-1');
   });
 });

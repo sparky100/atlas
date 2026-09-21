@@ -20,6 +20,8 @@ const STILL_VERB: Record<RelationshipType, { from: string; to: string }> = {
   owns: { from: 'own', to: 'be owned by' },
   flows_to: { from: 'flow to', to: 'receive from' },
   replaces: { from: 'replace', to: 'be replaced by' },
+  // F6 (ADR-023): a system never holds an `enables` edge (capability → stage only), so a conversion never carries one — exhaustive-Record entry.
+  enables: { from: 'enable', to: 'be enabled by' },
 };
 
 /** "The new module will still {verb} {otherName}." — one line per relationship the conversion carries over unchanged (`buildConvertSystemToModuleDeltas`'s own module comment: every one of them carries over, nothing is ever dropped). */

@@ -91,6 +91,17 @@ export const RELATIONSHIP_TYPE_RULES: readonly RelationshipTypeRule[] = [
   { relationshipType: 'replaces', fromType: 'system', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'replaces', fromType: 'container', toType: 'system', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
   { relationshipType: 'replaces', fromType: 'container', toType: 'container', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
+  // F6 (ADR-023): a capability enables a value-stream *stage* — "this
+  // capability is one of those that deliver this stage." This row admits
+  // the whole `value_stream` type because this table has never expressed
+  // anything finer than (relationshipType, fromType, toType); "a stage,
+  // never a stream" (the target's own `parentId` must be non-null) is C22
+  // (`src/engine/deltas.ts`'s `checkEnablesTarget`), for the same reason
+  // the platform/module row above kept its parent-kind rule out of here.
+  // No cardinality in either direction: a capability commonly enables
+  // several stages across several streams, and a stage is usually enabled
+  // by more than one capability.
+  { relationshipType: 'enables', fromType: 'capability', toType: 'value_stream', maxPerFrom: null, maxPrimaryPerTo: null, maxPrimaryPerFrom: null },
 ] as const;
 
 /** The rule for a triple, or `undefined` if the triple isn't legal (C9/V3). */

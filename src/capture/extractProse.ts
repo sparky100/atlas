@@ -154,6 +154,9 @@ const ELEMENT_ATTRIBUTE_PARSERS: Readonly<Record<ElementType, Readonly<Record<st
     isExternal: parseBooleanAttribute,
     externalOrganisation: parsePlainString,
   },
+  // F6 (ADR-023): capture never proposes a value stream (runCapture.ts's
+  // own REQUIRED_ATTRIBUTES_BY_TYPE note) — exhaustive-Record entry only.
+  value_stream: { description: parsePlainString },
 };
 
 /** `role` is never asked of the model (see module comment) but is a real contract key on both types — accepted if a future prompt revision ever supplies it, defaulted otherwise (`applyRoleDefault`). `owns` has no `description` attribute at all (`OwnsAttributes`). */
@@ -163,6 +166,8 @@ const RELATIONSHIP_ATTRIBUTE_PARSERS: Readonly<Record<RelationshipType, Readonly
   owns: { role: (raw) => parseEnumAttribute(raw, OWNS_ROLE_VALUES) },
   flows_to: { description: parsePlainString },
   replaces: { description: parsePlainString },
+  // F6 (ADR-023): no attributes (`EnablesAttributes`), never proposed by capture.
+  enables: {},
 };
 
 // ---------------------------------------------------------------------------

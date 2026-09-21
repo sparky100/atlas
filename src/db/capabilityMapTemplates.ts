@@ -92,3 +92,40 @@ export async function listCapabilityMapItems(supabase: Client, mapId: UUID): Pro
   if (error) throw new Error(`listCapabilityMapItems: ${error.message}`);
   return data as CapabilityMapItemRow[];
 }
+
+/** F6 (ADR-023, SPEC §3.10): a starter map's value stream (`parent_code` null) or one of its stages (`parent_code` = the stream's code) — `20260921060000_value_streams.sql`. */
+export interface CapabilityMapValueStreamItemRow {
+  id: UUID;
+  map_id: UUID;
+  code: string;
+  parent_code: string | null;
+  name: string;
+  description: string | null;
+  /** Same `item_order`-not-`order` reasoning as `CapabilityMapItemRow`. */
+  item_order: number;
+}
+
+/** F6: "this capability enables this stage" in a starter map — `capability_code` already resolved from the content file's capability *name* by `scripts/loadCapabilityMaps.ts`. */
+export interface CapabilityMapValueStreamEnablesRow {
+  map_id: UUID;
+  stage_code: string;
+  capability_code: string;
+}
+
+/** Streams first (a null `parent_code` sorts first under `nullsFirst`), then stages — the same parent-before-child order `listCapabilityMapItems`'s `order('level')` gives, for the same reason (`buildSeedDeltas` mints ids parent-first). */
+export async function listCapabilityMapValueStreamItems(supabase: Client, mapId: UUID): Promise<CapabilityMapValueStreamItemRow[]> {
+  const { data, error } = await supabase
+    .from('capability_map_value_stream_items')
+    .select('*')
+    .eq('map_id', mapId)
+    .order('parent_code', { ascending: true, nullsFirst: true })
+    .order('item_order');
+  if (error) throw new Error(`listCapabilityMapValueStreamItems: ${error.message}`);
+  return data as CapabilityMapValueStreamItemRow[];
+}
+
+export async function listCapabilityMapValueStreamEnables(supabase: Client, mapId: UUID): Promise<CapabilityMapValueStreamEnablesRow[]> {
+  const { data, error } = await supabase.from('capability_map_value_stream_enables').select('*').eq('map_id', mapId).order('stage_code').order('capability_code');
+  if (error) throw new Error(`listCapabilityMapValueStreamEnables: ${error.message}`);
+  return data as CapabilityMapValueStreamEnablesRow[];
+}

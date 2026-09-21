@@ -58,8 +58,8 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | Type | Values |
 |---|---|
 | `member_role` | `owner`, `architect`, `contributor`, `viewer` |
-| `element_type` | `capability`, `system`, `container`, `actor`, `value_stream` (S1 item 18 removed `component`, `20260913010000_remove_component_element_type.sql`; `deltas.element_type` itself moved from this enum to plain `text` in the same migration — that column's own historical rows are immutable, see the migration's own comment. ADR-023/F6 adds `value_stream` — a stream, or a stage when `parent_id` is set — via `alter type … add value`, the first addition to this enum since it was created) |
-| `relationship_type` | `supports`, `uses`, `owns`, `flows_to`, `enables` (ADR-023/F6: capability → stage, the first addition to this enum since it was created) |
+| `element_type` | `capability`, `system`, `container`, `actor`, `value_stream` (S1 item 18 removed `component`, `20260913010000_remove_component_element_type.sql`; `deltas.element_type` itself moved from this enum to plain `text` in the same migration — that column's own historical rows are immutable, see the migration's own comment. ADR-023/F6 adds `value_stream` — a stream, or a stage when `parent_id` is set — via `alter type … add value` in `20260921060000_value_streams.sql`, the first addition to this enum since it was created) |
+| `relationship_type` | `supports`, `uses`, `owns`, `flows_to`, `replaces` (ADR-001's "replaces" amendment, `20260921030000_relationship_type_replaces.sql`: from = the replacement, to = the retiring element), `enables` (ADR-023/F6: capability → stage) |
 | `branch_kind` | `main`, `change`, `capture_draft` |
 | `branch_status` | `draft`, `proposed`, `in_review`, `approved`, `merged`, `rejected`, `archived` |
 | `commit_kind` | `genesis`, `manual`, `capture`, `merge`, `template_seed`, `preparation` (ADR-021 §2a amendment 1, C2b — written only by `atlas.refresh_branch`, never directly by a client, §5.1) |
@@ -713,6 +713,7 @@ A map's value streams and their stages — the content file's optional `valueStr
 
 | Column | Type | Constraints |
 |---|---|---|
+| `id` | uuid | primary key — a seeded stream/stage's `attributes.templateRef` points here, exactly as a capability's points at `capability_map_items.id` |
 | `map_id` | uuid | → `capability_maps(id)` on delete cascade |
 | `code` | text | not null; `unique (map_id, code)` — the stream/stage's stable reference (its `template_code` alias once seeded), independent of `item_order` |
 | `parent_code` | text | nullable → `(map_id, code)`; null for a stream, a stream's code for a stage |

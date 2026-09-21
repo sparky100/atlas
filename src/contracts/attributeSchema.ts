@@ -27,6 +27,7 @@ import type {
   ContainerAttributes,
   ElementType,
   SystemAttributes,
+  ValueStreamAttributes,
 } from './delta';
 import type { Json } from './rows';
 
@@ -202,11 +203,32 @@ const ACTOR_META: Record<keyof ActorAttributes, AttributeFieldMeta> = {
 };
 const ACTOR_ORDER: (keyof ActorAttributes)[] = ['subtype', 'description', 'email', 'orgUnit', 'isExternal', 'externalOrganisation', 'memberId'];
 
+// F6 (ADR-023): a value stream or one of its stages — one schema for both,
+// since only `parentId` tells them apart (`ValueStreamAttributes`'s own doc
+// comment, delta.ts). No required field, so `defaultCreateAttributes` gives
+// a bare `{}` for the type.
+const VALUE_STREAM_META: Record<keyof ValueStreamAttributes, AttributeFieldMeta> = {
+  description: { label: 'Description', required: false, kind: 'text', multiline: true },
+  templateRef: { label: 'Template reference', required: false, kind: 'text', editable: false, hidden: true },
+  // Same "the reorder control is the only writer" shape as CAPABILITY_META.order.
+  order: { label: 'Order', required: false, kind: 'text', editable: false },
+  // Written only by the stream's Deactivate/Reactivate action (ADR-023: a
+  // stream is deactivated, never deleted) — read-only in the attribute form.
+  // Shown as "—" while unset (§4.3's default; `hideWhenEmpty` stays
+  // Capability.code's alone, ADR-020) and single-line (check C2: only a
+  // `description` field is ever multiline).
+  inactive: { label: 'Inactive', required: false, kind: 'boolean', editable: false },
+  inactiveSince: { label: 'Inactive since', required: false, kind: 'date', editable: false },
+  inactiveReason: { label: 'Inactive reason', required: false, kind: 'text', editable: false },
+};
+const VALUE_STREAM_ORDER: (keyof ValueStreamAttributes)[] = ['description', 'templateRef', 'order', 'inactive', 'inactiveSince', 'inactiveReason'];
+
 export const ATTRIBUTE_SCHEMA_BY_TYPE: Record<ElementType, readonly AttributeFieldSchema[]> = {
   capability: schemaOf(CAPABILITY_ORDER, CAPABILITY_META),
   system: schemaOf(SYSTEM_ORDER, SYSTEM_META),
   container: schemaOf(CONTAINER_ORDER, CONTAINER_META),
   actor: schemaOf(ACTOR_ORDER, ACTOR_META),
+  value_stream: schemaOf(VALUE_STREAM_ORDER, VALUE_STREAM_META),
 };
 
 export function attributeFieldSchema(elementType: ElementType, key: string): AttributeFieldSchema | undefined {

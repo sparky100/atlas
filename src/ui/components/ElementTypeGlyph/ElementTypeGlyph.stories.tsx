@@ -23,6 +23,7 @@ export const AllTypes: Story = {
           { type: 'actor' as const, actorSubtype: 'person' as const, label: 'Actor · person' },
           { type: 'actor' as const, actorSubtype: 'team' as const, label: 'Actor · team' },
           { type: 'actor' as const, actorSubtype: 'organisation' as const, label: 'Actor · organisation' },
+          { type: 'value_stream' as const, label: 'Value stream / stage' },
         ]
       ).map((row) => (
         <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>

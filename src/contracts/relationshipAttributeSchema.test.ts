@@ -3,9 +3,10 @@ import { RELATIONSHIP_TYPES } from './delta';
 import { RELATIONSHIP_ATTRIBUTE_SCHEMA_BY_TYPE, validateCustomRelationshipAttributeValue, validateRelationshipAttributeValue } from './relationshipAttributeSchema';
 
 describe('RELATIONSHIP_ATTRIBUTE_SCHEMA_BY_TYPE', () => {
-  it('has a schema for every relationship type', () => {
+  it('has a schema for every relationship type — non-empty for all but enables, which has no attributes by decision (ADR-023/F6)', () => {
     for (const type of RELATIONSHIP_TYPES) {
-      expect(RELATIONSHIP_ATTRIBUTE_SCHEMA_BY_TYPE[type].length).toBeGreaterThan(0);
+      if (type === 'enables') expect(RELATIONSHIP_ATTRIBUTE_SCHEMA_BY_TYPE[type]).toEqual([]);
+      else expect(RELATIONSHIP_ATTRIBUTE_SCHEMA_BY_TYPE[type].length).toBeGreaterThan(0);
     }
   });
 

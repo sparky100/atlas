@@ -23,7 +23,7 @@ import styles from './RelationshipsSection.module.css';
 
 // Fixed display order (UI-principles §4.4) — distinct from RELATIONSHIP_TYPES'
 // wire-contract listing order, which doesn't itself mandate a UI order.
-const DISPLAY_ORDER: RelationshipType[] = ['supports', 'owns', 'uses', 'flows_to'];
+const DISPLAY_ORDER: RelationshipType[] = ['supports', 'owns', 'uses', 'flows_to', 'enables'];
 
 const DIRECTION_LABEL: Record<RelationshipType, { outbound: string; inbound: string }> = {
   supports: { outbound: 'supports', inbound: 'supported by' },
@@ -35,6 +35,8 @@ const DIRECTION_LABEL: Record<RelationshipType, { outbound: string; inbound: str
   // "Replaced by" sections don't render on the element page until a later
   // PR adds 'replaces' to DISPLAY_ORDER and covers the rendering behaviour.
   replaces: { outbound: 'replaces', inbound: 'replaced by' },
+  // F6 (ADR-023): a capability's "Enables" group and a stage's "Enabled by" group both come from this one entry plus the rules row.
+  enables: { outbound: 'enables', inbound: 'enabled by' },
 };
 
 /** Everything `RelationshipAdd` needs beyond the group slot itself and direction — one object so `RelationshipsSection`'s own prop list doesn't grow one entry per field every time the create path needs another. Omitted entirely (not passed disabled) when the caller hasn't established edit rights, same convention as `CapabilityMapView`'s `reorderCapability`. */

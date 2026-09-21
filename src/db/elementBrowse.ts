@@ -91,4 +91,4 @@ export function lifecycleStatusOf(element: ElementsHeadRow): string | null {
   return typeof value === 'string' ? value : null;
 }
 
-export const ELEMENT_TYPE_FILTER_OPTIONS: readonly (ElementType | 'all')[] = ['all', 'capability', 'system', 'container', 'actor'];
+export const ELEMENT_TYPE_FILTER_OPTIONS: readonly (ElementType | 'all')[] = ['all', 'capability', 'system', 'container', 'actor', 'value_stream'];
