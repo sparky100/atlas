@@ -172,7 +172,7 @@ describe('runCapture — pasted text (PR11 prose path)', () => {
     const text = 'The CRM system is supplied by Acme Corp.';
     const location: PromptBChunkLocation = { kind: 'pastedText', start: 0, end: text.length, total: text.length };
     const userMessage = buildPromptBUserMessage({ inputName: 'notes.txt', location, chunkText: text });
-    const request: LlmRequest = { effort: 'high', system: PROMPT_B_SYSTEM, format: { type: 'json_schema', schema: PROMPT_B_SCHEMA }, messages: [{ role: 'user', content: userMessage }] };
+    const request: LlmRequest = { effort: 'medium', system: PROMPT_B_SYSTEM, format: { type: 'json_schema', schema: PROMPT_B_SCHEMA }, messages: [{ role: 'user', content: userMessage }] };
     const key = hashLlmRequest(request);
     const responseBody = {
       elements: [

@@ -14,7 +14,7 @@ function identitySourceRefForOffset(start: number, end: number): SourceRef {
 
 function llmClientFor(chunkText: string, priorElementNames: readonly string[], responseBody: unknown): RecordedLlmClient {
   const userMessage = buildPromptBUserMessage({ inputName: 'doc.txt', location: LOCATION, chunkText, ...(priorElementNames.length > 0 ? { priorElementNames } : {}) });
-  const request: LlmRequest = { effort: 'high', system: PROMPT_B_SYSTEM, format: { type: 'json_schema', schema: PROMPT_B_SCHEMA }, messages: [{ role: 'user', content: userMessage }] };
+  const request: LlmRequest = { effort: 'medium', system: PROMPT_B_SYSTEM, format: { type: 'json_schema', schema: PROMPT_B_SCHEMA }, messages: [{ role: 'user', content: userMessage }] };
   const key = hashLlmRequest(request);
   return new RecordedLlmClient({ cassettes: new Map([[key, { text: JSON.stringify(responseBody), stopReason: 'end_turn', inputTokens: 10, outputTokens: 10, cacheReadTokens: 0 }]]) });
 }
@@ -166,7 +166,7 @@ describe('extractProseChunk', () => {
   it('propagates a malformed prompt-B response as ExtractProseError rather than silently accepting it', async () => {
     const chunkText = 'Some text.';
     const userMessage = buildPromptBUserMessage({ inputName: 'doc.txt', location: LOCATION, chunkText });
-    const request: LlmRequest = { effort: 'high', system: PROMPT_B_SYSTEM, format: { type: 'json_schema', schema: PROMPT_B_SCHEMA }, messages: [{ role: 'user', content: userMessage }] };
+    const request: LlmRequest = { effort: 'medium', system: PROMPT_B_SYSTEM, format: { type: 'json_schema', schema: PROMPT_B_SCHEMA }, messages: [{ role: 'user', content: userMessage }] };
     const key = hashLlmRequest(request);
     const llmClient = new RecordedLlmClient({ cassettes: new Map([[key, { text: 'not json', stopReason: 'end_turn', inputTokens: 1, outputTokens: 1, cacheReadTokens: 0 }]]) });
 

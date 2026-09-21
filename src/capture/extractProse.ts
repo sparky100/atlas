@@ -55,8 +55,8 @@ import { applyRequiredDefaults, type RowCandidate } from './rowsToCandidates';
 
 export class ExtractProseError extends Error {}
 
-/** §6: "Effort: prompt B `high`." */
-const PROMPT_B_EFFORT = 'high';
+/** §6 named prompt B `high`; lowered to `medium` because the model's default-effort thinking makes a single extraction call take up to ~150s, and a multi-chunk document needs several — well past `capture-run`'s one-invocation wall clock (504). */
+const PROMPT_B_EFFORT = 'medium';
 
 const promptBAttributeResponseSchema = z.object({
   key: z.string(),
