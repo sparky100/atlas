@@ -69,7 +69,7 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
         </Panel>
       )}
 
-      {status === 'loading' && <Text tone="muted">Loading…</Text>}
+      {status === 'loading' && jobs.length === 0 && <Text tone="muted">Loading…</Text>}
       {error !== null && (
         <Text as="p" size="sm">
           {error}
