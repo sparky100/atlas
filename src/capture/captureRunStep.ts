@@ -41,7 +41,7 @@ import { captureCandidateWireToRow, type CaptureCandidateRowShape } from '../con
 import { envelopeToDeltaRows, type DeltaRow } from '../contracts/rows';
 import type { UUID } from '../contracts/delta';
 import { cloneHead, fold, type Head } from '../engine/deltas';
-import { buildCaptureDraftEnvelope } from './buildCaptureDraftEnvelope';
+import { buildCaptureDraftEnvelope, candidateDeltaRank } from './buildCaptureDraftEnvelope';
 import type { LlmClient } from './llm/client';
 import type { MatchIndex } from './matchIndex';
 import type { PreviousCandidateForDiff } from './reimportDiff';
@@ -232,13 +232,30 @@ export async function runCaptureRunStep(deps: CaptureRunDeps, jobId: UUID): Prom
     });
 
     // §8.1 step 3's own "the worker has already folded the envelope with
-    // src/engine to check [C1-C6]" — a defensive re-check before the
-    // one-shot RPC call, so a bug in this pipeline surfaces as a job
-    // failure with a clear stack, not an opaque SQL constraint violation.
-    fold(cloneHead(mainHead), envelope.deltas, { authorId: job.createdBy, createdAt });
+    // src/engine to check [C1-C6]" — made fault-tolerant: fold each
+    // candidate's own deltas in the same dependency order the envelope used
+    // (elements before relationships) and *drop* (mark `invalid`) any
+    // candidate the engine rejects, so one bad candidate (a C9/C17/V6
+    // violation, or a future bug) only costs that one candidate, never the
+    // whole run.
+    const workingHead = cloneHead(mainHead);
+    const rejectedSeqs = new Set<number>();
+    const deltaOrder = [...candidates].sort((a, b) => candidateDeltaRank(a) - candidateDeltaRank(b) || a.seq - b.seq);
+    for (const candidate of deltaOrder) {
+      const deltaIds = draftDeltaIdsBySeq.get(candidate.seq) ?? [];
+      if (deltaIds.length === 0) continue;
+      const candidateDeltas = envelope.deltas.filter((d) => deltaIds.includes(d.id));
+      try {
+        fold(workingHead, candidateDeltas, { authorId: job.createdBy, createdAt });
+      } catch {
+        rejectedSeqs.add(candidate.seq);
+      }
+    }
 
-    const finishedCandidates = candidates.map((c) => ({ ...c, draftDeltaIds: draftDeltaIdsBySeq.get(c.seq) ?? [] }));
-    const deltaRows = envelopeToDeltaRows(envelope, { orgId: job.orgId, modelId: job.modelId, createdBy: job.createdBy });
+    const rejectedDeltaIds = new Set([...rejectedSeqs].flatMap((seq) => draftDeltaIdsBySeq.get(seq) ?? []));
+    const keptEnvelope = { ...envelope, deltas: envelope.deltas.filter((d) => !rejectedDeltaIds.has(d.id)) };
+    const finishedCandidates = candidates.map((c) => (rejectedSeqs.has(c.seq) ? { ...c, class: 'invalid' as const, draftDeltaIds: [] } : { ...c, draftDeltaIds: draftDeltaIdsBySeq.get(c.seq) ?? [] }));
+    const deltaRows = envelopeToDeltaRows(keptEnvelope, { orgId: job.orgId, modelId: job.modelId, createdBy: job.createdBy });
     const candidateRows = finishedCandidates.map(captureCandidateWireToRow);
 
     const written = await deps.writeCaptureDraft({

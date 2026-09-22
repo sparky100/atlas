@@ -3,8 +3,9 @@ import type { CaptureJobError, CaptureJobProgress } from '../contracts/capture';
 import type { UUID } from '../contracts/delta';
 import { emptyHead } from '../engine/deltas';
 import { runCaptureRunStep, type CaptureRunDeps, type CaptureRunJob, type WriteCaptureDraftInput, type WriteCaptureDraftOutput } from './captureRunStep';
-import { LlmRefusalError, type LlmClient, type LlmResponse } from './llm/client';
+import { hashLlmRequest, LlmRefusalError, RecordedLlmClient, type LlmClient, type LlmRequest, type LlmResponse } from './llm/client';
 import { buildMatchIndex } from './matchIndex';
+import { buildPromptBUserMessage, PROMPT_B_SCHEMA, PROMPT_B_SYSTEM, type PromptBChunkLocation } from './prompts/b';
 import type { RunCaptureSource } from './runCapture';
 
 const NEVER_CALLED_LLM: LlmClient = {
@@ -199,5 +200,39 @@ describe('runCaptureRunStep', () => {
     expect(second.status).toBe('parsed');
     expect(calls.beginAttempt).toHaveLength(2); // once per attempt — the second call's own beginAttempt is what clears the first attempt's stale error in a real implementation.
     expect(deps.writeCaptureDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a candidate whose delta the engine rejects, keeping the rest of the run', async () => {
+    const text = 'CRM uses Billing.';
+    const location: PromptBChunkLocation = { kind: 'pastedText', start: 0, end: text.length, total: text.length };
+    const userMessage = buildPromptBUserMessage({ inputName: PENDING_JOB.inputName, location, chunkText: text });
+    const request: LlmRequest = { effort: 'medium', system: PROMPT_B_SYSTEM, format: { type: 'json_schema', schema: PROMPT_B_SCHEMA }, messages: [{ role: 'user', content: userMessage }] };
+    const key = hashLlmRequest(request);
+    const responseBody = {
+      elements: [
+        { elementType: 'system', name: 'CRM', namePassage: 'CRM', nameConfidence: 0.9, parentName: null, attributes: [] },
+        { elementType: 'system', name: 'Billing', namePassage: 'Billing', nameConfidence: 0.9, parentName: null, attributes: [] },
+      ],
+      // Two identical uses relationships — the second is a duplicate the
+      // engine rejects (V6). One bad candidate must not fail the whole run.
+      relationships: [
+        { relationshipType: 'uses', fromName: 'CRM', toName: 'Billing', passage: 'CRM uses Billing', confidence: 0.9, attributes: [] },
+        { relationshipType: 'uses', fromName: 'CRM', toName: 'Billing', passage: 'CRM uses Billing', confidence: 0.9, attributes: [] },
+      ],
+    };
+    const llmClient = new RecordedLlmClient({ cassettes: new Map([[key, { text: JSON.stringify(responseBody), stopReason: 'end_turn', inputTokens: 10, outputTokens: 10, cacheReadTokens: 0 }]]) });
+
+    const { deps, calls } = fakeDeps({ llmClient, source: { format: 'text' as const, text } });
+    const result = await runCaptureRunStep(deps, PENDING_JOB.id);
+
+    expect(result.status).toBe('parsed');
+    expect(calls.writeCaptureDraft).toHaveLength(1);
+    const written = calls.writeCaptureDraft[0];
+    const relationshipCandidates = written?.candidates.filter((c) => c.kind === 'relationship') ?? [];
+    expect(relationshipCandidates).toHaveLength(2);
+    expect(relationshipCandidates.filter((c) => c.class === 'new')).toHaveLength(1);
+    expect(relationshipCandidates.filter((c) => c.class === 'invalid')).toHaveLength(1);
+    // The kept relationship's delta survives; the dropped one's does not.
+    expect(written?.deltas.filter((d) => d.kind === 'relationship_create')).toHaveLength(1);
   });
 });

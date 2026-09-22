@@ -122,6 +122,19 @@ function requireDraftSubjectId(candidate: CaptureCandidate, situation: string): 
   return candidate.draftSubjectId;
 }
 
+/**
+ * Dependency rank for delta ordering: top-level element creates, then childed
+ * element creates, then relationship creates/updates — a create must precede
+ * anything that references it, but candidates arrive in document order (a
+ * relationship can precede the element it names). Shared with
+ * `captureRunStep.ts`'s own fault-tolerant fold, which must walk the same
+ * order.
+ */
+export function candidateDeltaRank(candidate: CaptureCandidate): number {
+  if (candidate.kind !== 'element') return 2;
+  return candidate.proposal.kind === 'element' && candidate.proposal.parent !== null ? 1 : 0;
+}
+
 /** One `element.update`/`relationship.update` per key in `attributes`, `previousDeltaId`/confidence resolved uniformly for either subject kind. */
 function buildAttributeUpdateDeltas(
   candidate: CaptureCandidate,
@@ -150,7 +163,16 @@ export function buildCaptureDraftEnvelope(input: BuildCaptureDraftEnvelopeInput)
   const deltas: Delta[] = [];
   const draftDeltaIdsBySeq = new Map<number, UUID[]>();
 
-  for (const candidate of candidates) {
+  // Deltas are folded in list order, and a create must precede anything that
+  // references it — but candidates arrive in document order, where a
+  // relationship (or a childed element) can precede the element it names
+  // (the element is identified later in the text). Re-order for delta
+  // building only: top-level elements, then childed elements, then
+  // relationships, stable by `seq` within each rank. `draftDeltaIdsBySeq`
+  // below stays keyed by each candidate's own original `seq` regardless.
+  const deltaOrder = [...candidates].sort((a, b) => candidateDeltaRank(a) - candidateDeltaRank(b) || a.seq - b.seq);
+
+  for (const candidate of deltaOrder) {
     const before = deltas.length;
 
     if (candidate.class === 'invalid' || candidate.class === 'unsourced') {
