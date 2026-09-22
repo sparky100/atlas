@@ -50,7 +50,7 @@ function changeRow(branchEvents: RoadmapBranchEvents): string[][] {
   return events.map((event) => {
     if (event.kind === 'add') return ['Change', '', event.elementName, '', '', '', '', '', date, changeDescription(event)];
     if (event.kind === 'retire') return ['Change', '', event.elementName, '', '', '', '', '', date, changeDescription(event)];
-    return ['Change', event.capabilityName, event.toSystemName, '', '', '', '', '', date, changeDescription(event)];
+    return ['Change', event.capabilityName ?? '', event.toSystemName, '', '', '', '', '', date, changeDescription(event)];
   });
 }
 

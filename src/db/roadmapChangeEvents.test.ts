@@ -31,6 +31,10 @@ function relationshipCreate(id: string, relationshipId: string, fromElementId: s
   return { kind: 'relationship.create', id, relationshipId, relationshipType: 'supports', fromElementId, toElementId, attributes: { role: 'secondary' }, sourceId: 'src', confidence: 1 };
 }
 
+function replacesCreate(id: string, relationshipId: string, fromElementId: string, toElementId: string): Delta {
+  return { kind: 'relationship.create', id, relationshipId, relationshipType: 'replaces', fromElementId, toElementId, attributes: {}, sourceId: 'src', confidence: 1 };
+}
+
 function system(name: string): ElementRow {
   return { elementType: 'system', name, parentId: null, attributes: {}, existsDeltaId: `create-${name}` };
 }
@@ -178,5 +182,108 @@ describe('deriveRoadmapChangeEvents', () => {
     const events = deriveRoadmapChangeEvents([relationshipCreate('d1', 'rel-new', 'sys-new', 'cap-1')], asIs, toBe);
 
     expect(events).toEqual([]);
+  });
+
+  it('derives a replacement arrow from a `replaces` edge created in the change — replacement-from is the arrow\'s `to`, retiring-to is its `from`', () => {
+    const asIs = emptyHead();
+    asIs.elements.set('sys-old', system('Old System'));
+    const toBe = emptyHead();
+    toBe.elements.set('sys-old', system('Old System'));
+    toBe.elements.set('sys-new', system('New System'));
+
+    const events = deriveRoadmapChangeEvents([replacesCreate('d1', 'rel-1', 'sys-new', 'sys-old')], asIs, toBe);
+
+    expect(events).toEqual([
+      {
+        kind: 'replace',
+        fromSystemId: 'sys-old',
+        fromSystemName: 'Old System',
+        toSystemId: 'sys-new',
+        toSystemName: 'New System',
+      },
+    ]);
+  });
+
+  it('derives a replacement arrow from a module\'s (Container) `replaces` edge, same as a system\'s', () => {
+    const asIs = emptyHead();
+    asIs.elements.set('bw', container('BW', 'sap'));
+    const toBe = emptyHead();
+    toBe.elements.set('bw', container('BW', 'sap'));
+    toBe.elements.set('datasphere', system('Datasphere'));
+
+    const events = deriveRoadmapChangeEvents([replacesCreate('d1', 'rel-1', 'datasphere', 'bw')], asIs, toBe);
+
+    expect(events).toEqual([
+      {
+        kind: 'replace',
+        fromSystemId: 'bw',
+        fromSystemName: 'BW',
+        toSystemId: 'datasphere',
+        toSystemName: 'Datasphere',
+      },
+    ]);
+  });
+
+  it('prefers the `replaces` edge over re-deriving the swap from transferred supports edges, emitting one arrow not one per capability', () => {
+    const asIs = emptyHead();
+    asIs.elements.set('sys-old', system('Old System'));
+    asIs.elements.set('cap-1', capability('Housing'));
+    asIs.elements.set('cap-2', capability('Finance'));
+    asIs.relationships.set('rel-old-1', supports('sys-old', 'cap-1'));
+    asIs.relationships.set('rel-old-2', supports('sys-old', 'cap-2'));
+
+    const toBe = emptyHead();
+    toBe.elements.set('sys-old', system('Old System'));
+    toBe.elements.set('sys-new', system('New System'));
+    toBe.elements.set('cap-1', capability('Housing'));
+    toBe.elements.set('cap-2', capability('Finance'));
+    toBe.relationships.set('rel-new-1', supports('sys-new', 'cap-1'));
+    toBe.relationships.set('rel-new-2', supports('sys-new', 'cap-2'));
+
+    const deltas = [
+      relationshipRetract('d1', 'rel-old-1', 'create-rel-old-1'),
+      relationshipRetract('d2', 'rel-old-2', 'create-rel-old-2'),
+      relationshipCreate('d3', 'rel-new-1', 'sys-new', 'cap-1'),
+      relationshipCreate('d4', 'rel-new-2', 'sys-new', 'cap-2'),
+      replacesCreate('d5', 'rel-repl', 'sys-new', 'sys-old'),
+    ];
+    const events = deriveRoadmapChangeEvents(deltas, asIs, toBe);
+
+    expect(events).toEqual([
+      {
+        kind: 'replace',
+        fromSystemId: 'sys-old',
+        fromSystemName: 'Old System',
+        toSystemId: 'sys-new',
+        toSystemName: 'New System',
+      },
+    ]);
+  });
+
+  it('still derives a capability-qualified arrow when a supports transfer happens without a `replaces` edge (import-driven replacement)', () => {
+    const asIs = emptyHead();
+    asIs.elements.set('sys-old', system('Old System'));
+    asIs.elements.set('cap-1', capability('Housing'));
+    asIs.relationships.set('rel-old', supports('sys-old', 'cap-1'));
+
+    const toBe = emptyHead();
+    toBe.elements.set('sys-new', system('New System'));
+    toBe.elements.set('cap-1', capability('Housing'));
+    toBe.relationships.set('rel-new', supports('sys-new', 'cap-1'));
+
+    const deltas = [relationshipRetract('d1', 'rel-old', 'create-rel-old'), relationshipCreate('d2', 'rel-new', 'sys-new', 'cap-1')];
+    const events = deriveRoadmapChangeEvents(deltas, asIs, toBe);
+
+    expect(events).toEqual([
+      {
+        kind: 'replace',
+        capabilityId: 'cap-1',
+        capabilityName: 'Housing',
+        fromSystemId: 'sys-old',
+        fromSystemName: 'Old System',
+        toSystemId: 'sys-new',
+        toSystemName: 'New System',
+      },
+    ]);
   });
 });

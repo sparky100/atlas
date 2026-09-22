@@ -31,7 +31,9 @@ export function computeRoadmapVisibleData(groups: readonly RoadmapGroup[], branc
 export function changeDescription(event: RoadmapBranchEvents['events'][number]): string {
   if (event.kind === 'add') return `${event.elementName} added`;
   if (event.kind === 'retire') return `${event.elementName} retired`;
-  return `${event.fromSystemName} replaced by ${event.toSystemName} (${event.capabilityName})`;
+  return event.capabilityName === undefined
+    ? `${event.fromSystemName} replaced by ${event.toSystemName}`
+    : `${event.fromSystemName} replaced by ${event.toSystemName} (${event.capabilityName})`;
 }
 
 export interface RoadmapSystemEvent {

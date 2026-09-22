@@ -23,17 +23,17 @@ import styles from './RelationshipsSection.module.css';
 
 // Fixed display order (UI-principles §4.4) — distinct from RELATIONSHIP_TYPES'
 // wire-contract listing order, which doesn't itself mandate a UI order.
-const DISPLAY_ORDER: RelationshipType[] = ['supports', 'owns', 'uses', 'flows_to', 'enables'];
+// ADR-001 amendment ("replaces"): the edge is written by the retire/replace
+// flows (`useElementRetire.ts`), never by hand, so the group is read-only — no
+// +Add/Remove/edit. It only appears once a replacement is recorded (rows
+// present), then shows the target, its optional `description`, and provenance.
+const DISPLAY_ORDER: RelationshipType[] = ['supports', 'owns', 'uses', 'flows_to', 'enables', 'replaces'];
 
 const DIRECTION_LABEL: Record<RelationshipType, { outbound: string; inbound: string }> = {
   supports: { outbound: 'supports', inbound: 'supported by' },
   owns: { outbound: 'owns', inbound: 'owned by' },
   uses: { outbound: 'uses', inbound: 'used by' },
   flows_to: { outbound: 'flows to', inbound: 'receives from' },
-  // ADR-001 amendment ("replaces") — not yet in DISPLAY_ORDER below, so this
-  // entry exists only to satisfy the exhaustive Record; the "Replaces"/
-  // "Replaced by" sections don't render on the element page until a later
-  // PR adds 'replaces' to DISPLAY_ORDER and covers the rendering behaviour.
   replaces: { outbound: 'replaces', inbound: 'replaced by' },
   // F6 (ADR-023): a capability's "Enables" group and a stage's "Enabled by" group both come from this one entry plus the rules row.
   enables: { outbound: 'enables', inbound: 'enabled by' },
@@ -149,15 +149,19 @@ export function RelationshipsSection({
     // F6 (ADR-023): `enables`' own narrower, structural-edit gate replaces
     // the general one for this type alone — see `enablesAddRelationship`'s
     // own doc comment.
-    const groupAddRelationship = type === 'enables' ? enablesAddRelationship : addRelationship;
-    const groupRemoveRelationship = type === 'enables' ? enablesRemoveRelationship : removeRelationship;
+    //
+    // `replaces` (ADR-001) is read-only — written by the retire/replace
+    // flows, not by hand — so it gets no add, remove, or edit affordance.
+    const groupAddRelationship = type === 'enables' ? enablesAddRelationship : type === 'replaces' ? undefined : addRelationship;
+    const groupRemoveRelationship = type === 'enables' ? enablesRemoveRelationship : type === 'replaces' ? undefined : removeRelationship;
+    const groupEditRelationship = type === 'replaces' ? undefined : editRelationship;
     const outboundRows = relationships.filter((r) => r.relationship_type === type && r.from_element_id === elementId);
     const inboundRows = relationships.filter((r) => r.relationship_type === type && r.to_element_id === elementId);
     const outboundSlot = outboundSlots.get(type);
     const inboundSlot = inboundSlots.get(type);
     const showOutbound = outboundRows.length > 0 || (groupAddRelationship !== undefined && outboundSlot !== undefined);
     const showInbound = inboundRows.length > 0 || (groupAddRelationship !== undefined && inboundSlot !== undefined);
-    return { type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound, groupAddRelationship, groupRemoveRelationship };
+    return { type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound, groupAddRelationship, groupRemoveRelationship, groupEditRelationship };
   }).filter((group) => group.showOutbound || group.showInbound);
 
   if (groups.length === 0) {
@@ -166,7 +170,7 @@ export function RelationshipsSection({
 
   return (
     <div>
-      {groups.map(({ type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound, groupAddRelationship, groupRemoveRelationship }) => (
+      {groups.map(({ type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound, groupAddRelationship, groupRemoveRelationship, groupEditRelationship }) => (
         <div key={type} className={styles.typeGroup}>
           {showOutbound && (
             <RelationshipDirectionGroup
@@ -184,7 +188,7 @@ export function RelationshipsSection({
               sources={sources}
               addRelationship={groupAddRelationship}
               removeRelationship={groupRemoveRelationship}
-              editRelationship={editRelationship}
+              editRelationship={groupEditRelationship}
               justAddedElementId={justAddedElementId}
             />
           )}
@@ -204,7 +208,7 @@ export function RelationshipsSection({
               sources={sources}
               addRelationship={groupAddRelationship}
               removeRelationship={groupRemoveRelationship}
-              editRelationship={editRelationship}
+              editRelationship={groupEditRelationship}
               justAddedElementId={justAddedElementId}
             />
           )}

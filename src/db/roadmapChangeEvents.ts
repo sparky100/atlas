@@ -10,15 +10,24 @@
  * capability" needs the as-is head's own row, not a display string
  * already flattened into "supports A → B" text.
  *
- * "Replacement" here is exactly `useElementRetire.ts`'s own shape
- * (UI-principles decision 4, "planned replacement requires a retract
- * delta in the same approved change"): a `supports` edge retracted from
- * an old system into a capability, and a `supports` edge created from a
- * *different* system into that *same* capability, both in the one
- * change's own deltas. Nothing beyond that pairing is inferred — a
- * retract with no matching create for the same capability is a bare
- * removal (no marker of its own here; the retiring system's own "retire"
- * marker already covers it), never guessed at as a replacement.
+ * "Replacement" here comes from two equivalent sources, both looked for in
+ * the one change's own deltas:
+ *  - the `replaces` edge itself (`useElementRetire.ts` writes it
+ *    replacement-from -> retiring-to, ADR-001), which names the swap
+ *    directly; and
+ *  - a `supports` edge retracted from an old system into a capability, with
+ *    a `supports` edge created from a *different* system into that *same*
+ *    capability (UI-principles decision 4, "planned replacement requires a
+ *    retract delta in the same approved change").
+ * A retire-with-replacement records both, so a `replaces` edge for a pairing
+ * takes precedence and the supports re-derivation is skipped for it —
+ * otherwise the same swap would get one arrow per transferred capability
+ * (the common shape is every supports edge retracted from the old system and
+ * recreated from the new one in the one change).
+ * Nothing beyond those two is inferred — a retract with no matching create
+ * for the same capability is a bare removal (no marker of its own here; the
+ * retiring system's own "retire" marker already covers it), never guessed at
+ * as a replacement.
  */
 import type { Delta, UUID } from '../contracts/delta';
 import { listOwnDeltas, type BranchFork } from '../engine/branch';
@@ -42,8 +51,9 @@ export interface RoadmapRetireMarker {
 
 export interface RoadmapReplacementArrow {
   kind: 'replace';
-  capabilityId: UUID;
-  capabilityName: string;
+  /** The pairing's capability when the arrow came from a supports-edge transfer; absent when it came from a `replaces` edge, which names systems but no capability. */
+  capabilityId?: UUID;
+  capabilityName?: string;
   fromSystemId: UUID;
   fromSystemName: string;
   toSystemId: UUID;
@@ -67,6 +77,9 @@ export function deriveRoadmapChangeEvents(ownDeltas: readonly Delta[], asIsHead:
   // Capability id -> the one system this change's own deltas retracted from it / created into it.
   const supportsRetractedFrom = new Map<UUID, UUID>();
   const supportsCreatedTo = new Map<UUID, UUID>();
+  // Retiring element id -> its named replacement (a `replaces` edge: `from` is
+  // the replacement, `to` the retiring element, per ADR-001's delta shape).
+  const replacedPairs = new Map<UUID, UUID>();
 
   for (const delta of ownDeltas) {
     // `system` or `container` (a platform module — "platforms and modules"
@@ -91,12 +104,33 @@ export function deriveRoadmapChangeEvents(ownDeltas: readonly Delta[], asIsHead:
 
     if (delta.kind === 'relationship.create' && delta.relationshipType === 'supports') {
       supportsCreatedTo.set(delta.toElementId, delta.fromElementId);
+      continue;
     }
+
+    if (delta.kind === 'relationship.create' && delta.relationshipType === 'replaces') {
+      replacedPairs.set(delta.toElementId, delta.fromElementId);
+    }
+  }
+
+  for (const [oldSystemId, newSystemId] of replacedPairs) {
+    if (newSystemId === oldSystemId) continue;
+    events.push({
+      kind: 'replace',
+      fromSystemId: oldSystemId,
+      fromSystemName: elementNameOf(asIsHead, toBeHead, oldSystemId),
+      toSystemId: newSystemId,
+      toSystemName: elementNameOf(toBeHead, asIsHead, newSystemId),
+    });
   }
 
   for (const [capabilityId, oldSystemId] of supportsRetractedFrom) {
     const newSystemId = supportsCreatedTo.get(capabilityId);
     if (newSystemId === undefined || newSystemId === oldSystemId) continue;
+    // A `replaces` edge already naming this exact pairing took precedence
+    // above — don't also re-derive the same swap from the transferred
+    // supports edges (a retire-with-replacement retracts every supports edge
+    // from the old system and recreates it from the new one).
+    if (replacedPairs.get(oldSystemId) === newSystemId) continue;
     events.push({
       kind: 'replace',
       capabilityId,
