@@ -33,6 +33,21 @@ describe('groundPassage', () => {
     expect(haystack.slice(result.start, result.end)).toBe('Implementation of a Contract Lifecycle Management (CLM) platform to manage contractor interactions');
   });
 
+  it('finds a passage that drops a hyphen ("industry leading" vs "industry-leading")', () => {
+    const haystack = 'We use Tractivity, an industry-leading system.';
+    const result = groundPassage(haystack, 'We use Tractivity, an industry leading system');
+    expect(result.found).toBe(true);
+    expect(result.normalised).toBe(true);
+    expect(haystack.slice(result.start, result.end)).toBe('We use Tractivity, an industry-leading system');
+  });
+
+  it('finds a passage where a line-break hyphenated word is read unhyphenated', () => {
+    const haystack = 'Customer Stakeholder Pre-\nApplication Tool';
+    const result = groundPassage(haystack, 'Customer Stakeholder Pre-Application Tool');
+    expect(result.found).toBe(true);
+    expect(result.normalised).toBe(true);
+  });
+
   it('reports not found when the passage is nowhere in the text, never a guess', () => {
     const result = groundPassage('The CRM system is supplied by Acme.', 'a completely different sentence');
     expect(result.found).toBe(false);

@@ -3,8 +3,9 @@
  * prose extraction (prompt B) returns must have its own `passage` verified
  * against the chunk text it actually came from — byte-exact match is
  * confidence factor 1.0; a match found only after normalising case,
- * whitespace, quotes and dashes is 0.85 with `PASSAGE_NORMALISED`; no match
- * at all means the fact never happened, never a guess at where it might be.
+ * whitespace, quotes, hyphens and dashes is 0.85 with `PASSAGE_NORMALISED`;
+ * no match at all means the fact never happened, never a guess at where it
+ * might be.
  *
  * The normalised search still has to report a real offset into the
  * *original* text (so `sourceRef` — §4.1's `pdf:p{page}!{start}-{end}` /
@@ -29,17 +30,18 @@ const NOT_FOUND: GroundResult = { found: false, normalised: false, start: -1, en
 
 const CURLY_DOUBLE_QUOTES = new Set(['“', '”']);
 const CURLY_SINGLE_QUOTES = new Set(['‘', '’']);
-const DASHES = new Set(['–', '—']); // en dash, em dash
+const DASHES = new Set(['–', '—']); // en dash, em dash — folded to whitespace below, exactly like a hyphen.
 
 /**
  * One pass, one output character (or none) per input character: whitespace
- * runs collapse to a single space, letters case-fold to lowercase (the model
- * commonly re-cases a passage it otherwise copied verbatim — e.g. title case
- * for a sentence-case source), curly quotes straighten, en/em dashes become a
- * hyphen. `indexMap[i]` is the original-text index the normalised string's
- * own character `i` came from, so `indexMap[matchStart]` and
- * `indexMap[matchEnd - 1] + 1` recover the original span of any match found
- * in the normalised string.
+ * runs collapse to a single space, hyphens and en/em dashes fold to a space
+ * (the model often drops or adds a hyphen — "industry-leading" ↔ "industry
+ * leading" — and a PDF line-break hyphenates a word as "Pre-\nApplication"
+ * where the model correctly reads "Pre-Application"), letters case-fold to
+ * lowercase, curly quotes straighten. `indexMap[i]` is the original-text
+ * index the normalised string's own character `i` came from, so
+ * `indexMap[matchStart]` and `indexMap[matchEnd - 1] + 1` recover the
+ * original span of any match found in the normalised string.
  */
 function normaliseForGrounding(text: string): { normalised: string; indexMap: number[] } {
   const chars: string[] = [];
@@ -48,7 +50,7 @@ function normaliseForGrounding(text: string): { normalised: string; indexMap: nu
 
   for (let i = 0; i < text.length; i++) {
     const ch = text[i] ?? '';
-    if (/\s/.test(ch)) {
+    if (/\s/.test(ch) || ch === '-' || DASHES.has(ch)) {
       if (!previousWasSpace) {
         chars.push(' ');
         indexMap.push(i);
@@ -59,7 +61,6 @@ function normaliseForGrounding(text: string): { normalised: string; indexMap: nu
     previousWasSpace = false;
     if (CURLY_DOUBLE_QUOTES.has(ch)) chars.push('"');
     else if (CURLY_SINGLE_QUOTES.has(ch)) chars.push("'");
-    else if (DASHES.has(ch)) chars.push('-');
     else chars.push(ch.toLowerCase());
     indexMap.push(i);
   }
