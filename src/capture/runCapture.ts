@@ -407,31 +407,30 @@ function resolveElementCandidate(candidate: RowCandidate, proposal: ElementPropo
 // ---------------------------------------------------------------------------
 
 /**
- * `uses`/`flows_to` endpoints may be system or container (§6.2's own
- * prompt-B description). For a *sheet* row, `owns`/`supports` endpoints
- * are always already resolved (to a candidate seq or an existing main id)
- * by `rowsToCandidates.ts`/`capabilityAssignment.ts` themselves, so this
- * list never actually gets consulted for them from that path — but
- * `extractProse.ts` (PR11) leaves *every* relationship's own `from`/`to`
- * as `{kind:'unresolved', text}` uniformly (§5.3: "resolved exactly as
- * sheet unresolved refs are"), `owns`'s own actor `from` endpoint
- * included, so `owns` genuinely needs `actor` in its own list too — one
- * shared list per relationship type, not per end, since `resolveEndpointRef`
- * doesn't distinguish `from` from `to` when it searches (searching one
- * type bucket that doesn't contain a real hit is a no-op, never a false
- * match against a different bucket).
+ * §6.2's own prompt-B endpoint types, per relationship type **and per end**
+ * (a `supports` is system|container → capability, an `owns` is actor →
+ * capability|system|container, and so on). `resolveEndpointRef` looks each
+ * `unresolved` text up in *its own end's* bucket, so a capability named as a
+ * `supports.from` (the document describing one capability supporting another,
+ * which the taxonomy doesn't model) resolves to nothing and marks the
+ * candidate `invalid` — instead of the old single shared list resolving both
+ * ends against `capability` and emitting a `supports(capability, capability)`
+ * the engine then rejects at fold time (C9). Sheet rows never reach this
+ * record (`rowsToCandidates.ts`/`capabilityAssignment.ts` already resolve
+ * their endpoints to a candidate seq or a main id), so only prose extraction
+ * is affected.
  */
-const ENDPOINT_TYPES_BY_RELATIONSHIP: Readonly<Record<RelationshipType, readonly ElementType[]>> = {
-  supports: ['capability'],
-  uses: ['system', 'container'],
-  owns: ['actor', 'system', 'container', 'capability'],
-  flows_to: ['system', 'container'],
+const ENDPOINT_TYPES_BY_RELATIONSHIP: Readonly<Record<RelationshipType, { from: readonly ElementType[]; to: readonly ElementType[] }>> = {
+  supports: { from: ['system', 'container'], to: ['capability'] },
+  uses: { from: ['system', 'container', 'actor'], to: ['system', 'container'] },
+  owns: { from: ['actor'], to: ['capability', 'system', 'container'] },
+  flows_to: { from: ['system', 'container'], to: ['system', 'container'] },
   // ADR-001 amendment ("replaces") — legal endpoint types match
   // RELATIONSHIP_TYPE_RULES' own system/container-to-system/container triples.
-  replaces: ['system', 'container'],
+  replaces: { from: ['system', 'container'], to: ['system', 'container'] },
   // F6 (ADR-023): never proposed by capture (see REQUIRED_ATTRIBUTES_BY_TYPE's
   // own value_stream note) — listed because this Record is exhaustive.
-  enables: ['capability', 'value_stream'],
+  enables: { from: ['capability'], to: ['value_stream'] },
 };
 
 interface ResolvedEndpoint {
@@ -446,7 +445,7 @@ function resolveEndpointRef(ref: RelationshipProposal['from'], relationshipType:
     if (resolved === undefined) throw new RunCaptureError(`internal — candidate seq ${String(ref.seq)} referenced before it was resolved.`);
     return resolved === null ? { elementId: null, warning: { code: 'ENDPOINT_UNRESOLVED', text: `(candidate seq ${String(ref.seq)})`, end } } : { elementId: resolved };
   }
-  const resolvedId = resolveTextRef(ref.text, ENDPOINT_TYPES_BY_RELATIONSHIP[relationshipType], runIndex, resolvedSubjectBySeq, matchIndex);
+  const resolvedId = resolveTextRef(ref.text, ENDPOINT_TYPES_BY_RELATIONSHIP[relationshipType][end], runIndex, resolvedSubjectBySeq, matchIndex);
   return resolvedId === null ? { elementId: null, warning: { code: 'ENDPOINT_UNRESOLVED', text: ref.text, end } } : { elementId: resolvedId };
 }
 

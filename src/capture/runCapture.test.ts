@@ -132,6 +132,42 @@ describe('runCapture — matching against main', () => {
   });
 });
 
+describe('runCapture — prose supports endpoint typing (C9 regression)', () => {
+  it('marks a supports relationship invalid when its from resolves to a capability, not a system', async () => {
+    const text = 'Data Governance supports Data Sharing.';
+    const capabilities = [
+      { element_id: 'cap-gov', element_type: 'capability' as const, name: 'Data Governance', parent_id: null, attributes: {}, exists_delta_id: 'd-gov' },
+      { element_id: 'cap-share', element_type: 'capability' as const, name: 'Data Sharing', parent_id: null, attributes: {}, exists_delta_id: 'd-share' },
+    ];
+    const matchIndex = buildMatchIndex(capabilities, []);
+
+    const location: PromptBChunkLocation = { kind: 'pastedText', start: 0, end: text.length, total: text.length };
+    const userMessage = buildPromptBUserMessage({ inputName: 'notes.txt', location, chunkText: text });
+    const request: LlmRequest = { effort: 'medium', system: PROMPT_B_SYSTEM, format: { type: 'json_schema', schema: PROMPT_B_SCHEMA }, messages: [{ role: 'user', content: userMessage }] };
+    const key = hashLlmRequest(request);
+    const responseBody = {
+      elements: [],
+      relationships: [{ relationshipType: 'supports', fromName: 'Data Governance', toName: 'Data Sharing', passage: 'Data Governance supports Data Sharing', confidence: 0.9, attributes: [] }],
+    };
+    const llmClient = new RecordedLlmClient({ cassettes: new Map([[key, { text: JSON.stringify(responseBody), stopReason: 'end_turn', inputTokens: 10, outputTokens: 10, cacheReadTokens: 0 }]]) });
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'notes.txt',
+        source: { format: 'text', text },
+        documentDate: null,
+        llmClient,
+        matchIndex,
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    const relationship = result.candidates.find((c) => c.kind === 'relationship');
+    expect(relationship?.class).toBe('invalid');
+  });
+});
+
 describe('runCapture — cross-sheet container parent resolution', () => {
   it('resolves a container to its parent system created earlier in the same run, marking it new under that context', async () => {
     const csv = ['Application,Supplier,Status', 'CRM,Acme,Live'].join('\n');
