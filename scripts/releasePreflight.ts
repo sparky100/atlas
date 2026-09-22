@@ -77,7 +77,8 @@ function versionAppearsAnywhere(row: MigrationListRow, version: string): boolean
 function runMigrationList(args: string[]): unknown[] | null {
   let stdout: string;
   try {
-    stdout = execFileSync('supabase', ['migration', 'list', ...args, '--output', 'json'], { encoding: 'utf8' });
+    // shell only on Windows: npm installs the CLI as a `.cmd` shim there, which execFileSync can't spawn directly (ENOENT without it). The flag is `--output-format json` — this CLI silently ignores the older status-variables `--output json` and prints the human table, which fails to parse below.
+    stdout = execFileSync('supabase', ['migration', 'list', ...args, '--output-format', 'json'], { encoding: 'utf8', shell: process.platform === 'win32' });
   } catch (e) {
     console.error(`releasePreflight: \`supabase migration list ${args.join(' ')}\` failed:`);
     console.error(e instanceof Error ? e.message : String(e));
@@ -87,12 +88,17 @@ function runMigrationList(args: string[]): unknown[] | null {
   try {
     parsed = JSON.parse(stdout);
   } catch {
-    console.error(`releasePreflight: could not parse \`supabase migration list ${args.join(' ')} --output json\` — CLI output format may have changed.`);
+    console.error(`releasePreflight: could not parse \`supabase migration list ${args.join(' ')} --output-format json\` — CLI output format may have changed.`);
     console.error(stdout);
     return null;
   }
+  // CLI 2.116 wraps the rows: `{"migrations":[…],"message":…}` rather than a bare array (its shape has changed before — hence this unwrap step living next to the tolerant row-key guesses below).
+  if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const wrapped = (parsed as { migrations?: unknown }).migrations;
+    if (Array.isArray(wrapped)) parsed = wrapped;
+  }
   if (!Array.isArray(parsed)) {
-    console.error(`releasePreflight: expected \`supabase migration list ${args.join(' ')} --output json\` to return an array, got:`);
+    console.error(`releasePreflight: expected \`supabase migration list ${args.join(' ')} --output-format json\` to return an array, got:`);
     console.error(stdout);
     return null;
   }
@@ -168,7 +174,7 @@ function main(): void {
   // the existing pre-flight, not a separate command to remember).
   if (linked) {
     try {
-      execFileSync('supabase', ['db', 'push', '--dry-run'], { stdio: 'inherit' });
+      execFileSync('supabase', ['db', 'push', '--dry-run'], { stdio: 'inherit', shell: process.platform === 'win32' });
       console.log('releasePreflight: `supabase db push --dry-run` succeeded — the real push should too.');
     } catch (e) {
       console.error('releasePreflight: `supabase db push --dry-run` failed — the real push would fail the same way. Fix the migration(s) above before running `pnpm release` for real.');
