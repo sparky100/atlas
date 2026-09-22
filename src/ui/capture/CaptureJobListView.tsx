@@ -38,10 +38,15 @@ const PROGRESS_STAGE_LABEL: Record<CaptureJobProgress['stage'], string> = {
   write: 'Writing',
 };
 
+/** How many runs to show before collapsing behind "View more". */
+const PAGE_SIZE = 8;
+
 export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCreate }: CaptureJobListViewProps) {
   const { userId } = useAuth();
-  const { status, jobs, error, createJob, retryJob } = useCaptureJobs(modelId, orgId, userId);
+  const { status, jobs, error, createJob, retryJob, discardJob } = useCaptureJobs(modelId, orgId, userId);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const visibleJobs = jobs.slice(0, visibleCount);
 
   return (
     <div>
@@ -78,10 +83,15 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
       {jobs.length === 0 && status !== 'loading' && <EmptyState>No capture runs yet. {canCreate ? 'Start one above.' : 'Nobody has started one.'}</EmptyState>}
 
       <ul className={styles.list}>
-        {jobs.map((job) => (
-          <CaptureJobRow key={job.id} job={job} orgSlug={orgSlug} modelSlug={modelSlug} onRetry={() => { retryJob(job.id); }} />
+        {visibleJobs.map((job) => (
+          <CaptureJobRow key={job.id} job={job} orgSlug={orgSlug} modelSlug={modelSlug} onRetry={() => { retryJob(job.id); }} onDiscard={() => { discardJob(job.id); }} />
         ))}
       </ul>
+      {jobs.length > visibleCount && (
+        <Button variant="ghost" onClick={() => { setVisibleCount((c) => c + PAGE_SIZE); }}>
+          View more ({jobs.length - visibleCount} more)
+        </Button>
+      )}
 
       {canCreate && (
         <UploadCaptureDialog
@@ -99,7 +109,7 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
   );
 }
 
-function CaptureJobRow({ job, orgSlug, modelSlug, onRetry }: { job: CaptureJob; orgSlug: string; modelSlug: string; onRetry: () => void }) {
+function CaptureJobRow({ job, orgSlug, modelSlug, onRetry, onDiscard }: { job: CaptureJob; orgSlug: string; modelSlug: string; onRetry: () => void; onDiscard: () => void }) {
   const isRunning = job.status === 'pending' && job.error === null;
   const isFailed = job.status === 'pending' && job.error !== null;
   return (
@@ -131,6 +141,16 @@ function CaptureJobRow({ job, orgSlug, modelSlug, onRetry }: { job: CaptureJob; 
         <div className={styles.rowActions}>
           <Button variant="secondary" onClick={onRetry}>
             Retry
+          </Button>
+          <Button variant="ghost" onClick={onDiscard}>
+            Discard
+          </Button>
+        </div>
+      )}
+      {isRunning && (
+        <div className={styles.rowActions}>
+          <Button variant="ghost" onClick={onDiscard}>
+            Cancel
           </Button>
         </div>
       )}

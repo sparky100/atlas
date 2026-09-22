@@ -66,6 +66,8 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
   const [pendingAmbiguousTargets, setPendingAmbiguousTargets] = useState<Map<UUID, PendingAmbiguousTarget>>(new Map());
   const [newBranchName, setNewBranchName] = useState('');
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
+  /** Class groups the reviewer has collapsed — toggled by the group header; a collapsed group hides its candidates but keeps its count. */
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<CandidateClass>>(new Set());
 
   const grouped = useMemo(() => CLASS_ORDER.map((cls) => ({ cls, items: candidates.filter((c) => c.class === cls) })).filter((g) => g.items.length > 0), [candidates]);
   const flat = useMemo(() => grouped.flatMap((g) => g.items), [grouped]);
@@ -178,6 +180,15 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
     };
   }, [canReview, selectedCandidate, effectiveSelectedId, flat, multiSelected, pendingAmbiguousTargets, targetBranchId, decideMany, setDecisionFor, apply]);
 
+  const toggleGroup = useCallback((cls: CandidateClass) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(cls)) next.delete(cls);
+      else next.add(cls);
+      return next;
+    });
+  }, []);
+
   if (status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (status === 'error' || !job) return <Text as="p">{error ?? "Couldn't load this capture review."}</Text>;
 
@@ -263,67 +274,74 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
       ) : (
         grouped.map(({ cls, items }) => (
           <div key={cls} className={styles.group}>
-            <Text as="h2" size="lg">
-              {CLASS_LABEL[cls]} ({items.length})
-            </Text>
-            <ul className={styles.list} role="listbox">
-              {items.map((candidate) => (
-                <CaptureCandidateRow
-                  key={candidate.id}
-                  candidate={candidate}
-                  mainElementById={mainElementById}
-                  mainRelationshipById={mainRelationshipById}
-                  draftElementById={draftElementById}
-                  canReview={canReview}
-                  selected={candidate.id === effectiveSelectedId}
-                  onSelect={() => {
-                    setSelectedId(candidate.id);
-                  }}
-                  multiSelected={multiSelected.has(candidate.id)}
-                  onToggleMultiSelect={() => {
-                    setMultiSelected((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(candidate.id)) next.delete(candidate.id);
-                      else next.add(candidate.id);
-                      return next;
-                    });
-                  }}
-                  editOpen={openPanel?.candidateId === candidate.id && openPanel.type === 'edit'}
-                  onOpenEdit={() => {
-                    setSelectedId(candidate.id);
-                    setOpenPanel({ candidateId: candidate.id, type: 'edit' });
-                  }}
-                  onCloseEdit={() => {
-                    setOpenPanel(null);
-                  }}
-                  splitOpen={openPanel?.candidateId === candidate.id && openPanel.type === 'split'}
-                  onOpenSplit={() => {
-                    setSelectedId(candidate.id);
-                    setOpenPanel({ candidateId: candidate.id, type: 'split' });
-                  }}
-                  onCloseSplit={() => {
-                    setOpenPanel(null);
-                  }}
-                  mergeOpen={openPanel?.candidateId === candidate.id && openPanel.type === 'merge'}
-                  onOpenMerge={() => {
-                    setSelectedId(candidate.id);
-                    setOpenPanel({ candidateId: candidate.id, type: 'merge' });
-                  }}
-                  onCloseMerge={() => {
-                    setOpenPanel(null);
-                  }}
-                  pendingAmbiguousTarget={pendingAmbiguousTargets.get(candidate.id) ?? null}
-                  onSetPendingAmbiguousTarget={(target) => {
-                    setPendingAmbiguousTargets((prev) => new Map(prev).set(candidate.id, target));
-                  }}
-                  onDecide={(decision, decisionDetail) => {
-                    setDecisionFor(candidate, decision, decisionDetail);
-                  }}
-                  targetChosen={targetBranchId !== null}
-                  searchTargetElements={searchTargetElements}
-                />
-              ))}
-            </ul>
+            <button type="button" className={styles.groupHeader} aria-expanded={!collapsedGroups.has(cls)} onClick={() => { toggleGroup(cls); }}>
+              <Text as="h2" size="lg">
+                {CLASS_LABEL[cls]} ({items.length})
+              </Text>
+              <Text as="span" tone="muted" size="sm">
+                {collapsedGroups.has(cls) ? 'Show ▸' : 'Hide ▾'}
+              </Text>
+            </button>
+            {!collapsedGroups.has(cls) && (
+              <ul className={styles.list} role="listbox">
+                {items.map((candidate) => (
+                  <CaptureCandidateRow
+                    key={candidate.id}
+                    candidate={candidate}
+                    mainElementById={mainElementById}
+                    mainRelationshipById={mainRelationshipById}
+                    draftElementById={draftElementById}
+                    canReview={canReview}
+                    selected={candidate.id === effectiveSelectedId}
+                    onSelect={() => {
+                      setSelectedId(candidate.id);
+                    }}
+                    multiSelected={multiSelected.has(candidate.id)}
+                    onToggleMultiSelect={() => {
+                      setMultiSelected((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(candidate.id)) next.delete(candidate.id);
+                        else next.add(candidate.id);
+                        return next;
+                      });
+                    }}
+                    editOpen={openPanel?.candidateId === candidate.id && openPanel.type === 'edit'}
+                    onOpenEdit={() => {
+                      setSelectedId(candidate.id);
+                      setOpenPanel({ candidateId: candidate.id, type: 'edit' });
+                    }}
+                    onCloseEdit={() => {
+                      setOpenPanel(null);
+                    }}
+                    splitOpen={openPanel?.candidateId === candidate.id && openPanel.type === 'split'}
+                    onOpenSplit={() => {
+                      setSelectedId(candidate.id);
+                      setOpenPanel({ candidateId: candidate.id, type: 'split' });
+                    }}
+                    onCloseSplit={() => {
+                      setOpenPanel(null);
+                    }}
+                    mergeOpen={openPanel?.candidateId === candidate.id && openPanel.type === 'merge'}
+                    onOpenMerge={() => {
+                      setSelectedId(candidate.id);
+                      setOpenPanel({ candidateId: candidate.id, type: 'merge' });
+                    }}
+                    onCloseMerge={() => {
+                      setOpenPanel(null);
+                    }}
+                    pendingAmbiguousTarget={pendingAmbiguousTargets.get(candidate.id) ?? null}
+                    onSetPendingAmbiguousTarget={(target) => {
+                      setPendingAmbiguousTargets((prev) => new Map(prev).set(candidate.id, target));
+                    }}
+                    onDecide={(decision, decisionDetail) => {
+                      setDecisionFor(candidate, decision, decisionDetail);
+                    }}
+                    targetChosen={targetBranchId !== null}
+                    searchTargetElements={searchTargetElements}
+                  />
+                ))}
+              </ul>
+            )}
           </div>
         ))
       )}

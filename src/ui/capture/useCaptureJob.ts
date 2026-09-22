@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { CaptureInputKind, CaptureJob } from '../../contracts/capture';
-import { computeInputSha256Hex, captureInputObjectPath, insertCaptureJob, invokeCaptureRun, listCaptureJobs, uploadCaptureInput } from '../../db/captureJobs';
+import { computeInputSha256Hex, captureInputObjectPath, discardCaptureJob, insertCaptureJob, invokeCaptureRun, listCaptureJobs, uploadCaptureInput } from '../../db/captureJobs';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -23,6 +23,8 @@ export interface UseCaptureJobsResult {
   createJob: (input: CreateCaptureJobInput) => Promise<CaptureJob | null>;
   /** Re-invokes `capture-run` for an already-created job (§3.2: "a failed job stays `pending` with `error` non-null and can be retried"). Fire-and-forget, like `createJob`'s own run — see that function's comment. */
   retryJob: (jobId: UUID) => void;
+  /** Discards a `pending`/`parsed` job (`atlas.discard_capture_job`) — the "cancel" for a run that is taking too long or has got stuck, or "discard" for a failed one. */
+  discardJob: (jobId: UUID) => void;
   reload: () => void;
 }
 
@@ -164,5 +166,21 @@ export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null):
     [reload],
   );
 
-  return { status, jobs, error, createJob, retryJob, reload };
+  const discardJob = useCallback(
+    (jobId: UUID) => {
+      setError(null);
+      void discardCaptureJob(supabase, jobId)
+        .then(() => {
+          reload();
+        })
+        .catch((e: unknown) => {
+          const message = e instanceof Error ? e.message : 'Could not discard this capture run.';
+          setError(message);
+          reportError("Couldn't discard this capture run.", e);
+        });
+    },
+    [reload],
+  );
+
+  return { status, jobs, error, createJob, retryJob, discardJob, reload };
 }

@@ -57,6 +57,7 @@ function formatMegabytes(bytes: number): string {
 export function UploadCaptureDialog({ open, onClose, modelId, createJob, status, error }: UploadCaptureDialogProps) {
   const [mode, setMode] = useState<Mode>('file');
   const [pastedText, setPastedText] = useState('');
+  const [pasteName, setPasteName] = useState('');
   const [fileSelection, setFileSelection] = useState<SelectedInput | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [documentDate, setDocumentDate] = useState('');
@@ -81,16 +82,18 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
     };
   }, [open, onClose]);
 
-  // §9.2: pasted text is stored as an object too, with a fixed name. Purely
-  // derived from `pastedText` — a `useMemo`, not a `useState`+`useEffect`
-  // pair, since there's no external system involved here at all.
+  // §9.2: pasted text is stored as an object too. Its name is the user's own
+  // (falling back to `pasted-text.txt` when left blank) so a later re-import
+  // can find it by the same name. Purely derived from `pastedText`/`pasteName`
+  // — a `useMemo`, not a `useState`+`useEffect` pair, since there's no
+  // external system involved here at all.
   const pasteSelection = useMemo((): { selected: SelectedInput | null; error: string | null } => {
     if (pastedText.trim().length === 0) return { selected: null, error: null };
     if (pastedText.length > MAX_PASTED_TEXT_CHARS) {
       return { selected: null, error: `Pasted text is ${pastedText.length.toLocaleString()} characters — the limit is ${MAX_PASTED_TEXT_CHARS.toLocaleString()}.` };
     }
-    return { selected: { inputKind: 'text', inputName: 'pasted-text.txt', bytes: new TextEncoder().encode(pastedText) }, error: null };
-  }, [pastedText]);
+    return { selected: { inputKind: 'text', inputName: pasteName.trim() !== '' ? pasteName.trim() : 'pasted-text.txt', bytes: new TextEncoder().encode(pastedText) }, error: null };
+  }, [pastedText, pasteName]);
 
   const selected = mode === 'file' ? fileSelection : pasteSelection.selected;
   const localError = mode === 'file' ? fileError : pasteSelection.error;
@@ -124,6 +127,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
   const resetForm = () => {
     setMode('file');
     setPastedText('');
+    setPasteName('');
     setFileSelection(null);
     setFileError(null);
     setDocumentDate('');
@@ -231,6 +235,24 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                     setPastedText(e.target.value);
                   }}
                 />
+              )}
+
+              {mode === 'paste' && (
+                <div className={styles.formRow}>
+                  <Text as="label" size="sm" tone="muted">
+                    Name (optional)
+                  </Text>
+                  <input
+                    className={styles.input}
+                    placeholder="pasted-text.txt"
+                    aria-label="Name for this pasted text"
+                    value={pasteName}
+                    disabled={status === 'creating'}
+                    onChange={(e) => {
+                      setPasteName(e.target.value);
+                    }}
+                  />
+                </div>
               )}
 
               <div className={styles.formRow}>

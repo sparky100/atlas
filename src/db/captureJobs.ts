@@ -188,3 +188,17 @@ export async function invokeCaptureRun(supabase: Client, jobId: UUID): Promise<I
   }
   return data as InvokeCaptureRunResult;
 }
+
+/**
+ * §3.2: discards a `pending`/`parsed` job via `atlas.discard_capture_job` —
+ * the "cancel" for a run that is taking too long or has got stuck (its
+ * in-flight `capture-run` timed out, leaving it `pending` with no `error`),
+ * and the "discard" for a failed one. The RPC marks the job `discarded` and
+ * archives its draft branch; its own security-definer body re-checks
+ * "creator (contributor+) or owner/architect" and the pending/parsed gate.
+ */
+export async function discardCaptureJob(supabase: Client, jobId: UUID): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { error } = await supabase.schema('atlas').rpc('discard_capture_job', { p_job_id: jobId });
+  if (error) throw new Error(`discardCaptureJob: ${error.message}`);
+}
