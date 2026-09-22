@@ -65,11 +65,12 @@ describe('computeRoadmapAxisTicks', () => {
     expect(ticks[ticks.length - 1]?.pct).toBeGreaterThan(70);
   });
 
-  it('generates month ticks when granularity is months', () => {
+  it('generates month ticks when granularity is months, year printed once per year', () => {
     const ticks = computeRoadmapAxisTicks(range, 'months');
     expect(ticks).toHaveLength(12);
     expect(ticks[0]?.label).toBe('Jan 2026');
-    expect(ticks[11]?.label).toBe('Dec 2026');
+    expect(ticks[1]?.label).toBe('Feb');
+    expect(ticks[11]?.label).toBe('Dec');
   });
 
   it('generates year ticks when granularity is years', () => {

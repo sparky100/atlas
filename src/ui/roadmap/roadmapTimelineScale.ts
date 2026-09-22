@@ -40,8 +40,15 @@ export function computeRoadmapAxisTicks(range: RoadmapTimelineRange, granularity
     const totalMonths = (range.end.getFullYear() - range.start.getFullYear()) * 12 + (range.end.getMonth() - range.start.getMonth()) + 1;
     const step = totalMonths > 36 ? 3 : totalMonths > 18 ? 2 : 1;
     const start = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
+    let prevYear = -1;
     for (const cursor = new Date(start); cursor.getTime() <= range.end.getTime(); cursor.setMonth(cursor.getMonth() + step)) {
-      ticks.push({ label: `${SHORT_MONTH_NAMES[cursor.getMonth()] ?? ''} ${String(cursor.getFullYear())}`, pct: percentAt(cursor, range) });
+      const year = cursor.getFullYear();
+      const name = SHORT_MONTH_NAMES[cursor.getMonth()] ?? '';
+      // Year only on the first tick of each year — "Jan 2026", then bare
+      // "Feb"/"Mar"/… — so dense month ticks stay narrow enough not to
+      // collide on even a wide desktop.
+      ticks.push({ label: year === prevYear ? name : `${name} ${String(year)}`, pct: percentAt(cursor, range) });
+      prevYear = year;
     }
     return ticks;
   }
