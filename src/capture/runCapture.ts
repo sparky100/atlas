@@ -688,20 +688,29 @@ async function runProseCapture(input: RunProseCaptureInput): Promise<RunCaptureR
     chunkEntries = chunkPastedText(parsedText.text).map((chunk) => ({ kind: 'text' as const, chunk }));
   }
 
+  // §6.2's `priorElementNames` cross-chunk hint is dropped so the chunks run
+  // concurrently: firing every prompt-B call at once bounds the whole run by
+  // the *slowest* chunk rather than their sum, which is what lets a multi-page
+  // PDF finish inside one edge-function invocation (a sequential pass over a
+  // 5-chunk document was timing out at ~3 minutes of LLM calls). The hint was
+  // never a correctness requirement — `intraDocumentDedup` below already
+  // merges an element re-emitted across chunk boundaries, and a cross-chunk
+  // `parentName`/endpoint resolves by name in `classifyAndResolve` against
+  // this run's own candidates — so dropping it only costs a little extra
+  // de-dup work, never a lost reference.
+  const chunkResults = await Promise.all(
+    chunkEntries.map((entry) => {
+      const location = entry.kind === 'pdf' ? ({ kind: 'pages', first: entry.chunk.firstPage, last: entry.chunk.lastPage, total: entry.chunk.totalPages } as const) : ({ kind: 'pastedText', start: entry.chunk.start, end: entry.chunk.end, total: entry.chunk.total } as const);
+      const sourceRefForOffset = entry.kind === 'pdf' ? (start: number, end: number): SourceRef => pdfChunkSourceRefFor(entry.chunk, start, end) : (start: number, end: number): SourceRef => textChunkSourceRefFor(entry.chunk, start, end);
+      return extractProseChunk({ llmClient, inputName, location, chunkText: entry.chunk.text, priorElementNames: [], sourceRefForOffset });
+    }),
+  );
+
   let combined: RowCandidate[] = [];
   let seqOffset = 0;
-  let priorElementNames: string[] = [];
-
-  for (const entry of chunkEntries) {
-    const location = entry.kind === 'pdf' ? ({ kind: 'pages', first: entry.chunk.firstPage, last: entry.chunk.lastPage, total: entry.chunk.totalPages } as const) : ({ kind: 'pastedText', start: entry.chunk.start, end: entry.chunk.end, total: entry.chunk.total } as const);
-    const sourceRefForOffset = entry.kind === 'pdf' ? (start: number, end: number): SourceRef => pdfChunkSourceRefFor(entry.chunk, start, end) : (start: number, end: number): SourceRef => textChunkSourceRefFor(entry.chunk, start, end);
-
-    // Each chunk's own prompt-B call names the previous chunks' own extracted element names (§6.2), so chunks are inherently sequential, not parallelisable.
-    const { candidates, elementNames } = await extractProseChunk({ llmClient, inputName, location, chunkText: entry.chunk.text, priorElementNames, sourceRefForOffset });
-
+  for (const { candidates } of chunkResults) {
     combined = combined.concat(candidates.map((c) => offsetRowCandidate(c, seqOffset)));
     seqOffset += candidates.length;
-    priorElementNames = [...priorElementNames, ...elementNames];
     bump(stats, 'chunks');
   }
 
