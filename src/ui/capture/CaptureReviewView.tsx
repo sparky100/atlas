@@ -58,7 +58,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
   const { role } = useMembership(orgId, userId);
   const canReview = canRunCapture(role);
   const queue = useCaptureReviewQueue(modelId, orgId, jobId, userId);
-  const { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, searchTargetElements } = queue;
+  const { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, searchTargetElements } = queue;
 
   const [selectedId, setSelectedId] = useState<UUID | null>(null);
   const [openPanel, setOpenPanel] = useState<{ candidateId: UUID; type: 'edit' | 'split' | 'merge' } | null>(null);
@@ -273,6 +273,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
                   candidate={candidate}
                   mainElementById={mainElementById}
                   mainRelationshipById={mainRelationshipById}
+                  draftElementById={draftElementById}
                   canReview={canReview}
                   selected={candidate.id === effectiveSelectedId}
                   onSelect={() => {

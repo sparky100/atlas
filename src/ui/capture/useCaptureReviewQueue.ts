@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { CandidateDecision, CandidateDecisionDetail, CaptureCandidate, CaptureJob } from '../../contracts/capture';
 import { buildPromotionEnvelope } from '../../capture/buildPromotionEnvelope';
@@ -39,6 +39,8 @@ export interface UseCaptureReviewQueueResult {
   /** Main's own current row for a matched candidate's `draftSubjectId` — the "main now" side of `update`/`conflict`'s two/three-column display (SPEC §10). Empty maps while main has no commits yet. */
   mainElementById: Map<UUID, ElementsHeadRow>;
   mainRelationshipById: Map<UUID, RelationshipsHeadRow>;
+  /** This run's own newly-minted element names keyed by `draftSubjectId` — lets a reference to a `new` element (e.g. a relationship's `to` pointing at a just-proposed capability) resolve to its name rather than a raw draft id. */
+  draftElementById: Map<UUID, string>;
   targetBranchId: UUID | null;
   setTargetBranchId: (id: UUID | null) => void;
   /** Creates a fresh draft change branch to promote into, for a reviewer with no existing one yet — mirrors `useChanges.ts`'s own `createChange`, narrowed to what this page needs (a name; intent fixed at `'record'`, matching a capture promotion's own nature). */
@@ -277,5 +279,13 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
     [modelId, targetBranchId],
   );
 
-  return { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, searchTargetElements, reload };
+  const draftElementById = useMemo(() => {
+    const map = new Map<UUID, string>();
+    for (const c of candidates) {
+      if (c.proposal.kind === 'element' && c.draftSubjectId !== null) map.set(c.draftSubjectId, c.proposal.name);
+    }
+    return map;
+  }, [candidates]);
+
+  return { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, searchTargetElements, reload };
 }

@@ -38,6 +38,8 @@ export interface CaptureCandidateRowProps {
   candidate: CaptureCandidate;
   mainElementById: ReadonlyMap<UUID, ElementsHeadRow>;
   mainRelationshipById: ReadonlyMap<UUID, RelationshipsHeadRow>;
+  /** This run's own newly-minted element names keyed by `draftSubjectId` — resolves a reference to a `new` element to its name. */
+  draftElementById: ReadonlyMap<UUID, string>;
   /** Contributor+ (`stage_capture_decisions`'s own RLS floor) — a viewer sees every row read-only, with no action controls at all, same convention as every other role-gated affordance in this codebase. */
   canReview: boolean;
   selected: boolean;
@@ -74,6 +76,7 @@ export function CaptureCandidateRow({
   candidate,
   mainElementById,
   mainRelationshipById,
+  draftElementById,
   canReview,
   selected,
   onSelect,
@@ -128,9 +131,9 @@ export function CaptureCandidateRow({
   };
 
   const name = candidate.proposal.kind === 'element' ? candidate.proposal.name : null;
-  const parentLabel = candidate.proposal.kind === 'element' ? candidateRefLabel(candidate.proposal.parent, mainElementById) : null;
-  const fromLabel = candidate.proposal.kind === 'relationship' ? candidateRefLabel(candidate.proposal.from, mainElementById) : null;
-  const toLabel = candidate.proposal.kind === 'relationship' ? candidateRefLabel(candidate.proposal.to, mainElementById) : null;
+  const parentLabel = candidate.proposal.kind === 'element' ? candidateRefLabel(candidate.proposal.parent, mainElementById, draftElementById) : null;
+  const fromLabel = candidate.proposal.kind === 'relationship' ? candidateRefLabel(candidate.proposal.from, mainElementById, draftElementById) : null;
+  const toLabel = candidate.proposal.kind === 'relationship' ? candidateRefLabel(candidate.proposal.to, mainElementById, draftElementById) : null;
   const mainRow = candidate.draftSubjectId !== null ? (candidate.proposal.kind === 'element' ? mainElementById.get(candidate.draftSubjectId) : mainRelationshipById.get(candidate.draftSubjectId)) : undefined;
   const attributes = attributesRecord(candidate);
 
