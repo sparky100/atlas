@@ -246,7 +246,7 @@ export function RetireAction({
               }}
               disabled={busy}
             >
-              Cancel
+              Cancel create
             </Button>
           </div>
         </div>
