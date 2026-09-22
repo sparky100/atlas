@@ -18,7 +18,7 @@ import type { RoadmapMode } from './roadmapEligibility';
 import type { RoadmapFilters } from './roadmapFilter';
 import { type RoadmapGroup } from './roadmapLifecycleRows';
 import { percentAt, percentAtIso, type RoadmapTimelineRange } from './roadmapTimelineScale';
-import { changeDescription, computeRoadmapVisibleData, eventsForSystem } from './roadmapVisibleData';
+import { changeDescription, computeRoadmapVisibleData, eventsForSystem, recentRoadmapChanges } from './roadmapVisibleData';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 
 const PADDING = 24;
@@ -151,9 +151,7 @@ export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEve
     }
   }
 
-  const changeRows = eligibleEvents
-    .flatMap(({ branch, events }) => events.map((event) => ({ branch, event })))
-    .sort((a, b) => (a.branch.target_date ?? '').localeCompare(b.branch.target_date ?? ''));
+  const changeRows = recentRoadmapChanges(eligibleEvents);
 
   let changesHeaderY: number | null = null;
   const changeLines: RoadmapPngChangeLine[] = [];

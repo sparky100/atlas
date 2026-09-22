@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
+import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import { EMPTY_ROADMAP_FILTERS, type RoadmapFilters } from './roadmapFilter';
 import type { RoadmapGroup, RoadmapLifecycleBar } from './roadmapLifecycleRows';
-import { computeRoadmapVisibleData } from './roadmapVisibleData';
+import { computeRoadmapVisibleData, RECENT_CHANGES_LIMIT, recentRoadmapChanges } from './roadmapVisibleData';
 
 const NOW = new Date('2026-06-15T00:00:00Z');
 
@@ -77,5 +78,27 @@ describe('computeRoadmapVisibleData', () => {
     const filters: RoadmapFilters = { ...EMPTY_ROADMAP_FILTERS, criticalities: ['critical'] };
     const { filteredGroups } = computeRoadmapVisibleData(groups, [], 'toBe', filters, NOW);
     expect(filteredGroups[0]?.bars.map((b) => b.systemId)).toEqual(['a']);
+  });
+});
+
+describe('recentRoadmapChanges', () => {
+  it('returns the most recent changes first, capped at the limit', () => {
+    const events: RoadmapBranchEvents[] = [];
+    for (let i = 0; i < RECENT_CHANGES_LIMIT + 3; i += 1) {
+      events.push({ branch: branch({ id: `b-${String(i)}`, target_date: `2026-0${String(i + 1)}-01` }), events: [{ kind: 'add', elementId: `sys-${String(i)}`, elementName: `System ${String(i)}` }] });
+    }
+    const rows = recentRoadmapChanges(events);
+    expect(rows).toHaveLength(RECENT_CHANGES_LIMIT);
+    // Latest target date first.
+    expect(rows[0]?.branch.target_date).toBe('2026-09-01');
+    expect(rows[rows.length - 1]?.branch.target_date).toBe('2026-04-01');
+  });
+
+  it('flattens every event on a branch into its own row', () => {
+    const events: RoadmapBranchEvents[] = [
+      { branch: branch({ id: 'b-1', target_date: '2026-05-01' }), events: [{ kind: 'add', elementId: 'a', elementName: 'A' }, { kind: 'add', elementId: 'b', elementName: 'B' }] },
+    ];
+    const rows = recentRoadmapChanges(events);
+    expect(rows).toHaveLength(2);
   });
 });

@@ -11,7 +11,7 @@
  * across capability/system/container/actor.
  */
 import { type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
-import { changeDescription } from './roadmapVisibleData';
+import { changeDescription, recentRoadmapChanges } from './roadmapVisibleData';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 
 const HEADER = ['Type', 'Capability', 'System', 'Introduced', 'Planned end', 'Support ends', 'Criticality', 'Lifecycle status', 'Date', 'Description'] as const;
@@ -44,17 +44,14 @@ function lifecycleRow(groupName: string, bar: RoadmapLifecycleBar): string[] {
   ];
 }
 
-function changeRow(branchEvents: RoadmapBranchEvents): string[][] {
-  const { branch, events } = branchEvents;
+function changeRowCells(branch: RoadmapBranchEvents['branch'], event: RoadmapBranchEvents['events'][number]): string[] {
   const date = branch.target_date ?? '';
-  return events.map((event) => {
-    if (event.kind === 'add') return ['Change', '', event.elementName, '', '', '', '', '', date, changeDescription(event)];
-    if (event.kind === 'retire') return ['Change', '', event.elementName, '', '', '', '', '', date, changeDescription(event)];
-    return ['Change', event.capabilityName ?? '', event.toSystemName, '', '', '', '', '', date, changeDescription(event)];
-  });
+  if (event.kind === 'add') return ['Change', '', event.elementName, '', '', '', '', '', date, changeDescription(event)];
+  if (event.kind === 'retire') return ['Change', '', event.elementName, '', '', '', '', '', date, changeDescription(event)];
+  return ['Change', event.capabilityName ?? '', event.toSystemName, '', '', '', '', '', date, changeDescription(event)];
 }
 
-/** RFC 4180 CSV of the visible roadmap — lifecycle rows first (grouped as shown), then change events sorted by date, matching the on-screen order of `RoadmapView`/`RoadmapChangesList`. */
+/** RFC 4180 CSV of the visible roadmap — lifecycle rows first (grouped as shown), then the most recent change events (latest first), matching the on-screen order of `RoadmapView`/`RoadmapChangesList`. */
 export function roadmapToCsv(filteredGroups: readonly RoadmapGroup[], eligibleEvents: readonly RoadmapBranchEvents[]): string {
   const lines = [csvRow(HEADER)];
 
@@ -63,9 +60,7 @@ export function roadmapToCsv(filteredGroups: readonly RoadmapGroup[], eligibleEv
     for (const bar of group.bars) lines.push(csvRow(lifecycleRow(groupName, bar)));
   }
 
-  const changeRows = eligibleEvents.flatMap((be) => changeRow(be).map((cells) => ({ cells, date: be.branch.target_date ?? '' })));
-  changeRows.sort((a, b) => a.date.localeCompare(b.date));
-  for (const row of changeRows) lines.push(csvRow(row.cells));
+  for (const { branch, event } of recentRoadmapChanges(eligibleEvents)) lines.push(csvRow(changeRowCells(branch, event)));
 
   return lines.join('\r\n');
 }

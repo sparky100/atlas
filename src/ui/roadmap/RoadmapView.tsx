@@ -6,7 +6,7 @@ import type { RoadmapFilters } from './roadmapFilter';
 import { isRoadmapEligibleBranch, type RoadmapMode } from './roadmapEligibility';
 import { type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
 import { computeRoadmapTimelineRange, percentAt, percentAtIso, type RoadmapTimelineRange } from './roadmapTimelineScale';
-import { changeDescription, computeRoadmapVisibleData, eventsForSystem } from './roadmapVisibleData';
+import { changeDescription, computeRoadmapVisibleData, eventsForSystem, recentRoadmapChanges } from './roadmapVisibleData';
 import styles from './RoadmapView.module.css';
 
 export interface RoadmapViewProps {
@@ -101,17 +101,17 @@ function RoadmapAxis({ range }: { range: RoadmapTimelineRange }) {
 }
 
 /**
- * A reliable, always-shown list of every change on the roadmap — the
- * source of truth regardless of whether a given event also found a
+ * A reliable, always-shown list of the most recent changes on the roadmap —
+ * the source of truth regardless of whether a given event also found a
  * lifecycle-bar row to sit on (an added system with no lifecycle dates
  * recorded yet has nowhere on the timeline to place its own marker, but
  * the change it came from is never silently dropped for that reason).
+ * Capped at `RECENT_CHANGES_LIMIT`, most recent first, so the list stays
+ * scannable rather than growing to every change ever recorded.
  */
-function RoadmapChangesList({ branchEvents, mode }: { branchEvents: readonly RoadmapBranchEvents[]; mode: RoadmapMode }) {
-  const rows = branchEvents.filter(({ branch }) => isRoadmapEligibleBranch(branch, mode)).flatMap(({ branch, events }) => events.map((event) => ({ branch, event })));
+function RoadmapChangesList({ eligibleEvents }: { eligibleEvents: readonly RoadmapBranchEvents[] }) {
+  const rows = recentRoadmapChanges(eligibleEvents);
   if (rows.length === 0) return null;
-
-  rows.sort((a, b) => (a.branch.target_date ?? '').localeCompare(b.branch.target_date ?? ''));
 
   return (
     <div className={styles.changesList}>
@@ -182,7 +182,7 @@ export function RoadmapView({ groups, branchEvents, mode, filters, orgSlug, mode
           </div>
         </>
       )}
-      <RoadmapChangesList branchEvents={branchEvents} mode={mode} />
+      <RoadmapChangesList eligibleEvents={eligibleEvents} />
     </div>
   );
 }

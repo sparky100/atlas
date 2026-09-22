@@ -41,6 +41,31 @@ export interface RoadmapSystemEvent {
   branch: RoadmapBranchEvents['branch'];
 }
 
+/**
+ * The on-screen "Changes on this roadmap" list shows only this many of the
+ * most recently-dated changes (latest `target_date` first), not every change
+ * ever recorded — the full list grows without bound and buries what's
+ * actually next. Shared with the CSV/PNG export so what's exported can never
+ * drift from what's on screen (the same invariant the rest of this module
+ * already maintains for filters/mode).
+ */
+export const RECENT_CHANGES_LIMIT = 6;
+
+export interface RoadmapChangeRow {
+  branch: RoadmapBranchEvents['branch'];
+  event: RoadmapBranchEvents['events'][number];
+}
+
+/** Flattened, mode-eligible change rows, latest `target_date` first, capped at `RECENT_CHANGES_LIMIT`. */
+export function recentRoadmapChanges(eligibleEvents: readonly RoadmapBranchEvents[]): RoadmapChangeRow[] {
+  const rows: RoadmapChangeRow[] = [];
+  for (const { branch, events } of eligibleEvents) {
+    for (const event of events) rows.push({ branch, event });
+  }
+  rows.sort((a, b) => (b.branch.target_date ?? '').localeCompare(a.branch.target_date ?? ''));
+  return rows.slice(0, RECENT_CHANGES_LIMIT);
+}
+
 /** Every mode-eligible event touching `systemId` — shared by `RoadmapView`'s own marker rendering and the PNG export, so a marker never appears in one and not the other. */
 export function eventsForSystem(systemId: UUID, branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode): RoadmapSystemEvent[] {
   const result: RoadmapSystemEvent[] = [];

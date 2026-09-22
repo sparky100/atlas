@@ -59,13 +59,13 @@ describe('roadmapToCsv', () => {
     expect(csv.split('\r\n')[1]).toContain('Lifecycle,Unassigned,Legacy CRM');
   });
 
-  it('emits a change row per event, sorted by the branch\'s own target date', () => {
+  it('emits a change row per event, most recent target date first', () => {
     const early: RoadmapBranchEvents = { branch: branch({ id: 'b-early', target_date: '2026-01-01' }), events: [{ kind: 'add', elementId: 'sys-2', elementName: 'New CRM' }] };
     const late: RoadmapBranchEvents = { branch: branch({ id: 'b-late', target_date: '2026-06-01' }), events: [{ kind: 'retire', elementId: 'sys-1', elementName: 'Legacy CRM' }] };
     const csv = roadmapToCsv([], [late, early]);
     const lines = csv.split('\r\n').slice(1);
-    expect(lines[0]).toBe('Change,,New CRM,,,,,,2026-01-01,New CRM added');
-    expect(lines[1]).toBe('Change,,Legacy CRM,,,,,,2026-06-01,Legacy CRM retired');
+    expect(lines[0]).toBe('Change,,Legacy CRM,,,,,,2026-06-01,Legacy CRM retired');
+    expect(lines[1]).toBe('Change,,New CRM,,,,,,2026-01-01,New CRM added');
   });
 
   it('names the capability and both systems on a replacement row', () => {

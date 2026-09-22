@@ -213,7 +213,7 @@ export function RetireAction({
           </Button>
         </div>
       ) : mode === 'creating' ? (
-        <div>
+        <div className={styles.creating}>
           <label htmlFor={newNameId}>
             <Text as="span" size="sm" tone="muted">
               {element.element_type === 'container' ? 'New module name' : 'New system name'}
@@ -237,16 +237,18 @@ export function RetireAction({
               {previewCounts.otherCount > 0 ? `, ${String(previewCounts.otherCount)} uses/flows_to edge${previewCounts.otherCount === 1 ? '' : 's'}` : ''}, and retire &ldquo;{element.name}&rdquo;.
             </Text>
           )}
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setMode('none');
-              setNewReplacementName('');
-            }}
-            disabled={busy}
-          >
-            Cancel
-          </Button>
+          <div className={styles.actions}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setMode('none');
+                setNewReplacementName('');
+              }}
+              disabled={busy}
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
       ) : (
         <div className={styles.actions}>

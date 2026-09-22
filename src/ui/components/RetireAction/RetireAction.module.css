@@ -20,6 +20,17 @@
   font: inherit;
 }
 
+/* The "create new instead" mode's own fields — a flex column so the
+   "New module/system name" label sits on its own line above a full-width
+   input (the same label-above-input shape the "Planned end" field above it
+   already has), rather than the label and input flowing inline and the
+   input crowding the label text. */
+.creating {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 .results {
   list-style: none;
   margin: 0;
