@@ -48,6 +48,19 @@ describe('groundPassage', () => {
     expect(result.normalised).toBe(true);
   });
 
+  it('finds a passage threaded through jumbled multi-column text (word subsequence)', () => {
+    const haystack = 'We use Tractivity, an industry leading system, which has over stakeholder change. Our engagement with our stakeholders 6,500 stakeholders registered.';
+    const result = groundPassage(haystack, 'We use Tractivity, an industry leading system, which has over 6,500 stakeholders registered');
+    expect(result.found).toBe(true);
+    expect(result.normalised).toBe(true);
+  });
+
+  it('does not match a word subsequence when a passage word is absent', () => {
+    const haystack = 'We use a different platform for stakeholder engagement.';
+    const result = groundPassage(haystack, 'We use Tractivity for stakeholder engagement');
+    expect(result.found).toBe(false);
+  });
+
   it('reports not found when the passage is nowhere in the text, never a guess', () => {
     const result = groundPassage('The CRM system is supplied by Acme.', 'a completely different sentence');
     expect(result.found).toBe(false);
