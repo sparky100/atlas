@@ -69,7 +69,7 @@ describe('computeRoadmapPngPlan', () => {
     expect(plan.groups[0]?.label).toBe('Unassigned');
   });
 
-  it('omits the axis and groups entirely once every group is filtered out, but still lays out the changes list', () => {
+  it('omits the axis and groups entirely once every group is filtered out', () => {
     const groups: RoadmapGroup[] = [{ key: 'cap-1', label: 'Cap 1', href: null, bars: [bar()] }];
     const filters: RoadmapFilters = { ...EMPTY_ROADMAP_FILTERS, capabilityIds: ['cap-does-not-match'] };
     const branchEvents: RoadmapBranchEvents[] = [{ branch: branch(), events: [{ kind: 'add', elementId: 'sys-2', elementName: 'New CRM' }] }];
@@ -77,9 +77,6 @@ describe('computeRoadmapPngPlan', () => {
     const plan = computeRoadmapPngPlan(groups, branchEvents, 'toBe', filters, range, NOW);
     expect(plan.groups).toHaveLength(0);
     expect(plan.axisY).toBeNull();
-    expect(plan.changesHeaderY).not.toBeNull();
-    expect(plan.changeLines).toHaveLength(1);
-    expect(plan.changeLines[0]?.description).toBe('New CRM added');
   });
 
   it('places an add marker on the added system\'s own row', () => {
@@ -90,11 +87,11 @@ describe('computeRoadmapPngPlan', () => {
     expect(plan.groups[0]?.rows[0]?.markers).toEqual([{ x: expect.any(Number) as number, kind: 'add' }]);
   });
 
-  it('excludes an as-is-ineligible branch\'s events from the changes list', () => {
-    const branchEvents: RoadmapBranchEvents[] = [{ branch: branch({ status: 'in_review' }), events: [{ kind: 'add', elementId: 'sys-2', elementName: 'New CRM' }] }];
-    const range = computeRoadmapTimelineRange(['2025-01-01'], NOW);
-    const plan = computeRoadmapPngPlan([], branchEvents, 'asIs', EMPTY_ROADMAP_FILTERS, range, NOW);
-    expect(plan.changeLines).toHaveLength(0);
-    expect(plan.changesHeaderY).toBeNull();
+  it('excludes an as-is-ineligible branch\'s markers from rows', () => {
+    const groups: RoadmapGroup[] = [{ key: 'cap-1', label: 'Cap 1', href: null, bars: [bar({ systemId: 'sys-2', name: 'New CRM' })] }];
+    const branchEvents: RoadmapBranchEvents[] = [{ branch: branch({ target_date: '2026-06-01', status: 'in_review' }), events: [{ kind: 'add', elementId: 'sys-2', elementName: 'New CRM' }] }];
+    const range = computeRoadmapTimelineRange(['2025-01-01', '2026-12-01', '2026-06-01'], NOW);
+    const plan = computeRoadmapPngPlan(groups, branchEvents, 'asIs', EMPTY_ROADMAP_FILTERS, range, NOW);
+    expect(plan.groups[0]?.rows[0]?.markers).toHaveLength(0);
   });
 });

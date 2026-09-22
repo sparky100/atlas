@@ -18,7 +18,7 @@ import type { RoadmapMode } from './roadmapEligibility';
 import type { RoadmapFilters } from './roadmapFilter';
 import { type RoadmapGroup } from './roadmapLifecycleRows';
 import { percentAt, percentAtIso, type RoadmapTimelineRange } from './roadmapTimelineScale';
-import { changeDescription, computeRoadmapVisibleData, eventsForSystem, recentRoadmapChanges } from './roadmapVisibleData';
+import { computeRoadmapVisibleData, eventsForSystem } from './roadmapVisibleData';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 
 const PADDING = 24;
@@ -28,8 +28,6 @@ const AXIS_HEIGHT = 24;
 const ROW_HEIGHT = 32;
 const GROUP_HEADER_HEIGHT = 28;
 const GROUP_GAP = 16;
-const CHANGES_HEADER_HEIGHT = 28;
-const CHANGE_LINE_HEIGHT = 20;
 
 const PALETTE = {
   bg: '#ffffff',
@@ -63,20 +61,12 @@ export interface RoadmapPngGroup {
   rows: RoadmapPngRow[];
 }
 
-export interface RoadmapPngChangeLine {
-  y: number;
-  date: string;
-  description: string;
-}
-
 export interface RoadmapPngPlan {
   width: number;
   height: number;
   axisY: number | null;
   axisTicks: { label: string; x: number }[];
   groups: RoadmapPngGroup[];
-  changesHeaderY: number | null;
-  changeLines: RoadmapPngChangeLine[];
 }
 
 const TRACK_X0 = PADDING + NAME_COL_WIDTH;
@@ -115,7 +105,7 @@ function markersForBar(systemId: string, branchEvents: readonly RoadmapBranchEve
 
 /** The pure pixel layout — everything `drawRoadmapPng` needs to paint, computed once so the sizing math is unit-testable without a canvas. */
 export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode, filters: RoadmapFilters, range: RoadmapTimelineRange, now: Date): RoadmapPngPlan {
-  const { filteredGroups, eligibleEvents } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now);
+  const { filteredGroups } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now);
 
   let cursor = PADDING;
   const pngGroups: RoadmapPngGroup[] = [];
@@ -151,27 +141,14 @@ export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEve
     }
   }
 
-  const changeRows = recentRoadmapChanges(eligibleEvents);
-
-  let changesHeaderY: number | null = null;
-  const changeLines: RoadmapPngChangeLine[] = [];
-  if (changeRows.length > 0) {
-    changesHeaderY = cursor;
-    cursor += CHANGES_HEADER_HEIGHT;
-    for (const { branch, event } of changeRows) {
-      changeLines.push({ y: cursor, date: branch.target_date ?? '', description: changeDescription(event) });
-      cursor += CHANGE_LINE_HEIGHT;
-    }
-  }
+  const effectiveHeight = filteredGroups.length > 0 ? cursor - GROUP_GAP + PADDING : cursor + PADDING;
 
   return {
     width: PADDING * 2 + NAME_COL_WIDTH + TRACK_WIDTH,
-    height: cursor + PADDING,
+    height: effectiveHeight,
     axisY,
     axisTicks: filteredGroups.length > 0 ? axisTicks(range) : [],
     groups: pngGroups,
-    changesHeaderY,
-    changeLines,
   };
 }
 
@@ -232,19 +209,6 @@ export function drawRoadmapPng(ctx: CanvasRenderingContext2D, plan: RoadmapPngPl
           ctx.fill();
         }
       }
-    }
-  }
-
-  if (plan.changesHeaderY !== null) {
-    ctx.fillStyle = PALETTE.text;
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillText('Changes on this roadmap', PADDING, plan.changesHeaderY + CHANGES_HEADER_HEIGHT / 2);
-    ctx.font = '12px sans-serif';
-    for (const line of plan.changeLines) {
-      ctx.fillStyle = PALETTE.textMuted;
-      ctx.fillText(line.date, PADDING, line.y + CHANGE_LINE_HEIGHT / 2);
-      ctx.fillStyle = PALETTE.text;
-      ctx.fillText(line.description, PADDING + 90, line.y + CHANGE_LINE_HEIGHT / 2);
     }
   }
 }
