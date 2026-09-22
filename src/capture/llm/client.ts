@@ -82,6 +82,15 @@ export class LlmSchemaInvalidError extends Error {
   }
 }
 
+/** §11 `LLM_UNAVAILABLE`: the provider returned no usable text at all — an upstream failure (quota, billing, a dropped connection) rather than a capture problem. Without this, an empty body reaches `JSON.parse('')` and surfaces as a confusing "Unexpected end of JSON input". */
+export class LlmUnavailableError extends Error {
+  readonly code = 'LLM_UNAVAILABLE';
+  constructor() {
+    super('The model returned an empty response — likely an upstream failure (quota/billing or a dropped connection). Retry once the provider is available.');
+    this.name = 'LlmUnavailableError';
+  }
+}
+
 export const DEFAULT_CAPTURE_MODEL = 'claude-opus-5';
 export const DEFAULT_CAPTURE_MAX_TOKENS = 16000;
 
@@ -97,6 +106,7 @@ interface RawLlmResult {
 function finalizeResponse(raw: RawLlmResult): LlmResponse {
   if (raw.stopReason === 'refusal') throw new LlmRefusalError();
   if (raw.stopReason === 'max_tokens') throw new LlmTruncatedError();
+  if (raw.text.trim() === '') throw new LlmUnavailableError();
   return { text: raw.text, stopReason: raw.stopReason, inputTokens: raw.inputTokens, outputTokens: raw.outputTokens, cacheReadTokens: raw.cacheReadTokens };
 }
 

@@ -149,7 +149,14 @@ function buildAnthropicBody(request: ProxyRequestBody, model: string, stream: bo
 
   const body: Record<string, unknown> = { model, system, messages: userMessages, max_tokens: request.maxTokens, stream };
   if (request.outputConfig) {
-    body.output_config = { effort: request.outputConfig.effort, format: request.outputConfig.format };
+    // `effort` is only honoured by a subset of models (Sonnet/Opus 4.6+,
+    // Fable/Mythos); claude-haiku — the cheapest, commonly picked for cost —
+    // rejects it with a 400 ("This model does not support the effort
+    // parameter"). Drop it for haiku (and only haiku) and send the
+    // structured-output format alone, letting the model use its own default
+    // thinking; every other model keeps the caller's per-prompt effort.
+    const supportsEffort = !model.startsWith('claude-haiku');
+    body.output_config = supportsEffort ? { effort: request.outputConfig.effort, format: request.outputConfig.format } : { format: request.outputConfig.format };
   }
   return body;
 }

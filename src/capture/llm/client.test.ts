@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_CAPTURE_MAX_TOKENS, DEFAULT_CAPTURE_MODEL, LlmRefusalError, LlmSchemaInvalidError, LlmTruncatedError, ProxyLlmClient, RecordedLlmClient, hashLlmRequest, type LlmRequest } from './client';
+import { DEFAULT_CAPTURE_MAX_TOKENS, DEFAULT_CAPTURE_MODEL, LlmRefusalError, LlmSchemaInvalidError, LlmTruncatedError, LlmUnavailableError, ProxyLlmClient, RecordedLlmClient, hashLlmRequest, type LlmRequest } from './client';
 
 const BASE_REQUEST: LlmRequest = {
   effort: 'medium',
@@ -124,6 +124,12 @@ describe('RecordedLlmClient', () => {
     const key = hashLlmRequest(BASE_REQUEST);
     const client = new RecordedLlmClient({ cassettes: new Map([[key, { text: '', stopReason: 'refusal', inputTokens: 1, outputTokens: 0, cacheReadTokens: 0 }]]) });
     await expect(client.complete(BASE_REQUEST)).rejects.toBeInstanceOf(LlmRefusalError);
+  });
+
+  it('throws LlmUnavailableError on an empty end_turn response (upstream failure), not a JSON parse error', async () => {
+    const key = hashLlmRequest(BASE_REQUEST);
+    const client = new RecordedLlmClient({ cassettes: new Map([[key, { text: '', stopReason: 'end_turn', inputTokens: 1, outputTokens: 0, cacheReadTokens: 0 }]]) });
+    await expect(client.complete(BASE_REQUEST)).rejects.toBeInstanceOf(LlmUnavailableError);
   });
 });
 
