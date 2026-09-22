@@ -11,6 +11,50 @@ export interface RoadmapTimelineRange {
   end: Date;
 }
 
+export type RoadmapGranularity = 'months' | 'quarters' | 'years';
+
+export interface RoadmapAxisTick {
+  label: string;
+  pct: number;
+}
+
+const SHORT_MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/**
+ * Computes axis ticks along `range` for the given `granularity`.
+ * Shared by `RoadmapView.tsx`'s DOM axis and `roadmapPngExport.ts`'s canvas axis,
+ * ensuring the visual marks and labels never drift between screen and export.
+ */
+export function computeRoadmapAxisTicks(range: RoadmapTimelineRange, granularity: RoadmapGranularity = 'quarters'): RoadmapAxisTick[] {
+  const ticks: RoadmapAxisTick[] = [];
+
+  if (granularity === 'years') {
+    const start = new Date(range.start.getFullYear(), 0, 1);
+    for (const cursor = new Date(start); cursor.getTime() <= range.end.getTime(); cursor.setFullYear(cursor.getFullYear() + 1)) {
+      ticks.push({ label: String(cursor.getFullYear()), pct: percentAt(cursor, range) });
+    }
+    return ticks;
+  }
+
+  if (granularity === 'months') {
+    const totalMonths = (range.end.getFullYear() - range.start.getFullYear()) * 12 + (range.end.getMonth() - range.start.getMonth()) + 1;
+    const step = totalMonths > 36 ? 3 : totalMonths > 18 ? 2 : 1;
+    const start = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
+    for (const cursor = new Date(start); cursor.getTime() <= range.end.getTime(); cursor.setMonth(cursor.getMonth() + step)) {
+      ticks.push({ label: `${SHORT_MONTH_NAMES[cursor.getMonth()] ?? ''} ${String(cursor.getFullYear())}`, pct: percentAt(cursor, range) });
+    }
+    return ticks;
+  }
+
+  // Default: 'quarters'
+  const start = new Date(range.start.getFullYear(), Math.floor(range.start.getMonth() / 3) * 3, 1);
+  for (const cursor = new Date(start); cursor.getTime() <= range.end.getTime(); cursor.setMonth(cursor.getMonth() + 3)) {
+    const quarter = Math.floor(cursor.getMonth() / 3) + 1;
+    ticks.push({ label: `Q${String(quarter)} ${String(cursor.getFullYear())}`, pct: percentAt(cursor, range) });
+  }
+  return ticks;
+}
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 /** Pads the computed range by this many days on each side — a bar landing exactly on the range's own start/end would otherwise sit flush against the container edge, with nothing showing it isn't clipped. */
 const PAD_DAYS = 30;

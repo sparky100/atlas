@@ -18,7 +18,7 @@ import { RoadmapFilterBar } from '../roadmap/RoadmapFilterBar';
 import { RoadmapView } from '../roadmap/RoadmapView';
 import { useRoadmap } from '../roadmap/useRoadmap';
 import { useRoadmapExport } from '../roadmap/useRoadmapExport';
-import { parseRoadmapFilters, roadmapFiltersToSearchParams, parseRoadmapGroupBy, roadmapGroupByToSearchParams, type RoadmapGroupBy } from '../roadmap/roadmapFilterParams';
+import { parseRoadmapFilters, roadmapFiltersToSearchParams, parseRoadmapGroupBy, roadmapGroupByToSearchParams, parseRoadmapGranularity, roadmapGranularityToSearchParams, type RoadmapGroupBy, type RoadmapGranularity } from '../roadmap/roadmapFilterParams';
 import type { RoadmapFilters } from '../roadmap/roadmapFilter';
 import type { RoadmapMode } from '../roadmap/roadmapEligibility';
 import styles from './RoadmapPage.module.css';
@@ -74,6 +74,11 @@ export function RoadmapPage() {
     setSearchParams(roadmapGroupByToSearchParams(next, searchParams));
   };
 
+  const granularity = parseRoadmapGranularity(searchParams);
+  const setGranularity = (next: RoadmapGranularity): void => {
+    setSearchParams(roadmapGranularityToSearchParams(next, searchParams));
+  };
+
   const roadmapData = state.status === 'ready' ? state.data : null;
   // F6 Step 6: the same bars, grouped by capability or value stream — both
   // were computed by `useRoadmap`, so switching the toggle never refetches.
@@ -83,6 +88,7 @@ export function RoadmapPage() {
     branchEvents: roadmapData?.branchEvents ?? [],
     mode,
     filters,
+    granularity,
     filenameBase: model?.name ?? 'roadmap',
   });
   const hasNothingToExport = roadmapData === null || (groups.length === 0 && roadmapData.branchEvents.length === 0);
@@ -131,8 +137,8 @@ export function RoadmapPage() {
           {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
           {state.status === 'ready' && (
             <>
-              <RoadmapFilterBar filters={filters} onFiltersChange={setFilters} mode={mode} onModeChange={setMode} groupBy={groupBy} onGroupByChange={setGroupBy} capabilitiesById={state.data.capabilitiesById} ownerActorsById={state.data.ownerActorsById} />
-              <RoadmapView groups={groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+              <RoadmapFilterBar filters={filters} onFiltersChange={setFilters} mode={mode} onModeChange={setMode} groupBy={groupBy} onGroupByChange={setGroupBy} granularity={granularity} onGranularityChange={setGranularity} capabilitiesById={state.data.capabilitiesById} ownerActorsById={state.data.ownerActorsById} />
+              <RoadmapView groups={groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} granularity={granularity} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
             </>
           )}
         </main>

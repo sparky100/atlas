@@ -4,6 +4,7 @@ import { Chip } from '../components/Chip/Chip';
 import { EMPTY_ROADMAP_FILTERS, hasActiveRoadmapFilters, type RoadmapFilters } from './roadmapFilter';
 import { type RoadmapGroupBy } from './roadmapFilterParams';
 import type { RoadmapMode } from './roadmapEligibility';
+import type { RoadmapGranularity } from './roadmapTimelineScale';
 import styles from './RoadmapFilterBar.module.css';
 
 const CRITICALITY_OPTIONS: readonly { value: Criticality; label: string }[] = [
@@ -21,6 +22,9 @@ export interface RoadmapFilterBarProps {
   /** F6 Step 6: which grouping the timeline shows — capability (default) or value stream. */
   groupBy: RoadmapGroupBy;
   onGroupByChange: (groupBy: RoadmapGroupBy) => void;
+  /** Which time unit the axis shows — months/quarters/years. */
+  granularity: RoadmapGranularity;
+  onGranularityChange: (granularity: RoadmapGranularity) => void;
   capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>;
   ownerActorsById: ReadonlyMap<UUID, ElementsHeadRow>;
 }
@@ -72,7 +76,7 @@ function FacetDisclosure<T extends string>({ title, values, options, onToggle }:
  * own fork; this picks which *set of branches* the whole roadmap
  * includes (`roadmapEligibility.ts`'s own module comment).
  */
-export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange, groupBy, onGroupByChange, capabilitiesById, ownerActorsById }: RoadmapFilterBarProps) {
+export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange, groupBy, onGroupByChange, granularity, onGranularityChange, capabilitiesById, ownerActorsById }: RoadmapFilterBarProps) {
   const active = hasActiveRoadmapFilters(filters);
   const capabilityOptions = [...capabilitiesById.values()].map((c) => ({ value: c.element_id, label: c.name })).sort((a, b) => a.label.localeCompare(b.label));
   const ownerOptions = [...ownerActorsById.values()].map((a) => ({ value: a.element_id, label: a.name })).sort((a, b) => a.label.localeCompare(b.label));
@@ -93,6 +97,17 @@ export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange,
         </button>
         <button type="button" className={groupBy === 'valueStream' ? styles.modeActive : styles.mode} aria-pressed={groupBy === 'valueStream'} onClick={() => { onGroupByChange('valueStream'); }}>
           By value stream
+        </button>
+      </div>
+      <div className={styles.modeToggle} role="group" aria-label="Timeline granularity">
+        <button type="button" className={granularity === 'months' ? styles.modeActive : styles.mode} aria-pressed={granularity === 'months'} onClick={() => { onGranularityChange('months'); }}>
+          Months
+        </button>
+        <button type="button" className={granularity === 'quarters' ? styles.modeActive : styles.mode} aria-pressed={granularity === 'quarters'} onClick={() => { onGranularityChange('quarters'); }}>
+          Quarters
+        </button>
+        <button type="button" className={granularity === 'years' ? styles.modeActive : styles.mode} aria-pressed={granularity === 'years'} onClick={() => { onGranularityChange('years'); }}>
+          Years
         </button>
       </div>
       <div className={styles.facets} aria-label="Roadmap filters">

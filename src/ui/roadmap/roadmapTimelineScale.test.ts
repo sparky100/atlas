@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeRoadmapTimelineRange, percentAt, percentAtIso } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, computeRoadmapTimelineRange, percentAt, percentAtIso } from './roadmapTimelineScale';
 
 const NOW = new Date('2026-06-15T00:00:00Z');
 
@@ -52,5 +52,29 @@ describe('percentAtIso', () => {
   it('parses a real ISO date string and maps it the same as percentAt', () => {
     const range = { start: new Date('2020-01-01'), end: new Date('2021-01-01') };
     expect(percentAtIso('2020-01-01', range)).toBe(0);
+  });
+});
+
+describe('computeRoadmapAxisTicks', () => {
+  const range = { start: new Date('2026-01-01'), end: new Date('2026-12-31') };
+
+  it('generates quarter ticks by default', () => {
+    const ticks = computeRoadmapAxisTicks(range);
+    expect(ticks.map((t) => t.label)).toEqual(['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026']);
+    expect(ticks[0]?.pct).toBe(0);
+    expect(ticks[ticks.length - 1]?.pct).toBeGreaterThan(70);
+  });
+
+  it('generates month ticks when granularity is months', () => {
+    const ticks = computeRoadmapAxisTicks(range, 'months');
+    expect(ticks).toHaveLength(12);
+    expect(ticks[0]?.label).toBe('Jan 2026');
+    expect(ticks[11]?.label).toBe('Dec 2026');
+  });
+
+  it('generates year ticks when granularity is years', () => {
+    const multiYearRange = { start: new Date('2024-01-01'), end: new Date('2027-12-31') };
+    const ticks = computeRoadmapAxisTicks(multiYearRange, 'years');
+    expect(ticks.map((t) => t.label)).toEqual(['2024', '2025', '2026', '2027']);
   });
 });

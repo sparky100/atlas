@@ -52,7 +52,7 @@ describe('computeRoadmapPngPlan', () => {
   it('lays out one row per bar, taller for more rows and groups', () => {
     const groups: RoadmapGroup[] = [{ key: 'cap-1', label: 'Customer Contact', href: '/e/cap-1', bars: [bar()] }];
     const range = computeRoadmapTimelineRange(['2025-01-01', '2026-12-01'], NOW);
-    const plan = computeRoadmapPngPlan(groups, [], 'toBe', EMPTY_ROADMAP_FILTERS, range, NOW);
+    const plan = computeRoadmapPngPlan(groups, [], 'toBe', EMPTY_ROADMAP_FILTERS, 'quarters', range, NOW);
     expect(plan.groups).toHaveLength(1);
     expect(plan.groups[0]?.label).toBe('Customer Contact');
     expect(plan.groups[0]?.rows).toHaveLength(1);
@@ -65,7 +65,7 @@ describe('computeRoadmapPngPlan', () => {
   it('labels an unassigned group "Unassigned"', () => {
     const groups: RoadmapGroup[] = [{ key: UNASSIGNED_GROUP_KEY, label: 'Unassigned', href: null, bars: [bar()] }];
     const range = computeRoadmapTimelineRange(['2025-01-01'], NOW);
-    const plan = computeRoadmapPngPlan(groups, [], 'toBe', EMPTY_ROADMAP_FILTERS, range, NOW);
+    const plan = computeRoadmapPngPlan(groups, [], 'toBe', EMPTY_ROADMAP_FILTERS, 'quarters', range, NOW);
     expect(plan.groups[0]?.label).toBe('Unassigned');
   });
 
@@ -74,7 +74,7 @@ describe('computeRoadmapPngPlan', () => {
     const filters: RoadmapFilters = { ...EMPTY_ROADMAP_FILTERS, capabilityIds: ['cap-does-not-match'] };
     const branchEvents: RoadmapBranchEvents[] = [{ branch: branch(), events: [{ kind: 'add', elementId: 'sys-2', elementName: 'New CRM' }] }];
     const range = computeRoadmapTimelineRange(['2025-01-01'], NOW);
-    const plan = computeRoadmapPngPlan(groups, branchEvents, 'toBe', filters, range, NOW);
+    const plan = computeRoadmapPngPlan(groups, branchEvents, 'toBe', filters, 'quarters', range, NOW);
     expect(plan.groups).toHaveLength(0);
     expect(plan.axisY).toBeNull();
   });
@@ -83,7 +83,7 @@ describe('computeRoadmapPngPlan', () => {
     const groups: RoadmapGroup[] = [{ key: 'cap-1', label: 'Cap 1', href: null, bars: [bar({ systemId: 'sys-2', name: 'New CRM' })] }];
     const branchEvents: RoadmapBranchEvents[] = [{ branch: branch({ target_date: '2026-06-01' }), events: [{ kind: 'add', elementId: 'sys-2', elementName: 'New CRM' }] }];
     const range = computeRoadmapTimelineRange(['2025-01-01', '2026-12-01', '2026-06-01'], NOW);
-    const plan = computeRoadmapPngPlan(groups, branchEvents, 'toBe', EMPTY_ROADMAP_FILTERS, range, NOW);
+    const plan = computeRoadmapPngPlan(groups, branchEvents, 'toBe', EMPTY_ROADMAP_FILTERS, 'quarters', range, NOW);
     expect(plan.groups[0]?.rows[0]?.markers).toEqual([{ x: expect.any(Number) as number, kind: 'add' }]);
   });
 
@@ -91,7 +91,7 @@ describe('computeRoadmapPngPlan', () => {
     const groups: RoadmapGroup[] = [{ key: 'cap-1', label: 'Cap 1', href: null, bars: [bar({ systemId: 'sys-2', name: 'New CRM' })] }];
     const branchEvents: RoadmapBranchEvents[] = [{ branch: branch({ target_date: '2026-06-01', status: 'in_review' }), events: [{ kind: 'add', elementId: 'sys-2', elementName: 'New CRM' }] }];
     const range = computeRoadmapTimelineRange(['2025-01-01', '2026-12-01', '2026-06-01'], NOW);
-    const plan = computeRoadmapPngPlan(groups, branchEvents, 'asIs', EMPTY_ROADMAP_FILTERS, range, NOW);
+    const plan = computeRoadmapPngPlan(groups, branchEvents, 'asIs', EMPTY_ROADMAP_FILTERS, 'quarters', range, NOW);
     expect(plan.groups[0]?.rows[0]?.markers).toHaveLength(0);
   });
 });

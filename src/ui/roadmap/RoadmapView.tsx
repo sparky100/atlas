@@ -5,7 +5,7 @@ import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import type { RoadmapFilters } from './roadmapFilter';
 import { isRoadmapEligibleBranch, type RoadmapMode } from './roadmapEligibility';
 import { type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
-import { computeRoadmapTimelineRange, percentAt, percentAtIso, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, computeRoadmapTimelineRange, percentAtIso, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { changeDescription, computeRoadmapVisibleData, eventsForSystem, recentRoadmapChanges } from './roadmapVisibleData';
 import styles from './RoadmapView.module.css';
 
@@ -14,6 +14,8 @@ export interface RoadmapViewProps {
   branchEvents: readonly RoadmapBranchEvents[];
   mode: RoadmapMode;
   filters: RoadmapFilters;
+  /** Which time unit the axis shows (months/quarters/years) — a view control, not a filter, so it lives beside `mode` rather than inside `filters`. */
+  granularity: RoadmapGranularity;
   orgSlug: string;
   modelSlug: string;
   now?: Date;
@@ -79,16 +81,11 @@ function RoadmapRow({ bar, events, range, orgSlug, modelSlug }: { bar: RoadmapLi
   );
 }
 
-/** Quarter tick marks along the range — orientation for "time horizontal," not a precise axis (a roadmap reads by season/quarter, not by day). */
-function RoadmapAxis({ range }: { range: RoadmapTimelineRange }) {
-  const ticks: { label: string; pct: number }[] = [];
-  const start = new Date(range.start.getFullYear(), Math.floor(range.start.getMonth() / 3) * 3, 1);
-  for (const cursor = new Date(start); cursor.getTime() <= range.end.getTime(); cursor.setMonth(cursor.getMonth() + 3)) {
-    const quarter = Math.floor(cursor.getMonth() / 3) + 1;
-    ticks.push({ label: `Q${String(quarter)} ${String(cursor.getFullYear())}`, pct: percentAt(cursor, range) });
-  }
+/** Tick marks along the range — orientation for "time horizontal," not a precise axis (a roadmap reads by season/quarter, not by day). Granularity (months/quarters/years) picks the unit. */
+function RoadmapAxis({ range, granularity }: { range: RoadmapTimelineRange; granularity: RoadmapGranularity }) {
+  const ticks = computeRoadmapAxisTicks(range, granularity);
   return (
-    <div className={styles.axis} role="img" aria-label="Timeline, by quarter">
+    <div className={styles.axis} role="img" aria-label="Timeline by quarter">
       {ticks.map((tick) => (
         <span key={tick.label} className={styles.axisTick} style={{ left: `${String(tick.pct)}%` }}>
           <Text as="span" size="xs" tone="faint">
@@ -143,7 +140,7 @@ function RoadmapChangesList({ eligibleEvents }: { eligibleEvents: readonly Roadm
  * same role-boundary stance the capability map redesign already
  * established for this app's other structural-reference views.
  */
-export function RoadmapView({ groups, branchEvents, mode, filters, orgSlug, modelSlug, now = new Date() }: RoadmapViewProps) {
+export function RoadmapView({ groups, branchEvents, mode, filters, granularity, orgSlug, modelSlug, now = new Date() }: RoadmapViewProps) {
   const { filteredGroups, eligibleEvents } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now);
   const range = computeRoadmapTimelineRange(allDatesFor(groups, branchEvents, mode), now);
 
@@ -155,7 +152,7 @@ export function RoadmapView({ groups, branchEvents, mode, filters, orgSlug, mode
     <div className={styles.roadmap}>
       {filteredGroups.length > 0 && (
         <>
-          <RoadmapAxis range={range} />
+          <RoadmapAxis range={range} granularity={granularity} />
           <div role="list" aria-label="Capability domains">
             {filteredGroups.map((group) => (
               <div key={group.key} className={styles.group} role="listitem">

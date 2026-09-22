@@ -17,7 +17,7 @@
 import type { RoadmapMode } from './roadmapEligibility';
 import type { RoadmapFilters } from './roadmapFilter';
 import { type RoadmapGroup } from './roadmapLifecycleRows';
-import { percentAt, percentAtIso, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, percentAtIso, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { computeRoadmapVisibleData, eventsForSystem } from './roadmapVisibleData';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 
@@ -75,14 +75,8 @@ function xAt(pct: number): number {
   return TRACK_X0 + (TRACK_WIDTH * pct) / 100;
 }
 
-function axisTicks(range: RoadmapTimelineRange): { label: string; x: number }[] {
-  const ticks: { label: string; x: number }[] = [];
-  const start = new Date(range.start.getFullYear(), Math.floor(range.start.getMonth() / 3) * 3, 1);
-  for (const cursor = new Date(start); cursor.getTime() <= range.end.getTime(); cursor.setMonth(cursor.getMonth() + 3)) {
-    const quarter = Math.floor(cursor.getMonth() / 3) + 1;
-    ticks.push({ label: `Q${String(quarter)} ${String(cursor.getFullYear())}`, x: xAt(percentAt(cursor, range)) });
-  }
-  return ticks;
+function axisTicks(range: RoadmapTimelineRange, granularity: RoadmapGranularity): { label: string; x: number }[] {
+  return computeRoadmapAxisTicks(range, granularity).map((tick) => ({ label: tick.label, x: xAt(tick.pct) }));
 }
 
 function groupLabelOf(group: Pick<RoadmapGroup, 'label'>): string {
@@ -104,7 +98,7 @@ function markersForBar(systemId: string, branchEvents: readonly RoadmapBranchEve
 }
 
 /** The pure pixel layout — everything `drawRoadmapPng` needs to paint, computed once so the sizing math is unit-testable without a canvas. */
-export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode, filters: RoadmapFilters, range: RoadmapTimelineRange, now: Date): RoadmapPngPlan {
+export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode, filters: RoadmapFilters, granularity: RoadmapGranularity, range: RoadmapTimelineRange, now: Date): RoadmapPngPlan {
   const { filteredGroups } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now);
 
   let cursor = PADDING;
@@ -147,7 +141,7 @@ export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEve
     width: PADDING * 2 + NAME_COL_WIDTH + TRACK_WIDTH,
     height: effectiveHeight,
     axisY,
-    axisTicks: filteredGroups.length > 0 ? axisTicks(range) : [],
+    axisTicks: filteredGroups.length > 0 ? axisTicks(range, granularity) : [],
     groups: pngGroups,
   };
 }

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_ROADMAP_FILTERS } from './roadmapFilter';
-import { parseRoadmapFilters, roadmapFiltersToSearchParams, parseRoadmapGroupBy, roadmapGroupByToSearchParams } from './roadmapFilterParams';
+import {
+  parseRoadmapFilters,
+  roadmapFiltersToSearchParams,
+  parseRoadmapGroupBy,
+  roadmapGroupByToSearchParams,
+  parseRoadmapGranularity,
+  roadmapGranularityToSearchParams,
+} from './roadmapFilterParams';
 
 describe('parseRoadmapFilters', () => {
   it('returns the shared empty-filters constant when nothing is set', () => {
@@ -69,5 +76,32 @@ describe('roadmapGroupByToSearchParams', () => {
     const prev = new URLSearchParams('groupBy=valueStream');
     roadmapGroupByToSearchParams('capability', prev);
     expect(prev.get('groupBy')).toBe('valueStream');
+  });
+});
+
+describe('parseRoadmapGranularity', () => {
+  it('defaults to quarters for an absent or unknown value', () => {
+    expect(parseRoadmapGranularity(new URLSearchParams())).toBe('quarters');
+    expect(parseRoadmapGranularity(new URLSearchParams('granularity=quarters'))).toBe('quarters');
+    expect(parseRoadmapGranularity(new URLSearchParams('granularity=invalid'))).toBe('quarters');
+  });
+
+  it('reads months and years values', () => {
+    expect(parseRoadmapGranularity(new URLSearchParams('granularity=months'))).toBe('months');
+    expect(parseRoadmapGranularity(new URLSearchParams('granularity=years'))).toBe('years');
+  });
+});
+
+describe('roadmapGranularityToSearchParams', () => {
+  it('writes months and years, and deletes the param for the quarters default', () => {
+    expect(roadmapGranularityToSearchParams('months', new URLSearchParams()).get('granularity')).toBe('months');
+    expect(roadmapGranularityToSearchParams('years', new URLSearchParams()).get('granularity')).toBe('years');
+    expect(roadmapGranularityToSearchParams('quarters', new URLSearchParams('granularity=months')).has('granularity')).toBe(false);
+  });
+
+  it('never mutates the previous URLSearchParams in place', () => {
+    const prev = new URLSearchParams('granularity=months');
+    roadmapGranularityToSearchParams('quarters', prev);
+    expect(prev.get('granularity')).toBe('months');
   });
 });

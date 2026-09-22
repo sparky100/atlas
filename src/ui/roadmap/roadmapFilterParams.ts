@@ -8,6 +8,9 @@
  */
 import type { Criticality } from '../../contracts/delta';
 import { EMPTY_ROADMAP_FILTERS, type RoadmapFilters } from './roadmapFilter';
+import type { RoadmapGranularity } from './roadmapTimelineScale';
+
+export type { RoadmapGranularity } from './roadmapTimelineScale';
 
 const CRITICALITY_VALUES: readonly Criticality[] = ['critical', 'high', 'medium', 'low'];
 
@@ -57,5 +60,20 @@ export function roadmapGroupByToSearchParams(groupBy: RoadmapGroupBy, prev: URLS
   const next = new URLSearchParams(prev);
   if (groupBy === 'valueStream') next.set('groupBy', 'valueStream');
   else next.delete('groupBy');
+  return next;
+}
+
+/** Which time unit the timeline axis shows — `?granularity=months` or `?granularity=years`; defaults to `'quarters'`. */
+export function parseRoadmapGranularity(searchParams: URLSearchParams): RoadmapGranularity {
+  const raw = searchParams.get('granularity');
+  if (raw === 'months' || raw === 'years') return raw;
+  return 'quarters';
+}
+
+/** Copy-then-mutate — the quarters default deletes the param rather than writing a hollow `?granularity=quarters` marker. */
+export function roadmapGranularityToSearchParams(granularity: RoadmapGranularity, prev: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(prev);
+  if (granularity === 'months' || granularity === 'years') next.set('granularity', granularity);
+  else next.delete('granularity');
   return next;
 }
