@@ -5,7 +5,7 @@ import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import type { RoadmapFilters } from './roadmapFilter';
 import { isRoadmapEligibleBranch, type RoadmapMode } from './roadmapEligibility';
 import { type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
-import { computeRoadmapAxisTicks, computeRoadmapTimelineRange, percentAtIso, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, computeRoadmapTimelineRange, computeRoadmapWindow, percentAtIso, todayPercent, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { changeDescription, computeRoadmapVisibleData, eventsForSystem, recentRoadmapChanges } from './roadmapVisibleData';
 import styles from './RoadmapView.module.css';
 
@@ -16,6 +16,10 @@ export interface RoadmapViewProps {
   filters: RoadmapFilters;
   /** Which time unit the axis shows (months/quarters/years) — a view control, not a filter, so it lives beside `mode` rather than inside `filters`. */
   granularity: RoadmapGranularity;
+  /** Which viewing window the timeline shows — `'all'` fits every date; a fixed horizon shows a sliding 1y/3y window. */
+  horizon: RoadmapHorizon;
+  /** The fixed-horizon window's left edge (month start); `undefined` centers on now. Ignored when `horizon` is `'all'`. */
+  windowStart: Date | undefined;
   orgSlug: string;
   modelSlug: string;
   now?: Date;
@@ -42,7 +46,7 @@ function allDatesFor(groups: readonly RoadmapGroup[], branchEvents: readonly Roa
  * capability map redesign's own "fact, not a flag" stance forward: a thin
  * shape and colour, never a filled alarm treatment.
  */
-function RoadmapRow({ bar, events, range, orgSlug, modelSlug }: { bar: RoadmapLifecycleBar; events: readonly { event: RoadmapBranchEvents['events'][number]; branch: RoadmapBranchEvents['branch'] }[]; range: RoadmapTimelineRange; orgSlug: string; modelSlug: string }) {
+function RoadmapRow({ bar, events, range, todayPct, orgSlug, modelSlug }: { bar: RoadmapLifecycleBar; events: readonly { event: RoadmapBranchEvents['events'][number]; branch: RoadmapBranchEvents['branch'] }[]; range: RoadmapTimelineRange; todayPct: number | undefined; orgSlug: string; modelSlug: string }) {
   const startPct = percentAtIso(bar.introduced, range);
   const endPct = percentAtIso(bar.plannedEnd, range);
   const supportEndPct = percentAtIso(bar.supportEndsAt, range);
@@ -58,6 +62,7 @@ function RoadmapRow({ bar, events, range, orgSlug, modelSlug }: { bar: RoadmapLi
       </Link>
       <div className={styles.track}>
         <div className={styles.lifecycleBar} data-tone={bar.lifecycleStatus === 'retiring' || bar.lifecycleStatus === 'retired' ? 'warn' : 'neutral'} style={{ left: `${String(left)}%`, width: `${String(Math.max(width, 0.5))}%` }} />
+        {todayPct !== undefined && <div className={styles.todayLine} style={{ left: `${String(todayPct)}%` }} title="Today" aria-hidden="true" />}
         {supportEndPct !== undefined && <div className={styles.supportEndTick} style={{ left: `${String(supportEndPct)}%` }} title={`Support ends ${bar.supportEndsAt ?? ''}`} />}
         {events.map(({ event, branch }, index) => {
           const pct = percentAtIso(branch.target_date ?? undefined, range);
@@ -140,9 +145,11 @@ function RoadmapChangesList({ eligibleEvents }: { eligibleEvents: readonly Roadm
  * same role-boundary stance the capability map redesign already
  * established for this app's other structural-reference views.
  */
-export function RoadmapView({ groups, branchEvents, mode, filters, granularity, orgSlug, modelSlug, now = new Date() }: RoadmapViewProps) {
+export function RoadmapView({ groups, branchEvents, mode, filters, granularity, horizon, windowStart, orgSlug, modelSlug, now = new Date() }: RoadmapViewProps) {
   const { filteredGroups, eligibleEvents } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now);
-  const range = computeRoadmapTimelineRange(allDatesFor(groups, branchEvents, mode), now);
+  const fullRange = computeRoadmapTimelineRange(allDatesFor(groups, branchEvents, mode), now);
+  const range = computeRoadmapWindow(horizon, fullRange, now, windowStart);
+  const todayPct = todayPercent(range, now);
 
   if (filteredGroups.length === 0 && eligibleEvents.length === 0) {
     return <EmptyState>No systems with a recorded lifecycle date (introduced, planned end or support end) yet.</EmptyState>;
@@ -170,7 +177,7 @@ export function RoadmapView({ groups, branchEvents, mode, filters, granularity, 
                 <div role="list" aria-label={`${group.label} systems`}>
                   {group.bars.map((bar) => (
                     <div key={bar.systemId} role="listitem">
-                      <RoadmapRow bar={bar} events={eventsForSystem(bar.systemId, branchEvents, mode)} range={range} orgSlug={orgSlug} modelSlug={modelSlug} />
+                      <RoadmapRow bar={bar} events={eventsForSystem(bar.systemId, branchEvents, mode)} range={range} todayPct={todayPct} orgSlug={orgSlug} modelSlug={modelSlug} />
                     </div>
                   ))}
                 </div>

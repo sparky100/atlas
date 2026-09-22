@@ -7,6 +7,11 @@ import {
   roadmapGroupByToSearchParams,
   parseRoadmapGranularity,
   roadmapGranularityToSearchParams,
+  parseRoadmapHorizon,
+  roadmapHorizonToSearchParams,
+  parseRoadmapStartMonth,
+  formatRoadmapStartMonth,
+  roadmapStartMonthToSearchParams,
 } from './roadmapFilterParams';
 
 describe('parseRoadmapFilters', () => {
@@ -103,5 +108,59 @@ describe('roadmapGranularityToSearchParams', () => {
     const prev = new URLSearchParams('granularity=months');
     roadmapGranularityToSearchParams('quarters', prev);
     expect(prev.get('granularity')).toBe('months');
+  });
+});
+
+describe('parseRoadmapHorizon', () => {
+  it('defaults to "all" for an absent or unknown value', () => {
+    expect(parseRoadmapHorizon(new URLSearchParams())).toBe('all');
+    expect(parseRoadmapHorizon(new URLSearchParams('horizon=all'))).toBe('all');
+    expect(parseRoadmapHorizon(new URLSearchParams('horizon=bogus'))).toBe('all');
+  });
+
+  it('reads 1y and 3y values', () => {
+    expect(parseRoadmapHorizon(new URLSearchParams('horizon=1y'))).toBe('1y');
+    expect(parseRoadmapHorizon(new URLSearchParams('horizon=3y'))).toBe('3y');
+  });
+});
+
+describe('roadmapHorizonToSearchParams', () => {
+  it('writes 1y/3y and deletes the param for the "all" default', () => {
+    expect(roadmapHorizonToSearchParams('1y', new URLSearchParams()).get('horizon')).toBe('1y');
+    expect(roadmapHorizonToSearchParams('3y', new URLSearchParams()).get('horizon')).toBe('3y');
+    expect(roadmapHorizonToSearchParams('all', new URLSearchParams('horizon=3y')).has('horizon')).toBe(false);
+  });
+});
+
+describe('parseRoadmapStartMonth', () => {
+  it('returns undefined for an absent or invalid value', () => {
+    expect(parseRoadmapStartMonth(new URLSearchParams())).toBeUndefined();
+    expect(parseRoadmapStartMonth(new URLSearchParams('start=bogus'))).toBeUndefined();
+    expect(parseRoadmapStartMonth(new URLSearchParams('start=2026-13'))).toBeUndefined();
+  });
+
+  it('parses a valid YYYY-MM into a month-start date', () => {
+    const parsed = parseRoadmapStartMonth(new URLSearchParams('start=2026-04'));
+    expect(parsed).toEqual(new Date(2026, 3, 1));
+  });
+});
+
+describe('formatRoadmapStartMonth', () => {
+  it('formats a date back to YYYY-MM', () => {
+    expect(formatRoadmapStartMonth(new Date(2026, 3, 1))).toBe('2026-04');
+    expect(formatRoadmapStartMonth(new Date(2025, 10, 1))).toBe('2025-11');
+  });
+});
+
+describe('roadmapStartMonthToSearchParams', () => {
+  it('writes start and deletes it when undefined', () => {
+    expect(roadmapStartMonthToSearchParams(new Date(2026, 0, 1), new URLSearchParams()).get('start')).toBe('2026-01');
+    expect(roadmapStartMonthToSearchParams(undefined, new URLSearchParams('start=2026-01')).has('start')).toBe(false);
+  });
+
+  it('never mutates the previous URLSearchParams in place', () => {
+    const prev = new URLSearchParams('start=2026-01');
+    roadmapStartMonthToSearchParams(undefined, prev);
+    expect(prev.get('start')).toBe('2026-01');
   });
 });

@@ -99,3 +99,54 @@ export function percentAtIso(value: string | undefined, range: RoadmapTimelineRa
   const date = parseDate(value);
   return date === null ? undefined : percentAt(date, range);
 }
+
+export type RoadmapHorizon = '1y' | '3y' | 'all';
+
+/** How many months a fixed horizon covers; `null` for `'all'` (the full date span). */
+export function horizonDurationMonths(horizon: RoadmapHorizon): number | null {
+  if (horizon === '1y') return 12;
+  if (horizon === '3y') return 36;
+  return null;
+}
+
+/** The navigation step for the ←/→ steppers, in months (one quarter — small and predictable). */
+export const ROADMAP_NAV_STEP_MONTHS = 3;
+
+function toMonthStart(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addMonths(date: Date, months: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
+/** The default left edge of a fixed-horizon window — centered on `now`. */
+export function defaultRoadmapWindowStart(horizon: RoadmapHorizon, now: Date): Date {
+  const months = horizonDurationMonths(horizon);
+  if (months === null) return toMonthStart(now);
+  return addMonths(toMonthStart(now), -Math.floor(months / 2));
+}
+
+/**
+ * The visible timeline window. `'all'` returns `fullRange` unchanged (the
+ * current always-fit behaviour); a fixed horizon returns a `horizon`-wide
+ * window starting at `start` (or centered on `now` when `start` is absent),
+ * snapped to month starts so axis ticks land cleanly.
+ */
+export function computeRoadmapWindow(horizon: RoadmapHorizon, fullRange: RoadmapTimelineRange, now: Date, start?: Date): RoadmapTimelineRange {
+  const months = horizonDurationMonths(horizon);
+  if (months === null) return fullRange;
+  const windowStart = toMonthStart(start ?? defaultRoadmapWindowStart(horizon, now));
+  return { start: windowStart, end: addMonths(windowStart, months) };
+}
+
+/** Advances a fixed-horizon window's start by one nav step (`direction` = -1 back, +1 forward). */
+export function shiftRoadmapWindowStart(start: Date, direction: -1 | 1): Date {
+  return addMonths(toMonthStart(start), direction * ROADMAP_NAV_STEP_MONTHS);
+}
+
+/** `now`'s position on the axis as a percent, or `undefined` when `now` falls outside `range` (used to decide whether to draw the "today" marker). */
+export function todayPercent(range: RoadmapTimelineRange, now: Date): number | undefined {
+  if (now.getTime() < range.start.getTime() || now.getTime() > range.end.getTime()) return undefined;
+  return percentAt(now, range);
+}

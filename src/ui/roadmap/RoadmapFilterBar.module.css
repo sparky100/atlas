@@ -31,6 +31,32 @@
   border-color: var(--accent);
 }
 
+.horizonRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.navButton {
+  border: var(--border-width) solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  font-size: var(--text-sm-size);
+}
+
+.navButton:hover {
+  background: var(--bg-subtle);
+}
+
 .facets {
   display: flex;
   flex-wrap: wrap;

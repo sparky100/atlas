@@ -4,7 +4,7 @@ import { Chip } from '../components/Chip/Chip';
 import { EMPTY_ROADMAP_FILTERS, hasActiveRoadmapFilters, type RoadmapFilters } from './roadmapFilter';
 import { type RoadmapGroupBy } from './roadmapFilterParams';
 import type { RoadmapMode } from './roadmapEligibility';
-import type { RoadmapGranularity } from './roadmapTimelineScale';
+import type { RoadmapGranularity, RoadmapHorizon } from './roadmapTimelineScale';
 import styles from './RoadmapFilterBar.module.css';
 
 const CRITICALITY_OPTIONS: readonly { value: Criticality; label: string }[] = [
@@ -25,6 +25,13 @@ export interface RoadmapFilterBarProps {
   /** Which time unit the axis shows — months/quarters/years. */
   granularity: RoadmapGranularity;
   onGranularityChange: (granularity: RoadmapGranularity) => void;
+  /** Which viewing window the timeline shows — `'all'` or a fixed 1y/3y window. */
+  horizon: RoadmapHorizon;
+  onHorizonChange: (horizon: RoadmapHorizon) => void;
+  /** Slide the fixed-horizon window back (-1) or forward (+1) by one nav step. Only offered when `horizon !== 'all'`. */
+  onNudge: (direction: -1 | 1) => void;
+  /** Re-center the fixed-horizon window on today. */
+  onResetToday: () => void;
   capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>;
   ownerActorsById: ReadonlyMap<UUID, ElementsHeadRow>;
 }
@@ -76,7 +83,7 @@ function FacetDisclosure<T extends string>({ title, values, options, onToggle }:
  * own fork; this picks which *set of branches* the whole roadmap
  * includes (`roadmapEligibility.ts`'s own module comment).
  */
-export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange, groupBy, onGroupByChange, granularity, onGranularityChange, capabilitiesById, ownerActorsById }: RoadmapFilterBarProps) {
+export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange, groupBy, onGroupByChange, granularity, onGranularityChange, horizon, onHorizonChange, onNudge, onResetToday, capabilitiesById, ownerActorsById }: RoadmapFilterBarProps) {
   const active = hasActiveRoadmapFilters(filters);
   const capabilityOptions = [...capabilitiesById.values()].map((c) => ({ value: c.element_id, label: c.name })).sort((a, b) => a.label.localeCompare(b.label));
   const ownerOptions = [...ownerActorsById.values()].map((a) => ({ value: a.element_id, label: a.name })).sort((a, b) => a.label.localeCompare(b.label));
@@ -109,6 +116,32 @@ export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange,
         <button type="button" className={granularity === 'years' ? styles.modeActive : styles.mode} aria-pressed={granularity === 'years'} onClick={() => { onGranularityChange('years'); }}>
           Years
         </button>
+      </div>
+      <div className={styles.horizonRow}>
+        <div className={styles.modeToggle} role="group" aria-label="Timeline horizon">
+          <button type="button" className={horizon === '1y' ? styles.modeActive : styles.mode} aria-pressed={horizon === '1y'} onClick={() => { onHorizonChange('1y'); }}>
+            1 year
+          </button>
+          <button type="button" className={horizon === '3y' ? styles.modeActive : styles.mode} aria-pressed={horizon === '3y'} onClick={() => { onHorizonChange('3y'); }}>
+            3 years
+          </button>
+          <button type="button" className={horizon === 'all' ? styles.modeActive : styles.mode} aria-pressed={horizon === 'all'} onClick={() => { onHorizonChange('all'); }}>
+            All
+          </button>
+        </div>
+        {horizon !== 'all' && (
+          <div className={styles.nav} role="group" aria-label="Timeline navigation">
+            <button type="button" className={styles.navButton} onClick={() => { onNudge(-1); }} aria-label="Earlier">
+              ←
+            </button>
+            <button type="button" className={styles.navButton} onClick={onResetToday}>
+              Today
+            </button>
+            <button type="button" className={styles.navButton} onClick={() => { onNudge(1); }} aria-label="Later">
+              →
+            </button>
+          </div>
+        )}
       </div>
       <div className={styles.facets} aria-label="Roadmap filters">
         <FacetDisclosure

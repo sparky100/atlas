@@ -18,7 +18,8 @@ import { RoadmapFilterBar } from '../roadmap/RoadmapFilterBar';
 import { RoadmapView } from '../roadmap/RoadmapView';
 import { useRoadmap } from '../roadmap/useRoadmap';
 import { useRoadmapExport } from '../roadmap/useRoadmapExport';
-import { parseRoadmapFilters, roadmapFiltersToSearchParams, parseRoadmapGroupBy, roadmapGroupByToSearchParams, parseRoadmapGranularity, roadmapGranularityToSearchParams, type RoadmapGroupBy, type RoadmapGranularity } from '../roadmap/roadmapFilterParams';
+import { parseRoadmapFilters, roadmapFiltersToSearchParams, parseRoadmapGroupBy, roadmapGroupByToSearchParams, parseRoadmapGranularity, roadmapGranularityToSearchParams, parseRoadmapHorizon, roadmapHorizonToSearchParams, parseRoadmapStartMonth, roadmapStartMonthToSearchParams, type RoadmapGroupBy, type RoadmapGranularity, type RoadmapHorizon } from '../roadmap/roadmapFilterParams';
+import { defaultRoadmapWindowStart, shiftRoadmapWindowStart } from '../roadmap/roadmapTimelineScale';
 import type { RoadmapFilters } from '../roadmap/roadmapFilter';
 import type { RoadmapMode } from '../roadmap/roadmapEligibility';
 import styles from './RoadmapPage.module.css';
@@ -79,6 +80,20 @@ export function RoadmapPage() {
     setSearchParams(roadmapGranularityToSearchParams(next, searchParams));
   };
 
+  const horizon = parseRoadmapHorizon(searchParams);
+  const windowStart = parseRoadmapStartMonth(searchParams);
+  const setHorizon = (next: RoadmapHorizon): void => {
+    // Switching horizon re-centers the window — drop any explicit start so the default (centered on now) applies.
+    setSearchParams(roadmapStartMonthToSearchParams(undefined, roadmapHorizonToSearchParams(next, searchParams)));
+  };
+  const nudge = (direction: -1 | 1): void => {
+    const base = windowStart ?? defaultRoadmapWindowStart(horizon, new Date());
+    setSearchParams(roadmapStartMonthToSearchParams(shiftRoadmapWindowStart(base, direction), searchParams));
+  };
+  const resetToday = (): void => {
+    setSearchParams(roadmapStartMonthToSearchParams(undefined, searchParams));
+  };
+
   const roadmapData = state.status === 'ready' ? state.data : null;
   // F6 Step 6: the same bars, grouped by capability or value stream — both
   // were computed by `useRoadmap`, so switching the toggle never refetches.
@@ -89,6 +104,8 @@ export function RoadmapPage() {
     mode,
     filters,
     granularity,
+    horizon,
+    windowStart,
     filenameBase: model?.name ?? 'roadmap',
   });
   const hasNothingToExport = roadmapData === null || (groups.length === 0 && roadmapData.branchEvents.length === 0);
@@ -137,8 +154,8 @@ export function RoadmapPage() {
           {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
           {state.status === 'ready' && (
             <>
-              <RoadmapFilterBar filters={filters} onFiltersChange={setFilters} mode={mode} onModeChange={setMode} groupBy={groupBy} onGroupByChange={setGroupBy} granularity={granularity} onGranularityChange={setGranularity} capabilitiesById={state.data.capabilitiesById} ownerActorsById={state.data.ownerActorsById} />
-              <RoadmapView groups={groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} granularity={granularity} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+              <RoadmapFilterBar filters={filters} onFiltersChange={setFilters} mode={mode} onModeChange={setMode} groupBy={groupBy} onGroupByChange={setGroupBy} granularity={granularity} onGranularityChange={setGranularity} horizon={horizon} onHorizonChange={setHorizon} onNudge={nudge} onResetToday={resetToday} capabilitiesById={state.data.capabilitiesById} ownerActorsById={state.data.ownerActorsById} />
+              <RoadmapView groups={groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} granularity={granularity} horizon={horizon} windowStart={windowStart} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
             </>
           )}
         </main>

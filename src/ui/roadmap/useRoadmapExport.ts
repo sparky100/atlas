@@ -15,7 +15,7 @@ import type { RoadmapFilters } from './roadmapFilter';
 import type { RoadmapGroup } from './roadmapLifecycleRows';
 import { roadmapToCsv } from './roadmapExport';
 import { computeRoadmapPngPlan, roadmapPngPlanToDataUrl } from './roadmapPngExport';
-import { computeRoadmapTimelineRange, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapTimelineRange, computeRoadmapWindow, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { computeRoadmapVisibleData } from './roadmapVisibleData';
 
 export interface UseRoadmapExportInput {
@@ -24,6 +24,9 @@ export interface UseRoadmapExportInput {
   mode: RoadmapMode;
   filters: RoadmapFilters;
   granularity: RoadmapGranularity;
+  horizon: RoadmapHorizon;
+  /** The fixed-horizon window's left edge; `undefined` centers on now (ignored for `'all'`). */
+  windowStart: Date | undefined;
   /** The model/view name, for the filename — same role `useElementExport.ts`'s own `filenameBase` plays. */
   filenameBase: string;
   now?: Date;
@@ -62,7 +65,7 @@ function allDatesFor(groups: readonly RoadmapGroup[], branchEvents: readonly Roa
   return dates;
 }
 
-export function useRoadmapExport({ groups, branchEvents, mode, filters, granularity, filenameBase, now = new Date() }: UseRoadmapExportInput): UseRoadmapExportResult {
+export function useRoadmapExport({ groups, branchEvents, mode, filters, granularity, horizon, windowStart, filenameBase, now = new Date() }: UseRoadmapExportInput): UseRoadmapExportResult {
   const [error, setError] = useState<string | null>(null);
 
   const exportCsv = useCallback(() => {
@@ -81,7 +84,8 @@ export function useRoadmapExport({ groups, branchEvents, mode, filters, granular
   const exportPng = useCallback(() => {
     setError(null);
     try {
-      const range: RoadmapTimelineRange = computeRoadmapTimelineRange(allDatesFor(groups, branchEvents, mode), now);
+      const fullRange: RoadmapTimelineRange = computeRoadmapTimelineRange(allDatesFor(groups, branchEvents, mode), now);
+      const range = computeRoadmapWindow(horizon, fullRange, now, windowStart);
       const plan = computeRoadmapPngPlan(groups, branchEvents, mode, filters, granularity, range, now);
       const dataUrl = roadmapPngPlanToDataUrl(plan);
       downloadUrl(dataUrl, `${sanitizeForFilename(filenameBase)}-roadmap.png`);
@@ -89,7 +93,7 @@ export function useRoadmapExport({ groups, branchEvents, mode, filters, granular
       reportError("Couldn't export the roadmap image.", e);
       setError(e instanceof Error ? e.message : 'Could not export.');
     }
-  }, [groups, branchEvents, mode, filters, granularity, now, filenameBase]);
+  }, [groups, branchEvents, mode, filters, granularity, horizon, windowStart, now, filenameBase]);
 
   return { error, exportCsv, exportPng };
 }

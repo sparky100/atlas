@@ -17,7 +17,7 @@
 import type { RoadmapMode } from './roadmapEligibility';
 import type { RoadmapFilters } from './roadmapFilter';
 import { type RoadmapGroup } from './roadmapLifecycleRows';
-import { computeRoadmapAxisTicks, percentAtIso, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, percentAtIso, todayPercent, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { computeRoadmapVisibleData, eventsForSystem } from './roadmapVisibleData';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 
@@ -67,6 +67,8 @@ export interface RoadmapPngPlan {
   axisY: number | null;
   axisTicks: { label: string; x: number }[];
   groups: RoadmapPngGroup[];
+  /** The "today" marker's x position, or `null` when `now` falls outside the visible range. */
+  todayX: number | null;
 }
 
 const TRACK_X0 = PADDING + NAME_COL_WIDTH;
@@ -136,6 +138,7 @@ export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEve
   }
 
   const effectiveHeight = filteredGroups.length > 0 ? cursor - GROUP_GAP + PADDING : cursor + PADDING;
+  const todayPct = todayPercent(range, now);
 
   return {
     width: PADDING * 2 + NAME_COL_WIDTH + TRACK_WIDTH,
@@ -143,6 +146,7 @@ export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEve
     axisY,
     axisTicks: filteredGroups.length > 0 ? axisTicks(range, granularity) : [],
     groups: pngGroups,
+    todayX: todayPct !== undefined ? xAt(todayPct) : null,
   };
 }
 
@@ -204,6 +208,16 @@ export function drawRoadmapPng(ctx: CanvasRenderingContext2D, plan: RoadmapPngPl
         }
       }
     }
+  }
+
+  if (plan.todayX !== null && plan.axisY !== null) {
+    ctx.strokeStyle = PALETTE.textMuted;
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.moveTo(plan.todayX, plan.axisY + AXIS_HEIGHT);
+    ctx.lineTo(plan.todayX, plan.height - PADDING);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 }
 

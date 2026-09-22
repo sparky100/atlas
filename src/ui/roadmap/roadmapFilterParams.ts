@@ -8,9 +8,9 @@
  */
 import type { Criticality } from '../../contracts/delta';
 import { EMPTY_ROADMAP_FILTERS, type RoadmapFilters } from './roadmapFilter';
-import type { RoadmapGranularity } from './roadmapTimelineScale';
+import type { RoadmapGranularity, RoadmapHorizon } from './roadmapTimelineScale';
 
-export type { RoadmapGranularity } from './roadmapTimelineScale';
+export type { RoadmapGranularity, RoadmapHorizon } from './roadmapTimelineScale';
 
 const CRITICALITY_VALUES: readonly Criticality[] = ['critical', 'high', 'medium', 'low'];
 
@@ -75,5 +75,46 @@ export function roadmapGranularityToSearchParams(granularity: RoadmapGranularity
   const next = new URLSearchParams(prev);
   if (granularity === 'months' || granularity === 'years') next.set('granularity', granularity);
   else next.delete('granularity');
+  return next;
+}
+
+/** Which viewing horizon the timeline shows — `?horizon=1y` or `?horizon=3y`; defaults to `'all'` (fit every date). */
+export function parseRoadmapHorizon(searchParams: URLSearchParams): RoadmapHorizon {
+  const raw = searchParams.get('horizon');
+  if (raw === '1y' || raw === '3y') return raw;
+  return 'all';
+}
+
+/** Copy-then-mutate — the `'all'` default deletes the param rather than writing a hollow `?horizon=all` marker. */
+export function roadmapHorizonToSearchParams(horizon: RoadmapHorizon, prev: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(prev);
+  if (horizon === '1y' || horizon === '3y') next.set('horizon', horizon);
+  else next.delete('horizon');
+  return next;
+}
+
+/** The fixed-horizon window's left edge (`?start=YYYY-MM`), or `undefined` when absent/invalid — a bad token is ignored rather than crashing the page. */
+export function parseRoadmapStartMonth(searchParams: URLSearchParams): Date | undefined {
+  const raw = searchParams.get('start');
+  if (!raw) return undefined;
+  const match = /^(\d{4})-(\d{2})$/.exec(raw);
+  if (!match) return undefined;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return undefined;
+  const date = new Date(year, month - 1, 1);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+/** Formats a month-start date as `YYYY-MM` (the inverse of `parseRoadmapStartMonth`). */
+export function formatRoadmapStartMonth(start: Date): string {
+  return `${String(start.getFullYear())}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Copy-then-mutate — writes `?start=YYYY-MM` when a window start is set, deletes it otherwise (the centered-on-now default). */
+export function roadmapStartMonthToSearchParams(start: Date | undefined, prev: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(prev);
+  if (start) next.set('start', formatRoadmapStartMonth(start));
+  else next.delete('start');
   return next;
 }
