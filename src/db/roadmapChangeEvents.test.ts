@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Delta } from '../contracts/delta';
 import { emptyHead, type ElementRow, type RelationshipRow } from '../engine/deltas';
-import { deriveRoadmapChangeEvents } from './roadmapChangeEvents';
+import type { CommitLoader, CommitNode } from '../engine/head';
+import { deriveMainCommittedChangeEvents, deriveRoadmapChangeEvents, listMainCommittedDeltas, type RoadmapBranchEvents } from './roadmapChangeEvents';
+import type { BranchRow } from './types';
 
 function elementCreate(id: string, elementId: string, name: string): Delta {
   return { kind: 'element.create', id, elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: 'src', confidence: 1 };
@@ -285,5 +287,140 @@ describe('deriveRoadmapChangeEvents', () => {
         toSystemName: 'New System',
       },
     ]);
+  });
+});
+
+function mainBranch(): BranchRow {
+  return {
+    id: 'main-branch',
+    org_id: 'org-1',
+    model_id: 'model-1',
+    name: 'main',
+    kind: 'main',
+    status: 'merged',
+    base_commit_id: 'base-1',
+    head_commit_id: 'head-1',
+    shared_for_review: false,
+    title: null,
+    description: null,
+    target_date: null,
+    split_from: null,
+    created_by: 'user-1',
+    updated_at: '2026-01-01T00:00:00Z',
+    cancel_reason: null,
+    cancelled_at: null,
+    cancelled_by: null,
+    dismissed_identity_pairs: [],
+    intent: null,
+  };
+}
+
+function commitNode(id: string, parent: string | null, branchId: string, opts: { merge?: boolean; deltas?: Delta[] } = {}): CommitNode {
+  const merged = opts.merge === true;
+  return {
+    id,
+    org_id: 'org-1',
+    model_id: 'model-1',
+    branch_id: branchId,
+    parent_commit_id: parent,
+    merged_branch_head_commit_id: merged ? `merged-${id}` : null,
+    kind: merged ? 'merge' : 'manual',
+    title: 'test commit',
+    body: null,
+    author_id: 'user-1',
+    head_hash: null,
+    depth: 0,
+    created_at: '2026-01-01T00:00:00Z',
+    deltas: opts.deltas ?? [],
+  };
+}
+
+function loaderFor(nodes: CommitNode[]): CommitLoader {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  return (commitId) => byId.get(commitId);
+}
+
+function headWith(head: ElementRow, ...extra: [string, ElementRow][]): ReturnType<typeof emptyHead> {
+  const headElementRows = emptyHead();
+  headElementRows.elements.set('sys-1', head);
+  for (const [id, row] of extra) headElementRows.elements.set(id, row);
+  return headElementRows;
+}
+
+describe('deriveMainCommittedChangeEvents', () => {
+  it('adds a roadmap entry for a retirement committed directly on main, dated at the element\'s plannedEnd', () => {
+    const head = headWith({ ...system('Legacy System'), attributes: { plannedEnd: '2027-12-31', lifecycleStatus: 'retiring' } });
+
+    const events = deriveMainCommittedChangeEvents([retireUpdate('d1', 'sys-1', 'create-1')], head, [], mainBranch());
+
+    expect(events).toEqual([
+      { branch: expect.objectContaining({ id: 'main:d1', target_date: '2027-12-31', intent: 'record', status: 'merged' }), events: [{ kind: 'retire', elementId: 'sys-1', elementName: 'Legacy System' }] },
+    ]);
+  });
+
+  it('also surfaces a container (module) retirement committed directly on main', () => {
+    const head = emptyHead();
+    head.elements.set('bw-1', { ...container('BW', 'sap'), attributes: { plannedEnd: '2027-06-30', lifecycleStatus: 'retiring' } });
+
+    const events = deriveMainCommittedChangeEvents([containerRetireUpdate('d1', 'bw-1', 'create-1')], head, [], mainBranch());
+
+    expect(events).toEqual([{ branch: expect.objectContaining({ target_date: '2027-06-30' }), events: [{ kind: 'retire', elementId: 'bw-1', elementName: 'BW' }] }]);
+  });
+
+  it('skips a main-committed retirement whose element has no plannedEnd (nothing to place it at)', () => {
+    const head = headWith(system('Legacy System'));
+
+    const events = deriveMainCommittedChangeEvents([retireUpdate('d1', 'sys-1', 'create-1')], head, [], mainBranch());
+
+    expect(events).toEqual([]);
+  });
+
+  it('skips a main-committed retirement already shown by an eligible change branch (dedupes a rec path that also hit main)', () => {
+    const head = headWith({ ...system('Legacy System'), attributes: { plannedEnd: '2027-12-31' } });
+    const alreadyShown: RoadmapBranchEvents[] = [{ branch: mainBranch(), events: [{ kind: 'retire', elementId: 'sys-1', elementName: 'Legacy System' }] }];
+
+    const events = deriveMainCommittedChangeEvents([retireUpdate('d1', 'sys-1', 'create-1')], head, alreadyShown, mainBranch());
+
+    expect(events).toEqual([]);
+  });
+
+  it('adds a replacement arrow from a replaces edge committed on main, dated at the retiring element\'s plannedEnd', () => {
+    const head = headWith({ ...system('Old System'), attributes: { plannedEnd: '2027-12-31' } }, ['sys-new', system('New System')]);
+
+    const events = deriveMainCommittedChangeEvents([replacesCreate('d1', 'rel-1', 'sys-new', 'sys-1')], head, [], mainBranch());
+
+    expect(events).toEqual([
+      {
+        branch: expect.objectContaining({ id: 'main:d1', target_date: '2027-12-31' }),
+        events: [{ kind: 'replace', fromSystemId: 'sys-1', fromSystemName: 'Old System', toSystemId: 'sys-new', toSystemName: 'New System' }],
+      },
+    ]);
+  });
+
+  it('skips a main-committed replacement already shown by the change-branch path (no doubled arrow for the same swap)', () => {
+    const head = headWith({ ...system('Old System'), attributes: { plannedEnd: '2027-12-31' } }, ['sys-new', system('New System')]);
+    const alreadyShown: RoadmapBranchEvents[] = [
+      { branch: mainBranch(), events: [{ kind: 'replace', fromSystemId: 'sys-1', fromSystemName: 'Old System', toSystemId: 'sys-new', toSystemName: 'New System' }] },
+    ];
+
+    const events = deriveMainCommittedChangeEvents([replacesCreate('d1', 'rel-1', 'sys-new', 'sys-1')], head, alreadyShown, mainBranch());
+
+    expect(events).toEqual([]);
+  });
+});
+
+describe('listMainCommittedDeltas', () => {
+  it('collects only main\'s own commits from the linear chain, skipping merge commits\' copied branch deltas', () => {
+    const retireOnMain = retireUpdate('d1', 'sys-1', 'create-1');
+    const mergedRetire = containerRetireUpdate('d2', 'bw-1', 'create-2');
+    const nodes = [
+      commitNode('c1', null, 'main-branch'),
+      commitNode('c2', 'c1', 'main-branch', { deltas: [retireOnMain] }),
+      commitNode('c3', 'c2', 'main-branch', { merge: true, deltas: [mergedRetire] }),
+      commitNode('c4', 'c3', 'main-branch'),
+    ];
+    const branch = { ...mainBranch(), head_commit_id: 'c4' };
+
+    expect(listMainCommittedDeltas(loaderFor(nodes), branch)).toEqual([retireOnMain]);
   });
 });

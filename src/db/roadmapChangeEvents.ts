@@ -28,11 +28,29 @@
  * for the same capability is a bare removal (no marker of its own here; the
  * retiring system's own "retire" marker already covers it), never guessed at
  * as a replacement.
+ *
+ * F5 follow-up ("committed directly on main"): the whole branch path only
+ * reads `kind: 'change'` branches that carry a `target_date`
+ * (`isRoadmapEligibleBranch`), so lifecycle facts committed straight onto
+ * `main` — `useElementRetire.ts` runs on whatever branch the element page
+ * has selected, main included — never reached the roadmap. `loadMainCommittedRoadmapEventsForModel`
+ * closes that gap: it derives the two signals that reconstruct cleanly from
+ * a single folded head (a `lifecycleStatus -> "retiring"` update and a
+ * `replaces` edge, which names the swap directly) from main's *own* commits
+ * — its linear chain minus merge commits, which only carry branch deltas the
+ * branch path already surfaced — and synthesises one roadmap-eligible
+ * pseudo-branch per event dated at the retiring element's own `plannedEnd`
+ * (the same date the lifecycle bar already ends at, `roadmapLifecycleRows.ts`).
+ * Deliberately not derived there: a main-committed supports transfer (its
+ * retract endpoints only resolve against the head at the moment of the
+ * retract, not a single folded head — the branch path can do that because
+ * each branch fork pins its own as-is head) and `add` markers for elements
+ * created on main.
  */
 import type { Delta, UUID } from '../contracts/delta';
 import { listOwnDeltas, type BranchFork } from '../engine/branch';
 import type { Head } from '../engine/deltas';
-import { foldFromGenesis } from '../engine/head';
+import { foldFromGenesis, mustLoadCommit, type CommitLoader } from '../engine/head';
 import { buildCommitLoader } from './commitLoader';
 import type { Client } from './client';
 import type { BranchRow } from './types';
@@ -166,11 +184,11 @@ export interface RoadmapBranchEvents {
  * isn't applied yet, so a split branch's events can appear as a second
  * roadmap entry alongside its original rather than merged into one.
  */
-export async function loadRoadmapChangeEventsForModel(supabase: Client, modelId: UUID, branches: readonly BranchRow[]): Promise<RoadmapBranchEvents[]> {
+export async function loadRoadmapChangeEventsForModel(supabase: Client, modelId: UUID, branches: readonly BranchRow[], sharedLoader?: CommitLoader): Promise<RoadmapBranchEvents[]> {
   const results: RoadmapBranchEvents[] = [];
   if (branches.length === 0) return results;
 
-  const loader = await buildCommitLoader(supabase, modelId);
+  const loader = sharedLoader ?? (await buildCommitLoader(supabase, modelId));
   for (const branch of branches) {
     if (!branch.base_commit_id || !branch.head_commit_id) continue;
 
@@ -192,4 +210,89 @@ export async function loadRoadmapChangeEventsForModel(supabase: Client, modelId:
     }
   }
   return results;
+}
+
+/** Every delta main contributed itself: walk main's linear first-parent chain (`branch.ts`'s own `mainChain` shape), keeping only commits whose `branch_id` is main and that are not merge commits (`merged_branch_head_commit_id === null` — C14) — a merge commit's deltas are the merged branch's own, which the branch path above already surfaced. Oldest-first, matching `listOwnDeltas`'s dependency order. */
+export function listMainCommittedDeltas(loader: CommitLoader, mainBranch: Pick<BranchRow, 'id' | 'head_commit_id'>): Delta[] {
+  const commitDeltas: Delta[][] = [];
+  let cursor: UUID | null = mainBranch.head_commit_id;
+  while (cursor !== null) {
+    const node = mustLoadCommit(cursor, loader);
+    if (node.branch_id === mainBranch.id && node.merged_branch_head_commit_id === null) commitDeltas.push([...node.deltas]);
+    cursor = node.parent_commit_id;
+  }
+  return commitDeltas.reverse().flat();
+}
+
+/** A stand-in `branches` row for one main-committed event, dated at the retiring element's own `plannedEnd`. Not a real branch — the roadmap only ever reads `id` (its React key), `target_date` (marker position), and the eligibility fields — so a spread of main's own row keeps every other field truthful; `status: 'merged'` + `intent: 'record'` is exactly what `isRoadmapEligibleBranch` needs to show a landed fact under both as-is and to-be. */
+function pseudoMainBranch(mainBranch: BranchRow, deltaId: string, targetDate: string): BranchRow {
+  return { ...mainBranch, id: `main:${deltaId}`, intent: 'record', status: 'merged', target_date: targetDate };
+}
+
+/**
+ * Derives roadmap events from main's own commits — a retirement's
+ * `lifecycleStatus -> "retiring"` update and a `replaces` edge — and wraps
+ * each in its own pseudo-branch dated at the retiring element's `plannedEnd`
+ * from `head` (folded at main). Events already shown by an eligible change
+ * branch (`alreadyShown`) are skipped, so a retirement recorded both on a
+ * change branch and on main — or merged in via a merge commit — shows once,
+ * never twice. An event whose element carries no `plannedEnd` is dropped:
+ * with nothing to place it at, it stays off the timeline, the same "dateless
+ * doesn't appear" stance `isRoadmapEligibleBranch` takes for branches.
+ */
+export function deriveMainCommittedChangeEvents(directMainDeltas: readonly Delta[], head: Head, alreadyShown: readonly RoadmapBranchEvents[], mainBranch: BranchRow): RoadmapBranchEvents[] {
+  const results: RoadmapBranchEvents[] = [];
+  const shownRetires = new Set(alreadyShown.flatMap(({ events }) => events.filter((e) => e.kind === 'retire').map((e) => e.elementId)));
+  const shownReplacePairs = new Set(alreadyShown.flatMap(({ events }) => events.filter((e) => e.kind === 'replace').map((e) => `${e.fromSystemId}|${e.toSystemId}`)));
+
+  for (const delta of directMainDeltas) {
+    if (delta.kind === 'element.update' && (delta.elementType === 'system' || delta.elementType === 'container') && delta.attribute === 'lifecycleStatus' && delta.value === 'retiring') {
+      if (shownRetires.has(delta.elementId)) continue;
+      const element = head.elements.get(delta.elementId);
+      const plannedEnd = typeof element?.attributes.plannedEnd === 'string' ? element.attributes.plannedEnd : undefined;
+      if (plannedEnd === undefined) continue;
+      results.push({ branch: pseudoMainBranch(mainBranch, delta.id, plannedEnd), events: [{ kind: 'retire', elementId: delta.elementId, elementName: element?.name ?? delta.elementId }] });
+      continue;
+    }
+
+    if (delta.kind === 'relationship.create' && delta.relationshipType === 'replaces') {
+      const retiringId = delta.toElementId;
+      const replacementId = delta.fromElementId;
+      if (shownReplacePairs.has(`${retiringId}|${replacementId}`)) continue;
+      const retiring = head.elements.get(retiringId);
+      const plannedEnd = typeof retiring?.attributes.plannedEnd === 'string' ? retiring.attributes.plannedEnd : undefined;
+      if (plannedEnd === undefined) continue;
+      results.push({
+        branch: pseudoMainBranch(mainBranch, delta.id, plannedEnd),
+        events: [
+          {
+            kind: 'replace',
+            fromSystemId: retiringId,
+            fromSystemName: retiring?.name ?? retiringId,
+            toSystemId: replacementId,
+            toSystemName: head.elements.get(replacementId)?.name ?? replacementId,
+          },
+        ],
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * `deriveMainCommittedChangeEvents` for main itself — one shared loader with
+ * the change-branch path when the caller already built one (useRoadmap), so
+ * the roadmap's two event sources never load the model twice.
+ */
+export async function loadMainCommittedRoadmapEventsForModel(supabase: Client, modelId: UUID, mainBranch: BranchRow, alreadyShown: readonly RoadmapBranchEvents[], sharedLoader?: CommitLoader): Promise<RoadmapBranchEvents[]> {
+  const loader = sharedLoader ?? (await buildCommitLoader(supabase, modelId));
+  const directMainDeltas = listMainCommittedDeltas(loader, mainBranch);
+  if (directMainDeltas.length === 0) return [];
+  try {
+    const head = foldFromGenesis(mainBranch.head_commit_id, loader);
+    return deriveMainCommittedChangeEvents(directMainDeltas, head, alreadyShown, mainBranch);
+  } catch {
+    return []; // same "one bad branch shouldn't blank the whole roadmap" stance the branch path takes
+  }
 }

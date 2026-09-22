@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import { listSupportsEdgesForCapabilities } from '../../db/capabilityMap';
-import { listChangeBranches } from '../../db/branches';
+import { listChangeBranches, getMainBranch } from '../../db/branches';
+import { buildCommitLoader } from '../../db/commitLoader';
 import { listAllElements, listOwnsEdges } from '../../db/elementBrowse';
 import { getElementsByIds } from '../../db/elements';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
 import type { BranchRow } from '../../db/types';
-import { loadRoadmapChangeEventsForModel, type RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
+import { loadMainCommittedRoadmapEventsForModel, loadRoadmapChangeEventsForModel, type RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import { listAllEnablesEdges } from '../../db/valueStreams';
 import { reportError } from '../errors/errorBannerStore';
 import { isRoadmapEligibleBranch } from './roadmapEligibility';
@@ -83,7 +84,7 @@ export function useRoadmap(
       const capabilityIds = capabilities.map((c) => c.element_id);
       const valueStreamsById = new Map(allElements.filter((e) => e.element_type === 'value_stream').map((e) => [e.element_id, e]));
 
-      const [supportsEdges, ownsEdges, changeBranches, enablesEdges] = await Promise.all([listSupportsEdgesForCapabilities(supabase, commitId, capabilityIds), listOwnsEdges(supabase, commitId), listChangeBranches(supabase, modelId), listAllEnablesEdges(supabase, commitId)]);
+      const [supportsEdges, ownsEdges, changeBranches, enablesEdges, mainBranch] = await Promise.all([listSupportsEdgesForCapabilities(supabase, commitId, capabilityIds), listOwnsEdges(supabase, commitId), listChangeBranches(supabase, modelId), listAllEnablesEdges(supabase, commitId), getMainBranch(supabase, modelId)]);
 
       const elementHref = (id: UUID): string => `/o/${orgSlug}/m/${modelSlug}/e/${id}`;
       const groups = groupRoadmapLifecycleBars(systemsAndModules, supportsEdges, ownsEdges, capabilitiesById, elementHref);
@@ -93,9 +94,17 @@ export function useRoadmap(
       const ownerActorsById = ownerActorIds.length > 0 ? await getElementsByIds(supabase, commitId, ownerActorIds) : new Map<UUID, ElementsHeadRow>();
 
       const eligibleBranches = changeBranches.filter((branch): branch is BranchRow => isRoadmapEligibleBranch(branch, 'toBe'));
-      const branchEvents = await loadRoadmapChangeEventsForModel(supabase, modelId, eligibleBranches);
+      // One loader shared by both event sources so the roadmap's two derivations never load the model twice (`loadRoadmapChangeEventsForModel`'s sharedLoader).
+      const commitLoader = await buildCommitLoader(supabase, modelId);
+      const branchEvents = await loadRoadmapChangeEventsForModel(supabase, modelId, eligibleBranches, commitLoader);
+      // Lifecycle facts committed straight onto main (no change branch, so the
+      // branch path above would never see them) — derived from main's own
+      // commits and dated at each element's own plannedEnd
+      // (`deriveMainCommittedChangeEvents`), one pseudo-branch per event.
+      const mainCommittedEvents = mainBranch ? await loadMainCommittedRoadmapEventsForModel(supabase, modelId, mainBranch, branchEvents, commitLoader) : [];
+      const allBranchEvents = [...branchEvents, ...mainCommittedEvents];
 
-      if (!cancelled) setState({ status: 'ready', data: { commitId, groups, valueStreamGroups, branchEvents, capabilitiesById, ownerActorsById } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, groups, valueStreamGroups, branchEvents: allBranchEvents, capabilitiesById, ownerActorsById } });
     }
 
     load().catch((e: unknown) => {
