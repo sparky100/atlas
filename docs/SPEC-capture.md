@@ -402,7 +402,9 @@ defaulted attribute = 0.60 (§5.4); gone = 0.50 (K-14)
 
 Three prompts. Each is a frozen string in `src/capture/prompts/{a,b,c}.ts` with its JSON schema beside it; the request is built with the stable system block first (cache-controlled), volatile content last. Every prompt tells the model the taxonomy, the closed vocabularies, and that it may never invent evidence. Structured outputs (`output_config.format`, strict schema) replace any instruction to "reply in JSON"; there is no assistant prefill.
 
-Effort: prompt A `medium`, prompt B `high`, prompt C `medium`. `max_tokens: 16000`. Model: `claude-opus-5` unless `CAPTURE_MODEL` says otherwise. `stop_reason` handling is in §11.
+Effort: prompt A `medium`, prompt B `medium`, prompt C `medium`. `max_tokens: 16000`. Model: `claude-opus-5` unless `CAPTURE_MODEL` says otherwise. `stop_reason` handling is in §11.
+
+**Amended, prompt B effort (found in a capture-pipeline audit, issue #282):** this section originally set prompt B to `high`. Built at `medium` instead (`src/capture/extractProse.ts`'s own `PROMPT_B_EFFORT`) — `high` effort with the model's default-effort thinking can take a single extraction call up to ~150s, and a multi-chunk document needs several calls per invocation; K-12's own `capture-run` step is bounded to ≤ 60s wall clock. `medium` was the disclosed tradeoff never carried back into this document until now. Revisit once chunk-level resumability (K-12's own deferred row) means one invocation no longer has to fit a whole chunk's extraction inside one bounded step.
 
 ### 6.1 Prompt A — spreadsheet column mapping
 
