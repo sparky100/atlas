@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { ImportFileParseError } from './parseImportFile';
-import { parseImportJson } from './parseImportJson';
+import { parseImportJson, parseImportJsonText } from './parseImportJson';
 
 function jsonFile(body: unknown, name = 'import.json'): File {
   return new File([JSON.stringify(body)], name, { type: 'application/json' });
 }
+
+describe('parseImportJsonText (Sprint F2b) — the pure half runCapture.ts calls directly', () => {
+  it('parses text with no File/browser API involved, same shape as parseImportJson', () => {
+    const result = parseImportJsonText(JSON.stringify({ systems: [{ name: 'CRM' }] }), 'import.json');
+    expect(result.fileName).toBe('import.json');
+    expect(result.rows).toEqual([expect.objectContaining({ name: 'CRM' })]);
+  });
+
+  it('throws ImportFileParseError on malformed JSON, naming the file', () => {
+    expect(() => parseImportJsonText('not json', 'bad.json')).toThrow(ImportFileParseError);
+    expect(() => parseImportJsonText('not json', 'bad.json')).toThrow(/bad\.json/);
+  });
+});
 
 describe('parseImportJson', () => {
   it('parses a systems-only file the same way parseImportFile would', async () => {

@@ -447,3 +447,146 @@ describe('runCapture — Relationships sheet (Sprint F2b, SPEC-capture.md §5.2a
     expect(result.candidates.find((c) => c.relationshipType === 'flows_to')?.class).toBe('new');
   });
 });
+
+describe('runCapture — JSON input (Sprint F2b, SPEC-capture.md §5.6)', () => {
+  it('produces new system candidates, an owner actor + owns edge, and a resolved capability, with no LLM call', async () => {
+    const json = JSON.stringify({
+      systems: [{ name: 'CRM', vendor: 'Acme', business_owner: 'Sales Team', capability: 'Customer Service' }],
+    });
+    const capabilities = [{ element_id: 'cap-1', element_type: 'capability' as const, name: 'Customer Service', parent_id: null, attributes: {}, exists_delta_id: 'd-1' }];
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'import.json',
+        source: { format: 'json', text: json },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex(capabilities, []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    const system = result.candidates.find((c) => c.elementType === 'system');
+    expect(system?.class).toBe('new');
+    expect(system?.proposal.kind === 'element' && (system.proposal.attributes as Record<string, unknown>).vendor).toBe('Acme');
+    expect(system?.evidence.extractor).toBe('json-authored');
+
+    const actor = result.candidates.find((c) => c.elementType === 'actor');
+    expect(actor?.proposal.kind === 'element' && actor.proposal.name).toBe('Sales Team');
+
+    const owns = result.candidates.find((c) => c.relationshipType === 'owns');
+    expect(owns?.class).toBe('new');
+
+    const supports = result.candidates.find((c) => c.relationshipType === 'supports');
+    expect(supports?.class).toBe('new');
+    expect(supports?.proposal.kind === 'relationship' && supports.proposal.to).toEqual({ kind: 'existing', elementId: 'cap-1' });
+  });
+
+  it('caps an unstated confidence at 0.90, never defaulting to 1.0', async () => {
+    const json = JSON.stringify({ systems: [{ name: 'CRM' }] });
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'import.json',
+        source: { format: 'json', text: json },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+    const system = result.candidates.find((c) => c.elementType === 'system');
+    expect(system?.confidence).toBeLessThanOrEqual(0.9);
+  });
+
+  it('uses a stated confidence as given, clipped to [0,1]', async () => {
+    const json = JSON.stringify({ systems: [{ name: 'CRM', confidence: 0.4 }] });
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'import.json',
+        source: { format: 'json', text: json },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+    const system = result.candidates.find((c) => c.elementType === 'system');
+    expect(system?.evidence.attributeConfidence.name).toBe(0.4);
+  });
+
+  it('resolves a relationships-section entry against the systems section, carrying via as viaHint', async () => {
+    const json = JSON.stringify({
+      systems: [{ name: 'CRM' }, { name: 'Billing' }],
+      relationships: [{ from: 'CRM', type: 'uses', to: 'Billing', description: 'reads invoice data', via: 'Enterprise Bus' }],
+    });
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'import.json',
+        source: { format: 'json', text: json },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+    const uses = result.candidates.find((c) => c.relationshipType === 'uses');
+    expect(uses?.class).toBe('new');
+    expect(uses?.proposal.kind === 'relationship' && uses.proposal.attributes).toMatchObject({ description: 'reads invoice data' });
+  });
+
+  it('resolves a changes-section retire against an existing main element, never creating one', async () => {
+    const existing = { element_id: 'sys-1', element_type: 'system' as const, name: 'Legacy CRM', parent_id: null, attributes: {}, exists_delta_id: 'd-1' };
+    const json = JSON.stringify({ systems: [{ name: 'Something Else' }], changes: [{ name: 'Legacy CRM', action: 'retire', reason: 'replaced' }] });
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'import.json',
+        source: { format: 'json', text: json },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([existing], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+    const retirements = result.candidates.filter((c) => c.elementType === 'system' && c.draftSubjectId === 'sys-1');
+    expect(retirements).toHaveLength(1);
+    expect(retirements[0]?.class === 'new').toBe(false);
+    expect(retirements[0]?.proposal.kind === 'element' && (retirements[0].proposal.attributes as Record<string, unknown>).lifecycleStatus).toBe('retired');
+  });
+
+  it('classifies a changes-section entry naming something nowhere in the model as invalid, never new', async () => {
+    const json = JSON.stringify({ systems: [{ name: 'Something' }], changes: [{ name: 'Nonexistent System', action: 'retire' }] });
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'import.json',
+        source: { format: 'json', text: json },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+    const change = result.candidates.find((c) => c.proposal.kind === 'element' && c.proposal.name === 'Nonexistent System');
+    expect(change?.class).toBe('invalid');
+    expect(change?.draftSubjectId).toBeNull();
+  });
+
+  it('fails INPUT_UNREADABLE for malformed JSON', async () => {
+    const result = await runCapture({
+      inputName: 'import.json',
+      source: { format: 'json', text: 'not json' },
+      documentDate: null,
+      llmClient: NEVER_CALLED_LLM,
+      matchIndex: buildMatchIndex([], []),
+      mainHead: emptyHead(),
+      mintId: mintIdFrom('el'),
+    });
+    expect(result.status).toBe('failed');
+    if (result.status === 'failed') expect(result.errorCode).toBe('INPUT_UNREADABLE');
+  });
+});

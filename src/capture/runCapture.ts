@@ -66,33 +66,39 @@
  */
 import type { CandidateClass, CandidateProposal, CandidateReimportStatus, CaptureAliasType, CaptureJobStats, ElementProposal, EvidenceWarning, MatchOutcome, RelationshipProposal } from '../contracts/capture';
 import type { CandidateEvidence } from '../contracts/capture';
-import type { ElementType, RelationshipType, UUID } from '../contracts/delta';
+import type { ActorSubtype, ElementType, OwnsRole, RelationshipType, UUID } from '../contracts/delta';
 import type { SourceRef } from '../contracts/sourceRef';
 import { factMapKey, type Head } from '../engine/deltas';
 import { assignCapabilities } from './capabilityAssignment';
 import { chunkPastedText, chunkPdfPages, type PdfChunk, type PdfChunkPageRange, type TextChunk } from './chunk';
 import type { ColumnRoleAssignment } from './columnSynonyms';
 import { classifyAttribute, classifyElement, classifyRelationship, type AttributeComparisonInput, type AttributeOutcome } from './classify';
-import { existenceConf, SHEET_CONFIDENCE_CAP } from './confidence';
+import { DEFAULTED_ATTRIBUTE_CONFIDENCE, existenceConf, SHEET_CONFIDENCE_CAP } from './confidence';
 import { extractProseChunk } from './extractProse';
+import type { ImportChangeRow } from './importChangeRow';
+import type { ImportRelationshipRow } from './importRelationshipRow';
+import type { ImportRow, OwnerReference } from './importRowSchema';
 import type { LlmClient } from './llm/client';
 import { mapSheetColumns } from './mapColumns';
 import { matchElement, resolveByTrigram, TOP_LEVEL_CONTEXT, type MatchContext } from './match';
 import { buildTargetOnlyMatchIndex, type MatchIndex } from './matchIndex';
 import { normaliseName } from './normalise';
+import { looksLikePersonName } from './normaliseValue';
 import { parseCsv } from './parse/csv';
 import { pageHasNoText, parsePdf, PdfParseError, PdfPasswordProtectedError } from './parse/pdf';
 import { parsePastedText } from './parse/pastedText';
 import { parseXlsxWorkbook, type ParsedSpreadsheetSheet } from './parse/spreadsheet';
 import { dedupeIntraDocumentCandidates } from './intraDocumentDedup';
+import { ImportFileParseError } from './parseImportFile';
+import { parseImportJsonText } from './parseImportJson';
 import { diffAgainstPreviousImport, type PreviousCandidateForDiff } from './reimportDiff';
 import { isRelationshipsSheet, relationshipSheetToCandidates } from './relationshipSheetToCandidates';
 import { elementRowKey, relationshipRowKey } from './rowKey';
-import { rowsToCandidates, type CapabilityColumnRow, type RowCandidate } from './rowsToCandidates';
+import { applyRequiredDefaults, rowsToCandidates, type CapabilityColumnRow, type RowCandidate } from './rowsToCandidates';
 
 export class RunCaptureError extends Error {}
 
-export type RunCaptureSource = { format: 'csv'; text: string } | { format: 'xlsx'; bytes: ArrayBuffer } | { format: 'pdf'; bytes: ArrayBuffer } | { format: 'text'; text: string };
+export type RunCaptureSource = { format: 'csv'; text: string } | { format: 'xlsx'; bytes: ArrayBuffer } | { format: 'pdf'; bytes: ArrayBuffer } | { format: 'text'; text: string } | { format: 'json'; text: string };
 
 export interface RunCaptureInput {
   inputName: string;
@@ -395,6 +401,14 @@ function resolveElementCandidate(candidate: RowCandidate, proposal: ElementPropo
 
   if (match.level === 'none') {
     const attributes = proposal.attributes as Record<string, unknown>;
+    // Sprint F2b (SPEC-capture.md §5.6): a JSON `changes`-section entry
+    // names an *existing* element only — no match means the entry names
+    // something nowhere in the model, `invalid`, never a `new` create and
+    // never checked against the target branch either (a `changes` entry
+    // is always relative to main).
+    if (candidate.mustMatchExisting) {
+      return { class: 'invalid', match, draftSubjectId: null, attributes, extraWarning: { code: 'PARENT_UNRESOLVED', text: proposal.name }, parentNameForRowKey, resolvedParentElementId };
+    }
     if (targetOnlyIndex) {
       const targetMatch = matchElement(
         { name: proposal.name, elementType: proposal.elementType, context: proposal.parent === null ? TOP_LEVEL_CONTEXT : contextElementId },
@@ -563,6 +577,9 @@ export async function runCapture(input: RunCaptureInput): Promise<RunCaptureResu
   if (source.format === 'pdf' || source.format === 'text') {
     return runProseCapture({ ...input, source });
   }
+  if (source.format === 'json') {
+    return runJsonCapture({ ...input, source });
+  }
   return runSheetCapture({ ...input, source });
 }
 
@@ -661,6 +678,192 @@ async function runSheetCapture(input: RunSheetCaptureInput): Promise<RunCaptureR
   }
 
   return classifyAndResolve(combined, matchIndex, targetHead, mainHead, documentDate, reimportPrevious, mintId, stats);
+}
+
+// ---------------------------------------------------------------------------
+// JSON path (§5.6, Sprint F2b) — pre-parsed systems/relationships/changes,
+// folded in from F2-lite's own JSON import. No column mapping and no LLM
+// call for the systems/relationships sections (the file already names its
+// fields); capability lists still go through `assignCapabilities` (§6.3),
+// reusing the exact same pipe-list/single-value split Sprint F2b's own
+// sheet path already has.
+// ---------------------------------------------------------------------------
+
+interface RunJsonCaptureInput extends Omit<RunCaptureInput, 'source'> {
+  source: { format: 'json'; text: string };
+}
+
+/** §5.6: 1.0 is reserved for a real human assertion made in the review queue's own edit panel — an uploaded file (often AI-drafted, `docs/import/PROMPT.md`) isn't that, even though a human chose to upload it. A stated `confidence` is used as given, clipped to [0, 1]. */
+const JSON_CONFIDENCE_CAP = 0.9;
+
+function jsonConfidence(stated: number | undefined): number {
+  return stated === undefined ? JSON_CONFIDENCE_CAP : Math.max(0, Math.min(1, stated));
+}
+
+/** §5.6: no raw document exists for a JSON entry to ground a passage against — `start`/`end` are a stable per-entry locator, not a byte offset into anything; the review queue's source pane shows the whole passage regardless of these. */
+function jsonSourceRef(index: number): SourceRef {
+  return { kind: 'text', start: index, end: index };
+}
+
+/** §5.6: `evidence.passage` is the entry's own `quote` verbatim when given, else its JSON fragment rendered as text. */
+function jsonPassage(quote: string | undefined, fallback: unknown): string {
+  return quote ?? JSON.stringify(fallback);
+}
+
+function actorSubtypeFor(owner: OwnerReference): ActorSubtype {
+  if (owner.externalOrganisation !== null) return 'organisation';
+  return looksLikePersonName(owner.name) ? 'person' : 'team';
+}
+
+interface JsonActorGroup {
+  seq: number;
+  ref: OwnerReference;
+}
+
+interface JsonPendingOwns {
+  ownerKey: string;
+  elementSeq: number;
+  role: OwnsRole;
+  confidence: number;
+  index: number;
+}
+
+function actorKeyFor(owner: OwnerReference): string {
+  return `${owner.externalOrganisation ?? ''}|${normaliseName(owner.name)}`;
+}
+
+/** §5.6's own `systems` section: one element candidate per row, plus its owners (actor + `owns`) and its capability list (deferred to `assignCapabilities`, same as a sheet's own `capability` column). */
+function buildJsonElementCandidates(rows: readonly ImportRow[], startSeq: number): { candidates: RowCandidate[]; capabilityRows: CapabilityColumnRow[]; nextSeq: number } {
+  const candidates: RowCandidate[] = [];
+  const capabilityRows: CapabilityColumnRow[] = [];
+  const actorGroups = new Map<string, JsonActorGroup>();
+  const pendingOwns: JsonPendingOwns[] = [];
+  let seq = startSeq;
+
+  rows.forEach((row, index) => {
+    const elSeq = seq++;
+    const confidence = jsonConfidence(row.confidence);
+    const attributes: Record<string, unknown> = { ...row.attributes };
+    if (row.isExternal !== undefined) attributes.isExternal = row.isExternal;
+    const attributeConfidence: Record<string, number> = { name: confidence };
+    for (const key of Object.keys(attributes)) attributeConfidence[key] = confidence;
+    applyRequiredDefaults(row.elementType, attributes, attributeConfidence, {}, jsonSourceRef(index));
+
+    const proposal: ElementProposal = { kind: 'element', elementType: row.elementType, name: row.name, parent: row.platformName !== null ? { kind: 'unresolved', text: row.platformName } : null, attributes };
+    const evidence: CandidateEvidence = { sourceRef: jsonSourceRef(index), passage: jsonPassage(row.quote, { name: row.name, ...row.attributes }), extractor: 'json-authored', attributeConfidence, warnings: [] };
+    candidates.push({ seq: elSeq, proposal, evidence, aliasProposals: [{ type: 'name', value: row.name }] });
+
+    const [soleCapabilityName] = row.capabilityNames;
+    if (soleCapabilityName !== undefined) {
+      const capabilityText = row.capabilityNames.length === 1 ? soleCapabilityName : row.capabilityNames.join('|');
+      const description = attributes.description;
+      capabilityRows.push({ seq: elSeq, systemName: row.name, ...(typeof description === 'string' ? { description } : {}), capabilityText, sourceRef: jsonSourceRef(index) });
+    }
+
+    for (const [owner, role] of [
+      [row.businessOwner, 'business' as const],
+      [row.technicalOwner, 'technical' as const],
+    ] satisfies [OwnerReference | null, OwnsRole][]) {
+      if (!owner) continue;
+      const key = actorKeyFor(owner);
+      if (!actorGroups.has(key)) actorGroups.set(key, { seq: seq++, ref: owner });
+      pendingOwns.push({ ownerKey: key, elementSeq: elSeq, role, confidence, index });
+    }
+  });
+
+  for (const group of actorGroups.values()) {
+    const isExternal = group.ref.externalOrganisation !== null;
+    const attributes: Record<string, unknown> = { subtype: actorSubtypeFor(group.ref), isExternal };
+    const attributeConfidence: Record<string, number> = { subtype: DEFAULTED_ATTRIBUTE_CONFIDENCE, isExternal: isExternal ? JSON_CONFIDENCE_CAP : DEFAULTED_ATTRIBUTE_CONFIDENCE, name: JSON_CONFIDENCE_CAP };
+    if (group.ref.externalOrganisation !== null) {
+      attributes.externalOrganisation = group.ref.externalOrganisation;
+      attributeConfidence.externalOrganisation = JSON_CONFIDENCE_CAP;
+    }
+    const proposal: ElementProposal = { kind: 'element', elementType: 'actor', name: group.ref.name, parent: null, attributes };
+    const evidence: CandidateEvidence = { sourceRef: jsonSourceRef(group.seq), passage: group.ref.name, extractor: 'json-authored', attributeConfidence, warnings: [] };
+    candidates.push({ seq: group.seq, proposal, evidence, aliasProposals: [{ type: 'name', value: group.ref.name }] });
+  }
+
+  for (const pending of pendingOwns) {
+    const actorSeq = actorGroups.get(pending.ownerKey)?.seq;
+    if (actorSeq === undefined) continue;
+    const proposal: RelationshipProposal<'owns'> = { kind: 'relationship', relationshipType: 'owns', from: { kind: 'candidate', seq: actorSeq }, to: { kind: 'candidate', seq: pending.elementSeq }, attributes: { role: pending.role } };
+    const evidence: CandidateEvidence = { sourceRef: jsonSourceRef(pending.index), passage: '', extractor: 'json-authored', attributeConfidence: { role: pending.confidence }, warnings: [] };
+    candidates.push({ seq: seq++, proposal, evidence, aliasProposals: [] });
+  }
+
+  return { candidates, capabilityRows, nextSeq: seq };
+}
+
+/** §5.6's own `relationships` section — the JSON sibling of §5.2a's Relationships sheet, same shape (unresolved `from`/`to`, `viaHint`), no LLM call. */
+function buildJsonRelationshipCandidates(rows: readonly ImportRelationshipRow[], startSeq: number): { candidates: RowCandidate[]; nextSeq: number } {
+  const candidates: RowCandidate[] = [];
+  let seq = startSeq;
+  rows.forEach((row, index) => {
+    const confidence = jsonConfidence(row.confidence);
+    const attributes: Record<string, unknown> = { description: row.description };
+    if (row.type === 'flows_to' && row.dataClassification !== null) attributes.dataClassification = row.dataClassification;
+    const attributeConfidence: Record<string, number> = { description: confidence, ...(attributes.dataClassification !== undefined ? { dataClassification: confidence } : {}) };
+
+    const proposal: RelationshipProposal<'uses' | 'flows_to'> = { kind: 'relationship', relationshipType: row.type, from: { kind: 'unresolved', text: row.from }, to: { kind: 'unresolved', text: row.to }, attributes };
+    const evidence: CandidateEvidence = { sourceRef: jsonSourceRef(index), passage: jsonPassage(row.quote, row), extractor: 'json-authored', attributeConfidence, warnings: [] };
+    candidates.push({ seq: seq++, proposal, evidence, ...(row.via !== null ? { viaHint: row.via } : {}), aliasProposals: [] });
+  });
+  return { candidates, nextSeq: seq };
+}
+
+/** §5.6's own `changes` section only ever targets a `system` or a `container` (never a capability/actor) — neither the entry nor the contract states which, so this picks whichever type an exact-normalised-name match resolves against on main, defaulting to `system` when neither does (`resolveElementCandidate`'s own full alias/trigram match, called downstream, still does the real work — this only decides which pool it searches). */
+function inferChangeTargetType(name: string, matchIndex: MatchIndex): ElementType {
+  const normalised = normaliseName(name);
+  const aliasHit = matchIndex.aliasByNormalisedValue.get(normalised);
+  const aliasElement = aliasHit ? matchIndex.elements.get(aliasHit.elementId) : undefined;
+  if (aliasElement?.element_type === 'system' || aliasElement?.element_type === 'container') return aliasElement.element_type;
+  for (const type of ['system', 'container'] as const) {
+    if ((matchIndex.elementsByType.get(type) ?? []).some((el) => normaliseName(el.name) === normalised)) return type;
+  }
+  return 'system';
+}
+
+/** §5.6's own `changes` section: an explicit retire/restore instruction against an *existing* element only — `mustMatchExisting` makes `resolveElementCandidate` refuse to fall through to `new`. `replaced_by`'s own supports-edge transfer is Step 4's job (`buildPromotionEnvelope.ts`), designed alongside the promotion-time mechanism it needs — not built here. */
+function buildJsonChangeCandidates(rows: readonly ImportChangeRow[], startSeq: number, matchIndex: MatchIndex): { candidates: RowCandidate[]; nextSeq: number } {
+  const candidates: RowCandidate[] = [];
+  let seq = startSeq;
+  rows.forEach((row, index) => {
+    const confidence = jsonConfidence(row.confidence);
+    const lifecycleStatus = row.action === 'retire' ? 'retired' : 'active';
+    const elementType = inferChangeTargetType(row.name, matchIndex);
+    const proposal: ElementProposal = { kind: 'element', elementType, name: row.name, parent: null, attributes: { lifecycleStatus } };
+    const evidence: CandidateEvidence = { sourceRef: jsonSourceRef(index), passage: jsonPassage(row.quote, row), extractor: 'json-authored', attributeConfidence: { lifecycleStatus: confidence }, warnings: [] };
+    candidates.push({ seq: seq++, proposal, evidence, aliasProposals: [], mustMatchExisting: true });
+  });
+  return { candidates, nextSeq: seq };
+}
+
+async function runJsonCapture(input: RunJsonCaptureInput): Promise<RunCaptureResult> {
+  const { inputName, source, documentDate, llmClient, matchIndex, mainHead, targetHead, reimportPrevious, mintId } = input;
+  const stats: Record<string, number> = {};
+
+  let parsed;
+  try {
+    parsed = parseImportJsonText(source.text, inputName);
+  } catch (e) {
+    if (e instanceof ImportFileParseError) return { status: 'failed', errorCode: 'INPUT_UNREADABLE', message: e.message };
+    throw e;
+  }
+
+  const { candidates: elementCandidates, capabilityRows, nextSeq: afterElements } = buildJsonElementCandidates(parsed.rows, 0);
+  const { candidates: relationshipCandidates, nextSeq: afterRelationships } = buildJsonRelationshipCandidates(parsed.relationshipRows, afterElements);
+  const { candidates: changeCandidates, nextSeq: afterChanges } = buildJsonChangeCandidates(parsed.changeRows, afterRelationships, matchIndex);
+
+  let combined: RowCandidate[] = [...elementCandidates, ...relationshipCandidates, ...changeCandidates];
+
+  if (capabilityRows.length > 0) {
+    const { candidates: supportsCandidates } = await assignCapabilities({ rows: capabilityRows, matchIndex, llmClient, startSeq: afterChanges, mainHead });
+    combined = combined.concat(supportsCandidates);
+  }
+
+  const { candidates: deduped } = dedupeIntraDocumentCandidates(combined);
+  return classifyAndResolve(deduped, matchIndex, targetHead, mainHead, documentDate, reimportPrevious, mintId, stats);
 }
 
 // ---------------------------------------------------------------------------

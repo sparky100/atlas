@@ -14,6 +14,12 @@
  * Returns the identical `ParsedImportFile` shape `parseImportFile` does, so
  * every downstream consumer (`useSpreadsheetImport.ts`, `buildImportCommit.ts`,
  * the dialog itself) needs no branching beyond picking which parser to call.
+ *
+ * `parseImportJsonText` (Sprint F2b, SPEC-capture.md §5.6) is the pure half
+ * of this module, taking already-read text rather than a browser `File` —
+ * `runCapture.ts` calls it directly (it runs in a Deno edge function too,
+ * where `File`/`file.text()` don't exist); `parseImportJson` below is now a
+ * thin wrapper kept for F2-lite's own caller, `useSpreadsheetImport.ts`.
  */
 import { validateImportChangeRow, type ImportChangeRowResult } from './importChangeRow';
 import { validateImportRelationshipRow, type ImportRelationshipRowResult } from './importRelationshipRow';
@@ -25,21 +31,20 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export async function parseImportJson(file: File): Promise<ParsedImportFile> {
-  const text = await file.text();
+export function parseImportJsonText(text: string, fileName: string): ParsedImportFile {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch (e) {
-    throw new ImportFileParseError(`Could not read "${file.name}" as JSON: ${e instanceof Error ? e.message : String(e)}`);
+    throw new ImportFileParseError(`Could not read "${fileName}" as JSON: ${e instanceof Error ? e.message : String(e)}`);
   }
   if (!isPlainObject(parsed)) {
-    throw new ImportFileParseError(`"${file.name}" must be a JSON object with a "systems" array.`);
+    throw new ImportFileParseError(`"${fileName}" must be a JSON object with a "systems" array.`);
   }
 
   const rawSystems = parsed.systems;
   if (!Array.isArray(rawSystems) || rawSystems.length === 0) {
-    throw new ImportFileParseError(`"${file.name}" must have a non-empty "systems" array.`);
+    throw new ImportFileParseError(`"${fileName}" must have a non-empty "systems" array.`);
   }
 
   const rows: ParsedImportFile['rows'] = [];
@@ -96,5 +101,10 @@ export async function parseImportJson(file: File): Promise<ParsedImportFile> {
   });
 
   const detectedColumns = Object.keys(parsed).filter((key) => key === 'systems' || key === 'relationships' || key === 'changes' || key === 'value_streams');
-  return { fileName: file.name, detectedColumns, previewRows: rawSystems.slice(0, PREVIEW_ROW_COUNT) as Record<string, unknown>[], rows, errors, relationshipRows, relationshipErrors, changeRows, changeErrors, valueStreamRows, valueStreamErrors };
+  return { fileName, detectedColumns, previewRows: rawSystems.slice(0, PREVIEW_ROW_COUNT) as Record<string, unknown>[], rows, errors, relationshipRows, relationshipErrors, changeRows, changeErrors, valueStreamRows, valueStreamErrors };
+}
+
+export async function parseImportJson(file: File): Promise<ParsedImportFile> {
+  const text = await file.text();
+  return parseImportJsonText(text, file.name);
 }

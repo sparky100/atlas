@@ -55,6 +55,8 @@ export interface RowCandidate {
   aliasProposals: { type: CaptureAliasType; value: string }[];
   /** §5.3 (PR11): the candidate's own defining passage (an element's `name`, or a relationship's own `passage`) failed to ground — the orchestrator classifies it `unsourced` before any matching is attempted, the same early-return shape `PARENT_UNRESOLVED` already gets. Never set by `rowsToCandidates.ts` itself (a sheet cell is never ungrounded). */
   ungrounded?: boolean;
+  /** Sprint F2b, SPEC-capture.md §5.6: a JSON `changes`-section entry names an *existing* element only — it never creates one. When set, `resolveElementCandidate` (`runCapture.ts`) returns `invalid` on a `match.level === 'none'` instead of the ordinary `new`/`duplicate_in_target` branch. Element candidates only; never set by `rowsToCandidates.ts`/`relationshipSheetToCandidates.ts` themselves. */
+  mustMatchExisting?: boolean;
 }
 
 export interface RowsToCandidatesInput {
