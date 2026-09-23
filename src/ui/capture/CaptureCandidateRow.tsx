@@ -310,9 +310,11 @@ export function CaptureCandidateRow({
               Undo
             </Button>
           )}
-          <Button variant="ghost" onClick={editOpen ? onCloseEdit : onOpenEdit}>
-            {isInvalidOrUnsourced ? 'Edit…' : 'Edit'}
-          </Button>
+          {candidate.class !== 'confirm' && (
+            <Button variant="ghost" onClick={editOpen ? onCloseEdit : onOpenEdit}>
+              {isInvalidOrUnsourced ? 'Edit…' : 'Edit'}
+            </Button>
+          )}
           {(candidate.class === 'new' || candidate.class === 'update') && (
             <Button variant="ghost" onClick={splitOpen ? onCloseSplit : onOpenSplit}>
               Split
