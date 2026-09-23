@@ -154,6 +154,7 @@ function toCaptureCandidate(resolved: ResolvedCandidate, orgId: UUID, jobId: UUI
     rowKey: resolved.rowKey,
     reimportStatus: resolved.reimportStatus,
     draftDeltaIds: [],
+    aliasProposals: resolved.aliasProposals,
     decision: null,
     decisionDetail: null,
     decidedBy: null,

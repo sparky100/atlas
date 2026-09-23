@@ -141,6 +141,8 @@ describe('write_capture_draft / discard_capture_job against a real local Supabas
       rowKey: 'name:system:crm:',
       reimportStatus: null,
       draftDeltaIds: [],
+      // issue #284: proves alias_proposals round-trips through the real RPC, not just the pure row<->wire mapping RT-K1 already covers.
+      aliasProposals: [{ type: 'source_system_key', value: 'APP-101' }],
       decision: null,
       decisionDetail: null,
       decidedBy: null,
@@ -206,7 +208,7 @@ describe('write_capture_draft / discard_capture_job against a real local Supabas
 
     const { data: candidateRows, error: candidateError } = await owner.client.from('capture_candidates').select('*').eq('job_id', jobId).order('seq');
     if (candidateError) throw new Error(candidateError.message);
-    expect(candidateRows).toEqual([expect.objectContaining({ id: candidateId, seq: 0, class: 'new', draft_subject_id: elementId, draft_delta_ids: [deltaId] })]);
+    expect(candidateRows).toEqual([expect.objectContaining({ id: candidateId, seq: 0, class: 'new', draft_subject_id: elementId, draft_delta_ids: [deltaId], alias_proposals: [{ type: 'source_system_key', value: 'APP-101' }] })]);
 
     const { data: job, error: jobError } = await owner.client.from('capture_jobs').select('*').eq('id', jobId).single();
     if (jobError) throw new Error(jobError.message);

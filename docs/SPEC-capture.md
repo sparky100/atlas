@@ -126,6 +126,7 @@ One row per thing the pipeline proposed, whether or not it became a delta.
 | `row_key` | text | not null — re-import lineage key (§9.1) |
 | `reimport_status` | text | nullable, `check (reimport_status in ('new','changed','unchanged','gone'))`; null when the job has no `reimport_of_job_id` |
 | `draft_delta_ids` | uuid[] | not null default `'{}'` — the draft-commit deltas this candidate produced |
+| `alias_proposals` | jsonb | not null default `'[]'` — `CaptureAliasProposal[]` (§7.6), amended in by issue #284: shown to the reviewer (§10) before they decide, not only written to `aliases` after |
 | `decision` | text | nullable, `check (decision in ('accepted','rejected','merged','edited','split'))` |
 | `decision_detail` | jsonb | nullable — for `merged`: `{intoElementId}`; for `edited`: `{attributes}`; for `split`: `{acceptedAttributes[]}` |
 | `decided_by` | uuid | nullable |
@@ -790,7 +791,7 @@ A run whose `input_sha256` equals its `reimport_of_job_id`'s is allowed (main ma
 
 The layout, keys and three panes are UI-principles §5, unchanged. This section fixes what the **centre pane** contains per class and what the keys do for each, so K1 builds the queue against a decided design. Route: `/o/{org}/m/{model}/review/capture/{captureJobId}` (UI §2.4).
 
-**Every unit** shows: type glyph and name as it will appear on the element page; the attribute rows with the proposed value and the badge the accepted fact would carry (`⚙ · age from document_date · dots from confidence`); the match line (`Matched: alias "PowerOn" → PowerON` / `Matched: name+context 0.71 → Tenants Portal (in Housing)` / `Matched: none (new)` / `Matched: Atlas id`); `Similar:` entries at 0.50–0.60 with `⚠`; warnings from `evidence.warnings` as short chips (`date assumed dd/mm`, `status "Live" read as active`, `column mapped by AI 0.72`); and, on the right, the source passage with the extractor's cells/span highlighted.
+**Every unit** shows: type glyph and name as it will appear on the element page; the attribute rows with the proposed value and the badge the accepted fact would carry (`⚙ · age from document_date · dots from confidence`); the match line (`Matched: alias "PowerOn" → PowerON` / `Matched: name+context 0.71 → Tenants Portal (in Housing)` / `Matched: none (new)` / `Matched: Atlas id`); `Similar:` entries at 0.50–0.60 with `⚠`; **any alias proposals this candidate carries** ("Will also remember: name \"PowerON\", source_system_key \"APP-101\"") — not only on a `new` candidate: §7.6's level-2/3 match and intra-document-group aliases attach to matched classes too, and a reviewer accepting or merging any of them is still teaching the matcher something (amended, issue #284 — `capture_candidates.alias_proposals`, persisted from PR8's own `aliasProposals` that PR10 already threaded through but PR12 never wrote to a column); warnings from `evidence.warnings` as short chips (`date assumed dd/mm`, `status "Live" read as active`, `column mapped by AI 0.72`); and, on the right, the source passage with the extractor's cells/span highlighted.
 
 | Class | Centre pane adds | Keys |
 |---|---|---|

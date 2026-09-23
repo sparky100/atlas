@@ -100,6 +100,7 @@ describe('stage_capture_decisions / apply_capture_decisions against a real local
       rowKey: 'name:system:crm:',
       reimportStatus: null,
       draftDeltaIds: [],
+      aliasProposals: [],
       decision: null,
       decisionDetail: null,
       decidedBy: null,

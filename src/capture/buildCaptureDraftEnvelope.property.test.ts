@@ -76,6 +76,7 @@ function newSupportsCandidate(seq: number, draftSubjectId: UUID, fromElementId: 
     rowKey: `row-${String(seq)}`,
     reimportStatus: null,
     draftDeltaIds: [],
+    aliasProposals: [],
     decision: null,
     decisionDetail: null,
     decidedBy: null,

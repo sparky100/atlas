@@ -188,6 +188,13 @@ export function CaptureCandidateRow({
         </Text>
       )}
 
+      {/* §10's `new` row: "the alias proposals that would be recorded" — shown whenever the candidate carries any (a level-2/3 match or an intra-document group can too, §7.6), not only for `new`, so accepting or merging never teaches the matcher something the reviewer wasn't shown first (issue #284). */}
+      {candidate.aliasProposals.length > 0 && (
+        <Text as="p" tone="muted" size="sm">
+          Will also remember: {candidate.aliasProposals.map((a) => `${a.type} "${a.value}"`).join(', ')}
+        </Text>
+      )}
+
       {isInvalidOrUnsourced ? (
         <Text as="p" size="sm">
           {candidate.class === 'invalid' ? candidate.evidence.warnings.map(evidenceWarningLabel).join('; ') || 'This candidate is invalid.' : 'No passage found for this fact in the source.'}

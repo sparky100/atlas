@@ -55,6 +55,7 @@ function candidate(overrides: Partial<CaptureCandidate> & { proposal: CandidateP
     rowKey: 'row-0',
     reimportStatus: null,
     draftDeltaIds: [],
+    aliasProposals: [],
     decision: null,
     decisionDetail: null,
     decidedBy: null,

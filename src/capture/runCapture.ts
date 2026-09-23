@@ -20,12 +20,16 @@
  * Scope, disclosed:
  * - `aliasProposals` (§7.6): threaded through on every `ResolvedCandidate`
  *   (never dropped — `buildPromotionEnvelope.ts`'s own PR8 comment names
- *   this as "the orchestrator's own job (PR10) once it exists"), but not
- *   yet persisted onto a `capture_candidates` row — `CaptureCandidate`
- *   (PR1's contract) has no field for it today. Whether that needs a new
- *   column or can be derived some other way is PR12's own decision, made
- *   together with wiring `write_capture_draft` for real; this module's job
- *   is only to make sure the data survives this far, not to persist it.
+ *   this as "the orchestrator's own job (PR10) once it exists"), and now
+ *   persisted onto `capture_candidates.alias_proposals` and shown in the
+ *   review queue (`captureRunStep.ts`'s `toCaptureCandidate`, issue #284) —
+ *   §7.6's own name-match/sourceKey/intra-document-group aliases only;
+ *   this module never adds a level-3-name-match alias itself (§7.6's
+ *   "level 3 match on name" row) — `resolveElementCandidate` doesn't
+ *   append one on a `name_context` match, so a candidate proposing that
+ *   alias never carries it. Extending matching to actually produce it is
+ *   a separate, smaller gap than persisting what already exists, and not
+ *   part of this fix.
  * - `unsourced` only ever comes from `runProseCapture()` — `RowCandidate.ungrounded`
  *   (set by `extractProse.ts` when a fact's defining passage doesn't
  *   ground) short-circuits `resolveElementCandidate`/`resolveRelationshipCandidate`
