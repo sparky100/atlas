@@ -95,9 +95,14 @@ export function deriveRoadmapChangeEvents(ownDeltas: readonly Delta[], asIsHead:
   // Capability id -> the one system this change's own deltas retracted from it / created into it.
   const supportsRetractedFrom = new Map<UUID, UUID>();
   const supportsCreatedTo = new Map<UUID, UUID>();
-  // Retiring element id -> its named replacement (a `replaces` edge: `from` is
-  // the replacement, `to` the retiring element, per ADR-001's delta shape).
-  const replacedPairs = new Map<UUID, UUID>();
+  // Every named replacement (a `replaces` edge: `from` is the replacement,
+  // `to` the retiring element, per ADR-001's delta shape) — a plain list,
+  // not a Map keyed by the retiring element: ADR-001 allows split (one
+  // retiring element, several replacements, e.g. a monolith split two
+  // ways), and a Map can hold only one value per key, so a second
+  // `replaces` edge for the same retiring element silently overwrote the
+  // first, dropping one of the two arrows.
+  const replacedPairs: { toElementId: UUID; fromElementId: UUID }[] = [];
 
   for (const delta of ownDeltas) {
     // `system` or `container` (a platform module — "platforms and modules"
@@ -126,11 +131,11 @@ export function deriveRoadmapChangeEvents(ownDeltas: readonly Delta[], asIsHead:
     }
 
     if (delta.kind === 'relationship.create' && delta.relationshipType === 'replaces') {
-      replacedPairs.set(delta.toElementId, delta.fromElementId);
+      replacedPairs.push({ toElementId: delta.toElementId, fromElementId: delta.fromElementId });
     }
   }
 
-  for (const [oldSystemId, newSystemId] of replacedPairs) {
+  for (const { toElementId: oldSystemId, fromElementId: newSystemId } of replacedPairs) {
     if (newSystemId === oldSystemId) continue;
     events.push({
       kind: 'replace',
@@ -148,7 +153,7 @@ export function deriveRoadmapChangeEvents(ownDeltas: readonly Delta[], asIsHead:
     // above — don't also re-derive the same swap from the transferred
     // supports edges (a retire-with-replacement retracts every supports edge
     // from the old system and recreates it from the new one).
-    if (replacedPairs.get(oldSystemId) === newSystemId) continue;
+    if (replacedPairs.some((p) => p.toElementId === oldSystemId && p.fromElementId === newSystemId)) continue;
     events.push({
       kind: 'replace',
       capabilityId,
