@@ -91,6 +91,7 @@ function toCaptureCandidate(resolved: ResolvedCandidate, ids: { orgId: UUID; job
     rowKey: resolved.rowKey,
     reimportStatus: resolved.reimportStatus,
     draftDeltaIds: [],
+    aliasProposals: [],
     decision: resolved.class === 'confirm' ? 'accepted' : null,
     decisionDetail: null,
     decidedBy: null,

@@ -288,3 +288,8 @@ Every row has (or gets, in P1) a SPEC §11 row and an issue. A row leaves only w
 | Keyboard shortcuts for As-is/To-be/Diff; propose-change picker for contributors at main | S-track | create |
 | type_schemas (JSON-Schema generator) | never, if F2's edge function validates with the TypeScript contract | create |
 | Deploy workflow (token privileges) | P1 | create |
+| Capture: `LLM_BUDGET_EXCEEDED` doesn't exist — org cost cap collapses into `LLM_UNAVAILABLE` (§11) | needs a real per-org cost cap in llm-proxy first | #287 |
+| Capture: `LLM_TRUNCATED`/`LLM_SCHEMA_INVALID` "retried once" claimed in a code comment, not implemented (§11) | not scheduled | #288 |
+| Capture: calibration metric missing from `scoreCapture.ts` (§12.4) | not scheduled | #289 |
+| Capture: `DRAFT_HEAD_MOVED` guard missing from `apply_capture_decisions` (§11) | not scheduled | #290 |
+| Capture: SPEC-capture.md doc/code mismatches (§8.1 signature, §13 Playwright workaround, §5.2/§7.3 undisclosed narrowings) | not scheduled | #291 |

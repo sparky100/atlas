@@ -54,6 +54,7 @@ function baseCandidate(overrides: Partial<CaptureCandidate> & Pick<CaptureCandid
     rowKey: `row-${String(overrides.seq)}`,
     reimportStatus: null,
     draftDeltaIds: [],
+    aliasProposals: [],
     decision: 'accepted',
     decisionDetail: null,
     decidedBy: null,

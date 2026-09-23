@@ -94,6 +94,7 @@ const captureCandidateArb: fc.Arbitrary<CaptureCandidate> = fc.record(
     rowKey: fc.string({ minLength: 1, maxLength: 30 }),
     reimportStatus: fc.constantFrom('new' as const, 'changed' as const, 'unchanged' as const, 'gone' as const, null),
     draftDeltaIds: fc.array(uuid, { maxLength: 3 }),
+    aliasProposals: fc.array(fc.record({ type: fc.constantFrom('name' as const, 'code' as const, 'external_ref' as const, 'source_system_key' as const, 'template_code' as const, 'merged_id' as const), value: fc.string({ minLength: 1, maxLength: 30 }) }), { maxLength: 3 }),
     decision: fc.constantFrom('accepted' as const, 'rejected' as const, null),
     decisionDetail: fc.constant(null),
     decidedBy: fc.option(uuid, { nil: null }),
@@ -102,7 +103,7 @@ const captureCandidateArb: fc.Arbitrary<CaptureCandidate> = fc.record(
     promotedSubjectId: fc.option(uuid, { nil: null }),
     createdAt: isoDateTime,
   },
-  { requiredKeys: ['id', 'orgId', 'jobId', 'modelId', 'seq', 'kind', 'class', 'elementType', 'relationshipType', 'draftSubjectId', 'proposal', 'evidence', 'match', 'confidence', 'rowKey', 'reimportStatus', 'draftDeltaIds', 'decision', 'decisionDetail', 'decidedBy', 'decidedAt', 'promotedCommitId', 'promotedSubjectId', 'createdAt'] },
+  { requiredKeys: ['id', 'orgId', 'jobId', 'modelId', 'seq', 'kind', 'class', 'elementType', 'relationshipType', 'draftSubjectId', 'proposal', 'evidence', 'match', 'confidence', 'rowKey', 'reimportStatus', 'draftDeltaIds', 'aliasProposals', 'decision', 'decisionDetail', 'decidedBy', 'decidedAt', 'promotedCommitId', 'promotedSubjectId', 'createdAt'] },
 );
 
 const captureJobArb: fc.Arbitrary<CaptureJob> = fc.record(

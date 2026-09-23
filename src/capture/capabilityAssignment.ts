@@ -22,16 +22,18 @@
  * targets *main's* own tree, never another candidate in this run (unlike
  * `uses`/`flows_to`, which may point at a system this same sheet also
  * creates). `supports` proposals default to `role: 'secondary'` (K-13);
- * promoting a row's own first/only capability edge to `primary` needs
- * main's own live-primary state for that capability, which this module
- * doesn't have — that promotion is the orchestrator's own pass (PR10).
- * `eligibleForPrimary` on the per-row summary only says "this is the sole
+ * a row's own first/only capability edge is promoted to `primary` here,
+ * against `mainHead`'s own live-primary state for that target — checked
+ * the same way the engine's own C17 cardinality guard does
+ * (`checkPrimaryCardinality`, `src/engine/deltas.ts`), just read-only.
+ * `eligibleForPrimary` on the per-row summary says "this is the sole
  * capability edge this row itself proposed" — necessary for promotion,
- * not sufficient.
+ * not sufficient; the live-primary check above is the other half.
  */
 import { z } from 'zod';
 import type { CandidateEvidence, RelationshipProposal } from '../contracts/capture';
 import type { UUID } from '../contracts/delta';
+import type { Head } from '../engine/deltas';
 import type { ElementsHeadRow } from '../contracts/rows';
 import type { LlmClient } from './llm/client';
 import { resolveByTrigram } from './match';
@@ -146,6 +148,16 @@ export interface AssignCapabilitiesInput {
   llmClient: LlmClient;
   /** First `seq` the produced `supports` candidates may use — continuing straight on from whatever seq range `rowsToCandidates.ts` (and any other candidate-producing step already run) has used. */
   startSeq: number;
+  /** K-13: read to decide whether an eligible row's `supports` edge may promote to `primary` — a target already has a live primary on this head iff `checkPrimaryCardinality` would refuse a new one. */
+  mainHead: Head;
+}
+
+/** K-13/C17: true iff `capabilityElementId` already has a live `supports` edge with `role: 'primary'` on `mainHead` — mirrors `checkPrimaryCardinality`'s own read (`src/engine/deltas.ts`), read-only. */
+function hasLivePrimarySupports(mainHead: Head, capabilityElementId: UUID): boolean {
+  for (const rel of mainHead.relationships.values()) {
+    if (rel.relationshipType === 'supports' && rel.toElementId === capabilityElementId && rel.attributes.role === 'primary') return true;
+  }
+  return false;
 }
 
 export interface AssignCapabilitiesResult {
@@ -192,16 +204,25 @@ export async function assignCapabilities(input: AssignCapabilitiesInput): Promis
   });
 
   const candidates: RowCandidate[] = [];
+  // K-13's "first... such edge" is checked across this whole run, not per row in isolation: two different rows
+  // that both resolve to the same never-yet-primaried target must not both promote — that would hand
+  // `write_capture_draft`'s own fold a second live primary on one target in the same commit, which C17
+  // refuses (§8.1: "capture must never produce a draft commit commit_deltas refuses"). `input.rows` is
+  // already in §4.5's deterministic row order, so "first" here means first in that order.
+  const primaryClaimed = new Set<UUID>();
   let nextSeq = input.startSeq;
   for (const row of input.rows) {
     const targets = resolved.get(row.seq) ?? [];
+    const eligibleForPrimary = targets.length === 1;
     for (const target of targets) {
+      const role = eligibleForPrimary && !hasLivePrimarySupports(input.mainHead, target.elementId) && !primaryClaimed.has(target.elementId) ? 'primary' : 'secondary';
+      if (role === 'primary') primaryClaimed.add(target.elementId);
       const proposal: RelationshipProposal<'supports'> = {
         kind: 'relationship',
         relationshipType: 'supports',
         from: { kind: 'candidate', seq: row.seq },
         to: { kind: 'existing', elementId: target.elementId },
-        attributes: { role: 'secondary' },
+        attributes: { role },
       };
       const evidence: CandidateEvidence = {
         sourceRef: row.sourceRef,

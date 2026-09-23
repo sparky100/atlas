@@ -132,6 +132,78 @@ describe('runCapture — matching against main', () => {
   });
 });
 
+describe('runCapture — target-branch matching (K-8/§7.1, issue #285)', () => {
+  const csv = 'Application,Supplier,Status\nCRM,Acme,Live';
+
+  it('classifies a candidate matching a target-branch-only element as duplicate_in_target, with no draftSubjectId', async () => {
+    const targetHead = emptyHead();
+    targetHead.elements.set('target-crm', { elementType: 'system', name: 'CRM', parentId: null, attributes: {}, existsDeltaId: 'd-target-crm' });
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'Applications.csv',
+        source: { format: 'csv', text: csv },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([], []),
+        mainHead: emptyHead(),
+        targetHead,
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    const system = result.candidates.find((c) => c.elementType === 'system');
+    expect(system?.class).toBe('duplicate_in_target');
+    expect(system?.draftSubjectId).toBeNull();
+    expect(system?.match.elementId).toBe('target-crm');
+  });
+
+  it('classifies as new (not duplicate_in_target) when the job has no target branch', async () => {
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'Applications.csv',
+        source: { format: 'csv', text: csv },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    const system = result.candidates.find((c) => c.elementType === 'system');
+    expect(system?.class).toBe('new');
+    expect(system?.draftSubjectId).not.toBeNull();
+  });
+
+  it('prefers an ordinary main match over the target branch entirely — the target-only index is never even consulted', async () => {
+    const existing = { element_id: 'sys-1', element_type: 'system' as const, name: 'CRM', parent_id: null, attributes: { vendor: 'Acme' }, exists_delta_id: 'd-1' };
+    const matchIndex = buildMatchIndex([existing], []);
+    const mainHead = emptyHead();
+    mainHead.elements.set('sys-1', { elementType: 'system', name: 'CRM', parentId: null, attributes: existing.attributes, existsDeltaId: 'd-1' });
+
+    const targetHead = emptyHead();
+    targetHead.elements.set('target-crm', { elementType: 'system', name: 'CRM', parentId: null, attributes: {}, existsDeltaId: 'd-target-crm' });
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'Applications.csv',
+        source: { format: 'csv', text: csv },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex,
+        mainHead,
+        targetHead,
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    const system = result.candidates.find((c) => c.elementType === 'system');
+    expect(system?.class).not.toBe('duplicate_in_target');
+    expect(system?.draftSubjectId).toBe('sys-1');
+  });
+});
+
 describe('runCapture — prose supports endpoint typing (C9 regression)', () => {
   it('marks a supports relationship invalid when its from resolves to a capability, not a system', async () => {
     const text = 'Data Governance supports Data Sharing.';

@@ -151,6 +151,12 @@ export interface CandidateEvidence {
 
 export type CaptureAliasType = 'name' | 'code' | 'external_ref' | 'source_system_key' | 'template_code' | 'merged_id';
 
+/** §7.6: an alias `atlas.apply_capture_decisions` writes if/when this candidate is accepted or merged — computed at extraction/match time (`rowsToCandidates.ts`/`intraDocumentDedup.ts`/`extractProse.ts`), persisted on the candidate so §10's review queue can show "accepting this also teaches Atlas that X means Y" before the reviewer decides, not only after (issue #284). */
+export interface CaptureAliasProposal {
+  type: CaptureAliasType;
+  value: string;
+}
+
 export interface MatchOutcome {
   level: 'exact_id' | 'alias' | 'name_context' | 'none';
   elementId?: UUID;
@@ -167,7 +173,8 @@ export interface MatchOutcome {
 // §4.4: class: the 8-value taxonomy `classify()` (PR2) assigns.
 // ---------------------------------------------------------------------------
 
-export type CandidateClass = 'new' | 'update' | 'confirm' | 'conflict' | 'ambiguous' | 'gone' | 'invalid' | 'unsourced';
+/** `duplicate_in_target` (issue #285, K-8/§7.1): a candidate that matches an element already proposed on the job's own target change branch, but not yet on main — no delta (the draft forks from main, which has no such element to update), shown to the reviewer as a collision rather than silently produced as a second `new`. */
+export type CandidateClass = 'new' | 'update' | 'confirm' | 'conflict' | 'ambiguous' | 'gone' | 'invalid' | 'unsourced' | 'duplicate_in_target';
 
 export type CandidateDecision = 'accepted' | 'rejected' | 'merged' | 'edited' | 'split';
 
@@ -196,6 +203,8 @@ export interface CaptureCandidate {
   rowKey: string;
   reimportStatus: CandidateReimportStatus | null;
   draftDeltaIds: UUID[];
+  /** §7.6/§10: what accepting or merging this candidate would teach the matcher — shown to the reviewer before they decide, not just written after (issue #284). */
+  aliasProposals: CaptureAliasProposal[];
   decision: CandidateDecision | null;
   decisionDetail: CandidateDecisionDetail | null;
   decidedBy: UUID | null;
@@ -300,6 +309,7 @@ export interface CaptureCandidateRowShape {
   row_key: string;
   reimport_status: CandidateReimportStatus | null;
   draft_delta_ids: UUID[];
+  alias_proposals: CaptureAliasProposal[];
   decision: CandidateDecision | null;
   decision_detail: CandidateDecisionDetail | null;
   decided_by: UUID | null;
@@ -328,6 +338,7 @@ export function captureCandidateRowToWire(row: CaptureCandidateRowShape): Captur
     rowKey: row.row_key,
     reimportStatus: row.reimport_status,
     draftDeltaIds: row.draft_delta_ids,
+    aliasProposals: row.alias_proposals,
     decision: row.decision,
     decisionDetail: row.decision_detail,
     decidedBy: row.decided_by,
@@ -357,6 +368,7 @@ export function captureCandidateWireToRow(candidate: CaptureCandidate): CaptureC
     row_key: candidate.rowKey,
     reimport_status: candidate.reimportStatus,
     draft_delta_ids: candidate.draftDeltaIds,
+    alias_proposals: candidate.aliasProposals,
     decision: candidate.decision,
     decision_detail: candidate.decisionDetail,
     decided_by: candidate.decidedBy,

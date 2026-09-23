@@ -117,7 +117,10 @@ export function CaptureCandidateRow({
   }, [mergeOpen, mergeQuery, candidate, searchTargetElements]);
 
   const isInvalidOrUnsourced = candidate.class === 'invalid' || candidate.class === 'unsourced';
-  const canAccept = candidate.class === 'ambiguous' ? pendingAmbiguousTarget !== null : !isInvalidOrUnsourced;
+  // duplicate_in_target (issue #285, K-8): no delta was ever produced for this candidate (the draft forks
+  // from main, which has no such element yet), so there is nothing to accept and nothing to edit — only `r`.
+  const isDuplicateInTarget = candidate.class === 'duplicate_in_target';
+  const canAccept = candidate.class === 'ambiguous' ? pendingAmbiguousTarget !== null : !isInvalidOrUnsourced && !isDuplicateInTarget;
 
   const chooseMergeTarget = (target: { elementId: UUID; name: string }) => {
     if (candidate.class === 'ambiguous') onSetPendingAmbiguousTarget(target);
@@ -148,7 +151,7 @@ export function CaptureCandidateRow({
 
   return (
     <li
-      className={[styles.row, selected ? styles.selected : '', isInvalidOrUnsourced ? styles.badRow : ''].filter(Boolean).join(' ')}
+      className={[styles.row, selected ? styles.selected : '', isInvalidOrUnsourced || isDuplicateInTarget ? styles.badRow : ''].filter(Boolean).join(' ')}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -188,9 +191,20 @@ export function CaptureCandidateRow({
         </Text>
       )}
 
+      {/* §10's `new` row: "the alias proposals that would be recorded" — shown whenever the candidate carries any (a level-2/3 match or an intra-document group can too, §7.6), not only for `new`, so accepting or merging never teaches the matcher something the reviewer wasn't shown first (issue #284). */}
+      {candidate.aliasProposals.length > 0 && (
+        <Text as="p" tone="muted" size="sm">
+          Will also remember: {candidate.aliasProposals.map((a) => `${a.type} "${a.value}"`).join(', ')}
+        </Text>
+      )}
+
       {isInvalidOrUnsourced ? (
         <Text as="p" size="sm">
           {candidate.class === 'invalid' ? candidate.evidence.warnings.map(evidenceWarningLabel).join('; ') || 'This candidate is invalid.' : 'No passage found for this fact in the source.'}
+        </Text>
+      ) : isDuplicateInTarget ? (
+        <Text as="p" size="sm">
+          This matches something already proposed on the target change — not yet on main, so it can&rsquo;t be accepted from here without creating a duplicate. Reject this candidate, or reconcile it from the target change directly.
         </Text>
       ) : candidate.class === 'gone' ? (
         <Text as="p" size="sm">
@@ -231,7 +245,7 @@ export function CaptureCandidateRow({
         </div>
       )}
 
-      {candidate.evidence.warnings.length > 0 && !isInvalidOrUnsourced && (
+      {candidate.evidence.warnings.length > 0 && !isInvalidOrUnsourced && !isDuplicateInTarget && (
         <div className={styles.warnings}>
           {candidate.evidence.warnings.map((w, i) => (
             <Chip key={i} tone="warn">
@@ -310,9 +324,11 @@ export function CaptureCandidateRow({
               Undo
             </Button>
           )}
-          <Button variant="ghost" onClick={editOpen ? onCloseEdit : onOpenEdit}>
-            {isInvalidOrUnsourced ? 'Edit…' : 'Edit'}
-          </Button>
+          {candidate.class !== 'confirm' && !isDuplicateInTarget && (
+            <Button variant="ghost" onClick={editOpen ? onCloseEdit : onOpenEdit}>
+              {isInvalidOrUnsourced ? 'Edit…' : 'Edit'}
+            </Button>
+          )}
           {(candidate.class === 'new' || candidate.class === 'update') && (
             <Button variant="ghost" onClick={splitOpen ? onCloseSplit : onOpenSplit}>
               Split

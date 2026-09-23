@@ -34,12 +34,13 @@ export interface CaptureReviewViewProps {
   jobId: UUID;
 }
 
-/** SPEC §10's own queue order: needs-decision-first, bulk-accepted confirmations last. */
-const CLASS_ORDER: readonly CandidateClass[] = ['unsourced', 'invalid', 'ambiguous', 'conflict', 'new', 'update', 'gone', 'confirm'];
+/** SPEC §10's own queue order: needs-decision-first, bulk-accepted confirmations last. `duplicate_in_target` (issue #285) sits beside `invalid`/`unsourced` — no delta, needs the reviewer's attention before anything else. */
+const CLASS_ORDER: readonly CandidateClass[] = ['unsourced', 'invalid', 'duplicate_in_target', 'ambiguous', 'conflict', 'new', 'update', 'gone', 'confirm'];
 
 const CLASS_LABEL: Record<CandidateClass, string> = {
   unsourced: 'Unsourced',
   invalid: 'Invalid',
+  duplicate_in_target: 'Already proposed in this change',
   ambiguous: 'Ambiguous',
   conflict: 'Conflicts',
   new: 'New',
@@ -115,7 +116,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
           if (candidate.class === 'ambiguous') {
             const pending = pendingAmbiguousTargets.get(candidate.id) ?? null;
             if (pending) setDecisionFor(candidate, 'accepted', pending === 'new' ? null : { intoElementId: pending.elementId });
-          } else if (candidate.class !== 'invalid' && candidate.class !== 'unsourced') {
+          } else if (candidate.class !== 'invalid' && candidate.class !== 'unsourced' && candidate.class !== 'duplicate_in_target') {
             setDecisionFor(candidate, 'accepted');
           }
           break;
@@ -138,7 +139,10 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
           });
           break;
         case 'e':
-          setOpenPanel({ candidateId: candidate.id, type: 'edit' });
+          // §10's per-class key table lists `e` for every class except `confirm` (a, r, x only) — editing a
+          // pure provenance-refresh candidate would let a reviewer silently turn it into a hand-edited fact.
+          // `duplicate_in_target` (issue #285) has no delta at all to edit into being — only `r` applies.
+          if (candidate.class !== 'confirm' && candidate.class !== 'duplicate_in_target') setOpenPanel({ candidateId: candidate.id, type: 'edit' });
           break;
         case 's':
           if (candidate.class === 'new' || candidate.class === 'update') setOpenPanel({ candidateId: candidate.id, type: 'split' });

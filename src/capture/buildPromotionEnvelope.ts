@@ -182,6 +182,12 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
       throw new BuildPromotionEnvelopeError(`seq ${String(candidate.seq)}: 'edited' on an ${candidate.class} candidate needs re-grounding (src/capture/ground.ts, PR11) — not yet supported`);
     }
 
+    // duplicate_in_target (issue #285): no draft delta ever existed for this candidate — 'rejected' (already
+    // continue'd above) is the only legal decision; the review UI never offers any other action for this class.
+    if (candidate.class === 'duplicate_in_target') {
+      throw new BuildPromotionEnvelopeError(`seq ${String(candidate.seq)}: class duplicate_in_target only accepts 'rejected' (SPEC §10)`);
+    }
+
     if (candidate.decision === 'merged') {
       if (candidate.class !== 'new') throw new BuildPromotionEnvelopeError(`seq ${String(candidate.seq)}: 'merged' only applies to a 'new' candidate (SPEC §10)`);
       const detail = candidate.decisionDetail;
@@ -334,6 +340,11 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
     if (candidate.class === 'invalid' || candidate.class === 'unsourced') {
       if (candidate.decision !== 'edited') throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: class ${candidate.class} only accepts 'edited' or 'rejected' (SPEC §10)`);
       throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: 'edited' on an ${candidate.class} candidate needs re-grounding (src/capture/ground.ts, PR11) — not yet supported`);
+    }
+    // duplicate_in_target is only ever produced for element candidates (resolveElementCandidate) — never a
+    // relationship — but this defends the shared CandidateClass union the same way regardless.
+    if (candidate.class === 'duplicate_in_target') {
+      throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: class duplicate_in_target only accepts 'rejected' (SPEC §10)`);
     }
 
     if (candidate.class === 'new') {
