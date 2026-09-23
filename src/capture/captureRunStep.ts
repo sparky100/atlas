@@ -58,6 +58,8 @@ export interface CaptureRunJob {
   documentDate: string | null;
   status: CaptureStatus;
   reimportOfJobId: UUID | null;
+  /** K-8/§7.1's fifth bullet, issue #285: the change branch the reviewer most recently promoted into (`capture_jobs.target_branch_id`) — when set, matching also checks that branch's own folded head (`deps.foldMainHead`'s own `targetHead`). */
+  targetBranchId: UUID | null;
   createdBy: UUID;
 }
 
@@ -91,8 +93,8 @@ export interface CaptureRunDeps {
   setProgress: (jobId: UUID, progress: CaptureJobProgress) => Promise<void>;
   setError: (jobId: UUID, error: CaptureJobError) => Promise<void>;
   buildMatchIndex: (modelId: UUID) => Promise<MatchIndex>;
-  /** Main's current head_commit_id and its own folded `Head` — `null` head only for a model with no commits at all, which ADR-018 says cannot happen; a real implementation may still choose to guard it defensively. */
-  foldMainHead: (modelId: UUID) => Promise<{ mainHeadCommitId: UUID; head: Head }>;
+  /** Main's current head_commit_id and its own folded `Head` — `null` head only for a model with no commits at all, which ADR-018 says cannot happen; a real implementation may still choose to guard it defensively. `targetHead` (issue #285): the job's own `targetBranchId`'s folded head when set, else `null` — never read when `targetBranchId` is `null`. */
+  foldMainHead: (modelId: UUID, targetBranchId: UUID | null) => Promise<{ mainHeadCommitId: UUID; head: Head; targetHead: Head | null }>;
   /** `[]` when the job has no `reimportOfJobId`. */
   readReimportPrevious: (previousJobId: UUID) => Promise<PreviousCandidateForDiff[]>;
   /** §3.1: the run's own `sources` row — created once per job (`source` names it: the file's own name, or a preview of the pasted text); a retried attempt reuses the row a previous, interrupted attempt already created rather than minting a second one. */
@@ -115,7 +117,7 @@ export class CaptureRunStepError extends Error {}
 /** §8.1's own summary sentence for `commits.body` — derived from `runCapture()`'s own flat `class.*` stat keys (runCapture.ts's own module comment on why `stats` is flat, not SPEC §8.1's nested illustration). */
 function summarizeStats(stats: Readonly<Record<string, number>>): string {
   const total = stats.candidates ?? 0;
-  const classOrder = ['new', 'update', 'confirm', 'conflict', 'ambiguous', 'gone', 'invalid', 'unsourced'] as const;
+  const classOrder = ['new', 'update', 'confirm', 'conflict', 'ambiguous', 'gone', 'invalid', 'unsourced', 'duplicate_in_target'] as const;
   const parts = classOrder.map((cls) => [cls, stats[`class.${cls}`] ?? 0] as const).filter(([, count]) => count > 0);
   const summary = parts.map(([cls, count]) => `${String(count)} ${cls}`).join(', ');
   return summary !== '' ? `${String(total)} candidates: ${summary}.` : `${String(total)} candidates.`;
@@ -188,9 +190,9 @@ export async function runCaptureRunStep(deps: CaptureRunDeps, jobId: UUID): Prom
     // created until the input is in hand — sequenced before the rest,
     // which don't depend on it and run together.
     const source = await deps.downloadInput(job);
-    const [matchIndex, { mainHeadCommitId, head: mainHead }, reimportPrevious, sourceId] = await Promise.all([
+    const [matchIndex, { mainHeadCommitId, head: mainHead, targetHead }, reimportPrevious, sourceId] = await Promise.all([
       deps.buildMatchIndex(job.modelId),
-      deps.foldMainHead(job.modelId),
+      deps.foldMainHead(job.modelId, job.targetBranchId),
       job.reimportOfJobId ? deps.readReimportPrevious(job.reimportOfJobId) : Promise.resolve([]),
       deps.getOrCreateJobSource(job, source),
     ]);
@@ -202,6 +204,7 @@ export async function runCaptureRunStep(deps: CaptureRunDeps, jobId: UUID): Prom
       llmClient: deps.llmClient,
       matchIndex,
       mainHead,
+      ...(targetHead ? { targetHead } : {}),
       ...(reimportPrevious.length > 0 ? { reimportPrevious } : {}),
       mintId: deps.mintId,
     });

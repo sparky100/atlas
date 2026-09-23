@@ -87,6 +87,7 @@ interface CaptureJobRow {
   document_date: string | null;
   status: CaptureStatus;
   reimport_of_job_id: UUID | null;
+  target_branch_id: UUID | null;
   created_by: UUID;
 }
 
@@ -101,12 +102,13 @@ function jobFromRow(row: CaptureJobRow): CaptureRunJob {
     documentDate: row.document_date,
     status: row.status,
     reimportOfJobId: row.reimport_of_job_id,
+    targetBranchId: row.target_branch_id,
     createdBy: row.created_by,
   };
 }
 
 export async function readJob(service: SupabaseClient, jobId: UUID): Promise<CaptureRunJob | null> {
-  const { data, error } = await service.from('capture_jobs').select('id, org_id, model_id, input_kind, input_name, input_ref, document_date, status, reimport_of_job_id, created_by').eq('id', jobId).maybeSingle();
+  const { data, error } = await service.from('capture_jobs').select('id, org_id, model_id, input_kind, input_name, input_ref, document_date, status, reimport_of_job_id, target_branch_id, created_by').eq('id', jobId).maybeSingle();
   if (error) throw new Error(`readJob: ${error.message}`);
   return data ? jobFromRow(data as CaptureJobRow) : null;
 }
@@ -169,7 +171,17 @@ async function buildCommitLoaderForModel(service: SupabaseClient, modelId: UUID)
   return (id) => nodes.get(id);
 }
 
-export async function foldMainHead(service: SupabaseClient, modelId: UUID): Promise<{ mainHeadCommitId: UUID; head: Head }> {
+/**
+ * K-8/§7.1's fifth bullet, issue #285: when `targetBranchId` is set, also
+ * folds that branch's own head, from the same model-scoped commit loader
+ * (`buildCommitLoaderForModel` already reads every commit/delta for the
+ * model, not just main's ancestry, so a second `foldFromGenesis` call
+ * costs no extra I/O). `targetHead` is `null` when the job has no target
+ * branch yet, or that branch's own `head_commit_id` is unset (a brand-new
+ * `draft` branch always has one — SPEC §5.2 — but this reads defensively
+ * rather than assuming it).
+ */
+export async function foldMainHead(service: SupabaseClient, modelId: UUID, targetBranchId: UUID | null): Promise<{ mainHeadCommitId: UUID; head: Head; targetHead: Head | null }> {
   const { data: mainBranch, error } = await service.from('branches').select('head_commit_id').eq('model_id', modelId).eq('kind', 'main').maybeSingle();
   if (error) throw new Error(`foldMainHead: ${error.message}`);
   const mainHeadCommitId = (mainBranch as { head_commit_id: UUID } | null)?.head_commit_id;
@@ -181,7 +193,17 @@ export async function foldMainHead(service: SupabaseClient, modelId: UUID): Prom
   if (!mainHeadCommitId) throw new Error(`foldMainHead: model ${modelId} has no main branch head_commit_id.`);
 
   const loader = await buildCommitLoaderForModel(service, modelId);
-  return { mainHeadCommitId, head: foldFromGenesis(mainHeadCommitId, loader) };
+  const head = foldFromGenesis(mainHeadCommitId, loader);
+
+  let targetHead: Head | null = null;
+  if (targetBranchId) {
+    const { data: targetBranch, error: targetError } = await service.from('branches').select('head_commit_id').eq('id', targetBranchId).maybeSingle();
+    if (targetError) throw new Error(`foldMainHead: ${targetError.message}`);
+    const targetHeadCommitId = (targetBranch as { head_commit_id: UUID | null } | null)?.head_commit_id;
+    if (targetHeadCommitId) targetHead = foldFromGenesis(targetHeadCommitId, loader);
+  }
+
+  return { mainHeadCommitId, head, targetHead };
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +352,7 @@ export function buildRealCaptureRunDeps(config: RealCaptureRunDepsConfig): Captu
     setProgress: (jobId, progress) => setProgress(service, jobId, progress),
     setError: (jobId, jobError) => setError(service, jobId, jobError),
     buildMatchIndex: (modelId) => buildMatchIndexForModel(service, modelId),
-    foldMainHead: (modelId) => foldMainHead(service, modelId),
+    foldMainHead: (modelId, targetBranchId) => foldMainHead(service, modelId, targetBranchId),
     readReimportPrevious: (previousJobId) => readReimportPrevious(service, previousJobId),
     getOrCreateJobSource: (job, source) => getOrCreateJobSource(service, job, source, mintId),
     downloadInput: (job) => downloadInput(service, job),

@@ -29,6 +29,7 @@ const PENDING_JOB: CaptureRunJob = {
   documentDate: '2026-01-01',
   status: 'pending',
   reimportOfJobId: null,
+  targetBranchId: null,
   createdBy: 'user-1',
 };
 
@@ -72,7 +73,7 @@ function fakeDeps(overrides: FakeDepsOverrides = {}) {
       return Promise.resolve();
     }),
     buildMatchIndex: vi.fn(() => Promise.resolve(buildMatchIndex([], []))),
-    foldMainHead: vi.fn(() => Promise.resolve({ mainHeadCommitId: 'main-commit-0', head: emptyHead() })),
+    foldMainHead: vi.fn(() => Promise.resolve({ mainHeadCommitId: 'main-commit-0', head: emptyHead(), targetHead: null })),
     readReimportPrevious: vi.fn(() => Promise.resolve([])),
     getOrCreateJobSource: vi.fn((_job: CaptureRunJob, _source: RunCaptureSource) => Promise.resolve('source-1')),
     downloadInput: vi.fn(() => Promise.resolve(overrides.source ?? { format: 'csv' as const, text: csv })),

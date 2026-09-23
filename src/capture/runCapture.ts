@@ -78,7 +78,7 @@ import { extractProseChunk } from './extractProse';
 import type { LlmClient } from './llm/client';
 import { mapSheetColumns } from './mapColumns';
 import { matchElement, resolveByTrigram, TOP_LEVEL_CONTEXT, type MatchContext } from './match';
-import type { MatchIndex } from './matchIndex';
+import { buildTargetOnlyMatchIndex, type MatchIndex } from './matchIndex';
 import { normaliseName } from './normalise';
 import { parseCsv } from './parse/csv';
 import { pageHasNoText, parsePdf, PdfParseError, PdfPasswordProtectedError } from './parse/pdf';
@@ -102,6 +102,8 @@ export interface RunCaptureInput {
   /** §7.1's read set, already built by the caller (a real DB read in `capture-run`, PR12; `model.json` folded into one in the fixture harness). */
   matchIndex: MatchIndex;
   mainHead: Head;
+  /** K-8/§7.1's fifth bullet, issue #285: present iff the job has a `target_branch_id` — that branch's own folded head, so a candidate matching something the target branch already proposes (but main doesn't have yet) gets `duplicate_in_target` instead of a second `new`. */
+  targetHead?: Head;
   /** Present iff the job's own `reimport_of_job_id` is set (§9). */
   reimportPrevious?: readonly PreviousCandidateForDiff[];
   /** Every `new`-class candidate's own `draftSubjectId` (§8.1: the worker mints element/relationship ids before building the draft envelope) — delta ids are `buildCaptureDraftEnvelope.ts`'s own separate `mintId`, never this one. */
@@ -341,7 +343,7 @@ interface ElementResolutionResult {
 }
 
 /** Resolves one element candidate's own `parent` ref (system/actor never have one — `context` is unconditionally top-level for them per `match.ts`'s own `contextMatches`) and matches/classifies it against main. */
-function resolveElementCandidate(candidate: RowCandidate, proposal: ElementProposal, runIndex: RunElementIndex, resolvedSubjectBySeq: ReadonlyMap<number, UUID | null>, matchIndex: MatchIndex, mainHead: Head, sourceCapturedAt: string | null, mintId: () => UUID): ElementResolutionResult {
+function resolveElementCandidate(candidate: RowCandidate, proposal: ElementProposal, runIndex: RunElementIndex, resolvedSubjectBySeq: ReadonlyMap<number, UUID | null>, matchIndex: MatchIndex, targetOnlyIndex: MatchIndex | null, mainHead: Head, sourceCapturedAt: string | null, mintId: () => UUID): ElementResolutionResult {
   if (candidate.ungrounded) {
     return {
       class: 'unsourced',
@@ -392,6 +394,15 @@ function resolveElementCandidate(candidate: RowCandidate, proposal: ElementPropo
 
   if (match.level === 'none') {
     const attributes = proposal.attributes as Record<string, unknown>;
+    if (targetOnlyIndex) {
+      const targetMatch = matchElement(
+        { name: proposal.name, elementType: proposal.elementType, context: proposal.parent === null ? TOP_LEVEL_CONTEXT : contextElementId },
+        targetOnlyIndex,
+      );
+      if (targetMatch.level !== 'none') {
+        return { class: 'duplicate_in_target', match: targetMatch, draftSubjectId: null, attributes, parentNameForRowKey, resolvedParentElementId };
+      }
+    }
     return { class: 'new', match, draftSubjectId: mintId(), attributes, parentNameForRowKey, resolvedParentElementId };
   }
 
@@ -559,7 +570,7 @@ export async function runCapture(input: RunCaptureInput): Promise<RunCaptureResu
 // ---------------------------------------------------------------------------
 
 async function runSheetCapture(input: RunSheetCaptureInput): Promise<RunCaptureResult> {
-  const { inputName, source, documentDate, llmClient, matchIndex, mainHead, reimportPrevious, mintId } = input;
+  const { inputName, source, documentDate, llmClient, matchIndex, mainHead, targetHead, reimportPrevious, mintId } = input;
   const stats: Record<string, number> = {};
   const bumpStat = (key: string): void => { bump(stats, key); };
 
@@ -636,7 +647,7 @@ async function runSheetCapture(input: RunSheetCaptureInput): Promise<RunCaptureR
     combined = combined.concat(supportsCandidates);
   }
 
-  return classifyAndResolve(combined, matchIndex, mainHead, documentDate, reimportPrevious, mintId, stats);
+  return classifyAndResolve(combined, matchIndex, targetHead, mainHead, documentDate, reimportPrevious, mintId, stats);
 }
 
 // ---------------------------------------------------------------------------
@@ -662,7 +673,7 @@ function textChunkSourceRefFor(chunk: TextChunk, start: number, end: number): So
 type ProseChunkEntry = { kind: 'pdf'; chunk: PdfChunk } | { kind: 'text'; chunk: TextChunk };
 
 async function runProseCapture(input: RunProseCaptureInput): Promise<RunCaptureResult> {
-  const { inputName, source, llmClient, matchIndex, mainHead, documentDate, reimportPrevious, mintId } = input;
+  const { inputName, source, llmClient, matchIndex, mainHead, targetHead, documentDate, reimportPrevious, mintId } = input;
   const stats: Record<string, number> = {};
 
   let chunkEntries: ProseChunkEntry[];
@@ -720,7 +731,7 @@ async function runProseCapture(input: RunProseCaptureInput): Promise<RunCaptureR
   // §5.2's own "Intra-document duplicates" pass (`intraDocumentDedup.ts`) is extractor-agnostic — reused here across the whole document's own chunks, not per-chunk, since the same element can plausibly recur across chunk boundaries despite §6.2's own "do not re-emit" instruction to the model.
   const { candidates: deduped } = dedupeIntraDocumentCandidates(combined);
 
-  return classifyAndResolve(deduped, matchIndex, mainHead, documentDate, reimportPrevious, mintId, stats);
+  return classifyAndResolve(deduped, matchIndex, targetHead, mainHead, documentDate, reimportPrevious, mintId, stats);
 }
 
 // ---------------------------------------------------------------------------
@@ -733,9 +744,10 @@ async function runProseCapture(input: RunProseCaptureInput): Promise<RunCaptureR
 // restored at the very end.
 // ---------------------------------------------------------------------------
 
-function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: MatchIndex, mainHead: Head, documentDate: string | null, reimportPrevious: readonly PreviousCandidateForDiff[] | undefined, mintId: () => UUID, stats: Record<string, number>): RunCaptureResult {
+function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: MatchIndex, targetHead: Head | undefined, mainHead: Head, documentDate: string | null, reimportPrevious: readonly PreviousCandidateForDiff[] | undefined, mintId: () => UUID, stats: Record<string, number>): RunCaptureResult {
   const runIndex = buildRunElementIndex(combined);
   const relationshipIndex = buildRelationshipIndex(mainHead);
+  const targetOnlyIndex = targetHead ? buildTargetOnlyMatchIndex(targetHead, mainHead) : null;
 
   const resolvedSubjectBySeq = new Map<number, UUID | null>();
   const seqByElementId = new Map<UUID, number>();
@@ -747,7 +759,7 @@ function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: Match
   const relationships = combined.filter((c): c is RowCandidate & { proposal: RelationshipProposal } => c.proposal.kind === 'relationship');
 
   const resolveOneElement = (candidate: RowCandidate & { proposal: ElementProposal }): void => {
-    const result = resolveElementCandidate(candidate, candidate.proposal, runIndex, resolvedSubjectBySeq, matchIndex, mainHead, documentDate, mintId);
+    const result = resolveElementCandidate(candidate, candidate.proposal, runIndex, resolvedSubjectBySeq, matchIndex, targetOnlyIndex, mainHead, documentDate, mintId);
     resolvedSubjectBySeq.set(candidate.seq, result.draftSubjectId);
     if (result.draftSubjectId !== null) seqByElementId.set(result.draftSubjectId, candidate.seq);
 

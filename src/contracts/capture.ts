@@ -173,7 +173,8 @@ export interface MatchOutcome {
 // §4.4: class: the 8-value taxonomy `classify()` (PR2) assigns.
 // ---------------------------------------------------------------------------
 
-export type CandidateClass = 'new' | 'update' | 'confirm' | 'conflict' | 'ambiguous' | 'gone' | 'invalid' | 'unsourced';
+/** `duplicate_in_target` (issue #285, K-8/§7.1): a candidate that matches an element already proposed on the job's own target change branch, but not yet on main — no delta (the draft forks from main, which has no such element to update), shown to the reviewer as a collision rather than silently produced as a second `new`. */
+export type CandidateClass = 'new' | 'update' | 'confirm' | 'conflict' | 'ambiguous' | 'gone' | 'invalid' | 'unsourced' | 'duplicate_in_target';
 
 export type CandidateDecision = 'accepted' | 'rejected' | 'merged' | 'edited' | 'split';
 

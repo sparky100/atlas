@@ -175,7 +175,9 @@ export function buildCaptureDraftEnvelope(input: BuildCaptureDraftEnvelopeInput)
   for (const candidate of deltaOrder) {
     const before = deltas.length;
 
-    if (candidate.class === 'invalid' || candidate.class === 'unsourced') {
+    // duplicate_in_target (issue #285, K-8): matches something already proposed on the target change
+    // branch, not yet on main — the draft forks from main, so there is no legal delta to write here at all.
+    if (candidate.class === 'invalid' || candidate.class === 'unsourced' || candidate.class === 'duplicate_in_target') {
       draftDeltaIdsBySeq.set(candidate.seq, []);
       continue;
     }
