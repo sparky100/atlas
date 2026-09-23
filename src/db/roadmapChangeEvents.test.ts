@@ -226,6 +226,23 @@ describe('deriveRoadmapChangeEvents', () => {
     ]);
   });
 
+  it('emits one arrow per replacement for a split (one retiring element, two replacements) — a Map keyed by the retiring element would silently drop the second', () => {
+    const asIs = emptyHead();
+    asIs.elements.set('sys-old', system('Monolith'));
+    const toBe = emptyHead();
+    toBe.elements.set('sys-old', system('Monolith'));
+    toBe.elements.set('sys-new-1', system('Ingest Service'));
+    toBe.elements.set('sys-new-2', system('Dashboard Service'));
+
+    const deltas = [replacesCreate('d1', 'rel-1', 'sys-new-1', 'sys-old'), replacesCreate('d2', 'rel-2', 'sys-new-2', 'sys-old')];
+    const events = deriveRoadmapChangeEvents(deltas, asIs, toBe);
+
+    expect(events).toEqual([
+      { kind: 'replace', fromSystemId: 'sys-old', fromSystemName: 'Monolith', toSystemId: 'sys-new-1', toSystemName: 'Ingest Service' },
+      { kind: 'replace', fromSystemId: 'sys-old', fromSystemName: 'Monolith', toSystemId: 'sys-new-2', toSystemName: 'Dashboard Service' },
+    ]);
+  });
+
   it('prefers the `replaces` edge over re-deriving the swap from transferred supports edges, emitting one arrow not one per capability', () => {
     const asIs = emptyHead();
     asIs.elements.set('sys-old', system('Old System'));

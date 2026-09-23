@@ -23,10 +23,12 @@ import styles from './RelationshipsSection.module.css';
 
 // Fixed display order (UI-principles §4.4) — distinct from RELATIONSHIP_TYPES'
 // wire-contract listing order, which doesn't itself mandate a UI order.
-// ADR-001 amendment ("replaces"): the edge is written by the retire/replace
-// flows (`useElementRetire.ts`), never by hand, so the group is read-only — no
-// +Add/Remove/edit. It only appears once a replacement is recorded (rows
-// present), then shows the target, its optional `description`, and provenance.
+// ADR-001 amendment ("replaces"): the edge is created by the retire/replace
+// flows (`useElementRetire.ts`), never by hand, so there's no "+Add" for
+// this group — it only appears once a replacement is recorded. Once
+// recorded, though, it's an ordinary fact like any other: remove and edit
+// (its one optional `description` field) both work the same generic way
+// every other relationship type's row does.
 const DISPLAY_ORDER: RelationshipType[] = ['supports', 'owns', 'uses', 'flows_to', 'enables', 'replaces'];
 
 const DIRECTION_LABEL: Record<RelationshipType, { outbound: string; inbound: string }> = {
@@ -150,11 +152,13 @@ export function RelationshipsSection({
     // the general one for this type alone — see `enablesAddRelationship`'s
     // own doc comment.
     //
-    // `replaces` (ADR-001) is read-only — written by the retire/replace
-    // flows, not by hand — so it gets no add, remove, or edit affordance.
+    // `replaces` (ADR-001) is created only by the retire/replace flows, not
+    // by hand — no "+Add" for it — but once it exists it can be removed
+    // (undoing a mistaken replacement) or edited (its one optional
+    // `description` field), same as any other relationship type's row.
     const groupAddRelationship = type === 'enables' ? enablesAddRelationship : type === 'replaces' ? undefined : addRelationship;
-    const groupRemoveRelationship = type === 'enables' ? enablesRemoveRelationship : type === 'replaces' ? undefined : removeRelationship;
-    const groupEditRelationship = type === 'replaces' ? undefined : editRelationship;
+    const groupRemoveRelationship = type === 'enables' ? enablesRemoveRelationship : removeRelationship;
+    const groupEditRelationship = editRelationship;
     const outboundRows = relationships.filter((r) => r.relationship_type === type && r.from_element_id === elementId);
     const inboundRows = relationships.filter((r) => r.relationship_type === type && r.to_element_id === elementId);
     const outboundSlot = outboundSlots.get(type);
