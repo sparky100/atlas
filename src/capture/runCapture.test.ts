@@ -576,6 +576,49 @@ describe('runCapture — JSON input (Sprint F2b, SPEC-capture.md §5.6)', () => 
     expect(change?.draftSubjectId).toBeNull();
   });
 
+  it('proposes a replaces candidate when a changes-section retire names a replacement, resolved against main', async () => {
+    const oldSystem = { element_id: 'old-crm', element_type: 'system' as const, name: 'Legacy CRM', parent_id: null, attributes: {}, exists_delta_id: 'd-old' };
+    const newSystem = { element_id: 'new-crm', element_type: 'system' as const, name: 'New CRM', parent_id: null, attributes: {}, exists_delta_id: 'd-new' };
+    const json = JSON.stringify({ systems: [{ name: 'Something' }], changes: [{ name: 'Legacy CRM', action: 'retire', replaced_by: 'New CRM' }] });
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'import.json',
+        source: { format: 'json', text: json },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([oldSystem, newSystem], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    const replaces = result.candidates.find((c) => c.relationshipType === 'replaces');
+    expect(replaces?.class).toBe('new');
+    expect(replaces?.proposal.kind === 'relationship' && replaces.proposal.from).toEqual({ kind: 'existing', elementId: 'new-crm' });
+    expect(replaces?.proposal.kind === 'relationship' && replaces.proposal.to).toEqual({ kind: 'existing', elementId: 'old-crm' });
+  });
+
+  it('classifies a replaces candidate as invalid when the replacement name resolves to nothing', async () => {
+    const oldSystem = { element_id: 'old-crm', element_type: 'system' as const, name: 'Legacy CRM', parent_id: null, attributes: {}, exists_delta_id: 'd-old' };
+    const json = JSON.stringify({ systems: [{ name: 'Something' }], changes: [{ name: 'Legacy CRM', action: 'retire', replaced_by: 'Nonexistent Replacement' }] });
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'import.json',
+        source: { format: 'json', text: json },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([oldSystem], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    const replaces = result.candidates.find((c) => c.relationshipType === 'replaces');
+    expect(replaces?.class).toBe('invalid');
+  });
+
   it('fails INPUT_UNREADABLE for malformed JSON', async () => {
     const result = await runCapture({
       inputName: 'import.json',

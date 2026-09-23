@@ -824,7 +824,21 @@ function inferChangeTargetType(name: string, matchIndex: MatchIndex): ElementTyp
   return 'system';
 }
 
-/** §5.6's own `changes` section: an explicit retire/restore instruction against an *existing* element only — `mustMatchExisting` makes `resolveElementCandidate` refuse to fall through to `new`. `replaced_by`'s own supports-edge transfer is Step 4's job (`buildPromotionEnvelope.ts`), designed alongside the promotion-time mechanism it needs — not built here. */
+/**
+ * §5.6's own `changes` section: an explicit retire/restore instruction
+ * against an *existing* element only — `mustMatchExisting` makes
+ * `resolveElementCandidate` refuse to fall through to `new`.
+ *
+ * `replaced_by` (retire only) is proposed as its own ordinary `replaces`
+ * relationship candidate — `{kind:'unresolved', text: replacedBy}` to
+ * `{kind:'unresolved', text: row.name}` — rather than a new field on this
+ * candidate: `resolveEndpointRef` already refuses to resolve either end to
+ * anything but an existing element (never mints one), which is exactly
+ * "replaced_by never creates anything" for free, and `buildPromotionEnvelope.ts`
+ * (Step 4) triggers the retiring element's own supports-edge transfer off
+ * this same candidate being promoted `new` — no `CaptureCandidate` schema
+ * change needed for either half of the mechanism.
+ */
 function buildJsonChangeCandidates(rows: readonly ImportChangeRow[], startSeq: number, matchIndex: MatchIndex): { candidates: RowCandidate[]; nextSeq: number } {
   const candidates: RowCandidate[] = [];
   let seq = startSeq;
@@ -835,6 +849,12 @@ function buildJsonChangeCandidates(rows: readonly ImportChangeRow[], startSeq: n
     const proposal: ElementProposal = { kind: 'element', elementType, name: row.name, parent: null, attributes: { lifecycleStatus } };
     const evidence: CandidateEvidence = { sourceRef: jsonSourceRef(index), passage: jsonPassage(row.quote, row), extractor: 'json-authored', attributeConfidence: { lifecycleStatus: confidence }, warnings: [] };
     candidates.push({ seq: seq++, proposal, evidence, aliasProposals: [], mustMatchExisting: true });
+
+    if (row.replacedBy !== null) {
+      const replacesProposal: RelationshipProposal<'replaces'> = { kind: 'relationship', relationshipType: 'replaces', from: { kind: 'unresolved', text: row.replacedBy }, to: { kind: 'unresolved', text: row.name }, attributes: {} };
+      const replacesEvidence: CandidateEvidence = { sourceRef: jsonSourceRef(index), passage: jsonPassage(row.quote, row), extractor: 'json-authored', attributeConfidence: {}, warnings: [] };
+      candidates.push({ seq: seq++, proposal: replacesProposal, evidence: replacesEvidence, aliasProposals: [] });
+    }
   });
   return { candidates, nextSeq: seq };
 }
