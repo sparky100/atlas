@@ -1,24 +1,29 @@
 /**
- * F2-lite ("spreadsheet import as reconciliation") — "elements in the model
- * but absent from the file listed as 'not in file' (a question, never a
- * retraction)". Pure — one function, reused twice for the same
- * comparison at two different times:
+ * "Elements in the model but absent from the file/document a capture run
+ * covered, listed as 'not in file' (a question, never a retraction)."
+ * Pure — one function, reused for the same comparison in two places:
  *
- *  - In the import dialog, right after matching, against the file still in
- *    memory (`useSpreadsheetImport.ts`).
- *  - On the change page, at any later time — a reload, a different
- *    reviewer, a different day — reading back `sources.import_touched_element_ids`
- *    (`20260918010000_import_touched_element_ids.sql`), the durable record
+ *  - In the capture review queue, right after matching, from the run's own
+ *    touched-element-id set (`useCaptureReviewQueue.ts`).
+ *  - On the change page, for a historical F2-lite-sourced import, reading
+ *    back `sources.import_touched_element_ids`
+ *    (`20260918010000_import_touched_element_ids.sql`) — the durable record
  *    of which element ids that import run's own rows matched or created.
  *
- * Scoped to exactly the universe this importer can ever address — top-level
- * systems and a platform's own modules — never a standalone container (this
- * importer never creates or targets one) and never actors/capabilities
- * (referenced by a row, never this row's own subject).
+ * Scoped to exactly the universe a spreadsheet/JSON capture run can ever
+ * address — top-level systems and a platform's own modules — never a
+ * standalone container and never actors/capabilities (referenced by a row,
+ * never this row's own subject).
  */
 import type { UUID } from '../contracts/delta';
 import type { ElementsHeadRow } from '../contracts/rows';
-import { isPlatformSystem } from './matchImportRows';
+
+/** A system's own `kind === 'platform'` — the same check `src/ui/elements/systemKind.ts`'s `isPlatform` makes, reimplemented rather than imported: `src/capture` is a pipeline stage `src/ui` depends on, never the other way (CLAUDE.md's own layering — crossing it here would be working around the layering, not a sign it's wrong). */
+function isPlatformSystem(system: ElementsHeadRow): boolean {
+  const attributes = system.attributes;
+  const kind = attributes !== null && typeof attributes === 'object' && !Array.isArray(attributes) ? (attributes as Record<string, unknown>).kind : undefined;
+  return kind === 'platform';
+}
 
 export interface NotInFileElement {
   elementId: UUID;

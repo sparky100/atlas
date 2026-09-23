@@ -270,6 +270,7 @@ export async function getOrCreateJobSource(service: SupabaseClient, job: Capture
 // ---------------------------------------------------------------------------
 
 const CSV_LIKE_EXTENSION = /\.(csv|tsv)$/i;
+const JSON_EXTENSION = /\.json$/i;
 
 function storageObjectPathFrom(inputRef: string): string {
   return inputRef.replace(/^capture-inputs\//, '');
@@ -284,6 +285,7 @@ export async function downloadInput(service: SupabaseClient, job: CaptureRunJob)
   if (job.inputKind === 'text') return { format: 'text', text: await blob.text() };
   if (job.inputKind === 'pdf') return { format: 'pdf', bytes: await blob.arrayBuffer() };
   // 'spreadsheet'.
+  if (JSON_EXTENSION.test(job.inputName)) return { format: 'json', text: await blob.text() };
   if (CSV_LIKE_EXTENSION.test(job.inputName)) return { format: 'csv', text: await blob.text() };
   return { format: 'xlsx', bytes: await blob.arrayBuffer() };
 }

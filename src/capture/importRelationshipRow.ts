@@ -1,14 +1,14 @@
 /**
- * F2-lite import close-out — the optional "Relationships" sheet (XLSX only;
- * a plain CSV has no second sheet to carry one, so a CSV import simply
- * never has relationship rows). One row per `uses`/`flows_to` edge, in the
- * same change as the main sheet's element rows.
+ * A relationship row from a capture run's "Relationships" spreadsheet sheet
+ * or a JSON file's `relationships` array — one row per `uses`/`flows_to`
+ * edge, alongside the same run's element rows.
  *
  * Pure — endpoints (`from`/`to`/`via`) are captured as raw text here, not
  * resolved: resolving a name (or a "Platform · Module" compound reference)
- * against the model's own elements, or this same file's own newly-created
- * rows, needs data this module has no access to (`buildImportCommit.ts`
- * does the resolving, alongside building every delta).
+ * against the model's own elements, or this same run's own newly-created
+ * rows, needs data this module has no access to (`runCapture.ts`'s own
+ * matching does the resolving, `buildPromotionEnvelope.ts` builds every
+ * delta).
  */
 import { validateRelationshipAttributeValue } from '../contracts/relationshipAttributeSchema';
 
@@ -28,7 +28,7 @@ export interface ImportRelationshipRow {
   via: string | null;
   /** `flows_to` only — `uses` has no such attribute (`UsesAttributes`), so a `uses` row setting this fails validation the same way a module row setting `vendor` does. */
   dataClassification: string | null;
-  /** JSON import follow-up: a supporting quote from whatever the file's author is working from — free text, never validated beyond non-blank. Carried onto every delta this row produces (`buildImportCommit.ts`), appended to `sourceRef`. */
+  /** JSON import follow-up: a supporting quote from whatever the file's author is working from — free text, never validated beyond non-blank. Carried onto every delta this row produces, appended to `sourceRef`. */
   quote?: string | undefined;
   /** JSON import follow-up: a confidence in [0,1] for this row as a whole — overrides the otherwise-hardcoded `1` on every delta this row produces. */
   confidence?: number | undefined;

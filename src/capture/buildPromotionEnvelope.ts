@@ -18,9 +18,9 @@
  * relationship endpoint, a container's parent) is re-pointed to the real
  * promoted id — the two-pass structure below (assign every element
  * candidate's promoted id first, then build every delta) exists
- * specifically so that re-pointing never depends on candidate order,
- * mirroring `buildImportCommit.ts`'s own two-pass shape ("a relationship
- * can reference a system created earlier in this very same file").
+ * specifically so that re-pointing never depends on candidate order — "a
+ * relationship can reference a system created earlier in this very same
+ * file" holds regardless of promotion order.
  *
  * Provenance: promoting a machine-proposed value (`accepted`/`merged`/
  * `split`) carries over the *original* capture provenance verbatim —
@@ -38,8 +38,8 @@
  * "Promotion... re-derives previousDeltaId against that [target] branch's
  * current head at apply time, so a stale draft never blocks a review") —
  * falling back to the subject's own `existsDeltaId` for a first-time
- * attribute assertion, the same convention PR7 established from
- * `buildImportCommit.ts`.
+ * attribute assertion, the same fallback rule
+ * `buildCaptureDraftEnvelope.ts` uses.
  *
  * Aliases (§7.6), scoped to what a persisted `CaptureCandidate` can
  * actually express: a `name` alias for a level-3 (`name_context`) match

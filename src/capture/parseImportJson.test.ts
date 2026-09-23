@@ -102,24 +102,13 @@ describe('parseImportJson', () => {
     expect(result.relationshipRows[0]).toMatchObject({ quote: 'Northgate reads from Southgate', confidence: 0.65 });
   });
 
-  it('parses a value_streams section alongside systems, and reports it as a detected column', async () => {
+  it('does not treat a value_streams section as a detected column (Sprint F2b — value streams are dropped from capture, per ADR-023)', async () => {
     const file = jsonFile({
       systems: [{ name: 'Northgate' }],
       value_streams: [{ name: 'Getting Connected', stages: [{ name: 'Apply & Quote', enables: ['Connection Quotations'] }] }],
     });
     const result = await parseImportJson(file);
-    expect(result.valueStreamErrors).toEqual([]);
-    expect(result.valueStreamRows).toEqual([{ rowNumber: 1, name: 'Getting Connected', stages: [{ name: 'Apply & Quote', enables: ['Connection Quotations'] }] }]);
-    expect(result.detectedColumns).toEqual(['systems', 'value_streams']);
-  });
-
-  it('collects a per-entry error in value_streams without discarding the entries that did validate', async () => {
-    const file = jsonFile({
-      systems: [{ name: 'Northgate' }],
-      value_streams: [{ name: 'Getting Connected', stages: [{ name: 'Apply', enables: [] }] }, { stages: [] }],
-    });
-    const result = await parseImportJson(file);
-    expect(result.valueStreamRows).toHaveLength(1);
-    expect(result.valueStreamErrors).toEqual([{ rowNumber: 2, error: '"name" is required' }]);
+    expect(result.detectedColumns).toEqual(['systems']);
+    expect(result).not.toHaveProperty('valueStreamRows');
   });
 });

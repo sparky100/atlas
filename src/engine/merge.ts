@@ -104,10 +104,10 @@ function newEntriesOf<T>(head: ReadonlyMap<UUID, T>, base: Head): [UUID, T][] {
  * Trim + lower-case, no fancier normalisation than that — the identity
  * check this module's own `classifyMerge` uses is deliberately exact,
  * not fuzzy (see `trigramSimilarity`'s own call site below for where
- * fuzziness enters instead). Exported (F2, narrowed capture pipeline —
- * `src/capture/matchImportRows.ts`) so a second module comparing names
- * for exact equality reuses this exact definition rather than drifting
- * from it with a second, slightly-different one.
+ * fuzziness enters instead). Exported so the capture pipeline's own
+ * exact-name comparisons (`src/capture/normalise.ts`, `importRowSchema.ts`)
+ * reuse this exact definition rather than drifting from it with a second,
+ * slightly-different one.
  */
 export const normalizeName = (name: string): string => name.trim().toLowerCase();
 

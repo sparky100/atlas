@@ -82,7 +82,7 @@ describe('validateImportRow', () => {
     }
   });
 
-  it('carries the capability/business_owner/technical_owner columns through unresolved, for matchImportRows to resolve', () => {
+  it('carries the capability/business_owner/technical_owner columns through unresolved, for runCapture to resolve', () => {
     const result = validateImportRow({ name: 'Northgate', capability: 'Billing', business_owner: 'Jane Doe', technical_owner: 'John Smith' }, 2);
     expect(result.ok).toBe(true);
     if (result.ok) {

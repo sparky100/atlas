@@ -1,17 +1,14 @@
 /**
- * F2-lite ("spreadsheet import as reconciliation") — supersedes F2 Phase
- * 1/2's narrower "one row = one system, `id` always wins" format. The fixed
- * CSV/XLSX column format a spreadsheet import must take. Still deliberately
- * not the full `docs/SPEC-capture.md` design (no LLM column-synonym
- * inference, no PDF/pasted text, no `capture_jobs`/re-import row-key
- * tracking) — see that plan for what's explicitly deferred and why.
+ * The `systems` section of a capture run's JSON input (`parseImportJson.ts`,
+ * SPEC-capture.md §5.6) — one JSON object per top-level system or module,
+ * keyed by the same snake_case column names this format has always used.
  *
- * One row is either a top-level system (`platform` blank) or a module —
+ * One entry is either a top-level system (`platform` unset) or a module —
  * a container parented to a named platform (`platform` set): "platform
- * column alone decides structure" (this session's own design call) — `kind`
- * is a plain system attribute, never a structural discriminator, and a
- * module's `parentId` is resolved later, once the model's own systems are
- * loaded (`matchImportRows.ts`), not here.
+ * field alone decides structure" — `kind` is a plain system attribute,
+ * never a structural discriminator, and a module's `parentId` is resolved
+ * later, once the model's own systems are loaded (`runCapture.ts`), not
+ * here.
  *
  * Reusing `validateAttributeValue(elementType, key, ...)` for every column
  * (rather than hand-rolling a system/container split) gets a column's
@@ -25,8 +22,8 @@
  *
  * Pure — no `xlsx` import here, so this stays unit-testable without it,
  * same split `elementExport.ts`/`elementExportXlsx.ts` already established
- * for the export side. `parseImportFile.ts` is the one caller that reads a
- * real file and hands each raw row here.
+ * for the export side. `parseImportJson.ts` is the one caller that reads a
+ * real file and hands each raw entry here.
  */
 import { validateAttributeValue } from '../contracts/attributeSchema';
 import { normalizeName } from '../engine/merge';
@@ -45,7 +42,7 @@ export interface OwnerReference {
   externalOrganisation: string | null;
 }
 
-/** One validated row, ready for matching (`matchImportRows.ts`) — `attributes`/`isExternal` only carry keys the row actually set (an omitted/blank optional column means "don't touch this attribute" for a matched row, and "use the schema default" for a new one, same as every other create/edit path in this app). `platformName`/`capabilityNames`/`businessOwner`/`technicalOwner` are raw row text, not resolved here — resolving a name against the model's own elements needs the model's own current head, which this pure module has no access to. */
+/** One validated row, ready for matching (`runCapture.ts`) — `attributes`/`isExternal` only carry keys the row actually set (an omitted/blank optional column means "don't touch this attribute" for a matched row, and "use the schema default" for a new one, same as every other create/edit path in this app). `platformName`/`capabilityNames`/`businessOwner`/`technicalOwner` are raw row text, not resolved here — resolving a name against the model's own elements needs the model's own current head, which this pure module has no access to. */
 export interface ImportRow {
   /** 1-based row number in the source file, for error messages and per-delta `sourceRef` — never used as an id. */
   rowNumber: number;
@@ -61,7 +58,7 @@ export interface ImportRow {
   capabilityNames: string[];
   businessOwner: OwnerReference | null;
   technicalOwner: OwnerReference | null;
-  /** JSON import follow-up: a supporting quote from whatever the file's author is working from — free text, never validated beyond non-blank. Carried onto every delta this row produces (`buildImportCommit.ts`), appended to `sourceRef`. */
+  /** JSON import follow-up: a supporting quote from whatever the file's author is working from — free text, never validated beyond non-blank. Carried onto every delta this row produces, appended to `sourceRef`. */
   quote?: string | undefined;
   /** JSON import follow-up: a confidence in [0,1] for this row as a whole — overrides the otherwise-hardcoded `1` on every delta this row produces. */
   confidence?: number | undefined;
@@ -85,8 +82,8 @@ function cellToString(raw: unknown): string | undefined {
   return str.length > 0 ? str : undefined;
 }
 
-/** Column header → the attribute key it sets, and nothing else — `platform`/`capability`/`business_owner`/`technical_owner` are resolved as references, not plain attributes, and `is_external` is its own boolean-kind column (below), so none of those five are in this list. Exported for `buildImportCommit.ts`'s own identical need (a changed/created attribute's own `sourceRef` names its column, not its attribute key) — one mapping, not two that could drift apart. */
-export const ATTRIBUTE_COLUMNS: readonly (readonly [ImportColumn, ImportRowAttributeKey])[] = [
+/** Column header → the attribute key it sets, and nothing else — `platform`/`capability`/`business_owner`/`technical_owner` are resolved as references, not plain attributes, and `is_external` is its own boolean-kind column (below), so none of those five are in this list. */
+const ATTRIBUTE_COLUMNS: readonly (readonly [ImportColumn, ImportRowAttributeKey])[] = [
   ['description', 'description'],
   ['kind', 'kind'],
   ['lifecycle', 'lifecycleStatus'],
@@ -143,14 +140,13 @@ function parseConfidence(raw: unknown): { ok: true; value: number | undefined } 
 /**
  * A module row's own `name` occasionally arrives pre-qualified as
  * "Platform · Module" — the exact compound form this format uses to
- * *reference* a module from `relationships`/`changes` (`resolveEndpointRef`/
- * `resolveChangeTarget`, `buildImportCommit.ts`), echoed back into the row's
- * own `name` field by mistake (an AI-authored import is especially prone to
- * this: it's the same convention it was shown for referencing a module, just
- * misapplied to naming one). Left alone, this both fails to match the real,
- * bare-named existing module (creating an ugly duplicate) and breaks every
- * relationship row that references this same file's own new module by its
- * bare name (`fileRowsByName` is keyed by the *actual* `name` used here).
+ * *reference* a module from `relationships`/`changes` entries, echoed back
+ * into the row's own `name` field by mistake (an AI-authored import is
+ * especially prone to this: it's the same convention it was shown for
+ * referencing a module, just misapplied to naming one). Left alone, this
+ * both fails to match the real, bare-named existing module (creating an
+ * ugly duplicate) and breaks every relationship/change entry that
+ * references this same file's own new module by its bare name.
  * Stripped once, here, only when the prefix's own platform half matches this
  * row's own `platform` field exactly — never a module name that genuinely
  * contains "·" for an unrelated reason.

@@ -45,10 +45,9 @@ describe('buildImportPromptSchema', () => {
     expect(schema).not.toContain('CSV');
   });
 
-  it('documents the value_streams section and its correction-intent consequence', () => {
+  it('does not document a value_streams section (Sprint F2b — dropped from capture, per ADR-023)', () => {
     const schema = buildImportPromptSchema();
-    expect(schema).toContain('value_streams');
-    expect(schema).toContain('enables');
-    expect(schema).toContain('correct');
+    expect(schema).not.toContain('value_streams');
+    expect(schema).toContain('never part of this file');
   });
 });

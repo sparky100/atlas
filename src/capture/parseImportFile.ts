@@ -1,22 +1,14 @@
 /**
- * F2-lite ("spreadsheet import as reconciliation") — reads a `.csv` or
- * `.xlsx` file into validated rows. The only place SheetJS (`xlsx`) is
- * imported in this module (`importRowSchema.ts`'s own validation stays
- * testable without it), same split `elementExportXlsx.ts` already
- * established for export.
- *
- * `XLSX.read` auto-detects CSV (SheetJS's own documented behaviour) —
- * there is deliberately no separate CSV parser here; both file types go
- * through the one code path below.
+ * `ParsedImportFile` — the shape a capture run's JSON input parses into
+ * (`parseImportJson.ts`), reusing the row types and validators
+ * (`importRowSchema.ts`/`importRelationshipRow.ts`/`importChangeRow.ts`)
+ * that a spreadsheet capture row (`rowsToCandidates.ts`) resolves through
+ * too, so a system/relationship/change proposal is validated the same way
+ * regardless of which input format produced it.
  */
-import * as XLSX from 'xlsx';
 import type { ImportChangeRow } from './importChangeRow';
-import { validateImportRelationshipRow, type ImportRelationshipRow, type ImportRelationshipRowResult } from './importRelationshipRow';
-import { validateImportRow, type ImportRow, type ImportRowResult } from './importRowSchema';
-import type { ImportValueStreamRow } from './importValueStreamRow';
-
-/** The one other sheet name this format recognises — case-sensitive, matching every other header/sheet name in this format. XLSX only: a plain CSV has no second sheet to carry one, so `relationshipRows`/`relationshipErrors` are always empty for a `.csv` file. */
-const RELATIONSHIPS_SHEET_NAME = 'Relationships';
+import type { ImportRelationshipRow } from './importRelationshipRow';
+import type { ImportRow } from './importRowSchema';
 
 export interface ParsedImportFile {
   fileName: string;
@@ -28,89 +20,17 @@ export interface ParsedImportFile {
   rows: ImportRow[];
   /** Every row that didn't, in source order — a real error per row (`ImportRowResult`'s own `error`), never silently dropped. */
   errors: { rowNumber: number; error: string }[];
-  /** Import close-out: every row from an optional "Relationships" sheet that validated. */
+  /** Every row from the "relationships" section that validated. */
   relationshipRows: ImportRelationshipRow[];
-  /** Every "Relationships" sheet row that didn't validate — same "surfaced, never dropped" stance as `errors`. */
+  /** Every "relationships" entry that didn't validate — same "surfaced, never dropped" stance as `errors`. */
   relationshipErrors: { rowNumber: number; error: string }[];
-  /** F2-lite JSON import's own "changes" section — always empty for a CSV/XLSX file, which has no such section. */
+  /** The "changes" section — retire/restore instructions against an existing element. */
   changeRows: ImportChangeRow[];
-  /** Every "changes" entry that didn't validate — always empty for a CSV/XLSX file. */
+  /** Every "changes" entry that didn't validate. */
   changeErrors: { rowNumber: number; error: string }[];
-  /** F6 (ADR-023) JSON import's own "value_streams" section — always empty for a CSV/XLSX file, which has no such section. */
-  valueStreamRows: ImportValueStreamRow[];
-  /** Every "value_streams" entry that didn't validate — always empty for a CSV/XLSX file. */
-  valueStreamErrors: { rowNumber: number; error: string }[];
 }
 
-/** How many of the file's own raw rows the dialog's preview shows, before any matching/classification runs. Exported for `parseImportJson.ts`'s own identical preview need. */
+/** How many of the file's own raw rows a preview would show, before any matching/classification runs. */
 export const PREVIEW_ROW_COUNT = 5;
 
 export class ImportFileParseError extends Error {}
-
-/**
- * `file.arrayBuffer()` → `XLSX.read` → one row object per sheet row, keyed
- * by header (`sheet_to_json`'s own `defval: null` — a cell the row's own
- * source didn't fill reads as `null`, not `undefined`, so a genuinely
- * blank optional column and a column the file never had at all look the
- * same to `validateImportRow`, which is the right behaviour for both).
- * Reads the first sheet as the main element rows, plus one other named
- * sheet — "Relationships" (import close-out) — if the workbook has one;
- * every other sheet is ignored. A CSV file is single-sheet by construction,
- * so its own `relationshipRows`/`relationshipErrors` are always empty.
- */
-export async function parseImportFile(file: File): Promise<ParsedImportFile> {
-  const buffer = await file.arrayBuffer();
-  let workbook: XLSX.WorkBook;
-  try {
-    workbook = XLSX.read(buffer, { type: 'array' });
-  } catch (e) {
-    throw new ImportFileParseError(`Could not read "${file.name}" as a CSV or XLSX file: ${e instanceof Error ? e.message : String(e)}`);
-  }
-
-  const firstSheetName = workbook.SheetNames[0];
-  if (firstSheetName === undefined) {
-    throw new ImportFileParseError(`"${file.name}" has no sheets to read.`);
-  }
-  const sheet = workbook.Sheets[firstSheetName];
-  if (!sheet) {
-    throw new ImportFileParseError(`"${file.name}"'s first sheet could not be read.`);
-  }
-
-  const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: null });
-  // `header: 1` reads the sheet as a plain array-of-arrays — its own first
-  // row is the file's real header cells, in file order, independent of
-  // `sheet_to_json`'s own object-keying (which silently drops a header
-  // cell that's blank or a duplicate) — exactly what "detected columns"
-  // should show, including a column this format doesn't recognise.
-  const headerRow = (XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] ?? []) as unknown[];
-  const detectedColumns = headerRow
-    .map((cell) => (typeof cell === 'string' || typeof cell === 'number' || typeof cell === 'boolean' ? String(cell).trim() : ''))
-    .filter((cell) => cell.length > 0);
-
-  const rows: ImportRow[] = [];
-  const errors: { rowNumber: number; error: string }[] = [];
-  rawRows.forEach((raw, index) => {
-    // +2: row 1 is the header row, and this is 1-based like every spreadsheet a reader would open in Excel.
-    const result: ImportRowResult = validateImportRow(raw, index + 2);
-    if (result.ok) rows.push(result.row);
-    else errors.push({ rowNumber: result.rowNumber, error: result.error });
-  });
-
-  if (rows.length === 0 && errors.length === 0) {
-    throw new ImportFileParseError(`"${file.name}" has a header row but no data rows.`);
-  }
-
-  const relationshipRows: ImportRelationshipRow[] = [];
-  const relationshipErrors: { rowNumber: number; error: string }[] = [];
-  const relationshipsSheet = workbook.Sheets[RELATIONSHIPS_SHEET_NAME];
-  if (relationshipsSheet) {
-    const rawRelationshipRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(relationshipsSheet, { defval: null });
-    rawRelationshipRows.forEach((raw, index) => {
-      const result: ImportRelationshipRowResult = validateImportRelationshipRow(raw, index + 2);
-      if (result.ok) relationshipRows.push(result.row);
-      else relationshipErrors.push({ rowNumber: result.rowNumber, error: result.error });
-    });
-  }
-
-  return { fileName: file.name, detectedColumns, previewRows: rawRows.slice(0, PREVIEW_ROW_COUNT), rows, errors, relationshipRows, relationshipErrors, changeRows: [], changeErrors: [], valueStreamRows: [], valueStreamErrors: [] };
-}
