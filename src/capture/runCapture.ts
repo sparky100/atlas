@@ -628,7 +628,7 @@ async function runSheetCapture(input: RunSheetCaptureInput): Promise<RunCaptureR
   }
 
   if (capabilityRows.length > 0) {
-    const { candidates: supportsCandidates } = await assignCapabilities({ rows: capabilityRows, matchIndex, llmClient, startSeq: seqOffset });
+    const { candidates: supportsCandidates } = await assignCapabilities({ rows: capabilityRows, matchIndex, llmClient, startSeq: seqOffset, mainHead });
     combined = combined.concat(supportsCandidates);
   }
 
