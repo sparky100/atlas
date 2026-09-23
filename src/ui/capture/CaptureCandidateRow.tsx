@@ -4,7 +4,8 @@
  * line, warnings, source passage) plus whatever the candidate's own
  * `class` adds. All interactive state that a keyboard shortcut also needs
  * to reach (which panel is open, an `ambiguous` pick pending confirmation,
- * the `confirm` multi-select) is owned by `CaptureReviewView` and passed
+ * the `confirm`/`new` multi-select — Sprint F2b widened this from
+ * `confirm` alone) is owned by `CaptureReviewView` and passed
  * down as plain props — this component has no internal effect reacting to
  * "a command arrived," only ordinary controlled-panel state (form fields
  * while a panel is open), so a click and the matching keypress always run
@@ -339,7 +340,7 @@ export function CaptureCandidateRow({
               Merge into…
             </Button>
           )}
-          {candidate.class === 'confirm' && (
+          {(candidate.class === 'confirm' || candidate.class === 'new') && (
             <label className={styles.panelRow}>
               <input type="checkbox" checked={multiSelected} onChange={onToggleMultiSelect} />
               <Text as="span" size="sm">
