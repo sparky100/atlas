@@ -36,7 +36,22 @@
  * confirms the accepted system by name on the change's own "Edits on this
  * change" list instead, and stops short of the badge assertion rather than
  * faking a click path that doesn't exist yet.
+ *
+ * **Amended, Sprint F2b:** a third test covers what this sprint added —
+ * uploading a JSON file (rather than a spreadsheet) and bulk-accepting
+ * every candidate with `x`/`a` rather than one keystroke per row — the
+ * mitigation for folding F2-lite's own one-shot commit into K1's
+ * always-review-first design (SPEC-capture.md's own Sprint F2b amendment
+ * to §10). Its own input is a small ad-hoc JSON payload written to a temp
+ * file at test time (`testInfo.outputPath`), not one of the checked-in
+ * `src/capture/fixtures/` — those exist for `fixtures.test.ts`'s own
+ * offline replay gate, and none of them happens to produce an
+ * all-`new`/all-`confirm` result with no `capability` field (so no LLM
+ * call, matching this file's other two tests) other than fixture 11,
+ * which is `.xlsx`; a few inline lines are simpler here than reusing a
+ * fixture shaped for a different point.
  */
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
@@ -53,7 +68,7 @@ test('upload a spreadsheet, accept and reject candidates by keyboard, and see th
   await page.getByRole('button', { name: 'New capture run' }).click();
 
   await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toBeVisible();
-  await page.getByLabel('Choose a CSV, XLSX, or PDF file').setInputFiles(path.join(FIXTURES_DIR, '01-clean-register', 'input.csv'));
+  await page.getByLabel('Choose a CSV, XLSX, JSON, or PDF file').setInputFiles(path.join(FIXTURES_DIR, '01-clean-register', 'input.csv'));
   const startButton = page.getByRole('button', { name: 'Start capture run' });
   await expect(startButton).toBeEnabled();
   await startButton.click();
@@ -112,7 +127,7 @@ test('a scanned PDF with no text layer fails with a plain explanation', async ({
   await page.getByRole('link', { name: 'Capture' }).click();
   await page.getByRole('button', { name: 'New capture run' }).click();
   await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toBeVisible();
-  await page.getByLabel('Choose a CSV, XLSX, or PDF file').setInputFiles(path.join(FIXTURES_DIR, '09-scanned', 'input.pdf'));
+  await page.getByLabel('Choose a CSV, XLSX, JSON, or PDF file').setInputFiles(path.join(FIXTURES_DIR, '09-scanned', 'input.pdf'));
   const startButton = page.getByRole('button', { name: 'Start capture run' });
   await expect(startButton).toBeEnabled();
   await startButton.click();
@@ -122,4 +137,61 @@ test('a scanned PDF with no text layer fails with a plain explanation', async ({
   // — this fails before any LLM call at all, so it needs no live model
   // connectivity, unlike the first test above.
   await expect(page.getByText(/scanned/i)).toBeVisible({ timeout: 60_000 });
+});
+
+test('upload a JSON file, bulk-accept every new candidate by keyboard, and apply', async ({ page }, testInfo) => {
+  // Sprint F2b: JSON as a capture input format, and bulk-accept (`x` then
+  // `a` on a multi-selection) for the common "clean register" case — before
+  // this sprint, a clean spreadsheet or JSON file with no ambiguity still
+  // needed one keystroke per row, a real regression against F2-lite's own
+  // one-shot commit for exactly this case. Two systems, no LLM call needed
+  // (no `capability`/prose entries), no existing model to match against —
+  // every candidate lands in "New".
+  const inputPath = testInfo.outputPath('two-systems.json');
+  await fs.writeFile(
+    inputPath,
+    JSON.stringify({
+      systems: [
+        { name: 'Billing Platform', description: 'Handles customer invoicing.', confidence: 1 },
+        { name: 'Fleet Tracker', description: 'Tracks vehicle locations.', confidence: 1 },
+      ],
+    }),
+  );
+
+  await signUpCreateOrgAndModel(page, 'capturejson');
+
+  await goToModelHome(page);
+  await page.getByRole('link', { name: 'Capture' }).click();
+  await page.getByRole('button', { name: 'New capture run' }).click();
+  await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toBeVisible();
+  await page.getByLabel('Choose a CSV, XLSX, JSON, or PDF file').setInputFiles(inputPath);
+  const startButton = page.getByRole('button', { name: 'Start capture run' });
+  await expect(startButton).toBeEnabled();
+  await startButton.click();
+  await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByText('Parsed', { exact: true })).toBeVisible({ timeout: 120_000 });
+
+  await page.getByRole('link', { name: 'Review →' }).click();
+  await expect(page.getByRole('heading', { name: 'New', exact: false })).toBeVisible();
+
+  await page.getByText('Billing Platform', { exact: true }).click();
+  await page.keyboard.press('x');
+  await page.getByText('Fleet Tracker', { exact: true }).click();
+  await page.keyboard.press('x');
+  await page.keyboard.press('a');
+  await expect(page.getByText('accepted', { exact: true }).first()).toBeVisible();
+
+  await page.getByPlaceholder('or name a new change…').fill('Add Billing Platform and Fleet Tracker');
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.locator('#capture-review-target-branch')).toHaveValue(/.+/);
+
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByText(/^Applied \d+ candidate/)).toBeVisible({ timeout: 15_000 });
+
+  await goToModelHome(page);
+  await page.getByRole('link', { name: 'Changes' }).click();
+  await page.getByRole('link', { name: 'Open →' }).click();
+  await expect(page.getByRole('heading', { name: 'Edits on this change' })).toBeVisible();
+  await expect(page.getByText('Billing Platform', { exact: true })).toBeVisible();
+  await expect(page.getByText('Fleet Tracker', { exact: true })).toBeVisible();
 });

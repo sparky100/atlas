@@ -1,0 +1,6 @@
+{
+  "elements": [
+    { "key": "cap-billing", "type": "capability", "id": "11111111-0000-0000-0000-000000000001", "name": "Billing", "attributes": {} },
+    { "key": "cap-reporting", "type": "capability", "id": "11111111-0000-0000-0000-000000000002", "name": "Reporting", "attributes": {} }
+  ]
+}

@@ -157,9 +157,31 @@ const CONTAINER_SHEET_NAME_PATTERN = /\b(modules?|components?|containers?|servic
 const CAPABILITY_SHEET_NAME_PATTERN = /\bcapabilit(y|ies)\b/i;
 const ACTOR_SHEET_NAME_PATTERN = /\b(teams?|owners?|contacts?)\b/i;
 
-/** §5.2: "system by default; container when a parent column resolves... or the sheet is named like Modules/…; capability when named like Capabilities/…; actor when named like Teams/…. The model's own `sheetType` is used only when the code heuristics are undecided." */
-export function inferSheetType(sheetName: string, hasParentColumn: boolean, llmSheetType: ElementType | null): ElementType {
-  if (hasParentColumn || CONTAINER_SHEET_NAME_PATTERN.test(sheetName)) return 'container';
+/**
+ * §5.2: "system by default; container when the sheet is named like
+ * Modules/…; capability when named like Capabilities/…; actor when named
+ * like Teams/…. The model's own `sheetType` is used only when the code
+ * heuristics are undecided."
+ *
+ * **Amended, Sprint F2b:** a mapped `parent` column no longer forces
+ * `container` at the sheet level — it used to (pre-F2b), which made the
+ * per-row mixed system/module split `rowsToCandidates.ts` added in this
+ * same sprint unreachable dead code: every sheet with a mapped `parent`
+ * column arrived there already forced to `sheetType: 'container'`, so its
+ * own `sheetType === 'system' && raw !== ''` branch could never run. A
+ * sheet not named like Modules/… now defaults through to `system` even
+ * with a mapped `parent` column, and `rowsToCandidates.ts` decides each
+ * row's own type from that column instead — blank parent → system, filled
+ * → container. A sheet whose *every* row fills `parent` still resolves
+ * every row to `container`, the same outcome as before; only a genuinely
+ * mixed sheet (some rows blank, some filled) behaves differently now, and
+ * only in the way this sprint's design intended. An unambiguously
+ * container-named sheet (`CONTAINER_SHEET_NAME_PATTERN`) is unaffected
+ * either way — every one of its own rows is still always `container`,
+ * `parent` optional, exactly as before.
+ */
+export function inferSheetType(sheetName: string, llmSheetType: ElementType | null): ElementType {
+  if (CONTAINER_SHEET_NAME_PATTERN.test(sheetName)) return 'container';
   if (CAPABILITY_SHEET_NAME_PATTERN.test(sheetName)) return 'capability';
   if (ACTOR_SHEET_NAME_PATTERN.test(sheetName)) return 'actor';
   if (llmSheetType !== null) return llmSheetType;
@@ -545,8 +567,30 @@ function buildRelationshipIndex(head: Head): Map<string, UUID> {
 // Confidence for a `new` candidate (§5.5's own `existenceConf`/`candidateConf`).
 // ---------------------------------------------------------------------------
 
-/** §5.5: `candidateConf = existenceConf` — computed the same way for every class, elements only ("min over {name, required attributes present}"); a matched candidate's own per-attribute *delta* confidence (`updateConf`, capped by match confidence) is a separate, lower-level number `buildCaptureDraftEnvelope.ts` computes itself, not this one. */
-function elementCandidateConfidence(elementType: ElementType, attributeConfidence: Readonly<Record<string, number>>): number {
+/**
+ * §5.5: `candidateConf = existenceConf` — computed the same way for every
+ * class, elements only ("min over {name, required attributes present}"); a
+ * matched candidate's own per-attribute *delta* confidence (`updateConf`,
+ * capped by match confidence) is a separate, lower-level number
+ * `buildCaptureDraftEnvelope.ts` computes itself, not this one.
+ *
+ * **Amended, Sprint F2b:** `mustMatchExisting` (a JSON `changes`-section
+ * entry) never asserts `name` or most of `REQUIRED_ATTRIBUTES_BY_TYPE` —
+ * a retire/restore only ever touches `lifecycleStatus`, deliberately never
+ * re-describing the element it targets (unlike a `new`/ordinary `update`
+ * candidate, which always does, via `applyRequiredDefaults`). Flooring on
+ * a `name`/`isExternal`/… confidence such a candidate never has any reason
+ * to set made every retire/restore's own top-level `confidence` read 0
+ * regardless of how confident its actual `lifecycleStatus` claim was —
+ * caught building fixture 12 (bug, not a real "no confidence at all"
+ * candidate: `buildCaptureDraftEnvelope.ts` reads `attributeConfidence`
+ * per attribute directly, so the promoted delta's own confidence was
+ * never wrong, only the candidate's own displayed/sorted score). Falls
+ * back to whatever attributes it actually populated, the same "no fixed
+ * required list" shape `relationshipCandidateConfidence` already uses.
+ */
+function elementCandidateConfidence(elementType: ElementType, attributeConfidence: Readonly<Record<string, number>>, mustMatchExisting: boolean): number {
+  if (mustMatchExisting) return existenceConf(Object.values(attributeConfidence));
   const required = ['name', ...REQUIRED_ATTRIBUTES_BY_TYPE[elementType]];
   return existenceConf(required.map((key) => attributeConfidence[key] ?? 0));
 }
@@ -641,9 +685,8 @@ async function runSheetCapture(input: RunSheetCaptureInput): Promise<RunCaptureR
       continue;
     }
 
-    const hasParentColumn = mapped.roles.some((r) => r?.role === 'parent');
     const llmSheetType = mapped.llmSheetType !== null && mapped.llmSheetType !== 'unknown' ? mapped.llmSheetType : null;
-    const sheetType = inferSheetType(sheet.sheetName, hasParentColumn, llmSheetType);
+    const sheetType = inferSheetType(sheet.sheetName, llmSheetType);
     bumpStat(`sheet.type.${sheetType}`);
     usableSheetCount++;
 
@@ -1011,7 +1054,7 @@ function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: Match
     const warnings = result.extraWarning ? [...candidate.evidence.warnings, result.extraWarning] : candidate.evidence.warnings;
     const parent: ElementProposal['parent'] = result.resolvedParentElementId !== null ? { kind: 'existing', elementId: result.resolvedParentElementId } : null;
     const proposal: ElementProposal = { ...candidate.proposal, parent, attributes: result.attributes };
-    const confidence = elementCandidateConfidence(candidate.proposal.elementType, candidate.evidence.attributeConfidence);
+    const confidence = elementCandidateConfidence(candidate.proposal.elementType, candidate.evidence.attributeConfidence, candidate.mustMatchExisting ?? false);
 
     built.set(candidate.seq, {
       seq: candidate.seq,

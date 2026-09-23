@@ -26,19 +26,19 @@ async function expectSuccess(promise: ReturnType<typeof runCapture>): Promise<Ru
 
 describe('inferSheetType', () => {
   it('defaults to system', () => {
-    expect(inferSheetType('Applications', false, null)).toBe('system');
+    expect(inferSheetType('Applications', null)).toBe('system');
   });
-  it('reads a parent column as container', () => {
-    expect(inferSheetType('Applications', true, null)).toBe('container');
-  });
-  it('reads a Modules-like sheet name as container even with no parent column', () => {
-    expect(inferSheetType('Modules', false, null)).toBe('container');
+  it('reads a Modules-like sheet name as container', () => {
+    expect(inferSheetType('Modules', null)).toBe('container');
   });
   it('reads a Teams-like sheet name as actor', () => {
-    expect(inferSheetType('Teams', false, null)).toBe('actor');
+    expect(inferSheetType('Teams', null)).toBe('actor');
   });
   it('falls back to the LLM sheetType only when heuristics are undecided', () => {
-    expect(inferSheetType('Sheet1', false, 'capability')).toBe('capability');
+    expect(inferSheetType('Sheet1', 'capability')).toBe('capability');
+  });
+  it('does not force container for a non-container-named sheet, even though it may have a parent column (Sprint F2b — a mapped parent column now decides per row, in rowsToCandidates.ts, not at the sheet level)', () => {
+    expect(inferSheetType('Applications', null)).toBe('system');
   });
 });
 
@@ -381,6 +381,61 @@ function buildWorkbookBuffer(sheets: Record<string, string[][]>): ArrayBuffer {
   return XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
 }
 
+describe('runCapture — mixed system/module sheet (Sprint F2b, SPEC-capture.md §5.2)', () => {
+  it('splits rows on a non-container-named sheet by its own parent column: blank -> system, filled -> module of that system, through the real inferSheetType path (regression: hasParentColumn used to force the whole sheet to container before this Sprint F2b fix, making rowsToCandidates.ts\'s own per-row split unreachable)', async () => {
+    const buffer = buildWorkbookBuffer({
+      Applications: [
+        ['Application', 'Parent system', 'Status'],
+        ['CRM', '', 'Live'],
+        ['Portal', 'CRM', 'Live'],
+      ],
+    });
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'Applications.xlsx',
+        source: { format: 'xlsx', bytes: buffer },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    const crm = result.candidates.find((c) => c.proposal.kind === 'element' && c.proposal.name === 'CRM');
+    const portal = result.candidates.find((c) => c.proposal.kind === 'element' && c.proposal.name === 'Portal');
+    expect(crm?.elementType).toBe('system');
+    expect(portal?.elementType).toBe('container');
+    expect(portal?.proposal.kind === 'element' && portal.proposal.parent).toEqual({ kind: 'existing', elementId: crm?.draftSubjectId });
+  });
+
+  it('still resolves every row to container when every row on the sheet fills the parent column (no regression for a sheet that was already all-module before this fix)', async () => {
+    const buffer = buildWorkbookBuffer({
+      Applications: [
+        ['Application', 'Parent system', 'Status'],
+        ['Portal', 'CRM', 'Live'],
+        ['Reports', 'Billing', 'Live'],
+      ],
+    });
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'Applications.xlsx',
+        source: { format: 'xlsx', bytes: buffer },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    const elements = result.candidates.filter((c) => c.kind === 'element');
+    expect(elements.every((c) => c.elementType === 'container')).toBe(true);
+  });
+});
+
 describe('runCapture — Relationships sheet (Sprint F2b, SPEC-capture.md §5.2a)', () => {
   it('resolves a Relationships-sheet row against systems the workbook\'s own Applications sheet just proposed, with no LLM call for either sheet', async () => {
     const buffer = buildWorkbookBuffer({
@@ -556,6 +611,24 @@ describe('runCapture — JSON input (Sprint F2b, SPEC-capture.md §5.6)', () => 
     expect(retirements).toHaveLength(1);
     expect(retirements[0]?.class === 'new').toBe(false);
     expect(retirements[0]?.proposal.kind === 'element' && (retirements[0].proposal.attributes as Record<string, unknown>).lifecycleStatus).toBe('retired');
+  });
+
+  it("reports a changes-section candidate's own confidence from its actual lifecycleStatus claim, not a false floor of 0 (regression: elementCandidateConfidence used to floor on name/isExternal confidences this candidate never sets, since it only ever asserts lifecycleStatus)", async () => {
+    const existing = { element_id: 'sys-1', element_type: 'system' as const, name: 'Legacy CRM', parent_id: null, attributes: { lifecycleStatus: 'active' }, exists_delta_id: 'd-1' };
+    const json = JSON.stringify({ systems: [{ name: 'Something Else' }], changes: [{ name: 'Legacy CRM', action: 'retire', confidence: 0.8 }] });
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'import.json',
+        source: { format: 'json', text: json },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([existing], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+    const retirement = result.candidates.find((c) => c.draftSubjectId === 'sys-1');
+    expect(retirement?.confidence).toBe(0.8);
   });
 
   it('classifies a changes-section entry naming something nowhere in the model as invalid, never new', async () => {

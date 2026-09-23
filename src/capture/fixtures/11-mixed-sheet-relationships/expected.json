@@ -1,0 +1,17 @@
+{
+  "job": { "status": "parsed" },
+  "candidates": {
+    "name:system:crm:": { "kind": "element", "class": "new", "elementType": "system", "matchLevel": "none" },
+    "name:container:portal:crm": { "kind": "element", "class": "new", "elementType": "container", "matchLevel": "none" },
+    "name:actor:jane doe:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "person", "isExternal": false } },
+    "name:actor:john smith:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "person", "isExternal": false } },
+    "name:actor:ofgem:": { "kind": "element", "class": "new", "elementType": "actor", "attributes": { "subtype": "organisation", "isExternal": true, "externalOrganisation": "Energy regulator" } },
+    "rel:owns:name:actor:jane doe:→name:system:crm:": { "kind": "relationship", "class": "new", "relationshipType": "owns", "attributes": { "role": "business" } },
+    "rel:owns:name:actor:john smith:→name:system:crm:": { "kind": "relationship", "class": "new", "relationshipType": "owns", "attributes": { "role": "technical" } },
+    "rel:owns:name:actor:ofgem:→name:container:portal:crm": { "kind": "relationship", "class": "new", "relationshipType": "owns", "attributes": { "role": "business" } },
+    "rel:flows_to:name:system:crm:→name:container:portal:crm": { "kind": "relationship", "class": "new", "relationshipType": "flows_to", "attributes": { "description": "sends customer updates to" } },
+    "rel:supports:name:system:crm:→name:capability:billing:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-billing", "attributes": { "role": "secondary" } },
+    "rel:supports:name:system:crm:→name:capability:reporting:": { "kind": "relationship", "class": "new", "relationshipType": "supports", "matchTo": "cap-reporting", "attributes": { "role": "secondary" } }
+  },
+  "absent": []
+}
