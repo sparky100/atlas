@@ -1,0 +1,10 @@
+{
+  "job": { "status": "parsed" },
+  "candidates": {
+    "name:system:electron:": { "kind": "element", "class": "new", "elementType": "system", "matchLevel": "none", "confidence": { "min": 0.6, "max": 0.6 } },
+    "name:system:legacy crm:": { "kind": "element", "class": "conflict", "elementType": "system", "matchElement": "legacy-crm", "attributes": { "lifecycleStatus": "retired" }, "confidence": { "min": 0.9, "max": 0.9 } },
+    "name:system:old reports:": { "kind": "element", "class": "update", "elementType": "system", "matchElement": "old-reports", "attributes": { "lifecycleStatus": "active" }, "confidence": { "min": 0.9, "max": 0.9 } },
+    "rel:replaces:name:system:electron:→name:system:legacy crm:": { "kind": "relationship", "class": "new", "relationshipType": "replaces", "matchTo": "legacy-crm" }
+  },
+  "absent": []
+}

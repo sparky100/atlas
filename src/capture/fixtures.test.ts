@@ -25,7 +25,19 @@ import { runCapture } from './runCapture';
 
 const FIXTURES_ROOT = join(__dirname, 'fixtures');
 
-const FIXTURE_IDS = ['01-clean-register', '02-odd-headers', '03-roundtrip-export', '04-duplicates-within', '05-aliases-known', '06-containers-two-sheets', '07-merged-cells-and-junk', '09-scanned', '10-pasted-notes'] as const;
+const FIXTURE_IDS = [
+  '01-clean-register',
+  '02-odd-headers',
+  '03-roundtrip-export',
+  '04-duplicates-within',
+  '05-aliases-known',
+  '06-containers-two-sheets',
+  '07-merged-cells-and-junk',
+  '09-scanned',
+  '10-pasted-notes',
+  '11-mixed-sheet-relationships',
+  '12-json-retire-restore',
+] as const;
 
 function mintId(prefix: string): () => string {
   let n = 0;

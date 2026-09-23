@@ -206,3 +206,20 @@ export function looksLikePersonName(raw: string): boolean {
   if (PERMISSIVE_EMAIL.test(trimmed)) return true;
   return /^[A-Z][a-zA-Z'-]*\s+[A-Z][a-zA-Z'-]*$/.test(trimmed);
 }
+
+export interface OwnerCellParseResult {
+  name: string;
+  /** `null` for a plain name; the parenthetical's own text for an owner marked external. */
+  externalOrganisation: string | null;
+}
+
+const EXTERNAL_OWNER = /^(.*?)\s*\(\s*external\s*:\s*(.+?)\s*\)\s*$/i;
+
+/** Sprint F2b (SPEC-capture.md §5.2), folded in from F2-lite's own `importRowSchema.ts` `parseOwnerCell`: an `owner`/`technicalOwner` cell of the form `"Name (External: Org)"` (case-insensitive on the literal word "External") marks the owner as a third-party organisation rather than an internal team/person. A plain name with no parenthetical returns `externalOrganisation: null` unchanged. */
+export function parseOwnerCell(raw: string): OwnerCellParseResult {
+  const trimmed = raw.trim();
+  const match = EXTERNAL_OWNER.exec(trimmed);
+  if (!match) return { name: trimmed, externalOrganisation: null };
+  const [, name, org] = match;
+  return { name: name && name.length > 0 ? name : trimmed, externalOrganisation: org ?? null };
+}

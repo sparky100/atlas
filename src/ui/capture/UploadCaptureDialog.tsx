@@ -45,7 +45,7 @@ interface SelectedInput {
 
 function inputKindForFilename(filename: string): CaptureInputKind | null {
   const lower = filename.toLowerCase();
-  if (lower.endsWith('.csv') || lower.endsWith('.xlsx')) return 'spreadsheet';
+  if (lower.endsWith('.csv') || lower.endsWith('.xlsx') || lower.endsWith('.json')) return 'spreadsheet';
   if (lower.endsWith('.pdf')) return 'pdf';
   return null;
 }
@@ -147,7 +147,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
     const kind = inputKindForFilename(file.name);
     if (!kind) {
       setFileSelection(null);
-      setFileError(`"${file.name}" isn't a .csv, .xlsx, or .pdf file.`);
+      setFileError(`"${file.name}" isn't a .csv, .xlsx, .json, or .pdf file.`);
       return;
     }
     if (file.size > MAX_UPLOAD_BYTES) {
@@ -199,7 +199,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
               </Button>
             </div>
             <Text as="p" tone="muted" size="sm">
-              Upload a spreadsheet or PDF, or paste in meeting notes — an AI extraction reads it, matches what it finds against this model, and produces a draft you review before anything changes.
+              Upload a spreadsheet, JSON file, or PDF, or paste in meeting notes — an AI extraction reads it, matches what it finds against this model, and produces a draft you review before anything changes.
             </Text>
 
             <div className={styles.modeToggle}>
@@ -216,8 +216,8 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                 <input
                   className={styles.input}
                   type="file"
-                  accept=".csv,.xlsx,.pdf"
-                  aria-label="Choose a CSV, XLSX, or PDF file"
+                  accept=".csv,.xlsx,.json,.pdf"
+                  aria-label="Choose a CSV, XLSX, JSON, or PDF file"
                   disabled={status === 'creating'}
                   onChange={(e) => {
                     const file = e.target.files?.[0];

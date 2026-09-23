@@ -10,16 +10,27 @@
  * consequence of that same gap).
  *
  * All interactive state a shortcut needs to reach — the selected
- * candidate, which panel (if any) is open, the `confirm` class's own
- * multi-select, and an `ambiguous` pick pending its own `a` confirmation —
- * lives here, not in `useCaptureReviewQueue.ts` (that hook owns server
- * state and mutations only) nor in the row component (which owns nothing
- * a keypress needs to reach from outside).
+ * candidate, which panel (if any) is open, the `confirm`/`new` classes'
+ * own multi-select, and an `ambiguous` pick pending its own `a`
+ * confirmation — lives here, not in `useCaptureReviewQueue.ts` (that hook
+ * owns server state and mutations only) nor in the row component (which
+ * owns nothing a keypress needs to reach from outside).
+ *
+ * **Amended, Sprint F2b (SPEC-capture.md §10):** `x` multi-select is
+ * widened from `confirm` alone to `confirm`/`new`, and `a`/`r` on a
+ * non-empty selection now bulk-accept/reject it (previously `r` was the
+ * only bulk action, `confirm`-only) — without this, a clean import that
+ * resolves to all-`confirm`/all-`new` went from one commit (F2-lite) to
+ * one keystroke per row. Bulk action reads `multiSelected` directly
+ * rather than gating on the currently-focused candidate's own class, so
+ * it fires regardless of which row `j`/`k` last landed on.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { CandidateClass, CaptureCandidate } from '../../contracts/capture';
 import { Button } from '../components/Button/Button';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
+import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
@@ -59,7 +70,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
   const { role } = useMembership(orgId, userId);
   const canReview = canRunCapture(role);
   const queue = useCaptureReviewQueue(modelId, orgId, jobId, userId);
-  const { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, searchTargetElements } = queue;
+  const { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, searchTargetElements, notInFile } = queue;
 
   const [selectedId, setSelectedId] = useState<UUID | null>(null);
   const [openPanel, setOpenPanel] = useState<{ candidateId: UUID; type: 'edit' | 'split' | 'merge' } | null>(null);
@@ -113,7 +124,10 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
       const candidate = selectedCandidate;
       switch (e.key) {
         case 'a': {
-          if (candidate.class === 'ambiguous') {
+          if (multiSelected.size > 0) {
+            decideMany([...multiSelected].map((id) => ({ candidateId: id, decision: 'accepted' as const })));
+            setMultiSelected(new Set());
+          } else if (candidate.class === 'ambiguous') {
             const pending = pendingAmbiguousTargets.get(candidate.id) ?? null;
             if (pending) setDecisionFor(candidate, 'accepted', pending === 'new' ? null : { intoElementId: pending.elementId });
           } else if (candidate.class !== 'invalid' && candidate.class !== 'unsourced' && candidate.class !== 'duplicate_in_target') {
@@ -122,7 +136,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
           break;
         }
         case 'r': {
-          if (candidate.class === 'confirm' && multiSelected.size > 0) {
+          if (multiSelected.size > 0) {
             decideMany([...multiSelected].map((id) => ({ candidateId: id, decision: 'rejected' as const })));
             setMultiSelected(new Set());
           } else {
@@ -154,7 +168,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
           if (candidate.class === 'ambiguous') setPendingAmbiguousTargets((prev) => new Map(prev).set(candidate.id, 'new'));
           break;
         case 'x':
-          if (candidate.class === 'confirm') {
+          if (candidate.class === 'confirm' || candidate.class === 'new') {
             setMultiSelected((prev) => {
               const next = new Set(prev);
               if (next.has(candidate.id)) next.delete(candidate.id);
@@ -267,11 +281,33 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
           )}
           {canReview && (
             <Text as="p" tone="faint" size="xs" className={styles.shortcuts}>
-              j/k select · a accept · r reject · u undo · e edit · s split · m merge into… · 1-5/n pick (ambiguous) · x select (confirm) · t target · ⌘/Ctrl+Enter apply
+              j/k select · a accept · r reject · u undo · e edit · s split · m merge into… · 1-5/n pick (ambiguous) · x select (confirm/new, then a/r bulk-acts) · t target · ⌘/Ctrl+Enter apply
             </Text>
           )}
         </Panel>
       </div>
+
+      {notInFile.length > 0 && (
+        <div className={styles.header}>
+          <Panel>
+            <CollapsibleSection title="Not in file" meta={`(${String(notInFile.length)})`} defaultOpen={false}>
+              <Text as="p" tone="muted" size="sm">
+                Main's own systems and modules this document never mentioned — a question, not a retraction.
+              </Text>
+              <ul className={styles.list}>
+                {notInFile.map((element) => (
+                  <li key={element.elementId} className={styles.notInFileRow}>
+                    <ElementTypeGlyph type={element.elementType} label={element.name} />
+                    <Text as="span" size="sm">
+                      {element.name}
+                    </Text>
+                  </li>
+                ))}
+              </ul>
+            </CollapsibleSection>
+          </Panel>
+        </div>
+      )}
 
       {candidates.length === 0 ? (
         <Text tone="muted">No candidates in this draft.</Text>

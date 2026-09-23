@@ -1,6 +1,8 @@
 /**
  * F2 (full K1) PR10, plan table row 10 / SPEC-capture.md §12.5: for
- * fixtures 01, 03, 05 and 06 — seed `model.json` onto main for real (via
+ * fixtures 01, 03, 05 and 06 (plus 12, Sprint F2b — the JSON `changes`
+ * section's own retire/restore/`replaces` promotion, the one write path
+ * none of the original four fixtures exercises) — seed `model.json` onto main for real (via
  * `commitToBranch`, never a hand-built projection row), run `runCapture()`
  * against it with the fixture's own `RecordedLlmClient`, build the draft
  * envelope (`buildCaptureDraftEnvelope.ts`, PR7) and call
@@ -52,7 +54,7 @@ import { runCapture, type ResolvedCandidate } from './runCapture';
 const env = loadEnv();
 const service = createServiceRoleClient(env);
 const FIXTURES_ROOT = join(__dirname, 'fixtures');
-const FIXTURE_IDS = ['01-clean-register', '03-roundtrip-export', '05-aliases-known', '06-containers-two-sheets'] as const;
+const FIXTURE_IDS = ['01-clean-register', '03-roundtrip-export', '05-aliases-known', '06-containers-two-sheets', '12-json-retire-restore'] as const;
 
 interface TestUser {
   id: string;

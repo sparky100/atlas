@@ -18,9 +18,9 @@
  * relationship endpoint, a container's parent) is re-pointed to the real
  * promoted id — the two-pass structure below (assign every element
  * candidate's promoted id first, then build every delta) exists
- * specifically so that re-pointing never depends on candidate order,
- * mirroring `buildImportCommit.ts`'s own two-pass shape ("a relationship
- * can reference a system created earlier in this very same file").
+ * specifically so that re-pointing never depends on candidate order — "a
+ * relationship can reference a system created earlier in this very same
+ * file" holds regardless of promotion order.
  *
  * Provenance: promoting a machine-proposed value (`accepted`/`merged`/
  * `split`) carries over the *original* capture provenance verbatim —
@@ -38,8 +38,8 @@
  * "Promotion... re-derives previousDeltaId against that [target] branch's
  * current head at apply time, so a stale draft never blocks a review") —
  * falling back to the subject's own `existsDeltaId` for a first-time
- * attribute assertion, the same convention PR7 established from
- * `buildImportCommit.ts`.
+ * attribute assertion, the same fallback rule
+ * `buildCaptureDraftEnvelope.ts` uses.
  *
  * Aliases (§7.6), scoped to what a persisted `CaptureCandidate` can
  * actually express: a `name` alias for a level-3 (`name_context`) match
@@ -372,6 +372,32 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
       const delta = { kind: 'relationship.create', id: mintId(), relationshipId, relationshipType, fromElementId, toElementId, attributes, ...provenance } as never as Delta;
       deltas.push(delta);
       if (candidate.decision === 'edited') resolvedConflicts.push({ id: mintId(), winningDeltaId: (delta as { id: UUID }).id, discardedDeltaId: draftFact(draftHead, draftSubjectId, EXISTS_ATTRIBUTE)?.deltaId ?? requireExistsDeltaId(draftHead, 'relationship', draftSubjectId, seq, `draft candidate ${draftSubjectId}`), rationale: null });
+
+      // Sprint F2b, Step 4 (SPEC-capture.md §5.6): a JSON changes-section
+      // `replaced_by` is promoted as an ordinary `replaces` candidate
+      // (built in `runCapture.ts`'s `buildJsonChangeCandidates`) — being
+      // promoted `new` here is what triggers the retiring element's
+      // (`toElementId`) own supports-edge transfer to the replacement
+      // (`fromElementId`), the same shape `useElementRetire.ts`'s own
+      // "replaced by" picker already uses: every live `supports` edge is
+      // retracted and re-created from the replacement at `role: 'secondary'`,
+      // carrying over `description` if any. Same provenance as the
+      // `replaces` delta itself — the transfer is a mechanical consequence
+      // of promoting that one fact, not a separately-sourced assertion.
+      // Scoped to `new` only (not `edited`/`split`, and not a re-asserted
+      // `update`/`confirm` below): a re-import re-promoting the same
+      // `replaces` edge finds no live `supports` edges left to transfer
+      // regardless, since the first promotion already retracted them.
+      if (relationshipType === 'replaces') {
+        for (const [edgeId, edge] of targetHead.relationships) {
+          if (edge.relationshipType !== 'supports' || edge.fromElementId !== toElementId) continue;
+          const existsFactDeltaId = targetHead.facts.get(factMapKey(edgeId, EXISTS_ATTRIBUTE))?.deltaId ?? edge.existsDeltaId;
+          deltas.push({ kind: 'relationship.retract', id: mintId(), relationshipId: edgeId, relationshipType: 'supports', previousDeltaId: existsFactDeltaId, ...provenance } as never);
+          const description = (edge.attributes as Record<string, unknown>).description;
+          const transferredAttributes: Record<string, Json> = typeof description === 'string' && description.trim() !== '' ? { role: 'secondary', description } : { role: 'secondary' };
+          deltas.push({ kind: 'relationship.create', id: mintId(), relationshipId: mintId(), relationshipType: 'supports', fromElementId, toElementId: edge.toElementId, attributes: transferredAttributes, ...provenance } as never);
+        }
+      }
       continue;
     }
 

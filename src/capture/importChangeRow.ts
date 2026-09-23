@@ -1,42 +1,42 @@
 /**
- * F2-lite JSON import — the "changes" section: explicit retire/restore
- * declarations for elements this import's author already knows about,
- * distinct from the Systems section's own rows (which can only ever assert
- * "this exists"). A CSV/XLSX import has no equivalent — it only ever infers
- * "not in file" from omission (`notInFile.ts`) and leaves retiring to a
- * manual follow-up on the change page (`useImportSummary.ts`); JSON can
- * state a retirement on purpose instead.
+ * A JSON capture input's "changes" section: explicit retire/restore
+ * declarations for elements the file's author already knows about,
+ * distinct from the `systems` section's own rows (which can only ever
+ * assert "this exists"). A spreadsheet capture run has no equivalent
+ * section — it only ever infers "not in file" from omission (`notInFile.ts`,
+ * surfaced unconditionally in the review queue); JSON can state a
+ * retirement or restoration on purpose instead.
  *
- * `action: 'retire'` sets `lifecycleStatus: 'retired'`, the same value (and
- * the same plain `element.update`, no `element.retract`) the change page's
- * own "not in file" retire shortcut already uses — a reconciliation import
- * reporting "this no longer exists", not the separate, stronger "remove
- * from model" action (`useElementRemoveFromModel.ts`) for undoing a mistaken
- * create. `action: 'restore'` is its exact inverse: `lifecycleStatus:
- * 'active'`, undoing an earlier retirement.
+ * `action: 'retire'`/`'restore'` becomes a `lifecycleStatus: 'retired'`/
+ * `'active'` candidate against an existing element only (`runCapture.ts`'s
+ * `buildJsonChangeCandidates` sets `mustMatchExisting: true` so an unresolved
+ * name is `invalid`, never `new`) — the same plain attribute change the
+ * change page's own "not in file" retire shortcut produces, not the
+ * separate, stronger "remove from model" action
+ * (`useElementRemoveFromModel.ts`) for undoing a mistaken create.
  *
  * `replaced_by` (retire only — snake_case, matching every other
  * multi-word column name in this format, e.g. `business_owner`) names the
- * system/module taking over: `buildImportCommit.ts` transfers every one of
- * the retiring element's own `supports` edges to it, `role: 'secondary'`,
- * the exact same shape and reasoning `useElementRetire.ts`'s own
- * "replaced by" picker already uses (never `'primary'` — promoting one
- * could collide with a primary edge the replacement already has elsewhere,
- * which this reconciliation pass has no reliable way to rule out either).
+ * system/module taking over. It doesn't drive a bespoke edge-transfer field
+ * on this row's own candidate: `buildJsonChangeCandidates` also emits a
+ * separate `RelationshipProposal<'replaces'>` candidate for it, and
+ * `buildPromotionEnvelope.ts` transfers every one of the retiring element's
+ * own live `supports` edges to the replacement (`role: 'secondary'`) when
+ * that `replaces` candidate promotes as `new` — the same shape and
+ * reasoning `useElementRetire.ts`'s own "replaced by" picker already uses
+ * (never `'primary'` — promoting one could collide with a primary edge the
+ * replacement already has elsewhere).
  *
- * `quote`/`confidence` — optional per-entry provenance an AI-authored
- * import can attach to any of the three sections alike (`importRowSchema.ts`/
+ * `quote`/`confidence` — optional per-entry provenance a JSON file can
+ * attach to any of its three sections alike (`importRowSchema.ts`/
  * `importRelationshipRow.ts` carry the identical pair): a supporting quote
- * from whatever the author is working from, and a confidence in [0,1].
- * Carried onto every delta this row produces (`buildImportCommit.ts`) —
- * `confidence` overriding the otherwise-hardcoded `1`, `quote` appended to
- * the delta's own `sourceRef` locator. Omitted entirely, they change
- * nothing (still `confidence: 1`, still a plain locator, exactly as before
- * this pair existed).
+ * from whatever the author is working from, and a confidence in [0,1],
+ * capped at 0.90 when omitted (`jsonConfidence`, Sprint F2b) — an uploaded
+ * file is not the same as a human's typed assertion in the review queue.
  *
  * Pure — no I/O, mirrors `importRelationshipRow.ts`'s own shape exactly:
- * `buildImportCommit.ts` resolves each row's `name`/`replaced_by` against
- * the model's own current systems/containers and builds the delta(s).
+ * `runCapture.ts` resolves each row's `name`/`replaced_by` against the
+ * model's own current systems/containers and builds the candidate(s).
  */
 export const CHANGE_IMPORT_COLUMNS = ['name', 'action', 'reason', 'replaced_by'] as const;
 export type ChangeImportColumn = (typeof CHANGE_IMPORT_COLUMNS)[number];
@@ -51,7 +51,7 @@ export interface ImportChangeRow {
   action: ImportChangeAction;
   /** Free text — never affects the delta itself, just carried through to the review UI so a reviewer can see why the file's author asked for this. */
   reason: string | null;
-  /** `action: 'retire'` only (rejected on `restore` — validated below) — the replacement system/module's own name (or alias), resolved the same way `name` itself is (`buildImportCommit.ts`'s `resolveChangeTarget`). `null` means no replacement named: the retiring element's own `supports` edges are left alone, same as today. */
+  /** `action: 'retire'` only (rejected on `restore` — validated below) — the replacement system/module's own name (or alias), resolved the same way `name` itself is. `null` means no replacement named: the retiring element's own `supports` edges are left alone, same as today. */
   replacedBy: string | null;
   /** A supporting quote from whatever the file's author is working from — free text, never validated beyond non-blank. */
   quote?: string | undefined;

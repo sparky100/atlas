@@ -34,8 +34,8 @@
  * fact for that exact (subjectId, attribute) — falling back to the
  * subject's own `existsDeltaId` when there isn't one yet (a document
  * stating an attribute for the first time on an already-existing element).
- * This is `buildImportCommit.ts`'s own long-established fallback
- * (`facts.get(attribute)?.delta_id ?? existsDeltaId`), reused verbatim:
+ * This is the same fallback rule (`facts.get(attribute)?.delta_id ??
+ * existsDeltaId`) every other capture-write path in this codebase uses:
  * `element.update.previousDeltaId` can never be null (`deltas`'s own
  * `(kind in (create kinds)) = (previous_delta_id is null)` check), and
  * SPEC §4.2's "facts[(subject,attr)].delta_id is always defined for any

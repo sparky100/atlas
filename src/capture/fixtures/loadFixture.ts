@@ -84,7 +84,7 @@ export interface FixtureModel {
 
 export interface FixtureOptions {
   inputKind: 'spreadsheet' | 'pdf' | 'text';
-  format: 'csv' | 'xlsx' | 'pdf' | 'text';
+  format: 'csv' | 'xlsx' | 'pdf' | 'text' | 'json';
   documentDate: string | null;
   /** §12.1's own `reimportOf: "<fixture id>"` names another fixture; this harness instead reads a hand-authored `previous.json` sitting alongside this fixture's own files when one is present (§9.2's own "synthetic previous job" — SPEC's own wording for fixture 03), which is simpler than actually re-running a second job to get one. Recorded here only for a human reading `options.json` to see the intent; `loadFixture` itself keys off `previous.json`'s presence, not this field. */
   reimportOf?: string;
@@ -200,11 +200,18 @@ function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
 }
 
-/** §12.1's own `input.csv|xlsx` widened, PR13, to the PDF/pasted-text formats PR11 added: `input.pdf` (bytes) or `input.txt` (text) alongside the existing two. */
+/**
+ * §12.1's own `input.csv|xlsx` widened, PR13, to the PDF/pasted-text formats
+ * PR11 added: `input.pdf` (bytes) or `input.txt` (text) alongside the
+ * existing two. **Amended, Sprint F2b:** `input.json` (text) for the JSON
+ * capture format §5.6 added — `runCapture()` has taken `format: 'json'`
+ * since Step 3, but this loader never grew a matching case until now.
+ */
 function loadSource(dir: string, format: FixtureOptions['format']): RunCaptureSource {
   if (format === 'csv') return { format: 'csv', text: readFileSync(join(dir, 'input.csv'), 'utf-8') };
   if (format === 'xlsx') return { format: 'xlsx', bytes: bufferToArrayBuffer(readFileSync(join(dir, 'input.xlsx'))) };
   if (format === 'pdf') return { format: 'pdf', bytes: bufferToArrayBuffer(readFileSync(join(dir, 'input.pdf'))) };
+  if (format === 'json') return { format: 'json', text: readFileSync(join(dir, 'input.json'), 'utf-8') };
   return { format: 'text', text: readFileSync(join(dir, 'input.txt'), 'utf-8') };
 }
 

@@ -1,8 +1,5 @@
 /*
- * Second modal in the product — `SpreadsheetImportDialog.module.css`'s own
- * backdrop/dialog/panel/header shape, duplicated rather than shared: two
- * near-identical selector sets is cheaper here than a shared base this
- * pair would otherwise be the only two callers of.
+ * This modal's own backdrop/dialog/panel/header shape.
  */
 .backdrop {
   position: fixed;

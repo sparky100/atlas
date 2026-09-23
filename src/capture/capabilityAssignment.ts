@@ -29,6 +29,15 @@
  * `eligibleForPrimary` on the per-row summary says "this is the sole
  * capability edge this row itself proposed" — necessary for promotion,
  * not sufficient; the live-primary check above is the other half.
+ *
+ * **Amended, Sprint F2b (SPEC-capture.md §5.2):** a `|`-delimited cell is a
+ * literal list of capability names, folded in from F2-lite's own
+ * `capability` column — each segment resolved independently against pass
+ * 1 only (never prompt C: an explicit list needs no inference), an
+ * unresolved segment dropped silently. `eligibleForPrimary` is untouched
+ * by this — it already reads the resolved list's own length, so a list
+ * resolving to two or more targets is all-secondary exactly like a
+ * prompt-C row naming two capabilities already is.
  */
 import { z } from 'zod';
 import type { CandidateEvidence, RelationshipProposal } from '../contracts/capture';
@@ -169,6 +178,35 @@ export interface AssignCapabilitiesResult {
 
 const EXTRACTOR_BY_SOURCE = { alias: 'sheet-mapping', trigram: 'sheet-mapping', llm: 'capability-llm' } as const;
 
+/** §6.3/§7: alias then trigram, first hit wins — the ordinary single-value resolution, factored out so Sprint F2b's own `|`-delimited path (below) can call it once per segment. */
+function resolveCapabilityByAliasOrTrigram(text: string, matchIndex: MatchIndex, capabilityPool: readonly ElementsHeadRow[]): CapabilityTarget | undefined {
+  const aliasHit = matchIndex.aliasByNormalisedValue.get(normaliseName(text));
+  const aliasElement = aliasHit ? matchIndex.elements.get(aliasHit.elementId) : undefined;
+  if (aliasElement?.element_type === 'capability') return { elementId: aliasElement.element_id, confidence: 1, source: 'alias' };
+
+  const trigram = resolveByTrigram(text, capabilityPool);
+  if (trigram.level === 'name_context' && !trigram.ambiguous && trigram.elementId !== undefined) {
+    return { elementId: trigram.elementId, confidence: trigram.score, source: 'trigram' };
+  }
+  return undefined;
+}
+
+/** Sprint F2b (SPEC-capture.md §5.2), folded in from F2-lite's own `parseCapabilityList`: a `|`-delimited cell is a literal list, trimmed, blanks between pipes dropped, deduplicated case-insensitively. A cell with no `|` returns it unchanged as the single-element ordinary case. */
+function splitCapabilityList(raw: string): string[] {
+  if (!raw.includes('|')) return [raw];
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const part of raw.split('|')) {
+    const name = part.trim();
+    if (name.length === 0) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+  return names;
+}
+
 /** §6.3, whole: alias/trigram pass first; prompt C only for what's left unresolved or ambiguous. */
 export async function assignCapabilities(input: AssignCapabilitiesInput): Promise<AssignCapabilitiesResult> {
   const capabilityPool = input.matchIndex.elementsByType.get('capability') ?? [];
@@ -176,16 +214,34 @@ export async function assignCapabilities(input: AssignCapabilitiesInput): Promis
   const needsPromptC: CapabilityColumnRow[] = [];
 
   for (const row of input.rows) {
-    const aliasHit = input.matchIndex.aliasByNormalisedValue.get(normaliseName(row.capabilityText));
-    const aliasElement = aliasHit ? input.matchIndex.elements.get(aliasHit.elementId) : undefined;
-    if (aliasElement?.element_type === 'capability') {
-      resolved.set(row.seq, [{ elementId: aliasElement.element_id, confidence: 1, source: 'alias' }]);
+    if (row.capabilityText.includes('|')) {
+      // Sprint F2b: a `|`-delimited cell is a literal list — a stronger
+      // signal than free text needing inference — resolved by name/alias
+      // only (§7), never sent to prompt C. An unresolved segment is
+      // dropped, the same silent omission a single value already gets when
+      // prompt C itself returns none — capabilities are never
+      // auto-created (§15) and never guessed. K-13's `eligibleForPrimary`
+      // rule is untouched below: it reads `resolved.get(seq).length`,
+      // agnostic to how that list was built, so a list resolving to two or
+      // more targets is all-secondary exactly like a prompt-C row naming
+      // two capabilities already is; a list resolving to exactly one
+      // (after dedup, or because every other segment failed to resolve)
+      // is primary-eligible exactly like any other single target.
+      const targets: CapabilityTarget[] = [];
+      const seenElementIds = new Set<UUID>();
+      for (const segment of splitCapabilityList(row.capabilityText)) {
+        const target = resolveCapabilityByAliasOrTrigram(segment, input.matchIndex, capabilityPool);
+        if (target === undefined || seenElementIds.has(target.elementId)) continue;
+        seenElementIds.add(target.elementId);
+        targets.push(target);
+      }
+      resolved.set(row.seq, targets);
       continue;
     }
 
-    const trigram = resolveByTrigram(row.capabilityText, capabilityPool);
-    if (trigram.level === 'name_context' && !trigram.ambiguous && trigram.elementId !== undefined) {
-      resolved.set(row.seq, [{ elementId: trigram.elementId, confidence: trigram.score, source: 'trigram' }]);
+    const single = resolveCapabilityByAliasOrTrigram(row.capabilityText, input.matchIndex, capabilityPool);
+    if (single !== undefined) {
+      resolved.set(row.seq, [single]);
       continue;
     }
 

@@ -4,6 +4,7 @@ import type { CandidateDecision, CandidateDecisionDetail, CaptureCandidate, Capt
 import { buildPromotionEnvelope } from '../../capture/buildPromotionEnvelope';
 import { loadCaptureDraftHead } from '../../capture/loadCaptureDraftHead';
 import { loadTargetBranchHead, type LoadedTargetBranch } from '../../capture/loadTargetBranchHead';
+import { computeNotInFile, type NotInFileElement } from '../../capture/notInFile';
 import { createChangeBranch, getMainBranch, listChangeBranches } from '../../db/branches';
 import { applyCaptureDecisions, listCaptureCandidates, stageCaptureDecisions, type CaptureDecisionInput } from '../../db/captureCandidates';
 import { getCaptureJob } from '../../db/captureJobs';
@@ -65,6 +66,16 @@ export interface UseCaptureReviewQueueResult {
    */
   searchTargetElements: (elementType: ElementType, query: string) => Promise<{ elementId: UUID; name: string; parentName: string | null }[] | null>;
   reload: () => void;
+  /**
+   * Sprint F2b (SPEC-capture.md §9.4): main's own systems/modules this
+   * job's own candidates never touched — always available, unlike §9.2's
+   * `gone` class (which needs `reimport_of_job_id` chaining to the same
+   * document's previous run). "Touched" means matched by *any* candidate
+   * (`draftSubjectId`), independent of the reviewer's own decision so far —
+   * this answers "what did the document not even mention," not "what did
+   * the reviewer accept."
+   */
+  notInFile: NotInFileElement[];
 }
 
 function tallyDecisions(candidates: readonly CaptureCandidate[]): Record<string, number> {
@@ -287,5 +298,19 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
     return map;
   }, [candidates]);
 
-  return { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, searchTargetElements, reload };
+  const notInFile = useMemo(() => {
+    const touchedElementIds = new Set<UUID>();
+    for (const c of candidates) {
+      if (c.kind === 'element' && c.draftSubjectId !== null) touchedElementIds.add(c.draftSubjectId);
+    }
+    const systems: ElementsHeadRow[] = [];
+    const containers: ElementsHeadRow[] = [];
+    for (const element of mainElementById.values()) {
+      if (element.element_type === 'system') systems.push(element);
+      else if (element.element_type === 'container') containers.push(element);
+    }
+    return computeNotInFile(systems, containers, touchedElementIds);
+  }, [candidates, mainElementById]);
+
+  return { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, searchTargetElements, reload, notInFile };
 }

@@ -1,0 +1,9 @@
+{
+  "systems": [
+    { "name": "Electron", "description": "New CRM replacing Legacy CRM.", "quote": "We are moving everyone onto Electron." }
+  ],
+  "changes": [
+    { "name": "Legacy CRM", "action": "retire", "replaced_by": "Electron", "reason": "Migrated to Electron", "quote": "Legacy CRM is being decommissioned now that Electron is live." },
+    { "name": "Old Reports", "action": "restore", "reason": "Still in active use, reactivating it on the register", "quote": "Old Reports turned out to still be needed, so it's back." }
+  ]
+}

@@ -317,3 +317,52 @@ describe('buildPromotionEnvelope — relationships', () => {
     expect(() => buildPromotionEnvelope({ candidates: [c], draftHead, targetHead, reviewerSourceId: REVIEWER_SOURCE_ID, mintId })).toThrow(BuildPromotionEnvelopeError);
   });
 });
+
+describe('buildPromotionEnvelope — replaces (Sprint F2b Step 4, SPEC-capture.md §5.6)', () => {
+  it('accepted as new: transfers the retiring element\'s own live supports edges to the replacement, role secondary, description carried over', () => {
+    const draftHead = headFrom([createElement('draft-old', 'old-crm', 'system', 'Legacy CRM', null, SYSTEM_ATTRS, DRAFT_SOURCE_ID), createElement('draft-new', 'new-crm', 'system', 'New CRM', null, SYSTEM_ATTRS, DRAFT_SOURCE_ID), createRelationship('draft-replaces', 'draft-replaces-id', 'replaces', 'new-crm', 'old-crm', {}, DRAFT_SOURCE_ID)]);
+    const targetHead = headFrom([
+      createElement('target-old', 'old-crm', 'system', 'Legacy CRM', null, SYSTEM_ATTRS),
+      createElement('target-new', 'new-crm', 'system', 'New CRM', null, SYSTEM_ATTRS),
+      createElement('target-cap', 'cap', 'capability', 'Customer Service'),
+      createRelationship('target-supports', 'supports-id', 'supports', 'old-crm', 'cap', { role: 'primary', description: 'handles enquiries' }),
+    ]);
+    const c = candidate({ seq: 0, kind: 'relationship', class: 'new', relationshipType: 'replaces', draftSubjectId: 'draft-replaces-id', decision: 'accepted', proposal: { kind: 'relationship', relationshipType: 'replaces', from: { kind: 'existing', elementId: 'new-crm' }, to: { kind: 'existing', elementId: 'old-crm' }, attributes: {} } });
+
+    const { deltas } = buildPromotionEnvelope({ candidates: [c], draftHead, targetHead, reviewerSourceId: REVIEWER_SOURCE_ID, mintId });
+
+    expect(deltas.find((d) => d.kind === 'relationship.create' && 'relationshipType' in d && d.relationshipType === 'replaces')).toMatchObject({ fromElementId: 'new-crm', toElementId: 'old-crm' });
+    expect(deltas.find((d) => d.kind === 'relationship.retract')).toMatchObject({ relationshipId: 'supports-id' });
+    const transferred = deltas.find((d) => d.kind === 'relationship.create' && 'relationshipType' in d && d.relationshipType === 'supports');
+    expect(transferred).toMatchObject({ fromElementId: 'new-crm', toElementId: 'cap', attributes: { role: 'secondary', description: 'handles enquiries' } });
+    expect(() => fold(cloneHead(targetHead), deltas, ctx)).not.toThrow();
+  });
+
+  it('never transfers a supports edge belonging to a different element', () => {
+    const draftHead = headFrom([createElement('draft-old', 'old-crm', 'system', 'Legacy CRM', null, SYSTEM_ATTRS, DRAFT_SOURCE_ID), createElement('draft-new', 'new-crm', 'system', 'New CRM', null, SYSTEM_ATTRS, DRAFT_SOURCE_ID), createRelationship('draft-replaces', 'draft-replaces-id', 'replaces', 'new-crm', 'old-crm', {}, DRAFT_SOURCE_ID)]);
+    const targetHead = headFrom([
+      createElement('target-old', 'old-crm', 'system', 'Legacy CRM', null, SYSTEM_ATTRS),
+      createElement('target-new', 'new-crm', 'system', 'New CRM', null, SYSTEM_ATTRS),
+      createElement('target-other', 'other', 'system', 'Unrelated System', null, SYSTEM_ATTRS),
+      createElement('target-cap', 'cap', 'capability', 'Customer Service'),
+      createRelationship('target-supports', 'supports-id', 'supports', 'other', 'cap', { role: 'primary' }),
+    ]);
+    const c = candidate({ seq: 0, kind: 'relationship', class: 'new', relationshipType: 'replaces', draftSubjectId: 'draft-replaces-id', decision: 'accepted', proposal: { kind: 'relationship', relationshipType: 'replaces', from: { kind: 'existing', elementId: 'new-crm' }, to: { kind: 'existing', elementId: 'old-crm' }, attributes: {} } });
+
+    const { deltas } = buildPromotionEnvelope({ candidates: [c], draftHead, targetHead, reviewerSourceId: REVIEWER_SOURCE_ID, mintId });
+
+    expect(deltas.filter((d) => d.kind === 'relationship.retract')).toHaveLength(0);
+    expect(deltas.filter((d) => d.kind === 'relationship.create')).toHaveLength(1); // the `replaces` edge itself only.
+  });
+
+  it('carries no transfer at all when the retiring element has no live supports edges', () => {
+    const draftHead = headFrom([createElement('draft-old', 'old-crm', 'system', 'Legacy CRM', null, SYSTEM_ATTRS, DRAFT_SOURCE_ID), createElement('draft-new', 'new-crm', 'system', 'New CRM', null, SYSTEM_ATTRS, DRAFT_SOURCE_ID), createRelationship('draft-replaces', 'draft-replaces-id', 'replaces', 'new-crm', 'old-crm', {}, DRAFT_SOURCE_ID)]);
+    const targetHead = headFrom([createElement('target-old', 'old-crm', 'system', 'Legacy CRM', null, SYSTEM_ATTRS), createElement('target-new', 'new-crm', 'system', 'New CRM', null, SYSTEM_ATTRS)]);
+    const c = candidate({ seq: 0, kind: 'relationship', class: 'new', relationshipType: 'replaces', draftSubjectId: 'draft-replaces-id', decision: 'accepted', proposal: { kind: 'relationship', relationshipType: 'replaces', from: { kind: 'existing', elementId: 'new-crm' }, to: { kind: 'existing', elementId: 'old-crm' }, attributes: {} } });
+
+    const { deltas } = buildPromotionEnvelope({ candidates: [c], draftHead, targetHead, reviewerSourceId: REVIEWER_SOURCE_ID, mintId });
+
+    expect(deltas).toHaveLength(1); // the `replaces` edge itself only.
+    expect(() => fold(cloneHead(targetHead), deltas, ctx)).not.toThrow();
+  });
+});

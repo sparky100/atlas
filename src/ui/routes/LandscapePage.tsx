@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -53,7 +53,6 @@ import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import { parseCapabilityParam, zoomQueryString } from '../nav/zoomParams';
 import { useRouteTiming } from '../perf/useRouteTiming';
-import { SpreadsheetImportDialog } from '../import/SpreadsheetImportDialog';
 import { downloadImportPrompt } from '../import/downloadImportPrompt';
 import { supabase } from '../supabaseClient';
 import styles from './LandscapePage.module.css';
@@ -275,7 +274,7 @@ export function LandscapePage() {
   // Sprint U4-1 E1: see this component's own module comment.
   const narrow = useIsNarrowViewport(768);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
+  const navigate = useNavigate();
   const addMenuId = useId();
 
   // Sprint M1b (`docs/HANDOFF-M1b-comments.md`'s Canvas section, direction
@@ -414,7 +413,7 @@ export function LandscapePage() {
         refParam={refParam}
         onCreated={reloadMainBranch}
       />
-      <Button variant="secondary" onClick={() => { setImportOpen(true); }}>
+      <Button variant="secondary" onClick={() => { void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/capture`); }}>
         Import model updates…
       </Button>
     </>
@@ -642,7 +641,7 @@ export function LandscapePage() {
                       refParam={refParam}
                       onCreated={reloadMainBranch}
                     />
-                    <Button variant="secondary" onClick={() => { setImportOpen(true); }}>
+                    <Button variant="secondary" onClick={() => { void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/capture`); }}>
                       Import model updates…
                     </Button>
                     <Button variant="ghost" onClick={() => void downloadImportPrompt(supabase, model.id, model.slug)}>
@@ -782,7 +781,6 @@ export function LandscapePage() {
         )}
         </main>
       </div>
-      <SpreadsheetImportDialog open={importOpen} onClose={() => { setImportOpen(false); }} modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
     </div>
   );
 }

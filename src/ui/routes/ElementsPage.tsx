@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router';
+import { useMemo } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import type { AttributeDefinitionKind } from '../../contracts/attributeSchema';
 import type { Json } from '../../contracts/rows';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -26,7 +26,6 @@ import { useElementBrowse, type ElementBrowseFilter } from '../elements/useEleme
 import type { BrowseRow } from '../../db/elementBrowse';
 import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromCriticalExposedFinding, prefillFromCriticalSupportEndFinding } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
-import { SpreadsheetImportDialog } from '../import/SpreadsheetImportDialog';
 import { useRouteTiming } from '../perf/useRouteTiming';
 import styles from './ElementsPage.module.css';
 
@@ -96,7 +95,7 @@ export function ElementsPage() {
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const canEdit = canEditOnMain(role);
-  const [importOpen, setImportOpen] = useState(false);
+  const navigate = useNavigate();
   const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   // Same search-first "type a name, find it or create it" control the front
   // doors use (`ModelHome.tsx`'s own `HomeSearch` wiring, verbatim) — a
@@ -259,11 +258,10 @@ export function ElementsPage() {
                 : undefined
             }
             decisionRowAction={decisionRowAction}
-            onImportClick={canEdit ? () => { setImportOpen(true); } : undefined}
+            onImportClick={canEdit ? () => { void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/capture`); } : undefined}
           />
         </main>
       </div>
-      <SpreadsheetImportDialog open={importOpen} onClose={() => { setImportOpen(false); }} modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
     </div>
   );
 }

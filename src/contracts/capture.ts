@@ -108,7 +108,8 @@ export type CandidateProposal = ElementProposal | RelationshipProposal;
 // §4.3: evidence.
 // ---------------------------------------------------------------------------
 
-export type Extractor = 'sheet-mapping' | 'prose-llm' | 'capability-llm' | 'reimport-diff';
+/** `json-authored` (Sprint F2b, SPEC-capture.md §5.6): a JSON input's own entry — pre-extracted by a person or an external AI assistant rather than parsed/extracted by this pipeline. Its `evidence.passage` is the entry's own `quote` verbatim (or the entry's JSON fragment when no `quote` was given), never verified against a source document the way §5.3's grounding check verifies a prose passage — there is no raw text to check it against. */
+export type Extractor = 'sheet-mapping' | 'prose-llm' | 'capability-llm' | 'reimport-diff' | 'json-authored';
 
 export type EvidenceWarning =
   | { code: 'MERGED_CELL'; cell: string }

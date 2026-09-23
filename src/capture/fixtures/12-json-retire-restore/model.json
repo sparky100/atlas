@@ -1,0 +1,6 @@
+{
+  "elements": [
+    { "key": "legacy-crm", "type": "system", "id": "12222222-0000-0000-0000-000000000001", "name": "Legacy CRM", "attributes": { "lifecycleStatus": "active" }, "confidence": 1 },
+    { "key": "old-reports", "type": "system", "id": "12222222-0000-0000-0000-000000000002", "name": "Old Reports", "attributes": { "lifecycleStatus": "retired" }, "confidence": 0.5 }
+  ]
+}
