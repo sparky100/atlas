@@ -150,10 +150,53 @@ describe('rowsToCandidates — container parent', () => {
     expect(element?.proposal.parent).toEqual({ kind: 'unresolved', text: 'CRM' });
   });
 
-  it('leaves parent null when the sheet type is not container', () => {
-    const result = run(['Application', 'Parent system'], [['CRM', 'Something']], 'system');
+  it('leaves parent null on a container sheet\'s own row with a blank parent cell', () => {
+    const result = run(['Module', 'Parent system'], [['Billing', '']], 'container');
     const [element] = elementProposals(result);
     expect(element?.proposal.parent).toBeNull();
+  });
+
+  describe('mixed system/module sheet (Sprint F2b, SPEC-capture.md §5.2)', () => {
+    it('treats a system-sheet row with a blank parent cell as a system, parent null', () => {
+      const result = run(['Application', 'Parent system'], [['CRM', '']], 'system');
+      const [element] = elementProposals(result);
+      expect(element?.proposal.elementType).toBe('system');
+      expect(element?.proposal.parent).toBeNull();
+    });
+
+    it('treats a system-sheet row with a filled parent cell as a container, parent unresolved', () => {
+      const result = run(['Application', 'Parent system'], [['Billing', 'CRM']], 'system');
+      const [element] = elementProposals(result);
+      expect(element?.proposal.elementType).toBe('container');
+      expect(element?.proposal.parent).toEqual({ kind: 'unresolved', text: 'CRM' });
+    });
+
+    it('lets one sheet mix top-level systems and platform modules', () => {
+      const result = run(['Application', 'Parent system'], [['CRM', ''], ['Billing', 'CRM']], 'system');
+      const elements = elementProposals(result);
+      expect(elements.find((e) => e.proposal.name === 'CRM')?.proposal.elementType).toBe('system');
+      expect(elements.find((e) => e.proposal.name === 'Billing')?.proposal.elementType).toBe('container');
+    });
+  });
+});
+
+describe('rowsToCandidates — owner external syntax (Sprint F2b, SPEC-capture.md §5.2)', () => {
+  it('parses "Name (External: Org)" into an organisation actor, isExternal true', () => {
+    const result = run(['Application', 'Owner'], [['CRM', 'Civica (External: Civica Group)']]);
+    const actor = elementProposals(result).find((e) => e.proposal.elementType === 'actor');
+    expect(actor?.proposal).toMatchObject({ name: 'Civica', attributes: { subtype: 'organisation', isExternal: true, externalOrganisation: 'Civica Group' } });
+  });
+
+  it('groups a plain-name reference and an external-syntax reference to the same owner into one actor', () => {
+    const result = run(['Application', 'Owner'], [['CRM', 'Civica (External: Civica Group)'], ['Billing', 'Civica']]);
+    const actors = elementProposals(result).filter((e) => e.proposal.elementType === 'actor');
+    expect(actors).toHaveLength(1);
+  });
+
+  it('does not downgrade an external owner to person when an ownerEmail column is present', () => {
+    const result = run(['Application', 'Owner', 'Owner email'], [['CRM', 'Civica (External: Civica Group)', 'contact@civica.example']]);
+    const actor = elementProposals(result).find((e) => e.proposal.elementType === 'actor');
+    expect(actor?.proposal.attributes).toMatchObject({ subtype: 'organisation', email: 'contact@civica.example' });
   });
 });
 

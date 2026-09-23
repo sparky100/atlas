@@ -86,6 +86,7 @@ import { parsePastedText } from './parse/pastedText';
 import { parseXlsxWorkbook, type ParsedSpreadsheetSheet } from './parse/spreadsheet';
 import { dedupeIntraDocumentCandidates } from './intraDocumentDedup';
 import { diffAgainstPreviousImport, type PreviousCandidateForDiff } from './reimportDiff';
+import { isRelationshipsSheet, relationshipSheetToCandidates } from './relationshipSheetToCandidates';
 import { elementRowKey, relationshipRowKey } from './rowKey';
 import { rowsToCandidates, type CapabilityColumnRow, type RowCandidate } from './rowsToCandidates';
 
@@ -593,6 +594,18 @@ async function runSheetCapture(input: RunSheetCaptureInput): Promise<RunCaptureR
     totalRows += bodyRows.length;
     if (totalRows > MAX_ROWS) {
       return { status: 'failed', errorCode: 'INPUT_TOO_LARGE', message: `Workbook has more than ${String(MAX_ROWS)} data rows (K-16).` };
+    }
+
+    // Sprint F2b (SPEC-capture.md §5.2a): a Relationships sheet is detected
+    // and parsed before any column mapping — its rows are relationships
+    // directly, never element rows, and need no LLM call at all.
+    if (isRelationshipsSheet(sheet.sheetName, sheet.headers)) {
+      const relationshipCandidates = relationshipSheetToCandidates({ sheetName: sheet.sheetName, headers: sheet.headers, headerColumnRefs: sheet.headerColumnRefs, rawSheet, headerRowIndex });
+      bumpStat('sheet.type.relationships');
+      usableSheetCount++;
+      combined = combined.concat(relationshipCandidates.map((c) => offsetRowCandidate(c, seqOffset)));
+      seqOffset += relationshipCandidates.length;
+      continue;
     }
 
     const mapped = await mapSheetColumns({

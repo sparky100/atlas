@@ -1,4 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
+import * as XLSX from 'xlsx';
 import { describe, expect, it } from 'vitest';
 import { emptyHead } from '../engine/deltas';
 import { hashLlmRequest, RecordedLlmClient, type LlmClient, type LlmRequest, type LlmResponse } from './llm/client';
@@ -369,5 +370,80 @@ describe('runCapture — PDF (PR11 prose path)', () => {
     });
     expect(result.status).toBe('failed');
     if (result.status === 'failed') expect(result.errorCode).toBe('INPUT_UNREADABLE');
+  });
+});
+
+function buildWorkbookBuffer(sheets: Record<string, string[][]>): ArrayBuffer {
+  const workbook = XLSX.utils.book_new();
+  for (const [name, rows] of Object.entries(sheets)) {
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), name);
+  }
+  return XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+}
+
+describe('runCapture — Relationships sheet (Sprint F2b, SPEC-capture.md §5.2a)', () => {
+  it('resolves a Relationships-sheet row against systems the workbook\'s own Applications sheet just proposed, with no LLM call for either sheet', async () => {
+    const buffer = buildWorkbookBuffer({
+      Applications: [
+        ['Application', 'Supplier', 'Status'],
+        ['CRM', 'Acme', 'Live'],
+        ['Billing', 'Beta', 'Live'],
+      ],
+      Relationships: [
+        ['from', 'type', 'to', 'description'],
+        ['CRM', 'uses', 'Billing', 'reads invoice data'],
+      ],
+    });
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'Applications.xlsx',
+        source: { format: 'xlsx', bytes: buffer },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    const systems = result.candidates.filter((c) => c.elementType === 'system');
+    expect(systems).toHaveLength(2);
+
+    const uses = result.candidates.find((c) => c.relationshipType === 'uses');
+    expect(uses?.class).toBe('new');
+    expect(uses?.proposal.kind === 'relationship' && uses.proposal.attributes).toEqual({ description: 'reads invoice data' });
+    const crmId = systems.find((c) => c.proposal.kind === 'element' && c.proposal.name === 'CRM')?.draftSubjectId;
+    const billingId = systems.find((c) => c.proposal.kind === 'element' && c.proposal.name === 'Billing')?.draftSubjectId;
+    expect(uses?.proposal.kind === 'relationship' && uses.proposal.from).toEqual({ kind: 'existing', elementId: crmId });
+    expect(uses?.proposal.kind === 'relationship' && uses.proposal.to).toEqual({ kind: 'existing', elementId: billingId });
+  });
+
+  it('detects a Relationships sheet by header shape even when its name does not match', async () => {
+    const buffer = buildWorkbookBuffer({
+      Applications: [
+        ['Application', 'Supplier', 'Status'],
+        ['CRM', 'Acme', 'Live'],
+        ['Billing', 'Beta', 'Live'],
+      ],
+      Sheet2: [
+        ['from', 'type', 'to', 'description'],
+        ['CRM', 'flows_to', 'Billing', 'sends nightly extract'],
+      ],
+    });
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'Applications.xlsx',
+        source: { format: 'xlsx', bytes: buffer },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([], []),
+        mainHead: emptyHead(),
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    expect(result.candidates.find((c) => c.relationshipType === 'flows_to')?.class).toBe('new');
   });
 });

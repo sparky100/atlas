@@ -183,3 +183,65 @@ describe('assignCapabilities — prompt C fallback', () => {
     expect(result.candidates.every((c) => (c.proposal as RelationshipProposal<'supports'>).attributes.role === 'secondary')).toBe(true);
   });
 });
+
+describe('assignCapabilities — "|"-delimited literal list (Sprint F2b, SPEC-capture.md §5.2)', () => {
+  it('resolves each segment independently by name/alias, never calling prompt C', async () => {
+    const capabilities = [capability({ element_id: 'cap-1', name: 'Customer Service' }), capability({ element_id: 'cap-2', name: 'Billing' })];
+    const matchIndex = buildMatchIndex(capabilities, []);
+    const llmClient = new RecordedLlmClient({ cassettes: new Map() }); // throws on any miss — proves prompt C is never called.
+    const testRow = row({ seq: 0, capabilityText: 'Customer Service|Billing' });
+
+    const result = await assignCapabilities({ rows: [testRow], matchIndex, llmClient, startSeq: 10, mainHead: emptyHead() });
+
+    expect(result.assignments[0]?.capabilities).toEqual([
+      { elementId: 'cap-1', confidence: 1, source: 'trigram' },
+      { elementId: 'cap-2', confidence: 1, source: 'trigram' },
+    ]);
+  });
+
+  it('drops an unresolved segment silently, keeping the ones that matched', async () => {
+    const capabilities = [capability({ element_id: 'cap-1', name: 'Customer Service' })];
+    const matchIndex = buildMatchIndex(capabilities, []);
+    const llmClient = new RecordedLlmClient({ cassettes: new Map() });
+    const testRow = row({ seq: 0, capabilityText: 'Customer Service|Something Nonexistent' });
+
+    const result = await assignCapabilities({ rows: [testRow], matchIndex, llmClient, startSeq: 0, mainHead: emptyHead() });
+
+    expect(result.assignments[0]?.capabilities).toEqual([{ elementId: 'cap-1', confidence: 1, source: 'trigram' }]);
+  });
+
+  it('trims, drops blank segments and deduplicates case-insensitively', async () => {
+    const capabilities = [capability({ element_id: 'cap-1', name: 'Customer Service' })];
+    const matchIndex = buildMatchIndex(capabilities, []);
+    const llmClient = new RecordedLlmClient({ cassettes: new Map() });
+    const testRow = row({ seq: 0, capabilityText: ' Customer Service | | customer service ' });
+
+    const result = await assignCapabilities({ rows: [testRow], matchIndex, llmClient, startSeq: 0, mainHead: emptyHead() });
+
+    expect(result.assignments[0]?.capabilities).toHaveLength(1);
+  });
+
+  it('is all-secondary when the list resolves to two or more targets, same as a prompt-C row naming two', async () => {
+    const capabilities = [capability({ element_id: 'cap-1', name: 'Customer Service' }), capability({ element_id: 'cap-2', name: 'Billing' })];
+    const matchIndex = buildMatchIndex(capabilities, []);
+    const llmClient = new RecordedLlmClient({ cassettes: new Map() });
+    const testRow = row({ seq: 0, capabilityText: 'Customer Service|Billing' });
+
+    const result = await assignCapabilities({ rows: [testRow], matchIndex, llmClient, startSeq: 0, mainHead: emptyHead() });
+
+    expect(result.assignments[0]?.eligibleForPrimary).toBe(false);
+    expect(result.candidates.every((c) => (c.proposal as RelationshipProposal<'supports'>).attributes.role === 'secondary')).toBe(true);
+  });
+
+  it('is primary-eligible when the list resolves to exactly one target', async () => {
+    const capabilities = [capability({ element_id: 'cap-1', name: 'Customer Service' })];
+    const matchIndex = buildMatchIndex(capabilities, []);
+    const llmClient = new RecordedLlmClient({ cassettes: new Map() });
+    const testRow = row({ seq: 0, capabilityText: 'Customer Service|Something Nonexistent' });
+
+    const result = await assignCapabilities({ rows: [testRow], matchIndex, llmClient, startSeq: 0, mainHead: emptyHead() });
+
+    expect(result.assignments[0]?.eligibleForPrimary).toBe(true);
+    expect((result.candidates[0]?.proposal as RelationshipProposal<'supports'>).attributes.role).toBe('primary');
+  });
+});

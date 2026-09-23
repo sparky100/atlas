@@ -39,7 +39,7 @@ import type { SourceRef } from '../contracts/sourceRef';
 import { DEFAULTED_ATTRIBUTE_CONFIDENCE, parseFactorFor, rowFactorFor, sheetAttrConf } from './confidence';
 import type { ColumnRoleAssignment } from './columnSynonyms';
 import { normaliseName } from './normalise';
-import { looksLikePersonName, parseBool, parseDate, parseEmail, parseHostingModel, parseLifecycle, parseName } from './normaliseValue';
+import { looksLikePersonName, parseBool, parseDate, parseEmail, parseHostingModel, parseLifecycle, parseName, parseOwnerCell } from './normaliseValue';
 import { extractDataRows, type CellMeta, type RawSheet } from './parse/sheetGrid';
 import type { PromptAColumnRole } from './prompts/a';
 
@@ -157,6 +157,8 @@ interface ActorGroup {
   email?: string;
   emailConfidence?: number;
   emailRef?: SourceRef;
+  /** Sprint F2b: set when an `owner`/`technicalOwner` cell used the `"Name (External: Org)"` syntax — implies `subtype: 'organisation'` and `isExternal: true` at emission (Phase 3). */
+  externalOrganisation?: string;
   warnings: EvidenceWarning[];
   passages: string[];
   aliasProposals: { type: CaptureAliasType; value: string }[];
@@ -232,18 +234,31 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
     const nameRowFactor = rowFactorFor(Boolean(row.cellMeta.get(nameColumnIndex)?.merged) || Boolean(row.cellMeta.get(nameColumnIndex)?.formulaError));
     const nameConfidence = sheetAttrConf({ mappingConfidence: nameAssignment?.confidence ?? 1, parseFactor: 1, rowFactor: nameRowFactor });
 
+    // Sprint F2b (SPEC-capture.md §5.2): on a sheet whose own inferred type is
+    // `system` (never a container-named sheet — that keeps every row a
+    // container, `parent` optional, exactly as before), a mapped `parent`
+    // column decides the row's own type instead of the sheet's: blank →
+    // `system`, filled → `container` — the mixed platform/module register
+    // F2-lite's own `platform` column supported. A `container`-typed sheet's
+    // own rows are unaffected: still always `container`, `parent` optional.
     let parentText: string | null = null;
-    if (sheetType === 'container' && parentColIndex >= 0) {
+    let rowElementType: ElementType = sheetType;
+    if (parentColIndex >= 0) {
       const raw = (row.cells[parentColIndex] ?? '').trim();
-      if (raw !== '') parentText = raw;
+      if (sheetType === 'container') {
+        if (raw !== '') parentText = raw;
+      } else if (sheetType === 'system' && raw !== '') {
+        rowElementType = 'container';
+        parentText = raw;
+      }
     }
 
-    const key = elementGroupKey(sheetType, name, parentText);
+    const key = elementGroupKey(rowElementType, name, parentText);
     let group = elementGroups.get(key);
     if (!group) {
       group = {
         seq: -1,
-        elementType: sheetType,
+        elementType: rowElementType,
         name,
         nameConfidence,
         nameRef,
@@ -358,10 +373,24 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
 
       if (role === 'owner' || role === 'technicalOwner') {
         if (raw === '') continue;
-        const aKey = actorGroupKey(raw);
+        // Sprint F2b (SPEC-capture.md §5.2): "Name (External: Org)" marks the
+        // owner as a third-party organisation rather than an internal
+        // team/person — folded in from F2-lite's own owner-cell syntax.
+        const { name: ownerName, externalOrganisation } = parseOwnerCell(raw);
+        const aKey = actorGroupKey(ownerName);
         let actor = actorGroups.get(aKey);
         if (!actor) {
-          actor = { seq: -1, name: raw, nameConfidence: DEFAULTED_ATTRIBUTE_CONFIDENCE, nameRef: ref, subtype: looksLikePersonName(raw) ? 'person' : 'team', warnings: [], passages: [], aliasProposals: [{ type: 'name', value: raw }] };
+          actor = {
+            seq: -1,
+            name: ownerName,
+            nameConfidence: DEFAULTED_ATTRIBUTE_CONFIDENCE,
+            nameRef: ref,
+            subtype: externalOrganisation !== null ? 'organisation' : looksLikePersonName(ownerName) ? 'person' : 'team',
+            ...(externalOrganisation !== null ? { externalOrganisation } : {}),
+            warnings: [],
+            passages: [],
+            aliasProposals: [{ type: 'name', value: ownerName }],
+          };
           actorGroups.set(aKey, actor);
         }
         actor.passages.push(passage);
@@ -375,10 +404,11 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
         // Attaches to whichever actor this row's own `owner` column just produced — a row with `ownerEmail` but no `owner` column has nothing to attach to.
         const ownerRaw = ownerColIndex >= 0 ? (row.cells[ownerColIndex] ?? '').trim() : '';
         if (ownerRaw === '') continue;
-        const actor = actorGroups.get(actorGroupKey(ownerRaw));
+        const actor = actorGroups.get(actorGroupKey(parseOwnerCell(ownerRaw).name));
         if (!actor) continue;
         actor.email = email;
-        actor.subtype = 'person';
+        // Sprint F2b: an owner already marked external (`"Name (External: Org)"`) stays `organisation` — an email column is not reason to downgrade a declared third party to a person.
+        if (actor.subtype !== 'organisation') actor.subtype = 'person';
         actor.emailConfidence = sheetAttrConf({ mappingConfidence: assignment.confidence, parseFactor: 1, rowFactor });
         actor.emailRef = ref;
         continue;
@@ -457,9 +487,16 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
   // --- Phase 3: emit actor candidates. ---
   for (const actor of actorGroups.values()) {
     actor.seq = nextSeq++;
-    const attributes: Record<string, unknown> = { subtype: actor.subtype, isExternal: false };
-    const attributeConfidence: Record<string, number> = { subtype: DEFAULTED_ATTRIBUTE_CONFIDENCE, isExternal: DEFAULTED_ATTRIBUTE_CONFIDENCE, name: actor.nameConfidence };
+    // Sprint F2b: an owner cell's own `"(External: Org)"` syntax makes `isExternal` a stated fact (the same confidence as the parsed name), not §5.4's second default.
+    const isExternal = actor.externalOrganisation !== undefined;
+    const attributes: Record<string, unknown> = { subtype: actor.subtype, isExternal };
+    const attributeConfidence: Record<string, number> = { subtype: DEFAULTED_ATTRIBUTE_CONFIDENCE, isExternal: isExternal ? actor.nameConfidence : DEFAULTED_ATTRIBUTE_CONFIDENCE, name: actor.nameConfidence };
     const attributeRefs: Record<string, SourceRef> = { subtype: actor.nameRef, isExternal: actor.nameRef, name: actor.nameRef };
+    if (actor.externalOrganisation !== undefined) {
+      attributes.externalOrganisation = actor.externalOrganisation;
+      attributeConfidence.externalOrganisation = actor.nameConfidence;
+      attributeRefs.externalOrganisation = actor.nameRef;
+    }
     if (actor.email) {
       attributes.email = actor.email;
       attributeConfidence.email = actor.emailConfidence ?? DEFAULTED_ATTRIBUTE_CONFIDENCE;
