@@ -377,6 +377,8 @@ A `MULTI_VALUE_CELL` in `vendor` ("Civica / Northgate") keeps the first value as
 
 No other attribute is ever defaulted. This is not a demo shortcut (rule 7): the fact is real, sourced to the row, and honestly low-confidence.
 
+**Amended, a third default for prose-extracted relationship `role` (found in a capture-pipeline audit, issue #283):** `SupportsAttributes.role`/`OwnsAttributes.role` (`src/contracts/delta.ts`) are required, non-optional contract fields — unlike an element's own attributes (always `Partial<>`), a `supports`/`owns` relationship candidate cannot form a legal delta at all without one. Sheet rows always have a source for it (K-13: the matched header, or the row's own single/first capability edge); prose extraction (§6.2's prompt B) has no equivalent structural signal — the model is never asked for a role at all, since role is an inference from context (which header matched, which edge is primary), not something a sentence states. `src/capture/extractProse.ts`'s `applyRoleDefault()` therefore defaults an unset `supports.role` to `secondary` and an unset `owns.role` to `business`, both at the same 0.60 confidence as §5.4's other two defaults, with `attributeRefs` pointing at the passage that grounded the rest of the relationship. Kept, not narrowed to `invalid`, on the same reasoning as the two defaults above: a real, sourced, honestly-low-confidence fact beats forcing every prose-derived relationship through manual review just to supply a role the document was never going to state.
+
 ### 5.5 Confidence
 
 All machine-extracted confidence is capped at **0.95** for sheets and **0.90** for prose; **1.0 is reserved for human assertion** (UI §4.3).

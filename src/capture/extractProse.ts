@@ -211,6 +211,7 @@ function groundAttributes(rawAttributes: readonly PromptBRawAttribute[], parsers
   return { values, confidence, refs };
 }
 
+/** SPEC-capture.md §5.4's amended "third default" (issue #283): `role` is a required, non-optional contract field on `supports`/`owns` (`src/contracts/delta.ts`) with no equivalent-to-a-sheet-header signal in prose — defaulted at DEFAULTED_ATTRIBUTE_CONFIDENCE, same as the two element-attribute defaults §5.4 already names, rather than forcing every prose relationship to `invalid`. */
 function applyRoleDefault(relationshipType: RelationshipType, grounded: GroundedAttributes, fallbackRef: SourceRef): void {
   if (relationshipType === 'supports' && grounded.values.role === undefined) {
     grounded.values.role = 'secondary';
