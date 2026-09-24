@@ -17,7 +17,7 @@
 import type { RoadmapMode } from './roadmapEligibility';
 import type { RoadmapFilters } from './roadmapFilter';
 import { type RoadmapGroup } from './roadmapLifecycleRows';
-import { computeRoadmapAxisTicks, percentAtIso, todayPercent, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, percentAtIso, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { computeRoadmapVisibleData, eventsForSystem } from './roadmapVisibleData';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 
@@ -78,7 +78,8 @@ function xAt(pct: number): number {
 }
 
 function axisTicks(range: RoadmapTimelineRange, granularity: RoadmapGranularity): { label: string; x: number }[] {
-  return computeRoadmapAxisTicks(range, granularity).map((tick) => ({ label: tick.label, x: xAt(tick.pct) }));
+  const ticks = thinAxisTicksToFit(computeRoadmapAxisTicks(range, granularity), TRACK_WIDTH);
+  return ticks.map((tick) => ({ label: tick.label, x: xAt(tick.pct) }));
 }
 
 function groupLabelOf(group: Pick<RoadmapGroup, 'label'>): string {

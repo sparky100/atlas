@@ -62,6 +62,31 @@ export function computeRoadmapAxisTicks(range: RoadmapTimelineRange, granularity
   return ticks;
 }
 
+/** A conservative estimate of the widest label shape either granularity ever produces ("Q1 2026" / "Jan 2026"), in pixels — the default minimum gap `thinAxisTicksToFit` enforces between kept ticks. */
+export const AXIS_TICK_LABEL_WIDTH_PX = 64;
+
+/**
+ * Thins `ticks` to fit `containerWidthPx` — the piece `computeRoadmapAxisTicks`
+ * deliberately leaves out, since it's pure date math with no notion of a
+ * rendered pixel width. Converts `minLabelWidthPx` to a minimum gap in
+ * `pct` terms and greedily keeps a tick only when it's at least that far
+ * from the last *kept* tick, always keeping the first tick. Shared by
+ * `RoadmapView.tsx`'s DOM axis (real, measured width) and
+ * `roadmapPngExport.ts`'s canvas axis (`TRACK_WIDTH`, a fixed pixel width
+ * it already has on hand) so neither can show ticks closer together than
+ * their labels need, at any container width or granularity.
+ */
+export function thinAxisTicksToFit(ticks: readonly RoadmapAxisTick[], containerWidthPx: number, minLabelWidthPx: number = AXIS_TICK_LABEL_WIDTH_PX): RoadmapAxisTick[] {
+  if (ticks.length === 0 || containerWidthPx <= 0) return [...ticks];
+  const minGapPct = (minLabelWidthPx / containerWidthPx) * 100;
+  const kept: RoadmapAxisTick[] = [];
+  for (const tick of ticks) {
+    const last = kept[kept.length - 1];
+    if (!last || tick.pct - last.pct >= minGapPct) kept.push(tick);
+  }
+  return kept;
+}
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 /** Pads the computed range by this many days on each side — a bar landing exactly on the range's own start/end would otherwise sit flush against the container edge, with nothing showing it isn't clipped. */
 const PAD_DAYS = 30;

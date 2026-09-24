@@ -62,21 +62,48 @@ test('a retire-and-replace change, once merged, appears as an arrow on the roadm
   await retireElement(page, isoDateDaysFromNow(90), 'New CRM Platform');
   await expect(page.getByText(/Replaced by/)).toBeVisible();
 
-  // Submit and merge — record's single-reviewer weight puts "Approve &
-  // merge" directly on the change's own page, no review queue involved.
+  // Submit and merge — record's single-reviewer weight (`isMultiReviewer`
+  // false for `record`/`correct`) means the review request page shows a
+  // plain "Approve" (not the multi-reviewer verdict controls), followed by
+  // "Merge" once approved — `ChangeView.tsx`'s own `afterSubmitted` always
+  // navigates to the request's own page, so there's no separate review-
+  // queue visit needed here.
   await page.getByRole('link', { name: 'Changes' }).click();
   await page.locator('li', { hasText: 'sunset-legacy-crm' }).getByRole('link', { name: 'Open →' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
   await expect(page.getByText('proposed', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Approve & merge' }).click();
+  await page.getByRole('button', { name: 'Approve', exact: true }).click();
+  await page.getByRole('button', { name: 'Merge', exact: true }).click();
   await expect(page.getByText('merged', { exact: true }).first()).toBeVisible();
 
   // The roadmap: the merged change's own replacement arrow, in its own
   // target quarter.
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Roadmap' }).click();
+  // `exact: true`: the breadcrumb's own org/model links ("goldenpath-roadmap
+  // Org …") substring-match "Roadmap" too, since this spec's own fixture
+  // org/model names contain the word — only visible at the 1280 viewport,
+  // where the breadcrumb renders (collapsed at 390, where this spec also
+  // runs — S2's own "fix until they pass at 1280 and 390").
+  await page.getByRole('link', { name: 'Roadmap', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Roadmap' })).toBeVisible();
   await expect(page.getByText(quarterLabelDaysFromNow(120))).toBeVisible();
   await expect(page.locator('[data-kind="replace"]').first()).toBeVisible();
-  await expect(page.getByText('Legacy CRM replaced by New CRM Platform (Customer Contact)')).toBeVisible();
+  // No capability parenthetical: this event comes from the real `replaces`
+  // edge the retire flow wrote (`roadmapChangeEvents.ts`'s direct-edge
+  // path), which is capability-free by design — only the coincidental
+  // supports-retract/create heuristic fallback ever attaches one.
+  await expect(page.getByText('Legacy CRM replaced by New CRM Platform', { exact: true })).toBeVisible();
+
+  // Regression coverage for the reported bug: axis tick labels overlapping
+  // right on load, on mobile — assert every rendered tick's bounding box
+  // is disjoint from its neighbour's, at whatever width this run's own
+  // project (1280 or 390) actually gives the axis.
+  const axisTicks = page.getByRole('img', { name: 'Timeline by quarter' }).locator('> span');
+  const boxes = (await axisTicks.all().then((ticks) => Promise.all(ticks.map((tick) => tick.boundingBox())))).filter((box): box is NonNullable<typeof box> => box !== null);
+  boxes.sort((a, b) => a.x - b.x);
+  for (let i = 1; i < boxes.length; i++) {
+    const prev = boxes[i - 1];
+    const curr = boxes[i];
+    if (prev && curr) expect(curr.x, `axis tick ${String(i)} overlaps the previous one`).toBeGreaterThanOrEqual(prev.x + prev.width);
+  }
 });

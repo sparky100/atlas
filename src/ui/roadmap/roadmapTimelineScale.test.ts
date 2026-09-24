@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeRoadmapAxisTicks, computeRoadmapTimelineRange, computeRoadmapWindow, defaultRoadmapWindowStart, horizonDurationMonths, percentAt, percentAtIso, shiftRoadmapWindowStart, todayPercent } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, computeRoadmapTimelineRange, computeRoadmapWindow, defaultRoadmapWindowStart, horizonDurationMonths, percentAt, percentAtIso, shiftRoadmapWindowStart, thinAxisTicksToFit, todayPercent } from './roadmapTimelineScale';
 
 const NOW = new Date('2026-06-15T00:00:00Z');
 
@@ -77,6 +77,46 @@ describe('computeRoadmapAxisTicks', () => {
     const multiYearRange = { start: new Date('2024-01-01'), end: new Date('2027-12-31') };
     const ticks = computeRoadmapAxisTicks(multiYearRange, 'years');
     expect(ticks.map((t) => t.label)).toEqual(['2024', '2025', '2026', '2027']);
+  });
+});
+
+describe('thinAxisTicksToFit', () => {
+  it('keeps every tick when the container is wide enough that none of them would collide', () => {
+    const range = { start: new Date('2026-01-01'), end: new Date('2026-12-31') };
+    const ticks = computeRoadmapAxisTicks(range); // 4 quarter ticks
+    expect(thinAxisTicksToFit(ticks, 2000)).toHaveLength(4);
+  });
+
+  it('drops colliding ticks on a narrow container, always keeping the first', () => {
+    const range = { start: new Date('2024-01-01'), end: new Date('2027-12-31') };
+    const ticks = computeRoadmapAxisTicks(range); // 16 quarter ticks over 4 years
+    const thinned = thinAxisTicksToFit(ticks, 300);
+    expect(thinned.length).toBeLessThan(ticks.length);
+    expect(thinned[0]).toEqual(ticks[0]);
+    for (let i = 1; i < thinned.length; i++) {
+      const prev = thinned[i - 1];
+      const curr = thinned[i];
+      expect(curr).toBeDefined();
+      expect(prev).toBeDefined();
+      if (prev && curr) expect(curr.pct - prev.pct).toBeGreaterThanOrEqual((64 / 300) * 100 - 1e-9);
+    }
+  });
+
+  it('reproduces the reported bug shape — quarters over several years at a narrow mobile width never collide once thinned', () => {
+    const range = { start: new Date('2025-06-01'), end: new Date('2028-06-01') };
+    const ticks = computeRoadmapAxisTicks(range, 'quarters');
+    const thinned = thinAxisTicksToFit(ticks, 280);
+    for (let i = 1; i < thinned.length; i++) {
+      const prev = thinned[i - 1];
+      const curr = thinned[i];
+      if (prev && curr) expect(curr.pct - prev.pct).toBeGreaterThanOrEqual((64 / 280) * 100 - 1e-9);
+    }
+  });
+
+  it('returns ticks unchanged for a non-positive container width', () => {
+    const range = { start: new Date('2026-01-01'), end: new Date('2026-12-31') };
+    const ticks = computeRoadmapAxisTicks(range);
+    expect(thinAxisTicksToFit(ticks, 0)).toEqual(ticks);
   });
 });
 

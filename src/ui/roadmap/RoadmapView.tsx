@@ -1,13 +1,17 @@
 import { Link } from 'react-router';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
+import { useCanvasWidth } from '../landscape/useCanvasWidth';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import type { RoadmapFilters } from './roadmapFilter';
 import { isRoadmapEligibleBranch, type RoadmapMode } from './roadmapEligibility';
 import { type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
-import { computeRoadmapAxisTicks, computeRoadmapTimelineRange, computeRoadmapWindow, percentAtIso, todayPercent, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, computeRoadmapTimelineRange, computeRoadmapWindow, percentAtIso, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { changeDescription, computeRoadmapVisibleData, eventsForSystem, recentRoadmapChanges } from './roadmapVisibleData';
 import styles from './RoadmapView.module.css';
+
+/** A conservative mobile-safe width to thin ticks against before `useCanvasWidth`'s `ResizeObserver` reports a real measurement — the report this fixes was "overlapping right on load, every time," so the very first paint has to already be thinned, not just the settled one. */
+const AXIS_WIDTH_FALLBACK_PX = 300;
 
 export interface RoadmapViewProps {
   groups: readonly RoadmapGroup[];
@@ -86,11 +90,20 @@ function RoadmapRow({ bar, events, range, todayPct, orgSlug, modelSlug }: { bar:
   );
 }
 
-/** Tick marks along the range — orientation for "time horizontal," not a precise axis (a roadmap reads by season/quarter, not by day). Granularity (months/quarters/years) picks the unit. */
+/**
+ * Tick marks along the range — orientation for "time horizontal," not a
+ * precise axis (a roadmap reads by season/quarter, not by day).
+ * Granularity (months/quarters/years) picks the unit; `thinAxisTicksToFit`
+ * then drops whichever ticks would collide at this container's own
+ * measured width — `computeRoadmapAxisTicks` itself has no notion of
+ * pixels, so without this step a narrow (mobile) axis can show ticks
+ * closer together than their labels need, regardless of granularity.
+ */
 function RoadmapAxis({ range, granularity }: { range: RoadmapTimelineRange; granularity: RoadmapGranularity }) {
-  const ticks = computeRoadmapAxisTicks(range, granularity);
+  const { ref, width } = useCanvasWidth();
+  const ticks = thinAxisTicksToFit(computeRoadmapAxisTicks(range, granularity), width ?? AXIS_WIDTH_FALLBACK_PX);
   return (
-    <div className={styles.axis} role="img" aria-label="Timeline by quarter">
+    <div ref={ref} className={styles.axis} role="img" aria-label="Timeline by quarter">
       {ticks.map((tick) => (
         <span key={tick.label} className={styles.axisTick} style={{ left: `${String(tick.pct)}%` }}>
           <Text as="span" size="xs" tone="faint">
