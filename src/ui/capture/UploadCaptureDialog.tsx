@@ -19,7 +19,7 @@ import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
-import type { CreateCaptureJobInput, CaptureJobsStatus } from './useCaptureJob';
+import { isCreatingJob, type CreateCaptureJobInput, type CaptureJobsStatus } from './useCaptureJob';
 import styles from './UploadCaptureDialog.module.css';
 
 export interface UploadCaptureDialogProps {
@@ -187,7 +187,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
     });
   };
 
-  const canSubmit = selected !== null && localError === null && status !== 'creating';
+  const canSubmit = selected !== null && localError === null && !isCreatingJob(status);
 
   const onSubmit = () => {
     if (!selected) return;
@@ -245,7 +245,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                   type="file"
                   accept=".csv,.xlsx,.json,.pdf"
                   aria-label="Choose a CSV, XLSX, JSON, or PDF file"
-                  disabled={status === 'creating'}
+                  disabled={isCreatingJob(status)}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) onFileChange(file);
@@ -263,7 +263,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                   placeholder="Paste meeting notes, an email, or any other free text describing systems, owners, or relationships…"
                   aria-label="Pasted text"
                   value={pastedText}
-                  disabled={status === 'creating'}
+                  disabled={isCreatingJob(status)}
                   onChange={(e) => {
                     setPastedText(e.target.value);
                   }}
@@ -280,7 +280,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                     placeholder="pasted-text.txt"
                     aria-label="Name for this pasted text"
                     value={pasteName}
-                    disabled={status === 'creating'}
+                    disabled={isCreatingJob(status)}
                     onChange={(e) => {
                       setPasteName(e.target.value);
                     }}
@@ -296,7 +296,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                   className={styles.input}
                   type="date"
                   value={documentDate}
-                  disabled={status === 'creating'}
+                  disabled={isCreatingJob(status)}
                   onChange={(e) => {
                     setDocumentDateTouched(true);
                     setDocumentDate(e.target.value);
@@ -310,7 +310,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                     type="checkbox"
                     id="use-reimport"
                     checked={useReimport}
-                    disabled={status === 'creating'}
+                    disabled={isCreatingJob(status)}
                     onChange={(e) => {
                       setUseReimport(e.target.checked);
                     }}
@@ -335,9 +335,9 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
 
               <div className={styles.actions}>
                 <Button variant="primary" disabled={!canSubmit} onClick={onSubmit}>
-                  {status === 'creating' ? 'Starting…' : 'Start capture run'}
+                  {status === 'uploading' ? 'Uploading…' : status === 'saving' ? 'Saving…' : 'Start capture run'}
                 </Button>
-                <Button variant="ghost" disabled={status === 'creating'} onClick={handleClose}>
+                <Button variant="ghost" disabled={isCreatingJob(status)} onClick={handleClose}>
                   Cancel
                 </Button>
               </div>

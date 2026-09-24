@@ -16,8 +16,10 @@
  * anywhere (`ReviewRequestView.tsx`'s own cards are each fully
  * self-contained instead) — this row follows that existing convention
  * instead of inventing a new split-pane layout from zero: the passage is
- * shown inline, in its own bordered block, right where the rest of this
- * unit's evidence already is.
+ * shown inline, right where the rest of this unit's evidence already is,
+ * inside a `CollapsibleSection` (collapsed by default — the source ref
+ * alone is usually enough context; the passage itself is what a reviewer
+ * opens when actually checking a fact against the source).
  */
 import { useEffect, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
@@ -26,6 +28,7 @@ import { formatSourceRef } from '../../contracts/sourceRef';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { ConfidenceDots } from '../components/ConfidenceDots/ConfidenceDots';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../components/Text/Text';
@@ -256,14 +259,19 @@ export function CaptureCandidateRow({
         </div>
       )}
 
-      <div className={styles.source}>
+      {/* Reported: this is the document text being *analysed*, not the
+          candidate's own content — a reviewer usually only needs the source
+          ref for context, and the passage itself (which can run to several
+          hundred words, e.g. a wide table row's own extraction) only when
+          actually checking a fact. Collapsed by default, same disclosure
+          mechanism every other section in this app already uses (no
+          separate "show/hide" control invented for this one case) — the
+          source ref stays visible in the header either way. */}
+      <CollapsibleSection title="Source passage" meta={formatSourceRef(candidate.evidence.sourceRef)} defaultOpen={false}>
         <Text as="p" size="sm" mono>
           {candidate.evidence.passage}
         </Text>
-        <Text as="span" tone="faint" size="xs">
-          {formatSourceRef(candidate.evidence.sourceRef)}
-        </Text>
-      </div>
+      </CollapsibleSection>
 
       {canReview && candidate.class === 'ambiguous' && (
         <div className={styles.candidateList}>
