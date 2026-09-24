@@ -14,9 +14,17 @@
  *   surface is asked for by SPEC-capture.md K-10, which names a single
  *   default model. Provider choice stays server-side either way (the
  *   caller never picks a model), same principle, smaller surface.
- * - **No streaming.** Capture is a background job, not an interactive chat
- *   UI (`src/contracts/llmProxy.ts`'s own module comment) — the response
- *   is always the complete text, never `text/event-stream`.
+ * - **No streaming to the caller — until the in-app help chat.** Capture is
+ *   a background job, not an interactive chat UI, so its own `stream` field
+ *   only ever asks for provider-side streaming behind one buffered JSON
+ *   response (`src/contracts/llmProxy.ts`'s own module comment). The help
+ *   chat (`src/ui/help/`) is a real interactive UI, so it opts into the one
+ *   genuinely new thing this port adds back from Des-Studio: `streamToClient`
+ *   (`normalizeRequest`/`callAnthropicStreamingPassthrough` below) forwards
+ *   the provider's raw SSE to the browser as `text/event-stream`, same as
+ *   Des-Studio's own `return new Response(upstream.body, ...)` — every other
+ *   caller is completely unaffected, since this only activates when the
+ *   caller explicitly sets `streamToClient: true`.
  * - **No audio transcription, no URL-fetch/readability extraction.** Both
  *   exist in Des-Studio's own version but are Lens-specific product
  *   features (an SSRF-guarded URL importer, Whisper/Deepgram voice notes),
@@ -79,6 +87,8 @@ interface ProxyRequestBody {
   outputConfig?: ProxyOutputConfig;
   cacheControl?: boolean;
   stream?: boolean;
+  /** See this file's own module comment — the in-app help chat's own passthrough-streaming opt-in. */
+  streamToClient?: boolean;
 }
 
 /** Same three-role collapse `src/contracts/llmProxy.ts`'s own `normalizeRole` uses — kept in sync by hand across the runtime boundary (see that file's own module comment). */
@@ -118,7 +128,17 @@ function normalizeRequest(raw: unknown): ProxyRequestBody | Response {
   const outputConfig = normalizeOutputConfig(r.outputConfig);
   const cacheControl = r.cacheControl === true;
   const stream = r.stream === true;
-  return { messages, maxTokens, responseFormat, ...(outputConfig ? { outputConfig } : {}), cacheControl, stream };
+  const streamToClient = r.streamToClient === true;
+  // Mirrors `isValidLlmProxyRequest`'s own cross-field rule in
+  // `src/contracts/llmProxy.ts` by hand (same runtime-boundary duplication
+  // this file's own module comment already notes for the rest of this
+  // shape): a passthrough with nothing to forward, or asked for alongside
+  // structured JSON output, is rejected outright rather than silently
+  // downgraded to a buffered response the caller didn't ask for.
+  if (streamToClient && (!stream || responseFormat !== 'text' || outputConfig !== undefined)) {
+    return jsonResponse({ status: 'error', message: 'streamToClient requires stream: true, responseFormat: "text", and no outputConfig.' }, 400);
+  }
+  return { messages, maxTokens, responseFormat, ...(outputConfig ? { outputConfig } : {}), cacheControl, stream, ...(streamToClient ? { streamToClient: true } : {}) };
 }
 
 interface AnthropicCallResult {
@@ -256,6 +276,96 @@ function callAnthropic(request: ProxyRequestBody, apiKey: string, model: string)
   return request.stream ? callAnthropicStreaming(request, apiKey, model) : callAnthropicBuffered(request, apiKey, model);
 }
 
+interface PassthroughResult {
+  response: Response;
+  /** Resolves once the stream this file's own caller reads has fully drained (success or failure) — so `Deno.serve`'s handler can await it and log exactly one `llm_proxy_requests` row per call, same as every other path, without blocking the first byte reaching the browser. */
+  logged: Promise<{ status: 'ok' | 'error'; inputTokens: number; outputTokens: number }>;
+}
+
+/**
+ * The in-app help chat's own path (`streamToClient`, this file's own module
+ * comment): opens the same upstream SSE call `callAnthropicStreaming` does,
+ * but instead of accumulating it into one buffered `AnthropicCallResult`,
+ * forwards each raw chunk to this function's own caller immediately — the
+ * exact bytes Anthropic sent, so the browser's own SSE parser
+ * (`src/ui/help/streamHelpAnswer.ts`, the same `data:` line format Des-
+ * Studio's `apiClient.js` already parses) needs no proxy-specific dialect.
+ * Usage/stop-reason are parsed from the same bytes as they pass through,
+ * purely for the post-stream audit log — never to alter what's forwarded.
+ */
+function callAnthropicStreamingPassthrough(request: ProxyRequestBody, apiKey: string, model: string): PassthroughResult {
+  let resolveLogged!: (value: { status: 'ok' | 'error'; inputTokens: number; outputTokens: number }) => void;
+  const logged = new Promise<{ status: 'ok' | 'error'; inputTokens: number; outputTokens: number }>((resolve) => {
+    resolveLogged = resolve;
+  });
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let inputTokens = 0;
+      let outputTokens = 0;
+      try {
+        const upstream = await fetch(ANTHROPIC_API_URL, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': ANTHROPIC_VERSION },
+          body: JSON.stringify(buildAnthropicBody(request, model, true)),
+        });
+
+        if (!upstream.ok || !upstream.body) {
+          const detail = await upstream.text().catch(() => '');
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'error', error: { message: `Upstream ${String(upstream.status)}: ${detail || 'no body'}` } })}\n\n`));
+          controller.close();
+          resolveLogged({ status: 'error', inputTokens: 0, outputTokens: 0 });
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+        for (const reader = upstream.body.getReader(); ;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          // Forwarded verbatim — this proxy never re-encodes what it just decoded to inspect it, so a caller reading raw bytes sees exactly what Anthropic sent.
+          controller.enqueue(value);
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue;
+            const payload = line.slice('data:'.length).trim();
+            if (!payload) continue;
+            let event: Record<string, unknown>;
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Deno runtime, no shared type-checking with src/.
+              event = JSON.parse(payload);
+            } catch {
+              continue;
+            }
+            if (event.type === 'message_start') {
+              const usage = (event.message as { usage?: Record<string, unknown> } | undefined)?.usage;
+              if (typeof usage?.input_tokens === 'number') inputTokens = usage.input_tokens;
+            } else if (event.type === 'message_delta') {
+              const usage = event.usage as Record<string, unknown> | undefined;
+              if (typeof usage?.output_tokens === 'number') outputTokens = usage.output_tokens;
+            }
+          }
+        }
+        controller.close();
+        resolveLogged({ status: 'ok', inputTokens, outputTokens });
+      } catch (e) {
+        controller.error(e);
+        resolveLogged({ status: 'error', inputTokens, outputTokens });
+      }
+    },
+  });
+
+  return {
+    response: new Response(stream, {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' },
+    }),
+    logged,
+  };
+}
+
 interface LlmProxyConfig {
   model: string;
   apiKey: string;
@@ -388,6 +498,22 @@ Deno.serve(async (req: Request) => {
     if (!config.apiKey) {
       await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs: Date.now() - startedAt });
       return jsonResponse({ status: 'error', message: 'LLM proxy is not configured — no API key in platform_config\'s "llm" row or ANTHROPIC_API_KEY. See docs/EDGE-FUNCTIONS.md.' }, 503);
+    }
+
+    if (proxyRequest.streamToClient) {
+      const passthrough = callAnthropicStreamingPassthrough(proxyRequest, config.apiKey, model);
+      // The response streams to the browser immediately; the audit-log row
+      // (`logRequest`, same table/shape every other path writes) is written
+      // once `passthrough.logged` resolves, after this function has already
+      // returned — `EdgeRuntime.waitUntil` (Deno Deploy's own mechanism for
+      // exactly this) keeps the isolate alive for it. Falls back to a plain
+      // fire-and-forget `.then()` when that global isn't present (e.g. a
+      // local test runner), since a best-effort audit log must never block
+      // or fail the response itself (`logRequest`'s own comment).
+      const logAfterStream = passthrough.logged.then((outcome) => logRequest({ serviceClient, orgId, model, status: outcome.status, latencyMs: Date.now() - startedAt, inputTokens: outcome.inputTokens, outputTokens: outcome.outputTokens }));
+      const runtime = (globalThis as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;
+      if (runtime) runtime.waitUntil(logAfterStream);
+      return passthrough.response;
     }
 
     const result = await callAnthropic(proxyRequest, config.apiKey, model);

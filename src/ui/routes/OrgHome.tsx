@@ -32,7 +32,7 @@ export function OrgHome() {
   if (orgLoading) {
     return (
       <div>
-        <AppHeader />
+        <AppHeader orgId={organisation?.id ?? null} />
         <main className={styles.main}>
           <Text tone="muted">Loading…</Text>
         </main>
@@ -43,7 +43,7 @@ export function OrgHome() {
   if (orgError !== null || !organisation) {
     return (
       <div>
-        <AppHeader />
+        <AppHeader orgId={organisation?.id ?? null} />
         <main className={styles.main}>
           <Text as="p">{orgError ?? `No organisation found for "${orgSlug ?? ''}", or you're not a member of it.`}</Text>
         </main>
@@ -53,7 +53,7 @@ export function OrgHome() {
 
   return (
     <div>
-      <AppHeader>
+      <AppHeader orgId={organisation.id}>
         <OrgSwitcher organisations={organisations} currentOrgSlug={organisation.slug} />
         {canManageOrgSettings(role) && (
           // Sprint 7j item 2: "a small settings affordance beside

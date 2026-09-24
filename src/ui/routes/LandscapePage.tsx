@@ -342,7 +342,7 @@ export function LandscapePage() {
   if (orgLoading || modelsLoading || !model) {
     return (
       <div>
-        <AppHeader />
+        <AppHeader orgId={organisation?.id ?? null} />
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
@@ -444,7 +444,7 @@ export function LandscapePage() {
 
   return (
     <div>
-      <AppHeader />
+      <AppHeader orgId={organisation?.id ?? null} />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main ref={canvasWidthRef} className={[styles.main, canvasWidthClass ? styles.mainWithCanvas : ''].filter(Boolean).join(' ')}>

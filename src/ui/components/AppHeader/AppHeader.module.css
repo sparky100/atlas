@@ -26,3 +26,21 @@
   color: var(--text);
   font-weight: 600;
 }
+
+.helpToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.helpToggle:hover {
+  background: var(--bg-subtle);
+  color: var(--text);
+}

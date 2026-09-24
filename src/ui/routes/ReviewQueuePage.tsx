@@ -23,7 +23,7 @@ export function ReviewQueuePage() {
   if (orgLoading || modelsLoading || !model || !organisation) {
     return (
       <div>
-        <AppHeader />
+        <AppHeader orgId={organisation?.id ?? null} />
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
@@ -36,7 +36,7 @@ export function ReviewQueuePage() {
 
   return (
     <div>
-      <AppHeader />
+      <AppHeader orgId={organisation.id} />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>

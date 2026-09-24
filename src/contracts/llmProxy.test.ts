@@ -78,6 +78,49 @@ describe('buildLlmProxyRequest — F2 (full K1) additions', () => {
   });
 });
 
+describe('buildLlmProxyRequest — streamToClient (in-app help passthrough)', () => {
+  it('omits streamToClient when not given', () => {
+    expect(buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }] })).not.toHaveProperty('streamToClient');
+  });
+
+  it('forces stream: true when streamToClient is set, even if stream was left unset', () => {
+    const request = buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }], streamToClient: true });
+    expect(request.stream).toBe(true);
+    expect(request.streamToClient).toBe(true);
+  });
+
+  it('produces something isValidLlmProxyRequest accepts', () => {
+    const request = buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }], streamToClient: true });
+    expect(isValidLlmProxyRequest(request)).toBe(true);
+  });
+});
+
+describe('isValidLlmProxyRequest — streamToClient cross-field rule', () => {
+  const base = { version: LLM_PROXY_CONTRACT_VERSION, messages: [{ role: 'user' as const, content: 'x' }], maxTokens: 100, responseFormat: 'text' as const };
+
+  it('rejects streamToClient: true without stream: true', () => {
+    expect(isValidLlmProxyRequest({ ...base, streamToClient: true })).toBe(false);
+    expect(isValidLlmProxyRequest({ ...base, stream: false, streamToClient: true })).toBe(false);
+  });
+
+  it('rejects streamToClient: true with responseFormat: json', () => {
+    expect(isValidLlmProxyRequest({ ...base, stream: true, responseFormat: 'json', streamToClient: true })).toBe(false);
+  });
+
+  it('rejects streamToClient: true alongside an outputConfig', () => {
+    const outputConfig = { effort: 'high' as const, format: { type: 'json_schema' as const, schema: { type: 'object' } } };
+    expect(isValidLlmProxyRequest({ ...base, stream: true, outputConfig, streamToClient: true })).toBe(false);
+  });
+
+  it('accepts streamToClient: true with stream: true and responseFormat: text', () => {
+    expect(isValidLlmProxyRequest({ ...base, stream: true, streamToClient: true })).toBe(true);
+  });
+
+  it('rejects a non-boolean streamToClient', () => {
+    expect(isValidLlmProxyRequest({ ...base, stream: true, streamToClient: 'yes' })).toBe(false);
+  });
+});
+
 describe('isValidLlmProxyRequest', () => {
   it('rejects a request with zero messages', () => {
     expect(isValidLlmProxyRequest({ version: LLM_PROXY_CONTRACT_VERSION, messages: [], maxTokens: 100, responseFormat: 'text' })).toBe(false);

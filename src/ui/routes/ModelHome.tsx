@@ -130,7 +130,7 @@ export function ModelHome() {
   if (loading || !model) {
     return (
       <div>
-        <AppHeader />
+        <AppHeader orgId={organisation?.id ?? null} />
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
@@ -143,7 +143,7 @@ export function ModelHome() {
 
   return (
     <div>
-      <AppHeader />
+      <AppHeader orgId={organisation?.id ?? null} />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>

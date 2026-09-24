@@ -211,7 +211,7 @@ export function CapabilityMapPage() {
   if (orgLoading || modelsLoading || !model) {
     return (
       <div>
-        <AppHeader />
+        <AppHeader orgId={organisation?.id ?? null} />
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
@@ -237,7 +237,7 @@ export function CapabilityMapPage() {
 
   return (
     <div>
-      <AppHeader />
+      <AppHeader orgId={organisation?.id ?? null} />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={[styles.main, hasContent ? styles.mainWithMap : ''].filter(Boolean).join(' ')}>

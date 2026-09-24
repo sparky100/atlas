@@ -66,9 +66,13 @@ retention, ported from the existing suite's own real, deployed `llm-proxy`
 (see `docs/ADR-000-foundations.md`'s ADR-014 amendment for exactly what was
 and wasn't carried over, and why this is a port into Atlas's own
 deployment rather than Atlas calling the existing suite's project
-directly). Anthropic only, no streaming — see the function's own module
-comment (`supabase/functions/llm-proxy/index.ts`) for the full list of
-deliberate cuts from the source it was ported from.
+directly). Anthropic only. No streaming to the caller for capture's own
+calls — see the function's own module comment
+(`supabase/functions/llm-proxy/index.ts`) for the full list of deliberate
+cuts from the source it was ported from. The in-app help chat (`src/ui/
+help/`) is the one caller that does stream to the browser, via the
+additive `streamToClient` field below, ported back from that same source
+now that an interactive chat UI actually exists in Atlas.
 
 Holds the Supabase **service-role** key, unlike `send-invite-email` above —
 it needs to write `llm_proxy_requests` (E4's own audit/rate-limit table;
@@ -187,7 +191,8 @@ cassette can tell which shape produced it):
 
 - `outputConfig?: { effort: 'low'|'medium'|'high'|'xhigh'|'max', format: { type: 'json_schema', schema } }` — asks the provider for schema-constrained JSON via its own `output_config`, instead of `responseFormat: 'json'`'s free-form hint.
 - `cacheControl?: boolean` — marks the joined system-role content as a stable, cache-controlled prefix (`cache_control: { type: 'ephemeral' }`).
-- `stream?: boolean` — asks the proxy to stream the generation from the provider internally, so a long prose-extraction call doesn't sit on one buffered upstream response long enough to time out. This call's own response to its caller is never `text/event-stream` either way — always one complete JSON body.
+- `stream?: boolean` — asks the proxy to stream the generation from the provider internally, so a long prose-extraction call doesn't sit on one buffered upstream response long enough to time out. This call's own response to its caller is never `text/event-stream` on its own — always one complete JSON body, unless `streamToClient` (below) is also set.
+- `streamToClient?: boolean` — the help chat's own opt-in: forwards the provider's raw SSE straight through as this call's own `text/event-stream` response, instead of buffering it into JSON. Requires `stream: true`, `responseFormat: 'text'`, and no `outputConfig`. One `llm_proxy_requests` row is still logged once the stream ends (usage is parsed from the forwarded bytes as they pass through, not from a second call).
 - Response gains `stopReason?: string` (the provider's own stop reason — `end_turn`/`max_tokens`/`refusal`/…) and `cacheReadTokens?: number`.
 
 `src/capture/llm/client.ts`'s `ProxyLlmClient` is the one caller that sets
