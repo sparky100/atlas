@@ -574,11 +574,11 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
           <Link to={duplicatesHref}>
             <Text as="span" size="2xl" className={insightsData && insightsData.duplicatesCount > 0 ? styles.statWarn : undefined}>
               {insightsData ? insightsData.duplicatesCount : '…'}
+            </Text>{' '}
+            <Text as="span" tone="muted" size="sm">
+              duplicate{insightsData?.duplicatesCount === 1 ? '' : 's'} flagged
             </Text>
-          </Link>{' '}
-          <Text as="span" tone="muted" size="sm">
-            duplicate{insightsData?.duplicatesCount === 1 ? '' : 's'} flagged
-          </Text>
+          </Link>
         </div>
       </div>
 

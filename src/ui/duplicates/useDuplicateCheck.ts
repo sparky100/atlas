@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ElementsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import { dismissDuplicatePair, getLatestDuplicateCheckRun, listDuplicateCandidates, runDuplicateCheck } from '../../db/duplicates';
 import type { DuplicateCandidateRow, DuplicateCheckRunRow } from '../../db/types';
@@ -10,6 +11,8 @@ export type DuplicateCheckStatus = 'loading' | 'idle' | 'checking';
 export interface UseDuplicateCheckResult {
   status: DuplicateCheckStatus;
   candidates: DuplicateCandidateRow[];
+  /** Every element a returned candidate names, resolved once by `listDuplicateCandidates` itself — the same read that already excludes a merged-away/retracted element's own stale row (that function's own doc comment). */
+  elementsById: Map<UUID, ElementsHeadRow>;
   latestRun: DuplicateCheckRunRow | null;
   error: string | null;
   /** Invokes `atlas.run_duplicate_check` and reloads the candidate list once it resolves. */
@@ -31,9 +34,10 @@ const POLL_INTERVAL_MS = 2500;
  * instead" convention `useCaptureJobs` already established, covering a
  * `pg_cron`-triggered run this hook didn't itself start.
  */
-export function useDuplicateCheck(modelId: UUID): UseDuplicateCheckResult {
+export function useDuplicateCheck(modelId: UUID, commitId: UUID): UseDuplicateCheckResult {
   const [status, setStatus] = useState<DuplicateCheckStatus>('loading');
   const [candidates, setCandidates] = useState<DuplicateCandidateRow[]>([]);
+  const [elementsById, setElementsById] = useState<Map<UUID, ElementsHeadRow>>(new Map());
   const [latestRun, setLatestRun] = useState<DuplicateCheckRunRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -45,10 +49,11 @@ export function useDuplicateCheck(modelId: UUID): UseDuplicateCheckResult {
   useEffect(() => {
     let cancelled = false;
     setStatus('loading');
-    Promise.all([listDuplicateCandidates(supabase, modelId), getLatestDuplicateCheckRun(supabase, modelId)])
-      .then(([candidateRows, run]) => {
+    Promise.all([listDuplicateCandidates(supabase, modelId, commitId), getLatestDuplicateCheckRun(supabase, modelId)])
+      .then(([{ candidates: candidateRows, elementsById: elementsMap }, run]) => {
         if (cancelled) return;
         setCandidates(candidateRows);
+        setElementsById(elementsMap);
         setLatestRun(run);
         setStatus('idle');
       })
@@ -62,7 +67,7 @@ export function useDuplicateCheck(modelId: UUID): UseDuplicateCheckResult {
     return () => {
       cancelled = true;
     };
-  }, [modelId, reloadToken]);
+  }, [modelId, commitId, reloadToken]);
 
   const reload = useCallback(() => {
     setReloadToken((t) => t + 1);
@@ -109,5 +114,5 @@ export function useDuplicateCheck(modelId: UUID): UseDuplicateCheckResult {
     [modelId, reload],
   );
 
-  return { status, candidates, latestRun, error, checkNow, dismiss, reload };
+  return { status, candidates, elementsById, latestRun, error, checkNow, dismiss, reload };
 }

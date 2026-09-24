@@ -13,12 +13,10 @@
  * omitted entirely for them, not shown disabled (this codebase's own
  * convention everywhere else a role gate hides an action).
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router';
-import type { ElementsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import type { MemberRole } from '../../db/types';
-import { getElementsByIds } from '../../db/elements';
 import { setDuplicatesCheckEnabled } from '../../db/duplicates';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -66,31 +64,11 @@ function signalBadges(signals: Record<string, unknown>): string[] {
 }
 
 export function DuplicatesReportView({ modelId, orgSlug, modelSlug, searchCommitId, duplicatesCheckEnabled, role }: DuplicatesReportViewProps) {
-  const { status, candidates, latestRun, error, checkNow, dismiss } = useDuplicateCheck(modelId);
-  const [elementsById, setElementsById] = useState<Map<UUID, ElementsHeadRow>>(new Map());
+  const { status, candidates, elementsById, latestRun, error, checkNow, dismiss } = useDuplicateCheck(modelId, searchCommitId);
   const [checkEnabled, setCheckEnabled] = useState(duplicatesCheckEnabled);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const canRun = canRunDuplicateCheck(role);
   const canManage = canManageDuplicatesCheck(role);
-
-  useEffect(() => {
-    let cancelled = false;
-    const ids = [...new Set(candidates.flatMap((c) => [c.element_a_id, c.element_b_id]))];
-    // No candidates yet (or none left) — nothing to resolve; `elementsById`
-    // is only ever read through `candidates.map`, so a stale, unused map
-    // left over from before the last candidate was dismissed is harmless.
-    if (ids.length === 0) return undefined;
-    getElementsByIds(supabase, searchCommitId, ids)
-      .then((map) => {
-        if (!cancelled) setElementsById(map);
-      })
-      .catch((e: unknown) => {
-        reportError("Couldn't load the elements in this report.", e);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [candidates, searchCommitId]);
 
   const handleToggle = (checked: boolean) => {
     setCheckEnabled(checked);
