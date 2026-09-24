@@ -109,10 +109,11 @@ function resolveCardAction(check: HealthCheck): FindingCardAction | null {
  * visible at 1080p without scrolling for a realistically-sized model.
  *
  * 1. A headline stat row (Review queue / findings needing attention /
- *    assurance items / my open changes), the same big-number/muted-label
- *    style the director door's own `.statsRow` already uses — this
- *    replaces the standalone "Review queue" panel's own oversized count,
- *    which now duplicates into one of these four numbers instead.
+ *    assurance items / my open changes / duplicates flagged — F4 added the
+ *    fifth), the same big-number/muted-label style the director door's own
+ *    `.statsRow` already uses — this replaces the standalone "Review queue"
+ *    panel's own oversized count, which now duplicates into one of these
+ *    numbers instead.
  *    "Findings needing attention" counts active *checks* (high+medium),
  *    not raw item counts — the same unit "N checks clear" already uses
  *    elsewhere on this door, and the only one that stays meaningful across
@@ -169,11 +170,14 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
     href: `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefill).toString()}`,
     label: 'Start a decision →',
   });
+  // F4 (ADR-019 "Amended (F4, ...)"): the architect door's own link into the
+  // standing duplicates report.
+  const duplicatesHref = `/o/${orgSlug}/m/${modelSlug}/duplicates`;
 
-  // `duplicatesCount` is typed as the literal `0` (still wired to 0 until
-  // Q1, ADR-019) — a placeholder notice, not a real check yet, so it's
-  // left out of this list and rendered as its own permanent line below
-  // rather than something "N checks clear" could ever roll it into.
+  // F4 (ADR-019 "Amended (F4, ...)"): `duplicatesCount` is real now — the
+  // standing duplicates report's own open-candidate count. Still left out
+  // of this list (it isn't a `HealthCheck` — no browse-table home, no
+  // severity) and rendered as its own stat/link below instead.
   const healthChecks: HealthCheck[] = !insightsData
     ? []
     : [
@@ -562,6 +566,20 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
             open change{data.myOpenBranches.length === 1 ? '' : 's'} of mine
           </Text>
         </div>
+        {/* F4 (ADR-019 "Amended (F4, ...)"): the fifth stat — the standing
+            duplicates report's own open-candidate count, real from here on
+            (previously a permanent "wired to 0" placeholder line below the
+            grid instead of a stat at all). */}
+        <div className={styles.stat}>
+          <Link to={duplicatesHref}>
+            <Text as="span" size="2xl" className={insightsData && insightsData.duplicatesCount > 0 ? styles.statWarn : undefined}>
+              {insightsData ? insightsData.duplicatesCount : '…'}
+            </Text>
+          </Link>{' '}
+          <Text as="span" tone="muted" size="sm">
+            duplicate{insightsData?.duplicatesCount === 1 ? '' : 's'} flagged
+          </Text>
+        </div>
       </div>
 
       <div className={styles.columns}>
@@ -608,20 +626,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
             ) : (
               <>
                 {findingGrid(gridHealthChecks)}
-                {(infoHealthChecks.length > 0 || activeHealthChecks.length > 0) && (
-                  <div className={styles.infoRows}>
-                    {infoRows(infoHealthChecks)}
-                    {/* Not a real check (always 0 until Q1, ADR-019) — never
-                        part of `healthChecks` or its "N checks clear" collapse,
-                        but kept alongside the other findings rather than shown
-                        when every real check is already clean. */}
-                    {activeHealthChecks.length > 0 && (
-                      <Text as="p" tone="faint" size="sm">
-                        {insightsData.duplicatesCount} duplicates flagged — wired to 0 until Q1&rsquo;s matching pipeline can populate the standing duplicates report (ADR-019).
-                      </Text>
-                    )}
-                  </div>
-                )}
+                {infoHealthChecks.length > 0 && <div className={styles.infoRows}>{infoRows(infoHealthChecks)}</div>}
                 {clearChecksSection(clearHealthChecks)}
 
                 {/* Item 5: Assurance keeps its own heading but uses the same

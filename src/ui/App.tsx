@@ -10,6 +10,7 @@ import { ContainerPage } from './routes/ContainerPage';
 import { ContextPage } from './routes/ContextPage';
 import { DecisionPage } from './routes/DecisionPage';
 import { DecisionsPage } from './routes/DecisionsPage';
+import { DuplicatesReportPage } from './routes/DuplicatesReportPage';
 import { ElementPage } from './routes/ElementPage';
 import { ElementsPage } from './routes/ElementsPage';
 import { ExternalInterfacesPage } from './routes/ExternalInterfacesPage';
@@ -81,6 +82,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/review/capture/:jobId" element={<CaptureReviewPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/boundary-crossings" element={<BoundaryCrossingsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/external-interfaces" element={<ExternalInterfacesPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/duplicates" element={<DuplicatesReportPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

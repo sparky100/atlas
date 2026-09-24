@@ -20,10 +20,12 @@ export {
   canEditBranch,
   canEditOnMain,
   canEditValueStreamStructure,
+  canManageDuplicatesCheck,
   canManageOrgSettings,
   canRestoreModel,
   canReviewMergeRequest,
   canRunCapture,
+  canRunDuplicateCheck,
   canStartDecision,
 } from './roleGates';
 

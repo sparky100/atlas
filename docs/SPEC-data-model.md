@@ -562,6 +562,48 @@ Outcome of running §6.3 against a commit's head.
 
 Primary key `(commit_id, level)`.
 
+#### `duplicate_check_runs`
+One duplicate-detection run against one model (F4, ADR-019 — `20260924010000_duplicates_schema.sql`).
+
+| Column | Type | Constraints |
+|---|---|---|
+| `model_id` | uuid | → `models(id)` |
+| `triggered_by` | uuid | → `auth.users(id)`, nullable — `null` means a scheduled (`pg_cron`) run, never a manual one |
+| `status` | duplicate_check_status | not null default `running` |
+| `candidate_count` | int | nullable until finished |
+| `error` | text | nullable — set only on `status = 'failed'` |
+| `finished_at` | timestamptz | nullable |
+
+Index `(model_id, created_at desc)` — the report's own "last checked" reads the newest row per model.
+
+#### `duplicate_candidates`
+The current, re-computed-each-run set of plausible duplicate pairs for a model (F4, ADR-019).
+
+| Column | Type | Constraints |
+|---|---|---|
+| `model_id` | uuid | → `models(id)` |
+| `element_a_id`, `element_b_id` | uuid | not null, `check (element_a_id < element_b_id)` — one canonical row per unordered pair |
+| `element_type` | element_type | not null, `check (element_type in ('system','container'))` — v1 scope; both sides always share this type by construction |
+| `score` | numeric(4,3) | not null, `[0,1]` — a documented, tunable weighted combination of the signals below, never derived science |
+| `name_similarity` | real | not null, `[0,1]` — the `pg_trgm` `%`-operator match that gates a pair's existence at all (`IDENTITY_TRIGRAM_THRESHOLD`, 0.6, SPEC §8 point 3) |
+| `signals` | jsonb | not null default `'{}'` — `{sharedOwner, sharedVendor, sharedParent, sharedDescription, neighbourOverlapCount, matchedVia}`, the exact inputs `score` was computed from |
+| `last_seen_check_run_id` | uuid | → `duplicate_check_runs(id)` |
+
+Unique `(model_id, element_a_id, element_b_id)`. Index `(model_id, score desc)`. Re-computed wholesale by every `atlas.run_duplicate_check` call: a pair refreshed if it still qualifies, deleted if it no longer does — never left stale. The report's own read query (not this table alone) inner-joins both sides to `elements_head` at main's current head, so a merged-away or retracted element silently drops the pair with no cleanup RPC needed.
+
+#### `duplicate_dismissals`
+A human's permanent "not a duplicate" for one pair (F4, ADR-019).
+
+| Column | Type | Constraints |
+|---|---|---|
+| `model_id` | uuid | → `models(id)` |
+| `element_a_id`, `element_b_id` | uuid | not null, `check (element_a_id < element_b_id)` |
+| `dismissed_by` | uuid | not null |
+
+Unique `(model_id, element_a_id, element_b_id)`. Append-only in v1 — consulted by `atlas.run_duplicate_check` so a dismissed pair is never re-proposed; no un-dismiss action exists yet, and since this table isn't among CLAUDE.md rule 5's protected ones, adding one later is an ordinary feature addition, not a design change.
+
+**`models.duplicates_check_enabled`** (boolean, not null, default `false`) — the per-model opt-in for the nightly `pg_cron` sweep over every enabled model, added alongside the three tables above. A plain column grant (`grant update (duplicates_check_enabled) on models to authenticated`), not a dedicated RPC: `models_update`'s own existing owner/architect RLS already gates it correctly, with none of the asymmetry that made `archived_at` withhold a blanket grant (`20260911040000_model_archive.sql`).
+
 ### 3.8 Collaboration
 
 #### `comments`
