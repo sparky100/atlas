@@ -40,6 +40,7 @@ import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
+import { parseMergePrefillFromSearchParams } from '../duplicates/mergePrefill';
 import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditBranch, canEditValueStreamStructure, useMembership } from '../orgs/useMembership';
@@ -121,9 +122,17 @@ export function ElementPage() {
   // closes the other, same as `editor`'s own idle/editing exclusivity).
   const [retiring, setRetiring] = useState(false);
   const [removingFromModel, setRemovingFromModel] = useState(false);
+  // F4's own "Merge into…" from the duplicates report (`mergePrefill.ts`):
+  // `?mergeTargetId=...&mergeTargetName=...` opens this panel already
+  // pointed at the other candidate — `null` for the ordinary case (E7's own
+  // "Merge into…" from the header), which opens to a blank search step.
+  // Read once, via the lazy initializers below, same convention
+  // `DecisionsView.tsx`'s own `prefill`-seeded state uses — never cleared
+  // from the URL afterward, so the link stays valid if revisited.
+  const mergePrefill = parseMergePrefillFromSearchParams(searchParams);
   // E7's own "Merge into…" — same inline-panel convention as `retiring`/
   // `removingFromModel` above.
-  const [merging, setMerging] = useState(false);
+  const [merging, setMerging] = useState(() => mergePrefill !== null);
   // "Convert to a module of…" — same inline-panel convention as `merging` above.
   const [converting, setConverting] = useState(false);
   // ADR-023/F6's "Deactivate…"/"Reactivate…" — same inline-panel
@@ -373,6 +382,7 @@ export function ElementPage() {
                 searchCommitId={searchCommitId ?? state.data.commitId}
                 branch={editingBranch ?? PLACEHOLDER_BRANCH}
                 expectedHeadCommitId={state.data.commitId}
+                initialTarget={mergePrefill ? { elementId: mergePrefill.targetId, name: mergePrefill.targetName } : null}
                 onMerged={(survivorId) => {
                   setMerging(false);
                   // The current element no longer exists at this ref once

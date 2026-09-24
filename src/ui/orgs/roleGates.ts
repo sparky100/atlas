@@ -165,3 +165,13 @@ export function canEditValueStreamStructure(role: MemberRole | null, branch: Bra
 export function canRunCapture(role: MemberRole | null): boolean {
   return role === 'owner' || role === 'architect' || role === 'contributor';
 }
+
+/** F4 (ADR-019 "Amended (F4, ...)"): mirrors `atlas.run_duplicate_check`/`atlas.dismiss_duplicate_pair`'s own role check (`20260924020000_duplicate_check_rpcs.sql`: contributor+) — gates both "Check now" and "Not a duplicate" on the duplicates report. Same floor as `canRunCapture`, named separately since the two coincide today but aren't the same rule. */
+export function canRunDuplicateCheck(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'architect' || role === 'contributor';
+}
+
+/** F4: mirrors `models_update`'s RLS (owner/architect) — `duplicates_check_enabled` is a plain column grant under that same RLS (`20260924010000_duplicates_schema.sql`), so the nightly-sweep toggle checkbox uses the identical floor `canArchiveModel` already uses for this table. A contributor visiting the report sees no toggle at all, only "Check now"/dismiss — and, per the v1 scope call (ADR-019 "Amended (F4, ...)"), no "Merge into…" either, since the report is main-scoped and `canEditOnMain` already gates merging there. */
+export function canManageDuplicatesCheck(role: MemberRole | null): boolean {
+  return canEditOnMain(role);
+}

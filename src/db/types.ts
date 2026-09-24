@@ -276,7 +276,7 @@ export interface DuplicateCheckRunRow {
   finished_at: string | null;
 }
 
-/** The literal shape of a row in `duplicate_candidates` (F4, ADR-019) — a plausible duplicate pair, re-computed on every `atlas.run_duplicate_check` call; a pair that no longer qualifies is deleted, not left stale. `element_a_id < element_b_id` always (one canonical row per unordered pair). `signals` is `{sharedOwner, sharedVendor, sharedParent, sharedDescription, neighbourOverlapCount, matchedVia}` — the exact inputs `score` was computed from. */
+/** The literal shape of a row in `duplicate_candidates` (F4, ADR-019) — a plausible duplicate pair, re-computed on every `atlas.run_duplicate_check` call; a pair that no longer qualifies is deleted, not left stale. `element_a_id < element_b_id` always (one canonical row per unordered pair). `signals` is `{sharedOwner, sharedVendor, sharedParent, sharedDescription, neighbourOverlapCount}` (booleans except the last) — the exact inputs `score` was computed from, `atlas.run_duplicate_check`'s own `jsonb_build_object` call (`20260924020000_duplicate_check_rpcs.sql`). */
 export interface DuplicateCandidateRow {
   id: UUID;
   org_id: UUID;

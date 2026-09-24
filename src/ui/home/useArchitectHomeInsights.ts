@@ -4,6 +4,7 @@ import type { CommitRow, ElementsHeadRow } from '../../contracts/rows';
 import { fromDeltaRow } from '../../contracts/rows';
 import { getMainBranch } from '../../db/branches';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
+import { listDuplicateCandidates } from '../../db/duplicates';
 import { getElementsByIds } from '../../db/elements';
 import {
   computeStaleAttributesFinding,
@@ -58,8 +59,8 @@ export interface RecentCommitRow {
 
 export interface ArchitectHomeInsightsData {
   recentCommits: RecentCommitRow[];
-  /** ADR-019 rule 3: named for Q1, not built — the standing duplicates report this door will eventually surface a count from. Always 0 until then, shown plainly rather than hidden (CLAUDE.md rule 7). */
-  duplicatesCount: 0;
+  /** F4 (ADR-019 "Amended (F4, ...)"): the standing duplicates report's own open-candidate count (`duplicate_candidates`, main's current head) — real from here on, no longer the permanent `0` placeholder this field carried before F4 shipped. */
+  duplicatesCount: number;
   /** Handoff 7d's Health findings (`docs/HANDOFF-7d-architect-door.md`) — the first three, built against real queries; `duplicatesCount` above is the fourth. */
   systemsWithoutCapability: ElementsHeadRow[];
   /** S1 item 19's own informational nudge: a platform with modules that itself carries a direct `supports` edge, probably meant for the module. */
@@ -127,7 +128,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         return;
       }
 
-      const [commits, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, plannedReplacements] = await Promise.all([
+      const [commits, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, plannedReplacements, duplicateCandidates] = await Promise.all([
         // S1 item 6: "recent activity" now groups consecutive same-subject
         // commits into one line and prefers others' activity when trimming
         // to five displayed items (groupRecentActivity.ts) — both can
@@ -156,6 +157,9 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         // approximation of it (`findCapabilitiesWithPoorFitPrimarySupporter`'s
         // own doc comment).
         loadPlannedReplacements(supabase, modelId),
+        // F4 (ADR-019 "Amended (F4, ...)"): the standing duplicates report's
+        // own open-candidate count — real from here on.
+        listDuplicateCandidates(supabase, modelId),
       ]);
 
       const usesAndFlowsToEndpointsById = new Map([...usesAndFlowsToEndpoints, ...actors].map((el) => [el.element_id, el]));
@@ -204,7 +208,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
           status: 'ready',
           data: {
             recentCommits,
-            duplicatesCount: 0,
+            duplicatesCount: duplicateCandidates.length,
             systemsWithoutCapability: findSystemsWithoutCapability(systems, supportsEdges, containers),
             platformSupportsThatShouldMoveToModule: findPlatformSupportsThatShouldMoveToModule(systems, supportsEdges, containers),
             flowsToPlatformInsteadOfModule: findFlowsToPlatformInsteadOfModule(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),

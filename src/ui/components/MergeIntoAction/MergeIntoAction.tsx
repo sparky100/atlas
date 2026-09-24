@@ -30,6 +30,8 @@ export interface MergeIntoActionProps {
   searchCommitId: UUID;
   branch: BranchRow;
   expectedHeadCommitId: UUID;
+  /** F4's own "Merge into…" from the duplicates report (`mergePrefill.ts`): the other candidate, already chosen — skips straight to the preview/rationale step instead of opening the search box. `undefined`/`null` for every other caller (E7's own element-page action), which still opens to the ordinary search step. */
+  initialTarget?: MergeIntoTarget | null;
   onMerged: (survivorId: UUID) => void;
   onCancel: () => void;
 }
@@ -56,10 +58,14 @@ export function MergeIntoAction({
   searchCommitId,
   branch,
   expectedHeadCommitId,
+  initialTarget,
   onMerged,
   onCancel,
 }: MergeIntoActionProps) {
-  const [target, setTarget] = useState<MergeIntoTarget | null>(null);
+  // Lazy initializer, not an effect: `initialTarget` is read once, on open —
+  // the same "URL-derived starting value, not a live prop sync" convention
+  // `DecisionsView.tsx`'s own `prefill`-seeded state uses.
+  const [target, setTarget] = useState<MergeIntoTarget | null>(() => initialTarget ?? null);
   const [rationale, setRationale] = useState('');
   const rationaleId = useId();
   const search = useRelationshipTargetSearch(searchCommitId, modelId, [element.element_type], element.element_id, target === null);
