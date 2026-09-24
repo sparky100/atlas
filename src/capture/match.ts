@@ -59,6 +59,25 @@ function contextMatches(elementType: ElementType, context: MatchContext, candida
   return candidate.parent_id === context;
 }
 
+/**
+ * A document commonly doesn't say which of these two an extracted name
+ * actually is — Prompt B's own system/container distinction rests on the
+ * document explicitly naming a parent nearby ("container: … parentName
+ * (the system it is part of)"); a platform's own module mentioned without
+ * that phrasing reads exactly like a top-level application, so the model
+ * reasonably calls it `system`. Found via real capture review: a module
+ * ("ESCOMS") extracted as a `system`, with no parent, found no match at
+ * all in a pool strictly scoped to `system`-typed elements, even though it
+ * already existed as a `container`. `system`/`container` are the only pair
+ * this applies to — `capability`/`actor` are never mistaken for either
+ * (nothing in Prompt B's own taxonomy could produce that confusion).
+ */
+function crossTypeFallback(elementType: ElementType): ElementType | null {
+  if (elementType === 'system') return 'container';
+  if (elementType === 'container') return 'system';
+  return null;
+}
+
 export type TrigramMatchResult = Pick<MatchOutcome, 'level' | 'elementId' | 'score' | 'similar' | 'ambiguous'>;
 
 /**
@@ -124,5 +143,22 @@ export function matchElement(input: MatchElementInput, index: MatchIndex): Match
 
   // 3. name + type + context.
   const pool = (index.elementsByType.get(input.elementType) ?? []).filter((el) => contextMatches(input.elementType, input.context, el));
-  return { ...resolveByTrigram(input.name, pool), warnings };
+  const primary = resolveByTrigram(input.name, pool);
+  if (primary.level !== 'none') return { ...primary, warnings };
+
+  // 4. system/container cross-type fallback — see `crossTypeFallback`'s own
+  // doc comment. Context-blind: the candidate's own declared type never
+  // had a real chance to resolve a parent (a `system` proposal's own
+  // `context` is always `TOP_LEVEL_CONTEXT`, `contextMatches`' own first
+  // line), so a container's usual "must share the resolved parent" rule
+  // would reject every real container outright — name similarity alone
+  // decides this fallback, same threshold as the primary pool.
+  const fallbackType = crossTypeFallback(input.elementType);
+  if (fallbackType) {
+    const fallbackPool = index.elementsByType.get(fallbackType) ?? [];
+    const fallback = resolveByTrigram(input.name, fallbackPool);
+    if (fallback.level !== 'none') return { ...fallback, warnings: [...warnings, 'MATCHED_CROSS_TYPE'] };
+  }
+
+  return { ...primary, warnings };
 }

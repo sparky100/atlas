@@ -96,6 +96,48 @@ describe('matchElement', () => {
     expect(notMatchedUnderDifferentParent.level).toBe('none');
   });
 
+  it('cross-type fallback: a system-typed candidate with no system match falls back to a real container of the same name (ESCOMS: extracted as a system, actually a container of a platform)', () => {
+    const platform = element({ element_id: 'sys-1', element_type: 'system', name: 'Salesforce' });
+    const escoms = element({ element_id: 'c-1', element_type: 'container', name: 'ESCOMS', parent_id: 'sys-1' });
+    const index = buildMatchIndex([platform, escoms], []);
+
+    // No parent was resolved (the document never said "ESCOMS is a module of
+    // Salesforce" in so many words) — `context` is unconditionally top-level
+    // for a `system`-typed candidate, same as every other system match.
+    const outcome = matchElement({ name: 'ESCOMS', elementType: 'system', context: 'top-level' }, index);
+    expect(outcome.level).toBe('name_context');
+    expect(outcome.elementId).toBe('c-1');
+    expect(outcome.warnings).toContain('MATCHED_CROSS_TYPE');
+  });
+
+  it('cross-type fallback: the reverse direction — a container-typed candidate falls back to a real top-level system', () => {
+    const system = element({ element_id: 'sys-1', element_type: 'system', name: 'Payroll Gateway' });
+    const index = buildMatchIndex([system], []);
+
+    const outcome = matchElement({ name: 'Payroll Gateway', elementType: 'container', context: 'top-level' }, index);
+    expect(outcome.level).toBe('name_context');
+    expect(outcome.elementId).toBe('sys-1');
+    expect(outcome.warnings).toContain('MATCHED_CROSS_TYPE');
+  });
+
+  it('cross-type fallback: never consulted when the primary pool already has a hit', () => {
+    const sameNameSystem = element({ element_id: 'sys-1', element_type: 'system', name: 'Shared Name' });
+    const sameNameContainer = element({ element_id: 'c-1', element_type: 'container', name: 'Shared Name', parent_id: 'sys-1' });
+    const index = buildMatchIndex([sameNameSystem, sameNameContainer], []);
+
+    const outcome = matchElement({ name: 'Shared Name', elementType: 'system', context: 'top-level' }, index);
+    expect(outcome.elementId).toBe('sys-1');
+    expect(outcome.warnings).not.toContain('MATCHED_CROSS_TYPE');
+  });
+
+  it('cross-type fallback: capability/actor never fall back to anything, even with a same-named element of another type', () => {
+    const system = element({ element_id: 'sys-1', element_type: 'system', name: 'Finance' });
+    const index = buildMatchIndex([system], []);
+
+    const outcome = matchElement({ name: 'Finance', elementType: 'capability', context: 'top-level' }, index);
+    expect(outcome.level).toBe('none');
+  });
+
   it('level 3: a top-level capability only matches another top-level capability', () => {
     const parentCap = element({ element_id: 'cap-parent', element_type: 'capability' });
     const topLevelCap = element({ element_id: 'cap-1', element_type: 'capability', name: 'Finance', parent_id: null });

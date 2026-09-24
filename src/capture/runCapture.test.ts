@@ -131,6 +131,39 @@ describe('runCapture — matching against main', () => {
     expect(system?.draftSubjectId).toBe('sys-1');
     expect(system?.proposal.kind === 'element' && Object.keys(system.proposal.attributes)).toEqual(expect.arrayContaining(['vendor', 'lifecycleStatus', 'isExternal']));
   });
+
+  it('a plain Applications-sheet row (always proposed as elementType system, no parent) matches a real container of the same name instead of proposing a duplicate new system (ESCOMS regression)', async () => {
+    const csv = 'Application,Supplier,Status\nESCOMS,Acme,Live';
+    const platform = { element_id: 'sys-1', element_type: 'system' as const, name: 'Salesforce', parent_id: null, attributes: {}, exists_delta_id: 'd-1' };
+    const escoms = { element_id: 'c-1', element_type: 'container' as const, name: 'ESCOMS', parent_id: 'sys-1', attributes: { vendor: 'Acme', lifecycleStatus: 'active', isExternal: false }, exists_delta_id: 'd-2' };
+    const matchIndex = buildMatchIndex([platform, escoms], []);
+    const mainHead = emptyHead();
+    mainHead.elements.set('sys-1', { elementType: 'system', name: 'Salesforce', parentId: null, attributes: {}, existsDeltaId: 'd-1' });
+    mainHead.elements.set('c-1', { elementType: 'container', name: 'ESCOMS', parentId: 'sys-1', attributes: escoms.attributes, existsDeltaId: 'd-2' });
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'Applications.csv',
+        source: { format: 'csv', text: csv },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex,
+        mainHead,
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    expect(result.candidates.filter((c) => c.kind === 'element')).toHaveLength(1);
+    const matched = result.candidates.find((c) => c.kind === 'element');
+    // Proposed as a system (a plain Applications sheet has no notion of
+    // "module of X") — resolved to the real container's own type, not left
+    // as the document's own guess, and matched rather than creating a
+    // second, duplicate `new` system alongside the real container.
+    expect(matched?.elementType).toBe('container');
+    expect(matched?.draftSubjectId).toBe('c-1');
+    expect(matched?.class).not.toBe('new');
+    expect(matched?.match.warnings).toContain('MATCHED_CROSS_TYPE');
+  });
 });
 
 describe('runCapture — target-branch matching (K-8/§7.1, issue #285)', () => {
