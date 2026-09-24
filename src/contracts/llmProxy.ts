@@ -69,6 +69,22 @@ export interface LlmProxyRequest {
   cacheControl?: boolean;
   /** Additive, K-10: ask the proxy to stream the generation from the provider internally (§3.5: "streaming for the prose-extraction call") — never changes the shape of this call's own response, which is always one complete JSON body. */
   stream?: boolean;
+  /**
+   * Additive, in-app help (ported from Des-Studio's `llm-proxy`, which
+   * genuinely forwards `text/event-stream` to the browser — unlike the rest
+   * of this proxy, whose `stream` field above only ever asks for internal
+   * provider-side streaming behind one buffered JSON response). Set only by
+   * the help chat (`src/ui/help/streamHelpAnswer.ts`), never by capture:
+   * when true, the edge function's own HTTP response to *this* caller is
+   * `text/event-stream`, forwarding the provider's raw SSE bytes as they
+   * arrive so an answer can type out live, and it still logs one
+   * `llm_proxy_requests` row once the stream ends. Requires `stream: true`
+   * (there is no buffered variant of a passthrough) and `responseFormat:
+   * 'text'` with no `outputConfig` (structured JSON isn't meaningfully
+   * streamable token-by-token to a chat UI) — `isValidLlmProxyRequest`
+   * enforces both.
+   */
+  streamToClient?: boolean;
 }
 
 export interface LlmProxyResponse {
@@ -120,6 +136,8 @@ export interface BuildLlmProxyRequestInput {
   outputConfig?: LlmProxyOutputConfig;
   cacheControl?: boolean;
   stream?: boolean;
+  /** Additive, in-app help — see `LlmProxyRequest.streamToClient`'s own comment. Setting this forces `stream: true` regardless of the `stream` input, since a passthrough with no provider-side stream to forward makes no sense. */
+  streamToClient?: boolean;
 }
 
 /** Builds a well-formed `LlmProxyRequest` from loose input — the one place normalization happens, so every caller and this file's own round-trip test agree on the same rules. */
@@ -134,7 +152,8 @@ export function buildLlmProxyRequest(input: BuildLlmProxyRequestInput): LlmProxy
     responseFormat,
     ...(input.outputConfig ? { outputConfig: input.outputConfig } : {}),
     ...(input.cacheControl ? { cacheControl: true } : {}),
-    ...(input.stream ? { stream: true } : {}),
+    ...(input.stream || input.streamToClient ? { stream: true } : {}),
+    ...(input.streamToClient ? { streamToClient: true } : {}),
   };
 }
 
@@ -165,5 +184,9 @@ export function isValidLlmProxyRequest(value: unknown): value is LlmProxyRequest
   if (v.outputConfig !== undefined && !isValidOutputConfig(v.outputConfig)) return false;
   if (v.cacheControl !== undefined && typeof v.cacheControl !== 'boolean') return false;
   if (v.stream !== undefined && typeof v.stream !== 'boolean') return false;
+  if (v.streamToClient !== undefined) {
+    if (typeof v.streamToClient !== 'boolean') return false;
+    if (v.streamToClient && (v.stream !== true || v.responseFormat !== 'text' || v.outputConfig !== undefined)) return false;
+  }
   return true;
 }

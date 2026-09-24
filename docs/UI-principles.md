@@ -64,6 +64,7 @@ It is chrome, not a per-page affordance — a page never grows its own "back to 
 | `SlidersHorizontal` | Inspector panel (§6.5): the Filters section |
 | `ChevronLeft` / `ChevronRight` | Inspector panel (§6.5): collapse/expand toggle |
 | `Info` | Capability map (§6.5): each domain/card row's own small inline "Inspect" button (capability map density redesign — no longer a tile-corner overlay) — the view's only way into the Inspector, since it has no click-to-focus concept of its own (every row's primary link still navigates) |
+| `CircleHelp` | App header (`AppHeader.tsx`): the Help chat toggle — shown only when the current route has an org in scope (`AppHeader`'s own `orgId` prop comment) |
 
 Implementation: `src/ui/components/ModelNav/ModelNav.tsx`, section membership resolved by path in `src/ui/nav/modelNavSection.ts`.
 

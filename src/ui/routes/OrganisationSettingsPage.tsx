@@ -22,7 +22,7 @@ export function OrganisationSettingsPage() {
   if (orgLoading) {
     return (
       <div>
-        <AppHeader />
+        <AppHeader orgId={organisation?.id ?? null} />
         <main className={styles.main}>
           <Text tone="muted">Loading…</Text>
         </main>
@@ -33,7 +33,7 @@ export function OrganisationSettingsPage() {
   if (orgError !== null || !organisation) {
     return (
       <div>
-        <AppHeader />
+        <AppHeader orgId={organisation?.id ?? null} />
         <main className={styles.main}>
           <Text as="p">{orgError ?? `No organisation found for "${orgSlug ?? ''}", or you're not a member of it.`}</Text>
         </main>
@@ -43,7 +43,7 @@ export function OrganisationSettingsPage() {
 
   return (
     <div>
-      <AppHeader />
+      <AppHeader orgId={organisation.id} />
       <main className={styles.main}>
         <Text as="h1" size="2xl">
           Organisation settings

@@ -73,7 +73,7 @@ export function ChangePage() {
   if (orgLoading || modelsLoading || !model) {
     return (
       <div>
-        <AppHeader />
+        <AppHeader orgId={organisation?.id ?? null} />
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
@@ -88,7 +88,7 @@ export function ChangePage() {
 
   return (
     <div>
-      <AppHeader />
+      <AppHeader orgId={organisation?.id ?? null} />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>

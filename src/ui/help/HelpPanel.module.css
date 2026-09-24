@@ -1,0 +1,115 @@
+/*
+ * Fixed, right-aligned slide-in — Des-Studio's own `HelpAssistant.jsx`
+ * shape (`this file's own module comment`), not a centred blocking dialog
+ * like `UploadCaptureDialog`: a chat you reference while the page behind
+ * it stays visible and interactive. `z-index: 40` sits above
+ * `UploadCaptureDialog`'s own backdrop (30) since Help must stay reachable
+ * from any state the app is in.
+ */
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 420px;
+  max-width: 100vw;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-raised);
+  border-left: var(--border-width) solid var(--border);
+  box-shadow: var(--surface-raised-shadow);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--panel-padding);
+  border-bottom: var(--border-width) solid var(--border);
+  flex-shrink: 0;
+}
+
+.conversation {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--panel-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.starterList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+}
+
+.starterButton {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  cursor: pointer;
+}
+
+.starterButton:hover {
+  border-color: var(--accent);
+  background: var(--accent-surface);
+}
+
+.bubble {
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--border);
+}
+
+.bubbleUser {
+  background: var(--accent-surface);
+}
+
+.bubbleAssistant {
+  background: var(--bg-subtle);
+  border-left: var(--border-width-emphasis) solid var(--accent);
+}
+
+.bubbleLabel {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--space-1);
+}
+
+.error {
+  color: var(--status-danger);
+}
+
+.inputRow {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+  padding: var(--panel-padding);
+  border-top: var(--border-width) solid var(--border);
+  flex-shrink: 0;
+}
+
+.textarea {
+  flex: 1;
+  resize: none;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  box-sizing: border-box;
+}

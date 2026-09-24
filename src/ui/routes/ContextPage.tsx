@@ -100,7 +100,7 @@ export function ContextPage() {
   if (orgLoading || modelsLoading || !model) {
     return (
       <div>
-        <AppHeader />
+        <AppHeader orgId={organisation?.id ?? null} />
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
@@ -119,7 +119,7 @@ export function ContextPage() {
 
   return (
     <div>
-      <AppHeader />
+      <AppHeader orgId={organisation?.id ?? null} />
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={[styles.main, state.status === 'ready' ? styles.mainWithView : ''].filter(Boolean).join(' ')}>
