@@ -26,10 +26,13 @@
 /**
  * Below 768px (this app's own mobile breakpoint — ModelNav.tsx/UI-principles
  * §2), the 200px name column would eat more than half a 390px viewport
- * (390px, the app's own narrow-mobile floor), and a full run of quarterly
- * axis labels has nowhere near enough room to avoid overlapping — narrower
- * column, and every other tick hidden, rather than either shipping known
- * overlap or truncating the axis down to nothing.
+ * (390px, the app's own narrow-mobile floor) — narrower column. Tick
+ * density itself is handled in JS (`RoadmapAxis`'s `thinAxisTicksToFit`,
+ * against the axis's own measured width), not here — a blunt "hide every
+ * other tick" CSS rule used to live in this block, but it was purely
+ * positional (index parity), not label-width-aware, so it could still
+ * leave long labels ("Q1 2026", "Jan 2026") overlapping near the start of
+ * the timeline.
  */
 @media (max-width: 767px) {
   .row {
@@ -38,10 +41,6 @@
 
   .axis {
     margin-left: 110px;
-  }
-
-  .axisTick:nth-child(even) {
-    display: none;
   }
 }
 
