@@ -232,7 +232,12 @@ describe('runCaptureRunStep', () => {
     const relationshipCandidates = written?.candidates.filter((c) => c.kind === 'relationship') ?? [];
     expect(relationshipCandidates).toHaveLength(2);
     expect(relationshipCandidates.filter((c) => c.class === 'new')).toHaveLength(1);
-    expect(relationshipCandidates.filter((c) => c.class === 'invalid')).toHaveLength(1);
+    const invalidCandidates = relationshipCandidates.filter((c) => c.class === 'invalid');
+    expect(invalidCandidates).toHaveLength(1);
+    // `capture_candidates_check3`: an `invalid` candidate's `draftSubjectId`
+    // must be null — this candidate started as `new` (a freshly minted
+    // subject id) before the engine rejected its delta and downgraded it.
+    expect(invalidCandidates[0]?.draft_subject_id).toBeNull();
     // The kept relationship's delta survives; the dropped one's does not.
     expect(written?.deltas.filter((d) => d.kind === 'relationship_create')).toHaveLength(1);
   });
