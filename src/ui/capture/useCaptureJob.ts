@@ -5,7 +5,20 @@ import { computeInputSha256Hex, captureInputObjectPath, discardCaptureJob, inser
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
-export type CaptureJobsStatus = 'loading' | 'idle' | 'creating';
+/**
+ * `'uploading'`/`'saving'` replace the single, unchanging `'creating'` this
+ * used to be — the reported gap: for a large file, `createJob` spends real,
+ * visible time uploading the raw bytes to Storage before it ever inserts
+ * the job row, and a single static "Starting…" button label the whole time
+ * gave no sign anything was actually progressing. Two named phases let
+ * `UploadCaptureDialog.tsx` show which one is running.
+ */
+export type CaptureJobsStatus = 'loading' | 'idle' | 'uploading' | 'saving';
+
+/** Whichever of `'uploading'`/`'saving'` — a submission is in flight, same as the old single `status === 'creating'` check every disabled-while-submitting control already used. */
+export function isCreatingJob(status: CaptureJobsStatus): boolean {
+  return status === 'uploading' || status === 'saving';
+}
 
 export interface CreateCaptureJobInput {
   inputKind: CaptureInputKind;
@@ -63,8 +76,8 @@ export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null):
     let cancelled = false;
     // `reload()` is only ever called once `status` is already back to
     // `'idle'` (`createJob` below sets it before its own first `reload()`),
-    // so there's no in-flight `'creating'` for this reset to clobber —
-    // same plain literal `useChanges.ts`'s own load effect uses.
+    // so there's no in-flight `'uploading'`/`'saving'` for this reset to
+    // clobber — same plain literal `useChanges.ts`'s own load effect uses.
     setStatus('loading');
     listCaptureJobs(supabase, modelId)
       .then((rows) => {
@@ -104,11 +117,12 @@ export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null):
         return null;
       }
       setError(null);
-      setStatus('creating');
+      setStatus('uploading');
       const jobId: UUID = crypto.randomUUID();
       try {
         const inputSha256Hex = input.inputSha256Hex ?? (await computeInputSha256Hex(input.bytes));
         await uploadCaptureInput(supabase, { orgId, modelId, jobId, filename: input.inputName, bytes: input.bytes });
+        setStatus('saving');
         const job = await insertCaptureJob(supabase, {
           id: jobId,
           orgId,
