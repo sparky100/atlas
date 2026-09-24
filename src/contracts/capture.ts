@@ -167,7 +167,8 @@ export interface MatchOutcome {
   ambiguous?: { elementId: UUID; name: string; score: number; parentName?: string }[];
   /** 0.50–0.60 near-misses, shown as a UI warning, never auto-matched. */
   similar: { elementId: UUID; name: string; score: number; parentName?: string }[];
-  warnings: ('ATLAS_ID_NOT_FOUND' | 'RESOLVED_THROUGH_MERGED_ID')[];
+  /** `MATCHED_CROSS_TYPE` (`match.ts`'s own `crossTypeFallback`): this hit came from the system/container fallback pool, not the candidate's own declared type's pool — the caller (`runCapture.ts`) corrects the candidate's own `elementType` to the matched element's real one when it sees this. */
+  warnings: ('ATLAS_ID_NOT_FOUND' | 'RESOLVED_THROUGH_MERGED_ID' | 'MATCHED_CROSS_TYPE')[];
 }
 
 // ---------------------------------------------------------------------------

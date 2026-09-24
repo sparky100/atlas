@@ -369,6 +369,14 @@ interface ElementResolutionResult {
   parentNameForRowKey: string | null;
   /** The candidate's own `parent` ref, fully resolved (`null` for a top-level element) — the caller writes this back into the output `proposal.parent` as `{kind:'existing', elementId}`, since `buildCaptureDraftEnvelope.ts` requires every ref already resolved by the time it sees a candidate. */
   resolvedParentElementId: UUID | null;
+  /** `proposal.elementType`, unless `match` came from `match.ts`'s own system/container cross-type fallback — then the matched element's *real* stored type, so the delta this candidate eventually builds carries the type the model actually has, not the model's own guess (`resolveElementType`'s own doc comment). */
+  resolvedElementType: ElementType;
+}
+
+/** `match`'s own `MATCHED_CROSS_TYPE` warning (`match.ts`) means `match.elementId` is a real element whose stored type differs from `proposalElementType` — everything downstream (the row key, the eventual delta's own `elementType` field) needs the matched element's real type from here on, not the candidate's original guess, or an `element.update` delta would carry a type that disagrees with the element it's updating. */
+function resolveElementType(match: MatchOutcome, proposalElementType: ElementType, matchIndex: MatchIndex): ElementType {
+  if (!match.warnings.includes('MATCHED_CROSS_TYPE') || match.elementId === undefined) return proposalElementType;
+  return matchIndex.elements.get(match.elementId)?.element_type ?? proposalElementType;
 }
 
 /** Resolves one element candidate's own `parent` ref (system/actor never have one — `context` is unconditionally top-level for them per `match.ts`'s own `contextMatches`) and matches/classifies it against main. */
@@ -381,6 +389,7 @@ function resolveElementCandidate(candidate: RowCandidate, proposal: ElementPropo
       attributes: proposal.attributes,
       parentNameForRowKey: proposal.parent?.kind === 'unresolved' ? proposal.parent.text : null,
       resolvedParentElementId: null,
+      resolvedElementType: proposal.elementType,
     };
   }
 
@@ -404,6 +413,7 @@ function resolveElementCandidate(candidate: RowCandidate, proposal: ElementPropo
         extraWarning: { code: 'PARENT_UNRESOLVED', text: proposal.parent.text },
         parentNameForRowKey,
         resolvedParentElementId: null,
+        resolvedElementType: proposal.elementType,
       };
     }
     contextElementId = resolvedParentId;
@@ -429,7 +439,7 @@ function resolveElementCandidate(candidate: RowCandidate, proposal: ElementPropo
     // never checked against the target branch either (a `changes` entry
     // is always relative to main).
     if (candidate.mustMatchExisting) {
-      return { class: 'invalid', match, draftSubjectId: null, attributes, extraWarning: { code: 'PARENT_UNRESOLVED', text: proposal.name }, parentNameForRowKey, resolvedParentElementId };
+      return { class: 'invalid', match, draftSubjectId: null, attributes, extraWarning: { code: 'PARENT_UNRESOLVED', text: proposal.name }, parentNameForRowKey, resolvedParentElementId, resolvedElementType: proposal.elementType };
     }
     if (targetOnlyIndex) {
       const targetMatch = matchElement(
@@ -437,10 +447,18 @@ function resolveElementCandidate(candidate: RowCandidate, proposal: ElementPropo
         targetOnlyIndex,
       );
       if (targetMatch.level !== 'none') {
-        return { class: 'duplicate_in_target', match: targetMatch, draftSubjectId: null, attributes, parentNameForRowKey, resolvedParentElementId };
+        return {
+          class: 'duplicate_in_target',
+          match: targetMatch,
+          draftSubjectId: null,
+          attributes,
+          parentNameForRowKey,
+          resolvedParentElementId,
+          resolvedElementType: resolveElementType(targetMatch, proposal.elementType, targetOnlyIndex),
+        };
       }
     }
-    return { class: 'new', match, draftSubjectId: mintId(), attributes, parentNameForRowKey, resolvedParentElementId };
+    return { class: 'new', match, draftSubjectId: mintId(), attributes, parentNameForRowKey, resolvedParentElementId, resolvedElementType: proposal.elementType };
   }
 
   const matchedElementId = match.elementId;
@@ -451,7 +469,7 @@ function resolveElementCandidate(candidate: RowCandidate, proposal: ElementPropo
   const outcomes = new Map<string, AttributeOutcome>([...comparisons].map(([key, input]) => [key, classifyAttribute(input)]));
   const attributes = filterAttributesForClass(proposal.attributes, cls, outcomes);
 
-  return { class: cls, match, draftSubjectId: matchedElementId, attributes, parentNameForRowKey, resolvedParentElementId };
+  return { class: cls, match, draftSubjectId: matchedElementId, attributes, parentNameForRowKey, resolvedParentElementId, resolvedElementType: resolveElementType(match, proposal.elementType, matchIndex) };
 }
 
 // ---------------------------------------------------------------------------
@@ -1042,8 +1060,13 @@ function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: Match
     resolvedSubjectBySeq.set(candidate.seq, result.draftSubjectId);
     if (result.draftSubjectId !== null) seqByElementId.set(result.draftSubjectId, candidate.seq);
 
+    // `result.resolvedElementType`, not `candidate.proposal.elementType` —
+    // the candidate's own type once `match.ts`'s cross-type fallback found
+    // it (e.g. an LLM-guessed `system` that's actually a `container`), so
+    // the row key, confidence, and the final proposal/candidate all agree
+    // with the real element rather than repeating the model's own guess.
     const rowKey = elementRowKey({
-      elementType: candidate.proposal.elementType,
+      elementType: result.resolvedElementType,
       name: candidate.proposal.name,
       parentName: result.parentNameForRowKey,
       ...(candidate.matchHints?.atlasId !== undefined ? { atlasId: candidate.matchHints.atlasId } : {}),
@@ -1053,14 +1076,14 @@ function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: Match
 
     const warnings = result.extraWarning ? [...candidate.evidence.warnings, result.extraWarning] : candidate.evidence.warnings;
     const parent: ElementProposal['parent'] = result.resolvedParentElementId !== null ? { kind: 'existing', elementId: result.resolvedParentElementId } : null;
-    const proposal: ElementProposal = { ...candidate.proposal, parent, attributes: result.attributes };
-    const confidence = elementCandidateConfidence(candidate.proposal.elementType, candidate.evidence.attributeConfidence, candidate.mustMatchExisting ?? false);
+    const proposal: ElementProposal = { ...candidate.proposal, elementType: result.resolvedElementType, parent, attributes: result.attributes };
+    const confidence = elementCandidateConfidence(result.resolvedElementType, candidate.evidence.attributeConfidence, candidate.mustMatchExisting ?? false);
 
     built.set(candidate.seq, {
       seq: candidate.seq,
       kind: 'element',
       class: result.class,
-      elementType: candidate.proposal.elementType,
+      elementType: result.resolvedElementType,
       relationshipType: null,
       draftSubjectId: result.draftSubjectId,
       proposal,
