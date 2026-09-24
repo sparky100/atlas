@@ -216,7 +216,7 @@ Prerequisites: E1. Before F2. `atlas.merge_elements(winner, loser)` as one rever
 
 ### F4 — duplicates report (Q1)
 
-Prerequisites: E7. Nightly candidate job (name/alias similarity, shared owner, overlapping relationships); count on the architect door; list with merge (E7) / not-a-duplicate remembered. Golden path: two near-duplicate systems, merge from the report, old name found by search.
+**In progress, 2026-09-24 — Step 1 done (ADR-019 amendment, `docs/ADR-000-foundations.md`).** Prerequisites: E7 (`merge_elements`, done). ADR-019 already named this feature and deferred it; this sprint records the concrete build decisions against it (detection as a Postgres RPC, no LLM/edge function needed; the trigram/corroborating-signal scoring; the per-model on/off toggle, default off, chosen over per-org; the on-demand check as the primary path with the nightly `pg_cron` sweep as a secondary, separately-shipped enhancement) before writing the migrations. Nightly candidate job (name/alias similarity, shared owner, overlapping relationships); count on the architect door (`ArchitectHome.tsx`'s already-stubbed `duplicatesCount`); list with merge (E7) / not-a-duplicate remembered. Golden path: two near-duplicate systems, merge from the report, old name found by search.
 
 ### F5 — roadmap (R1)
 
