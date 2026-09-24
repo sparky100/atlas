@@ -38,7 +38,7 @@ import { ownersByRole } from '../elements/ownersByRole';
 import { parseLandscapeFilters, landscapeFiltersToSearchParams } from '../landscape/landscapeFilterParams';
 import { LANDSCAPE_COLOUR_BY_OPTIONS } from '../landscape/landscapeColour';
 import { LandscapeMobileList } from '../landscape/LandscapeMobileList';
-import type { LandscapeLaneDisplayOptions } from '../landscape/layout';
+import { listLandscapeLaneOptions, type LandscapeLaneDisplayOptions } from '../landscape/layout';
 import { useCanvasWidth } from '../landscape/useCanvasWidth';
 import { useCapabilityLandscape } from '../landscape/useCapabilityLandscape';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
@@ -187,13 +187,23 @@ export function LandscapePage() {
   // the `Set`-based shape `layout.ts` takes, memoised on those arrays' own
   // identity so an unrelated re-render doesn't rebuild (and thereby
   // recompute layout for) a `laneDisplay` that hasn't actually changed.
-  const { collapsedLaneKeys, expandedLaneKeys, pinnedLaneKeys, setLaneCollapsed, setLanePinned, reorderPinnedLane } = useLandscapeLaneDisplayPreference(userId);
+  const { collapsedLaneKeys, expandedLaneKeys, pinnedLaneKeys, hiddenLaneKeys, setLaneCollapsed, setLanePinned, reorderPinnedLane, setLaneHidden } = useLandscapeLaneDisplayPreference(userId);
   const laneDisplay = useMemo<LandscapeLaneDisplayOptions>(
-    () => ({ collapsedLaneKeys: new Set(collapsedLaneKeys), expandedLaneKeys: new Set(expandedLaneKeys), pinnedLaneKeys }),
-    [collapsedLaneKeys, expandedLaneKeys, pinnedLaneKeys],
+    () => ({ collapsedLaneKeys: new Set(collapsedLaneKeys), expandedLaneKeys: new Set(expandedLaneKeys), pinnedLaneKeys, hiddenLaneKeys: new Set(hiddenLaneKeys) }),
+    [collapsedLaneKeys, expandedLaneKeys, pinnedLaneKeys, hiddenLaneKeys],
   );
   const displayInput = state.status === 'ready' ? state.data : null;
   const displayState = useLandscapeDisplay(displayInput, filters, laneDisplay, canvasWidth ?? undefined);
+  // The Inspector's own hide-toggle list needs every lane key+label
+  // regardless of hidden state (`layout.ts`'s `listLandscapeLaneOptions`
+  // doc comment) — `displayState.display.layout.lanes` alone can't supply
+  // this once a lane is hidden, since that array stops including it
+  // entirely. Cheap (no row/height geometry), so computed inline rather
+  // than routed through the layout worker.
+  const laneOptions = useMemo(
+    () => (displayInput ? listLandscapeLaneOptions([...displayInput.systemsById.values()], displayInput.supportsEdges, displayInput.l1AncestorByCapabilityId, [...displayInput.actorsById.values()]) : []),
+    [displayInput],
+  );
   // V2: click-to-focus — plain, unpersisted view state, the same shape
   // `routeViaPlatforms`/`commentsOnlyFilter` already use below.
   const [rawFocusedElementId, setFocusedElementId] = useState<UUID | null>(null);
@@ -746,10 +756,13 @@ export function LandscapePage() {
                     showConnections={showConnections}
                     onShowConnectionsChange={setShowConnections}
                     lanes={displayState.display.layout.lanes}
+                    laneOptions={laneOptions}
                     pinnedLaneKeys={pinnedLaneKeys}
+                    hiddenLaneKeys={hiddenLaneKeys}
                     onSetLaneCollapsed={setLaneCollapsed}
                     onSetLanePinned={setLanePinned}
                     onReorderPinnedLane={reorderPinnedLane}
+                    onSetLaneHidden={setLaneHidden}
                     filters={filters}
                     onFiltersChange={(next) => {
                       setSearchParams((prev) => landscapeFiltersToSearchParams(next, prev));

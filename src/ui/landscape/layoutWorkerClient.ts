@@ -51,6 +51,7 @@ function toWorkerLaneDisplay(laneDisplay: LandscapeLaneDisplayOptions | undefine
     ...(laneDisplay.collapsedLaneKeys ? { collapsedLaneKeys: [...laneDisplay.collapsedLaneKeys] } : {}),
     ...(laneDisplay.expandedLaneKeys ? { expandedLaneKeys: [...laneDisplay.expandedLaneKeys] } : {}),
     ...(laneDisplay.pinnedLaneKeys ? { pinnedLaneKeys: [...laneDisplay.pinnedLaneKeys] } : {}),
+    ...(laneDisplay.hiddenLaneKeys ? { hiddenLaneKeys: [...laneDisplay.hiddenLaneKeys] } : {}),
   };
 }
 

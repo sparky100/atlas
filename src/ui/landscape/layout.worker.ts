@@ -19,6 +19,7 @@ export interface LayoutWorkerLaneDisplay {
   collapsedLaneKeys?: string[];
   expandedLaneKeys?: string[];
   pinnedLaneKeys?: string[];
+  hiddenLaneKeys?: string[];
 }
 
 export interface LayoutWorkerRequest {
@@ -52,6 +53,7 @@ ctx.onmessage = (event) => {
     ...(laneDisplay?.collapsedLaneKeys ? { collapsedLaneKeys: new Set(laneDisplay.collapsedLaneKeys) } : {}),
     ...(laneDisplay?.expandedLaneKeys ? { expandedLaneKeys: new Set(laneDisplay.expandedLaneKeys) } : {}),
     ...(laneDisplay?.pinnedLaneKeys ? { pinnedLaneKeys: laneDisplay.pinnedLaneKeys } : {}),
+    ...(laneDisplay?.hiddenLaneKeys ? { hiddenLaneKeys: new Set(laneDisplay.hiddenLaneKeys) } : {}),
   };
   const layout = computeLandscapeLayout(systems, supportsEdges, new Map(capabilities), actors, layoutWidthHint, laneDisplayOptions);
   ctx.postMessage({ requestId, layout });

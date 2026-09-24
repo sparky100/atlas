@@ -340,6 +340,38 @@ function groupSystemsByLane(systems: readonly ElementsHeadRow[], supportsEdges: 
 
 export { groupSystemsByLane };
 
+/** A lane key's own display label — the one place this mapping lives, `placeLane`'s own inline ternary and `listLandscapeLaneOptions` below both call this rather than each keeping their own copy. */
+function laneLabelFor(key: string, l1CapabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>): string {
+  return key === EXTERNAL_LANE_KEY ? 'External' : key === OT_ZONE_LANE_KEY ? 'OT' : key === PLATFORM_BAND_KEY ? 'Platforms' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
+}
+
+export interface LandscapeLaneOption {
+  key: string;
+  label: string;
+}
+
+/**
+ * Every lane key this system/actor set would ever place a member or
+ * reference chip in, key+label only — no row/height geometry, so (unlike
+ * `computeLandscapeLayout`) this never runs in the layout worker and never
+ * omits a hidden lane. The Inspector's own hide toggle list (`layout.ts`'s
+ * `LandscapeLaneDisplayOptions.hiddenLaneKeys` doc comment) needs exactly
+ * this: a lane a user just hid must stay listed, with a way back, even
+ * though `computeLandscapeLayout`'s own `lanes` output no longer includes
+ * it at all.
+ */
+export function listLandscapeLaneOptions(
+  systems: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  l1AncestorByCapabilityId: ReadonlyMap<UUID, ElementsHeadRow>,
+  actors: readonly ElementsHeadRow[] = [],
+): LandscapeLaneOption[] {
+  const { boundaryKeys, hasExternalLane: hasExternalSystemLane, l1CapabilitiesById } = groupSystemsByLane(systems, supportsEdges, l1AncestorByCapabilityId);
+  const hasExternalLane = hasExternalSystemLane || actors.some(isExternal);
+  const keys = hasExternalLane ? [...boundaryKeys, EXTERNAL_LANE_KEY] : boundaryKeys;
+  return keys.map((key) => ({ key, label: laneLabelFor(key, l1CapabilitiesById) }));
+}
+
 /**
  * V2 "landscape focus and filters", decision 1 (UI-principles.md §10):
  * per-lane collapse/expand and pin, both remembered per user
@@ -355,6 +387,8 @@ export interface LandscapeLaneDisplayOptions {
   expandedLaneKeys?: ReadonlySet<string>;
   /** In the user's own chosen order — every other lane keeps `laneSortKey`'s existing order, appended after every pinned one. */
   pinnedLaneKeys?: readonly string[];
+  /** Lane keys dropped from layout entirely — no header line, no member tiles, no reference chips, and no space reserved (unlike a collapsed lane, whose header line and reference chips always stay). Independent of collapse/expand/pin: a key here is simply never placed. */
+  hiddenLaneKeys?: ReadonlySet<string>;
 }
 
 /**
@@ -416,7 +450,15 @@ export function computeLandscapeLayout(
     l1AncestorByCapabilityId,
   );
   const pinnedLaneKeys = laneDisplay.pinnedLaneKeys ?? [];
-  const boundaryKeys = pinnedLaneKeys.length === 0 ? unpinnedOrderedKeys : [...unpinnedOrderedKeys].sort((a, b) => pinTier(a, pinnedLaneKeys) - pinTier(b, pinnedLaneKeys));
+  const orderedKeys = pinnedLaneKeys.length === 0 ? unpinnedOrderedKeys : [...unpinnedOrderedKeys].sort((a, b) => pinTier(a, pinnedLaneKeys) - pinTier(b, pinnedLaneKeys));
+  // A hidden lane is dropped before `placeLane` ever sees its key — never
+  // pushed into `lanes`, never advances `y`, and (since `placeLane` is what
+  // reads `referenceTargets` for a given key) never renders its own
+  // reference chips either. This is what makes hide different from
+  // collapse, whose header line and chips always survive
+  // (`placeLane`'s own comment on why a collapsed lane still shows them).
+  const hiddenLaneKeys = laneDisplay.hiddenLaneKeys;
+  const boundaryKeys = hiddenLaneKeys && hiddenLaneKeys.size > 0 ? orderedKeys.filter((key) => !hiddenLaneKeys.has(key)) : orderedKeys;
 
   // S1 item 11a: an external actor joins the external band below the
   // boundary, alongside external systems, rather than the top actor row —
@@ -464,7 +506,7 @@ export function computeLandscapeLayout(
     // untouched — only this lane's own pixel placement hides its members.
     const collapsed = isLaneCollapsed(key, rawMembers.length === 0 && rawActorMembers.length === 0, laneDisplay);
     const members = collapsed ? [] : rawMembers;
-    const label = key === EXTERNAL_LANE_KEY ? 'External' : key === OT_ZONE_LANE_KEY ? 'OT' : key === PLATFORM_BAND_KEY ? 'Platforms' : key === UNASSIGNED_LANE_KEY ? 'Unassigned' : (l1CapabilitiesById.get(key)?.name ?? 'Unassigned');
+    const label = laneLabelFor(key, l1CapabilitiesById);
     const row = layoutRow(members, y + LANE_LABEL_HEIGHT, itemsPerRow);
     const sortedActorMembers = collapsed ? [] : rawActorMembers;
     const actorRowTop = y + LANE_LABEL_HEIGHT + (members.length > 0 ? row.height + NODE_GUTTER_Y : 0);
@@ -496,7 +538,7 @@ export function computeLandscapeLayout(
   for (const key of boundaryKeys) placeLane(key, key === UNASSIGNED_LANE_KEY ? 'unassigned' : key === OT_ZONE_LANE_KEY ? 'ot' : key === PLATFORM_BAND_KEY ? 'platform' : 'capability');
   const boundaryBottom = y;
 
-  if (hasExternalLane) {
+  if (hasExternalLane && !hiddenLaneKeys?.has(EXTERNAL_LANE_KEY)) {
     y += EXTERNAL_GUTTER_Y;
     placeLane(EXTERNAL_LANE_KEY, 'external', externalActors);
   }

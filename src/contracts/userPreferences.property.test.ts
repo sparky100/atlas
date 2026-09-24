@@ -34,6 +34,7 @@ const userPreferencesArb: fc.Arbitrary<UserPreferences> = fc.record({
   landscapeCollapsedLaneKeys: fc.option(fc.array(fc.string()), { nil: null }),
   landscapeExpandedLaneKeys: fc.option(fc.array(fc.string()), { nil: null }),
   landscapePinnedLaneKeys: fc.option(fc.array(fc.string()), { nil: null }),
+  landscapeHiddenLaneKeys: fc.option(fc.array(fc.string()), { nil: null }),
   // Sprint F7 item 3: always a real boolean, never nullable (unlike the
   // colour-by/lane-key fields above) — no context-dependent default to
   // compute.
