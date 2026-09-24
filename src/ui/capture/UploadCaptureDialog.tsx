@@ -121,7 +121,30 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
 
   const reimportCandidate = selected !== null && reimportLookup !== null && reimportLookup.inputName === selected.inputName ? reimportLookup.job : null;
 
-  const selectedSha256Hex = useMemo(() => (selected ? computeInputSha256Hex(selected.bytes) : null), [selected]);
+  // Hashing a multi-megabyte file used to run synchronously inside this
+  // `useMemo`, as part of the very render `setFileSelection`/`setPastedText`
+  // triggers — nothing (not even the file input showing a selection, or the
+  // Start button becoming enabled) could paint until that hash finished, no
+  // matter how long it took. An effect instead lets the "file selected"
+  // render commit and paint first, with `computeInputSha256Hex`'s own
+  // `crypto.subtle` hash (non-blocking by construction) running after.
+  // Keyed by `selected` itself, same "derive, don't imperatively reset"
+  // shape `reimportLookup`/`reimportCandidate` above already use — this
+  // never calls `setState` for the "nothing selected"/"selection changed"
+  // case, only once the hash of *this* `selected` actually resolves.
+  const [hashLookup, setHashLookup] = useState<{ selected: SelectedInput; hex: string } | null>(null);
+  useEffect(() => {
+    if (!selected) return undefined;
+    let cancelled = false;
+    void computeInputSha256Hex(selected.bytes).then((hex) => {
+      if (!cancelled) setHashLookup({ selected, hex });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
+  const selectedSha256Hex = selected !== null && hashLookup !== null && hashLookup.selected === selected ? hashLookup.hex : null;
+  const hashing = selected !== null && selectedSha256Hex === null;
   const isIdenticalToReimportCandidate = reimportCandidate !== null && selectedSha256Hex !== null && selectedSha256Hex === reimportCandidate.inputSha256;
 
   const resetForm = () => {
@@ -174,6 +197,10 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
       bytes: selected.bytes,
       documentDate: documentDate.trim().length > 0 ? documentDate.trim() : null,
       reimportOfJobId: useReimport && reimportCandidate ? reimportCandidate.id : null,
+      // Already computed by the effect above whenever it's finished in time
+      // — `undefined` (still hashing, or nothing to reuse) just means
+      // `createJob` computes it itself rather than submit waiting on it.
+      inputSha256Hex: selectedSha256Hex ?? undefined,
     }).then((job) => {
       if (job) handleClose();
     });
@@ -224,7 +251,13 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                     if (file) onFileChange(file);
                   }}
                 />
-              ) : (
+              ) : null}
+              {mode === 'file' && hashing && (
+                <Text as="p" tone="muted" size="sm">
+                  Reading {selected.inputName}…
+                </Text>
+              )}
+              {mode === 'paste' ? (
                 <textarea
                   className={styles.textarea}
                   placeholder="Paste meeting notes, an email, or any other free text describing systems, owners, or relationships…"
@@ -235,7 +268,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                     setPastedText(e.target.value);
                   }}
                 />
-              )}
+              ) : null}
 
               {mode === 'paste' && (
                 <div className={styles.formRow}>

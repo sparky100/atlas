@@ -2,7 +2,13 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { NO_TEXT_THRESHOLD, PdfParseError, pageHasNoText, parsePdf } from './pdf';
 
-async function buildPdf(pages: readonly { lines?: readonly string[]; twoColumn?: readonly [string, string] }[]): Promise<ArrayBuffer> {
+interface PositionedRun {
+  x: number;
+  y: number;
+  text: string;
+}
+
+async function buildPdf(pages: readonly { lines?: readonly string[]; twoColumn?: readonly [string, string]; runs?: readonly PositionedRun[] }[]): Promise<ArrayBuffer> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   for (const spec of pages) {
@@ -20,6 +26,14 @@ async function buildPdf(pages: readonly { lines?: readonly string[]; twoColumn?:
       // Two runs on the same visual line, left column first in the content stream — reading order must still put the left column's own text before the right's.
       page.drawText(right, { x: 250, y: 550, size: 12 });
       page.drawText(left, { x: 50, y: 550, size: 12 });
+    }
+    if (spec.runs) {
+      // Drawn right-to-left/bottom-to-top of the spec's own order where it
+      // matters (the multi-column tests below rely on this) — content
+      // stream order must never be what decides reading order.
+      for (const run of [...spec.runs].reverse()) {
+        page.drawText(run.text, { x: run.x, y: run.y, size: 12 });
+      }
     }
   }
   const bytes = await doc.save();
@@ -63,6 +77,47 @@ describe('parsePdf', () => {
     const rightIndex = page.text.indexOf('Right column text');
     expect(leftIndex).toBeGreaterThanOrEqual(0);
     expect(rightIndex).toBeGreaterThan(leftIndex);
+  });
+
+  it('reads a genuine two-column page column-major, never gluing a left-column row to the right-column row that happens to share its y', async () => {
+    const bytes = await buildPdf([
+      {
+        runs: [
+          { x: 50, y: 550, text: 'Left line 1' },
+          { x: 250, y: 550, text: 'Right line 1' },
+          { x: 50, y: 530, text: 'Left line 2' },
+          { x: 250, y: 530, text: 'Right line 2' },
+          { x: 50, y: 510, text: 'Left line 3' },
+          { x: 250, y: 510, text: 'Right line 3' },
+        ],
+      },
+    ]);
+    const result = await parsePdf(bytes);
+    const page = result.pages[0];
+    if (page === undefined) throw new Error('expected one page');
+    expect(page.text).toBe('Left line 1\nLeft line 2\nLeft line 3\n\nRight line 1\nRight line 2\nRight line 3');
+  });
+
+  it('does not let a full-width heading above a two-column body suppress column detection for the rows below it', async () => {
+    const bytes = await buildPdf([
+      {
+        runs: [
+          { x: 50, y: 580, text: 'Quarterly Digitalisation Report Overview' },
+          { x: 50, y: 550, text: 'Left line 1' },
+          { x: 250, y: 550, text: 'Right line 1' },
+          { x: 50, y: 530, text: 'Left line 2' },
+          { x: 250, y: 530, text: 'Right line 2' },
+        ],
+      },
+    ]);
+    const result = await parsePdf(bytes);
+    const page = result.pages[0];
+    if (page === undefined) throw new Error('expected one page');
+    // The heading lands in the same (left) band as the column it sits above
+    // — never glued mid-line to a right-column run, and the body below it
+    // still splits into two real columns rather than collapsing back to
+    // one because of the heading's own single wide run.
+    expect(page.text).toBe('Quarterly Digitalisation Report Overview\nLeft line 1\nLeft line 2\n\nRight line 1\nRight line 2');
   });
 
   it('throws PdfParseError for bytes that are not a real PDF', async () => {
