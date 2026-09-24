@@ -18,7 +18,7 @@ function element(id: string, type: ElementsHeadRow['element_type'], attributes: 
 }
 
 function row(element: ElementsHeadRow, owner: ElementsHeadRow | null = null): BrowseRow {
-  return { element, owner, lifecycleStatus: null, parent: null };
+  return { element, owner, lifecycleStatus: null, criticality: null, parent: null };
 }
 
 function definition(key: string, label: string, appliesTo: ElementsHeadRow['element_type'][]): AttributeDefinitionRow {

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ElementType, UUID } from '../../contracts/delta';
+import type { Criticality, ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
-import { listAllElements, loadOwnersByElementId, ownersByElementIdFromOwnsEdges, lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
+import { CRITICALITY_ORDER } from './criticalityTone';
+import { listAllElements, loadOwnersByElementId, ownersByElementIdFromOwnsEdges, lifecycleStatusOf, criticalityOf, type BrowseRow } from '../../db/elementBrowse';
 import { attributesRecord } from './attributesRecord';
 import { compareCustomAttributeValues, sortKeyEquals, type ElementBrowseSortKey } from './elementBrowseSort';
 import { moduleDisplayName } from './moduleDisplayName';
@@ -111,7 +112,14 @@ function compareRows(a: BrowseRow, b: BrowseRow, key: ElementBrowseSortKey): num
       return (a.owner?.name ?? '').localeCompare(b.owner?.name ?? '') || displayName(a).localeCompare(displayName(b));
     case 'lifecycle':
       return (a.lifecycleStatus ?? '').localeCompare(b.lifecycleStatus ?? '') || displayName(a).localeCompare(displayName(b));
+    case 'criticality':
+      return criticalityOrderOf(a.criticality) - criticalityOrderOf(b.criticality) || displayName(a).localeCompare(displayName(b));
   }
+}
+
+/** A missing or unrecognised criticality sorts before every recognised value — same "unset sorts first" convention `?? ''` already gives `owner`/`lifecycle` above. */
+function criticalityOrderOf(value: string | null): number {
+  return value !== null && value in CRITICALITY_ORDER ? CRITICALITY_ORDER[value as Criticality] : -1;
 }
 
 /**
@@ -282,6 +290,7 @@ export function useElementBrowse(
         element,
         owner: ownersByElementId.get(element.element_id) ?? null,
         lifecycleStatus: lifecycleStatusOf(element),
+        criticality: criticalityOf(element),
         parent: element.parent_id !== null ? (elementsById.get(element.parent_id) ?? null) : null,
       }));
 

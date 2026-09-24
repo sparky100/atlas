@@ -81,6 +81,8 @@ export interface BrowseRow {
   owner: ElementsHeadRow | null;
   /** `SystemAttributes.lifecycleStatus` — the only type that carries one; `null` for every other type. */
   lifecycleStatus: string | null;
+  /** `SystemAttributes.criticality` — the element's own value, same "system-only, no module inheritance" scope as `lifecycleStatus` above (`moduleAttributes.ts`'s inheritance is deliberately not applied here, matching `lifecycleStatusOf`'s own precedent). `null` for every other type or an unset value. */
+  criticality: string | null;
   /** `element`'s own parent, for `moduleDisplayName`'s "Platform · Module" convention — the whole model's elements are already loaded for this table (`useElementBrowse.ts`), so this is a free Map lookup, never a second query. `null` for every element without a parent. */
   parent: ElementsHeadRow | null;
 }
@@ -91,4 +93,33 @@ export function lifecycleStatusOf(element: ElementsHeadRow): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+export function criticalityOf(element: ElementsHeadRow): string | null {
+  if (element.element_type !== 'system') return null;
+  const value = attributesRecord(element.attributes).criticality;
+  return typeof value === 'string' ? value : null;
+}
+
 export const ELEMENT_TYPE_FILTER_OPTIONS: readonly (ElementType | 'all')[] = ['all', 'capability', 'system', 'container', 'actor', 'value_stream'];
+
+/**
+ * Health findings (`useElementBrowse.ts`'s own `ElementBrowseFilter` named
+ * variants) as a pickable toolbar dropdown — previously reachable only as a
+ * `?filter=` deep link from `ArchitectHome.tsx`'s own Health findings panel.
+ * Labels are a shortened form of that panel's own `summary` strings, one per
+ * `ElementsPage.tsx`'s own `VALID_FILTERS`. `''` is "no finding filter",
+ * matching `ElementBrowseCustomAttrSelection`'s own "unset" convention.
+ */
+export const FINDING_FILTER_OPTIONS: readonly { value: string; label: string }[] = [
+  { value: '', label: 'All findings' },
+  { value: 'unlinked-systems', label: 'Systems not linked to a capability' },
+  { value: 'platform-supports-move-to-module', label: 'Platform supports that could move to a module' },
+  { value: 'unowned-capabilities', label: 'Capabilities with no owner' },
+  { value: 'stale-attributes', label: 'Systems with stale attributes' },
+  { value: 'no-technical-owner', label: 'Systems with no technical owner' },
+  { value: 'critical-no-business-owner', label: 'Critical systems with no business owner' },
+  { value: 'critical-exposed', label: 'Critical systems exposed with no replacement' },
+  { value: 'unused-integration-platform', label: 'Unused integration platforms' },
+  { value: 'essential-no-technical-owner', label: 'Essential systems with no technical owner' },
+  { value: 'critical-support-end', label: 'Critical systems past or near support end' },
+  { value: 'capability-no-supporters', label: 'Capabilities with no supporters' },
+];

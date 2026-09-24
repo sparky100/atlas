@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import type { AttributeDefinitionKind } from '../../../contracts/attributeSchema';
 import { attributeDefinitionToFieldSchema } from '../../../contracts/attributeSchema';
 import type { ElementType, UUID } from '../../../contracts/delta';
-import { ELEMENT_TYPE_FILTER_OPTIONS, type BrowseRow } from '../../../db/elementBrowse';
+import { ELEMENT_TYPE_FILTER_OPTIONS, FINDING_FILTER_OPTIONS, type BrowseRow } from '../../../db/elementBrowse';
 import type { AttributeDefinitionRow, BranchRow } from '../../../db/types';
 import type { ThreadCount } from '../../comments/useThreadCounts';
 import { attributesRecord, formatCustomAttributeValue } from '../../elements/attributesRecord';
@@ -12,9 +12,11 @@ import type { DraftValue } from '../../elements/useElementEditor';
 import { RelationshipAdd } from '../RelationshipGroup/RelationshipAdd';
 import { AttributeValueInput } from '../AttributeValueInput/AttributeValueInput';
 import { Button } from '../Button/Button';
+import { Chip } from '../Chip/Chip';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
+import { criticalityToneFor } from '../../elements/criticalityTone';
 import { useElementExport } from '../../elements/useElementExport';
 import { sortKeyEquals, type ElementBrowseState } from '../../elements/useElementBrowse';
 import styles from './ElementBrowseTable.module.css';
@@ -61,6 +63,9 @@ export interface ElementBrowseTableProps {
   attributeDefinitions: readonly AttributeDefinitionRow[];
   customAttr: ElementBrowseCustomAttrSelection;
   onCustomAttrChange: (next: ElementBrowseCustomAttrSelection) => void;
+  /** The named `?filter=` finding, surfaced as a pickable dropdown (`FINDING_FILTER_OPTIONS` above) instead of only a deep link — `''` for none. Mutually exclusive with `customAttr` (the caller, `ElementsPage.tsx`, clears one whenever the other is set). */
+  findingFilter: string;
+  onFindingFilterChange: (next: string) => void;
   /**
    * Per-item-actions prompt: "each row [in a decision-shaped finding's
    * filtered list] carries its own pre-filled Start a decision" — the same
@@ -83,11 +88,12 @@ export interface ElementBrowseTableProps {
 // never includes the `{ custom }` variant (that's the one dynamic column,
 // added separately below), and `key={column.key}` needs a valid React key,
 // which an object isn't.
-const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle'; label: string }[] = [
+const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle' | 'criticality'; label: string }[] = [
   { key: 'name', label: 'Name' },
   { key: 'type', label: 'Type' },
   { key: 'owner', label: 'Owner' },
   { key: 'lifecycle', label: 'Lifecycle' },
+  { key: 'criticality', label: 'Criticality' },
 ];
 
 function customAttrValueToDraft(kind: AttributeDefinitionKind, raw: string | null): DraftValue {
@@ -195,7 +201,7 @@ function InlineSupportsPicker({ system, config, searchCommitId }: { system: { el
 }
 
 /** Sprint U3b: "filterable, sortable table of elements by type with owner and lifecycle." A real `<table>` — semantic tabular data, not a design-system gap (native `<table>`/`<th>`/`<td>` is the correct element here, the same way `<ul>`/`<li>` already is for plain lists elsewhere in this app). */
-export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenameBase, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange, decisionRowAction, onImportClick }: ElementBrowseTableProps) {
+export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenameBase, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange, findingFilter, onFindingFilterChange, decisionRowAction, onImportClick }: ElementBrowseTableProps) {
   // Called unconditionally (Rules of Hooks) — `commitId`/`rows` are only real
   // once `state.status === 'ready'`, and the export loader refuses to run on
   // the null/empty fallbacks until then.
@@ -295,6 +301,18 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
           {ELEMENT_TYPE_FILTER_OPTIONS.map((option) => (
             <option key={option} value={option}>
               {option === 'all' ? 'All types' : option}
+            </option>
+          ))}
+        </select>
+        <select
+          className={styles.select}
+          aria-label="Finding"
+          value={findingFilter}
+          onChange={(e) => { onFindingFilterChange(e.target.value); }}
+        >
+          {FINDING_FILTER_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -403,6 +421,15 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                         <Text as="span" size="sm">
                           {row.lifecycleStatus}
                         </Text>
+                      ) : (
+                        <Text as="span" tone="faint" size="sm">
+                          —
+                        </Text>
+                      )}
+                    </td>
+                    <td headers={`${headerIdBase}-criticality`}>
+                      {row.criticality ? (
+                        <Chip tone={criticalityToneFor(row.criticality) ?? 'neutral'}>{row.criticality}</Chip>
                       ) : (
                         <Text as="span" tone="faint" size="sm">
                           —
