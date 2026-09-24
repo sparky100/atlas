@@ -1,0 +1,147 @@
+import { useMemo, useState } from 'react';
+import { useParams } from 'react-router';
+import { AppHeader } from '../components/AppHeader/AppHeader';
+import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { Button } from '../components/Button/Button';
+import { DiffLegend } from '../components/DiffBadge/DiffLegend';
+import { ModelNav } from '../components/ModelNav/ModelNav';
+import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { Text } from '../components/Text/Text';
+import { useAuth } from '../auth/useAuth';
+import { impactedLaneKeys } from '../decisions/decisionOptionImpact';
+import { useDecision } from '../decisions/useDecision';
+import { EMPTY_LANDSCAPE_FILTERS } from '../landscape/landscapeFilter';
+import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
+import { EMPTY_LANE_DISPLAY, listLandscapeLaneOptions, type LandscapeLaneDisplayOptions } from '../landscape/layout';
+import { useCanvasWidth } from '../landscape/useCanvasWidth';
+import { useLandscape } from '../landscape/useLandscape';
+import { useLandscapeDisplay } from '../landscape/useLandscapeDisplay';
+import { useModels } from '../models/useModels';
+import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
+import styles from './DecisionOptionLandscapePage.module.css';
+
+/**
+ * "The decision process should allow the creation of option diagrams —
+ * something that shows 'this option touches these elements' rather than
+ * just saying it." Per the design conversation that shaped this: not a new
+ * diagram type — `useLandscape` pointed at the option's own branch in
+ * `mode: 'diff'` already *is* "what this option changed"
+ * (`src/engine/versionDiff.ts`, the same diff tinting `LandscapeCanvas`
+ * already draws for every other Diff-mode view). The one new piece is the
+ * default: every capability lane with no changed system in it starts
+ * hidden (`layout.ts`'s hide mechanism, `LandscapeLaneDisplayOptions.hiddenLaneKeys`),
+ * computed fresh from the diff every render — never a saved preference,
+ * never written to `user_preferences` — so opening this page shows only
+ * what the option actually touches, with a "Show all lanes" escape hatch
+ * for full context.
+ *
+ * Read-only by construction: no edit affordances (no add-system, no
+ * comments, no filter bar) — an option's branch is somebody's in-progress
+ * exploration, not something this preview writes to. Bypasses the app's
+ * shared "selected ref" (`useSelectedRef`) entirely, unlike `LandscapePage`
+ * — opening an option's diagram must never change what branch the rest of
+ * the app is editing.
+ */
+export function DecisionOptionLandscapePage() {
+  const { orgSlug, modelSlug, decisionId, branchId } = useParams<{ orgSlug: string; modelSlug: string; decisionId: string; branchId: string }>();
+  const { userId } = useAuth();
+  const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
+  const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
+  const model = models.find((m) => m.slug === modelSlug);
+  const { state: decisionState } = useDecision(model?.id ?? '', decisionId ?? '');
+
+  const ref = useMemo(() => ({ kind: 'branch' as const, branchId: branchId ?? '' }), [branchId]);
+  const { state } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, 'diff', Boolean(model && branchId));
+
+  const [showAllLanes, setShowAllLanes] = useState(false);
+  const { ref: canvasRef, width: canvasWidth } = useCanvasWidth();
+
+  const displayInput = state.status === 'ready' ? state.data : null;
+  const laneOptions = useMemo(
+    () => (displayInput ? listLandscapeLaneOptions([...displayInput.systemsById.values()], displayInput.supportsEdges, displayInput.l1AncestorByCapabilityId, [...displayInput.actorsById.values()]) : []),
+    [displayInput],
+  );
+  const impacted = useMemo(
+    () => (displayInput?.diff ? impactedLaneKeys(displayInput.diff, [...displayInput.systemsById.values()], displayInput.supportsEdges, displayInput.l1AncestorByCapabilityId) : null),
+    [displayInput],
+  );
+  const hiddenCount = impacted ? laneOptions.filter((o) => !impacted.has(o.key)).length : 0;
+  const laneDisplay = useMemo<LandscapeLaneDisplayOptions>(() => {
+    if (showAllLanes || !impacted) return EMPTY_LANE_DISPLAY;
+    return { hiddenLaneKeys: new Set(laneOptions.filter((o) => !impacted.has(o.key)).map((o) => o.key)) };
+  }, [showAllLanes, impacted, laneOptions]);
+  const displayState = useLandscapeDisplay(displayInput, EMPTY_LANDSCAPE_FILTERS, laneDisplay, canvasWidth ?? undefined);
+
+  const elementHref = (elementId: string) => `/o/${orgSlug ?? ''}/m/${modelSlug ?? ''}/e/${elementId}`;
+  const nodeHref = (systemId: string) => `/o/${orgSlug ?? ''}/m/${modelSlug ?? ''}/context/${systemId}`;
+
+  if (orgLoading || modelsLoading || !model) {
+    return (
+      <div>
+        <AppHeader orgId={organisation?.id ?? null} />
+        <div className={navStyles.body}>
+          <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+          <main className={styles.main}>
+            <Text tone="muted">Loading…</Text>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  const decisionTitle = decisionState.status === 'ready' ? decisionState.decision.title : 'Decision';
+
+  return (
+    <div>
+      <AppHeader orgId={organisation?.id ?? null} />
+      <div className={navStyles.body}>
+        <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
+        <main className={styles.main} ref={canvasRef}>
+          <Breadcrumb
+            org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
+            model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
+            refLabel="diff"
+            segments={[
+              { label: decisionTitle, href: `/o/${orgSlug ?? ''}/m/${model.slug}/decisions/${decisionId ?? ''}` },
+              { label: 'Option diagram', href: `/o/${orgSlug ?? ''}/m/${model.slug}/decisions/${decisionId ?? ''}/options/${branchId ?? ''}/landscape` },
+            ]}
+          />
+          <div className={styles.header}>
+            <Text as="h1" size="2xl">
+              What this option touches
+            </Text>
+            {hiddenCount > 0 && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowAllLanes((v) => !v);
+                }}
+              >
+                {showAllLanes ? `Hide ${String(hiddenCount)} untouched lane${hiddenCount === 1 ? '' : 's'}` : `Show ${String(hiddenCount)} untouched lane${hiddenCount === 1 ? '' : 's'}`}
+              </Button>
+            )}
+          </div>
+          <DiffLegend />
+
+          {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+          {state.status === 'error' && <Text as="p">{state.message}</Text>}
+          {state.status === 'refNotFound' && <Text as="p">This option no longer exists.</Text>}
+          {state.status === 'ready' && displayState.status === 'ready' && (
+            <div className={styles.canvasWrap}>
+              <LandscapeCanvas
+                layout={displayState.display.layout}
+                systemsById={state.data.systemsById}
+                actorsById={state.data.actorsById}
+                edges={state.data.edges}
+                diff={state.data.diff}
+                nodeHref={nodeHref}
+                actorHref={elementHref}
+                capabilityHref={elementHref}
+              />
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}

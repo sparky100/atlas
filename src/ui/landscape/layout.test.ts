@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOUNDARY_MARGIN, computeLandscapeLayout, EXTERNAL_LANE_KEY, laneLabelLeftInset, MIN_LAYOUT_WIDTH, OT_ZONE_LANE_KEY, PLATFORM_BAND_KEY, UNASSIGNED_LANE_KEY, viaPositionFor } from './layout';
+import { BOUNDARY_MARGIN, computeLandscapeLayout, EXTERNAL_LANE_KEY, laneLabelLeftInset, listLandscapeLaneOptions, MIN_LAYOUT_WIDTH, OT_ZONE_LANE_KEY, PLATFORM_BAND_KEY, UNASSIGNED_LANE_KEY, viaPositionFor } from './layout';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 
 function system(id: string, name: string, isExternal = false, domain?: Json, kind?: Json): ElementsHeadRow {
@@ -539,5 +539,65 @@ describe('lane collapse/pin (V2, UI-principles.md §10 decision 12)', () => {
     const laneB = layout.lanes.find((l) => l.key === 'cap-b');
     expect(layout.referenceMarkers.some((m) => m.elementId === 'sys-1' && m.laneKey === 'cap-b')).toBe(true);
     expect(laneB).toBeDefined();
+  });
+});
+
+describe('lane hide', () => {
+  it('a hidden lane is dropped from lanes and nodes entirely, unlike collapse — no header, and its space is reclaimed by the lane after it', () => {
+    const capA = capability('cap-a', 'Alpha');
+    const capB = capability('cap-b', 'Beta');
+    const sysA = system('sys-a', 'Sys A');
+    const sysB = system('sys-b', 'Sys B');
+    const edges = [supports('sys-a', 'cap-a'), supports('sys-b', 'cap-b')];
+    const l1 = new Map([['cap-a', capA], ['cap-b', capB]]);
+
+    const collapsed = computeLandscapeLayout([sysA, sysB], edges, l1, [], MIN_LAYOUT_WIDTH, { collapsedLaneKeys: new Set(['cap-a']) });
+    expect(collapsed.lanes.map((l) => l.key)).toEqual(['cap-a', 'cap-b']); // collapsed still has a header line
+
+    const hidden = computeLandscapeLayout([sysA, sysB], edges, l1, [], MIN_LAYOUT_WIDTH, { hiddenLaneKeys: new Set(['cap-a']) });
+    expect(hidden.lanes.map((l) => l.key)).toEqual(['cap-b']); // hidden has no header line at all
+    expect(hidden.nodes.some((n) => n.elementId === 'sys-a')).toBe(false);
+    expect(hidden.nodes.some((n) => n.elementId === 'sys-b')).toBe(true);
+    // cap-b's own header sits where cap-a's would have been — its space is reclaimed, not just skipped.
+    const capBLaneInFullLayout = collapsed.lanes.find((l) => l.key === 'cap-b');
+    const capBLaneWhenHidden = hidden.lanes.find((l) => l.key === 'cap-b');
+    expect(capBLaneWhenHidden?.y).toBeLessThan(capBLaneInFullLayout?.y ?? Infinity);
+  });
+
+  it('a hidden lane\'s own reference chips are gone too — unlike collapse, which still shows them', () => {
+    const capA = capability('cap-a', 'Alpha');
+    const capB = capability('cap-b', 'Beta');
+    const sys = system('sys-1', 'Multi-homed');
+    const edges = [supports('sys-1', 'cap-a', 'primary'), supports('sys-1', 'cap-b', 'secondary')];
+    const l1 = new Map([['cap-a', capA], ['cap-b', capB]]);
+
+    const hidden = computeLandscapeLayout([sys], edges, l1, [], MIN_LAYOUT_WIDTH, { hiddenLaneKeys: new Set(['cap-b']) });
+    expect(hidden.lanes.some((l) => l.key === 'cap-b')).toBe(false);
+    expect(hidden.referenceMarkers.some((m) => m.laneKey === 'cap-b')).toBe(false);
+  });
+
+  it('hiding the external lane key drops it too', () => {
+    const sys = system('sys-1', 'Vendor Portal', true);
+    const layout = computeLandscapeLayout([sys], [], new Map(), [], MIN_LAYOUT_WIDTH, { hiddenLaneKeys: new Set([EXTERNAL_LANE_KEY]) });
+    expect(layout.lanes.some((l) => l.key === EXTERNAL_LANE_KEY)).toBe(false);
+    expect(layout.nodes).toHaveLength(0);
+  });
+});
+
+describe('listLandscapeLaneOptions', () => {
+  it('lists every lane key+label regardless of hidden state — the Inspector\'s own "way back" for a hidden lane', () => {
+    const capA = capability('cap-a', 'Alpha');
+    const capB = capability('cap-b', 'Beta');
+    const sysA = system('sys-a', 'Sys A');
+    const sysB = system('sys-b', 'Sys B');
+    const edges = [supports('sys-a', 'cap-a'), supports('sys-b', 'cap-b')];
+    const options = listLandscapeLaneOptions([sysA, sysB], edges, new Map([['cap-a', capA], ['cap-b', capB]]));
+    expect(options).toEqual([{ key: 'cap-a', label: 'Alpha' }, { key: 'cap-b', label: 'Beta' }]);
+  });
+
+  it('includes the external lane when any system or actor is external', () => {
+    const sys = system('sys-1', 'Vendor Portal', true);
+    const options = listLandscapeLaneOptions([sys], [], new Map());
+    expect(options).toContainEqual({ key: EXTERNAL_LANE_KEY, label: 'External' });
   });
 });

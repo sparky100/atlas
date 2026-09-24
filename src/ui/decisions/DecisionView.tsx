@@ -204,6 +204,11 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                       <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`}>
                         <Text as="span">{intentHeaderLine(branch)}</Text>
                       </Link>
+                      <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${branch.id}/landscape`}>
+                        <Text as="span" size="sm">
+                          View diagram →
+                        </Text>
+                      </Link>
                       {canChoose && branch.status === 'draft' && (
                         <Button
                           variant="secondary"

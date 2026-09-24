@@ -8,9 +8,10 @@ interface LaneDisplayState {
   collapsedLaneKeys: readonly string[];
   expandedLaneKeys: readonly string[];
   pinnedLaneKeys: readonly string[];
+  hiddenLaneKeys: readonly string[];
 }
 
-const EMPTY_STATE: LaneDisplayState = { collapsedLaneKeys: [], expandedLaneKeys: [], pinnedLaneKeys: [] };
+const EMPTY_STATE: LaneDisplayState = { collapsedLaneKeys: [], expandedLaneKeys: [], pinnedLaneKeys: [], hiddenLaneKeys: [] };
 
 export interface UseLandscapeLaneDisplayPreferenceResult extends LaneDisplayState {
   loading: boolean;
@@ -20,6 +21,8 @@ export interface UseLandscapeLaneDisplayPreferenceResult extends LaneDisplayStat
   setLanePinned: (laneKey: string, pinned: boolean) => void;
   /** Swap a pinned lane with its adjacent neighbour in the pin order; a no-op at either end. */
   reorderPinnedLane: (laneKey: string, direction: 'up' | 'down') => void;
+  /** Hide or unhide a lane — independent of collapse/expand/pin, no mutual exclusion with either. */
+  setLaneHidden: (laneKey: string, hidden: boolean) => void;
 }
 
 /**
@@ -46,6 +49,7 @@ export function useLandscapeLaneDisplayPreference(userId: UUID | null): UseLands
             collapsedLaneKeys: row?.landscape_collapsed_lane_keys ?? [],
             expandedLaneKeys: row?.landscape_expanded_lane_keys ?? [],
             pinnedLaneKeys: row?.landscape_pinned_lane_keys ?? [],
+            hiddenLaneKeys: row?.landscape_hidden_lane_keys ?? [],
           });
         }
       })
@@ -69,6 +73,7 @@ export function useLandscapeLaneDisplayPreference(userId: UUID | null): UseLands
         landscapeCollapsedLaneKeys: [...next.collapsedLaneKeys],
         landscapeExpandedLaneKeys: [...next.expandedLaneKeys],
         landscapePinnedLaneKeys: [...next.pinnedLaneKeys],
+        landscapeHiddenLaneKeys: [...next.hiddenLaneKeys],
       }).catch(() => {
         // Best-effort, same stance as useLandscapeColourByPreference.ts's own setColourBy.
       });
@@ -102,6 +107,18 @@ export function useLandscapeLaneDisplayPreference(userId: UUID | null): UseLands
     [persist],
   );
 
+  const setLaneHidden = useCallback(
+    (laneKey: string, hidden: boolean) => {
+      setSaved((current) => {
+        const base = current ?? EMPTY_STATE;
+        const next: LaneDisplayState = { ...base, hiddenLaneKeys: hidden ? [...new Set([...base.hiddenLaneKeys, laneKey])] : base.hiddenLaneKeys.filter((k) => k !== laneKey) };
+        persist(next);
+        return next;
+      });
+    },
+    [persist],
+  );
+
   const reorderPinnedLane = useCallback(
     (laneKey: string, direction: 'up' | 'down') => {
       setSaved((current) => {
@@ -123,5 +140,5 @@ export function useLandscapeLaneDisplayPreference(userId: UUID | null): UseLands
     [persist],
   );
 
-  return { ...state, loading, setLaneCollapsed, setLanePinned, reorderPinnedLane };
+  return { ...state, loading, setLaneCollapsed, setLanePinned, reorderPinnedLane, setLaneHidden };
 }

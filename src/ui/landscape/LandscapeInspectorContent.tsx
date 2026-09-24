@@ -13,7 +13,7 @@ import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { LandscapeFilterBar } from './LandscapeFilterBar';
 import type { LandscapeFilters } from './landscapeFilter';
 import type { LandscapeInspectorNeighbour, LandscapeInspectorSupport } from './landscapeInspectorSelection';
-import type { LandscapeLane } from './layout';
+import type { LandscapeLane, LandscapeLaneOption } from './layout';
 import styles from './LandscapeInspectorContent.module.css';
 
 function capitalize(value: string): string {
@@ -64,10 +64,14 @@ export interface LandscapeInspectorContentProps {
   showConnections: boolean;
   onShowConnectionsChange: (value: boolean) => void;
   lanes: readonly LandscapeLane[];
+  /** Every lane key+label this model could ever place a system in, regardless of hidden state (`layout.ts`'s `listLandscapeLaneOptions`) — `lanes` above alone can't drive this list, since a hidden lane drops out of it entirely with no way back. */
+  laneOptions: readonly LandscapeLaneOption[];
   pinnedLaneKeys: readonly string[];
+  hiddenLaneKeys: readonly string[];
   onSetLaneCollapsed: (key: string, collapsed: boolean) => void;
   onSetLanePinned: (key: string, pinned: boolean) => void;
   onReorderPinnedLane: (key: string, direction: 'up' | 'down') => void;
+  onSetLaneHidden: (key: string, hidden: boolean) => void;
 
   filters: LandscapeFilters;
   onFiltersChange: (filters: LandscapeFilters) => void;
@@ -89,10 +93,13 @@ export function LandscapeInspectorContent({
   showConnections,
   onShowConnectionsChange,
   lanes,
+  laneOptions,
   pinnedLaneKeys,
+  hiddenLaneKeys,
   onSetLaneCollapsed,
   onSetLanePinned,
   onReorderPinnedLane,
+  onSetLaneHidden,
   filters,
   onFiltersChange,
   capabilityOptions,
@@ -221,9 +228,35 @@ export function LandscapeInspectorContent({
           </ul>
         )}
 
-        {lanes.length > 0 && (
+        {laneOptions.length > 0 && (
           <ul className={styles.laneList}>
-            {lanes.map((lane) => {
+            {laneOptions.map((option) => {
+              const hidden = hiddenLaneKeys.includes(option.key);
+              // A hidden lane has no layout entry at all (`layout.ts`'s own
+              // `boundaryKeys` filter) — its row shows only its label and
+              // the way back (the show button), never the now-meaningless
+              // collapse/pin controls for a lane nothing is drawing.
+              if (hidden) {
+                return (
+                  <li key={option.key} className={styles.laneRow}>
+                    <Text as="span" size="sm" tone="faint" className={styles.laneLabel}>
+                      {option.label}
+                    </Text>
+                    <button
+                      type="button"
+                      className={styles.pinButton}
+                      aria-label={`Show ${option.label} lane`}
+                      onClick={() => {
+                        onSetLaneHidden(option.key, false);
+                      }}
+                    >
+                      👁️‍🗨️
+                    </button>
+                  </li>
+                );
+              }
+              const lane = lanes.find((l) => l.key === option.key);
+              if (!lane) return null;
               const pinned = pinnedLaneKeys.includes(lane.key);
               const pinIndex = pinnedLaneKeys.indexOf(lane.key);
               return (
@@ -269,6 +302,16 @@ export function LandscapeInspectorContent({
                     }}
                   >
                     {pinned ? '📌' : '📍'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.pinButton}
+                    aria-label={`Hide ${lane.label} lane`}
+                    onClick={() => {
+                      onSetLaneHidden(lane.key, true);
+                    }}
+                  >
+                    🙈
                   </button>
                 </li>
               );

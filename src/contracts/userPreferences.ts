@@ -100,6 +100,16 @@ export interface UserPreferences {
    */
   landscapePinnedLaneKeys: LandscapeLaneKeyList | null;
   /**
+   * Hidden lane keys — a lane in this set is dropped from layout entirely
+   * (no header line, no reference chips), unlike `landscapeCollapsedLaneKeys`
+   * which still leaves the header/chips on the canvas. A single set, not a
+   * two-directional override pair: there's no "empty defaults to X"
+   * ambiguity for hide the way there is for collapse (`isLaneCollapsed`'s
+   * own emptiness default), so one array is enough. `null` means nothing
+   * hidden.
+   */
+  landscapeHiddenLaneKeys: LandscapeLaneKeyList | null;
+  /**
    * Sprint F7 item 3: whether an @mention creates an in-app notification
    * for this user — always a real boolean (`not null default true`),
    * never nullable like the colour-by/lane-key fields above, since there's
@@ -140,6 +150,7 @@ export interface UserPreferencesRow {
   landscape_collapsed_lane_keys: LandscapeLaneKeyList | null;
   landscape_expanded_lane_keys: LandscapeLaneKeyList | null;
   landscape_pinned_lane_keys: LandscapeLaneKeyList | null;
+  landscape_hidden_lane_keys: LandscapeLaneKeyList | null;
   notify_on_mention: boolean;
   notify_on_reply: boolean;
   notify_on_review_assigned: boolean;
@@ -158,6 +169,7 @@ export function toUserPreferencesRow(prefs: UserPreferences): UserPreferencesRow
     landscape_collapsed_lane_keys: prefs.landscapeCollapsedLaneKeys,
     landscape_expanded_lane_keys: prefs.landscapeExpandedLaneKeys,
     landscape_pinned_lane_keys: prefs.landscapePinnedLaneKeys,
+    landscape_hidden_lane_keys: prefs.landscapeHiddenLaneKeys,
     notify_on_mention: prefs.notifyOnMention,
     notify_on_reply: prefs.notifyOnReply,
     notify_on_review_assigned: prefs.notifyOnReviewAssigned,
@@ -177,6 +189,7 @@ export function fromUserPreferencesRow(row: UserPreferencesRow): UserPreferences
     landscapeCollapsedLaneKeys: row.landscape_collapsed_lane_keys,
     landscapeExpandedLaneKeys: row.landscape_expanded_lane_keys,
     landscapePinnedLaneKeys: row.landscape_pinned_lane_keys,
+    landscapeHiddenLaneKeys: row.landscape_hidden_lane_keys,
     notifyOnMention: row.notify_on_mention,
     notifyOnReply: row.notify_on_reply,
     notifyOnReviewAssigned: row.notify_on_review_assigned,
@@ -206,6 +219,7 @@ export function defaultUserPreferences(userId: UUID, isOwnerOrArchitect: boolean
     landscapeCollapsedLaneKeys: null,
     landscapeExpandedLaneKeys: null,
     landscapePinnedLaneKeys: null,
+    landscapeHiddenLaneKeys: null,
     notifyOnMention: true,
     notifyOnReply: true,
     notifyOnReviewAssigned: true,

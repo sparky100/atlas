@@ -29,6 +29,8 @@ export interface UpsertUserPreferencesInput {
   landscapeExpandedLaneKeys?: UserPreferencesRow['landscape_expanded_lane_keys'];
   /** V2: pinned lane keys, in display order — same omitted-leaves-untouched convention. */
   landscapePinnedLaneKeys?: UserPreferencesRow['landscape_pinned_lane_keys'];
+  /** Hidden lane keys — same omitted-leaves-untouched convention. */
+  landscapeHiddenLaneKeys?: UserPreferencesRow['landscape_hidden_lane_keys'];
   /** Sprint F7 item 3 — same omitted-leaves-untouched convention. */
   notifyOnMention?: UserPreferencesRow['notify_on_mention'];
   /** Sprint F7 item 3 — same omitted-leaves-untouched convention. */
@@ -55,6 +57,7 @@ export async function upsertUserPreferences(supabase: Client, input: UpsertUserP
   if (input.landscapeCollapsedLaneKeys !== undefined) patch.landscape_collapsed_lane_keys = input.landscapeCollapsedLaneKeys;
   if (input.landscapeExpandedLaneKeys !== undefined) patch.landscape_expanded_lane_keys = input.landscapeExpandedLaneKeys;
   if (input.landscapePinnedLaneKeys !== undefined) patch.landscape_pinned_lane_keys = input.landscapePinnedLaneKeys;
+  if (input.landscapeHiddenLaneKeys !== undefined) patch.landscape_hidden_lane_keys = input.landscapeHiddenLaneKeys;
   if (input.notifyOnMention !== undefined) patch.notify_on_mention = input.notifyOnMention;
   if (input.notifyOnReply !== undefined) patch.notify_on_reply = input.notifyOnReply;
   if (input.notifyOnReviewAssigned !== undefined) patch.notify_on_review_assigned = input.notifyOnReviewAssigned;
