@@ -1,0 +1,22 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-8);
+  max-width: none;
+  margin: 0;
+  height: calc(100vh - var(--app-header-height));
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.canvasWrap {
+  flex: 1;
+  min-height: 0;
+}

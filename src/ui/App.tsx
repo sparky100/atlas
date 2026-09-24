@@ -8,6 +8,7 @@ import { ChangePage } from './routes/ChangePage';
 import { ChangesPage } from './routes/ChangesPage';
 import { ContainerPage } from './routes/ContainerPage';
 import { ContextPage } from './routes/ContextPage';
+import { DecisionOptionLandscapePage } from './routes/DecisionOptionLandscapePage';
 import { DecisionPage } from './routes/DecisionPage';
 import { DecisionsPage } from './routes/DecisionsPage';
 import { DuplicatesReportPage } from './routes/DuplicatesReportPage';
@@ -76,6 +77,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/changes/:branchId" element={<ChangePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/decisions" element={<DecisionsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/decisions/:decisionId" element={<DecisionPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/decisions/:decisionId/options/:branchId/landscape" element={<DecisionOptionLandscapePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/diff" element={<VersionDiffPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/review" element={<ReviewQueuePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/review/:mergeRequestId" element={<ReviewRequestPage />} />
