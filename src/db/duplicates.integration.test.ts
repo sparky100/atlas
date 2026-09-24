@@ -1,25 +1,32 @@
 /**
- * F4/ADR-019: schema + RLS round trip for `duplicate_check_runs`/
- * `duplicate_candidates`/`duplicate_dismissals` and the `models.
- * duplicates_check_enabled` toggle, against a real local Supabase. Same
- * "this sandbox has no Docker route" limitation named in
- * `repository.integration.test.ts`'s own module comment — written and
- * reasoned through against the real RLS/RPC behaviour, not executed here.
+ * F4/ADR-019: schema, RLS, and detection RPCs for the duplicates report,
+ * against a real local Supabase. Same "this sandbox has no Docker route"
+ * limitation named in `repository.integration.test.ts`'s own module
+ * comment — written and reasoned through against the real RLS/RPC
+ * behaviour, not executed here.
  *
- * Step 2's own scope only (`docs/ADR-000-foundations.md`'s "Amended (F4,
- * ...)" paragraph, Step 2 of the F4 plan): no RPC exists yet
- * (`atlas.run_duplicate_check`/`atlas.dismiss_duplicate_pair` land in
- * Step 3), so every row here is inserted directly by the service-role
- * client — this test only proves the schema, RLS, and the toggle's own
- * grant are correct, not the detection logic itself.
+ * The first describe block is Step 2's own scope (`docs/ADR-000-foundations.md`'s
+ * "Amended (F4, ...)" paragraph): before any RPC existed, every row was
+ * inserted directly by the service-role client, proving only the schema,
+ * RLS, and the toggle's own grant. The second is Step 3's: the real
+ * `atlas.run_duplicate_check`/`atlas.dismiss_duplicate_pair` RPCs added in
+ * `20260924020000_duplicate_check_rpcs.sql`, exercising the detection
+ * query itself. The full scenario this pair sits within (through a real
+ * merge, the report's own read query) is Step 7's own job, not repeated
+ * here.
  */
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { CommitEnvelope, Delta } from '../contracts/delta';
+import { getMainBranch } from './branches';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
+import { commitToBranch } from './commits';
 import { loadEnv } from './env';
 import { createModel } from './models';
 import { createOrganisation } from './organisations';
+import { getOrCreateManualSource } from './sources';
+import type { DuplicateCheckRunRow, DuplicateDismissalRow } from './types';
 
 const env = loadEnv();
 const service = createServiceRoleClient(env);
@@ -138,5 +145,114 @@ describe('duplicates schema (F4 step 2) against a real local Supabase', () => {
 
     const { data: stillEnabled } = await owner.client.from('models').select('duplicates_check_enabled').eq('id', modelId).single();
     expect(stillEnabled?.duplicates_check_enabled).toBe(true);
+  });
+});
+
+describe('atlas.run_duplicate_check / atlas.dismiss_duplicate_pair (F4 step 3) against a real local Supabase', () => {
+  let owner: TestUser;
+  let contributor: TestUser;
+  let orgId: string;
+  let modelId: string;
+  let powerOnId: string;
+  let powerOnVariantId: string;
+  let distinctSystemId: string;
+  let ownerActorId: string;
+
+  beforeAll(async () => {
+    owner = await createSignedInUser('duplicatecheck-owner');
+    contributor = await createSignedInUser('duplicatecheck-contributor');
+
+    orgId = randomUUID();
+    await createOrganisation(owner.client, { id: orgId, name: 'Duplicate Check Test Org', slug: `duplicatecheck-${orgId.slice(0, 8)}`, createdBy: owner.id });
+    const { error: memberError } = await owner.client.from('members').insert({ org_id: orgId, user_id: contributor.id, role: 'contributor', invited_by: owner.id });
+    if (memberError) throw new Error(`add contributor: ${memberError.message}`);
+
+    modelId = randomUUID();
+    await createModel(owner.client, { id: modelId, orgId, name: 'Duplicate Check Test Model', slug: `duplicatecheck-model-${modelId.slice(0, 8)}`, createdBy: owner.id });
+
+    const source = await getOrCreateManualSource(owner.client, { id: randomUUID(), orgId, modelId, userId: owner.id });
+    const main = await getMainBranch(owner.client, modelId);
+    if (!main) throw new Error('main branch missing');
+
+    // "PowerON"/"Power On" — the same near-duplicate spelling pair fixture
+    // 04 already uses for exactly this reason (a real, deliberately messy
+    // name pair, not a contrived one). A shared owner gives the
+    // corroborating-signal path something real to find; "Totally
+    // Different System" proves the scan doesn't just flag everything.
+    powerOnId = randomUUID();
+    powerOnVariantId = randomUUID();
+    distinctSystemId = randomUUID();
+    ownerActorId = randomUUID();
+
+    const deltas: Delta[] = [
+      { kind: 'element.create', id: randomUUID(), elementId: powerOnId, elementType: 'system', name: 'PowerON', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: source.id, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: powerOnVariantId, elementType: 'system', name: 'Power On', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: source.id, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: distinctSystemId, elementType: 'system', name: 'Totally Different System', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: source.id, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: ownerActorId, elementType: 'actor', name: 'Platform Team', parentId: null, attributes: { subtype: 'team', isExternal: false }, sourceId: source.id, confidence: 1 },
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'owns', fromElementId: ownerActorId, toElementId: powerOnId, attributes: { role: 'business' }, sourceId: source.id, confidence: 1 },
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'owns', fromElementId: ownerActorId, toElementId: powerOnVariantId, attributes: { role: 'business' }, sourceId: source.id, confidence: 1 },
+    ];
+    const envelope: CommitEnvelope = { id: randomUUID(), branchId: main.id, parentCommitId: main.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title: 'seed', body: null, deltas };
+    const result = await commitToBranch(owner.client, { modelId, branchId: main.id, expectedHeadCommitId: main.head_commit_id, envelope });
+    if (!result.ok) throw new Error(`seed commit: ${result.message}`);
+  });
+
+  afterAll(async () => {
+    await service.from('organisations').delete().eq('id', orgId);
+  });
+
+  it('flags PowerON/Power On as a candidate (with the shared-owner signal), never the distinct system, and only that one run', async () => {
+    const { data: runData, error } = await contributor.client.schema('atlas').rpc('run_duplicate_check', { p_model_id: modelId }).single();
+    const run = runData as DuplicateCheckRunRow | null;
+    expect(error).toBeNull();
+    expect(run?.status).toBe('succeeded');
+    expect(run?.candidate_count).toBe(1);
+
+    const { data: candidates } = await owner.client.from('duplicate_candidates').select('*').eq('model_id', modelId);
+    expect(candidates).toHaveLength(1);
+    const pair = candidates?.[0];
+    expect([pair?.element_a_id, pair?.element_b_id].sort()).toEqual([powerOnId, powerOnVariantId].sort());
+    expect(pair?.element_type).toBe('system');
+    expect(pair?.name_similarity).toBeGreaterThanOrEqual(0.6);
+    expect((pair?.signals as Record<string, unknown> | undefined)?.sharedOwner).toBe(true);
+
+    expect(candidates?.some((c) => [c.element_a_id, c.element_b_id].includes(distinctSystemId))).toBe(false);
+  });
+
+  it('a contributor can dismiss a pair; it disappears immediately and never resurfaces on a later run', async () => {
+    const { error: dismissError, data: dismissalData } = await contributor.client.schema('atlas').rpc('dismiss_duplicate_pair', { p_model_id: modelId, p_element_a_id: powerOnId, p_element_b_id: powerOnVariantId }).single();
+    const dismissal = dismissalData as DuplicateDismissalRow | null;
+    expect(dismissError).toBeNull();
+    expect(dismissal?.dismissed_by).toBe(contributor.id);
+
+    const { data: afterDismiss } = await owner.client.from('duplicate_candidates').select('id').eq('model_id', modelId);
+    expect(afterDismiss ?? []).toHaveLength(0);
+
+    const { data: rerunData, error: rerunError } = await owner.client.schema('atlas').rpc('run_duplicate_check', { p_model_id: modelId }).single();
+    const rerun = rerunData as DuplicateCheckRunRow | null;
+    expect(rerunError).toBeNull();
+    expect(rerun?.candidate_count).toBe(0);
+
+    const { data: stillGone } = await owner.client.from('duplicate_candidates').select('id').eq('model_id', modelId);
+    expect(stillGone ?? []).toHaveLength(0);
+
+    // Idempotent: dismissing the same pair again is a no-op, not an error.
+    const { error: secondDismissError } = await contributor.client.schema('atlas').rpc('dismiss_duplicate_pair', { p_model_id: modelId, p_element_a_id: powerOnVariantId, p_element_b_id: powerOnId });
+    expect(secondDismissError).toBeNull();
+  });
+
+  it('refuses a second concurrent run on the same model (the partial unique index, not a check-then-insert race)', async () => {
+    const [first, second] = await Promise.all([
+      owner.client.schema('atlas').rpc('run_duplicate_check', { p_model_id: modelId }),
+      contributor.client.schema('atlas').rpc('run_duplicate_check', { p_model_id: modelId }),
+    ]);
+    const errors = [first.error, second.error].filter((e) => e !== null);
+    const successes = [first.error, second.error].filter((e) => e === null);
+    // Exactly one of the two truly concurrent calls wins the unique-index
+    // race on duplicate_check_runs(model_id) where status = 'running'; the
+    // other gets this function's own "already running" exception. Both
+    // succeeding, or both failing, would mean the guard isn't atomic.
+    expect(successes).toHaveLength(1);
+    expect(errors).toHaveLength(1);
   });
 });
