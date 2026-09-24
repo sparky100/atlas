@@ -77,6 +77,8 @@ export interface ModelRow {
   created_at: string;
   /** Sprint 7j item 1: set by `atlas.archive_model`, cleared by `atlas.restore_model` — see that migration's own comment. */
   archived_at: string | null;
+  /** F4/ADR-019: per-model opt-in for the nightly duplicate-check sweep (`pg_cron`) — default `false`. Toggled directly by owner/architect via `models_update`'s own RLS, no dedicated RPC. */
+  duplicates_check_enabled: boolean;
 }
 
 /** F7 item 4: a cross-org, read-only grant on a model, optionally pinned to one tag (ADR-009, SPEC §3.2). */
@@ -256,6 +258,48 @@ export interface ElementMergeRow {
   rationale: string;
   evidence_id: UUID | null;
   commit_id: UUID;
+  created_at: string;
+}
+
+export type DuplicateCheckStatus = 'running' | 'succeeded' | 'failed';
+
+/** The literal shape of a row in `duplicate_check_runs` (F4, ADR-019 — `20260924010000_duplicates_schema.sql`) — one duplicate-detection run against one model. `triggered_by` is `null` for a scheduled (`pg_cron`) run, never for a manual one. */
+export interface DuplicateCheckRunRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  triggered_by: UUID | null;
+  status: DuplicateCheckStatus;
+  candidate_count: number | null;
+  error: string | null;
+  created_at: string;
+  finished_at: string | null;
+}
+
+/** The literal shape of a row in `duplicate_candidates` (F4, ADR-019) — a plausible duplicate pair, re-computed on every `atlas.run_duplicate_check` call; a pair that no longer qualifies is deleted, not left stale. `element_a_id < element_b_id` always (one canonical row per unordered pair). `signals` is `{sharedOwner, sharedVendor, sharedParent, sharedDescription, neighbourOverlapCount, matchedVia}` — the exact inputs `score` was computed from. */
+export interface DuplicateCandidateRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  element_a_id: UUID;
+  element_b_id: UUID;
+  element_type: 'system' | 'container';
+  score: number;
+  name_similarity: number;
+  signals: Record<string, unknown>;
+  last_seen_check_run_id: UUID;
+  created_at: string;
+  updated_at: string;
+}
+
+/** The literal shape of a row in `duplicate_dismissals` (F4, ADR-019) — a human's permanent "not a duplicate" for one pair; consulted by `atlas.run_duplicate_check` so a dismissed pair is never re-proposed. Append-only in v1 (no un-dismiss action exists yet). */
+export interface DuplicateDismissalRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  element_a_id: UUID;
+  element_b_id: UUID;
+  dismissed_by: UUID;
   created_at: string;
 }
 
