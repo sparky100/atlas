@@ -150,6 +150,19 @@ export function ElementsPage() {
     setSearchParams(params);
   };
 
+  // The `?filter=` finding, now pickable from the toolbar
+  // (`FINDING_FILTER_OPTIONS`, `ElementBrowseTable.tsx`) rather than only
+  // reachable via ArchitectHome's own deep links — same mutual-exclusion
+  // with the custom attribute filter as `setCustomAttrParams` above.
+  const setFindingFilter = (next: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('customAttr');
+    params.delete('customValue');
+    if (next === '') params.delete('filter');
+    else params.set('filter', next);
+    setSearchParams(params);
+  };
+
   const state = useElementBrowse(model?.id ?? '', ref, 'toBe', filter, mainBranch?.head_commit_id ?? null);
   // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment.
   useRouteTiming('elements', state.status === 'ready');
@@ -239,6 +252,8 @@ export function ElementsPage() {
             attributeDefinitions={attributeDefinitions}
             customAttr={{ key: customAttrKey, value: customValueRaw }}
             onCustomAttrChange={setCustomAttrParams}
+            findingFilter={customAttrKey === null ? (searchParams.get('filter') ?? '') : ''}
+            onFindingFilterChange={setFindingFilter}
             linkSupportsInline={
               filter === 'unlinked-systems' && canEdit && mainBranch
                 ? {

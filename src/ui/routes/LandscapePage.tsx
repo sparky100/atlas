@@ -48,7 +48,7 @@ import { useLandscapeDisplay } from '../landscape/useLandscapeDisplay';
 import { useLandscapeLaneDisplayPreference } from '../landscape/useLandscapeLaneDisplayPreference';
 import { fitForPurposeToneFor } from '../elements/fitForPurposeTone';
 import { useElementExport } from '../elements/useElementExport';
-import { lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
+import { criticalityOf, lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
 import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import { parseCapabilityParam, zoomQueryString } from '../nav/zoomParams';
@@ -305,6 +305,7 @@ export function LandscapePage() {
       element: row.system,
       owner: row.owner,
       lifecycleStatus: lifecycleStatusOf(row.system),
+      criticality: criticalityOf(row.system),
       // `row.system.name` is already "Platform · Module"-qualified where it
       // applies (`useCapabilityLandscape.ts`'s own `withModuleLabels` pass)
       // — `null` here just means `moduleDisplayName` leaves that already-
