@@ -158,8 +158,11 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         // own doc comment).
         loadPlannedReplacements(supabase, modelId),
         // F4 (ADR-019 "Amended (F4, ...)"): the standing duplicates report's
-        // own open-candidate count — real from here on.
-        listDuplicateCandidates(supabase, modelId),
+        // own open-candidate count — real from here on. `listDuplicateCandidates`
+        // itself excludes a pair whose element was merged away or retracted
+        // since the last check (that function's own doc comment), so this
+        // count never lags a merge the way "next scheduled check" alone would.
+        listDuplicateCandidates(supabase, modelId, main.head_commit_id),
       ]);
 
       const usesAndFlowsToEndpointsById = new Map([...usesAndFlowsToEndpoints, ...actors].map((el) => [el.element_id, el]));
@@ -208,7 +211,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
           status: 'ready',
           data: {
             recentCommits,
-            duplicatesCount: duplicateCandidates.length,
+            duplicatesCount: duplicateCandidates.candidates.length,
             systemsWithoutCapability: findSystemsWithoutCapability(systems, supportsEdges, containers),
             platformSupportsThatShouldMoveToModule: findPlatformSupportsThatShouldMoveToModule(systems, supportsEdges, containers),
             flowsToPlatformInsteadOfModule: findFlowsToPlatformInsteadOfModule(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),

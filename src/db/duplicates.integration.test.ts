@@ -10,10 +10,16 @@
  * inserted directly by the service-role client, proving only the schema,
  * RLS, and the toggle's own grant. The second is Step 3's: the real
  * `atlas.run_duplicate_check`/`atlas.dismiss_duplicate_pair` RPCs added in
- * `20260924020000_duplicate_check_rpcs.sql`, exercising the detection
- * query itself. The full scenario this pair sits within (through a real
- * merge, the report's own read query) is Step 7's own job, not repeated
- * here.
+ * `20260924020000_duplicate_check_rpcs.sql`, exercising the detection query
+ * itself. The third is Step 7's own job: a real merge through the existing
+ * `mergeElements()`, proving `listDuplicateCandidates`'s own join-based
+ * exclusion (its doc comment, `src/db/duplicates.ts`) for real — a defect
+ * found while writing this very test: Step 5's first cut of that function
+ * had no such join at all, so a merged-away element's own stale candidate
+ * row would have kept showing in the report until the next scheduled check
+ * happened to prune it, contradicting what ADR-019's own "Amended (F4, ...)"
+ * paragraph (item 3) already promised. Fixed alongside this test, not left
+ * for a later sprint.
  */
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -22,6 +28,8 @@ import { getMainBranch } from './branches';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { commitToBranch } from './commits';
+import { listDuplicateCandidates } from './duplicates';
+import { mergeElements } from './elementMerges';
 import { loadEnv } from './env';
 import { createModel } from './models';
 import { createOrganisation } from './organisations';
@@ -254,5 +262,94 @@ describe('atlas.run_duplicate_check / atlas.dismiss_duplicate_pair (F4 step 3) a
     // succeeding, or both failing, would mean the guard isn't atomic.
     expect(successes).toHaveLength(1);
     expect(errors).toHaveLength(1);
+  });
+});
+
+describe('listDuplicateCandidates excludes a pair after a real merge, without waiting for the next check (F4 step 7)', () => {
+  let owner: TestUser;
+  let orgId: string;
+  let modelId: string;
+  let survivorId: string;
+  let loserId: string;
+  let sourceId: string;
+
+  beforeAll(async () => {
+    owner = await createSignedInUser('duplicatemerge-owner');
+
+    orgId = randomUUID();
+    await createOrganisation(owner.client, { id: orgId, name: 'Duplicate Merge Test Org', slug: `duplicatemerge-${orgId.slice(0, 8)}`, createdBy: owner.id });
+
+    modelId = randomUUID();
+    await createModel(owner.client, { id: modelId, orgId, name: 'Duplicate Merge Test Model', slug: `duplicatemerge-model-${modelId.slice(0, 8)}`, createdBy: owner.id });
+
+    const source = await getOrCreateManualSource(owner.client, { id: randomUUID(), orgId, modelId, userId: owner.id });
+    sourceId = source.id;
+    const main = await getMainBranch(owner.client, modelId);
+    if (!main) throw new Error('main branch missing');
+
+    // Same "PowerON"/"Power On" pair the Step 3 describe block above already
+    // proved clears IDENTITY_TRIGRAM_THRESHOLD — a separate org/model here,
+    // not a shared fixture, so this describe block's own merge can't
+    // interact with that one's dismiss/concurrency assertions.
+    survivorId = randomUUID();
+    loserId = randomUUID();
+    const deltas: Delta[] = [
+      { kind: 'element.create', id: randomUUID(), elementId: survivorId, elementType: 'system', name: 'PowerON', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId, confidence: 1 },
+      { kind: 'element.create', id: randomUUID(), elementId: loserId, elementType: 'system', name: 'Power On', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId, confidence: 1 },
+    ];
+    const envelope: CommitEnvelope = { id: randomUUID(), branchId: main.id, parentCommitId: main.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title: 'seed', body: null, deltas };
+    const result = await commitToBranch(owner.client, { modelId, branchId: main.id, expectedHeadCommitId: main.head_commit_id, envelope });
+    if (!result.ok) throw new Error(`seed commit: ${result.message}`);
+  });
+
+  afterAll(async () => {
+    await service.from('organisations').delete().eq('id', orgId);
+  });
+
+  it('flags the pair; a real merge then removes it from a subsequent read with no second check run', async () => {
+    const { data: runData, error: runError } = await owner.client.schema('atlas').rpc('run_duplicate_check', { p_model_id: modelId }).single();
+    const run = runData as DuplicateCheckRunRow | null;
+    expect(runError).toBeNull();
+    expect(run?.candidate_count).toBe(1);
+
+    const mainBeforeMerge = await getMainBranch(owner.client, modelId);
+    if (!mainBeforeMerge) throw new Error('main branch missing');
+
+    const before = await listDuplicateCandidates(owner.client, modelId, mainBeforeMerge.head_commit_id);
+    expect(before.candidates).toHaveLength(1);
+    expect([before.candidates[0]?.element_a_id, before.candidates[0]?.element_b_id].sort()).toEqual([survivorId, loserId].sort());
+    expect(before.elementsById.get(survivorId)?.name).toBe('PowerON');
+    expect(before.elementsById.get(loserId)?.name).toBe('Power On');
+
+    const mergeResult = await mergeElements(owner.client, {
+      modelId,
+      branchId: mainBeforeMerge.id,
+      expectedHeadCommitId: mainBeforeMerge.head_commit_id,
+      survivorId,
+      loserId,
+      sourceId,
+      rationale: 'PowerON and Power On are the same real system',
+    });
+    expect(mergeResult.status).toBe('merged');
+
+    const mainAfterMerge = await getMainBranch(owner.client, modelId);
+    if (!mainAfterMerge) throw new Error('main branch missing after merge');
+
+    // The join-based exclusion ADR-019's own "Amended (F4, ...)" paragraph
+    // (item 3) promises: no second atlas.run_duplicate_check call here — the
+    // read itself, against the new post-merge head, is what drops the
+    // now-stale candidate row naming a retracted element.
+    const after = await listDuplicateCandidates(owner.client, modelId, mainAfterMerge.head_commit_id);
+    expect(after.candidates).toHaveLength(0);
+
+    // The next scheduled/manual check also prunes the now-permanently-stale
+    // row outright, rather than leaving it to be filtered on every future
+    // read forever.
+    const { data: rerunData, error: rerunError } = await owner.client.schema('atlas').rpc('run_duplicate_check', { p_model_id: modelId }).single();
+    const rerun = rerunData as DuplicateCheckRunRow | null;
+    expect(rerunError).toBeNull();
+    expect(rerun?.candidate_count).toBe(0);
+    const { data: prunedRows } = await owner.client.from('duplicate_candidates').select('id').eq('model_id', modelId);
+    expect(prunedRows ?? []).toHaveLength(0);
   });
 });
