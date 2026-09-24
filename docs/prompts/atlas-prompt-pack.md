@@ -6,9 +6,9 @@ Supersedes `docs/prompts/atlas-prompt-pack.md` (v1). v1 stays in the repo as his
 
 ## 1. State
 
-**Works on main (engine-path evidence, not golden-path):** orgs, models, archive/delete, members, invites, roles; capability map (seed, tailor, reorder mode, colour-by, export, mobile accordion); landscape (lanes, bands, zoom, auto-layout, mobile list); context as a C4-style diagram, container as a DOM list (component removed from the taxonomy entirely — ADR-001, S1 item 18); element page with provenance; search-first create; rename; retire with replacement; remove from model; relationships create/edit/remove with roles and verb; changes create/enter/leave/submit/review/approve/merge/split/refresh; C19 fast-forward fold rule (ADR-021 §2.1); reviewer read-only view of a change; "Submit for review" on the banner; sixteen golden-path specs at 1280 and 390; versions tag/diff; comments backend and UI (markers, panel, tray, counts, incl. the mobile landscape list and the capability-scoped list); front doors; browse; health findings incl. Assurance; 7k attributes (criticality, hosting, owner roles, IT/OT, integration platforms with `via`, regulatory fields, platforms and modules); eight starter maps published, incl. the electricity map's "Network Delivery & Maintenance" domain; C2b structural-conflict resolution (deferred Playwright coverage still open — register, issue #76); custom attributes; decisions (D1); F2-lite capture/import (deterministic spreadsheet/CSV/JSON reconciliation) **and F2 full K1** (LLM-driven capture — spreadsheet/CSV, PDF, pasted text; three-level matching; capture-draft branch; re-import lineage; per-class review queue with keyboard shortcuts; capture-specific aliases; the ten-fixture scoring harness — `docs/SPEC-capture.md`, PR1–PR16), shipped alongside F2-lite rather than replacing it — F2-lite's own upload dialog is untouched, and retiring it is a follow-on decision, not part of PR1–16; roadmap (F5 — lifecycle bars, add/retire/replace markers, filters, as-is/to-be, CSV/PNG export; split-branch rollup and version-upgrade markers/tray anchors still deferred — SPEC §11).
+**Works on main (engine-path evidence, not golden-path):** orgs, models, archive/delete, members, invites, roles; capability map (seed, tailor, reorder mode, colour-by, export, mobile accordion); landscape (lanes, bands, zoom, auto-layout, mobile list); context as a C4-style diagram, container as a DOM list (component removed from the taxonomy entirely — ADR-001, S1 item 18); element page with provenance; search-first create; rename; retire with replacement; remove from model; relationships create/edit/remove with roles and verb; changes create/enter/leave/submit/review/approve/merge/split/refresh; C19 fast-forward fold rule (ADR-021 §2.1); reviewer read-only view of a change; "Submit for review" on the banner; sixteen golden-path specs at 1280 and 390; versions tag/diff; comments backend and UI (markers, panel, tray, counts, incl. the mobile landscape list and the capability-scoped list); front doors; browse; health findings incl. Assurance; 7k attributes (criticality, hosting, owner roles, IT/OT, integration platforms with `via`, regulatory fields, platforms and modules); eight starter maps published, incl. the electricity map's "Network Delivery & Maintenance" domain; C2b structural-conflict resolution (deferred Playwright coverage still open — register, issue #76); custom attributes; decisions (D1); F2 full K1 capture (LLM-driven — spreadsheet/CSV, PDF, pasted text, JSON; three-level matching; capture-draft branch; re-import lineage; per-class review queue with keyboard shortcuts, incl. bulk-accept; capture-specific aliases; a twelve-fixture scoring harness — `docs/SPEC-capture.md`, PR1–PR16, audited #293, folded/retired F2-lite F2b); value streams (F6 — stream/stage taxonomy, rollup, impact hop, the Value streams page, starter content, ADR-023 Accepted); roadmap (F5 — lifecycle bars, add/retire/replace markers, filters, as-is/to-be, CSV/PNG export; split-branch rollup and version-upgrade markers/tray anchors still deferred — SPEC §11).
 
-**Not built:** duplicates (Q1); value streams (F6).
+**Not built:** duplicates (Q1).
 
 **Environment:** dev at atlas.simmodlr.app; Supabase project `xakqcssapdiatwrmnjop`. Deploy workflow has failed 59/59 runs at `supabase link` with a token-privilege error; all releases so far were manual. Migrations local = remote as of 12 September (applied by hand).
 
@@ -210,9 +210,9 @@ Prerequisites: E1. Before F2. `atlas.merge_elements(winner, loser)` as one rever
 
 **Done — PR1–PR16 (2026-09-20); audited and gap-fixed (#293, 2026-09-23).** Prerequisites: F1; E2 (C2b); E7 (merge_elements); E3 (delta-apply); E4 (LLM proxy deployed). Decide in design whether the edge function validates with the TypeScript contract (preferred) so `type_schemas` is never built. From `docs/SPEC-capture.md` (Prompt 10, already written): sources; candidate extraction for spreadsheet/CSV, PDF, pasted text; matching (exact id → alias → name+context); capture-draft branch; re-import diff; review queue for candidates (accept / merge into / reject / split) built on the S1 review page; aliases learned from merges; `supports` and technical-owner and `via` as first-class inferred fields; fixture set of ten messy inventories and a scoring script — the pipeline is done when it passes the fixtures. Starter-map upgrade flow (diff a model's tree against a newer map version, propose additions as a capture-draft) rides on this and is **not** part of what PR1–16 built — still open, see the register. Golden path, as actually shipped (`e2e/golden-path-capture-review.spec.ts`): upload a small CSV register, land as a `parsed` draft, open the review queue, accept a `new` candidate by keyboard (`a`), choose a target change (`t`), apply (`⌘/Ctrl+Enter`), and see it promoted with a `⚙` provenance badge — narrower than this line's original "twelve systems... merge... landscape" description, which was F2-lite's own reconciliation flow (`golden-path-import-spreadsheet.spec.ts` already covered that one until F2b retired it).
 
-### F2b — fold F2-lite into K1 capture (in progress, 2026-09-23)
+### F2b — fold F2-lite into K1 capture
 
-Prerequisites: F2 (K1, done); F6 (ADR-023, done — its own gate outlives this sprint). `docs/SPEC-capture.md`'s own "follow-on decision this build did not make" (its Amended 2026-09-20 note) is now made: retire F2-lite (`src/ui/import/SpreadsheetImportDialog.tsx`, `useSpreadsheetImport.ts`, `matchImportRows.ts`, `buildImportCommit.ts` and the row parsers) rather than run it alongside K1 indefinitely. Every gap F2-lite covered that K1 didn't is folded into `docs/SPEC-capture.md` (§5.2's mixed system/module sheet and owner/capability conventions, §5.2a's Relationships sheet, §5.6's JSON input format, §9.4's always-on "not in file", §10's bulk-accept), decided with the human where it genuinely conflicted with a standing ADR: **value-stream import is dropped, not carried over** (ADR-023 already forbids capture from proposing a value stream or stage; F2-lite's own JSON `value_streams` section is retired along with the rest of it, amended into ADR-023 directly), and a JSON entry with no stated confidence is capped at 0.90 like prose, not defaulted to 1.0 as F2-lite did (K-5/ADR-007: 1.0 is a human assertion, not an upload). Steps 1–6 (docs; contract/migration; parsing/matching; retire-restore + edge transfer; review-queue bulk-accept; F2-lite's own removal) are done, one PR at a time; Step 7 (fixtures, integration/e2e coverage, sprint status doc) remains.
+**Done — Steps 1–7 (2026-09-23), `docs/SPRINT-F2b-STATUS.md`.** Prerequisites: F2 (K1, done); F6 (ADR-023, done — its own gate outlives this sprint). `docs/SPEC-capture.md`'s own "follow-on decision this build did not make" (its Amended 2026-09-20 note) is made: F2-lite (`src/ui/import/SpreadsheetImportDialog.tsx`, `useSpreadsheetImport.ts`, `matchImportRows.ts`, `buildImportCommit.ts` and the row parsers) is retired rather than run alongside K1 indefinitely — every one of those files, and the golden-path spec that covered its own dialog (`golden-path-import-spreadsheet.spec.ts`), is deleted from the tree. Every gap F2-lite covered that K1 didn't is folded into `docs/SPEC-capture.md` (§5.2's mixed system/module sheet and owner/capability conventions, §5.2a's Relationships sheet, §5.6's JSON input format, §9.4's always-on "not in file", §10's bulk-accept), decided with the human where it genuinely conflicted with a standing ADR: **value-stream import is dropped, not carried over** (ADR-023 already forbids capture from proposing a value stream or stage; F2-lite's own JSON `value_streams` section is retired along with the rest of it, amended into ADR-023 directly), and a JSON entry with no stated confidence is capped at 0.90 like prose, not defaulted to 1.0 as F2-lite did (K-5/ADR-007: 1.0 is a human assertion, not an upload). Two pre-existing K1 defects (from this same sprint's own earlier steps) were found and fixed while authoring Step 7's fixtures — `inferSheetType` forcing every parent-column sheet to `container` (making the mixed-sheet split unreachable), and a JSON retire/restore candidate's own confidence display flooring at 0 — both amended into `docs/SPEC-capture.md` §5.2/§5.5. Integration and Playwright suites are written and typecheck-clean but not executed in the authoring sandbox (no Docker/Supabase route there); a desktop run is still needed before this can be called done by CLAUDE.md's own "Verification" standard.
 
 ### F4 — duplicates report (Q1)
 
@@ -250,7 +250,6 @@ Prerequisites: S2. Profile the worst 5% of frames on the 2,000-system fixture be
 
 | Item | Why | Before |
 |---|---|---|
-| Typed Supabase client | H2 | any time |
 | Landscape p5 fps 30 → 45: profile worst frames first | R-perf | after S2 |
 
 ---
@@ -263,30 +262,20 @@ Taxonomy (12 September): capability, system (incl. platform kinds), container (m
 
 ## 7. Deferred register
 
-Every row has (or gets, in P1) a SPEC §11 row and an issue. A row leaves only when the work lands or the human drops it.
+Every row has (or gets, in P1) a SPEC §11 row and an issue. A row leaves only when the work lands or the human drops it. **2026-09-24 reconciliation:** ten rows removed as landed, confirmed against the codebase rather than taken on the doc's own earlier word — C19 (E1), Reviewer read-only view / Submit for review on the banner / Cancel a change / Electricity map Network Delivery (all S1), Golden-path specs (S2, 19 exist), Context view as C4-style diagram (V1), Custom attributes (F1), Value streams (F6), Typed Supabase client (E5).
 
 | Item | Target | Issue |
 |---|---|---|
-| C19 fast-forward fold rule | E1 | create |
 | C2b structural-conflict resolution + deferred Playwright | E2 (before F2) | #76 |
-| Reviewer read-only view of a change | S1 | create |
-| Submit for review on the banner | S1 | create |
-| Cancel a change | S1 | create |
 | Comments on mobile landscape list and capability-scoped list | S1 | create |
-| Electricity map Network Delivery & Maintenance; utility equivalent | S1 | create |
 | Reorder on-the-fly order, L3 controls, header height, picker alphabetical | S1 | create |
 | A2 remainder (resolveRef dedup, reportError everywhere, console check) | S1 | create |
 | BranchRebasePanel persisted dismissals; viewer-visibility test | S1 | create |
-| Golden-path specs (zero exist) | S2 | create |
-| Context view as C4-style diagram | V1 | create |
 | C2 review-queue design pass (after first real partial acceptance) | after S2 | create |
-| Custom attributes | F1 | create |
 | Starter-map upgrade flow (rides on full K1, which landed at PR1–PR16 — this row is the only part of the original F2 (full K1) register entry still open) | F2 (full K1) | create |
 | Notification tray deep links (decision, version anchors) | F3 / F5 | create |
-| Value streams | F6 | create |
 | Drag-and-drop reorder | S-track when move buttons prove tedious | create |
-| Typed Supabase client | any | create |
-| Landscape p5 fps | after S2 | create |
+| Landscape p5 fps (2026-09-24: `docs/perf/2026-09.md` covers E8's route/action timing only — no dedicated frame-rate profile found yet) | after S2 | create |
 | Landscape position persistence with layout versioning | not scheduled | create |
 | Security zone on containers; compliance view | not scheduled | create |
 | Keyboard shortcuts for As-is/To-be/Diff; propose-change picker for contributors at main | S-track | create |
