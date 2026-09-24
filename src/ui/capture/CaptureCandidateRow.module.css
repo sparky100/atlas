@@ -50,12 +50,6 @@
   flex-wrap: wrap;
 }
 
-.source {
-  padding: var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--surface-muted, var(--border));
-}
-
 .actions {
   display: flex;
   align-items: center;
