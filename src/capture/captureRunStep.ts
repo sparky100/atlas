@@ -258,7 +258,12 @@ export async function runCaptureRunStep(deps: CaptureRunDeps, jobId: UUID): Prom
 
     const rejectedDeltaIds = new Set([...rejectedSeqs].flatMap((seq) => draftDeltaIdsBySeq.get(seq) ?? []));
     const keptEnvelope = { ...envelope, deltas: envelope.deltas.filter((d) => !rejectedDeltaIds.has(d.id)) };
-    const finishedCandidates = candidates.map((c) => (rejectedSeqs.has(c.seq) ? { ...c, class: 'invalid' as const, draftDeltaIds: [] } : { ...c, draftDeltaIds: draftDeltaIdsBySeq.get(c.seq) ?? [] }));
+    // `capture_candidates_check3`: `class: 'invalid'` requires `draftSubjectId`
+    // null, same as every other path that produces an `invalid` candidate
+    // (`runCapture.ts`'s own classifiers) — this reclassification-after-the-
+    // fact used to leave a `new`/`update`/`confirm`/`conflict`/`ambiguous`
+    // candidate's already-set `draftSubjectId` in place, violating it.
+    const finishedCandidates = candidates.map((c) => (rejectedSeqs.has(c.seq) ? { ...c, class: 'invalid' as const, draftDeltaIds: [], draftSubjectId: null } : { ...c, draftDeltaIds: draftDeltaIdsBySeq.get(c.seq) ?? [] }));
     const deltaRows = envelopeToDeltaRows(keptEnvelope, { orgId: job.orgId, modelId: job.modelId, createdBy: job.createdBy });
     const candidateRows = finishedCandidates.map(captureCandidateWireToRow);
 
