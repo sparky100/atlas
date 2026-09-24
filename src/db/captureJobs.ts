@@ -12,7 +12,6 @@
  * Untyped client, same as every other src/db repository (branches.ts's own
  * module comment) — `eslint-disable` comments mark exactly that boundary.
  */
-import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import type { CaptureRunStepResult } from '../capture/captureRunStep';
 import type { UUID } from '../contracts/delta';
@@ -23,9 +22,26 @@ import type { CaptureJobRow } from './types';
 
 const CAPTURE_INPUTS_BUCKET = 'capture-inputs';
 
-/** SHA-256 of the exact bytes about to be uploaded, hex-encoded — `CaptureJob.inputSha256`'s own wire shape. Same isomorphic `@noble/hashes` call `src/engine/head.ts`'s `headHash` uses, for the same reason: this runs in the browser, not just in tests/edge functions. */
-export function computeInputSha256Hex(bytes: Uint8Array): string {
-  return bytesToHex(sha256(bytes));
+/**
+ * SHA-256 of the exact bytes about to be uploaded, hex-encoded —
+ * `CaptureJob.inputSha256`'s own wire shape. Web Crypto (`crypto.subtle`),
+ * not `@noble/hashes` — this runs on the full file's bytes in the browser's
+ * main thread (`UploadCaptureDialog.tsx`, on file selection and again on
+ * submit), and a pure-JS hash over a multi-megabyte PDF was slow enough to
+ * visibly stall the dialog with no way to yield a paint mid-hash. Native
+ * `crypto.subtle.digest` is async by construction (never blocks the render
+ * that requests it) and available everywhere this function runs — browser,
+ * Vitest (Node ≥19), and the `capture-run` edge function's Deno runtime —
+ * so the standard SHA-256 digest this produces is identical to
+ * `@noble/hashes`' own, just computed off the render path.
+ */
+export async function computeInputSha256Hex(bytes: Uint8Array): Promise<string> {
+  // `Uint8Array`'s own generic buffer parameter (`ArrayBufferLike`, which
+  // includes `SharedArrayBuffer`) is stricter than `BufferSource` requires
+  // here — a TS lib mismatch, not a real runtime concern (every caller
+  // constructs `bytes` from a plain `ArrayBuffer`, never a shared one).
+  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
+  return bytesToHex(new Uint8Array(digest));
 }
 
 /** PostgREST's own wire form for a `bytea` column is `\x`-prefixed hex — stripped here so `captureJobRowToWire` always sees the plain hex string its own type comment promises. */

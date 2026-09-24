@@ -14,6 +14,8 @@ export interface CreateCaptureJobInput {
   bytes: Uint8Array;
   documentDate: string | null;
   reimportOfJobId: UUID | null;
+  /** `UploadCaptureDialog.tsx` already hashes `bytes` itself (to compare against a re-import candidate) — passing that result through here avoids hashing the same multi-megabyte file a second time on submit. `undefined` (a caller with no reason to have hashed already, or hashing not yet finished) computes it here instead. */
+  inputSha256Hex?: string | undefined;
 }
 
 export interface UseCaptureJobsResult {
@@ -105,7 +107,7 @@ export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null):
       setStatus('creating');
       const jobId: UUID = crypto.randomUUID();
       try {
-        const inputSha256Hex = computeInputSha256Hex(input.bytes);
+        const inputSha256Hex = input.inputSha256Hex ?? (await computeInputSha256Hex(input.bytes));
         await uploadCaptureInput(supabase, { orgId, modelId, jobId, filename: input.inputName, bytes: input.bytes });
         const job = await insertCaptureJob(supabase, {
           id: jobId,
