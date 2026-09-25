@@ -369,13 +369,14 @@ interface ElementResolutionResult {
   parentNameForRowKey: string | null;
   /** The candidate's own `parent` ref, fully resolved (`null` for a top-level element) — the caller writes this back into the output `proposal.parent` as `{kind:'existing', elementId}`, since `buildCaptureDraftEnvelope.ts` requires every ref already resolved by the time it sees a candidate. */
   resolvedParentElementId: UUID | null;
-  /** `proposal.elementType`, unless `match` came from `match.ts`'s own system/container cross-type fallback — then the matched element's *real* stored type, so the delta this candidate eventually builds carries the type the model actually has, not the model's own guess (`resolveElementType`'s own doc comment). */
+  /** `proposal.elementType`, unless `match` came from `match.ts`'s own system/container cross-type fallback or platform-prefix fallback — then the matched element's *real* stored type, so the delta this candidate eventually builds carries the type the model actually has, not the model's own guess (`resolveElementType`'s own doc comment). */
   resolvedElementType: ElementType;
 }
 
-/** `match`'s own `MATCHED_CROSS_TYPE` warning (`match.ts`) means `match.elementId` is a real element whose stored type differs from `proposalElementType` — everything downstream (the row key, the eventual delta's own `elementType` field) needs the matched element's real type from here on, not the candidate's original guess, or an `element.update` delta would carry a type that disagrees with the element it's updating. */
+/** `match`'s own `MATCHED_CROSS_TYPE`/`MATCHED_PLATFORM_PREFIX` warnings (`match.ts`) mean `match.elementId` is a real element whose stored type differs from `proposalElementType` — everything downstream (the row key, the eventual delta's own `elementType` field) needs the matched element's real type from here on, not the candidate's original guess, or an `element.update` delta would carry a type that disagrees with the element it's updating. */
 function resolveElementType(match: MatchOutcome, proposalElementType: ElementType, matchIndex: MatchIndex): ElementType {
-  if (!match.warnings.includes('MATCHED_CROSS_TYPE') || match.elementId === undefined) return proposalElementType;
+  const fromRealType = match.warnings.includes('MATCHED_CROSS_TYPE') || match.warnings.includes('MATCHED_PLATFORM_PREFIX');
+  if (!fromRealType || match.elementId === undefined) return proposalElementType;
   return matchIndex.elements.get(match.elementId)?.element_type ?? proposalElementType;
 }
 
@@ -468,6 +469,16 @@ function resolveElementCandidate(candidate: RowCandidate, proposal: ElementPropo
   const cls = classifyElement({ match, attributes: [...comparisons.values()] });
   const outcomes = new Map<string, AttributeOutcome>([...comparisons].map(([key, input]) => [key, classifyAttribute(input)]));
   const attributes = filterAttributesForClass(proposal.attributes, cls, outcomes);
+
+  // `match.ts`'s own `resolvePlatformPrefixed`: the document never named a
+  // parent for this candidate at all (it wrote the platform name inline,
+  // e.g. "SAP PM"), so the parent recovered here is the *only* source of
+  // one — nothing above already set `resolvedParentElementId` in this
+  // branch (it's only ever set from `proposal.parent`, which is `null`
+  // whenever this fallback is what found the match).
+  if (match.warnings.includes('MATCHED_PLATFORM_PREFIX') && match.resolvedParentId !== undefined) {
+    resolvedParentElementId = match.resolvedParentId;
+  }
 
   return { class: cls, match, draftSubjectId: matchedElementId, attributes, parentNameForRowKey, resolvedParentElementId, resolvedElementType: resolveElementType(match, proposal.elementType, matchIndex) };
 }
