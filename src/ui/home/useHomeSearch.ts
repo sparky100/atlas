@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import { countMatches, loadSearchPoolForTypes, matchElements, type SearchPoolElement } from '../../db/elementSearch';
+import { countMatches, loadSearchPoolForTypes, matchElements, overlayBranchElements, type SearchPoolElement } from '../../db/elementSearch';
 import { enrichElementMatches, type MatchEnrichment } from '../elements/enrichElementMatches';
+import { loadProjectionAtCommitCached } from '../query/cachedBranchProjection';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 import { HOME_SEARCH_TYPES, hasCreatableExactMatch } from './homeSearchTypes';
@@ -49,7 +50,16 @@ export interface UseHomeSearchResult {
  * relationship count, same enrichment `useElementSearchAdd` already used
  * (`enrichElementMatches.ts`), not a plain type label.
  */
-export function useHomeSearch(commitId: UUID, modelId: UUID): UseHomeSearchResult {
+/**
+ * `branchCommitId`: the front door's own active change branch, when
+ * there is one (`HomeSearch.tsx`'s own `activeRef`/`editingBranch`) — folded
+ * and overlaid onto the main-scoped pool (`overlayBranchElements`) so an
+ * element added or edited earlier in *this* change is findable again
+ * without waiting for a merge, the one deliberate exception
+ * `src/db/elementSearch.ts`'s own module comment names. `null` (viewing
+ * main, or no branch context) keeps this exactly as main-only as before.
+ */
+export function useHomeSearch(commitId: UUID, modelId: UUID, branchCommitId: UUID | null = null): UseHomeSearchResult {
   const [pool, setPool] = useState<SearchPoolElement[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -59,9 +69,13 @@ export function useHomeSearch(commitId: UUID, modelId: UUID): UseHomeSearchResul
     let cancelled = false;
     setPool(null);
     setError(null);
-    loadSearchPoolForTypes(supabase, commitId, modelId, HOME_SEARCH_TYPES)
-      .then((loaded) => {
-        if (!cancelled) setPool(loaded);
+    Promise.all([
+      loadSearchPoolForTypes(supabase, commitId, modelId, HOME_SEARCH_TYPES),
+      branchCommitId !== null ? loadProjectionAtCommitCached(supabase, modelId, branchCommitId) : Promise.resolve(null),
+    ])
+      .then(([mainPool, branchProjection]) => {
+        if (cancelled) return;
+        setPool(branchProjection !== null ? overlayBranchElements(mainPool, branchProjection.elementsHead, HOME_SEARCH_TYPES) : mainPool);
       })
       .catch((e: unknown) => {
         // S1 audit follow-up (item 15's own reportError rollout missed this one).
@@ -71,7 +85,7 @@ export function useHomeSearch(commitId: UUID, modelId: UUID): UseHomeSearchResul
     return () => {
       cancelled = true;
     };
-  }, [commitId, modelId]);
+  }, [commitId, modelId, branchCommitId]);
 
   const matches = pool ? matchElements(pool, query) : [];
 

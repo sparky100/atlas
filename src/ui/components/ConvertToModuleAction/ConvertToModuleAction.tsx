@@ -68,7 +68,7 @@ export function ConvertToModuleAction({
   onCancel,
 }: ConvertToModuleActionProps) {
   const [target, setTarget] = useState<ConvertToModuleTarget | null>(null);
-  const search = useRelationshipTargetSearch(searchCommitId, modelId, ['system'], element.element_id, target === null);
+  const search = useRelationshipTargetSearch(searchCommitId, modelId, ['system'], element.element_id, target === null, branch.kind === 'change' ? branch.head_commit_id : null);
   const preview = useConvertToModulePreview(modelId, expectedHeadCommitId, element.element_id, target?.elementId ?? null);
   const { status, error, convert } = useConvertToModule({
     modelId,

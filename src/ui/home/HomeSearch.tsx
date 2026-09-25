@@ -33,7 +33,7 @@ export interface HomeSearchProps {
   orgId: UUID;
   userId: UUID | null;
   role: MemberRole | null;
-  /** Always main's real head — search never varies with the ref (src/db/elementSearch.ts's own module comment; Handoff — Flow: Add a system's own "Search does not change with the branch"). */
+  /** Always main's real head (src/db/elementSearch.ts's own module comment; Handoff — Flow: Add a system's own "Search does not change with the branch") — `editingBranch`'s own head is additionally overlaid onto this when it's a change (`useHomeSearch`'s own `branchCommitId`), so search still doesn't drift with someone else's branch, only with the one this session is actually writing to. */
   searchCommitId: UUID;
   /** The current front-door ref (Handoff — Flow: Add a system, decision 5: "create follows the active ref") — `main` unless the door is opened at `?ref=branch:…`. */
   activeRef: Ref;
@@ -75,19 +75,26 @@ export interface HomeSearchProps {
  */
 export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activeRef, editingBranch, orgSlug, modelSlug, autoFocus }: HomeSearchProps) {
   const navigate = useNavigate();
-  const search = useHomeSearch(searchCommitId, modelId);
+  // Folds and overlays `editingBranch`'s own head onto the main-scoped pool
+  // (`useHomeSearch`'s own `branchCommitId` doc comment) — an element added
+  // or edited earlier in *this* change is findable again from Home search
+  // without waiting for a merge.
+  const search = useHomeSearch(searchCommitId, modelId, editingBranch?.kind === 'change' ? editingBranch.head_commit_id : null);
   const [createType, setCreateType] = useState<ElementType>('system');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [description, setDescription] = useState('');
   const [capability, setCapability] = useState<{ id: UUID; name: string } | null>(null);
   const [platform, setPlatform] = useState<{ id: UUID; name: string } | null>(null);
   const [proposedBranch, setProposedBranch] = useState<BranchRow | null>(null);
-  // Bug fix: this used to hardcode `?ref=main` — an *existing* element
-  // found by search always lives on main (search itself never varies
-  // with the ref, this component's own doc comment), but opening it
-  // still needs to carry the session's own selected ref forward, or the
-  // very next edit made from that element page silently targets main
-  // instead of the change the reviewer had open a moment ago.
+  // Bug fix: this used to hardcode `?ref=main` — a result found by search
+  // is almost always on main (search itself doesn't vary with the ref for
+  // anyone else's additions), but opening it still needs to carry the
+  // session's own selected ref forward, or the very next edit made from
+  // that element page silently targets main instead of the change the
+  // reviewer had open a moment ago. It matters even more now that a result
+  // can itself be one of this change's own overlaid elements (`search`'s
+  // own `branchCommitId` above) — that element genuinely only exists on
+  // `activeRef`, never on main at all yet.
   const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?ref=${refParamOf(activeRef)}`;
 
   // Decision 5: a contributor viewing main has no direct write to main
@@ -108,7 +115,14 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
   // only a container needs one, and only once `platform` is actually
   // chosen (`showPlatformPicker`'s own sheet below gates `create` on that).
   const parentId = showPlatformPicker ? (platform?.id ?? null) : null;
-  const platformSearch = useRelationshipTargetSearch(searchCommitId, modelId, ['system'], NO_EXCLUSION, showPlatformPicker && sheetOpen && platform === null);
+  const platformSearch = useRelationshipTargetSearch(
+    searchCommitId,
+    modelId,
+    ['system'],
+    NO_EXCLUSION,
+    showPlatformPicker && sheetOpen && platform === null,
+    writeBranch?.kind === 'change' ? writeBranch.head_commit_id : null,
+  );
 
   const { status: createStatus, error: createError, create } = useElementCreate({
     modelId,
@@ -151,7 +165,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
 
       {activeRef.kind === 'branch' && (
         <Text as="p" tone="faint" size="xs">
-          Searched against main, not this change.
+          Searched against main and this change — not anyone else&apos;s.
         </Text>
       )}
 

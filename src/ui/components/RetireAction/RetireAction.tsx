@@ -72,7 +72,12 @@ export function RetireAction({
   const [newReplacementName, setNewReplacementName] = useState('');
   const plannedEndId = useId();
   const newNameId = useId();
-  const search = useRelationshipTargetSearch(searchCommitId, modelId, [element.element_type], element.element_id, mode === 'searching');
+  // A replacement named in the same change as the retire itself (real
+  // capture review: "SAP Datasphere," added moments earlier on this same
+  // branch, as SAP BW's own replacement) is otherwise invisible to a
+  // main-only search — `useRelationshipTargetSearch`'s own `branchCommitId`
+  // doc comment.
+  const search = useRelationshipTargetSearch(searchCommitId, modelId, [element.element_type], element.element_id, mode === 'searching', branch.kind === 'change' ? branch.head_commit_id : null);
   const searchPlaceholder = element.element_type === 'container' ? 'Search modules…' : 'Search systems…';
   const { status, error, retire } = useElementRetire({
     modelId,
