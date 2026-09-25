@@ -115,6 +115,42 @@ export function resolveByTrigram(name: string, pool: readonly ElementsHeadRow[])
   };
 }
 
+/**
+ * A document's own platform-qualified naming convention ("SAP PM" in the
+ * prose, for a container whose own stored `name` is just "PM" under
+ * platform "SAP") is a document-authoring habit, not stored data — a
+ * container's own `name` never repeats its parent platform's name (that
+ * combination, "Platform · Module", is `moduleDisplayName`'s own UI
+ * formatting concern elsewhere, not anything persisted). Found via real
+ * capture review: "SAP PM" extracted as a top-level `system` with no
+ * parent (the document never says "PM is a module of SAP" in so many
+ * words — it just writes the platform name inline), found no match at
+ * levels 1–4 even though "PM" already exists as a container of "SAP".
+ *
+ * Tried only after every earlier level has failed. `normaliseName`
+ * already collapses every separator variant (space, `·`, `-`, `:`, …) to
+ * a single space and lowercases, so matching against `<normalised
+ * platform name> ` as a literal prefix covers all of them without extra
+ * separator-specific logic. The remainder must still clear the normal
+ * identity threshold against one of *that specific platform's* own
+ * containers — a wrong strip just fails to match (falls through to
+ * `none`) rather than mis-matching, since nothing here lowers the bar
+ * `resolveByTrigram` already enforces.
+ */
+function resolvePlatformPrefixed(name: string, index: MatchIndex): (TrigramMatchResult & { resolvedParentId?: UUID }) | null {
+  const normalisedName = normaliseName(name);
+  const platforms = index.elementsByType.get('system') ?? [];
+  for (const platform of platforms) {
+    const prefix = `${normaliseName(platform.name)} `;
+    if (!normalisedName.startsWith(prefix) || normalisedName.length <= prefix.length) continue;
+    const remainder = normalisedName.slice(prefix.length);
+    const childPool = (index.elementsByType.get('container') ?? []).filter((el) => el.parent_id === platform.element_id);
+    const hit = resolveByTrigram(remainder, childPool);
+    if (hit.level !== 'none') return { ...hit, resolvedParentId: platform.element_id };
+  }
+  return null;
+}
+
 export function matchElement(input: MatchElementInput, index: MatchIndex): MatchOutcome {
   const warnings: MatchOutcome['warnings'] = [];
 
@@ -158,6 +194,19 @@ export function matchElement(input: MatchElementInput, index: MatchIndex): Match
     const fallbackPool = index.elementsByType.get(fallbackType) ?? [];
     const fallback = resolveByTrigram(input.name, fallbackPool);
     if (fallback.level !== 'none') return { ...fallback, warnings: [...warnings, 'MATCHED_CROSS_TYPE'] };
+  }
+
+  // 5. platform-name-prefix fallback — see `resolvePlatformPrefixed`'s own
+  // doc comment. Only worth trying for `system`/`container` candidates,
+  // the same pair `crossTypeFallback` covers — a document's own inline
+  // "Platform Module" habit is a name-composition mistake about the same
+  // two types, never `capability`/`actor`.
+  if (input.elementType === 'system' || input.elementType === 'container') {
+    const prefixed = resolvePlatformPrefixed(input.name, index);
+    if (prefixed) {
+      const { resolvedParentId, ...outcome } = prefixed;
+      return { ...outcome, warnings: [...warnings, 'MATCHED_PLATFORM_PREFIX'], ...(resolvedParentId !== undefined ? { resolvedParentId } : {}) };
+    }
   }
 
   return { ...primary, warnings };

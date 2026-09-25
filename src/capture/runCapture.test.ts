@@ -164,6 +164,41 @@ describe('runCapture — matching against main', () => {
     expect(matched?.class).not.toBe('new');
     expect(matched?.match.warnings).toContain('MATCHED_CROSS_TYPE');
   });
+
+  it('a plain Applications-sheet row named with a platform prefix (always proposed as elementType system, no parent) matches the platform\'s own container of the bare remainder name, and recovers the parent link ("SAP PM" regression)', async () => {
+    const csv = 'Application,Supplier,Status\nSAP PM,Acme,Live';
+    const platform = { element_id: 'sys-1', element_type: 'system' as const, name: 'SAP', parent_id: null, attributes: {}, exists_delta_id: 'd-1' };
+    const pm = { element_id: 'c-1', element_type: 'container' as const, name: 'PM', parent_id: 'sys-1', attributes: { vendor: 'Acme', lifecycleStatus: 'active', isExternal: false }, exists_delta_id: 'd-2' };
+    const matchIndex = buildMatchIndex([platform, pm], []);
+    const mainHead = emptyHead();
+    mainHead.elements.set('sys-1', { elementType: 'system', name: 'SAP', parentId: null, attributes: {}, existsDeltaId: 'd-1' });
+    mainHead.elements.set('c-1', { elementType: 'container', name: 'PM', parentId: 'sys-1', attributes: pm.attributes, existsDeltaId: 'd-2' });
+
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'Applications.csv',
+        source: { format: 'csv', text: csv },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex,
+        mainHead,
+        mintId: mintIdFrom('el'),
+      }),
+    );
+
+    expect(result.candidates.filter((c) => c.kind === 'element')).toHaveLength(1);
+    const matched = result.candidates.find((c) => c.kind === 'element');
+    // Proposed as a top-level system named "SAP PM" (a plain Applications
+    // sheet has no notion of "module of X", and the document never states a
+    // parent) — resolved to the real container's own type and matched, with
+    // the platform recovered as this candidate's parent even though the
+    // document itself never named one.
+    expect(matched?.elementType).toBe('container');
+    expect(matched?.draftSubjectId).toBe('c-1');
+    expect(matched?.class).not.toBe('new');
+    expect(matched?.match.warnings).toContain('MATCHED_PLATFORM_PREFIX');
+    expect(matched?.proposal.kind === 'element' && matched.proposal.parent).toEqual({ kind: 'existing', elementId: 'sys-1' });
+  });
 });
 
 describe('runCapture — target-branch matching (K-8/§7.1, issue #285)', () => {

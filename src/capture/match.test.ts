@@ -138,6 +138,60 @@ describe('matchElement', () => {
     expect(outcome.level).toBe('none');
   });
 
+  it('platform-prefix fallback: a compound "Platform Module" name matches the module\'s own bare name under that platform (SAP PM: extracted as a top-level system, actually container "PM" under platform "SAP")', () => {
+    const platform = element({ element_id: 'sys-1', element_type: 'system', name: 'SAP' });
+    const otherPlatform = element({ element_id: 'sys-2', element_type: 'system', name: 'Workday' });
+    const pm = element({ element_id: 'c-1', element_type: 'container', name: 'PM', parent_id: 'sys-1' });
+    const unrelatedContainer = element({ element_id: 'c-2', element_type: 'container', name: 'PM', parent_id: 'sys-2' });
+    const index = buildMatchIndex([platform, otherPlatform, pm, unrelatedContainer], []);
+
+    const outcome = matchElement({ name: 'SAP PM', elementType: 'system', context: 'top-level' }, index);
+    expect(outcome.level).toBe('name_context');
+    expect(outcome.elementId).toBe('c-1');
+    expect(outcome.warnings).toContain('MATCHED_PLATFORM_PREFIX');
+    expect(outcome.resolvedParentId).toBe('sys-1');
+  });
+
+  it('platform-prefix fallback: separator variants in the prefix all normalise the same way (SAP · PM, SAP-PM, sap pm)', () => {
+    const platform = element({ element_id: 'sys-1', element_type: 'system', name: 'SAP' });
+    const pm = element({ element_id: 'c-1', element_type: 'container', name: 'PM', parent_id: 'sys-1' });
+    const index = buildMatchIndex([platform, pm], []);
+
+    for (const name of ['SAP · PM', 'SAP-PM', 'sap pm']) {
+      const outcome = matchElement({ name, elementType: 'system', context: 'top-level' }, index);
+      expect(outcome.level).toBe('name_context');
+      expect(outcome.elementId).toBe('c-1');
+    }
+  });
+
+  it('platform-prefix fallback: never consulted when an earlier level already matched', () => {
+    const platform = element({ element_id: 'sys-1', element_type: 'system', name: 'SAP' });
+    const directHit = element({ element_id: 'sys-2', element_type: 'system', name: 'SAP PM' });
+    const index = buildMatchIndex([platform, directHit], []);
+
+    const outcome = matchElement({ name: 'SAP PM', elementType: 'system', context: 'top-level' }, index);
+    expect(outcome.elementId).toBe('sys-2');
+    expect(outcome.warnings).not.toContain('MATCHED_PLATFORM_PREFIX');
+  });
+
+  it('platform-prefix fallback: a wrong strip just fails rather than mis-matching (no container of that platform is close enough)', () => {
+    const platform = element({ element_id: 'sys-1', element_type: 'system', name: 'SAP' });
+    const unrelated = element({ element_id: 'c-1', element_type: 'container', name: 'Zzz Totally Unrelated', parent_id: 'sys-1' });
+    const index = buildMatchIndex([platform, unrelated], []);
+
+    const outcome = matchElement({ name: 'SAP PM', elementType: 'system', context: 'top-level' }, index);
+    expect(outcome.level).toBe('none');
+  });
+
+  it('platform-prefix fallback: capability/actor never try it', () => {
+    const platform = element({ element_id: 'sys-1', element_type: 'system', name: 'SAP' });
+    const pm = element({ element_id: 'c-1', element_type: 'container', name: 'PM', parent_id: 'sys-1' });
+    const index = buildMatchIndex([platform, pm], []);
+
+    const outcome = matchElement({ name: 'SAP PM', elementType: 'capability', context: 'top-level' }, index);
+    expect(outcome.level).toBe('none');
+  });
+
   it('level 3: a top-level capability only matches another top-level capability', () => {
     const parentCap = element({ element_id: 'cap-parent', element_type: 'capability' });
     const topLevelCap = element({ element_id: 'cap-1', element_type: 'capability', name: 'Finance', parent_id: null });
