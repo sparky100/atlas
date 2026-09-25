@@ -143,7 +143,11 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   const [labelDraft, setLabelDraft] = useState('');
   const [showViaStage, setShowViaStage] = useState(false);
   const labelId = useId();
-  const search = useRelationshipTargetSearch(searchCommitId, modelId, slot.targetTypes, elementId);
+  // A target added earlier on this same change (a second new system this
+  // element should relate to, say) is otherwise invisible to a main-only
+  // search — `useRelationshipTargetSearch`'s own `branchCommitId` doc comment.
+  const branchCommitId = branch.kind === 'change' ? branch.head_commit_id : null;
+  const search = useRelationshipTargetSearch(searchCommitId, modelId, slot.targetTypes, elementId, true, branchCommitId);
   // V6 (SPEC §5.2, `checkNoDuplicateRelationship` in `src/engine/deltas.ts`):
   // no two live relationships may share `(type, from, to)`. The search pool
   // itself doesn't know this element's own existing edges, so it's filtered
@@ -166,7 +170,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   // Only mounted (its own fetch enabled) for uses/flows_to slots — see this
   // hook's own `enabled` doc comment for why every other slot on the same
   // element page must not also pay for a redundant system-pool query.
-  const viaSearch = useRelationshipTargetSearch(searchCommitId, modelId, ['system'], elementId, needsLabel);
+  const viaSearch = useRelationshipTargetSearch(searchCommitId, modelId, ['system'], elementId, needsLabel, branchCommitId);
   // Set right before each `create()` call so the hook's own success callback
   // (which carries no arguments of its own) can still report which element
   // the new relationship points at (Handoff — Flow: Add a system, step 7).

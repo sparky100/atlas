@@ -68,7 +68,7 @@ export function MergeIntoAction({
   const [target, setTarget] = useState<MergeIntoTarget | null>(() => initialTarget ?? null);
   const [rationale, setRationale] = useState('');
   const rationaleId = useId();
-  const search = useRelationshipTargetSearch(searchCommitId, modelId, [element.element_type], element.element_id, target === null);
+  const search = useRelationshipTargetSearch(searchCommitId, modelId, [element.element_type], element.element_id, target === null, branch.kind === 'change' ? branch.head_commit_id : null);
   const preview = useMergePreview(modelId, expectedHeadCommitId, target?.elementId ?? null, element.element_id);
   const { status, error, merge } = useElementMerge({
     modelId,

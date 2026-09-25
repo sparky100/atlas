@@ -10,25 +10,25 @@
  * the same shape as `listSystemsForLandscape` — not a candidate for the
  * `.in()` ceiling `assertInFilterSize` guards against.
  *
- * Search always reads main's real materialised head — not a change branch's
- * unmaterialised projection (SPEC §1 S-2) — regardless of which ref/branch
- * the page creating the element is currently viewing. This is deliberate:
- * search-first exists to catch "this already exists in the model," and the
- * model, for that purpose, is main — a change branch's own not-yet-merged
- * additions aren't a second copy of the canonical answer to "does this
- * exist," they're a proposal on top of it. Where the new element's commit
- * actually lands (main, or the branch being edited) is a separate question,
- * answered by the caller's own branch/role resolution (`useEditingBranch`/
- * `canEditBranch`), not by this module.
+ * Search reads main's real materialised head — not a change branch's
+ * unmaterialised projection (SPEC §1 S-2). This is still the *only* pool
+ * for a bare "does this already exist in the model" check with no branch
+ * context of its own, and for anyone other than the person actually
+ * working the branch: a change branch's own not-yet-merged additions
+ * aren't a second copy of the canonical answer to "does this exist,"
+ * they're a proposal on top of it.
  *
- * The corollary — the creator's own side of this, not just the searcher's
- * (`HomeSearch.tsx`'s own "Searched against main, not this change" note
- * already covered the latter): an element created on a change branch won't
- * show up in *this* search itself, for anyone, until that branch merges.
- * `ElementSearchAdd.tsx`/`HomeSearch.tsx` both surface a plain warning next
- * to their own create action whenever the write target is a `change`
- * branch, rather than letting someone discover the gap the hard way by
- * searching for what they just added a moment ago.
+ * `overlayBranchElements` below is the one deliberate exception: a caller
+ * that already knows which change branch it's operating on (Home search,
+ * the "replaced by"/relationship/merge/convert-to-module pickers — every
+ * one of them already has the branch in hand for the write itself) folds
+ * that branch's own head and overlays it onto this main-scoped pool, so an
+ * element added or edited earlier in the *same* change is findable by the
+ * person working it, without waiting for a merge. `ElementSearchAdd.tsx`
+ * still surfaces its own plain warning next to a create action whenever
+ * the write target is a `change` branch — creating on a branch still isn't
+ * visible to anyone *else's* search until that branch merges, only to
+ * pickers that overlay that specific branch.
  */
 import type { ElementType, UUID } from '../contracts/delta';
 import type { ElementsHeadRow } from '../contracts/rows';
@@ -104,6 +104,32 @@ export function mergeSearchPools(pools: readonly SearchPoolElement[][]): SearchP
 export async function loadSearchPoolForTypes(supabase: Client, commitId: UUID, modelId: UUID, elementTypes: readonly ElementType[]): Promise<SearchPoolElement[]> {
   const pools = await Promise.all(elementTypes.map((elementType) => loadSearchPool(supabase, commitId, modelId, elementType)));
   return mergeSearchPools(pools);
+}
+
+/**
+ * Overlays a change branch's own folded elements onto an already-loaded
+ * main-scoped pool (see this module's own doc comment for why/when a
+ * caller does this at all). A branch element replaces a same-id main
+ * entry — the branch's own view is the more current one for whoever is
+ * working in it, whether that's a brand-new element main has never seen
+ * or an edit (a rename, say) to one main already has. `elementTypes`
+ * mirrors whatever the caller's own main-scoped pool was already restricted
+ * to, so a branch's own elements of an irrelevant type are never pulled in.
+ * A branch-only element carries no aliases (aliases are model-scoped and
+ * already loaded for anything main already has; a genuinely new element
+ * has none yet to lose) — same reasoning `useRelationshipTargetSearch.ts`'s
+ * own `resultParents` gives for a similarly best-effort, not-quite-complete
+ * enrichment on a branch-sourced match.
+ */
+export function overlayBranchElements(mainPool: readonly SearchPoolElement[], branchElements: readonly ElementsHeadRow[], elementTypes: readonly ElementType[]): SearchPoolElement[] {
+  const typeSet = new Set(elementTypes);
+  const byId = new Map(mainPool.map((entry) => [entry.element.element_id, entry]));
+  for (const element of branchElements) {
+    if (!typeSet.has(element.element_type)) continue;
+    const existing = byId.get(element.element_id);
+    byId.set(element.element_id, { element, aliases: existing?.aliases ?? [] });
+  }
+  return mergeSearchPools([[...byId.values()]]);
 }
 
 function descriptionOf(element: ElementsHeadRow): string {

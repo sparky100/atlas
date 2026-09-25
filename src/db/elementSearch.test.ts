@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countMatches, hasExactMatch, matchElements, mergeSearchPools, type SearchPoolElement } from './elementSearch';
+import { countMatches, hasExactMatch, matchElements, mergeSearchPools, overlayBranchElements, type SearchPoolElement } from './elementSearch';
 import type { ElementsHeadRow } from '../contracts/rows';
 
 function el(overrides: Partial<ElementsHeadRow>): ElementsHeadRow {
@@ -167,6 +167,43 @@ describe('mergeSearchPools', () => {
     expect(mergeSearchPools([])).toEqual([]);
     const p = pool([{ element: el({ element_id: 'e2', name: 'Zebra' }) }, { element: el({ element_id: 'e1', name: 'Apple' }) }]);
     expect(mergeSearchPools([p]).map((x) => x.element.name)).toEqual(['Apple', 'Zebra']);
+  });
+});
+
+describe('overlayBranchElements (a change branch\'s own additions/edits, folded onto the main-scoped pool)', () => {
+  it('adds a branch-only element (not on main at all) to the pool', () => {
+    const mainPool = pool([{ element: el({ element_id: 'sys-1', name: 'SAP' }) }]);
+    const branchOnly = el({ element_id: 'c-1', element_type: 'container', name: 'Datasphere', parent_id: 'sys-1' });
+    const merged = overlayBranchElements(mainPool, [branchOnly], ['system', 'container']);
+    expect(merged.map((p) => p.element.element_id).sort()).toEqual(['c-1', 'sys-1']);
+  });
+
+  it("a branch edit to an element main already has wins over main's own stale copy", () => {
+    const mainPool = pool([{ element: el({ element_id: 'sys-1', name: 'Old Name' }) }]);
+    const renamed = el({ element_id: 'sys-1', name: 'New Name' });
+    const merged = overlayBranchElements(mainPool, [renamed], ['system']);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.element.name).toBe('New Name');
+  });
+
+  it("a branch element keeps main's own aliases for the same id rather than losing them", () => {
+    const mainPool = pool([{ element: el({ element_id: 'sys-1', name: 'Old Name' }), aliases: ['LEGACY-1'] }]);
+    const renamed = el({ element_id: 'sys-1', name: 'New Name' });
+    const merged = overlayBranchElements(mainPool, [renamed], ['system']);
+    expect(merged[0]?.aliases).toEqual(['LEGACY-1']);
+  });
+
+  it('ignores a branch element of a type the caller never asked for', () => {
+    const mainPool = pool([{ element: el({ element_id: 'sys-1', name: 'SAP' }) }]);
+    const irrelevant = el({ element_id: 'cap-1', element_type: 'capability', name: 'Finance' });
+    const merged = overlayBranchElements(mainPool, [irrelevant], ['system']);
+    expect(merged.map((p) => p.element.element_id)).toEqual(['sys-1']);
+  });
+
+  it('an empty branch element list leaves the main pool unchanged (just re-sorted)', () => {
+    const mainPool = pool([{ element: el({ element_id: 'sys-1', name: 'SAP' }) }]);
+    const merged = overlayBranchElements(mainPool, [], ['system']);
+    expect(merged.map((p) => p.element.element_id)).toEqual(['sys-1']);
   });
 });
 
