@@ -8,10 +8,11 @@
  * is silent" stance the attribute itself documents.
  *
  * The derived set is: the touched systems' business and technical owners,
- * the affected capabilities' business owners, plus one architect — all
- * `required`. It is a *suggestion* the proposer confirms and adjusts in the
- * submit reviewer picker; the RPC (`atlas.submit_merge_request`) is the
- * enforcement point, re-checking the org's architect floor.
+ * the affected capabilities' business owners, plus one architect-or-better
+ * (`pickArchitect`'s own doc comment) — all `required`. It is a
+ * *suggestion* the proposer confirms and adjusts in the submit reviewer
+ * picker; the RPC (`atlas.submit_merge_request`) is the enforcement point,
+ * re-checking the org's architect-or-better floor.
  */
 import type { UUID } from '../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
@@ -77,11 +78,20 @@ export function ownerReviewerCandidates(
 /**
  * Pure: the first architect member, deterministically — callers pass the
  * member list already sorted (the loader sorts by `joined_at` then
- * `user_id`, so this is stable for a given org).
+ * `user_id`, so this is stable for a given org). Falls back to the first
+ * `owner` when there's no dedicated `architect` — `owner` counts as
+ * architect-or-better for the org's review floor (`role in ('owner',
+ * 'architect')`, `atlas.submit_merge_request`/`atlas.set_reviewers`,
+ * 20260926010000_owner_counts_as_architect_reviewer.sql), so a solo-owner
+ * org (no separate architect member at all) still gets a real suggestion
+ * here instead of leaving the required architect slot for the proposer to
+ * notice and fill in by hand.
  */
 export function pickArchitect(members: readonly { userId: UUID; role: MemberRole }[]): UUID | null {
   const architect = members.find((m) => m.role === 'architect');
-  return architect?.userId ?? null;
+  if (architect) return architect.userId;
+  const owner = members.find((m) => m.role === 'owner');
+  return owner?.userId ?? null;
 }
 
 /**

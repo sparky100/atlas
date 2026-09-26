@@ -53,8 +53,21 @@ describe('pickArchitect', () => {
     expect(pickArchitect(members)).toBe('u-arch');
   });
 
-  it('returns null when there is no architect', () => {
+  it('returns null when there is no architect and no owner', () => {
     expect(pickArchitect([{ userId: 'u-contrib', role: 'contributor' }])).toBeNull();
+  });
+
+  it('falls back to the first owner when there is no dedicated architect (a solo-owner org)', () => {
+    const members: { userId: string; role: MemberRole }[] = [{ userId: 'u-owner', role: 'owner' }];
+    expect(pickArchitect(members)).toBe('u-owner');
+  });
+
+  it('prefers a real architect over an owner when both are present', () => {
+    const members: { userId: string; role: MemberRole }[] = [
+      { userId: 'u-owner', role: 'owner' },
+      { userId: 'u-arch', role: 'architect' },
+    ];
+    expect(pickArchitect(members)).toBe('u-arch');
   });
 });
 
