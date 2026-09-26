@@ -55,8 +55,8 @@ export function VersionDiffPage() {
           <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />
           {(() => {
             const commitTitles = state.status === 'ready' ? state.data.commitTitles : new Map<string, string>();
-            const asIsLabel = refLabelOf(asIs, undefined, asIs.kind === 'commit' ? commitTitles.get(asIs.commitId) : undefined);
-            const toBeLabel = refLabelOf(toBe, undefined, toBe.kind === 'commit' ? commitTitles.get(toBe.commitId) : undefined);
+            const asIsLabel = refLabelOf(asIs, asIs.kind === 'commit' ? commitTitles.get(asIs.commitId) : undefined);
+            const toBeLabel = refLabelOf(toBe, toBe.kind === 'commit' ? commitTitles.get(toBe.commitId) : undefined);
             return (
               <>
                 <Breadcrumb

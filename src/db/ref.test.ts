@@ -45,7 +45,7 @@ describe('refParamOf / refLabelOf round-trip', () => {
   it('commit: label is the commit\'s own title when given, else a short id fragment', () => {
     const ref = parseRefParam('commit:11111111-1111-1111-1111-111111111111');
     expect(refParamOf(ref)).toBe('commit:11111111-1111-1111-1111-111111111111');
-    expect(refLabelOf(ref, undefined, 'Merge: Datasphere')).toBe('Merge: Datasphere');
+    expect(refLabelOf(ref, 'Merge: Datasphere')).toBe('Merge: Datasphere');
     expect(refLabelOf(ref)).toBe('commit 11111111');
   });
 });
