@@ -92,10 +92,14 @@ export function ElementPage() {
   const { ref } = useSelectedRef();
   const viewing = isViewingMode(searchParams);
   // Bug fix: this page used to call `refLabelOf(ref)` with no second
-  // argument at all — every other ref-aware page resolves the branch's
-  // own title via `useBranchLabel` first, so this was the one page whose
+  // argument at all — every other ref-aware page resolves the ref's own
+  // label via `useBranchLabel` first, so this was the one page whose
   // breadcrumb never showed "Change: {title}" for a selected change, only
-  // the short id fragment `refLabelOf`'s own fallback uses.
+  // the short id fragment `refLabelOf`'s own fallback uses. This is also
+  // the one page ever reached with a `commit:` ref (`VersionDiffView.tsx`'s
+  // own "each changed element links at that same commit") — `useBranchLabel`
+  // resolves that ref kind's own commit title too, so a reader following a
+  // diff link here sees "Merge: Datasphere," not "commit 35a1b90f."
   const { label: branchLabel } = useBranchLabel(ref);
   const { userId } = useAuth();
   const location = useLocation();

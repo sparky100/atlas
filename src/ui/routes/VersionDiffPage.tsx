@@ -53,16 +53,25 @@ export function VersionDiffPage() {
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
           <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />
-          <Breadcrumb
-            org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
-            model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
-            refLabel={`${refLabelOf(asIs)} → ${refLabelOf(toBe)}`}
-          />
-          <div className={styles.header}>
-            <Text as="h1" size="2xl">
-              Diff: {refLabelOf(asIs)} → {refLabelOf(toBe)}
-            </Text>
-          </div>
+          {(() => {
+            const commitTitles = state.status === 'ready' ? state.data.commitTitles : new Map<string, string>();
+            const asIsLabel = refLabelOf(asIs, asIs.kind === 'commit' ? commitTitles.get(asIs.commitId) : undefined);
+            const toBeLabel = refLabelOf(toBe, toBe.kind === 'commit' ? commitTitles.get(toBe.commitId) : undefined);
+            return (
+              <>
+                <Breadcrumb
+                  org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
+                  model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
+                  refLabel={`${asIsLabel} → ${toBeLabel}`}
+                />
+                <div className={styles.header}>
+                  <Text as="h1" size="2xl">
+                    Diff: {asIsLabel} → {toBeLabel}
+                  </Text>
+                </div>
+              </>
+            );
+          })()}
 
           {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}

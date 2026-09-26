@@ -66,18 +66,24 @@ export function refQueryParam(ref: Ref, viewing: boolean): string {
 
 /**
  * The `[ref]` chip's text (UI-principles §2.2) — `main`, a tag's own name,
- * or `Change: {title}` for a branch (§2.2's own example). `branchLabel`,
- * when given, is normally a branch's `title ?? name` — callers rendering a
- * branch ref already have the `BranchRow` in hand (they need
- * `base_commit_id`/`head_commit_id` for the As-is/To-be/Diff selector
- * anyway, via `resolveBranchRef` below) and pass its label through; absent,
- * this falls back to a short id fragment rather than nothing.
+ * `Change: {title}` for a branch (§2.2's own example), or a commit's own
+ * `title` for a `commit:` ref. `label`, when given, is the ref's own
+ * already-resolved display label — a branch's `title ?? name`, or a
+ * commit's own `title` (both via `useBranchLabel`, despite its name — one
+ * hook resolving whichever of the two this ref needs, `db/modelHome.ts`'s
+ * `getCommitTitles` for the commit case). Absent, this falls back to a
+ * short id fragment rather than nothing — the gap that originally left a
+ * diff page's own heading reading as two meaningless hash fragments
+ * ("Diff: commit e89195fb → commit 35a1b90f") and, one click further in,
+ * an element reached from that diff view (`VersionDiffView.tsx`'s own
+ * `elementHref`) showing the identical raw hash in its own breadcrumb —
+ * nobody has a commit id memorised either way.
  */
-export function refLabelOf(ref: Ref, branchLabel?: string): string {
+export function refLabelOf(ref: Ref, label?: string): string {
   if (ref.kind === 'main') return 'main';
   if (ref.kind === 'tag') return ref.name;
-  if (ref.kind === 'commit') return `commit ${ref.commitId.slice(0, 8)}`;
-  return `Change: ${branchLabel ?? ref.branchId.slice(0, 8)}`;
+  if (ref.kind === 'commit') return label ?? `commit ${ref.commitId.slice(0, 8)}`;
+  return `Change: ${label ?? ref.branchId.slice(0, 8)}`;
 }
 
 /** The commit_id a ref resolves to, or `null` if it doesn't resolve (an unknown tag name, an unknown/deleted branch, an unknown commit id, or a model with no commits yet). A branch ref resolves to its **to-be** head — §6.2's default lens — not its as-is base; `resolveBranchRef` is what a caller building the As-is/To-be/Diff selector itself needs instead. */
