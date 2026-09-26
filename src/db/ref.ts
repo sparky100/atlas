@@ -71,12 +71,20 @@ export function refQueryParam(ref: Ref, viewing: boolean): string {
  * branch ref already have the `BranchRow` in hand (they need
  * `base_commit_id`/`head_commit_id` for the As-is/To-be/Diff selector
  * anyway, via `resolveBranchRef` below) and pass its label through; absent,
- * this falls back to a short id fragment rather than nothing.
+ * this falls back to a short id fragment rather than nothing. `commitTitle`
+ * is the same idea for a `commit:` ref — the activity row's "link to the
+ * commit diff" (`ArchitectHome.tsx`'s `commitDiffHref`) only ever had the
+ * bare commit id to build the URL from, which left the diff page's own
+ * heading reading as two meaningless hash fragments ("Diff: commit e89195fb
+ * → commit 35a1b90f") to every reader — nobody has the commit id memorised.
+ * A caller that has already loaded the commit row (or its own `title`,
+ * `getCommitTitles` in `modelHome.ts`) passes it through; absent, this
+ * falls back to the short id fragment exactly as before.
  */
-export function refLabelOf(ref: Ref, branchLabel?: string): string {
+export function refLabelOf(ref: Ref, branchLabel?: string, commitTitle?: string): string {
   if (ref.kind === 'main') return 'main';
   if (ref.kind === 'tag') return ref.name;
-  if (ref.kind === 'commit') return `commit ${ref.commitId.slice(0, 8)}`;
+  if (ref.kind === 'commit') return commitTitle ?? `commit ${ref.commitId.slice(0, 8)}`;
   return `Change: ${branchLabel ?? ref.branchId.slice(0, 8)}`;
 }
 

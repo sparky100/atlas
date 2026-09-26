@@ -90,6 +90,23 @@ export async function listRecentCommits(supabase: Client, mainBranchId: UUID, li
  * `loadCommitDepths`/`loadChangeTouchCounts` above already use for a
  * caller-scoped, fixed-size id list.
  */
+/**
+ * A commit's own `title` (`commit_titles`'s own migration comment: generated
+ * from its deltas, or a domain-specific phrase like "Merge: {branch title}"
+ * for a merge commit), by id — the version diff page's own way of labelling
+ * "Diff: {asIs} → {toBe}" with something a reader recognises instead of a
+ * bare hash fragment (`refLabelOf`'s own `commitTitle` param). Bounded by
+ * the caller's own fixed, small id list (`VersionDiffPage.tsx` always asks
+ * for exactly two) — same "caller-scoped, fixed-size id list" shape
+ * `loadCommitDepths`/`listDeltasForCommits` above already use, not a
+ * candidate for `assertInFilterSize`.
+ */
+export async function getCommitTitles(supabase: Client, commitIds: readonly UUID[]): Promise<Map<UUID, string>> {
+  if (commitIds.length === 0) return new Map();
+  const rows = await selectAll<{ id: UUID, title: string }>(supabase.from('commits').select('id, title', { count: 'exact' }).in('id', commitIds as UUID[]));
+  return new Map(rows.map((row) => [row.id, row.title]));
+}
+
 export async function listDeltasForCommits(supabase: Client, commitIds: readonly UUID[]): Promise<DeltaRow[]> {
   if (commitIds.length === 0) return [];
   assertInFilterSize('listDeltasForCommits', 'commit_id', commitIds);

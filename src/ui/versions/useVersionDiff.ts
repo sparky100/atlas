@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
+import { getCommitTitles } from '../../db/modelHome';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
 import { computeVersionDiff, type VersionDiff } from '../../engine/versionDiff';
 import { reportError } from '../errors/errorBannerStore';
@@ -10,6 +11,8 @@ export interface VersionDiffData {
   asIsCommitId: UUID;
   toBeCommitId: UUID;
   diff: VersionDiff;
+  /** Each side's own commit `title` (`db/modelHome.ts`'s `getCommitTitles`), keyed by commit id — lets the page's own "Diff: {asIs} → {toBe}" heading (`refLabelOf`'s `commitTitle` param) read as something a reader recognises ("Merge: Datasphere") rather than a bare hash fragment neither side has memorised. A commit that isn't found (rare — a stale/deleted id) simply falls back to the short id fragment `refLabelOf` already used before this, since the map has no entry for it. */
+  commitTitles: Map<UUID, string>;
 }
 
 export type VersionDiffState =
@@ -54,13 +57,14 @@ export function useVersionDiff(modelId: UUID, toBe: Ref, asIs: Ref): VersionDiff
         return;
       }
 
-      const [toBeHead, asIsHead] = await Promise.all([
+      const [toBeHead, asIsHead, commitTitles] = await Promise.all([
         loadHeadAtCommitCached(supabase, modelId, toBeCommitId),
         loadHeadAtCommitCached(supabase, modelId, asIsCommitId),
+        getCommitTitles(supabase, [toBeCommitId, asIsCommitId]),
       ]);
       const diff = computeVersionDiff(asIsHead, toBeHead);
 
-      if (!cancelled) setState({ status: 'ready', data: { asIsCommitId, toBeCommitId, diff } });
+      if (!cancelled) setState({ status: 'ready', data: { asIsCommitId, toBeCommitId, diff, commitTitles } });
     }
 
     load().catch((e: unknown) => {
