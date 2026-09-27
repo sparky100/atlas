@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useParams, useSearchParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
+import { Button } from '../components/Button/Button';
 import { Inspector } from '../components/Inspector/Inspector';
 import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
 import { ModelNav } from '../components/ModelNav/ModelNav';
@@ -54,6 +55,7 @@ import styles from './ViewPage.module.css';
  */
 export function ContextPage() {
   const { orgSlug, modelSlug, elementId } = useParams<{ orgSlug: string; modelSlug: string; elementId: string }>();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { ref } = useSelectedRef();
   const viewing = isViewingMode(searchParams);
@@ -157,6 +159,9 @@ export function ContextPage() {
             <Text as="p" tone="muted">
               This isn't a system or container here. It may have been retracted, or never existed at this point.
             </Text>
+            <Button variant="secondary" onClick={() => { void navigate(-1); }}>
+              Go back
+            </Button>
           </Panel>
         )}
         {state.status === 'ready' && state.data.kind === 'platform-structure' && (

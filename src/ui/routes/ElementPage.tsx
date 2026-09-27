@@ -289,6 +289,9 @@ export function ElementPage() {
             <Text as="p" tone="muted">
               This element is not present here. It may have been retracted, or never existed at this point.
             </Text>
+            <Button variant="secondary" onClick={() => { void navigate(-1); }}>
+              Go back
+            </Button>
           </Panel>
         )}
         {state.status === 'ready' && (

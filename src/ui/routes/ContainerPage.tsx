@@ -1,6 +1,7 @@
-import { useParams, useSearchParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
+import { Button } from '../components/Button/Button';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
@@ -44,6 +45,7 @@ import styles from './ViewPage.module.css';
  */
 export function ContainerPage() {
   const { orgSlug, modelSlug, systemId } = useParams<{ orgSlug: string; modelSlug: string; systemId: string }>();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { ref } = useSelectedRef();
   const viewing = isViewingMode(searchParams);
@@ -134,6 +136,9 @@ export function ContainerPage() {
             <Text as="p" tone="muted">
               This system is not present here. It may have been retracted, or never existed at this point.
             </Text>
+            <Button variant="secondary" onClick={() => { void navigate(-1); }}>
+              Go back
+            </Button>
           </Panel>
         )}
         {state.status === 'ready' && (
