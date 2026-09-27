@@ -80,8 +80,26 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
   /** Class groups the reviewer has collapsed — toggled by the group header; a collapsed group hides its candidates but keeps its count. */
   const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<CandidateClass>>(new Set());
+  /**
+   * The one thing the header's own "N candidate(s) · M decided" summary
+   * couldn't answer: *which* ones. Found the hard way — a 147-candidate
+   * queue with 132 decided has no way to see the other 15 without
+   * scrolling every class group by eye, and an accepted relationship whose
+   * own endpoint was left undecided among them silently breaks Apply
+   * (`explainPromotionError.ts`'s own doc comment tells that exact story).
+   * Filters the same `candidates` list every class group already reads
+   * from, so it composes with class grouping rather than replacing it —
+   * "Needs review" under "New" is still "New," just narrowed.
+   */
+  const [decisionFilter, setDecisionFilter] = useState<'all' | 'needsReview' | 'decided'>('all');
+  const needsReviewCount = useMemo(() => candidates.filter((c) => c.decision === null).length, [candidates]);
+  const decidedCount = candidates.length - needsReviewCount;
+  const filteredCandidates = useMemo(() => {
+    if (decisionFilter === 'all') return candidates;
+    return candidates.filter((c) => (decisionFilter === 'needsReview' ? c.decision === null : c.decision !== null));
+  }, [candidates, decisionFilter]);
 
-  const grouped = useMemo(() => CLASS_ORDER.map((cls) => ({ cls, items: candidates.filter((c) => c.class === cls) })).filter((g) => g.items.length > 0), [candidates]);
+  const grouped = useMemo(() => CLASS_ORDER.map((cls) => ({ cls, items: filteredCandidates.filter((c) => c.class === cls) })).filter((g) => g.items.length > 0), [filteredCandidates]);
   const flat = useMemo(() => grouped.flatMap((g) => g.items), [grouped]);
 
   // Defaults to the first candidate rather than resetting `selectedId`
@@ -210,7 +228,6 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
   if (status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (status === 'error' || !job) return <Text as="p">{error ?? "Couldn't load this capture review."}</Text>;
 
-  const decidedCount = candidates.filter((c) => c.decision !== null).length;
   const applyDisabledReason = !targetBranchId ? 'Choose a target change first.' : status === 'applying' ? 'Applying…' : null;
 
   return (
@@ -221,6 +238,17 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
             <Text as="p" size="sm" tone="muted">
               {candidates.length} candidate(s) · {decidedCount} decided
             </Text>
+          </div>
+          <div className={styles.filterRow} role="group" aria-label="Filter by review status">
+            <Button variant={decisionFilter === 'all' ? 'primary' : 'ghost'} onClick={() => { setDecisionFilter('all'); }}>
+              All ({candidates.length})
+            </Button>
+            <Button variant={decisionFilter === 'needsReview' ? 'primary' : 'ghost'} onClick={() => { setDecisionFilter('needsReview'); }}>
+              Needs review ({needsReviewCount})
+            </Button>
+            <Button variant={decisionFilter === 'decided' ? 'primary' : 'ghost'} onClick={() => { setDecisionFilter('decided'); }}>
+              Decided ({decidedCount})
+            </Button>
           </div>
           <div className={styles.targetRow}>
             <Text as="label" size="sm" tone="muted">
@@ -311,6 +339,8 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
 
       {candidates.length === 0 ? (
         <Text tone="muted">No candidates in this draft.</Text>
+      ) : filteredCandidates.length === 0 ? (
+        <Text tone="muted">{decisionFilter === 'needsReview' ? 'Nothing left to review — every candidate has a decision.' : 'Nothing decided yet.'}</Text>
       ) : (
         grouped.map(({ cls, items }) => (
           <div key={cls} className={styles.group}>

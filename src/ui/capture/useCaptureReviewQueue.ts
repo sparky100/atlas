@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { CandidateDecision, CandidateDecisionDetail, CaptureCandidate, CaptureJob } from '../../contracts/capture';
-import { buildPromotionEnvelope } from '../../capture/buildPromotionEnvelope';
+import { buildPromotionEnvelope, BuildPromotionEnvelopeError } from '../../capture/buildPromotionEnvelope';
+import { explainPromotionError } from './explainPromotionError';
 import { loadCaptureDraftHead } from '../../capture/loadCaptureDraftHead';
 import { loadTargetBranchHead, type LoadedTargetBranch } from '../../capture/loadTargetBranchHead';
 import { computeNotInFile, type NotInFileElement } from '../../capture/notInFile';
@@ -106,6 +107,14 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
   const [reloadToken, setReloadToken] = useState(0);
   const targetSeededRef = useRef(false);
   const targetHeadCacheRef = useRef<{ branchId: UUID; promise: Promise<LoadedTargetBranch> } | null>(null);
+
+  const draftElementById = useMemo(() => {
+    const map = new Map<UUID, string>();
+    for (const c of candidates) {
+      if (c.proposal.kind === 'element' && c.draftSubjectId !== null) map.set(c.draftSubjectId, c.proposal.name);
+    }
+    return map;
+  }, [candidates]);
 
   useEffect(() => {
     let cancelled = false;
@@ -262,12 +271,16 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
       return { appliedCount: toPromote.length };
     } catch (e) {
       setStatus('idle');
-      const message = e instanceof Error ? e.message : 'Could not apply these decisions.';
+      // `explainPromotionError.ts`'s own doc comment: a bare `e.message` here
+      // used to read "seq 12: to (d4667dbd-…) was not found on the target
+      // branch" — a raw id and a seq number the review list shows nowhere,
+      // leaving the reviewer no way to find what actually needs fixing.
+      const message = e instanceof BuildPromotionEnvelopeError ? explainPromotionError(e, candidates, mainElementById, draftElementById) : e instanceof Error ? e.message : 'Could not apply these decisions.';
       setError(message);
       reportError("Couldn't apply capture review decisions.", e);
       return null;
     }
-  }, [job, targetBranchId, userId, candidates, modelId, orgId, reload]);
+  }, [job, targetBranchId, userId, candidates, modelId, orgId, reload, mainElementById, draftElementById]);
 
   const searchTargetElements = useCallback(
     async (elementType: ElementType, query: string): Promise<{ elementId: UUID; name: string; parentName: string | null }[] | null> => {
@@ -289,14 +302,6 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
     },
     [modelId, targetBranchId],
   );
-
-  const draftElementById = useMemo(() => {
-    const map = new Map<UUID, string>();
-    for (const c of candidates) {
-      if (c.proposal.kind === 'element' && c.draftSubjectId !== null) map.set(c.draftSubjectId, c.proposal.name);
-    }
-    return map;
-  }, [candidates]);
 
   const notInFile = useMemo(() => {
     const touchedElementIds = new Set<UUID>();
