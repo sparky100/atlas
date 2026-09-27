@@ -65,7 +65,30 @@ import { EXISTS_ATTRIBUTE, type Delta, type Json, type UUID } from '../contracts
 import { factMapKey, type FactRow, type Head } from '../engine/deltas';
 import { GONE_CONFIDENCE, matchConfidenceFor } from './confidence';
 
-export class BuildPromotionEnvelopeError extends Error {}
+/**
+ * `seq` (every throw site already computes it — this just stops discarding
+ * it into an unstructured message string) and `unresolvedRefId`, set only
+ * where the error names one specific missing/unresolved id, are what let a
+ * caller turn this into something a reviewer can actually act on
+ * (`explainPromotionError.ts`) instead of the raw `message` alone — found
+ * the hard way: a reviewer hit "seq 12: to (d4667dbd-…) was not found on
+ * the target branch" with no way to connect that id back to anything in
+ * the review UI, which never shows a candidate's own `seq` or raw id at
+ * all. The underlying cause here specifically was a relationship
+ * candidate's own endpoint pointing at an element candidate the reviewer
+ * had rejected in the very same review.
+ */
+export class BuildPromotionEnvelopeError extends Error {
+  readonly seq: number;
+  readonly unresolvedRefId: UUID | undefined;
+
+  constructor(seq: number, message: string, unresolvedRefId?: UUID) {
+    super(message);
+    this.name = 'BuildPromotionEnvelopeError';
+    this.seq = seq;
+    this.unresolvedRefId = unresolvedRefId;
+  }
+}
 
 export interface AliasRowToInsert {
   id: UUID;
@@ -110,7 +133,7 @@ function draftFact(draftHead: Head, draftSubjectId: UUID, attribute: string): Fa
 
 /** Provenance fields (`sourceId`/`sourceRef`/`effectiveDate`/`confidence`) copied verbatim from a draft fact — the "same provenance" every non-`edited` decision carries forward. */
 function provenanceFromDraftFact(fact: FactRow | undefined, seq: number, subjectLabel: string): Pick<FactRow, 'sourceId' | 'sourceRef' | 'effectiveDate' | 'confidence'> {
-  if (!fact) throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: no draft fact found for ${subjectLabel} — the draft head this promotion was built from doesn't match the candidate`);
+  if (!fact) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: no draft fact found for ${subjectLabel} — the draft head this promotion was built from doesn't match the candidate`);
   return { sourceId: fact.sourceId, ...(fact.sourceRef !== undefined ? { sourceRef: fact.sourceRef } : {}), ...(fact.effectiveDate !== undefined ? { effectiveDate: fact.effectiveDate } : {}), confidence: fact.confidence };
 }
 
@@ -120,25 +143,25 @@ function editedProvenance(reviewerSourceId: UUID): { sourceId: UUID; confidence:
 
 function requireExistsDeltaId(head: Head, kind: 'element' | 'relationship', subjectId: UUID, seq: number, situation: string): UUID {
   const existsDeltaId = kind === 'element' ? head.elements.get(subjectId)?.existsDeltaId : head.relationships.get(subjectId)?.existsDeltaId;
-  if (existsDeltaId === undefined) throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: ${situation} — ${subjectId} was not found on the given head`);
+  if (existsDeltaId === undefined) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: ${situation} — ${subjectId} was not found on the given head`);
   return existsDeltaId;
 }
 
 /** The `requireExistsDeltaId` message that's actually accurate on the *target* head — TARGET_RETRACTED (§11) is only ever a target-head concern, never a draft-head one (the draft is immutable once written). */
 function requireExistsDeltaIdOnTarget(head: Head, kind: 'element' | 'relationship', subjectId: UUID, seq: number, situation: string): UUID {
   const existsDeltaId = kind === 'element' ? head.elements.get(subjectId)?.existsDeltaId : head.relationships.get(subjectId)?.existsDeltaId;
-  if (existsDeltaId === undefined) throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: ${situation} — ${subjectId} was not found on the target branch's current head (TARGET_RETRACTED)`);
+  if (existsDeltaId === undefined) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: ${situation} — ${subjectId} was not found on the target branch's current head (TARGET_RETRACTED)`);
   return existsDeltaId;
 }
 
 function decisionDetailAttributes(detail: CandidateDecisionDetail | null, seq: number): Record<string, unknown> {
   if (detail !== null && 'attributes' in detail) return detail.attributes;
-  throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: 'edited' needs decisionDetail.attributes`);
+  throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: 'edited' needs decisionDetail.attributes`);
 }
 
 function decisionDetailAcceptedAttributes(detail: CandidateDecisionDetail | null, seq: number): readonly string[] {
   if (detail !== null && 'acceptedAttributes' in detail) return detail.acceptedAttributes;
-  throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: 'split' needs decisionDetail.acceptedAttributes`);
+  throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: 'split' needs decisionDetail.acceptedAttributes`);
 }
 
 function pick(attributes: Readonly<Record<string, unknown>>, keys: readonly string[]): Record<string, Json> {
@@ -158,7 +181,7 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
 
   function resolveRef(ref: CandidateRef | null, seq: number, field: string): UUID | null {
     if (ref === null) return null;
-    if (ref.kind !== 'existing') throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: ${field} is not resolved (${ref.kind})`);
+    if (ref.kind !== 'existing') throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: ${field} is not resolved (${ref.kind})`);
     const remapped = promotedIdByDraftId.get(ref.elementId);
     // A remapped id was just minted by this same apply call (pass 1, above)
     // — it can never be in `targetHead` yet (that's the *pre*-commit head),
@@ -166,7 +189,7 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
     // live element on the target — a genuinely pre-existing reference, or
     // a broken one (an unpromoted/rejected draft id) this check catches.
     if (remapped !== undefined) return remapped;
-    if (!targetHead.elements.has(ref.elementId)) throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: ${field} (${ref.elementId}) was not found on the target branch — either it wasn't promoted in this same apply call, or it no longer exists there`);
+    if (!targetHead.elements.has(ref.elementId)) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: ${field} (${ref.elementId}) was not found on the target branch — either it wasn't promoted in this same apply call, or it no longer exists there`, ref.elementId);
     return ref.elementId;
   }
 
@@ -178,21 +201,21 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
     if (candidate.proposal.kind !== 'element') continue;
 
     if (candidate.class === 'invalid' || candidate.class === 'unsourced') {
-      if (candidate.decision !== 'edited') throw new BuildPromotionEnvelopeError(`seq ${String(candidate.seq)}: class ${candidate.class} only accepts 'edited' or 'rejected' (SPEC §10)`);
-      throw new BuildPromotionEnvelopeError(`seq ${String(candidate.seq)}: 'edited' on an ${candidate.class} candidate needs re-grounding (src/capture/ground.ts, PR11) — not yet supported`);
+      if (candidate.decision !== 'edited') throw new BuildPromotionEnvelopeError(candidate.seq, `seq ${String(candidate.seq)}: class ${candidate.class} only accepts 'edited' or 'rejected' (SPEC §10)`);
+      throw new BuildPromotionEnvelopeError(candidate.seq, `seq ${String(candidate.seq)}: 'edited' on an ${candidate.class} candidate needs re-grounding (src/capture/ground.ts, PR11) — not yet supported`);
     }
 
     // duplicate_in_target (issue #285): no draft delta ever existed for this candidate — 'rejected' (already
     // continue'd above) is the only legal decision; the review UI never offers any other action for this class.
     if (candidate.class === 'duplicate_in_target') {
-      throw new BuildPromotionEnvelopeError(`seq ${String(candidate.seq)}: class duplicate_in_target only accepts 'rejected' (SPEC §10)`);
+      throw new BuildPromotionEnvelopeError(candidate.seq, `seq ${String(candidate.seq)}: class duplicate_in_target only accepts 'rejected' (SPEC §10)`);
     }
 
     if (candidate.decision === 'merged') {
-      if (candidate.class !== 'new') throw new BuildPromotionEnvelopeError(`seq ${String(candidate.seq)}: 'merged' only applies to a 'new' candidate (SPEC §10)`);
+      if (candidate.class !== 'new') throw new BuildPromotionEnvelopeError(candidate.seq, `seq ${String(candidate.seq)}: 'merged' only applies to a 'new' candidate (SPEC §10)`);
       const detail = candidate.decisionDetail;
-      if (detail === null || !('intoElementId' in detail)) throw new BuildPromotionEnvelopeError(`seq ${String(candidate.seq)}: 'merged' needs decisionDetail.intoElementId`);
-      if (!targetHead.elements.has(detail.intoElementId)) throw new BuildPromotionEnvelopeError(`seq ${String(candidate.seq)}: merge target ${detail.intoElementId} was not found on the target branch (TARGET_RETRACTED)`);
+      if (detail === null || !('intoElementId' in detail)) throw new BuildPromotionEnvelopeError(candidate.seq, `seq ${String(candidate.seq)}: 'merged' needs decisionDetail.intoElementId`);
+      if (!targetHead.elements.has(detail.intoElementId)) throw new BuildPromotionEnvelopeError(candidate.seq, `seq ${String(candidate.seq)}: merge target ${detail.intoElementId} was not found on the target branch (TARGET_RETRACTED)`, detail.intoElementId);
       if (candidate.draftSubjectId !== null) promotedIdByDraftId.set(candidate.draftSubjectId, detail.intoElementId);
       // A merge still "promotes" — its own attributes land as updates
       // against the chosen element — so `promoted_subject_id` records that
@@ -216,8 +239,8 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
     // target): the promoted subject is the real element the draft already
     // matched — never re-minted.
     const subjectId = candidate.class === 'ambiguous' && candidate.decisionDetail !== null && 'intoElementId' in candidate.decisionDetail ? candidate.decisionDetail.intoElementId : candidate.draftSubjectId;
-    if (subjectId === null) throw new BuildPromotionEnvelopeError(`seq ${String(candidate.seq)}: a matched candidate needs a resolved subject id`);
-    if (!targetHead.elements.has(subjectId)) throw new BuildPromotionEnvelopeError(`seq ${String(candidate.seq)}: matched element ${subjectId} was not found on the target branch (TARGET_RETRACTED)`);
+    if (subjectId === null) throw new BuildPromotionEnvelopeError(candidate.seq, `seq ${String(candidate.seq)}: a matched candidate needs a resolved subject id`);
+    if (!targetHead.elements.has(subjectId)) throw new BuildPromotionEnvelopeError(candidate.seq, `seq ${String(candidate.seq)}: matched element ${subjectId} was not found on the target branch (TARGET_RETRACTED)`, subjectId);
     promotedSubjectIdBySeq.set(candidate.seq, subjectId);
   }
 
@@ -237,7 +260,7 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
     // here.
     if (candidate.class === 'gone' && candidate.decision !== 'edited') {
       const subjectId = promotedSubjectIdBySeq.get(seq);
-      if (subjectId === undefined) throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: internal — 'gone' candidate has no promoted subject id`);
+      if (subjectId === undefined) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: internal — 'gone' candidate has no promoted subject id`);
       const existsDeltaId = requireExistsDeltaIdOnTarget(targetHead, 'element', subjectId, seq, `'gone' candidate ${subjectId}`);
       const draftSubjectId = candidate.draftSubjectId ?? subjectId;
       if (elementType === 'system') {
@@ -258,10 +281,10 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
       // `merged` was already fully handled in pass 1 (no create at all).
       if (candidate.decision === 'merged') continue;
       const elementId = promotedSubjectIdBySeq.get(seq);
-      if (elementId === undefined) throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: internal — 'new'-shaped candidate has no promoted subject id`);
+      if (elementId === undefined) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: internal — 'new'-shaped candidate has no promoted subject id`);
       const parentId = resolveRef(proposal.parent, seq, 'parent');
       const draftSubjectId = candidate.draftSubjectId;
-      if (draftSubjectId === null) throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: a 'new'-shaped candidate needs a resolved draftSubjectId`);
+      if (draftSubjectId === null) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: a 'new'-shaped candidate needs a resolved draftSubjectId`);
 
       let attributes: Record<string, Json>;
       let provenance: { sourceId: UUID; sourceRef?: string; effectiveDate?: string; confidence: number };
@@ -287,7 +310,7 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
     // target, provenance carried from the draft (or reviewer-supplied for
     // 'edited').
     const subjectId = promotedSubjectIdBySeq.get(seq);
-    if (subjectId === undefined) throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: internal — matched candidate has no promoted subject id`);
+    if (subjectId === undefined) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: internal — matched candidate has no promoted subject id`);
     const existsDeltaId = requireExistsDeltaIdOnTarget(targetHead, 'element', subjectId, seq, `matched element ${subjectId}`);
     const draftSubjectId = candidate.draftSubjectId ?? subjectId;
     const sourceAttributes: Record<string, unknown> = candidate.decision === 'edited' ? decisionDetailAttributes(candidate.decisionDetail, seq) : candidate.decision === 'split' ? pick(proposal.attributes, decisionDetailAcceptedAttributes(candidate.decisionDetail, seq)) : (proposal.attributes);
@@ -335,25 +358,25 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
     const relationshipType = proposal.relationshipType;
     const seq = candidate.seq;
 
-    if (candidate.class === 'gone') throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: a relationship candidate can never be class 'gone' (SPEC-capture.md §4.4)`);
-    if (candidate.decision === 'merged') throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: 'merged' never applies to a relationship candidate (SPEC §10)`);
+    if (candidate.class === 'gone') throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: a relationship candidate can never be class 'gone' (SPEC-capture.md §4.4)`);
+    if (candidate.decision === 'merged') throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: 'merged' never applies to a relationship candidate (SPEC §10)`);
     if (candidate.class === 'invalid' || candidate.class === 'unsourced') {
-      if (candidate.decision !== 'edited') throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: class ${candidate.class} only accepts 'edited' or 'rejected' (SPEC §10)`);
-      throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: 'edited' on an ${candidate.class} candidate needs re-grounding (src/capture/ground.ts, PR11) — not yet supported`);
+      if (candidate.decision !== 'edited') throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: class ${candidate.class} only accepts 'edited' or 'rejected' (SPEC §10)`);
+      throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: 'edited' on an ${candidate.class} candidate needs re-grounding (src/capture/ground.ts, PR11) — not yet supported`);
     }
     // duplicate_in_target is only ever produced for element candidates (resolveElementCandidate) — never a
     // relationship — but this defends the shared CandidateClass union the same way regardless.
     if (candidate.class === 'duplicate_in_target') {
-      throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: class duplicate_in_target only accepts 'rejected' (SPEC §10)`);
+      throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: class duplicate_in_target only accepts 'rejected' (SPEC §10)`);
     }
 
     if (candidate.class === 'new') {
       const relationshipId = mintId();
       const fromElementId = resolveRef(proposal.from, seq, 'from');
       const toElementId = resolveRef(proposal.to, seq, 'to');
-      if (fromElementId === null || toElementId === null) throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: a relationship needs resolved from/to endpoints`);
+      if (fromElementId === null || toElementId === null) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: a relationship needs resolved from/to endpoints`);
       const draftSubjectId = candidate.draftSubjectId;
-      if (draftSubjectId === null) throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: a 'new' relationship candidate needs a resolved draftSubjectId`);
+      if (draftSubjectId === null) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: a 'new' relationship candidate needs a resolved draftSubjectId`);
       promotedSubjectIdBySeq.set(seq, relationshipId);
 
       let attributes: Record<string, Json>;
@@ -403,8 +426,8 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
 
     // update / confirm / conflict.
     const subjectId = candidate.draftSubjectId;
-    if (subjectId === null) throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: a matched relationship candidate needs a resolved draftSubjectId`);
-    if (!targetHead.relationships.has(subjectId)) throw new BuildPromotionEnvelopeError(`seq ${String(seq)}: matched relationship ${subjectId} was not found on the target branch (TARGET_RETRACTED)`);
+    if (subjectId === null) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: a matched relationship candidate needs a resolved draftSubjectId`);
+    if (!targetHead.relationships.has(subjectId)) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: matched relationship ${subjectId} was not found on the target branch (TARGET_RETRACTED)`, subjectId);
     promotedSubjectIdBySeq.set(seq, subjectId);
     const existsDeltaId = requireExistsDeltaIdOnTarget(targetHead, 'relationship', subjectId, seq, `matched relationship ${subjectId}`);
     const sourceAttributes: Record<string, unknown> = candidate.decision === 'edited' ? decisionDetailAttributes(candidate.decisionDetail, seq) : candidate.decision === 'split' ? pick(proposal.attributes as unknown as Record<string, unknown>, decisionDetailAcceptedAttributes(candidate.decisionDetail, seq)) : (proposal.attributes as unknown as Record<string, unknown>);

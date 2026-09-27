@@ -281,6 +281,21 @@ describe('buildPromotionEnvelope — rejected', () => {
     const rejectedNew = candidate({ seq: 0, class: 'new', elementType: 'system', draftSubjectId: 'draft-crm', decision: 'rejected', proposal: { kind: 'element', elementType: 'system', name: 'CRM', parent: null, attributes: SYSTEM_ATTRS } });
     const rel = candidate({ seq: 1, kind: 'relationship', class: 'new', relationshipType: 'supports', draftSubjectId: 'draft-rel-id', decision: 'accepted', proposal: { kind: 'relationship', relationshipType: 'supports', from: { kind: 'existing', elementId: 'draft-crm' }, to: { kind: 'existing', elementId: 'cap' }, attributes: { role: 'secondary' } } });
     expect(() => buildPromotionEnvelope({ candidates: [rejectedNew, rel], draftHead, targetHead, reviewerSourceId: REVIEWER_SOURCE_ID, mintId })).toThrow(BuildPromotionEnvelopeError);
+    // The offending candidate's own seq, and the specific draft id its own
+    // endpoint couldn't resolve — what `explainPromotionError.ts` needs to
+    // name the rejected candidate by name instead of a raw id (real capture
+    // review this shape was found from: "seq 12: to (d4667dbd-…) was not
+    // found on the target branch," with no way to connect that id to
+    // anything visible in the review UI).
+    try {
+      buildPromotionEnvelope({ candidates: [rejectedNew, rel], draftHead, targetHead, reviewerSourceId: REVIEWER_SOURCE_ID, mintId });
+      expect.unreachable('expected buildPromotionEnvelope to throw');
+    } catch (e) {
+      expect(e).toBeInstanceOf(BuildPromotionEnvelopeError);
+      const err = e as BuildPromotionEnvelopeError;
+      expect(err.seq).toBe(1);
+      expect(err.unresolvedRefId).toBe('draft-crm');
+    }
   });
 });
 
