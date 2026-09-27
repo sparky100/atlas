@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ATTRIBUTE_SCHEMA_BY_TYPE, attributeDefinitionToFieldSchema, type AttributeFieldSchema } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
@@ -156,6 +156,15 @@ export function ElementPage() {
   const { state, reload } = useElementPage(model?.id ?? '', elementId ?? '', ref, mainBranch?.head_commit_id ?? null);
   // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment.
   useRouteTiming('element-detail', state.status === 'ready');
+  // A dead end for the element at this ref (retracted, or never existed
+  // here) sends the user straight back to wherever linked here, rather
+  // than stranding them on a page with nothing to do — navigate(-1) is a
+  // real "back", not a fallback route, since there's no single correct
+  // page to land on instead (a search result, a history entry, another
+  // element's relationship list...).
+  useEffect(() => {
+    if (state.status === 'notPresentAtRef') void navigate(-1);
+  }, [state.status, navigate]);
   // F1 ("custom attributes") PR3: this org's own definitions — read-only
   // here (any member, per attribute_definitions_select's RLS), filtered
   // below to the ones that actually apply to this element's type. Called
@@ -284,16 +293,7 @@ export function ElementPage() {
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
-        {state.status === 'notPresentAtRef' && (
-          <Panel>
-            <Text as="p" tone="muted">
-              This element is not present here. It may have been retracted, or never existed at this point.
-            </Text>
-            <Button variant="secondary" onClick={() => { void navigate(-1); }}>
-              Go back
-            </Button>
-          </Panel>
-        )}
+        {state.status === 'notPresentAtRef' && <Text tone="muted">Going back…</Text>}
         {state.status === 'ready' && (
           <>
             <Breadcrumb

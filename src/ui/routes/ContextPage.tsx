@@ -1,14 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
-import { Button } from '../components/Button/Button';
 import { Inspector } from '../components/Inspector/Inspector';
 import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
-import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useModels } from '../models/useModels';
@@ -71,6 +69,11 @@ export function ContextPage() {
   const { branch: mainBranch } = useMainBranch(model?.id ?? null);
 
   const state = useElementContext(model?.id ?? '', organisation?.id ?? '', userId, elementId ?? '', ref, mode);
+  // See ElementPage.tsx's identical effect for why this is a real
+  // navigate(-1) rather than a fallback route.
+  useEffect(() => {
+    if (state.status === 'notPresentAtRef') void navigate(-1);
+  }, [state.status, navigate]);
 
   const hub = state.status === 'ready' ? (state.data.kind === 'group' ? state.data.group.hub : state.data.hub) : null;
   // V3 item 1's own breadcrumb example ("DNO > Base > main > SAP > SAP FI"):
@@ -154,16 +157,7 @@ export function ContextPage() {
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
-        {state.status === 'notPresentAtRef' && (
-          <Panel>
-            <Text as="p" tone="muted">
-              This isn't a system or container here. It may have been retracted, or never existed at this point.
-            </Text>
-            <Button variant="secondary" onClick={() => { void navigate(-1); }}>
-              Go back
-            </Button>
-          </Panel>
-        )}
+        {state.status === 'notPresentAtRef' && <Text tone="muted">Going back…</Text>}
         {state.status === 'ready' && state.data.kind === 'platform-structure' && (
           <PlatformStructureView
             hub={state.data.hub}

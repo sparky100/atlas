@@ -1,11 +1,10 @@
+import { useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
-import { Button } from '../components/Button/Button';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
-import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useModels } from '../models/useModels';
@@ -70,6 +69,11 @@ export function ContainerPage() {
   const canAdd = canEdit && searchCommitId !== null && writeHeadCommitId !== null;
 
   const state = useStructureView(model?.id ?? '', organisation?.id ?? '', userId, systemId ?? '', ref, mode, mainBranch?.head_commit_id ?? null);
+  // See ElementPage.tsx's identical effect for why this is a real
+  // navigate(-1) rather than a fallback route.
+  useEffect(() => {
+    if (state.status === 'notPresentAtRef') void navigate(-1);
+  }, [state.status, navigate]);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -131,16 +135,7 @@ export function ContainerPage() {
         {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
-        {state.status === 'notPresentAtRef' && (
-          <Panel>
-            <Text as="p" tone="muted">
-              This system is not present here. It may have been retracted, or never existed at this point.
-            </Text>
-            <Button variant="secondary" onClick={() => { void navigate(-1); }}>
-              Go back
-            </Button>
-          </Panel>
-        )}
+        {state.status === 'notPresentAtRef' && <Text tone="muted">Going back…</Text>}
         {state.status === 'ready' && (
           <StructureView
             group={state.data.group}
