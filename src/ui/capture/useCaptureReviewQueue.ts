@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { CandidateDecision, CandidateDecisionDetail, CaptureCandidate, CaptureJob } from '../../contracts/capture';
 import { buildPromotionEnvelope, BuildPromotionEnvelopeError } from '../../capture/buildPromotionEnvelope';
+import { autoMergeCaptureChange } from './autoMergeCaptureChange';
 import { explainPromotionError } from './explainPromotionError';
 import { loadCaptureDraftHead } from '../../capture/loadCaptureDraftHead';
 import { loadTargetBranchHead, type LoadedTargetBranch } from '../../capture/loadTargetBranchHead';
@@ -12,7 +13,7 @@ import { getCaptureJob } from '../../db/captureJobs';
 import { getOrCreateManualSource } from '../../db/sources';
 import { envelopeToDeltaRows, type ElementsHeadRow, type RelationshipsHeadRow } from '../../contracts/rows';
 import { selectAll } from '../../db/selectAll';
-import type { BranchRow } from '../../db/types';
+import type { BranchRow, MemberRole } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -51,8 +52,18 @@ export interface UseCaptureReviewQueueResult {
   decide: (candidateId: UUID, decision: CandidateDecision | null, decisionDetail?: CandidateDecisionDetail | null) => void;
   /** The `confirm` class's own `x` multi-select + `r` exclude (SPEC §10) — one staging call for the whole batch. */
   decideMany: (entries: readonly { candidateId: UUID; decision: CandidateDecision | null; decisionDetail?: CandidateDecisionDetail | null }[]) => void;
-  /** Builds and applies the promotion envelope for every decided-but-not-yet-promoted candidate (⌘/Ctrl+Enter, SPEC §8.2) — returns the count actually promoted, or `null` on failure/no target chosen. */
-  apply: () => Promise<{ appliedCount: number } | null>;
+  /**
+   * Builds and applies the promotion envelope for every decided-but-not-yet-promoted
+   * candidate (⌘/Ctrl+Enter, SPEC §8.2) — returns the count actually
+   * promoted, or `null` on failure/no target chosen. When the caller is
+   * `owner`/`architect` and the target branch is `record`/`correct`
+   * intent, also runs `autoMergeCaptureChange.ts`'s own submit → approve →
+   * merge sequence immediately after — `merged: true` once that's landed
+   * on main, `merged: false` (with `mergeSkippedReason`) whenever it
+   * wasn't attempted or didn't succeed; the promotion itself is never
+   * affected either way.
+   */
+  apply: () => Promise<{ appliedCount: number; merged: boolean; mergeSkippedReason?: string } | null>;
   /**
    * The `m` picker's own search (SPEC §10: "picker prefilled with `similar`,
    * then search") — a case-insensitive substring match over the *target*
@@ -94,7 +105,7 @@ function tallyDecisions(candidates: readonly CaptureCandidate[]): Record<string,
  * PR8's own client-side pre-check pipeline, called here for the first time
  * from a real UI rather than only from `applyCaptureDecisions.integration.test.ts`).
  */
-export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, userId: UUID | null): UseCaptureReviewQueueResult {
+export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, userId: UUID | null, role: MemberRole | null): UseCaptureReviewQueueResult {
   const [status, setStatus] = useState<CaptureReviewStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<CaptureJob | null>(null);
@@ -218,7 +229,7 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
     [modelId, orgId, userId, mainHeadCommitId],
   );
 
-  const apply = useCallback(async (): Promise<{ appliedCount: number } | null> => {
+  const apply = useCallback(async (): Promise<{ appliedCount: number; merged: boolean; mergeSkippedReason?: string } | null> => {
     if (!job?.resultingBranchId) {
       setError('This job has no draft to promote from.');
       return null;
@@ -266,9 +277,19 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
         resolvedConflicts: resolvedConflicts.map((r) => ({ id: r.id, winningDeltaId: r.winningDeltaId, discardedDeltaId: r.discardedDeltaId, rationale: r.rationale })),
         stats: { decided: tallyDecisions(toPromote) },
       });
+      // `autoMergeCaptureChange.ts`'s own doc comment: an owner/architect
+      // reviewer already decided every candidate one by one — the
+      // follow-up "Submit for review → Approve & merge" on the change
+      // page would just be them re-confirming that same decision a second
+      // time. Attempted only for them, and only for a record/correct
+      // target — never a propose/explore change, which still needs a
+      // real, separate reviewer set regardless of who's applying.
+      // Best-effort: the promotion commit above has already landed
+      // either way, so a failure here never undoes it.
+      const mergeResult = await autoMergeCaptureChange(supabase, modelId, role, targetBranchId);
       setStatus('idle');
       reload();
-      return { appliedCount: toPromote.length };
+      return { appliedCount: toPromote.length, merged: mergeResult.merged, ...(mergeResult.merged ? {} : { mergeSkippedReason: mergeResult.reason }) };
     } catch (e) {
       setStatus('idle');
       // `explainPromotionError.ts`'s own doc comment: a bare `e.message` here
@@ -280,7 +301,7 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
       reportError("Couldn't apply capture review decisions.", e);
       return null;
     }
-  }, [job, targetBranchId, userId, candidates, modelId, orgId, reload, mainElementById, draftElementById]);
+  }, [job, targetBranchId, userId, candidates, modelId, orgId, role, reload, mainElementById, draftElementById]);
 
   const searchTargetElements = useCallback(
     async (elementType: ElementType, query: string): Promise<{ elementId: UUID; name: string; parentName: string | null }[] | null> => {

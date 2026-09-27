@@ -29,6 +29,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { CandidateClass, CaptureCandidate } from '../../contracts/capture';
 import { findBlockedCandidates } from '../../capture/findBlockedCandidates';
+import { applyResultMessage } from './applyResultMessage';
 import { Button } from '../components/Button/Button';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
@@ -70,7 +71,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
   const { userId } = useAuth();
   const { role } = useMembership(orgId, userId);
   const canReview = canRunCapture(role);
-  const queue = useCaptureReviewQueue(modelId, orgId, jobId, userId);
+  const queue = useCaptureReviewQueue(modelId, orgId, jobId, userId, role);
   const { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, searchTargetElements, notInFile } = queue;
 
   const [selectedId, setSelectedId] = useState<UUID | null>(null);
@@ -135,7 +136,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
         void apply().then((result) => {
-          if (result) setApplyMessage(`Applied ${String(result.appliedCount)} candidate(s).`);
+          if (result) setApplyMessage(applyResultMessage(result));
         });
         return;
       }
@@ -303,7 +304,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
             >
               Create
             </Button>
-            <Button variant="primary" disabled={!!applyDisabledReason} title={applyDisabledReason ?? undefined} onClick={() => { void apply().then((result) => { if (result) setApplyMessage(`Applied ${String(result.appliedCount)} candidate(s).`); }); }}>
+            <Button variant="primary" disabled={!!applyDisabledReason} title={applyDisabledReason ?? undefined} onClick={() => { void apply().then((result) => { if (result) setApplyMessage(applyResultMessage(result)); }); }}>
               {status === 'applying' ? 'Applying…' : 'Apply decisions'}
             </Button>
           </div>
