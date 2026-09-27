@@ -28,6 +28,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { CandidateClass, CaptureCandidate } from '../../contracts/capture';
+import { findBlockedCandidates } from '../../capture/findBlockedCandidates';
 import { Button } from '../components/Button/Button';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
@@ -91,13 +92,24 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
    * from, so it composes with class grouping rather than replacing it —
    * "Needs review" under "New" is still "New," just narrowed.
    */
-  const [decisionFilter, setDecisionFilter] = useState<'all' | 'needsReview' | 'decided'>('all');
+  const [decisionFilter, setDecisionFilter] = useState<'all' | 'needsReview' | 'decided' | 'blocked'>('all');
   const needsReviewCount = useMemo(() => candidates.filter((c) => c.decision === null).length, [candidates]);
   const decidedCount = candidates.length - needsReviewCount;
+  /**
+   * The other half of that same story, surfaced *before* Apply ever runs:
+   * every candidate `findBlockedCandidates.ts` can already tell, from the
+   * candidate list alone, will fail to promote — an accepted relationship
+   * (or a container/capability's own parent) referencing a sibling
+   * candidate that's rejected or still undecided. `explainPromotionError.ts`
+   * still explains it if you apply anyway; this filter means finding it
+   * doesn't require applying and reading the error first.
+   */
+  const blockedCandidateIds = useMemo(() => findBlockedCandidates(candidates), [candidates]);
   const filteredCandidates = useMemo(() => {
     if (decisionFilter === 'all') return candidates;
+    if (decisionFilter === 'blocked') return candidates.filter((c) => blockedCandidateIds.has(c.id));
     return candidates.filter((c) => (decisionFilter === 'needsReview' ? c.decision === null : c.decision !== null));
-  }, [candidates, decisionFilter]);
+  }, [candidates, decisionFilter, blockedCandidateIds]);
 
   const grouped = useMemo(() => CLASS_ORDER.map((cls) => ({ cls, items: filteredCandidates.filter((c) => c.class === cls) })).filter((g) => g.items.length > 0), [filteredCandidates]);
   const flat = useMemo(() => grouped.flatMap((g) => g.items), [grouped]);
@@ -249,6 +261,9 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
             <Button variant={decisionFilter === 'decided' ? 'primary' : 'ghost'} onClick={() => { setDecisionFilter('decided'); }}>
               Decided ({decidedCount})
             </Button>
+            <Button variant={decisionFilter === 'blocked' ? 'primary' : 'ghost'} onClick={() => { setDecisionFilter('blocked'); }} title="Decided candidates that reference another candidate you rejected or haven't decided yet — Apply will fail on these.">
+              Blocked ({blockedCandidateIds.size})
+            </Button>
           </div>
           <div className={styles.targetRow}>
             <Text as="label" size="sm" tone="muted">
@@ -340,7 +355,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
       {candidates.length === 0 ? (
         <Text tone="muted">No candidates in this draft.</Text>
       ) : filteredCandidates.length === 0 ? (
-        <Text tone="muted">{decisionFilter === 'needsReview' ? 'Nothing left to review — every candidate has a decision.' : 'Nothing decided yet.'}</Text>
+        <Text tone="muted">{decisionFilter === 'needsReview' ? 'Nothing left to review — every candidate has a decision.' : decisionFilter === 'blocked' ? "Nothing blocked — every decided candidate's own references are safe to apply." : 'Nothing decided yet.'}</Text>
       ) : (
         grouped.map(({ cls, items }) => (
           <div key={cls} className={styles.group}>
