@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { CommitEnvelope, Delta } from '../contracts/delta';
 import { createChangeBranch, getMainBranch } from './branches';
+import { insertCaptureJob } from './captureJobs';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { commitToBranch } from './commits';
@@ -134,6 +135,37 @@ describe('model archive/restore/delete against a real local Supabase', () => {
     const { error: commentError } = await owner.client.from('comments').insert({ id: randomUUID(), org_id: orgId, model_id: modelId, anchor_type: 'element', anchor_id: elementId, body: 'A comment on the doomed element.', author_id: owner.id });
     if (commentError) throw new Error(`seed comment: ${commentError.message}`);
 
+    // The regression this migration actually fixes (20260927010000): a
+    // capture_candidates row whose promoted_commit_id points at a real
+    // commit — capture_candidates has no insert RLS policy of its own (only
+    // written via the write_capture_draft/apply_capture_decisions RPCs), so
+    // seeded via the service-role client, the same way this file already
+    // seeds through `service` for cleanup. Reproduces the exact live error:
+    // "update or delete on table commits violates foreign key constraint
+    // capture_candidates_promoted_commit_id_fkey" when delete_model never
+    // cleared capture_jobs/capture_candidates before deleting commits.
+    const captureJob = await insertCaptureJob(service, { id: randomUUID(), orgId, modelId, inputKind: 'text', inputName: 'doomed-import.txt', inputRef: `${orgId}/${modelId}/doomed-import.txt`, inputSha256Hex: '00'.repeat(32), documentDate: null, reimportOfJobId: null, createdBy: owner.id });
+    const { error: candidateError } = await service.from('capture_candidates').insert({
+      id: randomUUID(),
+      org_id: orgId,
+      job_id: captureJob.id,
+      model_id: modelId,
+      seq: 1,
+      kind: 'element',
+      class: 'confirm',
+      element_type: 'system',
+      draft_subject_id: elementId,
+      proposal: { kind: 'element', elementType: 'system', name: 'Doomed System', parent: null, attributes: {} },
+      evidence: { sourceRef: null, passage: '', extractor: 'sheet-mapping', attributeConfidence: {}, warnings: [] },
+      match: { level: 'exact_id', elementId, score: 1, similar: [], warnings: [] },
+      confidence: 1,
+      row_key: 'row-1',
+      decision: 'accepted',
+      promoted_commit_id: updateCommitId,
+      promoted_subject_id: elementId,
+    });
+    if (candidateError) throw new Error(`seed capture_candidates: ${candidateError.message}`);
+
     // Archive, then delete — the real path a user takes.
     await archiveModel(owner.client, modelId);
     const result = await deleteModel(owner.client, modelId);
@@ -150,6 +182,10 @@ describe('model archive/restore/delete against a real local Supabase', () => {
     expect(remainingDeltas ?? []).toHaveLength(0);
     const { data: remainingBranches } = await service.from('branches').select('id').eq('model_id', modelId);
     expect(remainingBranches ?? []).toHaveLength(0);
+    const { data: remainingCaptureJobs } = await service.from('capture_jobs').select('id').eq('model_id', modelId);
+    expect(remainingCaptureJobs ?? []).toHaveLength(0);
+    const { data: remainingCaptureCandidates } = await service.from('capture_candidates').select('id').eq('model_id', modelId);
+    expect(remainingCaptureCandidates ?? []).toHaveLength(0);
   });
 
   it('delete on an already-deleted (or never-existed) model returns not_found rather than throwing', async () => {
