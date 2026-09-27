@@ -1135,7 +1135,7 @@ export function LandscapeCanvas({
     }
   }
 
-  function zoomBy(factor: number, center?: { x: number; y: number }): void {
+  const zoomBy = useCallback((factor: number, center?: { x: number; y: number }): void => {
     setTransform((prev) => {
       const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, prev.scale * factor));
       const wrapper = wrapperRef.current;
@@ -1145,19 +1145,38 @@ export function LandscapeCanvas({
       const worldY = (cy - prev.ty) / prev.scale;
       return { scale: nextScale, tx: cx - worldX * nextScale, ty: cy - worldY * nextScale };
     });
-  }
+  }, []);
 
-  function handleWheel(e: React.WheelEvent<HTMLCanvasElement>): void {
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    // `wheelZoomFactor` (zoom.ts) scales the step by how much of a single
-    // wheel "notch" this event's own deltaY represents — see its own
-    // comment for the bug this fixes (a burst of small-delta events, from
-    // a trackpad or a high-resolution mouse, used to each get the same
-    // full step as one real notch and could compound to MIN/MAX_SCALE, and
-    // therefore off-screen, in a fraction of a second).
-    zoomBy(wheelZoomFactor(e.deltaY, e.deltaMode), { x: e.clientX - rect.left, y: e.clientY - rect.top });
-  }
+  // A plain React `onWheel` prop is attached by React as a passive native
+  // listener (React 17+ default, to keep scrolling smooth), so calling
+  // `preventDefault()` from inside it is a no-op that also warns on every
+  // event ("Unable to preventDefault inside passive event listener
+  // invocation") — this canvas needs the page to *not* scroll while the
+  // user zooms it with the wheel, so the listener is attached natively
+  // below with `{ passive: false }` instead of via the JSX prop.
+  const handleWheel = useCallback(
+    (e: WheelEvent): void => {
+      e.preventDefault();
+      const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
+      // `wheelZoomFactor` (zoom.ts) scales the step by how much of a single
+      // wheel "notch" this event's own deltaY represents — see its own
+      // comment for the bug this fixes (a burst of small-delta events, from
+      // a trackpad or a high-resolution mouse, used to each get the same
+      // full step as one real notch and could compound to MIN/MAX_SCALE, and
+      // therefore off-screen, in a fraction of a second).
+      zoomBy(wheelZoomFactor(e.deltaY, e.deltaMode), { x: e.clientX - rect.left, y: e.clientY - rect.top });
+    },
+    [zoomBy],
+  );
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleWheel]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLCanvasElement>): void {
     if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -1230,7 +1249,6 @@ export function LandscapeCanvas({
           setHover(null);
           setHoverReference(null);
         }}
-        onWheel={handleWheel}
         onKeyDown={handleKeyDown}
       />
       <div className={styles.toolbar}>
