@@ -1,0 +1,65 @@
+/**
+ * The mobile Elements browse list (`ElementBrowseCards.tsx`'s own module
+ * comment). Same card/row shape `LandscapeMobileList.module.css`'s own
+ * `.row`/`.rowMain`/`.rowSecondary` already establish — `min-width: 0`
+ * throughout for the same reason that file's own comment gives: every
+ * element here is a flex item of a `flex-direction: column` ancestor, so
+ * without it an un-wrapped row of content sets an unshrinkable width floor
+ * wider than a narrow viewport.
+ */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+}
+
+.cardMain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Deliberately no `white-space: nowrap`/`text-overflow: ellipsis` here,
+   unlike `LandscapeMobileList.module.css`'s own `.rowName` — a long name
+   wrapping onto a second line is exactly what this view exists to allow
+   instead of (the table's `nowrap` cells forcing a wide, scroll-only
+   column). */
+.cardName {
+  min-width: 0;
+  font-weight: 600;
+}
+
+.cardSecondary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.unresolvedBadge {
+  white-space: nowrap;
+}
+
+.cardActions {
+  padding-top: var(--space-1);
+}
