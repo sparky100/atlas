@@ -16,10 +16,47 @@ test('define a select attribute, set it on a system, and filter the browse table
 
   // Two systems: one will get Region=EMEA, the other is left unset —
   // the filter step below proves it actually narrows the table, not just
-  // that it renders.
+  // that it renders. A third, deliberately long-named system is added
+  // purely for the row-to-row Name-column regression check below — it
+  // needs a row whose name is much longer than whichever row happens to
+  // render first, which the two short names above never produce.
   await addSystemFromHome(page, { name: 'Northgate', description: "The borough's new revenues platform." });
   await goToModelHome(page);
   await addSystemFromHome(page, { name: 'Council Tax System', description: 'Handles council tax accounts.' });
+  await goToModelHome(page);
+  await addSystemFromHome(page, { name: 'Integrated Regional Revenue and Benefits Collection Platform', description: 'A long-named system, for column-width regression coverage.' });
+  await goToModelHome(page);
+
+  // Regression coverage: the Name column's width used to be measured from
+  // only the first rendered body row (`ElementBrowseTable.tsx`'s
+  // `useLayoutEffect`) — safe for the bounded-vocabulary columns
+  // (Type/Owner/Lifecycle/Criticality), but Name is open-ended text, so a
+  // long name on any row *after* the first used to render its text
+  // visibly overlapping into the Type column next to it (`white-space:
+  // nowrap`, nothing to wrap or clip it). Checked here, unfiltered, while
+  // all three systems (including the long-named one, which never sorts
+  // first alphabetically) are on screen together.
+  await page.getByRole('link', { name: 'Browse all elements' }).click();
+  await expect(page.getByRole('link', { name: 'Integrated Regional Revenue and Benefits Collection Platform' })).toBeVisible();
+  // `expect.poll`, same as the header/body check below: a `ResizeObserver`
+  // drives `colWidths`, so the first paint after navigation can still be
+  // mid-settle.
+  await expect.poll(async () => {
+    return page.evaluate(() => {
+      const bodyTable = document.querySelectorAll('table')[1];
+      if (!bodyTable) return -Infinity;
+      let maxOverlapPx = -Infinity;
+      for (const tr of bodyTable.querySelectorAll('tbody tr')) {
+        const nameCell = tr.children[0] as HTMLElement | undefined;
+        const typeCell = tr.children[1] as HTMLElement | undefined;
+        if (!nameCell || !typeCell) continue;
+        const nameContentRight = nameCell.getBoundingClientRect().left + nameCell.scrollWidth;
+        const typeLeft = typeCell.getBoundingClientRect().left;
+        maxOverlapPx = Math.max(maxOverlapPx, nameContentRight - typeLeft);
+      }
+      return maxOverlapPx;
+    });
+  }, 'Name column overflows into Type on some row').toBeLessThan(1);
   await goToModelHome(page);
 
   // Define the attribute — owner-only, under organisation settings

@@ -212,15 +212,17 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
   // physically outside `.tableWrap` — the only way to make it stick to the
   // viewport while `.tableWrap` still scrolls the body horizontally on its
   // own (see that CSS file's own comment on why the two can't be one
-  // table's `<thead>`/`<tbody>` and still both work). This borrows the
-  // body table's own real, content-driven column widths (there's no body
-  // row here to auto-size the header table's own `table-layout: fixed`
-  // against) from the first rendered body row, and re-measures whenever
-  // the row set, custom column, or optional columns change — anything
-  // that could change a column's natural width. `useLayoutEffect`, not
-  // `useEffect`: the measure-and-set-state round trip has to land before
-  // the browser paints, or the header would visibly snap widths on first
-  // render.
+  // table's `<thead>`/`<tbody>` and still both work). Both tables now
+  // share one `<colgroup>` (that CSS file's own comment on why the body
+  // table needs it too, not just the header) — this borrows the body
+  // table's own real, content-driven column widths (there's no body row
+  // here to auto-size the header table's own `table-layout: fixed`
+  // against) from every currently-rendered body row's own cells (not just
+  // the first — see the loop below), and re-measures whenever the row
+  // set, custom column, or optional columns change — anything that could
+  // change a column's natural width. `useLayoutEffect`, not `useEffect`:
+  // the measure-and-set-state round trip has to land before the browser
+  // paints, or the header would visibly snap widths on first render.
   //
   // Bug fix: a body column's own content can be narrower than its header
   // label ever is — every visible row's Owner cell reads as a bare "—"
@@ -240,12 +242,12 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
   const tableWrapRef = useRef<HTMLDivElement>(null);
   const headerClipRef = useRef<HTMLDivElement>(null);
   const headerRowRef = useRef<HTMLTableRowElement>(null);
-  const firstBodyRowRef = useRef<HTMLTableRowElement | null>(null);
+  const tbodyRef = useRef<HTMLTableSectionElement | null>(null);
   const [colWidths, setColWidths] = useState<number[] | null>(null);
 
   useLayoutEffect(() => {
-    const row = firstBodyRowRef.current;
-    if (!row) {
+    const tbody = tbodyRef.current;
+    if (!tbody) {
       setColWidths(null);
       return;
     }
@@ -275,15 +277,48 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
         const cellStyle = getComputedStyle(cell);
         return inner.scrollWidth + parseFloat(cellStyle.paddingLeft) + parseFloat(cellStyle.paddingRight);
       }) : [];
-      setColWidths(Array.from(row.children).map((cell, i) => Math.max(cell.getBoundingClientRect().width, headerWidths[i] ?? 0)));
+      // Every rendered row's own cell width, not just the first row's —
+      // found live: Type/Owner/Lifecycle/Criticality all come from a
+      // small, bounded vocabulary (short status words), so one row's
+      // width used to stand in fine for the whole column, but Name is
+      // open-ended user text with wildly varying length row to row.
+      // Sizing the Name column from whichever name happened to be first
+      // left every longer name further down the table overflowing
+      // visually into the Type column next to it (no wrap, no clip —
+      // `white-space: nowrap` with nothing catching the overflow). No
+      // virtualization exists on this table (`state.rows.map(...)`
+      // already renders every row), so every row is already in the DOM
+      // being painted — reading their bounding rects here adds no new
+      // DOM-scale exposure, just cheap reads over what's already there.
+      //
+      // `cell.scrollWidth`, not `getBoundingClientRect().width` — found
+      // live: once `table-layout: fixed` is in effect (true from the very
+      // first render, colgroup or not — the CSS spec has it size every
+      // row's column from the *first* row alone when there's no colgroup
+      // yet), every row in a column is already forced to the *same*
+      // rendered box width, regardless of that row's own actual content.
+      // `getBoundingClientRect()` on row 3's Name cell was reporting row
+      // 0's own width back, every time — never row 3's real one.
+      // `scrollWidth` is driven by the cell's own content alone (constant
+      // per row, since `white-space: nowrap` means it never wraps to
+      // begin with), so it reports each row's true natural width
+      // regardless of what its column is currently constrained to.
+      const colWidthsNext: number[] = [];
+      for (const bodyRow of tbody.rows) {
+        Array.from(bodyRow.children).forEach((cell, i) => {
+          const width = Math.max(cell.scrollWidth, headerWidths[i] ?? 0);
+          colWidthsNext[i] = Math.max(colWidthsNext[i] ?? 0, width);
+        });
+      }
+      setColWidths(colWidthsNext);
     };
     measure();
     const observer = new ResizeObserver(measure);
-    observer.observe(row);
+    observer.observe(tbody);
     return () => {
       observer.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measures on anything that could change a rendered cell's natural width (including the header's own sort-arrow toggling); `firstBodyRowRef.current`/`headerRowRef.current` themselves aren't valid deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measures on anything that could change a rendered cell's natural width (including the header's own sort-arrow toggling); `tbodyRef.current`/`headerRowRef.current` themselves aren't valid deps.
   }, [state.status === 'ready' ? state.rows : null, customAttr, linkSupportsInline, decisionRowAction, state.status === 'ready' ? state.sortKey : null, state.status === 'ready' ? state.sortDirection : null]);
 
   function syncHeaderScroll() {
@@ -309,8 +344,8 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
   // *same* explicit widths, or a column whose header label needs more room
   // than the body's own actual content (e.g. "Owner" over a column of bare
   // "—"s) widens correctly in one table but silently not in the other,
-  // desyncing their column boundaries column by column. `headerTableStyle`'s
-  // own width (the colgroup's own sum) matters only for the header table —
+  // desyncing their column boundaries column by column. `headerTableStyle`'s own
+  // width (the colgroup's own sum) matters only for the header table —
   // `.tableWrap`'s real scrollbar already gives the body table room to be
   // this wide without it, but the header table has no scrollbar of its own
   // (`.headerClip`'s `overflow-x: hidden` only ever gets scrolled
@@ -435,11 +470,11 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
           <div className={styles.tableWrap} ref={tableWrapRef} onScroll={syncHeaderScroll}>
             <table className={styles.table}>
               {colgroupEl}
-              <tbody>
-                {state.rows.map((row, rowIndex) => {
+              <tbody ref={tbodyRef}>
+                {state.rows.map((row) => {
                   const unresolvedCount = unresolvedCounts?.get(row.element.element_id)?.open ?? 0;
                   return (
-                  <tr key={row.element.element_id} ref={rowIndex === 0 ? firstBodyRowRef : undefined}>
+                  <tr key={row.element.element_id}>
                     <td headers={`${headerIdBase}-name`}>
                       <Link to={elementHref(row.element.element_id)} className={styles.nameCell}>
                         <ElementTypeGlyph type={row.element.element_type} />
