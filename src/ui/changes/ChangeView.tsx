@@ -84,6 +84,10 @@ export interface ChangeViewProps {
  * only when this branch was actually the one selected — never a bystander
  * reviewer's own selection just because they happened to look at this page.
  */
+
+/** How many subjects to show in "Edits on this change" before collapsing behind "View more" — same pattern as CaptureJobListView.tsx's own PAGE_SIZE, for the identical reason: a capture-driven change can carry hundreds of edits. */
+const EDITED_SUBJECTS_PAGE_SIZE = 20;
+
 export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role, canEdit }: ChangeViewProps) {
   const { userId } = useAuth();
   const { status, branch, error, updateMetadata, reload } = useChange(branchId);
@@ -105,6 +109,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [pickingReviewers, setPickingReviewers] = useState(false);
+  const [visibleSubjectCount, setVisibleSubjectCount] = useState(EDITED_SUBJECTS_PAGE_SIZE);
 
   if (status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (status === 'not_found' || !branch) return <Text as="p">No change found for this id.</Text>;
@@ -526,34 +531,41 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         {summaryState.status === 'error' && <Text as="p">{summaryState.message}</Text>}
         {summaryState.status === 'ready' && summaryState.summary.subjects.length === 0 && <EmptyState>No edits yet — this change hasn't diverged from main.</EmptyState>}
         {summaryState.status === 'ready' && summaryState.summary.subjects.length > 0 && (
-          <ul className={styles.subjectList}>
-            {summaryState.summary.subjects.map((subject) => (
-              <li key={subject.subjectId} className={styles.subjectRow}>
-                <div className={styles.subjectTitle}>
-                  {subject.subjectType === 'element' && <ElementTypeGlyph type={subject.elementType} />}
-                  <Text as="span" size="lg">
-                    {subject.name}
-                  </Text>
-                </div>
-                <ul className={styles.deltaList}>
-                  {subject.deltas.map((delta) => {
-                    const source = summaryState.summary.sourcesById.get(delta.sourceId);
-                    return (
-                      <li key={delta.id} className={styles.deltaRow}>
-                        <Text as="span" size="sm">
-                          {describeDelta(delta)}
-                        </Text>
-                        <Text as="span" tone="muted" size="sm">
-                          {source?.name ?? delta.sourceId}
-                        </Text>
-                        <ConfidenceDots confidence={delta.confidence} />
-                      </li>
-                    );
-                  })}
-                </ul>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className={styles.subjectList}>
+              {summaryState.summary.subjects.slice(0, visibleSubjectCount).map((subject) => (
+                <li key={subject.subjectId} className={styles.subjectRow}>
+                  <div className={styles.subjectTitle}>
+                    {subject.subjectType === 'element' && <ElementTypeGlyph type={subject.elementType} />}
+                    <Text as="span" size="lg">
+                      {subject.name}
+                    </Text>
+                  </div>
+                  <ul className={styles.deltaList}>
+                    {subject.deltas.map((delta) => {
+                      const source = summaryState.summary.sourcesById.get(delta.sourceId);
+                      return (
+                        <li key={delta.id} className={styles.deltaRow}>
+                          <Text as="span" size="sm">
+                            {describeDelta(delta)}
+                          </Text>
+                          <Text as="span" tone="muted" size="sm">
+                            {source?.name ?? delta.sourceId}
+                          </Text>
+                          <ConfidenceDots confidence={delta.confidence} />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+            {summaryState.summary.subjects.length > visibleSubjectCount && (
+              <Button variant="ghost" onClick={() => { setVisibleSubjectCount((c) => c + EDITED_SUBJECTS_PAGE_SIZE); }}>
+                View more ({summaryState.summary.subjects.length - visibleSubjectCount} more)
+              </Button>
+            )}
+          </>
         )}
       </Panel>
 
