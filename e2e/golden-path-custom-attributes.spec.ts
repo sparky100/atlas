@@ -38,19 +38,19 @@ test('define a select attribute, set it on a system, and filter the browse table
   // "Applies to" already defaults to "system" — this golden path never
   // needs to touch it.
   await page.getByRole('button', { name: 'Define attribute' }).click();
-  await expect(page.getByText('Region')).toBeVisible();
+  await expect(page.getByText('Region', { exact: true })).toBeVisible();
 
   // Back into the model, onto Northgate's own page, to set the value.
   await page.getByRole('link', { name: 'Atlas' }).click();
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: modelName }).click();
-  await page.getByRole('link', { name: 'Northgate' }).click();
+  await page.getByRole('link', { name: 'Northgate', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Northgate' })).toBeVisible();
 
   await page.getByRole('button', { name: /Edit/ }).click();
   await page.getByLabel('Region').selectOption('EMEA');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.getByText('EMEA')).toBeVisible();
+  await expect(page.getByText('EMEA', { exact: true })).toBeVisible();
 
   // Filter the browse table by the same attribute — only Northgate should
   // remain; Council Tax System (never given a Region) drops out.
@@ -61,4 +61,24 @@ test('define a select attribute, set it on a system, and filter the browse table
 
   await expect(page.getByRole('link', { name: 'Northgate' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Council Tax System' })).not.toBeVisible();
+
+  // Regression coverage: the browse table's own separate header row/table
+  // (kept apart from the scrollable body for `position: sticky` to work —
+  // ElementBrowseTable.module.css's own comment) must size each column to
+  // match the body's real column, at whatever width this run's own project
+  // (1280 or 390) gives it. Each header cell's left edge should line up
+  // with its own `<td>`'s left edge in the first body row — a `ResizeObserver`
+  // drives the header's own widths, so `expect.poll` (not a single read)
+  // waits out the one settling pass after the filter above just added a
+  // whole new column ("Region") to both rows.
+  const headerCells = page.locator('table').first().locator('thead th');
+  const bodyCells = page.locator('table').nth(1).locator('tbody tr').first().locator('td');
+  const headerCount = await headerCells.count();
+  for (let i = 0; i < headerCount; i++) {
+    await expect.poll(async () => {
+      const headerBox = await headerCells.nth(i).boundingBox();
+      const bodyBox = await bodyCells.nth(i).boundingBox();
+      return headerBox && bodyBox ? Math.abs(headerBox.x - bodyBox.x) : Number.NaN;
+    }, `header/body column ${String(i)} misaligned`).toBeLessThan(1);
+  }
 });

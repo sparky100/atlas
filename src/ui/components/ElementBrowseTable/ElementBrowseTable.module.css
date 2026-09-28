@@ -72,6 +72,17 @@
      the body table's own cells still share this class. */
   border-collapse: separate;
   border-spacing: 0;
+  /* Both tables (header and body) render the *same* `<colgroup>`
+     (`ElementBrowseTable.tsx`'s own `colWidths` state), and both need
+     `table-layout: fixed` for it to be authoritative rather than advisory
+     — found live: giving only the header table a colgroup, with the body
+     table left at the default auto layout, meant a column whose *header*
+     label needed more room than the body's own actual content (e.g.
+     "Owner" needing more width than every row's own bare "—") correctly
+     widened the header cell but left the body's matching column at its own
+     narrower natural width, since nothing forced it to match — the two
+     tables' column boundaries silently drifted apart column by column. */
+  table-layout: fixed;
 }
 
 .table th,
@@ -99,14 +110,6 @@
   z-index: 1;
   overflow-x: hidden;
   background: var(--bg);
-}
-
-/* The header table's own columns are fixed-width, copied at runtime from
-   the body table's real, content-driven ones (there's no body of its own
-   here to auto-size against) — `table-layout: fixed` is what makes an
-   explicit `<colgroup>` authoritative instead of advisory. */
-.headerTable {
-  table-layout: fixed;
 }
 
 .sortButton {

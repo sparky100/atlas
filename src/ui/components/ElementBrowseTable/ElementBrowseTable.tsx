@@ -251,7 +251,30 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
     }
     const measure = () => {
       const headerRow = headerRowRef.current;
-      const headerWidths = headerRow ? Array.from(headerRow.children).map((cell) => cell.scrollWidth) : [];
+      // Measures each `<th>`'s own inner wrapper (its sort button, or the
+      // plain `<span>` wrapping a non-sortable label like "Comments"), never
+      // the `<th>` itself — a `<th>` already carrying a previous render's
+      // `<col>` width can never report a *smaller* scrollWidth than that
+      // width once applied, so measuring the cell directly creates a one-
+      // way ratchet: an inflated width can never shrink back down on a
+      // later render. Found live: the *first* render measures before any
+      // `<colgroup>` exists at all, and `table-layout: fixed` with no
+      // column hints divides the table's width equally across every column
+      // — that already-wrong equal split is what starts the ratchet, and
+      // every later render just measures its own previous mistake back.
+      // The inner button/span is a shrink-wrapped inline element that
+      // always reports its own true natural content width, regardless of
+      // how wide its ancestor `<th>`/`<col>` currently is.
+      const headerWidths = headerRow ? Array.from(headerRow.children).map((cell) => {
+        const inner = cell.querySelector('button, span') ?? cell;
+        // Add the `<th>`'s own horizontal padding back in — `inner` is
+        // deliberately measured without it (that's what keeps the
+        // measurement immune to the ratchet above), but the column itself
+        // still needs room for it, or adjacent header labels render flush
+        // against each other with no gap.
+        const cellStyle = getComputedStyle(cell);
+        return inner.scrollWidth + parseFloat(cellStyle.paddingLeft) + parseFloat(cellStyle.paddingRight);
+      }) : [];
       setColWidths(Array.from(row.children).map((cell, i) => Math.max(cell.getBoundingClientRect().width, headerWidths[i] ?? 0)));
     };
     measure();
@@ -281,6 +304,30 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
     (d) => d.deprecated_at === null && (state.typeFilter === 'all' || d.applies_to.includes(state.typeFilter)),
   );
   const selectedCustomDefinition = customAttr.key ? applicableCustomDefinitions.find((d) => d.key === customAttr.key) : undefined;
+
+  // Shared between the header table and the body table — both need the
+  // *same* explicit widths, or a column whose header label needs more room
+  // than the body's own actual content (e.g. "Owner" over a column of bare
+  // "—"s) widens correctly in one table but silently not in the other,
+  // desyncing their column boundaries column by column. `headerTableStyle`'s
+  // own width (the colgroup's own sum) matters only for the header table —
+  // `.tableWrap`'s real scrollbar already gives the body table room to be
+  // this wide without it, but the header table has no scrollbar of its own
+  // (`.headerClip`'s `overflow-x: hidden` only ever gets scrolled
+  // programmatically, in sync with `.tableWrap`) and would otherwise be
+  // squeezed to fit `width: 100%` of its clip container.
+  const colgroupEl = colWidths && (
+    <colgroup>
+      {colWidths.map((width, i) => (
+        // Column position, not identity, is what this keys — the set of
+        // columns only ever changes by length (a conditional column
+        // appearing/disappearing), never reorders, so an index key is safe
+        // here.
+        <col key={`col-${String(i)}`} style={{ width: `${String(width)}px` }} />
+      ))}
+    </colgroup>
+  );
+  const headerTableStyle = colWidths ? { width: colWidths.reduce((sum, width) => sum + width, 0) } : undefined;
 
   return (
     <div>
@@ -348,18 +395,8 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
       ) : (
         <>
           <div className={styles.headerClip} ref={headerClipRef}>
-            <table className={[styles.table, styles.headerTable].filter(Boolean).join(' ')}>
-              {colWidths && (
-                <colgroup>
-                  {colWidths.map((width, i) => (
-                    // Column position, not identity, is what this keys — the
-                    // set of columns only ever changes by length (a
-                    // conditional column appearing/disappearing), never
-                    // reorders, so an index key is safe here.
-                    <col key={`col-${String(i)}`} style={{ width: `${String(width)}px` }} />
-                  ))}
-                </colgroup>
-              )}
+            <table className={styles.table} style={headerTableStyle}>
+              {colgroupEl}
               <thead>
                 <tr ref={headerRowRef}>
                   {COLUMNS.map((column) => (
@@ -378,15 +415,26 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                       </button>
                     </th>
                   )}
-                  <th id={`${headerIdBase}-comments`}>Comments</th>
-                  {linkSupportsInline && <th id={`${headerIdBase}-link`}>Link to a capability</th>}
-                  {decisionRowAction && <th id={`${headerIdBase}-decision`}>Decision</th>}
+                  <th id={`${headerIdBase}-comments`}>
+                    <span>Comments</span>
+                  </th>
+                  {linkSupportsInline && (
+                    <th id={`${headerIdBase}-link`}>
+                      <span>Link to a capability</span>
+                    </th>
+                  )}
+                  {decisionRowAction && (
+                    <th id={`${headerIdBase}-decision`}>
+                      <span>Decision</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
             </table>
           </div>
           <div className={styles.tableWrap} ref={tableWrapRef} onScroll={syncHeaderScroll}>
             <table className={styles.table}>
+              {colgroupEl}
               <tbody>
                 {state.rows.map((row, rowIndex) => {
                   const unresolvedCount = unresolvedCounts?.get(row.element.element_id)?.open ?? 0;
