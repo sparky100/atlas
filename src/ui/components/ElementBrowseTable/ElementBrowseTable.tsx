@@ -18,8 +18,13 @@ import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
 import { criticalityToneFor } from '../../elements/criticalityTone';
 import { useElementExport } from '../../elements/useElementExport';
-import { sortKeyEquals, type ElementBrowseState } from '../../elements/useElementBrowse';
+import { sortKeyEquals, type ElementBrowseSortKey, type ElementBrowseState } from '../../elements/useElementBrowse';
+import { useIsNarrowViewport } from '../../landscape/useIsNarrowViewport';
+import { ElementBrowseCards } from './ElementBrowseCards';
 import styles from './ElementBrowseTable.module.css';
+
+/** Same breakpoint every other "table/canvas → mobile list" swap in this app uses (`LandscapePage.tsx`/`ContextPage.tsx`/`ValueStreamsPage.tsx`, all `useIsNarrowViewport(768)`) — one convention, not a bespoke value per view. */
+const MOBILE_BREAKPOINT_PX = 768;
 
 /**
  * Sprint U4-1 B3: "the browse table filtered to unlinked systems with the
@@ -179,7 +184,8 @@ function CustomAttributePicker({
  * construction none of these do yet (the very-first-link path, always
  * `role: 'secondary'`, exactly matches what a from-scratch link should be).
  */
-function InlineSupportsPicker({ system, config, searchCommitId }: { system: { elementId: UUID; name: string }; config: ElementBrowseLinkSupportsConfig; searchCommitId: UUID }) {
+/** Exported for `ElementBrowseCards.tsx`'s own identical mobile call site — same picker, same pre-wired assumptions, never a second implementation. */
+export function InlineSupportsPicker({ system, config, searchCommitId }: { system: { elementId: UUID; name: string }; config: ElementBrowseLinkSupportsConfig; searchCommitId: UUID }) {
   return (
     <RelationshipAdd
       slot={{ relationshipType: 'supports', targetTypes: ['capability'] }}
@@ -206,6 +212,13 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
   // once `state.status === 'ready'`, and the export loader refuses to run on
   // the null/empty fallbacks until then.
   const exportState = useElementExport({ modelId, commitId: state.status === 'ready' ? state.commitId : null, definitions: attributeDefinitions, rows: state.status === 'ready' ? state.rows : [], filenameBase });
+
+  // Below the breakpoint, `ElementBrowseCards` replaces the two-table
+  // sticky-header block entirely, rather than trying to make one render
+  // work at every width (`ElementBrowseCards.tsx`'s own module comment) —
+  // same swap-the-whole-renderer shape `LandscapePage.tsx`/`ContextPage.tsx`
+  // already use for their own canvas/table-vs-mobile-list split.
+  const narrow = useIsNarrowViewport(MOBILE_BREAKPOINT_PX);
 
   // Sprint U4-1 findings item 5's own follow-up: the column header lives in
   // its own small table (`.headerClip`, ElementBrowseTable.module.css),
@@ -399,6 +412,37 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
           ))}
         </select>
         <CustomAttributePicker definitions={applicableCustomDefinitions} selection={customAttr} onChange={onCustomAttrChange} />
+        {narrow && (
+          // Cards have no clickable column headers to sort by (the desktop
+          // table's own affordance) — without this, mobile would silently
+          // lose sorting entirely rather than just losing the table shape.
+          // `setSort` toggles direction on a re-pick of the *same* key
+          // (`useElementBrowse.ts`'s own `sortKeyEquals` check), the same
+          // behaviour clicking an already-sorted header column gives — the
+          // direction button below reuses that by calling it with the
+          // current key unchanged.
+          <>
+            <select
+              className={styles.select}
+              aria-label="Sort by"
+              value={typeof state.sortKey === 'object' ? `custom:${state.sortKey.custom}` : state.sortKey}
+              onChange={(e) => {
+                const next = e.target.value;
+                state.setSort(next.startsWith('custom:') ? { custom: next.slice('custom:'.length) } : (next as ElementBrowseSortKey));
+              }}
+            >
+              {COLUMNS.map((column) => (
+                <option key={column.key} value={column.key}>
+                  {column.label}
+                </option>
+              ))}
+              {selectedCustomDefinition && <option value={`custom:${selectedCustomDefinition.key}`}>{selectedCustomDefinition.label}</option>}
+            </select>
+            <Button variant="secondary" aria-label={`Sort direction: ${state.sortDirection === 'asc' ? 'ascending' : 'descending'}`} onClick={() => { state.setSort(state.sortKey); }}>
+              {state.sortDirection === 'asc' ? '▲' : '▼'}
+            </Button>
+          </>
+        )}
         <Button
           variant="secondary"
           disabled={state.rows.length === 0 || exportState.status === 'working'}
@@ -427,6 +471,16 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
 
       {state.rows.length === 0 ? (
         <EmptyState>No elements match this filter.</EmptyState>
+      ) : narrow ? (
+        <ElementBrowseCards
+          rows={state.rows}
+          elementHref={elementHref}
+          unresolvedCounts={unresolvedCounts}
+          selectedCustomDefinition={selectedCustomDefinition}
+          linkSupportsInline={linkSupportsInline}
+          decisionRowAction={decisionRowAction}
+          commitId={state.commitId}
+        />
       ) : (
         <>
           <div className={styles.headerClip} ref={headerClipRef}>

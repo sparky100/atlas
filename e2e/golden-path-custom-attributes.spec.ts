@@ -38,25 +38,36 @@ test('define a select attribute, set it on a system, and filter the browse table
   // first alphabetically) are on screen together.
   await page.getByRole('link', { name: 'Browse all elements' }).click();
   await expect(page.getByRole('link', { name: 'Integrated Regional Revenue and Benefits Collection Platform' })).toBeVisible();
-  // `expect.poll`, same as the header/body check below: a `ResizeObserver`
-  // drives `colWidths`, so the first paint after navigation can still be
-  // mid-settle.
-  await expect.poll(async () => {
-    return page.evaluate(() => {
-      const bodyTable = document.querySelectorAll('table')[1];
-      if (!bodyTable) return -Infinity;
-      let maxOverlapPx = -Infinity;
-      for (const tr of bodyTable.querySelectorAll('tbody tr')) {
-        const nameCell = tr.children[0] as HTMLElement | undefined;
-        const typeCell = tr.children[1] as HTMLElement | undefined;
-        if (!nameCell || !typeCell) continue;
-        const nameContentRight = nameCell.getBoundingClientRect().left + nameCell.scrollWidth;
-        const typeLeft = typeCell.getBoundingClientRect().left;
-        maxOverlapPx = Math.max(maxOverlapPx, nameContentRight - typeLeft);
-      }
-      return maxOverlapPx;
-    });
-  }, 'Name column overflows into Type on some row').toBeLessThan(1);
+  // Below the mobile breakpoint (`ElementBrowseTable.tsx`'s own
+  // `MOBILE_BREAKPOINT_PX`), `ElementBrowseCards` renders instead of the
+  // table — no fixed-width columns to overflow at all (the long name just
+  // wraps), so the table-specific overlap check below doesn't apply; the
+  // equivalent mobile guarantee (no page-level horizontal scroll even with
+  // this exact long name) is checked directly instead. Deeper mobile-card
+  // behaviour (sort control, tap-to-navigate) has its own dedicated spec,
+  // `element-browse-mobile-cards.engine.spec.ts`.
+  if ((await page.locator('table').count()) === 0) {
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+  } else {
+    // `expect.poll`: a `ResizeObserver` drives `colWidths`, so the first
+    // paint after navigation can still be mid-settle.
+    await expect.poll(async () => {
+      return page.evaluate(() => {
+        const bodyTable = document.querySelectorAll('table')[1];
+        if (!bodyTable) return -Infinity;
+        let maxOverlapPx = -Infinity;
+        for (const tr of bodyTable.querySelectorAll('tbody tr')) {
+          const nameCell = tr.children[0] as HTMLElement | undefined;
+          const typeCell = tr.children[1] as HTMLElement | undefined;
+          if (!nameCell || !typeCell) continue;
+          const nameContentRight = nameCell.getBoundingClientRect().left + nameCell.scrollWidth;
+          const typeLeft = typeCell.getBoundingClientRect().left;
+          maxOverlapPx = Math.max(maxOverlapPx, nameContentRight - typeLeft);
+        }
+        return maxOverlapPx;
+      });
+    }, 'Name column overflows into Type on some row').toBeLessThan(1);
+  }
   await goToModelHome(page);
 
   // Define the attribute — owner-only, under organisation settings
@@ -108,14 +119,21 @@ test('define a select attribute, set it on a system, and filter the browse table
   // drives the header's own widths, so `expect.poll` (not a single read)
   // waits out the one settling pass after the filter above just added a
   // whole new column ("Region") to both rows.
-  const headerCells = page.locator('table').first().locator('thead th');
-  const bodyCells = page.locator('table').nth(1).locator('tbody tr').first().locator('td');
-  const headerCount = await headerCells.count();
-  for (let i = 0; i < headerCount; i++) {
-    await expect.poll(async () => {
-      const headerBox = await headerCells.nth(i).boundingBox();
-      const bodyBox = await bodyCells.nth(i).boundingBox();
-      return headerBox && bodyBox ? Math.abs(headerBox.x - bodyBox.x) : Number.NaN;
-    }, `header/body column ${String(i)} misaligned`).toBeLessThan(1);
+  // Below the mobile breakpoint there's no header/body table pair to check
+  // alignment of at all (`ElementBrowseCards` renders instead — see the
+  // identical guard above) — the Northgate/Council Tax visibility
+  // assertions just above already prove filtering itself still works on a
+  // card list.
+  if ((await page.locator('table').count()) > 0) {
+    const headerCells = page.locator('table').first().locator('thead th');
+    const bodyCells = page.locator('table').nth(1).locator('tbody tr').first().locator('td');
+    const headerCount = await headerCells.count();
+    for (let i = 0; i < headerCount; i++) {
+      await expect.poll(async () => {
+        const headerBox = await headerCells.nth(i).boundingBox();
+        const bodyBox = await bodyCells.nth(i).boundingBox();
+        return headerBox && bodyBox ? Math.abs(headerBox.x - bodyBox.x) : Number.NaN;
+      }, `header/body column ${String(i)} misaligned`).toBeLessThan(1);
+    }
   }
 });
