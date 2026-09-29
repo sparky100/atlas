@@ -82,7 +82,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     ? branchLinks
         .map((l) => readyState.linkedBranchesById.get(l.linked_id))
         .filter((b): b is NonNullable<typeof b> => b !== undefined)
-        .map((b) => ({ branchId: b.id, headCommitId: b.head_commit_id, label: intentHeaderLine(b) }))
+        .map((b) => ({ branchId: b.id, baseCommitId: b.base_commit_id, headCommitId: b.head_commit_id, label: intentHeaderLine(b) }))
     : [];
   const comparison = useDecisionComparison(modelId, main?.head_commit_id ?? null, concernedCapabilityIds, otherConcernElementIds, comparisonOptions);
 

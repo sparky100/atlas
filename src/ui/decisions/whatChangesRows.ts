@@ -12,17 +12,22 @@
  * concern + boundary crossings + affected-value-stream rows"):
  * - A capability concern becomes up to four independent metric rows
  *   (coverage/lifecycle/criticality/fit — decision 2 in the sprint's own
- *   go-ahead), each collapsing on its own.
+ *   go-ahead), each collapsing on its own. These still compare main's
+ *   *current* head projection against the option's own head projection
+ *   (unchanged by the own-deltas rework below) — see `compareOptions.ts`'s
+ *   own module comment on what that means when main has drifted since the
+ *   option forked.
  * - A system/container concern becomes one outcome row
- *   (unchanged/retired/replaced by X), derived from
- *   `computeVersionDiff` plus a `replaces` edge the diff surfaces as an
- *   *added* relationship whose `toElementId` is this concern (ADR-001's
- *   own `from = replacement, to = retiring element` convention) — no
- *   second calculation, no `replaces`-specific fetch.
+ *   (unchanged/retired/replaced by X), derived from the option's own
+ *   `OptionTouch` (`optionTouch.ts`) — its own `retiredElements` and
+ *   `replacesEdges`, both read off the option's *own* deltas, never a
+ *   version-diff against main (which would conflate the option's own
+ *   changes with independent main-side drift).
  * - Exactly one "boundary crossings" row, scoped per option (decision 1:
  *   at-least-one-endpoint-in-scope) — distinct from the model-wide figure
  *   `DecisionView.tsx` shows as a fixed label alongside this table, never
- *   folded into it.
+ *   folded into it. The scope's own "everything this option touches" half
+ *   is `OptionTouch.touchedElementIds` — own-deltas, not a diff.
  * - One row per value stream reached by *any* row (main or an option) —
  *   "not reached" is a real, comparable state of its own, never the same
  *   as an empty cell.
@@ -31,8 +36,8 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { findBoundaryCrossings } from '../../db/healthFindings';
 import type { ValueStreamTone } from '../valueStreams/valueStreamRollup';
-import type { VersionDiff } from '../../engine/versionDiff';
 import type { CapabilityComparisonMetrics, OptionComparisonRow } from './compareOptions';
+import type { OptionTouch } from './optionTouch';
 
 export interface WhatChangesCell {
   display: string;
@@ -109,26 +114,25 @@ export function buildCapabilityMetricRows(capability: ElementsHeadRow, mainMetri
 
 export type SystemConcernOutcome = { kind: 'unchanged' } | { kind: 'retired' } | { kind: 'replaced'; replacedByName: string };
 
-/** `elementId`'s own outcome on this option, read off `computeVersionDiff(mainHead, optionHead)` — retracted (state `'removed'`) with no `replaces` edge pointing at it is `'retired'`; retracted with one is `'replaced'`, naming the edge's own `fromElementId` (ADR-001: `from = replacement`) via this option's own elements. Anything else (still present, whether `'unchanged'`/`'changed'`/`'moved'`) reads as `'unchanged'` — rule 5 only ever distinguishes these three outcomes, never a fourth "modified" state. */
-export function computeSystemConcernOutcome(elementId: UUID, diff: VersionDiff, optionElementsById: ReadonlyMap<UUID, ElementsHeadRow>): SystemConcernOutcome {
-  const elementDiff = diff.elements.find((e) => e.elementId === elementId);
-  if (elementDiff?.state !== 'removed') return { kind: 'unchanged' };
+/** `elementId`'s own outcome on this option, read off its own `OptionTouch` (`optionTouch.ts`, itself `summarizeOwnDeltas` filtered by delta kind) — retracted by one of this option's own deltas with no `replaces` edge pointing at it is `'retired'`; retracted with one is `'replaced'`, naming the edge's own `fromElementId` (ADR-001: `from = replacement`) via this option's own elements. Anything not retracted by this option's own deltas reads as `'unchanged'` — rule 5 only ever distinguishes these three outcomes, never a fourth "modified" state, and this option never touching the element at all is exactly as "unchanged" as one that touched-but-didn't-retract it. */
+export function computeSystemConcernOutcome(elementId: UUID, touch: OptionTouch, optionElementsById: ReadonlyMap<UUID, ElementsHeadRow>): SystemConcernOutcome {
+  if (!touch.retiredElements.some((e) => e.id === elementId)) return { kind: 'unchanged' };
 
-  const replacesEdge = diff.relationships.find((r) => r.state === 'added' && r.toBe?.relationshipType === 'replaces' && r.toBe.toElementId === elementId);
-  if (!replacesEdge?.toBe) return { kind: 'retired' };
-  const replacedByName = optionElementsById.get(replacesEdge.toBe.fromElementId)?.name ?? replacesEdge.toBe.fromElementId;
+  const replacesEdge = touch.replacesEdges.find((r) => r.toElementId === elementId);
+  if (!replacesEdge) return { kind: 'retired' };
+  const replacedByName = optionElementsById.get(replacesEdge.fromElementId)?.name ?? replacesEdge.fromElementId;
   return { kind: 'replaced', replacedByName };
 }
 
 export interface SystemConcernOptionInput {
-  diff: VersionDiff;
+  touch: OptionTouch;
   elementsById: ReadonlyMap<UUID, ElementsHeadRow>;
 }
 
 export function buildSystemConcernOutcomeRow(element: ElementsHeadRow, optionsInput: ReadonlyMap<UUID, SystemConcernOptionInput>): WhatChangesRow {
   const options = new Map<UUID, WhatChangesCell>();
   for (const [branchId, input] of optionsInput) {
-    const outcome = computeSystemConcernOutcome(element.element_id, input.diff, input.elementsById);
+    const outcome = computeSystemConcernOutcome(element.element_id, input.touch, input.elementsById);
     const display = outcome.kind === 'unchanged' ? 'no change' : outcome.kind === 'retired' ? 'retired' : `replaced by ${outcome.replacedByName}`;
     options.set(branchId, cell(display, outcome.kind !== 'unchanged'));
   }
@@ -162,11 +166,12 @@ export interface ScopedCrossingCounts {
  * supporting a concern capability (on *both* main's and this option's own
  * `supports` edges — a system this option newly added or removed as a
  * supporter still belongs in scope), plus everything this option's own
- * diff touched at all (added/removed/changed — removed elements
- * included, so a retired system's own crossings still count against the
- * *before* picture). Main's own count is computed against this exact same
- * scope, against main's own edges — never the model-wide figure — so "3 →
- * 2" is always a like-with-like comparison (the sprint's own rule 7).
+ * deltas touched at all (`OptionTouch.touchedElementIds` — created,
+ * updated, or retracted; removed elements included, so a retired system's
+ * own crossings still count against the *before* picture). Main's own
+ * count is computed against this exact same scope, against main's own
+ * edges — never the model-wide figure — so "3 → 2" is always a
+ * like-with-like comparison (the sprint's own rule 7).
  */
 export function computeScopedBoundaryCrossings(
   concernElementIds: readonly UUID[],
@@ -176,13 +181,13 @@ export function computeScopedBoundaryCrossings(
   optionRelationshipsHead: readonly RelationshipsHeadRow[],
   mainElementsById: ReadonlyMap<UUID, ElementsHeadRow>,
   optionElementsById: ReadonlyMap<UUID, ElementsHeadRow>,
-  diff: VersionDiff,
+  touch: OptionTouch,
 ): ScopedCrossingCounts {
   const concernIdSet = new Set(concernElementIds);
   const scope = new Set<UUID>(concernElementIds);
   for (const edge of mainSupportsEdges) if (concernIdSet.has(edge.to_element_id)) scope.add(edge.from_element_id);
   for (const edge of optionSupportsEdges) if (concernIdSet.has(edge.to_element_id)) scope.add(edge.from_element_id);
-  for (const e of diff.elements) if (e.state !== 'unchanged') scope.add(e.elementId);
+  for (const id of touch.touchedElementIds) scope.add(id);
 
   const inScope = (edge: RelationshipsHeadRow): boolean => scope.has(edge.from_element_id) || scope.has(edge.to_element_id);
 
@@ -196,7 +201,7 @@ export interface BoundaryCrossingsOptionInput {
   supportsEdges: readonly RelationshipsHeadRow[];
   relationshipsHead: readonly RelationshipsHeadRow[];
   elementsById: ReadonlyMap<UUID, ElementsHeadRow>;
-  diff: VersionDiff;
+  touch: OptionTouch;
 }
 
 export function buildBoundaryCrossingsRow(
@@ -208,7 +213,7 @@ export function buildBoundaryCrossingsRow(
 ): WhatChangesRow {
   const options = new Map<UUID, WhatChangesCell>();
   for (const [branchId, input] of optionsInput) {
-    const counts = computeScopedBoundaryCrossings(concernElementIds, mainSupportsEdges, input.supportsEdges, mainRelationshipsHead, input.relationshipsHead, mainElementsById, input.elementsById, input.diff);
+    const counts = computeScopedBoundaryCrossings(concernElementIds, mainSupportsEdges, input.supportsEdges, mainRelationshipsHead, input.relationshipsHead, mainElementsById, input.elementsById, input.touch);
     const display = formatCountDelta(counts.main, counts.option, (n) => (n === 1 ? 'crossing' : 'crossings'));
     options.set(branchId, cell(display, counts.main !== counts.option));
   }
@@ -266,7 +271,7 @@ export interface WhatChangesOptionInput {
   elementsById: Map<UUID, ElementsHeadRow>;
   relationshipsHead: RelationshipsHeadRow[];
   supportsEdges: RelationshipsHeadRow[];
-  diff: VersionDiff;
+  touch: OptionTouch;
 }
 
 export interface WhatChangesInput {
@@ -291,12 +296,12 @@ export function buildWhatChangesRows(input: WhatChangesInput): WhatChangesRow[] 
   }
 
   for (const element of input.concernSystemsOrContainers) {
-    const optionsInput = new Map(input.options.map((o) => [o.branchId, { diff: o.diff, elementsById: o.elementsById }]));
+    const optionsInput = new Map(input.options.map((o) => [o.branchId, { touch: o.touch, elementsById: o.elementsById }]));
     rows.push(buildSystemConcernOutcomeRow(element, optionsInput));
   }
 
   const concernElementIds = [...input.concernCapabilities, ...input.concernSystemsOrContainers].map((e) => e.element_id);
-  const crossingsInput = new Map(input.options.map((o) => [o.branchId, { supportsEdges: o.supportsEdges, relationshipsHead: o.relationshipsHead, elementsById: o.elementsById, diff: o.diff }]));
+  const crossingsInput = new Map(input.options.map((o) => [o.branchId, { supportsEdges: o.supportsEdges, relationshipsHead: o.relationshipsHead, elementsById: o.elementsById, touch: o.touch }]));
   rows.push(buildBoundaryCrossingsRow(concernElementIds, input.main.supportsEdges, input.main.relationshipsHead, input.main.elementsById, crossingsInput));
 
   const streamNameById = new Map<UUID, string>();

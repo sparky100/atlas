@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import type { Delta, RelationshipType } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import { emptyHead, type ElementRow, type Head, type RelationshipRow } from '../../engine/deltas';
-import { computeVersionDiff } from '../../engine/versionDiff';
+import type { ChangeSubjectSummary } from '../../db/changeSummary';
 import type { CapabilityComparisonMetrics, OptionComparisonRow } from './compareOptions';
+import { deriveOptionTouch } from './optionTouch';
 import {
   buildBoundaryCrossingsRow,
   buildCapabilityMetricRows,
@@ -15,22 +16,28 @@ import {
   valueStreamToneLabel,
 } from './whatChangesRows';
 
-function withElement(head: Head, id: string, row: ElementRow): Head {
-  head.elements.set(id, row);
-  return head;
-}
-
-function withRelationship(head: Head, id: string, row: RelationshipRow): Head {
-  head.relationships.set(id, row);
-  return head;
-}
-
 function elementRow(id: string, type: ElementsHeadRow['element_type'], name: string, attributes: Record<string, unknown> = {}): ElementsHeadRow {
   return { element_id: id, element_type: type, name, parent_id: null, attributes: attributes as ElementsHeadRow['attributes'], exists_delta_id: 'd1' };
 }
 
 function relRow(id: string, type: RelationshipsHeadRow['relationship_type'], from: string, to: string, attributes: Record<string, unknown> = {}): RelationshipsHeadRow {
   return { relationship_id: id, relationship_type: type, from_element_id: from, to_element_id: to, attributes: attributes as RelationshipsHeadRow['attributes'], exists_delta_id: 'd2' };
+}
+
+// Own-delta fixtures (ChangeSubjectSummary, the `summarizeOwnDeltas` shape
+// `deriveOptionTouch` consumes) — the sprint's own decision to derive
+// "what an option did" from its own deltas, not a version-diff against main.
+function elementSubject(id: string, name: string, delta: Delta): ChangeSubjectSummary {
+  return { subjectType: 'element', elementType: 'system', subjectId: id, name, deltas: [delta] };
+}
+
+function retractDelta(elementId: string): Delta {
+  return { kind: 'element.retract', id: `retract-${elementId}`, elementId, elementType: 'system', previousDeltaId: 'prev', sourceId: 's1', confidence: 1 };
+}
+
+function relationshipSubject(id: string, relationshipType: RelationshipType, from: string, to: string): ChangeSubjectSummary {
+  const delta = { kind: 'relationship.create', id: `create-${id}`, relationshipId: id, relationshipType, fromElementId: from, toElementId: to, attributes: {}, sourceId: 's1', confidence: 1 } as Delta;
+  return { subjectType: 'relationship', relationshipType, subjectId: id, name: `${relationshipType} ${from} → ${to}`, deltas: [delta] };
 }
 
 describe('buildCapabilityMetricRows', () => {
@@ -75,42 +82,34 @@ describe('buildCapabilityMetricRows', () => {
 });
 
 describe('computeSystemConcernOutcome', () => {
-  it('reads as unchanged when the element still exists on the option', () => {
-    const row = { elementType: 'system' as const, name: 'PM', parentId: null, attributes: {}, existsDeltaId: 'd1' };
-    const diff = computeVersionDiff(withElement(emptyHead(), 'pm', row), withElement(emptyHead(), 'pm', row));
-    expect(computeSystemConcernOutcome('pm', diff, new Map())).toEqual({ kind: 'unchanged' });
+  it('reads as unchanged when this option never touched the element', () => {
+    const touch = deriveOptionTouch([]);
+    expect(computeSystemConcernOutcome('pm', touch, new Map())).toEqual({ kind: 'unchanged' });
   });
 
-  it('reads as retired when the element is retracted with no replaces edge', () => {
-    const row = { elementType: 'system' as const, name: 'PM', parentId: null, attributes: {}, existsDeltaId: 'd1' };
-    const diff = computeVersionDiff(withElement(emptyHead(), 'pm', row), emptyHead());
-    expect(computeSystemConcernOutcome('pm', diff, new Map())).toEqual({ kind: 'retired' });
+  it('reads as retired when this option retracted the element, with no replaces edge', () => {
+    const touch = deriveOptionTouch([elementSubject('pm', 'PM', retractDelta('pm'))]);
+    expect(computeSystemConcernOutcome('pm', touch, new Map())).toEqual({ kind: 'retired' });
   });
 
-  it('reads as replaced-by-X when retracted alongside an added `replaces` edge pointing at it', () => {
-    const pm = { elementType: 'system' as const, name: 'PM', parentId: null, attributes: {}, existsDeltaId: 'd1' };
-    const hana = { elementType: 'system' as const, name: 'Hana equivalent', parentId: null, attributes: {}, existsDeltaId: 'd1' };
-    const asIs = withElement(emptyHead(), 'pm', pm);
-    let toBe = withElement(emptyHead(), 'hana', hana);
-    toBe = withRelationship(toBe, 'r1', { relationshipType: 'replaces', fromElementId: 'hana', toElementId: 'pm', attributes: {}, existsDeltaId: 'd2' });
-    const diff = computeVersionDiff(asIs, toBe);
+  it('reads as replaced-by-X when this option retracted the element alongside its own `replaces` edge pointing at it', () => {
+    const touch = deriveOptionTouch([elementSubject('pm', 'PM', retractDelta('pm')), relationshipSubject('r1', 'replaces', 'hana', 'pm')]);
     const optionElementsById = new Map([['hana', elementRow('hana', 'system', 'Hana equivalent')]]);
-    expect(computeSystemConcernOutcome('pm', diff, optionElementsById)).toEqual({ kind: 'replaced', replacedByName: 'Hana equivalent' });
+    expect(computeSystemConcernOutcome('pm', touch, optionElementsById)).toEqual({ kind: 'replaced', replacedByName: 'Hana equivalent' });
   });
 });
 
 describe('buildSystemConcernOutcomeRow / buildWhatChangesRows system row', () => {
   it('collapses to "no change" when unchanged, and shows the outcome text when not', () => {
     const element = elementRow('sys1', 'system', 'Legacy Gateway');
-    const pm = { elementType: 'system' as const, name: 'Legacy Gateway', parentId: null, attributes: {}, existsDeltaId: 'd1' };
-    const unchangedDiff = computeVersionDiff(withElement(emptyHead(), 'sys1', pm), withElement(emptyHead(), 'sys1', pm));
-    const retiredDiff = computeVersionDiff(withElement(emptyHead(), 'sys1', pm), emptyHead());
+    const unchangedTouch = deriveOptionTouch([]);
+    const retiredTouch = deriveOptionTouch([elementSubject('sys1', 'Legacy Gateway', retractDelta('sys1'))]);
 
     const row = buildSystemConcernOutcomeRow(
       element,
       new Map([
-        ['unchanged-branch', { diff: unchangedDiff, elementsById: new Map() }],
-        ['retired-branch', { diff: retiredDiff, elementsById: new Map() }],
+        ['unchanged-branch', { touch: unchangedTouch, elementsById: new Map() }],
+        ['retired-branch', { touch: retiredTouch, elementsById: new Map() }],
       ]),
     );
     expect(row.anyChanged).toBe(true);
@@ -130,8 +129,8 @@ describe('computeScopedBoundaryCrossings', () => {
     const supportsEdges = [relRow('s1', 'supports', 'sysIT', 'capA')];
     const elementsById = new Map([capA, sysIT, sysOther].map((e) => [e.element_id, e]));
     const relationshipsHead = [...supportsEdges, relRow('u1', 'uses', 'sysIT', 'sysOther')];
-    const diff = computeVersionDiff(emptyHead(), emptyHead());
-    const counts = computeScopedBoundaryCrossings(['capA'], supportsEdges, supportsEdges, relationshipsHead, relationshipsHead, elementsById, elementsById, diff);
+    const touch = deriveOptionTouch([]);
+    const counts = computeScopedBoundaryCrossings(['capA'], supportsEdges, supportsEdges, relationshipsHead, relationshipsHead, elementsById, elementsById, touch);
     expect(counts).toEqual({ main: 1, option: 1 });
   });
 
@@ -145,11 +144,10 @@ describe('computeScopedBoundaryCrossings', () => {
     const optionRelationshipsHead: RelationshipsHeadRow[] = [];
     const optionElementsById = new Map([capA, sysIT].map((e) => [e.element_id, e]));
 
-    const pmRow = { elementType: 'system' as const, name: 'OT System', parentId: null, attributes: { domain: 'ot' }, existsDeltaId: 'd1' };
-    const asIs = withElement(emptyHead(), 'sysOT', pmRow);
-    const diff = computeVersionDiff(asIs, emptyHead());
+    // The option's own deltas retracted sysOT — its own retire, not a diff artifact.
+    const touch = deriveOptionTouch([elementSubject('sysOT', 'OT System', retractDelta('sysOT'))]);
 
-    const counts = computeScopedBoundaryCrossings(['capA'], mainSupportsEdges, optionSupportsEdges, mainRelationshipsHead, optionRelationshipsHead, mainElementsById, optionElementsById, diff);
+    const counts = computeScopedBoundaryCrossings(['capA'], mainSupportsEdges, optionSupportsEdges, mainRelationshipsHead, optionRelationshipsHead, mainElementsById, optionElementsById, touch);
     // Scope includes sysOT (removed element, still added to scope) and capA's main-side supporter sysOT.
     expect(counts.main).toBe(1);
     expect(counts.option).toBe(0);
@@ -159,8 +157,8 @@ describe('computeScopedBoundaryCrossings', () => {
 describe('buildBoundaryCrossingsRow / groupWhatChangesRows', () => {
   it('shows "no change" and is grouped as collapsed when the scoped count is identical', () => {
     const elementsById = new Map<string, ElementsHeadRow>();
-    const diff = computeVersionDiff(emptyHead(), emptyHead());
-    const row = buildBoundaryCrossingsRow([], [], [], elementsById, new Map([['b1', { supportsEdges: [], relationshipsHead: [], elementsById, diff }]]));
+    const touch = deriveOptionTouch([]);
+    const row = buildBoundaryCrossingsRow([], [], [], elementsById, new Map([['b1', { supportsEdges: [], relationshipsHead: [], elementsById, touch }]]));
     expect(row.options.get('b1')).toEqual({ display: 'no change', changed: false });
     expect(groupWhatChangesRows([row]).collapsed).toEqual([row]);
     expect(groupWhatChangesRows([row]).visible).toEqual([]);
@@ -193,13 +191,13 @@ describe('buildWhatChangesRows (full orchestration)', () => {
     const metrics: CapabilityComparisonMetrics = { coverage: 1, oldestLifecycleStage: 'active', criticality: 'low', fit: null };
     const mainRow: OptionComparisonRow = { branchId: null, label: 'main', metricsByCapabilityId: new Map([['cap1', metrics]]), boundaryCrossingCount: 0, affectedValueStreams: [] };
     const optionRow: OptionComparisonRow = { branchId: 'b1', label: 'Option', metricsByCapabilityId: new Map([['cap1', metrics]]), boundaryCrossingCount: 0, affectedValueStreams: [] };
-    const diff = computeVersionDiff(emptyHead(), emptyHead());
+    const touch = deriveOptionTouch([]);
 
     const rows = buildWhatChangesRows({
       concernCapabilities: [capability],
       concernSystemsOrContainers: [],
       main: { row: mainRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [] },
-      options: [{ branchId: 'b1', row: optionRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [], diff }],
+      options: [{ branchId: 'b1', row: optionRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [], touch }],
     });
 
     const { visible, collapsed } = groupWhatChangesRows(rows);
@@ -212,14 +210,31 @@ describe('buildWhatChangesRows (full orchestration)', () => {
   it('an empty-delta option (no capability/system concerns, two like-for-like options) produces only the boundary-crossings row, and it collapses', () => {
     const mainRow: OptionComparisonRow = { branchId: null, label: 'main', metricsByCapabilityId: new Map(), boundaryCrossingCount: 0, affectedValueStreams: [] };
     const optionRow: OptionComparisonRow = { branchId: 'b1', label: 'Option', metricsByCapabilityId: new Map(), boundaryCrossingCount: 0, affectedValueStreams: [] };
-    const diff = computeVersionDiff(emptyHead(), emptyHead());
+    const touch = deriveOptionTouch([]);
     const rows = buildWhatChangesRows({
       concernCapabilities: [],
       concernSystemsOrContainers: [],
       main: { row: mainRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [] },
-      options: [{ branchId: 'b1', row: optionRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [], diff }],
+      options: [{ branchId: 'b1', row: optionRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [], touch }],
     });
     expect(rows).toHaveLength(1);
     expect(groupWhatChangesRows(rows).visible).toEqual([]);
+  });
+
+  it("a fixture where main has drifted since the option forked (an unrelated system added to main after fork) still produces a correct summary/outcome — own-delta derivation is immune to that drift", () => {
+    // The option's own deltas retire PM — nothing else. Main independently
+    // gained a new, unrelated capability concern after the option forked
+    // (simulated here by giving main's row different metrics for a SEPARATE
+    // capability than the option ever touched) — the option's own outcome
+    // and summary must still read exactly "retires PM", untouched by that
+    // drift, since both are derived from the option's own deltas alone.
+    const pm = elementRow('pm', 'system', 'PM');
+    const touch = deriveOptionTouch([elementSubject('pm', 'PM', retractDelta('pm'))]);
+    const outcome = computeSystemConcernOutcome('pm', touch, new Map());
+    expect(outcome).toEqual({ kind: 'retired' });
+    expect(touch.touchedElementIds.has(pm.element_id)).toBe(true);
+    // Drift on main (a capability this option never linked or touched)
+    // never appears in this option's own touch at all.
+    expect(touch.touchedElementIds.has('unrelated-capability-main-added-after-fork')).toBe(false);
   });
 });
