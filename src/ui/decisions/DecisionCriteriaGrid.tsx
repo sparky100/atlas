@@ -14,14 +14,12 @@ export interface DecisionCriteriaOption {
 }
 
 export interface DecisionCriteriaGridProps {
+  modelId: UUID;
   decisionId: UUID;
   options: DecisionCriteriaOption[];
-  ratings: DecisionOptionRatingRow[];
   /** `canRateDecisionOption` at the call site — decision-status-and-role gated, same as `canAddOption`/`canChoose`. `false` renders every cell read-only, with no tap affordance at all (the grid at time-of-choosing still needs to render, just never editable). */
   canRate: boolean;
   userId: UUID | null;
-  /** The caller's own `reload()` — a saved rating re-fetches the whole page's data, same "one source of truth" pattern `useDecisionOptions.ts` already uses. */
-  onRated: () => void;
 }
 
 interface EditingCell {
@@ -40,8 +38,9 @@ interface EditingCell {
  * per-cell popover) so the editor never has to fit inside a narrow table
  * cell at the ~380px width this sprint's own constraint names.
  */
-export function DecisionCriteriaGrid({ decisionId, options, ratings, canRate, userId, onRated }: DecisionCriteriaGridProps) {
-  const ratingsState = useDecisionRatings(onRated);
+export function DecisionCriteriaGrid({ modelId, decisionId, options, canRate, userId }: DecisionCriteriaGridProps) {
+  const ratingsState = useDecisionRatings(modelId, decisionId);
+  const ratings = ratingsState.ratings;
   const [editing, setEditing] = useState<EditingCell | null>(null);
   const [levelDraft, setLevelDraft] = useState<DecisionRatingLevel | null>(null);
   const [noteDraft, setNoteDraft] = useState('');

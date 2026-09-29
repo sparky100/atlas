@@ -84,7 +84,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   if (state.status === 'not_found') return <Text as="p">No decision found for this id.</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 
-  const { decision, linkedElementsById, linkedBranchesById, args, ratings } = state;
+  const { decision, linkedElementsById, linkedBranchesById, args } = state;
   const canAddOption = canCreateChangeBranch(role) && decision.status === 'proposed';
   const canChoose = canChooseDecisionOption(role) && decision.status === 'proposed';
   const canRate = canRateDecisionOption(role, decision);
@@ -277,12 +277,11 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               Criteria
             </Text>
             <DecisionCriteriaGrid
+              modelId={modelId}
               decisionId={decisionId}
               options={comparisonOptions.map((o) => ({ branchId: o.branchId, label: o.label }))}
-              ratings={ratings}
               canRate={canRate}
               userId={userId}
-              onRated={reload}
             />
           </div>
         )}
