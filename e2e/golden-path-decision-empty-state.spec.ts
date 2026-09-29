@@ -44,4 +44,14 @@ test('two like-for-like options with no commits of their own show the empty-stat
   // boundary-crossings row), every row collapses and the table's own
   // empty-state sentence shows instead of an empty table.
   await expect(page.getByText("These options don't change the structure of anything in scope.")).toBeVisible();
+
+  // Item 10 (sticky column, phone width): at a narrow viewport, the
+  // criteria grid's own two option-header columns (`DecisionCriteriaGrid.module.css`'s
+  // `.tableWrap`) must never widen the *page* itself — its own
+  // `overflow-x: auto` absorbs any width the columns need, the same
+  // established check every other narrow-viewport spec in this directory
+  // uses (`element-browse-sticky-header.engine.spec.ts`).
+  await page.setViewportSize({ width: 380, height: 800 });
+  const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+  expect(hasHorizontalOverflow).toBe(false);
 });
