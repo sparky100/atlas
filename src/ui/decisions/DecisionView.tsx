@@ -367,7 +367,14 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                             <th>Row</th>
                             <th>{comparison.main.label}</th>
                             {comparison.options.map((o) => (
-                              <th key={o.branchId}>{o.label}</th>
+                              <th key={o.branchId}>
+                                {o.label}
+                                {o.branchId !== null && comparison.mainDriftedByBranchId.has(o.branchId) && (
+                                  <Text as="p" size="sm" tone="muted">
+                                    Main has moved since this option branched
+                                  </Text>
+                                )}
+                              </th>
                             ))}
                           </tr>
                         </thead>

@@ -48,22 +48,25 @@ describe('buildCapabilityMetricRows', () => {
   const capability = elementRow('cap1', 'capability', 'Outage Management');
   const mainMetrics: CapabilityComparisonMetrics = { coverage: 3, oldestLifecycleStage: 'active', criticality: 'high', fit: 'poor' };
 
+  function optionInput(metrics: CapabilityComparisonMetrics | undefined, beforeMetrics: CapabilityComparisonMetrics | undefined = mainMetrics) {
+    return new Map([['b1', { metrics, beforeMetrics }]]);
+  }
+
   it('produces exactly four rows (coverage, lifecycle, criticality, fit), each grouped under the capability name', () => {
     const rows = buildCapabilityMetricRows(capability, mainMetrics, new Map());
     expect(rows.map((r) => r.rowLabel)).toEqual(['Coverage', 'Lifecycle', 'Criticality', 'Fit']);
     expect(rows.every((r) => r.groupLabel === 'Outage Management')).toBe(true);
   });
 
-  it('collapses (anyChanged: false) when every option matches main on every metric', () => {
-    const optionMetrics = new Map([['b1', mainMetrics]]);
-    const rows = buildCapabilityMetricRows(capability, mainMetrics, optionMetrics);
+  it('collapses (anyChanged: false) when every option matches its own before-metrics on every metric', () => {
+    const rows = buildCapabilityMetricRows(capability, mainMetrics, optionInput(mainMetrics));
     expect(rows.every((r) => !r.anyChanged)).toBe(true);
     expect(rows.every((r) => r.options.get('b1')?.display === 'no change')).toBe(true);
   });
 
   it('shows a delta and anyChanged: true for a metric that differs, independently per metric', () => {
     const changed: CapabilityComparisonMetrics = { coverage: 2, oldestLifecycleStage: 'active', criticality: 'high', fit: 'poor' };
-    const rows = buildCapabilityMetricRows(capability, mainMetrics, new Map([['b1', changed]]));
+    const rows = buildCapabilityMetricRows(capability, mainMetrics, optionInput(changed));
     const coverageRow = rows.find((r) => r.rowLabel === 'Coverage');
     const lifecycleRow = rows.find((r) => r.rowLabel === 'Lifecycle');
     expect(coverageRow?.anyChanged).toBe(true);
@@ -73,15 +76,30 @@ describe('buildCapabilityMetricRows', () => {
 
   it('an unrated fit (null) never reads as equal to a rated one, and displays "not rated"', () => {
     const unrated: CapabilityComparisonMetrics = { coverage: 3, oldestLifecycleStage: 'active', criticality: 'high', fit: null };
-    const rows = buildCapabilityMetricRows(capability, mainMetrics, new Map([['b1', unrated]]));
+    const rows = buildCapabilityMetricRows(capability, mainMetrics, optionInput(unrated));
     const fitRow = rows.find((r) => r.rowLabel === 'Fit');
     expect(fitRow?.anyChanged).toBe(true);
     expect(fitRow?.options.get('b1')?.display).toBe('poor → not rated');
   });
 
   it('an option missing from metricsByCapabilityId (capability not resolved there) reads as all-zero/unrated, not a crash', () => {
-    const rows = buildCapabilityMetricRows(capability, mainMetrics, new Map([['b1', undefined]]));
+    const rows = buildCapabilityMetricRows(capability, mainMetrics, optionInput(undefined));
     expect(rows.find((r) => r.rowLabel === 'Coverage')?.options.get('b1')?.display).toBe('3 → 0 systems (-3)');
+  });
+
+  it("decision-side-completion (drift-proofing): an option's delta compares against its OWN before-metrics (main folded at its own fork point), never the current-main figure shown in the \"Current (main)\" column — main drifting to a different current value after the option forked changes nothing about this row", () => {
+    // Main has drifted to 5 systems since this option forked; the option's
+    // own fork-point snapshot of main still reads 3 (unchanged from
+    // `mainMetrics`), and the option itself now has 3 (no real change of
+    // its own). If the row compared against current main (5), this would
+    // wrongly show a change the option never made; comparing against the
+    // option's own before-metrics (3) correctly reads "no change".
+    const currentMain: CapabilityComparisonMetrics = { coverage: 5, oldestLifecycleStage: 'active', criticality: 'high', fit: 'poor' };
+    const optionOwnMetrics: CapabilityComparisonMetrics = { coverage: 3, oldestLifecycleStage: 'active', criticality: 'high', fit: 'poor' };
+    const rows = buildCapabilityMetricRows(capability, currentMain, optionInput(optionOwnMetrics, mainMetrics));
+    const coverageRow = rows.find((r) => r.rowLabel === 'Coverage');
+    expect(coverageRow?.main.display).toBe('5 systems'); // "Current (main)" column shows the real current figure...
+    expect(coverageRow?.options.get('b1')).toEqual({ display: 'no change', changed: false }); // ...but the option's own row is unaffected by that drift.
   });
 });
 
@@ -187,7 +205,10 @@ describe('buildBoundaryCrossingsRow / groupWhatChangesRows', () => {
   it('shows "no change" and is grouped as collapsed when the scoped count is identical', () => {
     const elementsById = new Map<string, ElementsHeadRow>();
     const touch = deriveOptionTouch([], elementsById, []);
-    const row = buildBoundaryCrossingsRow([], [], [], elementsById, new Map([['b1', { supportsEdges: [], relationshipsHead: [], elementsById, touch }]]));
+    const row = buildBoundaryCrossingsRow(
+      [],
+      new Map([['b1', { supportsEdges: [], relationshipsHead: [], elementsById, touch, mainAtForkSupportsEdges: [], mainAtForkRelationshipsHead: [], mainAtForkElementsById: elementsById }]]),
+    );
     expect(row.options.get('b1')).toEqual({ display: 'no change', changed: false });
     expect(groupWhatChangesRows([row]).collapsed).toEqual([row]);
     expect(groupWhatChangesRows([row]).visible).toEqual([]);
@@ -226,7 +247,7 @@ describe('buildWhatChangesRows (full orchestration)', () => {
       concernCapabilities: [capability],
       concernSystemsOrContainers: [],
       main: { row: mainRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [] },
-      options: [{ branchId: 'b1', row: optionRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [], touch }],
+      options: [{ branchId: 'b1', row: optionRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [], touch, mainAtFork: { row: mainRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [] } }],
     });
 
     const { visible, collapsed } = groupWhatChangesRows(rows);
@@ -244,7 +265,7 @@ describe('buildWhatChangesRows (full orchestration)', () => {
       concernCapabilities: [],
       concernSystemsOrContainers: [],
       main: { row: mainRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [] },
-      options: [{ branchId: 'b1', row: optionRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [], touch }],
+      options: [{ branchId: 'b1', row: optionRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [], touch, mainAtFork: { row: mainRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [] } }],
     });
     expect(rows).toHaveLength(1);
     expect(groupWhatChangesRows(rows).visible).toEqual([]);

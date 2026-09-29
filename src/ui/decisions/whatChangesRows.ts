@@ -12,11 +12,12 @@
  * concern + boundary crossings + affected-value-stream rows"):
  * - A capability concern becomes up to four independent metric rows
  *   (coverage/lifecycle/criticality/fit — decision 2 in the sprint's own
- *   go-ahead), each collapsing on its own. These still compare main's
- *   *current* head projection against the option's own head projection
- *   (unchanged by the own-deltas rework below) — see `compareOptions.ts`'s
- *   own module comment on what that means when main has drifted since the
- *   option forked.
+ *   go-ahead), each collapsing on its own. Each option's own "before" side
+ *   for these rows is main folded at *that option's own* `baseCommitId`
+ *   (its fork point), never main's current head — a decision-side-
+ *   completion item, drift-proofing what used to compare against a moving
+ *   target. See `compareOptions.ts`'s own module comment for the fold and
+ *   the drift-note this makes possible.
  * - A system/container concern becomes one outcome row (unchanged/retired/
  *   replaced by X/removed from model), derived from the option's own
  *   `OptionTouch` (`optionTouch.ts`) — its own `lifecycleRetiredElements`,
@@ -28,10 +29,14 @@
  *   at-least-one-endpoint-in-scope) — distinct from the model-wide figure
  *   `DecisionView.tsx` shows as a fixed label alongside this table, never
  *   folded into it. The scope's own "everything this option touches" half
- *   is `OptionTouch.touchedElementIds` — own-deltas, not a diff.
+ *   is `OptionTouch.touchedElementIds` — own-deltas, not a diff. Main's own
+ *   scoped *count* is, like the metric rows above, computed against main
+ *   folded at this option's own fork point, not main's current head.
  * - One row per value stream reached by *any* row (main or an option) —
  *   "not reached" is a real, comparable state of its own, never the same
- *   as an empty cell.
+ *   as an empty cell. Deliberately NOT drift-proofed the same way — the
+ *   sprint's own decision-side-completion item scopes that fix to the
+ *   capability metric rows and the crossing count only.
  */
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
@@ -79,16 +84,24 @@ function formatCategoricalDelta(before: string | null, after: string | null): st
 // Capability concern -> up to four independent metric rows
 // ---------------------------------------------------------------------------
 
-export function buildCapabilityMetricRows(capability: ElementsHeadRow, mainMetrics: CapabilityComparisonMetrics | undefined, optionMetrics: ReadonlyMap<UUID, CapabilityComparisonMetrics | undefined>): WhatChangesRow[] {
-  const mainCoverage = mainMetrics?.coverage ?? 0;
-  const mainLifecycle = mainMetrics?.oldestLifecycleStage ?? null;
-  const mainCriticality = mainMetrics?.criticality ?? null;
-  const mainFit = mainMetrics?.fit ?? null;
+export interface CapabilityMetricOptionInput {
+  /** This option's own (after) metrics. */
+  metrics: CapabilityComparisonMetrics | undefined;
+  /** Main folded at *this option's own* `baseCommitId` (its fork point) — the "before" side these rows actually compare against, drift-proofed against main's current head moving independently after the fork. */
+  beforeMetrics: CapabilityComparisonMetrics | undefined;
+}
 
-  function buildRow(rowLabel: string, mainDisplay: string, pick: (m: CapabilityComparisonMetrics | undefined) => string): WhatChangesRow {
+/** `currentMainMetrics` is main's *current* head — used only for the "Current (main)" column's own absolute display value (what main looks like right now), never for the delta text or `anyChanged` — those come from each option's own `beforeMetrics` instead, per this file's own module comment. */
+export function buildCapabilityMetricRows(capability: ElementsHeadRow, currentMainMetrics: CapabilityComparisonMetrics | undefined, optionsInput: ReadonlyMap<UUID, CapabilityMetricOptionInput>): WhatChangesRow[] {
+  const currentMainCoverage = currentMainMetrics?.coverage ?? 0;
+  const currentMainLifecycle = currentMainMetrics?.oldestLifecycleStage ?? null;
+  const currentMainCriticality = currentMainMetrics?.criticality ?? null;
+  const currentMainFit = currentMainMetrics?.fit ?? null;
+
+  function buildRow(rowLabel: string, mainDisplay: string, pick: (input: CapabilityMetricOptionInput) => string): WhatChangesRow {
     const options = new Map<UUID, WhatChangesCell>();
-    for (const [branchId, metrics] of optionMetrics) {
-      const display = pick(metrics);
+    for (const [branchId, input] of optionsInput) {
+      const display = pick(input);
       options.set(branchId, cell(display, display !== 'no change'));
     }
     return {
@@ -102,10 +115,10 @@ export function buildCapabilityMetricRows(capability: ElementsHeadRow, mainMetri
   }
 
   return [
-    buildRow('Coverage', `${String(mainCoverage)} ${mainCoverage === 1 ? 'system' : 'systems'}`, (m) => formatCountDelta(mainCoverage, m?.coverage ?? 0, (n) => (n === 1 ? 'system' : 'systems'))),
-    buildRow('Lifecycle', mainLifecycle ?? UNRATED_LABEL, (m) => formatCategoricalDelta(mainLifecycle, m?.oldestLifecycleStage ?? null)),
-    buildRow('Criticality', mainCriticality ?? UNRATED_LABEL, (m) => formatCategoricalDelta(mainCriticality, m?.criticality ?? null)),
-    buildRow('Fit', mainFit ?? UNRATED_LABEL, (m) => formatCategoricalDelta(mainFit, m?.fit ?? null)),
+    buildRow('Coverage', `${String(currentMainCoverage)} ${currentMainCoverage === 1 ? 'system' : 'systems'}`, (input) => formatCountDelta(input.beforeMetrics?.coverage ?? 0, input.metrics?.coverage ?? 0, (n) => (n === 1 ? 'system' : 'systems'))),
+    buildRow('Lifecycle', currentMainLifecycle ?? UNRATED_LABEL, (input) => formatCategoricalDelta(input.beforeMetrics?.oldestLifecycleStage ?? null, input.metrics?.oldestLifecycleStage ?? null)),
+    buildRow('Criticality', currentMainCriticality ?? UNRATED_LABEL, (input) => formatCategoricalDelta(input.beforeMetrics?.criticality ?? null, input.metrics?.criticality ?? null)),
+    buildRow('Fit', currentMainFit ?? UNRATED_LABEL, (input) => formatCategoricalDelta(input.beforeMetrics?.fit ?? null, input.metrics?.fit ?? null)),
   ];
 }
 
@@ -198,6 +211,12 @@ export interface ScopedCrossingCounts {
  * count is computed against this exact same scope, against main's own
  * edges — never the model-wide figure — so "3 → 2" is always a
  * like-with-like comparison (the sprint's own rule 7).
+ *
+ * "Main" here is caller-supplied (`mainSupportsEdges`/`mainRelationshipsHead`/
+ * `mainElementsById`) — this function is agnostic to *which* main
+ * projection that is. `buildBoundaryCrossingsRow` passes each option's own
+ * fork-point main, drift-proofing `counts.main` the same way the
+ * capability metric rows are.
  */
 export function computeScopedBoundaryCrossings(
   concernElementIds: readonly UUID[],
@@ -228,18 +247,16 @@ export interface BoundaryCrossingsOptionInput {
   relationshipsHead: readonly RelationshipsHeadRow[];
   elementsById: ReadonlyMap<UUID, ElementsHeadRow>;
   touch: OptionTouch;
+  /** Main folded at *this option's own* `baseCommitId` (its fork point) — the "before" side `counts.main` actually compares against, same drift-proofing as the capability metric rows. Each option carries its own, since different options can fork at different points. */
+  mainAtForkSupportsEdges: readonly RelationshipsHeadRow[];
+  mainAtForkRelationshipsHead: readonly RelationshipsHeadRow[];
+  mainAtForkElementsById: ReadonlyMap<UUID, ElementsHeadRow>;
 }
 
-export function buildBoundaryCrossingsRow(
-  concernElementIds: readonly UUID[],
-  mainSupportsEdges: readonly RelationshipsHeadRow[],
-  mainRelationshipsHead: readonly RelationshipsHeadRow[],
-  mainElementsById: ReadonlyMap<UUID, ElementsHeadRow>,
-  optionsInput: ReadonlyMap<UUID, BoundaryCrossingsOptionInput>,
-): WhatChangesRow {
+export function buildBoundaryCrossingsRow(concernElementIds: readonly UUID[], optionsInput: ReadonlyMap<UUID, BoundaryCrossingsOptionInput>): WhatChangesRow {
   const options = new Map<UUID, WhatChangesCell>();
   for (const [branchId, input] of optionsInput) {
-    const counts = computeScopedBoundaryCrossings(concernElementIds, mainSupportsEdges, input.supportsEdges, mainRelationshipsHead, input.relationshipsHead, mainElementsById, input.elementsById, input.touch);
+    const counts = computeScopedBoundaryCrossings(concernElementIds, input.mainAtForkSupportsEdges, input.supportsEdges, input.mainAtForkRelationshipsHead, input.relationshipsHead, input.mainAtForkElementsById, input.elementsById, input.touch);
     const display = formatCountDelta(counts.main, counts.option, (n) => (n === 1 ? 'crossing' : 'crossings'));
     options.set(branchId, cell(display, counts.main !== counts.option));
   }
@@ -298,11 +315,19 @@ export interface WhatChangesOptionInput {
   relationshipsHead: RelationshipsHeadRow[];
   supportsEdges: RelationshipsHeadRow[];
   touch: OptionTouch;
+  /** Main folded at *this option's own* `baseCommitId` — the drift-proof "before" side for this option's own capability metric rows and scoped-crossing count (`compareOptions.ts`'s own module comment). */
+  mainAtFork: {
+    row: OptionComparisonRow;
+    elementsById: Map<UUID, ElementsHeadRow>;
+    relationshipsHead: RelationshipsHeadRow[];
+    supportsEdges: RelationshipsHeadRow[];
+  };
 }
 
 export interface WhatChangesInput {
   concernCapabilities: readonly ElementsHeadRow[];
   concernSystemsOrContainers: readonly ElementsHeadRow[];
+  /** Main's *current* head — used only for the "Current (main)" column's own display and the value-stream rows (deliberately not drift-proofed, per this file's own module comment). */
   main: {
     row: OptionComparisonRow;
     elementsById: Map<UUID, ElementsHeadRow>;
@@ -317,8 +342,10 @@ export function buildWhatChangesRows(input: WhatChangesInput): WhatChangesRow[] 
   const rows: WhatChangesRow[] = [];
 
   for (const capability of input.concernCapabilities) {
-    const optionMetrics = new Map(input.options.map((o) => [o.branchId, o.row.metricsByCapabilityId.get(capability.element_id)]));
-    rows.push(...buildCapabilityMetricRows(capability, input.main.row.metricsByCapabilityId.get(capability.element_id), optionMetrics));
+    const optionsInput = new Map(
+      input.options.map((o) => [o.branchId, { metrics: o.row.metricsByCapabilityId.get(capability.element_id), beforeMetrics: o.mainAtFork.row.metricsByCapabilityId.get(capability.element_id) }]),
+    );
+    rows.push(...buildCapabilityMetricRows(capability, input.main.row.metricsByCapabilityId.get(capability.element_id), optionsInput));
   }
 
   for (const element of input.concernSystemsOrContainers) {
@@ -327,8 +354,21 @@ export function buildWhatChangesRows(input: WhatChangesInput): WhatChangesRow[] 
   }
 
   const concernElementIds = [...input.concernCapabilities, ...input.concernSystemsOrContainers].map((e) => e.element_id);
-  const crossingsInput = new Map(input.options.map((o) => [o.branchId, { supportsEdges: o.supportsEdges, relationshipsHead: o.relationshipsHead, elementsById: o.elementsById, touch: o.touch }]));
-  rows.push(buildBoundaryCrossingsRow(concernElementIds, input.main.supportsEdges, input.main.relationshipsHead, input.main.elementsById, crossingsInput));
+  const crossingsInput = new Map(
+    input.options.map((o) => [
+      o.branchId,
+      {
+        supportsEdges: o.supportsEdges,
+        relationshipsHead: o.relationshipsHead,
+        elementsById: o.elementsById,
+        touch: o.touch,
+        mainAtForkSupportsEdges: o.mainAtFork.supportsEdges,
+        mainAtForkRelationshipsHead: o.mainAtFork.relationshipsHead,
+        mainAtForkElementsById: o.mainAtFork.elementsById,
+      },
+    ]),
+  );
+  rows.push(buildBoundaryCrossingsRow(concernElementIds, crossingsInput));
 
   const streamNameById = new Map<UUID, string>();
   for (const r of input.main.row.affectedValueStreams) streamNameById.set(r.stream.element_id, r.stream.name);
