@@ -163,6 +163,21 @@ export function worstFitForPurpose(capabilityId: UUID, supportsEdges: readonly R
   return worst;
 }
 
+/**
+ * This capability's own direct `supports` edges rated exactly `poor` — the
+ * edge-level detail `worstFitForPurpose`'s single worst-value summary
+ * doesn't carry. Needed by the director door's own "poor fit" pill
+ * (`src/db/modelHome.ts`'s `buildCapabilityTiles`) to check each poor
+ * edge's own supporter against a planned replacement (`groupPlannedReplacementsByCapability`),
+ * the same per-edge check `findCapabilitiesWithPoorFitPrimarySupporter`
+ * (`src/db/healthFindings.ts`) already makes for its own, primary-only
+ * finding — this reuses the identical `fitForPurposeOf` read, just without
+ * that finding's own `role === 'primary'` restriction.
+ */
+export function poorFitSupportsEdges(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[]): RelationshipsHeadRow[] {
+  return supportsEdges.filter((edge) => edge.to_element_id === capabilityId && fitForPurposeOf(edge) === 'poor');
+}
+
 /** `worstFitForPurpose` maximised over a set of descendant capability ids — a poor rating anywhere below makes the group read as poor. */
 export function worstFitForPurposeAcross(descendantCapabilityIds: readonly UUID[], supportsEdges: readonly RelationshipsHeadRow[]): FitForPurpose | null {
   let worst: FitForPurpose | null = null;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateTileColourFor, lifecycleExposure, oldestLifecycleStage, otShareOf, resolveDefaultColourBy, supportingSystemIds, tileColourFor, worstCriticality, worstFitForPurpose } from './metrics';
+import { aggregateTileColourFor, lifecycleExposure, oldestLifecycleStage, otShareOf, poorFitSupportsEdges, resolveDefaultColourBy, supportingSystemIds, tileColourFor, worstCriticality, worstFitForPurpose } from './metrics';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 
 function system(id: string, lifecycleStatus?: string, plannedEnd?: string, criticality?: string, domain?: string): ElementsHeadRow {
@@ -108,6 +108,17 @@ describe('worstFitForPurpose', () => {
 
   it('returns null for a capability with no supporting systems at all', () => {
     expect(worstFitForPurpose('cap-1', [])).toBeNull();
+  });
+});
+
+describe('poorFitSupportsEdges', () => {
+  it('finds only the edges into this capability rated exactly poor, ignoring good/adequate edges and edges into other capabilities', () => {
+    const edges = [supports('sys-1', 'cap-1', 'good'), supports('sys-2', 'cap-1', 'poor'), supports('sys-3', 'cap-1', 'adequate'), supports('sys-4', 'cap-2', 'poor')];
+    expect(poorFitSupportsEdges('cap-1', edges).map((e) => e.from_element_id)).toEqual(['sys-2']);
+  });
+
+  it('returns an empty array when nothing is rated poor', () => {
+    expect(poorFitSupportsEdges('cap-1', [supports('sys-1', 'cap-1', 'good'), supports('sys-2', 'cap-1')])).toEqual([]);
   });
 });
 

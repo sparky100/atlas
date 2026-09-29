@@ -5,6 +5,7 @@ import {
   prefillFromCapabilityNoSupportersFinding,
   prefillFromCriticalExposedFinding,
   prefillFromCriticalSupportEndFinding,
+  prefillFromPoorFitCapabilities,
   prefillFromPoorFitCapabilityFinding,
   prefillFromWeakCapability,
 } from './decisionPrefill';
@@ -15,8 +16,7 @@ describe('decisionPrefill', () => {
     expect(prefill.title).toContain('SAP PM');
     expect(prefill.statement).toContain('SAP PM');
     expect(prefill.sourceFindingKey).toBe('critical-support-end');
-    expect(prefill.linkedElementId).toBe('sys-1');
-    expect(prefill.linkedElementName).toBe('SAP PM');
+    expect(prefill.linkedElements).toEqual([{ id: 'sys-1', name: 'SAP PM' }]);
   });
 
   it('builds a weak-capability prefill naming the capability and its own tone label', () => {
@@ -33,8 +33,7 @@ describe('decisionPrefill', () => {
     expect(prefill.statement).toContain('Claims Intake');
     expect(prefill.statement).toContain('poor or adequate fit');
     expect(prefill.sourceFindingKey).toBe('poor-fit-no-replacement');
-    expect(prefill.linkedElementId).toBe('cap-1');
-    expect(prefill.linkedElementName).toBe('Claims Intake');
+    expect(prefill.linkedElements).toEqual([{ id: 'cap-1', name: 'Claims Intake' }]);
   });
 
   it('builds a critical-exposed prefill naming the system', () => {
@@ -42,8 +41,7 @@ describe('decisionPrefill', () => {
     expect(prefill.title).toContain('Legacy Case System');
     expect(prefill.statement).toContain('Legacy Case System');
     expect(prefill.sourceFindingKey).toBe('critical-exposed');
-    expect(prefill.linkedElementId).toBe('sys-2');
-    expect(prefill.linkedElementName).toBe('Legacy Case System');
+    expect(prefill.linkedElements).toEqual([{ id: 'sys-2', name: 'Legacy Case System' }]);
   });
 
   it('builds a capability-no-supporters prefill naming the capability', () => {
@@ -52,12 +50,44 @@ describe('decisionPrefill', () => {
     expect(prefill.statement).toContain('Adult Social Care');
     expect(prefill.statement).toContain('no known supporting system');
     expect(prefill.sourceFindingKey).toBe('capability-no-supporters');
-    expect(prefill.linkedElementId).toBe('cap-2');
-    expect(prefill.linkedElementName).toBe('Adult Social Care');
+    expect(prefill.linkedElements).toEqual([{ id: 'cap-2', name: 'Adult Social Care' }]);
+  });
+
+  describe('prefillFromPoorFitCapabilities (F6.1: fit visible to directors)', () => {
+    it('names the single capability and the tile it lives under', () => {
+      const prefill = prefillFromPoorFitCapabilities('Claims', [{ id: 'cap-1', name: 'Claims Intake' }]);
+      expect(prefill.title).toContain('Claims');
+      expect(prefill.statement).toContain('Claims Intake');
+      expect(prefill.statement).toContain('Claims');
+      expect(prefill.sourceFindingKey).toBe('poor-fit-director');
+      expect(prefill.linkedElements).toEqual([{ id: 'cap-1', name: 'Claims Intake' }]);
+    });
+
+    it('links every poor-fit capability, not just the level-1 tile, for a mixed subtree', () => {
+      const capabilities = [
+        { id: 'cap-1', name: 'Claims Intake' },
+        { id: 'cap-2', name: 'Claims Triage' },
+      ];
+      const prefill = prefillFromPoorFitCapabilities('Claims', capabilities);
+      expect(prefill.statement).toContain('2 capabilities');
+      expect(prefill.statement).toContain('Claims Intake');
+      expect(prefill.statement).toContain('Claims Triage');
+      expect(prefill.linkedElements).toEqual(capabilities);
+    });
   });
 
   it('round-trips through URLSearchParams unchanged', () => {
     const prefill = prefillFromCriticalSupportEndFinding({ id: 'sys-1', name: 'SAP PM' });
+    const params = decisionPrefillToSearchParams(prefill);
+    const parsed = parseDecisionPrefillFromSearchParams(params);
+    expect(parsed).toEqual(prefill);
+  });
+
+  it('round-trips a multi-element prefill (order preserved) through URLSearchParams', () => {
+    const prefill = prefillFromPoorFitCapabilities('Claims', [
+      { id: 'cap-1', name: 'Claims Intake' },
+      { id: 'cap-2', name: 'Claims Triage' },
+    ]);
     const params = decisionPrefillToSearchParams(prefill);
     const parsed = parseDecisionPrefillFromSearchParams(params);
     expect(parsed).toEqual(prefill);
@@ -75,5 +105,11 @@ describe('decisionPrefill', () => {
     const partial = decisionPrefillToSearchParams(prefillFromCriticalSupportEndFinding({ id: 'sys-1', name: 'SAP PM' }));
     partial.delete('startElementId');
     expect(parseDecisionPrefillFromSearchParams(partial)).toBeNull();
+  });
+
+  it('returns null when the id and name lists come out different lengths (a hand-edited or truncated URL)', () => {
+    const params = decisionPrefillToSearchParams(prefillFromCriticalSupportEndFinding({ id: 'sys-1', name: 'SAP PM' }));
+    params.append('startElementId', 'sys-2');
+    expect(parseDecisionPrefillFromSearchParams(params)).toBeNull();
   });
 });

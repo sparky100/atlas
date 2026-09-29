@@ -51,7 +51,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
   const [ownerId, setOwnerId] = useState(userId ?? '');
   const [neededBy, setNeededBy] = useState('');
   const [links, setLinks] = useState<{ elementId: UUID; name: string }[]>(() =>
-    prefill ? [{ elementId: prefill.linkedElementId, name: prefill.linkedElementName }] : [],
+    prefill ? prefill.linkedElements.map((el) => ({ elementId: el.id, name: el.name })) : [],
   );
 
   const resetForm = () => {

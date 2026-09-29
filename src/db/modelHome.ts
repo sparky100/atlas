@@ -14,6 +14,7 @@ import type { FitForPurpose, UUID } from '../contracts/delta';
 import type { CommitRow, DeltaRow, ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
 import { attributesRecord } from '../ui/elements/attributesRecord';
 import { computeCapabilityRollup } from '../ui/capabilityMap/capabilityRollup';
+import { poorFitSupportsEdges, worstFitForPurpose } from '../ui/capabilityMap/metrics';
 import type { Client } from './client';
 import { assertInFilterSize } from './inFilterLimit';
 import { selectAll } from './selectAll';
@@ -253,6 +254,35 @@ export interface CapabilityTileData {
   fitForPurpose: FitForPurpose | null;
   /** Same rollup's `isOwned` — this capability or any ancestor has an owner. */
   isOwned: boolean;
+  /**
+   * "Make capability fit-for-purpose visible to directors" (F6.1): the
+   * individual capabilities in this tile's own subtree whose own
+   * `worstFitForPurpose` (`metrics.ts`, every `supports` edge — primary or
+   * secondary, unlike the Architect door's own primary-only finding) is
+   * exactly `poor` — never `adequate` (director-door threshold is
+   * narrower than the Architect finding's `poor`-or-`adequate`, by
+   * design). Distinct from `fitForPurpose` above, which only says whether
+   * *something* below is poor, not which capability(ies) — the director
+   * door's own "poor fit: N capabilities" pill and its links need the
+   * individual rows, not just the worst-of summary. Empty when nothing in
+   * the subtree is rated poor.
+   */
+  poorFitCapabilities: ElementsHeadRow[];
+  /**
+   * `true` only when `poorFitCapabilities` is non-empty and *every* one of
+   * those capabilities' own edges rated exactly `poor` already has a
+   * planned replacement recorded for its own supporting system
+   * (`plannedReplacements`/`groupPlannedReplacementsByCapability` below —
+   * the same "an approved branch retracts this exact supporter while
+   * creating a new one for this capability" evidence
+   * `computeExposureTone`/`findCapabilitiesWithPoorFitPrimarySupporter`
+   * already use, reused here unchanged, not recomputed). The director
+   * door reads this to suppress its own "Start a decision" action and
+   * label the pill "replacement planned" instead — never true when
+   * `poorFitCapabilities` is empty (nothing to have a replacement planned
+   * for).
+   */
+  poorFitAllReplacementPlanned: boolean;
 }
 
 /**
@@ -320,6 +350,20 @@ export function buildCapabilityTiles(
     });
     const tone: ExposureTone | 'neutral' =
       supportingSystems.length === 0 ? 'neutral' : computeExposureTone(rollup.subtreeSupportsEdges, systemsById, replacementsByCapability.get(capability.element_id) ?? new Set());
+
+    // F6.1: individual poor-fit capabilities in this tile's own subtree,
+    // and whether every one of their own poor-rated edges already has a
+    // planned replacement — both reuse `rollup`/`replacementsByCapability`
+    // (already computed above), no new query and no new calculation
+    // beyond a filter over data already in hand.
+    const poorFitCapabilityIds = rollup.subtreeCapabilityIds.filter((id) => worstFitForPurpose(id, rollup.subtreeSupportsEdges) === 'poor');
+    const poorFitCapabilities = poorFitCapabilityIds
+      .map((id) => capabilitiesById.get(id))
+      .filter((c): c is ElementsHeadRow => c !== undefined)
+      .sort((a, b) => a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id));
+    const poorFitEdges = poorFitCapabilityIds.flatMap((id) => poorFitSupportsEdges(id, rollup.subtreeSupportsEdges));
+    const poorFitAllReplacementPlanned = poorFitEdges.length > 0 && poorFitEdges.every((edge) => replacementsByCapability.get(edge.to_element_id)?.has(edge.from_element_id) ?? false);
+
     return {
       capability,
       supportingSystems,
@@ -329,6 +373,8 @@ export function buildCapabilityTiles(
       totalCapabilityCount: rollup.totalCapabilityCount,
       isOwned: rollup.isOwned,
       fitForPurpose: rollup.fitForPurpose,
+      poorFitCapabilities,
+      poorFitAllReplacementPlanned,
     };
   });
 }
