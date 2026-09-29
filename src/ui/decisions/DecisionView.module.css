@@ -58,6 +58,7 @@
   width: 100%;
   border-collapse: collapse;
   margin: var(--space-3) 0;
+  table-layout: fixed;
 }
 
 .comparisonTable th,
@@ -68,6 +69,43 @@
   vertical-align: top;
 }
 
+/* Sticky first column (this sprint's own phone-width constraint, ~380px:
+   "sticky first column, compact delta format, horizontal scroll if
+   needed") — the row/group label stays readable while option columns
+   scroll under it, the same treatment DecisionCriteriaGrid.module.css
+   already gives its own first column. */
+.comparisonTable th:first-child,
+.comparisonTable td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  z-index: 1;
+  min-width: 110px;
+}
+
 .tableWrap {
   overflow-x: auto;
+}
+
+.collapsedToggle {
+  background: none;
+  border: none;
+  padding: var(--space-1) 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+}
+
+.collapsedToggle:hover,
+.collapsedToggle:focus-visible {
+  text-decoration: underline;
+}
+
+@media (max-width: 420px) {
+  .comparisonTable th,
+  .comparisonTable td {
+    padding: var(--space-1);
+    min-width: 90px;
+  }
 }

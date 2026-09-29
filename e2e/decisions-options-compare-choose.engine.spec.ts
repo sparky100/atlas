@@ -109,19 +109,23 @@ test('add three options to a decision, compare them, choose one; the chosen opti
   const extraResult = await commitToBranch(owner, { modelId, branchId: optionBBranchId, expectedHeadCommitId: optionBBranch.head_commit_id, envelope: extraEnvelope });
   if (!extraResult.ok) throw new Error(`decisioncompare: seeding option B's extra commit: ${extraResult.message}`);
 
-  // 4. Back on the decision page: the comparison table shows option B with
-  // 2 systems, options A and C (and main) with 1 — proof the fold is
-  // genuinely per-branch.
+  // 4. Back on the decision page: F6.3's own "What changes" table shows
+  // Finance's own Coverage row un-collapsed (option B genuinely differs),
+  // main's column at "1 system" and option B's own column reading the
+  // delta ("1 → 2 systems (+1)") — proof the fold is genuinely per-branch,
+  // not raw counts repeated per option the way the pre-rework table did.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionUrlMatch[1]}`);
-  const comparisonTable = page.locator('table');
-  await expect(comparisonTable).toBeVisible();
-  const financeRow = comparisonTable.locator('tr', { hasText: 'Finance' });
-  await expect(financeRow).toContainText('1 system'); // main's own column, still just Ledger Service
-  await expect(financeRow).toContainText('2 systems'); // option B's own column
+  const whatChangesTable = page.locator('table').filter({ has: page.locator('th', { hasText: 'Row' }) });
+  await expect(whatChangesTable).toBeVisible();
+  const coverageRow = whatChangesTable.locator('tr', { hasText: 'Coverage' });
+  await expect(coverageRow).toContainText('1 system'); // main's own column, still just Ledger Service
+  await expect(coverageRow).toContainText('1 → 2 systems (+1)'); // option B's own column
 
-  // 5. Choose option B.
-  const optionBListRow = page.locator('li', { hasText: 'Option 2' });
-  await optionBListRow.getByRole('button', { name: 'Choose' }).click();
+  // 5. Choose option B — the criteria grid's own merged option header now
+  // carries the "Choose" action (F6.3 folded the old separate Options list
+  // into these headers).
+  const optionBHeader = page.locator('th', { hasText: 'Option 2' });
+  await optionBHeader.getByRole('button', { name: 'Choose' }).click();
   await page.getByPlaceholder('The reasons this option was chosen over the others').fill('Option B is the only one that actually adds the replacement capacity.');
   await page.getByRole('button', { name: 'Confirm choice' }).click();
 
@@ -131,9 +135,13 @@ test('add three options to a decision, compare them, choose one; the chosen opti
 
   // 6. Options A and C read cancelled; option B's own page now reads
   // "Proposing: ..." (F0's own intent-flip) and goes through the ordinary
-  // review path (F0/PR3), unchanged by any of this.
-  await expect(page.locator('li', { hasText: 'Option 1' })).toContainText('cancelled');
-  await expect(page.locator('li', { hasText: 'Option 3' })).toContainText('cancelled');
+  // review path (F0/PR3), unchanged by any of this. Scoped to the criteria
+  // grid specifically (the page's *first* table) — the "What changes"
+  // table's own headers repeat each option's full, unstripped label too,
+  // which would otherwise make this locator ambiguous.
+  const criteriaGridTable = page.locator('table').first();
+  await expect(criteriaGridTable.locator('th', { hasText: 'Option 1' })).toContainText('cancelled');
+  await expect(criteriaGridTable.locator('th', { hasText: 'Option 3' })).toContainText('cancelled');
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${optionBBranchId}`);
   await expect(page.getByRole('heading', { name: /^Proposing: Option 2/ })).toBeVisible();

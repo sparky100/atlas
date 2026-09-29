@@ -3,9 +3,8 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { getMainBranch, listBranchesByIds } from '../../db/branches';
 import { getDecision, listDecisionArgumentsForDecision, listDecisionLinksForDecision } from '../../db/decisions';
-import { listDecisionRatingsForDecision } from '../../db/decisionRatings';
 import { getElementsByIds } from '../../db/elements';
-import type { BranchRow, DecisionArgumentRow, DecisionLinkRow, DecisionOptionRatingRow, DecisionRow } from '../../db/types';
+import type { BranchRow, DecisionArgumentRow, DecisionLinkRow, DecisionRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -20,20 +19,26 @@ export interface DecisionPageData {
   linkedBranchesById: Map<UUID, BranchRow>;
   /** Always empty until `atlas.choose_decision_option` (PR5) writes the chosen option's own reasons row — queried for real so the page renders an honest empty state, not a hardcoded one. */
   args: DecisionArgumentRow[];
-  /** The decision's own judgement ratings — one row per (option, criterion) that's actually been rated; an option/criterion pair with no row here is "Not rated," not a row with a null level (`decision_option_ratings`, `src/contracts/decisionCriteria.ts`). */
-  ratings: DecisionOptionRatingRow[];
 }
 
 export type DecisionPageState = { status: 'loading' } | { status: 'not_found' } | { status: 'error'; message: string } | ({ status: 'ready' } & DecisionPageData);
 
+/**
+ * F6.2 (fast rating saves): `decision_option_ratings` is deliberately
+ * *not* fetched here — `useDecisionRatings.ts` owns that data as its own
+ * lifecycle now, so a rating save patches its own local state instead of
+ * calling this hook's `reload()` and re-running every query below for a
+ * change that only ever touched one table. Fetching ratings a second
+ * time here would just be a redundant initial-load query with nothing to
+ * show for it.
+ */
 async function loadDecisionPageData(modelId: UUID, decisionId: UUID): Promise<DecisionPageState> {
   const decision = await getDecision(supabase, decisionId);
   if (!decision) return { status: 'not_found' };
 
-  const [links, args, ratings, main] = await Promise.all([
+  const [links, args, main] = await Promise.all([
     listDecisionLinksForDecision(supabase, decisionId),
     listDecisionArgumentsForDecision(supabase, decisionId),
-    listDecisionRatingsForDecision(supabase, decisionId),
     getMainBranch(supabase, modelId),
   ]);
 
@@ -45,7 +50,7 @@ async function loadDecisionPageData(modelId: UUID, decisionId: UUID): Promise<De
     branchLinkIds.length > 0 ? listBranchesByIds(supabase, branchLinkIds) : Promise.resolve([]),
   ]);
 
-  return { status: 'ready', decision, links, linkedElementsById: linkedElements, linkedBranchesById: new Map(linkedBranches.map((b) => [b.id, b])), args, ratings };
+  return { status: 'ready', decision, links, linkedElementsById: linkedElements, linkedBranchesById: new Map(linkedBranches.map((b) => [b.id, b])), args };
 }
 
 export interface UseDecisionResult {
