@@ -212,7 +212,7 @@ export async function compareDecisionOptions(supabase: Client, input: CompareDec
       const fork: BranchFork = { baseCommitId: o.baseCommitId, headCommitId: o.headCommitId };
       const ownDeltas = listOwnDeltas(fork, commitLoader);
       const { subjects }: { subjects: ChangeSubjectSummary[] } = summarizeOwnDeltas(ownDeltas, asIsHead, result.raw.head);
-      const touch = deriveOptionTouch(subjects);
+      const touch = deriveOptionTouch(subjects, result.raw.elementsById, result.raw.relationshipsHead);
       return { branchId: o.branchId, touch, ...result };
     }),
   );

@@ -17,10 +17,11 @@
  *   (unchanged by the own-deltas rework below) — see `compareOptions.ts`'s
  *   own module comment on what that means when main has drifted since the
  *   option forked.
- * - A system/container concern becomes one outcome row
- *   (unchanged/retired/replaced by X), derived from the option's own
- *   `OptionTouch` (`optionTouch.ts`) — its own `retiredElements` and
- *   `replacesEdges`, both read off the option's *own* deltas, never a
+ * - A system/container concern becomes one outcome row (unchanged/retired/
+ *   replaced by X/removed from model), derived from the option's own
+ *   `OptionTouch` (`optionTouch.ts`) — its own `lifecycleRetiredElements`,
+ *   `replacesEdges`, and `retiredElements`, all read off the option's
+ *   *own* deltas resolved against the option's own current head, never a
  *   version-diff against main (which would conflate the option's own
  *   changes with independent main-side drift).
  * - Exactly one "boundary crossings" row, scoped per option (decision 1:
@@ -112,16 +113,41 @@ export function buildCapabilityMetricRows(capability: ElementsHeadRow, mainMetri
 // System/container concern -> one outcome row
 // ---------------------------------------------------------------------------
 
-export type SystemConcernOutcome = { kind: 'unchanged' } | { kind: 'retired' } | { kind: 'replaced'; replacedByName: string };
+export type SystemConcernOutcome = { kind: 'unchanged' } | { kind: 'retired' } | { kind: 'replaced'; replacedByName: string } | { kind: 'removed' };
 
-/** `elementId`'s own outcome on this option, read off its own `OptionTouch` (`optionTouch.ts`, itself `summarizeOwnDeltas` filtered by delta kind) — retracted by one of this option's own deltas with no `replaces` edge pointing at it is `'retired'`; retracted with one is `'replaced'`, naming the edge's own `fromElementId` (ADR-001: `from = replacement`) via this option's own elements. Anything not retracted by this option's own deltas reads as `'unchanged'` — rule 5 only ever distinguishes these three outcomes, never a fourth "modified" state, and this option never touching the element at all is exactly as "unchanged" as one that touched-but-didn't-retract it. */
+/**
+ * `elementId`'s own outcome on this option, read off its own `OptionTouch`
+ * (`optionTouch.ts`) — three distinct, independently-real outcomes, per
+ * the real actions that produce them (ADR-000):
+ * - `'replaced'`: this option's own deltas introduced a live `replaces`
+ *   edge targeting the concern (`useElementRetire.ts`'s "replaced by"
+ *   picker) — checked first, since the same action that creates this edge
+ *   also sets `lifecycleStatus: 'retiring'` in the same commit, and
+ *   "replaced by X" is the more specific fact.
+ * - `'retired'`: this option's own deltas set the concern's
+ *   `lifecycleStatus` to `retiring`/`retired` (`'lifecycleRetiredElementIds'`,
+ *   `useElementRetire.ts` with no replacement picked) — the concern still
+ *   exists, only its lifecycle status changed.
+ * - `'removed'`: this option's own deltas retracted the concern outright
+ *   (`useElementRemoveFromModel.ts`'s "Remove from model…") — it no
+ *   longer exists at all, distinct from a lifecycle retirement.
+ * Anything this option didn't do reads as `'unchanged'` — this option
+ * never touching the element at all is exactly as "unchanged" as one that
+ * touched it without producing any of the three outcomes above.
+ */
 export function computeSystemConcernOutcome(elementId: UUID, touch: OptionTouch, optionElementsById: ReadonlyMap<UUID, ElementsHeadRow>): SystemConcernOutcome {
-  if (!touch.retiredElements.some((e) => e.id === elementId)) return { kind: 'unchanged' };
+  if (!optionElementsById.has(elementId)) {
+    return touch.retiredElements.some((e) => e.id === elementId) ? { kind: 'removed' } : { kind: 'unchanged' };
+  }
 
   const replacesEdge = touch.replacesEdges.find((r) => r.toElementId === elementId);
-  if (!replacesEdge) return { kind: 'retired' };
-  const replacedByName = optionElementsById.get(replacesEdge.fromElementId)?.name ?? replacesEdge.fromElementId;
-  return { kind: 'replaced', replacedByName };
+  if (replacesEdge) {
+    const replacedByName = optionElementsById.get(replacesEdge.fromElementId)?.name ?? replacesEdge.fromElementId;
+    return { kind: 'replaced', replacedByName };
+  }
+
+  if (touch.lifecycleRetiredElements.some((e) => e.id === elementId)) return { kind: 'retired' };
+  return { kind: 'unchanged' };
 }
 
 export interface SystemConcernOptionInput {
@@ -133,7 +159,7 @@ export function buildSystemConcernOutcomeRow(element: ElementsHeadRow, optionsIn
   const options = new Map<UUID, WhatChangesCell>();
   for (const [branchId, input] of optionsInput) {
     const outcome = computeSystemConcernOutcome(element.element_id, input.touch, input.elementsById);
-    const display = outcome.kind === 'unchanged' ? 'no change' : outcome.kind === 'retired' ? 'retired' : `replaced by ${outcome.replacedByName}`;
+    const display = outcome.kind === 'unchanged' ? 'no change' : outcome.kind === 'retired' ? 'retired' : outcome.kind === 'removed' ? 'removed from model' : `replaced by ${outcome.replacedByName}`;
     options.set(branchId, cell(display, outcome.kind !== 'unchanged'));
   }
   return {
