@@ -51,48 +51,73 @@ function makeBranch(overrides: Partial<BranchRow> = {}): BranchRow {
 }
 
 describe('exportDecisionAsAdrMarkdown', () => {
-  it('renders a proposed decision with no options as "Not yet decided", no Options section', () => {
-    const markdown = exportDecisionAsAdrMarkdown({ decision: makeDecision(), ownerName: 'Alice', options: [], reasons: null });
+  it('renders a proposed decision with no options as "Not yet decided", no Options/Concerns/What-changes sections', () => {
+    const markdown = exportDecisionAsAdrMarkdown({ decision: makeDecision(), ownerName: 'Alice', concerns: [], options: [], whatChangesRows: [], reasons: null });
     expect(markdown).toContain('# ADR: Replace Ledger Service?');
     expect(markdown).toContain('**Status:** Proposed');
     expect(markdown).toContain('**Owner:** Alice');
     expect(markdown).toContain('Ledger Service needs a real replacement plan.');
     expect(markdown).not.toContain('## Options considered');
+    expect(markdown).not.toContain('## Concerns');
+    expect(markdown).not.toContain('## What changes');
     expect(markdown).toContain('Not yet decided.');
   });
 
   it('omits needed-by and lens-map lines when absent, includes them when set', () => {
-    const withoutExtras = exportDecisionAsAdrMarkdown({ decision: makeDecision(), ownerName: 'Alice', options: [], reasons: null });
+    const withoutExtras = exportDecisionAsAdrMarkdown({ decision: makeDecision(), ownerName: 'Alice', concerns: [], options: [], whatChangesRows: [], reasons: null });
     expect(withoutExtras).not.toContain('**Needed by:**');
     expect(withoutExtras).not.toContain('**Lens map:**');
 
     const withExtras = exportDecisionAsAdrMarkdown({
       decision: makeDecision({ needed_by: '2026-10-01', lens_map_url: 'https://lens.example/map/1' }),
       ownerName: 'Alice',
+      concerns: [],
       options: [],
+      whatChangesRows: [],
       reasons: null,
     });
     expect(withExtras).toContain('**Needed by:** 2026-10-01');
     expect(withExtras).toContain('**Lens map:** https://lens.example/map/1');
   });
 
-  it('lists every option, marking the chosen one and every cancelled one distinctly', () => {
+  it('lists every declared concern with its type', () => {
+    const markdown = exportDecisionAsAdrMarkdown({
+      decision: makeDecision(),
+      ownerName: 'Alice',
+      concerns: [
+        { name: 'Outage Management', typeLabel: 'capability' },
+        { name: 'PM', typeLabel: 'system' },
+      ],
+      options: [],
+      whatChangesRows: [],
+      reasons: null,
+    });
+    expect(markdown).toContain('## Concerns');
+    expect(markdown).toContain('- Outage Management (capability)');
+    expect(markdown).toContain('- PM (system)');
+  });
+
+  it('lists every option, marking the chosen one and every cancelled one distinctly, each with its own ratings and notes', () => {
     const chosen = makeBranch({ id: 'branch-b', title: 'Option B', intent: 'propose' });
     const cancelledOne = makeBranch({ id: 'branch-a', title: 'Option A', status: 'cancelled', cancel_reason: 'Not chosen: see decision dec-1' });
     const cancelledTwo = makeBranch({ id: 'branch-c', title: 'Option C', status: 'cancelled' });
     const markdown = exportDecisionAsAdrMarkdown({
       decision: makeDecision({ status: 'accepted', decided_at: '2026-09-14', branch_id: 'branch-b' }),
       ownerName: 'Alice',
+      concerns: [],
       options: [
-        { branch: cancelledOne, isChosen: false },
-        { branch: chosen, isChosen: true },
-        { branch: cancelledTwo, isChosen: false },
+        { branch: cancelledOne, isChosen: false, ratings: [{ criterionLabel: 'Cost', levelLabel: 'High', note: null }] },
+        { branch: chosen, isChosen: true, ratings: [{ criterionLabel: 'Cost', levelLabel: 'Low', note: 'Cheaper than the incumbent.' }] },
+        { branch: cancelledTwo, isChosen: false, ratings: [] },
       ],
+      whatChangesRows: [],
       reasons: 'Option B is the only one that adds the replacement capacity.',
     });
     expect(markdown).toContain('## Options considered');
     expect(markdown).toContain('- **Proposing: Option B** — chosen');
+    expect(markdown).toContain('  - Cost: Low — Cheaper than the incumbent.');
     expect(markdown).toContain('- Exploring: Option A — not chosen');
+    expect(markdown).toContain('  - Cost: High');
     expect(markdown).toContain('- Exploring: Option C — not chosen');
     expect(markdown).toContain('**Status:** Accepted — decided 2026-09-14');
     expect(markdown).toContain('We will Proposing: Option B.');
@@ -104,10 +129,40 @@ describe('exportDecisionAsAdrMarkdown', () => {
     const markdown = exportDecisionAsAdrMarkdown({
       decision: makeDecision({ status: 'accepted', branch_id: 'branch-b' }),
       ownerName: 'Alice',
-      options: [{ branch: chosen, isChosen: true }],
+      concerns: [],
+      options: [{ branch: chosen, isChosen: true, ratings: [] }],
+      whatChangesRows: [],
       reasons: null,
     });
     expect(markdown).toContain('We will Proposing: Option B.');
     expect(markdown.trim().endsWith('We will Proposing: Option B.')).toBe(true);
+  });
+
+  it('renders the What-changes evidence rows, naming each option by its own label, with the "Current (main)" value first', () => {
+    const optionA = makeBranch({ id: 'branch-a', title: 'Option A' });
+    const markdown = exportDecisionAsAdrMarkdown({
+      decision: makeDecision(),
+      ownerName: 'Alice',
+      concerns: [],
+      options: [{ branch: optionA, isChosen: false, ratings: [] }],
+      whatChangesRows: [
+        {
+          id: 'element:pm:outcome',
+          groupLabel: 'PM',
+          rowLabel: 'Outcome',
+          main: { display: 'unchanged', changed: false },
+          options: new Map([['branch-a', { display: 'replaced by Hana equivalent', changed: true }]]),
+          anyChanged: true,
+        },
+      ],
+      reasons: null,
+    });
+    expect(markdown).toContain('## What changes (evidence)');
+    expect(markdown).toContain('- **PM — Outcome** — Current (main): unchanged; Exploring: Option A: replaced by Hana equivalent');
+  });
+
+  it('omits the What-changes section entirely when nothing differs', () => {
+    const markdown = exportDecisionAsAdrMarkdown({ decision: makeDecision(), ownerName: 'Alice', concerns: [], options: [], whatChangesRows: [], reasons: null });
+    expect(markdown).not.toContain('## What changes');
   });
 });

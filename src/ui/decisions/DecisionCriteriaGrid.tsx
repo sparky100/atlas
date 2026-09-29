@@ -7,7 +7,7 @@ import { branchStatusTone } from '../changes/branchStatus';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { Text } from '../components/Text/Text';
-import { useDecisionRatings } from './useDecisionRatings';
+import type { UseDecisionRatingsResult } from './useDecisionRatings';
 import styles from './DecisionCriteriaGrid.module.css';
 
 export interface DecisionCriteriaOption {
@@ -22,7 +22,6 @@ export interface DecisionCriteriaOption {
 }
 
 export interface DecisionCriteriaGridProps {
-  modelId: UUID;
   decisionId: UUID;
   options: DecisionCriteriaOption[];
   /** `canRateDecisionOption` at the call site — decision-status-and-role gated, same as `canAddOption`/`canChoose`. `false` renders every cell read-only, with no tap affordance at all (the grid at time-of-choosing still needs to render, just never editable). */
@@ -37,6 +36,15 @@ export interface DecisionCriteriaGridProps {
   canWorkOnChange: boolean;
   /** Selects this branch as the session's editing ref and navigates to its change page — the exact "Edit in this change" mechanism `ChangePage.tsx` already offers, reused rather than reinvented (item 5: "using the existing 'Work in this change' flow"). */
   onWorkOnThisChange: (branchId: UUID) => void;
+  /**
+   * Lifted from `DecisionView.tsx` (decision-side-completion item 6) rather
+   * than this component calling `useDecisionRatings` itself — the ADR
+   * export needs every option's own ratings too, and a second independent
+   * `useDecisionRatings` instance there would mean two separate fetches
+   * plus two separate 45s quiet-refetch polling loops for the same table.
+   * One hook instance, owned by the page, passed down here unchanged.
+   */
+  ratingsState: UseDecisionRatingsResult;
 }
 
 interface EditingCell {
@@ -76,8 +84,7 @@ function stripExploringPrefix(label: string): string {
  * only ever gets the person *into* the change workspace, never repeats
  * that flip.
  */
-export function DecisionCriteriaGrid({ modelId, decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, onChoose, canWorkOnChange, onWorkOnThisChange }: DecisionCriteriaGridProps) {
-  const ratingsState = useDecisionRatings(modelId, decisionId);
+export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, onChoose, canWorkOnChange, onWorkOnThisChange, ratingsState }: DecisionCriteriaGridProps) {
   const ratings = ratingsState.ratings;
   const [editing, setEditing] = useState<EditingCell | null>(null);
   const [levelDraft, setLevelDraft] = useState<DecisionRatingLevel | null>(null);

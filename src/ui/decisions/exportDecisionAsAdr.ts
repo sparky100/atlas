@@ -1,5 +1,7 @@
+import type { UUID } from '../../contracts/delta';
 import type { BranchRow, DecisionRow } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
+import type { WhatChangesRow } from './whatChangesRows';
 
 /**
  * Prompt pack F3 PR6's "Export as ADR markdown" — genuinely new from
@@ -13,16 +15,46 @@ import { intentHeaderLine } from '../changes/branchIntent';
  * clipboard pattern — no download mechanism exists anywhere in this app to
  * invent one for) assembles this input from data the decision page has
  * already loaded, and copies the string this function returns.
+ *
+ * Decision-side-completion item 6: the export was missing three of the
+ * things the brief names — the decision's own declared concerns, each
+ * option's own recorded judgement-criteria ratings and notes, and the
+ * "What changes" table's own evidence. All three are added below as
+ * plain, pre-resolved data the caller assembles from what it has already
+ * loaded (`DecisionView.tsx`'s own `concernedCapabilityIds`/
+ * `otherConcernElementIds`/`linkedElementsById`, `useDecisionRatings.ts`'s
+ * `ratings`, and `comparison.whatChangesRows` filtered to
+ * `groupWhatChangesRows(...).visible` — "only differing rows", the
+ * brief's own words, never the collapsed "N rows unchanged" group) —
+ * this stays a pure string builder with no fetch or fold of its own.
  */
+export interface DecisionAdrExportConcern {
+  name: string;
+  /** `element_type` ('capability' | 'system' | 'container') — shown alongside the name so a reader can tell a capability concern from a system/container one without opening the model. */
+  typeLabel: string;
+}
+
+export interface DecisionAdrExportOptionRating {
+  criterionLabel: string;
+  levelLabel: string;
+  note: string | null;
+}
+
 export interface DecisionAdrExportOption {
   branch: BranchRow;
   isChosen: boolean;
+  /** This option's own recorded ratings, already resolved to the criterion's/level's own display label (`decisionCriterionLevelLabel`) and in `DECISION_CRITERIA`'s own presentation order — the same labels and order the criteria grid itself shows, never a raw criterion/level key. Empty when nothing on this option has been rated yet. */
+  ratings: readonly DecisionAdrExportOptionRating[];
 }
 
 export interface DecisionAdrExportInput {
   decision: DecisionRow;
   ownerName: string;
+  /** The decision's own declared concerns (linked capabilities/systems/containers) — empty when none are linked yet. */
+  concerns: readonly DecisionAdrExportConcern[];
   options: readonly DecisionAdrExportOption[];
+  /** Only the rows the What-changes table itself renders as visible (`groupWhatChangesRows(comparison.whatChangesRows).visible`) — never the collapsed "N rows unchanged in all options" group, matching the brief's own "only differing rows". Empty when nothing differs (or no options are linked yet). */
+  whatChangesRows: readonly WhatChangesRow[];
   /** The one `decision_arguments` row `atlas.choose_decision_option` writes (`stance: 'for'`) — `null` until the decision is `accepted`. */
   reasons: string | null;
 }
@@ -39,6 +71,16 @@ function optionLine(option: DecisionAdrExportOption): string {
   return `- ${label} — ${option.branch.status}`;
 }
 
+/** One indented sub-bullet per rating, in the order the caller supplied (`DECISION_CRITERIA`'s own presentation order) — no ratings at all renders nothing, not an empty "no ratings" line, matching this file's own "only render what the decision actually has" rule. */
+function optionRatingLines(option: DecisionAdrExportOption): string[] {
+  return option.ratings.map((r) => `  - ${r.criterionLabel}: ${r.levelLabel}${r.note && r.note.trim().length > 0 ? ` — ${r.note}` : ''}`);
+}
+
+function whatChangesRowLine(row: WhatChangesRow, optionLabelsByBranchId: ReadonlyMap<UUID, string>): string {
+  const optionParts = [...row.options.entries()].map(([branchId, cell]) => `${optionLabelsByBranchId.get(branchId) ?? branchId}: ${cell.display}`);
+  return `- **${row.groupLabel} — ${row.rowLabel}** — ${[`Current (main): ${row.main.display}`, ...optionParts].join('; ')}`;
+}
+
 /**
  * Every section renders only what the decision actually has (CLAUDE.md
  * rule 7: absent, not faked) — "Options considered" is omitted entirely
@@ -46,7 +88,7 @@ function optionLine(option: DecisionAdrExportOption): string {
  * rather than inventing a reasons paragraph for a still-`proposed` decision.
  */
 export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): string {
-  const { decision, ownerName, options, reasons } = input;
+  const { decision, ownerName, concerns, options, whatChangesRows, reasons } = input;
   const lines: string[] = [];
   lines.push(`# ADR: ${decision.title}`);
   lines.push('');
@@ -59,11 +101,29 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
   lines.push('');
   lines.push(decision.statement.trim().length > 0 ? decision.statement : 'No context recorded.');
 
+  if (concerns.length > 0) {
+    lines.push('');
+    lines.push('## Concerns');
+    lines.push('');
+    for (const concern of concerns) lines.push(`- ${concern.name} (${concern.typeLabel})`);
+  }
+
   if (options.length > 0) {
     lines.push('');
     lines.push('## Options considered');
     lines.push('');
-    for (const option of options) lines.push(optionLine(option));
+    for (const option of options) {
+      lines.push(optionLine(option));
+      lines.push(...optionRatingLines(option));
+    }
+  }
+
+  if (whatChangesRows.length > 0) {
+    lines.push('');
+    lines.push('## What changes (evidence)');
+    lines.push('');
+    const optionLabelsByBranchId = new Map(options.map((o) => [o.branch.id, intentHeaderLine(o.branch)]));
+    for (const row of whatChangesRows) lines.push(whatChangesRowLine(row, optionLabelsByBranchId));
   }
 
   lines.push('');
