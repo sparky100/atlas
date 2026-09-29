@@ -22,6 +22,7 @@ export {
   canEditValueStreamStructure,
   canManageDuplicatesCheck,
   canManageOrgSettings,
+  canRateDecisionOption,
   canRestoreModel,
   canReviewMergeRequest,
   canRunCapture,
