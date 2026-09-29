@@ -135,6 +135,11 @@ async function computeComparisonRow(
   return { row, raw: { head, elementsById, relationshipsHead: projection.relationshipsHead, supportsEdges, ownsEdges } };
 }
 
+/** `true` when main has moved since this option's own fork point — the fact `mainDriftedByBranchId` flags for the reader via the "Main has moved since this option branched" note (`DecisionView.tsx`). Extracted as its own pure function so this one real piece of drift-detection logic is unit-testable directly, rather than only provable by exercising the whole (Supabase-backed) `compareDecisionOptions`. */
+export function hasMainDrifted(optionBaseCommitId: UUID, mainHeadCommitId: UUID): boolean {
+  return optionBaseCommitId !== mainHeadCommitId;
+}
+
 export interface CompareDecisionOptionsInput {
   modelId: UUID;
   mainHeadCommitId: UUID;
@@ -232,7 +237,7 @@ export async function compareDecisionOptions(supabase: Client, input: CompareDec
       const ownDeltas = listOwnDeltas(fork, commitLoader);
       const { subjects }: { subjects: ChangeSubjectSummary[] } = summarizeOwnDeltas(ownDeltas, asIsHead, result.raw.head);
       const touch = deriveOptionTouch(subjects, result.raw.elementsById, result.raw.relationshipsHead);
-      return { branchId: o.branchId, touch, mainAtFork, drifted: o.baseCommitId !== mainHeadCommitId, ...result };
+      return { branchId: o.branchId, touch, mainAtFork, drifted: hasMainDrifted(o.baseCommitId, mainHeadCommitId), ...result };
     }),
   );
 
