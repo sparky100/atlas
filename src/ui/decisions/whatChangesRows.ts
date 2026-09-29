@@ -8,8 +8,9 @@
  * differs from main, which is exactly the collapse rule the table itself
  * applies (`groupWhatChangesRows` below).
  *
- * Four row families, one per the brief's own rule 1 ("one row per declared
- * concern + boundary crossings + affected-value-stream rows"):
+ * Five row families, one per the brief's own rule 1 ("one row per declared
+ * concern + boundary crossings + affected-value-stream rows") plus the
+ * decision-side-completion item's own "Trigger resolved" addition:
  * - A capability concern becomes up to four independent metric rows
  *   (coverage/lifecycle/criticality/fit — decision 2 in the sprint's own
  *   go-ahead), each collapsing on its own. Each option's own "before" side
@@ -25,6 +26,17 @@
  *   *own* deltas resolved against the option's own current head, never a
  *   version-diff against main (which would conflate the option's own
  *   changes with independent main-side drift).
+ * - Every declared concern (capability *and* system/container alike) also
+ *   gets a "Trigger resolved" row — is the concern's own lifecycle exposure
+ *   gone under this option? Reuses `src/ui/capabilityMap/metrics.ts`'s
+ *   `systemsExposedByLifecycle` verbatim (the same definition the health
+ *   finding and the capability-map colour-by mode already use — never a
+ *   second, decision-page-local one), applied to a capability's own
+ *   supporting systems or to a system/container concern's own singleton
+ *   system, on both the option's fork-point-main "before" and its own head
+ *   "after" (the identical drift-proofing the metric rows above use). See
+ *   `computeTriggerResolution`'s own doc comment for the four possible
+ *   states.
  * - Exactly one "boundary crossings" row, scoped per option (decision 1:
  *   at-least-one-endpoint-in-scope) — distinct from the model-wide figure
  *   `DecisionView.tsx` shows as a fixed label alongside this table, never
@@ -36,11 +48,13 @@
  *   "not reached" is a real, comparable state of its own, never the same
  *   as an empty cell. Deliberately NOT drift-proofed the same way — the
  *   sprint's own decision-side-completion item scopes that fix to the
- *   capability metric rows and the crossing count only.
+ *   capability metric rows, the crossing count, and the trigger-resolved
+ *   row only.
  */
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { findBoundaryCrossings } from '../../db/healthFindings';
+import { hasLifecycleExposureData, supportingSystemIds, systemsExposedByLifecycle } from '../capabilityMap/metrics';
 import type { ValueStreamTone } from '../valueStreams/valueStreamRollup';
 import type { CapabilityComparisonMetrics, OptionComparisonRow } from './compareOptions';
 import type { OptionTouch } from './optionTouch';
@@ -271,6 +285,78 @@ export function buildBoundaryCrossingsRow(concernElementIds: readonly UUID[], op
 }
 
 // ---------------------------------------------------------------------------
+// Trigger resolved -> one row per declared concern (capability or
+// system/container), reusing the exact same lifecycle-exposure definition
+// the health finding and capability-map colour-by mode already use
+// (`src/ui/capabilityMap/metrics.ts`'s `systemsExposedByLifecycle` — never
+// a second, decision-page-local definition of exposure).
+// ---------------------------------------------------------------------------
+
+export type TriggerResolution = { kind: 'not_exposed' } | { kind: 'unknown' } | { kind: 'resolved' } | { kind: 'still_exposed' };
+
+const TRIGGER_RESOLUTION_LABEL: Record<TriggerResolution['kind'], string> = {
+  not_exposed: 'not exposed',
+  unknown: 'unknown',
+  resolved: 'exposed → resolved',
+  still_exposed: 'exposed → still exposed',
+};
+
+/**
+ * Whether this concern's own exposure trigger — the same lifecycle-exposure
+ * read the health finding and capability-map colour-by mode already use,
+ * applied here to `beforeSystems` (main folded at the option's own fork
+ * point, per this file's own drift-proofing) — is gone on `afterSystems`
+ * (this option's own head). Four states only, per the sprint's own list:
+ * - `'unknown'`: `beforeSystems` is non-empty but none of them carry a
+ *   recorded `plannedEnd` at all — there's no signal either way, so this
+ *   is deliberately distinct from a genuine "not exposed" read (a system
+ *   with no `plannedEnd` recorded reads identically to one confirmed to
+ *   have none, which `hasLifecycleExposureData` exists to tell apart).
+ * - `'not_exposed'`: either no systems are in scope at all (nothing that
+ *   could be exposed), or real data exists and none of it is within
+ *   `STALE_AFTER_MONTHS` — there was no trigger to resolve in the first
+ *   place, on the *before* side.
+ * - `'resolved'` / `'still_exposed'`: the before side was genuinely
+ *   exposed; whether the after side still is decides which.
+ * Deliberately not a fifth "newly exposed" state (before not exposed, after
+ * exposed) — outside the sprint's own four-state list, and this row is
+ * about resolving an existing trigger, not detecting a new one.
+ */
+export function computeTriggerResolution(beforeSystems: readonly ElementsHeadRow[], afterSystems: readonly ElementsHeadRow[], now: Date = new Date()): TriggerResolution {
+  if (beforeSystems.length === 0) return { kind: 'not_exposed' };
+  if (!hasLifecycleExposureData(beforeSystems)) return { kind: 'unknown' };
+  if (!systemsExposedByLifecycle(beforeSystems, now)) return { kind: 'not_exposed' };
+  return systemsExposedByLifecycle(afterSystems, now) ? { kind: 'still_exposed' } : { kind: 'resolved' };
+}
+
+export interface TriggerResolvedOptionInput {
+  beforeSystems: readonly ElementsHeadRow[];
+  afterSystems: readonly ElementsHeadRow[];
+}
+
+/** A cell only ever marks `changed` on `'resolved'` — `'still_exposed'` is truthfully "nothing changed here", and the collapse rule (rule 2) should hide this row when every option leaves the concern equally exposed, same as it hides any other row no option affects. */
+export function buildTriggerResolvedRow(id: string, groupLabel: string, mainSystems: readonly ElementsHeadRow[], optionsInput: ReadonlyMap<UUID, TriggerResolvedOptionInput>, now: Date = new Date()): WhatChangesRow {
+  const options = new Map<UUID, WhatChangesCell>();
+  for (const [branchId, input] of optionsInput) {
+    const resolution = computeTriggerResolution(input.beforeSystems, input.afterSystems, now);
+    options.set(branchId, cell(TRIGGER_RESOLUTION_LABEL[resolution.kind], resolution.kind === 'resolved'));
+  }
+  // Main's own column is never anything but a before-vs-itself read (no
+  // fork drift applies to main), so it can only ever land on `not_exposed`,
+  // `unknown`, or `still_exposed` — `resolved` is impossible here by
+  // construction, since `beforeSystems === afterSystems`.
+  const mainResolution = computeTriggerResolution(mainSystems, mainSystems, now);
+  return {
+    id,
+    groupLabel,
+    rowLabel: 'Trigger resolved',
+    main: cell(TRIGGER_RESOLUTION_LABEL[mainResolution.kind], false),
+    options,
+    anyChanged: [...options.values()].some((c) => c.changed),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Affected value streams -> one row per stream reached anywhere
 // ---------------------------------------------------------------------------
 
@@ -341,16 +427,44 @@ export interface WhatChangesInput {
 export function buildWhatChangesRows(input: WhatChangesInput): WhatChangesRow[] {
   const rows: WhatChangesRow[] = [];
 
+  function systemsFor(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): ElementsHeadRow[] {
+    const systems: ElementsHeadRow[] = [];
+    for (const id of supportingSystemIds(capabilityId, supportsEdges)) {
+      const system = elementsById.get(id);
+      if (system) systems.push(system);
+    }
+    return systems;
+  }
+
   for (const capability of input.concernCapabilities) {
     const optionsInput = new Map(
       input.options.map((o) => [o.branchId, { metrics: o.row.metricsByCapabilityId.get(capability.element_id), beforeMetrics: o.mainAtFork.row.metricsByCapabilityId.get(capability.element_id) }]),
     );
     rows.push(...buildCapabilityMetricRows(capability, input.main.row.metricsByCapabilityId.get(capability.element_id), optionsInput));
+
+    const triggerOptionsInput = new Map(
+      input.options.map((o) => [
+        o.branchId,
+        { beforeSystems: systemsFor(capability.element_id, o.mainAtFork.supportsEdges, o.mainAtFork.elementsById), afterSystems: systemsFor(capability.element_id, o.supportsEdges, o.elementsById) },
+      ]),
+    );
+    const mainSystems = systemsFor(capability.element_id, input.main.supportsEdges, input.main.elementsById);
+    rows.push(buildTriggerResolvedRow(`capability:${capability.element_id}:trigger`, capability.name, mainSystems, triggerOptionsInput));
   }
 
   for (const element of input.concernSystemsOrContainers) {
     const optionsInput = new Map(input.options.map((o) => [o.branchId, { touch: o.touch, elementsById: o.elementsById }]));
     rows.push(buildSystemConcernOutcomeRow(element, optionsInput));
+
+    const triggerOptionsInput = new Map(
+      input.options.map((o) => {
+        const before = o.mainAtFork.elementsById.get(element.element_id);
+        const after = o.elementsById.get(element.element_id);
+        return [o.branchId, { beforeSystems: before ? [before] : [], afterSystems: after ? [after] : [] }];
+      }),
+    );
+    const mainSelf = input.main.elementsById.get(element.element_id);
+    rows.push(buildTriggerResolvedRow(`element:${element.element_id}:trigger`, element.name, mainSelf ? [mainSelf] : [], triggerOptionsInput));
   }
 
   const concernElementIds = [...input.concernCapabilities, ...input.concernSystemsOrContainers].map((e) => e.element_id);

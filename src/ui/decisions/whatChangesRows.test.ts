@@ -8,10 +8,12 @@ import {
   buildBoundaryCrossingsRow,
   buildCapabilityMetricRows,
   buildSystemConcernOutcomeRow,
+  buildTriggerResolvedRow,
   buildValueStreamRow,
   buildWhatChangesRows,
   computeScopedBoundaryCrossings,
   computeSystemConcernOutcome,
+  computeTriggerResolution,
   groupWhatChangesRows,
   valueStreamToneLabel,
 } from './whatChangesRows';
@@ -165,6 +167,76 @@ describe('buildSystemConcernOutcomeRow / buildWhatChangesRows system row', () =>
   });
 });
 
+describe('computeTriggerResolution', () => {
+  const now = new Date('2026-01-01T00:00:00Z');
+  const exposedSystem = elementRow('sys1', 'system', 'Legacy Gateway', { plannedEnd: '2026-06-01' }); // within STALE_AFTER_MONTHS of `now`
+  const safeSystem = elementRow('sys2', 'system', 'Safe System', { plannedEnd: '2032-01-01' }); // far beyond STALE_AFTER_MONTHS
+  const noDataSystem = elementRow('sys3', 'system', 'No Data System');
+
+  it('reads "not exposed" when the concern has no systems in scope at all', () => {
+    expect(computeTriggerResolution([], [], now)).toEqual({ kind: 'not_exposed' });
+  });
+
+  it('reads "unknown" when systems exist but none carry a recorded plannedEnd — no signal either way, distinct from a genuine "not exposed"', () => {
+    expect(computeTriggerResolution([noDataSystem], [noDataSystem], now)).toEqual({ kind: 'unknown' });
+  });
+
+  it('reads "not exposed" when real plannedEnd data exists and none of it is within STALE_AFTER_MONTHS', () => {
+    expect(computeTriggerResolution([safeSystem], [safeSystem], now)).toEqual({ kind: 'not_exposed' });
+  });
+
+  it('reads "still_exposed" when the before side was exposed and the after side still is', () => {
+    expect(computeTriggerResolution([exposedSystem], [exposedSystem], now)).toEqual({ kind: 'still_exposed' });
+  });
+
+  it('reads "resolved" when the before side was exposed and the after side no longer is', () => {
+    expect(computeTriggerResolution([exposedSystem], [safeSystem], now)).toEqual({ kind: 'resolved' });
+  });
+
+  it('reads "resolved" when the exposed system was removed from the model entirely on the after side (no systems left to be exposed)', () => {
+    expect(computeTriggerResolution([exposedSystem], [], now)).toEqual({ kind: 'resolved' });
+  });
+
+  it('never reads a fifth "newly exposed" state — a before side that was not exposed stays "not exposed" even if the after side introduces new exposure', () => {
+    expect(computeTriggerResolution([safeSystem], [exposedSystem], now)).toEqual({ kind: 'not_exposed' });
+  });
+});
+
+describe('buildTriggerResolvedRow', () => {
+  const now = new Date('2026-01-01T00:00:00Z');
+  const exposedSystem = elementRow('sys1', 'system', 'Legacy Gateway', { plannedEnd: '2026-06-01' });
+  const safeSystem = elementRow('sys2', 'system', 'Safe System', { plannedEnd: '2032-01-01' });
+
+  it('marks changed only on "resolved", follows the collapse rule, and shows the right label per state', () => {
+    const row = buildTriggerResolvedRow(
+      'row1',
+      'Legacy Gateway',
+      [],
+      new Map([
+        ['resolved-branch', { beforeSystems: [exposedSystem], afterSystems: [safeSystem] }],
+        ['still-exposed-branch', { beforeSystems: [exposedSystem], afterSystems: [exposedSystem] }],
+        ['not-exposed-branch', { beforeSystems: [safeSystem], afterSystems: [safeSystem] }],
+      ]),
+      now,
+    );
+    expect(row.rowLabel).toBe('Trigger resolved');
+    expect(row.options.get('resolved-branch')).toEqual({ display: 'exposed → resolved', changed: true });
+    expect(row.options.get('still-exposed-branch')).toEqual({ display: 'exposed → still exposed', changed: false });
+    expect(row.options.get('not-exposed-branch')).toEqual({ display: 'not exposed', changed: false });
+    expect(row.anyChanged).toBe(true);
+  });
+
+  it("collapses when every option leaves the concern equally exposed (no option resolved it)", () => {
+    const row = buildTriggerResolvedRow('row1', 'Legacy Gateway', [], new Map([['b1', { beforeSystems: [exposedSystem], afterSystems: [exposedSystem] }]]), now);
+    expect(row.anyChanged).toBe(false);
+  });
+
+  it("main's own column reads its current exposure state (before === after, self-comparison), never \"resolved\"", () => {
+    const row = buildTriggerResolvedRow('row1', 'Legacy Gateway', [exposedSystem], new Map(), now);
+    expect(row.main).toEqual({ display: 'exposed → still exposed', changed: false });
+  });
+});
+
 describe('computeScopedBoundaryCrossings', () => {
   const capA = elementRow('capA', 'capability', 'A');
   const sysIT = elementRow('sysIT', 'system', 'IT System', { domain: 'it' });
@@ -252,9 +324,12 @@ describe('buildWhatChangesRows (full orchestration)', () => {
 
     const { visible, collapsed } = groupWhatChangesRows(rows);
     expect(visible).toEqual([]);
-    // 4 capability metric rows + 1 boundary-crossings row, all unchanged.
-    expect(collapsed).toHaveLength(5);
-    expect(collapsed.every((r) => r.options.get('b1')?.display === 'no change')).toBe(true);
+    // 4 capability metric rows + 1 trigger-resolved row (no supporting
+    // systems on either side, so "not exposed") + 1 boundary-crossings row.
+    expect(collapsed).toHaveLength(6);
+    const triggerRow = collapsed.find((r) => r.rowLabel === 'Trigger resolved');
+    expect(triggerRow?.options.get('b1')).toEqual({ display: 'not exposed', changed: false });
+    expect(collapsed.filter((r) => r.rowLabel !== 'Trigger resolved').every((r) => r.options.get('b1')?.display === 'no change')).toBe(true);
   });
 
   it('an empty-delta option (no capability/system concerns, two like-for-like options) produces only the boundary-crossings row, and it collapses', () => {
