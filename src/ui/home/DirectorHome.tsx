@@ -14,8 +14,9 @@ import { defaultIntentForEntryPoint } from '../changes/branchIntent';
 import type { BranchIntent } from '../../db/types';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { attributesRecord } from '../elements/attributesRecord';
-import { decisionPrefillToSearchParams, prefillFromWeakCapability } from '../decisions/decisionPrefill';
+import { decisionPrefillToSearchParams, prefillFromPoorFitCapabilities, prefillFromWeakCapability } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
+import { formatPoorFitPillLabel, isCapabilityTileWeak, poorFitPillTone } from './capabilityTileFit';
 import { ProposeChangePicker } from './ProposeChangePicker';
 import { ValueStreamsOutcomeView } from '../valueStreams/ValueStreamsOutcomeView';
 import { canCreateChangeBranch, canStartDecision } from '../orgs/useMembership';
@@ -83,8 +84,12 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
     );
   }
 
-  const weakTiles = data.tiles.filter((t) => t.tone !== 'ok');
-  const healthyTiles = data.tiles.filter((t) => t.tone === 'ok');
+  // F6.1 ("make capability fit-for-purpose visible to directors"): a tile
+  // is weak when its exposure tone says so *or* it has a poor-fit
+  // capability — a display rule only (`isCapabilityTileWeak`'s own doc
+  // comment); fit itself never becomes part of `tone` (ADR-023).
+  const weakTiles = data.tiles.filter((t) => isCapabilityTileWeak(t));
+  const healthyTiles = data.tiles.filter((t) => !isCapabilityTileWeak(t));
 
   return (
     <div className={styles.door}>
@@ -301,14 +306,29 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
   // existing classification rather than re-deriving it from the list.
   const isWeak = tile.tone === 'neutral';
   // Prompt pack F3 PR6: F3's own second named golden path, "from the
-  // director door's weak-capability tile, start a decision" — only ever
-  // offered on an emphasised (weak, `tone !== 'ok'`) tile, never a healthy
-  // one, and rendered as a sibling *after* the tile's own primary link, not
-  // nested inside it (an `<a>` cannot legally contain another `<a>`).
+  // director door's weak-capability tile, start a decision" — gated on
+  // the tile's own exposure tone specifically (not `emphasised`, which
+  // F6.1 widened to also cover a tone-ok/poor-fit-only tile — the exact
+  // "shows no known exposure" copy `prefillFromWeakCapability` writes
+  // would be wrong for a tile that's only weak because of fit), and
+  // rendered as a sibling *after* the tile's own primary link, not nested
+  // inside it (an `<a>` cannot legally contain another `<a>`).
   const startDecisionHref =
-    emphasised && canStartDecision(role)
+    tile.tone !== 'ok' && canStartDecision(role)
       ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefillFromWeakCapability({ id: tile.capability.element_id, name: tile.capability.name }, TONE_LABEL[tile.tone])).toString()}`
       : null;
+  // F6.1: a second, independent "Start a decision" for the fit reason —
+  // concerns are the individual poor-fit capabilities under this tile
+  // (`prefillFromPoorFitCapabilities`), never the level-1 tile itself.
+  // Suppressed once every poor-fit edge already has a planned
+  // replacement recorded (`poorFitAllReplacementPlanned`) — the fit pill
+  // reads "replacement planned" instead in that case, nothing left to
+  // start a decision about.
+  const startFitDecisionHref =
+    tile.poorFitCapabilities.length > 0 && !tile.poorFitAllReplacementPlanned && canStartDecision(role)
+      ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefillFromPoorFitCapabilities(tile.capability.name, tile.poorFitCapabilities.map((c) => ({ id: c.element_id, name: c.name })))).toString()}`
+      : null;
+  const decisionActionHrefs = [startDecisionHref, startFitDecisionHref].filter((href): href is string => href !== null);
   const content = (
     <>
       <span className={styles.statusBar} data-tone={tile.tone} aria-hidden="true" />
@@ -356,6 +376,16 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
           {TONE_LABEL[tile.tone]} · {tile.isOwned ? 'owned' : 'no owner'}
         </Chip>
       )}
+      {/* F6.1: a second, visually distinct pill — its own glyph shape (a
+          triangle, not the tone chip's round dot) so the two never read as
+          one combined status even before colour is considered (§6.3/§8.4's
+          "never colour alone"). Rendered off `poorFitCapabilities` directly,
+          not `emphasised` — the instruction's own "independently of tone". */}
+      {tile.poorFitCapabilities.length > 0 && (
+        <Chip tone={poorFitPillTone(tile.poorFitAllReplacementPlanned)} glyph={<span className={styles.fitGlyph} aria-hidden="true" />}>
+          {formatPoorFitPillLabel(tile.poorFitCapabilities.length, tile.poorFitAllReplacementPlanned)}
+        </Chip>
+      )}
     </>
   );
 
@@ -366,9 +396,35 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
       <Link to={href} className={linkClassName}>
         {emphasised ? <BlueprintFrame>{content}</BlueprintFrame> : content}
       </Link>
-      {startDecisionHref !== null && (
-        <div className={styles.tileAction}>
-          <StartDecisionLink href={startDecisionHref} />
+      {/* F6.1: "link to the capabilities concerned" — real, individually
+          navigable links, rendered as DOM siblings after the tile's own
+          primary link (never nested inside it, same reasoning as
+          `StartDecisionLink` below — an `<a>` cannot legally contain
+          another `<a>`). */}
+      {tile.poorFitCapabilities.length > 0 && (
+        <ul className={styles.fitCapabilityList}>
+          {tile.poorFitCapabilities.map((capability) => (
+            <li key={capability.element_id}>
+              <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${capability.element_id}`}>
+                <Text as="span" size="xs">
+                  {capability.name}
+                </Text>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      {decisionActionHrefs.length > 0 && (
+        // The common case (0 or 1 action) keeps the exact corner-overlay
+        // layout every existing tile already uses (`.tileAction`); the
+        // rare case of both a tone- and a fit-triggered action on the
+        // same tile falls back to an ordinary in-flow stack
+        // (`.tileActionsStacked`) rather than risking two absolutely-
+        // positioned links overlapping in the same corner.
+        <div className={decisionActionHrefs.length > 1 ? styles.tileActionsStacked : styles.tileAction}>
+          {decisionActionHrefs.map((href) => (
+            <StartDecisionLink key={href} href={href} />
+          ))}
         </div>
       )}
     </div>

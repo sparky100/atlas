@@ -86,6 +86,44 @@
   bottom: var(--space-3);
 }
 
+/* F6.1: the rare case of both a tone- and a fit-triggered "Start a
+   decision" on the same tile — an ordinary in-flow stack instead of
+   `.tileAction`'s single absolutely-positioned corner slot, so the two
+   links never overlap. */
+.tileActionsStacked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+/* F6.1: the poor-fit capability links — real navigable links to each
+   affected capability, kept outside the tile's own primary `<Link>`
+   (siblings, same reasoning `.tileAction` already documents) but still
+   visually grouped with the card above it. Compact enough to stay
+   readable at ~380px without widening the single-column tile grid. */
+.fitCapabilityList {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+/* A triangle, not the tone chip's round `.dot` — the fit pill must read
+   as a genuinely different signal even before its colour (`danger`/
+   `info`) is taken into account (§6.3/§8.4's "never colour alone"). */
+.fitGlyph {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: calc(var(--status-dot-size) / 2) solid transparent;
+  border-right: calc(var(--status-dot-size) / 2) solid transparent;
+  border-bottom: var(--status-dot-size) solid currentColor;
+}
+
 .tile,
 .tileEmphasised {
   display: block;

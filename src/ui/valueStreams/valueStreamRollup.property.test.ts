@@ -31,6 +31,8 @@ function tile(capabilityId: string, tone: ValueStreamTone, fitForPurpose: FitFor
     totalCapabilityCount: 0,
     isOwned: false,
     fitForPurpose,
+    poorFitCapabilities: [],
+    poorFitAllReplacementPlanned: false,
   };
 }
 
