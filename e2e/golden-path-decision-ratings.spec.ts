@@ -91,10 +91,20 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   await page.getByRole('button', { name: 'Confirm choice' }).click();
   await expect(page.getByText('accepted', { exact: true })).toBeVisible();
 
+  // The decision shows the chosen option and the rationale recorded at Choose time.
+  await expect(optionAHeader).toContainText('chosen');
+  await expect(page.getByText('Option 1 is cheaper and ready sooner.')).toBeVisible();
+
   // The ratings recorded before choosing are still shown afterwards...
   await expect(costRow.locator('button').nth(optionAColumn - 1)).toContainText('Low');
   await expect(optionAHeader).toContainText('2/5');
 
   // ...and are now read-only: the cell is no longer a live tap target.
   await expect(costRow.locator('button').nth(optionAColumn - 1)).toBeDisabled();
+
+  // The rejected option (Option 2) stays visible in the grid, not removed —
+  // its own column, status chip, and previously-recorded rating remain.
+  await expect(optionBHeader).toBeVisible();
+  await expect(optionBHeader).toContainText('cancelled');
+  await expect(timingRow.locator('button').nth(optionBColumn - 1)).toContainText('After end date');
 });
