@@ -453,6 +453,22 @@ export interface DecisionLinkRow {
   created_at: string;
 }
 
+/** `DecisionCriterionKey` (`src/contracts/decisionCriteria.ts`) as it's stored — verbatim, no translation layer. */
+export type DecisionRatingCriterion = 'cost' | 'effort' | 'deliveryRisk' | 'timing' | 'vendorFit';
+/** `DecisionRatingLevel` (`src/contracts/decisionCriteria.ts`) as it's stored — verbatim. */
+export type DecisionRatingLevelValue = 'favourable' | 'acceptable' | 'unfavourable';
+
+/** The literal shape of a row in `decision_option_ratings` — one row per (decision, option, criterion), primary key `(decision_id, branch_id, criterion)` so no `id` column of its own. Read-only once the decision is no longer `proposed` (RLS, `20260929010000_decision_option_ratings.sql`) — not enforced client-side, the same "the database is the real gate" posture every other read-only-after-a-status-change table in this schema already takes. */
+export interface DecisionOptionRatingRow {
+  decision_id: UUID;
+  branch_id: UUID;
+  criterion: DecisionRatingCriterion;
+  level: DecisionRatingLevelValue;
+  note: string | null;
+  rated_by: UUID;
+  rated_at: string;
+}
+
 /** The literal shape of a row in `assumptions` — first-class and independent of any one decision (ADR-013). Schema-complete; no authoring UI ships this sprint (CLAUDE.md rule 7). */
 export interface AssumptionRow {
   id: UUID;

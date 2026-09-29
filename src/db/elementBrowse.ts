@@ -79,24 +79,42 @@ export async function loadOwnersByElementId(supabase: Client, commitId: UUID, el
 export interface BrowseRow {
   element: ElementsHeadRow;
   owner: ElementsHeadRow | null;
-  /** `SystemAttributes.lifecycleStatus` — the only type that carries one; `null` for every other type. */
+  /** `SystemAttributes.lifecycleStatus`, or a module's own `ContainerAttributes.lifecycleStatus` override if it has one, else its parent platform's — same "own value if set, else the platform's" convention `moduleAttributes.ts`'s `effectiveModuleAttributes` already establishes (`lifecycleStatusOf` below takes the same two arguments for the same reason, rather than importing that function just to throw away three of its five merged fields). `null` for every other type, an ordinary (non-module) container, or an unset value with no parent to inherit from. */
   lifecycleStatus: string | null;
-  /** `SystemAttributes.criticality` — the element's own value, same "system-only, no module inheritance" scope as `lifecycleStatus` above (`moduleAttributes.ts`'s inheritance is deliberately not applied here, matching `lifecycleStatusOf`'s own precedent). `null` for every other type or an unset value. */
+  /** `SystemAttributes.criticality`, with the identical own-value-else-parent's resolution `lifecycleStatus` above has. `null` under the same conditions. */
   criticality: string | null;
   /** `element`'s own parent, for `moduleDisplayName`'s "Platform · Module" convention — the whole model's elements are already loaded for this table (`useElementBrowse.ts`), so this is a free Map lookup, never a second query. `null` for every element without a parent. */
   parent: ElementsHeadRow | null;
 }
 
-export function lifecycleStatusOf(element: ElementsHeadRow): string | null {
-  if (element.element_type !== 'system') return null;
-  const value = attributesRecord(element.attributes).lifecycleStatus;
-  return typeof value === 'string' ? value : null;
+/** `parent` is only ever consulted for a `container` whose own value is unset — a `system` never has one to inherit from, and an already-set container value always wins over its parent's, matching `effectiveModuleAttributes`'s own precedence. Omitting `parent` (existing call sites that don't have one loaded) just means "no inheritance," same as before this function looked at containers at all. */
+export function lifecycleStatusOf(element: ElementsHeadRow, parent?: ElementsHeadRow | null): string | null {
+  if (element.element_type === 'system') {
+    const value = attributesRecord(element.attributes).lifecycleStatus;
+    return typeof value === 'string' ? value : null;
+  }
+  if (element.element_type === 'container') {
+    const own = attributesRecord(element.attributes).lifecycleStatus;
+    if (typeof own === 'string') return own;
+    const inherited = parent ? attributesRecord(parent.attributes).lifecycleStatus : undefined;
+    return typeof inherited === 'string' ? inherited : null;
+  }
+  return null;
 }
 
-export function criticalityOf(element: ElementsHeadRow): string | null {
-  if (element.element_type !== 'system') return null;
-  const value = attributesRecord(element.attributes).criticality;
-  return typeof value === 'string' ? value : null;
+/** See `lifecycleStatusOf`'s own doc comment — identical resolution, `criticality` in place of `lifecycleStatus`. */
+export function criticalityOf(element: ElementsHeadRow, parent?: ElementsHeadRow | null): string | null {
+  if (element.element_type === 'system') {
+    const value = attributesRecord(element.attributes).criticality;
+    return typeof value === 'string' ? value : null;
+  }
+  if (element.element_type === 'container') {
+    const own = attributesRecord(element.attributes).criticality;
+    if (typeof own === 'string') return own;
+    const inherited = parent ? attributesRecord(parent.attributes).criticality : undefined;
+    return typeof inherited === 'string' ? inherited : null;
+  }
+  return null;
 }
 
 export const ELEMENT_TYPE_FILTER_OPTIONS: readonly (ElementType | 'all')[] = ['all', 'capability', 'system', 'container', 'actor', 'value_stream'];

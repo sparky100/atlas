@@ -1,0 +1,141 @@
+.wrap {
+  margin-bottom: var(--space-4);
+}
+
+.progressRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.grid th,
+.grid td {
+  text-align: left;
+  padding: var(--space-2);
+  border-bottom: var(--border-width) solid var(--border);
+  vertical-align: middle;
+}
+
+.criterionLabel {
+  white-space: nowrap;
+}
+
+.cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: none;
+  border: none;
+  padding: var(--space-1);
+  margin: calc(var(--space-1) * -1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.cell:disabled {
+  cursor: default;
+}
+
+.cell:not(:disabled):hover,
+.cell:not(:disabled):focus-visible {
+  background: var(--bg-subtle);
+}
+
+/* "Not rated" is visually distinct from a rated cell — a dashed outline
+   and muted text, never just an empty cell that could read as "rated
+   with nothing to show" (the brief's own "unrated cells shown as 'Not
+   rated,' visibly distinct"). */
+.notRated {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) dashed var(--border-strong);
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-lh);
+  white-space: nowrap;
+}
+
+.noteDot {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  line-height: 1;
+}
+
+.editor {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.levelPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.levelOption {
+  background: none;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  cursor: pointer;
+}
+
+.levelOptionSelected {
+  border-color: var(--border-strong);
+}
+
+.noteInput {
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  box-sizing: border-box;
+  min-height: calc(var(--row-height) * 1.5);
+  width: 100%;
+  resize: vertical;
+}
+
+.editorActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Phone width (~380px, this sprint's own constraint): shrink the table's
+   own padding so 2-3 option columns plus the criterion label column fit
+   without triggering the horizontal scroll .tableWrap allows as a
+   fallback — the golden path only ever needs two options on screen at
+   once. */
+@media (max-width: 420px) {
+  .grid th,
+  .grid td {
+    padding: var(--space-1);
+  }
+
+  .criterionLabel {
+    white-space: normal;
+    max-width: 90px;
+  }
+}

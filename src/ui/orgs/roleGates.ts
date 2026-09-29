@@ -8,7 +8,7 @@
  * unaffected — this is a location split, not a public API change.
  */
 import type { UUID } from '../../contracts/delta';
-import type { BranchRow, MemberRole } from '../../db/types';
+import type { BranchRow, DecisionRow, MemberRole } from '../../db/types';
 
 /** Mirrors `models_insert`'s RLS check (`atlas.has_role(org_id, 'owner', 'architect')`, supabase/migrations/20260906071300_models.sql) — for showing/hiding the affordance; the database enforces the real rule regardless of what this returns. */
 export function canCreateModel(role: MemberRole | null): boolean {
@@ -174,4 +174,19 @@ export function canRunDuplicateCheck(role: MemberRole | null): boolean {
 /** F4: mirrors `models_update`'s RLS (owner/architect) — `duplicates_check_enabled` is a plain column grant under that same RLS (`20260924010000_duplicates_schema.sql`), so the nightly-sweep toggle checkbox uses the identical floor `canArchiveModel` already uses for this table. A contributor visiting the report sees no toggle at all, only "Check now"/dismiss — and, per the v1 scope call (ADR-019 "Amended (F4, ...)"), no "Merge into…" either, since the report is main-scoped and `canEditOnMain` already gates merging there. */
 export function canManageDuplicatesCheck(role: MemberRole | null): boolean {
   return canEditOnMain(role);
+}
+
+/**
+ * Decision criteria ratings: mirrors `decision_option_ratings_insert`/`_update`'s
+ * own RLS predicate (`supabase/migrations/20260929010000_decision_option_ratings.sql`)
+ * — same floor `canAddOption`'s own inline check already used in
+ * `DecisionView.tsx` before this was pulled out to a named export ("adding
+ * an option" is the closest existing precedent for "rating one," not the
+ * narrower `decisions_update` tier used for the decision's own core
+ * fields). Ratings are read-only the instant the decision leaves
+ * `proposed` — there is no separate "reopened" affordance to special-case
+ * here, matching the RLS, which checks nothing but current status.
+ */
+export function canRateDecisionOption(role: MemberRole | null, decision: DecisionRow): boolean {
+  return canCreateChangeBranch(role) && decision.status === 'proposed';
 }

@@ -14,9 +14,10 @@ import type { MemberRole } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { branchStatusTone } from '../changes/branchStatus';
 import { profileLabel } from '../comments/profileLabel';
-import { canChooseDecisionOption, canCreateChangeBranch } from '../orgs/useMembership';
+import { canChooseDecisionOption, canCreateChangeBranch, canRateDecisionOption } from '../orgs/useMembership';
 import { useMembers } from '../orgs/useMembers';
 import type { ValueStreamTone } from '../valueStreams/valueStreamRollup';
+import { DecisionCriteriaGrid } from './DecisionCriteriaGrid';
 import { decisionStatusTone } from './decisionStatus';
 import { exportDecisionAsAdrMarkdown } from './exportDecisionAsAdr';
 import type { DecisionPageState } from './useDecision';
@@ -83,9 +84,10 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   if (state.status === 'not_found') return <Text as="p">No decision found for this id.</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 
-  const { decision, linkedElementsById, linkedBranchesById, args } = state;
+  const { decision, linkedElementsById, linkedBranchesById, args, ratings } = state;
   const canAddOption = canCreateChangeBranch(role) && decision.status === 'proposed';
   const canChoose = canChooseDecisionOption(role) && decision.status === 'proposed';
+  const canRate = canRateDecisionOption(role, decision);
 
   // Prompt pack F3 PR6's "Export as ADR markdown" — assembled from data
   // this page has already loaded (no second round trip). `decisionArgLinks`
@@ -267,6 +269,28 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               </Button>
             </div>
           </div>
+        )}
+
+        {comparisonOptions.length > 0 && (
+          <div className={styles.field}>
+            <Text as="h3" size="md">
+              Criteria
+            </Text>
+            <DecisionCriteriaGrid
+              decisionId={decisionId}
+              options={comparisonOptions.map((o) => ({ branchId: o.branchId, label: o.label }))}
+              ratings={ratings}
+              canRate={canRate}
+              userId={userId}
+              onRated={reload}
+            />
+          </div>
+        )}
+
+        {comparisonOptions.length > 0 && (
+          <Text as="h3" size="md">
+            What changes
+          </Text>
         )}
 
         {comparison.status === 'ready' && concernedCapabilityIds.length > 0 && (() => {
