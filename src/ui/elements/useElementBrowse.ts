@@ -286,13 +286,19 @@ export function useElementBrowse(
         ids = new Set(elements.filter((e) => attributesRecord(e.attributes)[filter.custom] === filter.value).map((e) => e.element_id));
       }
 
-      const rows: BrowseRow[] = elements.map((element) => ({
-        element,
-        owner: ownersByElementId.get(element.element_id) ?? null,
-        lifecycleStatus: lifecycleStatusOf(element),
-        criticality: criticalityOf(element),
-        parent: element.parent_id !== null ? (elementsById.get(element.parent_id) ?? null) : null,
-      }));
+      const rows: BrowseRow[] = elements.map((element) => {
+        const parent = element.parent_id !== null ? (elementsById.get(element.parent_id) ?? null) : null;
+        return {
+          element,
+          owner: ownersByElementId.get(element.element_id) ?? null,
+          // `parent` threaded through so a module whose own lifecycle/
+          // criticality is unset reads as its platform's, rather than
+          // blank — `lifecycleStatusOf`/`criticalityOf`'s own doc comment.
+          lifecycleStatus: lifecycleStatusOf(element, parent),
+          criticality: criticalityOf(element, parent),
+          parent,
+        };
+      });
 
       if (!cancelled) {
         setLoaded({ allRows: rows, commitId: resolvedCommitId, filteredIds: ids });
