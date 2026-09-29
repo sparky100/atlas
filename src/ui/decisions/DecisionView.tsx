@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
+import { DECISION_CRITERIA, decisionCriterionLevelLabel } from '../../contracts/decisionCriteria';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -10,6 +11,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useMainBranch } from '../branches/useMainBranch';
+import { useSelectedRef } from '../branches/useSelectedRef';
 import type { MemberRole } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { profileLabel } from '../comments/profileLabel';
@@ -22,6 +24,7 @@ import { exportDecisionAsAdrMarkdown } from './exportDecisionAsAdr';
 import type { DecisionPageState } from './useDecision';
 import { useDecisionComparison, type DecisionComparisonOption } from './useDecisionComparison';
 import { useDecisionOptions } from './useDecisionOptions';
+import { useDecisionRatings } from './useDecisionRatings';
 import { groupWhatChangesRows, type WhatChangesRow } from './whatChangesRows';
 import styles from './DecisionView.module.css';
 
@@ -57,6 +60,13 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
   const optionsState = useDecisionOptions(reload);
+  const navigate = useNavigate();
+  const { setRef } = useSelectedRef();
+  // Lifted up from `DecisionCriteriaGrid.tsx` (decision-side-completion
+  // item 6) — the ADR export below needs every option's own ratings too,
+  // and a second independent `useDecisionRatings` instance there would
+  // mean two separate fetches/polling loops for the same table.
+  const ratingsState = useDecisionRatings(modelId, decisionId);
 
   const [addingOption, setAddingOption] = useState(false);
   const [optionName, setOptionName] = useState('');
@@ -106,14 +116,34 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   // decision's own already-recorded `decision_arguments` row, once it has one.
   const decidedReasons = args.find((a) => a.stance === 'for')?.body ?? null;
 
+  // Decision-side-completion item 6: "Copy as ADR markdown" also carries
+  // the decision's own declared concerns, each option's own ratings/notes
+  // (`ratingsState.ratings`, lifted up above so this doesn't need a second
+  // fetch), and the What-changes table's own evidence — only the rows it
+  // renders visible, never the collapsed "unchanged" group, matching the
+  // table's own display exactly.
+  function optionRatingsFor(branchId: UUID) {
+    return DECISION_CRITERIA.map((criterion) => {
+      const rating = ratingsState.ratings.find((r) => r.branch_id === branchId && r.criterion === criterion.key);
+      if (!rating) return null;
+      return { criterionLabel: criterion.label, levelLabel: decisionCriterionLevelLabel(criterion.key, rating.level) ?? rating.level, note: rating.note };
+    }).filter((r): r is NonNullable<typeof r> => r !== null);
+  }
+
   async function copyAdrMarkdown() {
+    const concernIds = [...concernedCapabilityIds, ...otherConcernElementIds];
     const markdown = exportDecisionAsAdrMarkdown({
       decision,
       ownerName,
+      concerns: concernIds
+        .map((id) => linkedElementsById.get(id))
+        .filter((e): e is NonNullable<typeof e> => e !== undefined)
+        .map((e) => ({ name: e.name, typeLabel: e.element_type })),
       options: branchLinks
         .map((l) => linkedBranchesById.get(l.linked_id))
         .filter((b): b is NonNullable<typeof b> => b !== undefined)
-        .map((b) => ({ branch: b, isChosen: b.id === decision.branch_id })),
+        .map((b) => ({ branch: b, isChosen: b.id === decision.branch_id, ratings: optionRatingsFor(b.id) })),
+      whatChangesRows: comparison.status === 'ready' ? groupWhatChangesRows(comparison.whatChangesRows).visible : [],
       reasons: decidedReasons,
     });
     try {
@@ -213,7 +243,6 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               }));
             return (
               <DecisionCriteriaGrid
-                modelId={modelId}
                 decisionId={decisionId}
                 options={criteriaOptions}
                 canRate={canRate}
@@ -225,6 +254,12 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   setChoosingBranchId(branchId);
                   setReasons('');
                 }}
+                canWorkOnChange={canCreateChangeBranch(role)}
+                onWorkOnThisChange={(branchId) => {
+                  setRef({ kind: 'branch', branchId });
+                  void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
+                }}
+                ratingsState={ratingsState}
               />
             );
           })()
@@ -367,7 +402,14 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                             <th>Row</th>
                             <th>{comparison.main.label}</th>
                             {comparison.options.map((o) => (
-                              <th key={o.branchId}>{o.label}</th>
+                              <th key={o.branchId}>
+                                {o.label}
+                                {o.branchId !== null && comparison.mainDriftedByBranchId.has(o.branchId) && (
+                                  <Text as="p" size="sm" tone="muted">
+                                    Main has moved since this option branched
+                                  </Text>
+                                )}
+                              </th>
                             ))}
                           </tr>
                         </thead>

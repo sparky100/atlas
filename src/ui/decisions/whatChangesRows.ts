@@ -8,33 +8,53 @@
  * differs from main, which is exactly the collapse rule the table itself
  * applies (`groupWhatChangesRows` below).
  *
- * Four row families, one per the brief's own rule 1 ("one row per declared
- * concern + boundary crossings + affected-value-stream rows"):
+ * Five row families, one per the brief's own rule 1 ("one row per declared
+ * concern + boundary crossings + affected-value-stream rows") plus the
+ * decision-side-completion item's own "Trigger resolved" addition:
  * - A capability concern becomes up to four independent metric rows
  *   (coverage/lifecycle/criticality/fit — decision 2 in the sprint's own
- *   go-ahead), each collapsing on its own. These still compare main's
- *   *current* head projection against the option's own head projection
- *   (unchanged by the own-deltas rework below) — see `compareOptions.ts`'s
- *   own module comment on what that means when main has drifted since the
- *   option forked.
- * - A system/container concern becomes one outcome row
- *   (unchanged/retired/replaced by X), derived from the option's own
- *   `OptionTouch` (`optionTouch.ts`) — its own `retiredElements` and
- *   `replacesEdges`, both read off the option's *own* deltas, never a
+ *   go-ahead), each collapsing on its own. Each option's own "before" side
+ *   for these rows is main folded at *that option's own* `baseCommitId`
+ *   (its fork point), never main's current head — a decision-side-
+ *   completion item, drift-proofing what used to compare against a moving
+ *   target. See `compareOptions.ts`'s own module comment for the fold and
+ *   the drift-note this makes possible.
+ * - A system/container concern becomes one outcome row (unchanged/retired/
+ *   replaced by X/removed from model), derived from the option's own
+ *   `OptionTouch` (`optionTouch.ts`) — its own `lifecycleRetiredElements`,
+ *   `replacesEdges`, and `retiredElements`, all read off the option's
+ *   *own* deltas resolved against the option's own current head, never a
  *   version-diff against main (which would conflate the option's own
  *   changes with independent main-side drift).
+ * - Every declared concern (capability *and* system/container alike) also
+ *   gets a "Trigger resolved" row — is the concern's own lifecycle exposure
+ *   gone under this option? Reuses `src/ui/capabilityMap/metrics.ts`'s
+ *   `systemsExposedByLifecycle` verbatim (the same definition the health
+ *   finding and the capability-map colour-by mode already use — never a
+ *   second, decision-page-local one), applied to a capability's own
+ *   supporting systems or to a system/container concern's own singleton
+ *   system, on both the option's fork-point-main "before" and its own head
+ *   "after" (the identical drift-proofing the metric rows above use). See
+ *   `computeTriggerResolution`'s own doc comment for the four possible
+ *   states.
  * - Exactly one "boundary crossings" row, scoped per option (decision 1:
  *   at-least-one-endpoint-in-scope) — distinct from the model-wide figure
  *   `DecisionView.tsx` shows as a fixed label alongside this table, never
  *   folded into it. The scope's own "everything this option touches" half
- *   is `OptionTouch.touchedElementIds` — own-deltas, not a diff.
+ *   is `OptionTouch.touchedElementIds` — own-deltas, not a diff. Main's own
+ *   scoped *count* is, like the metric rows above, computed against main
+ *   folded at this option's own fork point, not main's current head.
  * - One row per value stream reached by *any* row (main or an option) —
  *   "not reached" is a real, comparable state of its own, never the same
- *   as an empty cell.
+ *   as an empty cell. Deliberately NOT drift-proofed the same way — the
+ *   sprint's own decision-side-completion item scopes that fix to the
+ *   capability metric rows, the crossing count, and the trigger-resolved
+ *   row only.
  */
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { findBoundaryCrossings } from '../../db/healthFindings';
+import { hasLifecycleExposureData, supportingSystemIds, systemsExposedByLifecycle } from '../capabilityMap/metrics';
 import type { ValueStreamTone } from '../valueStreams/valueStreamRollup';
 import type { CapabilityComparisonMetrics, OptionComparisonRow } from './compareOptions';
 import type { OptionTouch } from './optionTouch';
@@ -78,16 +98,24 @@ function formatCategoricalDelta(before: string | null, after: string | null): st
 // Capability concern -> up to four independent metric rows
 // ---------------------------------------------------------------------------
 
-export function buildCapabilityMetricRows(capability: ElementsHeadRow, mainMetrics: CapabilityComparisonMetrics | undefined, optionMetrics: ReadonlyMap<UUID, CapabilityComparisonMetrics | undefined>): WhatChangesRow[] {
-  const mainCoverage = mainMetrics?.coverage ?? 0;
-  const mainLifecycle = mainMetrics?.oldestLifecycleStage ?? null;
-  const mainCriticality = mainMetrics?.criticality ?? null;
-  const mainFit = mainMetrics?.fit ?? null;
+export interface CapabilityMetricOptionInput {
+  /** This option's own (after) metrics. */
+  metrics: CapabilityComparisonMetrics | undefined;
+  /** Main folded at *this option's own* `baseCommitId` (its fork point) — the "before" side these rows actually compare against, drift-proofed against main's current head moving independently after the fork. */
+  beforeMetrics: CapabilityComparisonMetrics | undefined;
+}
 
-  function buildRow(rowLabel: string, mainDisplay: string, pick: (m: CapabilityComparisonMetrics | undefined) => string): WhatChangesRow {
+/** `currentMainMetrics` is main's *current* head — used only for the "Current (main)" column's own absolute display value (what main looks like right now), never for the delta text or `anyChanged` — those come from each option's own `beforeMetrics` instead, per this file's own module comment. */
+export function buildCapabilityMetricRows(capability: ElementsHeadRow, currentMainMetrics: CapabilityComparisonMetrics | undefined, optionsInput: ReadonlyMap<UUID, CapabilityMetricOptionInput>): WhatChangesRow[] {
+  const currentMainCoverage = currentMainMetrics?.coverage ?? 0;
+  const currentMainLifecycle = currentMainMetrics?.oldestLifecycleStage ?? null;
+  const currentMainCriticality = currentMainMetrics?.criticality ?? null;
+  const currentMainFit = currentMainMetrics?.fit ?? null;
+
+  function buildRow(rowLabel: string, mainDisplay: string, pick: (input: CapabilityMetricOptionInput) => string): WhatChangesRow {
     const options = new Map<UUID, WhatChangesCell>();
-    for (const [branchId, metrics] of optionMetrics) {
-      const display = pick(metrics);
+    for (const [branchId, input] of optionsInput) {
+      const display = pick(input);
       options.set(branchId, cell(display, display !== 'no change'));
     }
     return {
@@ -101,10 +129,10 @@ export function buildCapabilityMetricRows(capability: ElementsHeadRow, mainMetri
   }
 
   return [
-    buildRow('Coverage', `${String(mainCoverage)} ${mainCoverage === 1 ? 'system' : 'systems'}`, (m) => formatCountDelta(mainCoverage, m?.coverage ?? 0, (n) => (n === 1 ? 'system' : 'systems'))),
-    buildRow('Lifecycle', mainLifecycle ?? UNRATED_LABEL, (m) => formatCategoricalDelta(mainLifecycle, m?.oldestLifecycleStage ?? null)),
-    buildRow('Criticality', mainCriticality ?? UNRATED_LABEL, (m) => formatCategoricalDelta(mainCriticality, m?.criticality ?? null)),
-    buildRow('Fit', mainFit ?? UNRATED_LABEL, (m) => formatCategoricalDelta(mainFit, m?.fit ?? null)),
+    buildRow('Coverage', `${String(currentMainCoverage)} ${currentMainCoverage === 1 ? 'system' : 'systems'}`, (input) => formatCountDelta(input.beforeMetrics?.coverage ?? 0, input.metrics?.coverage ?? 0, (n) => (n === 1 ? 'system' : 'systems'))),
+    buildRow('Lifecycle', currentMainLifecycle ?? UNRATED_LABEL, (input) => formatCategoricalDelta(input.beforeMetrics?.oldestLifecycleStage ?? null, input.metrics?.oldestLifecycleStage ?? null)),
+    buildRow('Criticality', currentMainCriticality ?? UNRATED_LABEL, (input) => formatCategoricalDelta(input.beforeMetrics?.criticality ?? null, input.metrics?.criticality ?? null)),
+    buildRow('Fit', currentMainFit ?? UNRATED_LABEL, (input) => formatCategoricalDelta(input.beforeMetrics?.fit ?? null, input.metrics?.fit ?? null)),
   ];
 }
 
@@ -112,16 +140,41 @@ export function buildCapabilityMetricRows(capability: ElementsHeadRow, mainMetri
 // System/container concern -> one outcome row
 // ---------------------------------------------------------------------------
 
-export type SystemConcernOutcome = { kind: 'unchanged' } | { kind: 'retired' } | { kind: 'replaced'; replacedByName: string };
+export type SystemConcernOutcome = { kind: 'unchanged' } | { kind: 'retired' } | { kind: 'replaced'; replacedByName: string } | { kind: 'removed' };
 
-/** `elementId`'s own outcome on this option, read off its own `OptionTouch` (`optionTouch.ts`, itself `summarizeOwnDeltas` filtered by delta kind) — retracted by one of this option's own deltas with no `replaces` edge pointing at it is `'retired'`; retracted with one is `'replaced'`, naming the edge's own `fromElementId` (ADR-001: `from = replacement`) via this option's own elements. Anything not retracted by this option's own deltas reads as `'unchanged'` — rule 5 only ever distinguishes these three outcomes, never a fourth "modified" state, and this option never touching the element at all is exactly as "unchanged" as one that touched-but-didn't-retract it. */
+/**
+ * `elementId`'s own outcome on this option, read off its own `OptionTouch`
+ * (`optionTouch.ts`) — three distinct, independently-real outcomes, per
+ * the real actions that produce them (ADR-000):
+ * - `'replaced'`: this option's own deltas introduced a live `replaces`
+ *   edge targeting the concern (`useElementRetire.ts`'s "replaced by"
+ *   picker) — checked first, since the same action that creates this edge
+ *   also sets `lifecycleStatus: 'retiring'` in the same commit, and
+ *   "replaced by X" is the more specific fact.
+ * - `'retired'`: this option's own deltas set the concern's
+ *   `lifecycleStatus` to `retiring`/`retired` (`'lifecycleRetiredElementIds'`,
+ *   `useElementRetire.ts` with no replacement picked) — the concern still
+ *   exists, only its lifecycle status changed.
+ * - `'removed'`: this option's own deltas retracted the concern outright
+ *   (`useElementRemoveFromModel.ts`'s "Remove from model…") — it no
+ *   longer exists at all, distinct from a lifecycle retirement.
+ * Anything this option didn't do reads as `'unchanged'` — this option
+ * never touching the element at all is exactly as "unchanged" as one that
+ * touched it without producing any of the three outcomes above.
+ */
 export function computeSystemConcernOutcome(elementId: UUID, touch: OptionTouch, optionElementsById: ReadonlyMap<UUID, ElementsHeadRow>): SystemConcernOutcome {
-  if (!touch.retiredElements.some((e) => e.id === elementId)) return { kind: 'unchanged' };
+  if (!optionElementsById.has(elementId)) {
+    return touch.retiredElements.some((e) => e.id === elementId) ? { kind: 'removed' } : { kind: 'unchanged' };
+  }
 
   const replacesEdge = touch.replacesEdges.find((r) => r.toElementId === elementId);
-  if (!replacesEdge) return { kind: 'retired' };
-  const replacedByName = optionElementsById.get(replacesEdge.fromElementId)?.name ?? replacesEdge.fromElementId;
-  return { kind: 'replaced', replacedByName };
+  if (replacesEdge) {
+    const replacedByName = optionElementsById.get(replacesEdge.fromElementId)?.name ?? replacesEdge.fromElementId;
+    return { kind: 'replaced', replacedByName };
+  }
+
+  if (touch.lifecycleRetiredElements.some((e) => e.id === elementId)) return { kind: 'retired' };
+  return { kind: 'unchanged' };
 }
 
 export interface SystemConcernOptionInput {
@@ -133,7 +186,7 @@ export function buildSystemConcernOutcomeRow(element: ElementsHeadRow, optionsIn
   const options = new Map<UUID, WhatChangesCell>();
   for (const [branchId, input] of optionsInput) {
     const outcome = computeSystemConcernOutcome(element.element_id, input.touch, input.elementsById);
-    const display = outcome.kind === 'unchanged' ? 'no change' : outcome.kind === 'retired' ? 'retired' : `replaced by ${outcome.replacedByName}`;
+    const display = outcome.kind === 'unchanged' ? 'no change' : outcome.kind === 'retired' ? 'retired' : outcome.kind === 'removed' ? 'removed from model' : `replaced by ${outcome.replacedByName}`;
     options.set(branchId, cell(display, outcome.kind !== 'unchanged'));
   }
   return {
@@ -172,6 +225,12 @@ export interface ScopedCrossingCounts {
  * count is computed against this exact same scope, against main's own
  * edges — never the model-wide figure — so "3 → 2" is always a
  * like-with-like comparison (the sprint's own rule 7).
+ *
+ * "Main" here is caller-supplied (`mainSupportsEdges`/`mainRelationshipsHead`/
+ * `mainElementsById`) — this function is agnostic to *which* main
+ * projection that is. `buildBoundaryCrossingsRow` passes each option's own
+ * fork-point main, drift-proofing `counts.main` the same way the
+ * capability metric rows are.
  */
 export function computeScopedBoundaryCrossings(
   concernElementIds: readonly UUID[],
@@ -202,18 +261,16 @@ export interface BoundaryCrossingsOptionInput {
   relationshipsHead: readonly RelationshipsHeadRow[];
   elementsById: ReadonlyMap<UUID, ElementsHeadRow>;
   touch: OptionTouch;
+  /** Main folded at *this option's own* `baseCommitId` (its fork point) — the "before" side `counts.main` actually compares against, same drift-proofing as the capability metric rows. Each option carries its own, since different options can fork at different points. */
+  mainAtForkSupportsEdges: readonly RelationshipsHeadRow[];
+  mainAtForkRelationshipsHead: readonly RelationshipsHeadRow[];
+  mainAtForkElementsById: ReadonlyMap<UUID, ElementsHeadRow>;
 }
 
-export function buildBoundaryCrossingsRow(
-  concernElementIds: readonly UUID[],
-  mainSupportsEdges: readonly RelationshipsHeadRow[],
-  mainRelationshipsHead: readonly RelationshipsHeadRow[],
-  mainElementsById: ReadonlyMap<UUID, ElementsHeadRow>,
-  optionsInput: ReadonlyMap<UUID, BoundaryCrossingsOptionInput>,
-): WhatChangesRow {
+export function buildBoundaryCrossingsRow(concernElementIds: readonly UUID[], optionsInput: ReadonlyMap<UUID, BoundaryCrossingsOptionInput>): WhatChangesRow {
   const options = new Map<UUID, WhatChangesCell>();
   for (const [branchId, input] of optionsInput) {
-    const counts = computeScopedBoundaryCrossings(concernElementIds, mainSupportsEdges, input.supportsEdges, mainRelationshipsHead, input.relationshipsHead, mainElementsById, input.elementsById, input.touch);
+    const counts = computeScopedBoundaryCrossings(concernElementIds, input.mainAtForkSupportsEdges, input.supportsEdges, input.mainAtForkRelationshipsHead, input.relationshipsHead, input.mainAtForkElementsById, input.elementsById, input.touch);
     const display = formatCountDelta(counts.main, counts.option, (n) => (n === 1 ? 'crossing' : 'crossings'));
     options.set(branchId, cell(display, counts.main !== counts.option));
   }
@@ -222,6 +279,78 @@ export function buildBoundaryCrossingsRow(
     groupLabel: 'Boundary crossings',
     rowLabel: 'Scoped crossings',
     main: cell('—', false),
+    options,
+    anyChanged: [...options.values()].some((c) => c.changed),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Trigger resolved -> one row per declared concern (capability or
+// system/container), reusing the exact same lifecycle-exposure definition
+// the health finding and capability-map colour-by mode already use
+// (`src/ui/capabilityMap/metrics.ts`'s `systemsExposedByLifecycle` — never
+// a second, decision-page-local definition of exposure).
+// ---------------------------------------------------------------------------
+
+export type TriggerResolution = { kind: 'not_exposed' } | { kind: 'unknown' } | { kind: 'resolved' } | { kind: 'still_exposed' };
+
+const TRIGGER_RESOLUTION_LABEL: Record<TriggerResolution['kind'], string> = {
+  not_exposed: 'not exposed',
+  unknown: 'unknown',
+  resolved: 'exposed → resolved',
+  still_exposed: 'exposed → still exposed',
+};
+
+/**
+ * Whether this concern's own exposure trigger — the same lifecycle-exposure
+ * read the health finding and capability-map colour-by mode already use,
+ * applied here to `beforeSystems` (main folded at the option's own fork
+ * point, per this file's own drift-proofing) — is gone on `afterSystems`
+ * (this option's own head). Four states only, per the sprint's own list:
+ * - `'unknown'`: `beforeSystems` is non-empty but none of them carry a
+ *   recorded `plannedEnd` at all — there's no signal either way, so this
+ *   is deliberately distinct from a genuine "not exposed" read (a system
+ *   with no `plannedEnd` recorded reads identically to one confirmed to
+ *   have none, which `hasLifecycleExposureData` exists to tell apart).
+ * - `'not_exposed'`: either no systems are in scope at all (nothing that
+ *   could be exposed), or real data exists and none of it is within
+ *   `STALE_AFTER_MONTHS` — there was no trigger to resolve in the first
+ *   place, on the *before* side.
+ * - `'resolved'` / `'still_exposed'`: the before side was genuinely
+ *   exposed; whether the after side still is decides which.
+ * Deliberately not a fifth "newly exposed" state (before not exposed, after
+ * exposed) — outside the sprint's own four-state list, and this row is
+ * about resolving an existing trigger, not detecting a new one.
+ */
+export function computeTriggerResolution(beforeSystems: readonly ElementsHeadRow[], afterSystems: readonly ElementsHeadRow[], now: Date = new Date()): TriggerResolution {
+  if (beforeSystems.length === 0) return { kind: 'not_exposed' };
+  if (!hasLifecycleExposureData(beforeSystems)) return { kind: 'unknown' };
+  if (!systemsExposedByLifecycle(beforeSystems, now)) return { kind: 'not_exposed' };
+  return systemsExposedByLifecycle(afterSystems, now) ? { kind: 'still_exposed' } : { kind: 'resolved' };
+}
+
+export interface TriggerResolvedOptionInput {
+  beforeSystems: readonly ElementsHeadRow[];
+  afterSystems: readonly ElementsHeadRow[];
+}
+
+/** A cell only ever marks `changed` on `'resolved'` — `'still_exposed'` is truthfully "nothing changed here", and the collapse rule (rule 2) should hide this row when every option leaves the concern equally exposed, same as it hides any other row no option affects. */
+export function buildTriggerResolvedRow(id: string, groupLabel: string, mainSystems: readonly ElementsHeadRow[], optionsInput: ReadonlyMap<UUID, TriggerResolvedOptionInput>, now: Date = new Date()): WhatChangesRow {
+  const options = new Map<UUID, WhatChangesCell>();
+  for (const [branchId, input] of optionsInput) {
+    const resolution = computeTriggerResolution(input.beforeSystems, input.afterSystems, now);
+    options.set(branchId, cell(TRIGGER_RESOLUTION_LABEL[resolution.kind], resolution.kind === 'resolved'));
+  }
+  // Main's own column is never anything but a before-vs-itself read (no
+  // fork drift applies to main), so it can only ever land on `not_exposed`,
+  // `unknown`, or `still_exposed` — `resolved` is impossible here by
+  // construction, since `beforeSystems === afterSystems`.
+  const mainResolution = computeTriggerResolution(mainSystems, mainSystems, now);
+  return {
+    id,
+    groupLabel,
+    rowLabel: 'Trigger resolved',
+    main: cell(TRIGGER_RESOLUTION_LABEL[mainResolution.kind], false),
     options,
     anyChanged: [...options.values()].some((c) => c.changed),
   };
@@ -272,11 +401,19 @@ export interface WhatChangesOptionInput {
   relationshipsHead: RelationshipsHeadRow[];
   supportsEdges: RelationshipsHeadRow[];
   touch: OptionTouch;
+  /** Main folded at *this option's own* `baseCommitId` — the drift-proof "before" side for this option's own capability metric rows and scoped-crossing count (`compareOptions.ts`'s own module comment). */
+  mainAtFork: {
+    row: OptionComparisonRow;
+    elementsById: Map<UUID, ElementsHeadRow>;
+    relationshipsHead: RelationshipsHeadRow[];
+    supportsEdges: RelationshipsHeadRow[];
+  };
 }
 
 export interface WhatChangesInput {
   concernCapabilities: readonly ElementsHeadRow[];
   concernSystemsOrContainers: readonly ElementsHeadRow[];
+  /** Main's *current* head — used only for the "Current (main)" column's own display and the value-stream rows (deliberately not drift-proofed, per this file's own module comment). */
   main: {
     row: OptionComparisonRow;
     elementsById: Map<UUID, ElementsHeadRow>;
@@ -290,19 +427,62 @@ export interface WhatChangesInput {
 export function buildWhatChangesRows(input: WhatChangesInput): WhatChangesRow[] {
   const rows: WhatChangesRow[] = [];
 
+  function systemsFor(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): ElementsHeadRow[] {
+    const systems: ElementsHeadRow[] = [];
+    for (const id of supportingSystemIds(capabilityId, supportsEdges)) {
+      const system = elementsById.get(id);
+      if (system) systems.push(system);
+    }
+    return systems;
+  }
+
   for (const capability of input.concernCapabilities) {
-    const optionMetrics = new Map(input.options.map((o) => [o.branchId, o.row.metricsByCapabilityId.get(capability.element_id)]));
-    rows.push(...buildCapabilityMetricRows(capability, input.main.row.metricsByCapabilityId.get(capability.element_id), optionMetrics));
+    const optionsInput = new Map(
+      input.options.map((o) => [o.branchId, { metrics: o.row.metricsByCapabilityId.get(capability.element_id), beforeMetrics: o.mainAtFork.row.metricsByCapabilityId.get(capability.element_id) }]),
+    );
+    rows.push(...buildCapabilityMetricRows(capability, input.main.row.metricsByCapabilityId.get(capability.element_id), optionsInput));
+
+    const triggerOptionsInput = new Map(
+      input.options.map((o) => [
+        o.branchId,
+        { beforeSystems: systemsFor(capability.element_id, o.mainAtFork.supportsEdges, o.mainAtFork.elementsById), afterSystems: systemsFor(capability.element_id, o.supportsEdges, o.elementsById) },
+      ]),
+    );
+    const mainSystems = systemsFor(capability.element_id, input.main.supportsEdges, input.main.elementsById);
+    rows.push(buildTriggerResolvedRow(`capability:${capability.element_id}:trigger`, capability.name, mainSystems, triggerOptionsInput));
   }
 
   for (const element of input.concernSystemsOrContainers) {
     const optionsInput = new Map(input.options.map((o) => [o.branchId, { touch: o.touch, elementsById: o.elementsById }]));
     rows.push(buildSystemConcernOutcomeRow(element, optionsInput));
+
+    const triggerOptionsInput = new Map(
+      input.options.map((o) => {
+        const before = o.mainAtFork.elementsById.get(element.element_id);
+        const after = o.elementsById.get(element.element_id);
+        return [o.branchId, { beforeSystems: before ? [before] : [], afterSystems: after ? [after] : [] }];
+      }),
+    );
+    const mainSelf = input.main.elementsById.get(element.element_id);
+    rows.push(buildTriggerResolvedRow(`element:${element.element_id}:trigger`, element.name, mainSelf ? [mainSelf] : [], triggerOptionsInput));
   }
 
   const concernElementIds = [...input.concernCapabilities, ...input.concernSystemsOrContainers].map((e) => e.element_id);
-  const crossingsInput = new Map(input.options.map((o) => [o.branchId, { supportsEdges: o.supportsEdges, relationshipsHead: o.relationshipsHead, elementsById: o.elementsById, touch: o.touch }]));
-  rows.push(buildBoundaryCrossingsRow(concernElementIds, input.main.supportsEdges, input.main.relationshipsHead, input.main.elementsById, crossingsInput));
+  const crossingsInput = new Map(
+    input.options.map((o) => [
+      o.branchId,
+      {
+        supportsEdges: o.supportsEdges,
+        relationshipsHead: o.relationshipsHead,
+        elementsById: o.elementsById,
+        touch: o.touch,
+        mainAtForkSupportsEdges: o.mainAtFork.supportsEdges,
+        mainAtForkRelationshipsHead: o.mainAtFork.relationshipsHead,
+        mainAtForkElementsById: o.mainAtFork.elementsById,
+      },
+    ]),
+  );
+  rows.push(buildBoundaryCrossingsRow(concernElementIds, crossingsInput));
 
   const streamNameById = new Map<UUID, string>();
   for (const r of input.main.row.affectedValueStreams) streamNameById.set(r.stream.element_id, r.stream.name);

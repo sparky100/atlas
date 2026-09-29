@@ -27,18 +27,18 @@ function retractDelta(elementId: string): Delta {
 
 describe('computeAlsoAffected', () => {
   it('excludes a touched element that is a declared concern', () => {
-    const touch = deriveOptionTouch([elementSubject('sys1', 'Touched', createDelta('sys1', 'Touched'))]);
     const elementsById = new Map([['sys1', elementRow('sys1', 'system', 'Touched')]]);
+    const touch = deriveOptionTouch([elementSubject('sys1', 'Touched', createDelta('sys1', 'Touched'))], elementsById, []);
     const result = computeAlsoAffected(touch, new Set(['sys1']), [], new Map(), [], elementsById);
     expect(result).toEqual([]);
   });
 
   it('includes a touched (added) element not among the declared concerns, with owners resolved from the OPTION\'s own projection', () => {
-    const touch = deriveOptionTouch([elementSubject('sys1', 'Touched', createDelta('sys1', 'Touched'))]);
     const optionElementsById = new Map([
       ['sys1', elementRow('sys1', 'system', 'Touched')],
       ['owner1', elementRow('owner1', 'actor', 'Ops Team')],
     ]);
+    const touch = deriveOptionTouch([elementSubject('sys1', 'Touched', createDelta('sys1', 'Touched'))], optionElementsById, []);
     const result = computeAlsoAffected(touch, new Set(), [], new Map(), [ownsEdge('o1', 'owner1', 'sys1', 'business')], optionElementsById);
     expect(result).toHaveLength(1);
     expect(result[0]?.element.name).toBe('Touched');
@@ -46,13 +46,13 @@ describe('computeAlsoAffected', () => {
   });
 
   it('excludes an element this option never touched at all', () => {
-    const touch = deriveOptionTouch([]);
+    const touch = deriveOptionTouch([], new Map(), []);
     const result = computeAlsoAffected(touch, new Set(), [], new Map(), [], new Map([['sys1', elementRow('sys1', 'system', 'Same')]]));
     expect(result).toEqual([]);
   });
 
   it("resolves a removed (retired) element, AND its owners, from MAIN's own projection — the option's own head no longer has it", () => {
-    const touch = deriveOptionTouch([elementSubject('sys1', 'Retired One', retractDelta('sys1'))]);
+    const touch = deriveOptionTouch([elementSubject('sys1', 'Retired One', retractDelta('sys1'))], new Map(), []);
     const mainElementsById = new Map([
       ['sys1', elementRow('sys1', 'system', 'Retired One')],
       ['owner1', elementRow('owner1', 'actor', 'Ops Team')],
@@ -66,16 +66,16 @@ describe('computeAlsoAffected', () => {
   });
 
   it('a retired element with a DIFFERENT owner on main than an added element has on the option — each side reads its own owners, never mixed', () => {
-    const touch = deriveOptionTouch([elementSubject('retired1', 'Retired', retractDelta('retired1')), elementSubject('added1', 'Added', createDelta('added1', 'Added'))]);
+    const optionElementsById = new Map([
+      ['added1', elementRow('added1', 'system', 'Added')],
+      ['optionOwner', elementRow('optionOwner', 'actor', 'Option-side Owner')],
+    ]);
+    const touch = deriveOptionTouch([elementSubject('retired1', 'Retired', retractDelta('retired1')), elementSubject('added1', 'Added', createDelta('added1', 'Added'))], optionElementsById, []);
     const mainElementsById = new Map([
       ['retired1', elementRow('retired1', 'system', 'Retired')],
       ['mainOwner', elementRow('mainOwner', 'actor', 'Main-side Owner')],
     ]);
     const mainOwnsEdges = [ownsEdge('o1', 'mainOwner', 'retired1', 'business')];
-    const optionElementsById = new Map([
-      ['added1', elementRow('added1', 'system', 'Added')],
-      ['optionOwner', elementRow('optionOwner', 'actor', 'Option-side Owner')],
-    ]);
     const optionOwnsEdges = [ownsEdge('o2', 'optionOwner', 'added1', 'technical')];
 
     const result = computeAlsoAffected(touch, new Set(), mainOwnsEdges, mainElementsById, optionOwnsEdges, optionElementsById);

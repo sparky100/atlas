@@ -135,6 +135,11 @@ async function computeComparisonRow(
   return { row, raw: { head, elementsById, relationshipsHead: projection.relationshipsHead, supportsEdges, ownsEdges } };
 }
 
+/** `true` when main has moved since this option's own fork point — the fact `mainDriftedByBranchId` flags for the reader via the "Main has moved since this option branched" note (`DecisionView.tsx`). Extracted as its own pure function so this one real piece of drift-detection logic is unit-testable directly, rather than only provable by exercising the whole (Supabase-backed) `compareDecisionOptions`. */
+export function hasMainDrifted(optionBaseCommitId: UUID, mainHeadCommitId: UUID): boolean {
+  return optionBaseCommitId !== mainHeadCommitId;
+}
+
 export interface CompareDecisionOptionsInput {
   modelId: UUID;
   mainHeadCommitId: UUID;
@@ -155,6 +160,8 @@ export interface CompareDecisionOptionsResult {
   alsoAffectedByBranchId: Map<UUID, AlsoAffectedElement[]>;
   /** Part B's per-option one-line derived summary ("Retires PM, adds Hana equivalent, re-points 4 flows") — `null` for an empty-delta option (the caller renders "No changes recorded yet" instead). */
   optionSummaries: Map<UUID, string | null>;
+  /** Branch ids whose `baseCommitId` no longer equals `mainHeadCommitId` — main has moved since this option forked. `DecisionView.tsx` shows a small note on these; the capability metric rows and the scoped-crossing count are already drift-proofed against this exact fact (each compares against main folded at the option's own fork point, not main's current head) — this set is purely informational, telling the reader *that* main moved, since the rows themselves no longer need it to stay correct. */
+  mainDriftedByBranchId: ReadonlySet<UUID>;
 }
 
 /**
@@ -166,18 +173,27 @@ export interface CompareDecisionOptionsResult {
  * data this function has already fetched, never recomputed by a
  * component.
  *
- * Two distinct derivations feed the result, deliberately kept separate:
- * - `metricsByCapabilityId`/`boundaryCrossingCount`/`affectedValueStreams`
- *   (via `computeComparisonRow`) compare main's *current* head projection
- *   against the option's own head projection — genuine state facts (how
- *   many systems support a capability *right now*), not deltas. An
- *   option's own head folds from genesis through its own `base_commit_id`
- *   (`ComparisonRowRaw`'s own doc comment) — if main has moved since that
- *   fork point and the option hasn't been rebased (`useBranchRebase.ts`),
- *   these rows can show a delta caused by main's own independent drift,
- *   not anything the option did. This function doesn't correct for that;
- *   it's a pre-existing property of comparing two live projections,
- *   unchanged by this rework.
+ * Three distinct derivations feed the result:
+ * - `boundaryCrossingCount`/`affectedValueStreams` (via `computeComparisonRow`,
+ *   the `main`/`options` rows themselves) compare main's *current* head
+ *   projection against the option's own head projection — genuine state
+ *   facts (how many systems support a capability *right now*), not deltas.
+ *   `boundaryCrossingCount` here is the model-wide figure `DecisionView.tsx`
+ *   shows as a fixed label, distinct from the "What changes" table's own
+ *   scoped crossing row below; `affectedValueStreams` isn't drift-proofed
+ *   (this sprint's own decision-side-completion item scopes that fix to
+ *   the two families below only).
+ * - The "What changes" table's own capability metric rows and scoped-
+ *   crossing count compare each option against main folded at *that
+ *   option's own* `baseCommitId` (its fork point) — `mainAtFork` below,
+ *   one fold per option (an option's own head already folds from genesis
+ *   through its own `base_commit_id`, `ComparisonRowRaw`'s own doc
+ *   comment; this folds the *same* commit id, just reading main's state
+ *   there instead of the option's). This drift-proofs those specific rows
+ *   against main moving independently after the fork — the "before"
+ *   number no longer changes underneath an option just because main kept
+ *   moving; `mainDriftedByBranchId` flags *that* it moved, for the reader,
+ *   since the rows themselves no longer need flagging to stay correct.
  * - `whatChangesRows`' own outcome/scope pieces, `alsoAffectedByBranchId`,
  *   and `optionSummaries` are built from each option's own `OptionTouch`
  *   (`optionTouch.ts`) — `summarizeOwnDeltas` over `listOwnDeltas`'s
@@ -202,18 +218,26 @@ export async function compareDecisionOptions(supabase: Client, input: CompareDec
   // widen to `UUID | null` even here, where it's always real.
   const optionComputations = await Promise.all(
     options.map(async (o) => {
-      const result = await computeComparisonRow(supabase, modelId, o.headCommitId, capabilityIds, o.branchId, o.label, plannedReplacements);
-      // `asIsHead` = this option's own fork point (its `base_commit_id`,
-      // cached the same way every other head in this file is) —
-      // `summarizeOwnDeltas`'s own "as-is/to-be" pair, needed to resolve a
-      // touched subject's display name; `result.raw.head` is already this
-      // option's own "to-be" (its current head), so no second fold there.
-      const asIsHead = await loadHeadAtCommitCached(supabase, modelId, o.baseCommitId);
+      // `mainAtFork` — main's own state, folded at *this option's own*
+      // fork point (`o.baseCommitId`), not at `mainHeadCommitId` — the
+      // drift-proof "before" side for this option's own capability metric
+      // rows and scoped-crossing count (this function's own module
+      // comment). `loadHeadAtCommitCached` inside `computeComparisonRow`
+      // means two options sharing a fork point reuse the same cached fold.
+      const [result, mainAtFork] = await Promise.all([
+        computeComparisonRow(supabase, modelId, o.headCommitId, capabilityIds, o.branchId, o.label, plannedReplacements),
+        computeComparisonRow(supabase, modelId, o.baseCommitId, capabilityIds, null, 'Main at fork', plannedReplacements),
+      ]);
+      // `asIsHead` = this option's own fork point — `summarizeOwnDeltas`'s
+      // own "as-is/to-be" pair, needed to resolve a touched subject's
+      // display name; `mainAtFork.raw.head` is this exact same fold, so no
+      // second fetch/fold for it.
+      const asIsHead = mainAtFork.raw.head;
       const fork: BranchFork = { baseCommitId: o.baseCommitId, headCommitId: o.headCommitId };
       const ownDeltas = listOwnDeltas(fork, commitLoader);
       const { subjects }: { subjects: ChangeSubjectSummary[] } = summarizeOwnDeltas(ownDeltas, asIsHead, result.raw.head);
-      const touch = deriveOptionTouch(subjects);
-      return { branchId: o.branchId, touch, ...result };
+      const touch = deriveOptionTouch(subjects, result.raw.elementsById, result.raw.relationshipsHead);
+      return { branchId: o.branchId, touch, mainAtFork, drifted: hasMainDrifted(o.baseCommitId, mainHeadCommitId), ...result };
     }),
   );
 
@@ -228,6 +252,7 @@ export async function compareDecisionOptions(supabase: Client, input: CompareDec
     relationshipsHead: c.raw.relationshipsHead,
     supportsEdges: c.raw.supportsEdges,
     touch: c.touch,
+    mainAtFork: { row: c.mainAtFork.row, elementsById: c.mainAtFork.raw.elementsById, relationshipsHead: c.mainAtFork.raw.relationshipsHead, supportsEdges: c.mainAtFork.raw.supportsEdges },
   }));
 
   const whatChangesRows = buildWhatChangesRows({
@@ -248,11 +273,14 @@ export async function compareDecisionOptions(supabase: Client, input: CompareDec
     optionSummaries.set(c.branchId, summarizeOptionChanges(c.touch));
   }
 
+  const mainDriftedByBranchId = new Set<UUID>(optionComputations.filter((c) => c.drifted).map((c) => c.branchId));
+
   return {
     main: mainResult.row,
     options: optionComputations.map((c) => c.row),
     whatChangesRows,
     alsoAffectedByBranchId,
     optionSummaries,
+    mainDriftedByBranchId,
   };
 }

@@ -207,19 +207,34 @@ function plannedEndOf(system: ElementsHeadRow): Date | null {
 }
 
 /**
- * `true` when any supporting system's `plannedEnd` falls within
+ * `true` when any of `systems` has a `plannedEnd` falling within
  * `STALE_AFTER_MONTHS` of `now` — including one already overdue, which is
- * more exposed still, not less. See the module comment for why "no
- * planned replacement" isn't (yet) a separate check.
+ * more exposed still, not less. The reusable core `lifecycleExposure`
+ * delegates to (and that the decision page's "Trigger resolved" row,
+ * `whatChangesRows.ts`, also calls directly against a system/container
+ * concern's own singleton system list) — see the module comment for why
+ * "no planned replacement" isn't (yet) a separate check.
  */
-export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): boolean {
-  for (const systemId of supportingSystemIds(capabilityId, supportsEdges)) {
-    const system = systemsById.get(systemId);
-    if (!system) continue;
+export function systemsExposedByLifecycle(systems: readonly ElementsHeadRow[], now: Date = new Date()): boolean {
+  for (const system of systems) {
     const plannedEnd = plannedEndOf(system);
     if (plannedEnd !== null && monthsUntil(plannedEnd, now) <= STALE_AFTER_MONTHS) return true;
   }
   return false;
+}
+
+/** `true` when at least one of `systems` has a recorded `plannedEnd` — `false` means exposure can't be determined either way (no signal), as distinct from a genuine "not exposed" read. */
+export function hasLifecycleExposureData(systems: readonly ElementsHeadRow[]): boolean {
+  return systems.some((system) => plannedEndOf(system) !== null);
+}
+
+export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): boolean {
+  const systems: ElementsHeadRow[] = [];
+  for (const systemId of supportingSystemIds(capabilityId, supportsEdges)) {
+    const system = systemsById.get(systemId);
+    if (system) systems.push(system);
+  }
+  return systemsExposedByLifecycle(systems, now);
 }
 
 /** The tone+label a tile should show for the selected colour-by mode — `mode: 'none'` always returns no tone and no label. */
