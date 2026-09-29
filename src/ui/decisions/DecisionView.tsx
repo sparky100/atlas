@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -10,6 +10,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useMainBranch } from '../branches/useMainBranch';
+import { useSelectedRef } from '../branches/useSelectedRef';
 import type { MemberRole } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { profileLabel } from '../comments/profileLabel';
@@ -57,6 +58,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
   const optionsState = useDecisionOptions(reload);
+  const navigate = useNavigate();
+  const { setRef } = useSelectedRef();
 
   const [addingOption, setAddingOption] = useState(false);
   const [optionName, setOptionName] = useState('');
@@ -224,6 +227,11 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                 onChoose={(branchId) => {
                   setChoosingBranchId(branchId);
                   setReasons('');
+                }}
+                canWorkOnChange={canCreateChangeBranch(role)}
+                onWorkOnThisChange={(branchId) => {
+                  setRef({ kind: 'branch', branchId });
+                  void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
                 }}
               />
             );

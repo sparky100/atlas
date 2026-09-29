@@ -33,6 +33,10 @@ export interface DecisionCriteriaGridProps {
   orgSlug: string;
   modelSlug: string;
   onChoose: (branchId: UUID) => void;
+  /** `canCreateChangeBranch(role)` at the call site, ungated by `decision.status` (unlike `canAddOption`/`canChoose`) — this action is only ever offered on the *chosen* option, which by definition means the decision has already moved past `proposed`. */
+  canWorkOnChange: boolean;
+  /** Selects this branch as the session's editing ref and navigates to its change page — the exact "Edit in this change" mechanism `ChangePage.tsx` already offers, reused rather than reinvented (item 5: "using the existing 'Work in this change' flow"). */
+  onWorkOnThisChange: (branchId: UUID) => void;
 }
 
 interface EditingCell {
@@ -60,8 +64,19 @@ function stripExploringPrefix(label: string): string {
  * own "Choose" confirm form, not a per-cell popover) so the editor never
  * has to fit inside a narrow table cell at the ~380px width this sprint's
  * own constraint names.
+ *
+ * Decision-side-completion item 5: once an option is chosen (and still a
+ * `draft` branch — the only status a change branch is ever committable
+ * to, same guard `ChangePage.tsx`'s own "Edit in this change" uses), its
+ * header also offers "Work on this as a change" — no new mechanism, just
+ * `onWorkOnThisChange` selecting the branch as the session's editing ref
+ * and navigating to its change page, the exact same thing `ChangePage.tsx`'s
+ * own button does. `atlas.choose_decision_option` already flips the chosen
+ * branch's `intent` to `propose` server-side at Choose time — this action
+ * only ever gets the person *into* the change workspace, never repeats
+ * that flip.
  */
-export function DecisionCriteriaGrid({ modelId, decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, onChoose }: DecisionCriteriaGridProps) {
+export function DecisionCriteriaGrid({ modelId, decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, onChoose, canWorkOnChange, onWorkOnThisChange }: DecisionCriteriaGridProps) {
   const ratingsState = useDecisionRatings(modelId, decisionId);
   const ratings = ratingsState.ratings;
   const [editing, setEditing] = useState<EditingCell | null>(null);
@@ -128,6 +143,16 @@ export function DecisionCriteriaGrid({ modelId, decisionId, options, canRate, us
                           }}
                         >
                           Choose
+                        </Button>
+                      )}
+                      {o.isChosen && canWorkOnChange && o.status === 'draft' && (
+                        <Button
+                          variant="primary"
+                          onClick={() => {
+                            onWorkOnThisChange(o.branchId);
+                          }}
+                        >
+                          Work on this as a change
                         </Button>
                       )}
                     </div>
