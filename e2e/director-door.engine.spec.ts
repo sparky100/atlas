@@ -52,7 +52,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
   // drives that member's own session (`approve_merge_request`'s own gate,
   // used below, is independent of the reviewer set — just owner/architect
   // role).
-  const architectUserId = await addArchitectMember(env, orgId, userId);
+  const { userId: architectUserId } = await addArchitectMember(env, orgId, userId);
 
   const modelId = randomUUID();
   const modelSlug = `directordoor-model-${modelId.slice(0, 8)}`;

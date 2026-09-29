@@ -38,6 +38,13 @@ export interface ChangeBranchFixture {
   createDeltaId: string;
 }
 
+/** The architect member `addArchitectMember` creates — credentials included so a caller can sign in as them in a second browser context to cast their own review verdict. */
+export interface ArchitectMember {
+  userId: string;
+  email: string;
+  password: string;
+}
+
 /**
  * F3a's own architect floor (`atlas.submit_merge_request`'s
  * `v_min_architects`, default 1): a propose/explore-intent submit needs a
@@ -50,14 +57,52 @@ export interface ChangeBranchFixture {
  * satisfy that floor — inserted directly as service role rather than
  * through the invite-and-accept UI flow these backend-driven specs have no
  * second `page` for.
+ *
+ * `pickArchitect` (`src/db/deriveReviewers.ts`) always prefers this real
+ * architect over the fixture's own owner once one exists, so the owner's
+ * own reviewer row is only ever `optional` — the review never reaches
+ * "approved" until this architect actually casts a verdict. A caller whose
+ * scenario needs that approval opens a second `browser.newContext()` and
+ * signs in as them with the email/password returned here (the pattern
+ * `golden-path-propose-review-merge.spec.ts` already uses for its own
+ * separately-invited architect).
  */
-export async function addArchitectMember(env: Env, orgId: string, invitedBy: string): Promise<string> {
+export async function addArchitectMember(env: Env, orgId: string, invitedBy: string): Promise<ArchitectMember> {
   const service = createServiceRoleClient(env);
-  const { data: created, error: createError } = await service.auth.admin.createUser({ email: `architect-${randomUUID()}@example.test`, password: `${randomUUID()}Aa1!`, email_confirm: true });
+  const email = `architect-${randomUUID()}@example.test`;
+  const password = `${randomUUID()}Aa1!`;
+  const { data: created, error: createError } = await service.auth.admin.createUser({ email, password, email_confirm: true });
   if (createError) throw new Error(`addArchitectMember: create user: ${createError.message}`);
   const { error: memberError } = await service.from('members').insert({ org_id: orgId, user_id: created.user.id, role: 'architect', invited_by: invitedBy });
   if (memberError) throw new Error(`addArchitectMember: add member: ${memberError.message}`);
-  return created.user.id;
+  return { userId: created.user.id, email, password };
+}
+
+/**
+ * Signs an already-existing user (e.g. the architect `addArchitectMember`
+ * creates via `auth.admin.createUser`, never through the sign-up UI) into
+ * a fresh `page` through `/sign-in`'s own default "signIn" mode — the
+ * counterpart to `acceptInviteViaSignUp`'s sign-*up* flow, needed here
+ * because this account's own UI session doesn't exist yet. Their very
+ * first sign-in (any route, not just sign-up) hits `DisplayNamePrompt` —
+ * `atlas.ensure_profile`'s row exists with `display_name` still null,
+ * same gate `acceptInviteViaSignUp` clears via its own "Continue" step —
+ * so this clears it too, using a name derived from `email` since nothing
+ * else here has one to offer.
+ */
+export async function signInExistingUser(page: Page, email: string, password: string): Promise<void> {
+  await page.goto('/sign-in');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  const displayNameHeading = page.getByRole('heading', { name: 'What should we call you?' });
+  const orgsHeading = page.getByRole('heading', { name: 'Your organisations' });
+  await expect(displayNameHeading.or(orgsHeading)).toBeVisible();
+  if (await displayNameHeading.isVisible()) {
+    await page.getByLabel('Display name').fill(email.split('@')[0] ?? email);
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(orgsHeading).toBeVisible();
+  }
 }
 
 /**
