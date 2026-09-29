@@ -36,11 +36,13 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
     await expect(page.getByText(title).first()).toBeVisible();
   }
 
-  // The criteria grid renders once both options are linked; find which
+  // The criteria grid renders once both options are linked (F6.3 folded the
+  // old separate Options list into its own column headers — find which
   // header column belongs to which option (`decision_links` carries no
   // guaranteed order) rather than assuming insertion order.
-  const criteriaTable = page.locator('table').filter({ has: page.getByRole('columnheader', { name: 'Criterion' }) });
-  await expect(criteriaTable).toBeVisible();
+  const criteriaGrid = page.getByTestId('decision-criteria-grid');
+  await expect(criteriaGrid).toBeVisible();
+  const criteriaTable = criteriaGrid.locator('table');
   const headers = await criteriaTable.locator('th').allTextContents();
   const optionAColumn = headers.findIndex((h) => h.includes('Option 1'));
   const optionBColumn = headers.findIndex((h) => h.includes('Option 2'));
@@ -65,8 +67,11 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   // Option 2: rate only Timing (1 of 5).
   await rateCell('Timing', optionBColumn, 'After end date', 'Vendor cannot commit to a date.');
 
-  await expect(page.getByText(/Option 1: 2 of 5 rated/)).toBeVisible();
-  await expect(page.getByText(/Option 2: 1 of 5 rated/)).toBeVisible();
+  // F6.3's own compact "N/5" progress cue, in each option's own header cell.
+  const optionAHeader = criteriaTable.locator('th').nth(optionAColumn);
+  const optionBHeader = criteriaTable.locator('th').nth(optionBColumn);
+  await expect(optionAHeader).toContainText('2/5');
+  await expect(optionBHeader).toContainText('1/5');
 
   // Unrated cells read "Not rated," visibly distinct from a rated one.
   const effortRowForOptionA = criteriaTable.locator('tr', { hasText: 'Effort' });
@@ -78,16 +83,17 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   const timingRow = criteriaTable.locator('tr', { hasText: 'Timing' });
   await expect(timingRow.locator('button').nth(optionBColumn - 1)).toContainText('After end date');
 
-  // Choose option 1 — unrated criteria did not block it.
-  const optionARow = page.locator('li', { hasText: 'Option 1' });
-  await optionARow.getByRole('button', { name: 'Choose' }).click();
+  // Choose option 1 — unrated criteria did not block it. The "Choose"
+  // action now lives in the criteria grid's own merged header (F6.3 folded
+  // the old separate Options list into these headers).
+  await optionAHeader.getByRole('button', { name: 'Choose' }).click();
   await page.getByPlaceholder('The reasons this option was chosen over the others').fill('Option 1 is cheaper and ready sooner.');
   await page.getByRole('button', { name: 'Confirm choice' }).click();
   await expect(page.getByText('accepted', { exact: true })).toBeVisible();
 
   // The ratings recorded before choosing are still shown afterwards...
   await expect(costRow.locator('button').nth(optionAColumn - 1)).toContainText('Low');
-  await expect(page.getByText(/Option 1: 2 of 5 rated/)).toBeVisible();
+  await expect(optionAHeader).toContainText('2/5');
 
   // ...and are now read-only: the cell is no longer a live tap target.
   await expect(costRow.locator('button').nth(optionAColumn - 1)).toBeDisabled();

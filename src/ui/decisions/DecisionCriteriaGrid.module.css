@@ -2,13 +2,6 @@
   margin-bottom: var(--space-4);
 }
 
-.progressRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-bottom: var(--space-2);
-}
-
 .tableWrap {
   overflow-x: auto;
 }
@@ -16,6 +9,7 @@
 .grid {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .grid th,
@@ -23,11 +17,49 @@
   text-align: left;
   padding: var(--space-2);
   border-bottom: var(--border-width) solid var(--border);
-  vertical-align: middle;
+  vertical-align: top;
 }
 
+/* Sticky first column (this sprint's own phone-width constraint: "sticky
+   first column, horizontal scroll if needed") — the criterion label stays
+   readable while option columns scroll under it. */
+.criterionHeaderCell,
 .criterionLabel {
   white-space: nowrap;
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  z-index: 1;
+  min-width: 90px;
+}
+
+.optionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 160px;
+}
+
+.optionHeaderTop {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.optionHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Decision 3 (the sprint's own go-ahead): an empty-delta option's header
+   column is muted so it never reads as an assessed-and-neutral option —
+   the summary text itself already picks up `tone="muted"` inline; this
+   dims the header cell as a whole so the whole column reads as "nothing
+   recorded yet" at a glance. */
+.mutedHeaderCell {
+  opacity: 0.7;
 }
 
 .cell {
@@ -137,5 +169,9 @@
   .criterionLabel {
     white-space: normal;
     max-width: 90px;
+  }
+
+  .optionHeader {
+    min-width: 130px;
   }
 }

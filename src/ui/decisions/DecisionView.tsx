@@ -12,17 +12,17 @@ import { useAuth } from '../auth/useAuth';
 import { useMainBranch } from '../branches/useMainBranch';
 import type { MemberRole } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
-import { branchStatusTone } from '../changes/branchStatus';
 import { profileLabel } from '../comments/profileLabel';
 import { canChooseDecisionOption, canCreateChangeBranch, canRateDecisionOption } from '../orgs/useMembership';
 import { useMembers } from '../orgs/useMembers';
-import type { ValueStreamTone } from '../valueStreams/valueStreamRollup';
-import { DecisionCriteriaGrid } from './DecisionCriteriaGrid';
+import type { AlsoAffectedElement } from './alsoAffected';
+import { DecisionCriteriaGrid, type DecisionCriteriaOption } from './DecisionCriteriaGrid';
 import { decisionStatusTone } from './decisionStatus';
 import { exportDecisionAsAdrMarkdown } from './exportDecisionAsAdr';
 import type { DecisionPageState } from './useDecision';
 import { useDecisionComparison, type DecisionComparisonOption } from './useDecisionComparison';
 import { useDecisionOptions } from './useDecisionOptions';
+import { groupWhatChangesRows, type WhatChangesRow } from './whatChangesRows';
 import styles from './DecisionView.module.css';
 
 export interface DecisionViewProps {
@@ -64,6 +64,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const [choosingBranchId, setChoosingBranchId] = useState<UUID | null>(null);
   const [reasons, setReasons] = useState('');
   const [adrCopied, setAdrCopied] = useState(false);
+  const [whatChangesExpanded, setWhatChangesExpanded] = useState(false);
 
   // Every hook above must run unconditionally (rules of hooks) — the
   // comparison hook too, even before `state` has resolved to `ready`;
@@ -72,13 +73,18 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const elementLinks = readyState ? readyState.links.filter((l) => l.linked_type === 'element' || l.linked_type === 'relationship') : [];
   const branchLinks = readyState ? readyState.links.filter((l) => l.linked_type === 'branch') : [];
   const concernedCapabilityIds = readyState ? elementLinks.map((l) => l.linked_id).filter((id) => readyState.linkedElementsById.get(id)?.element_type === 'capability') : [];
+  // F6.3 (Part B) rule 5: a system/container concern gets its own outcome
+  // row (unchanged/retired/replaced by X) alongside a capability concern's
+  // four metric rows — a distinct id list, since the two never share a
+  // row shape.
+  const otherConcernElementIds = readyState ? elementLinks.map((l) => l.linked_id).filter((id) => { const t = readyState.linkedElementsById.get(id)?.element_type; return t === 'system' || t === 'container'; }) : [];
   const comparisonOptions: DecisionComparisonOption[] = readyState
     ? branchLinks
         .map((l) => readyState.linkedBranchesById.get(l.linked_id))
         .filter((b): b is NonNullable<typeof b> => b !== undefined)
         .map((b) => ({ branchId: b.id, headCommitId: b.head_commit_id, label: intentHeaderLine(b) }))
     : [];
-  const comparison = useDecisionComparison(modelId, main?.head_commit_id ?? null, concernedCapabilityIds, comparisonOptions);
+  const comparison = useDecisionComparison(modelId, main?.head_commit_id ?? null, concernedCapabilityIds, otherConcernElementIds, comparisonOptions);
 
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (state.status === 'not_found') return <Text as="p">No decision found for this id.</Text>;
@@ -188,50 +194,45 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
 
       <Panel>
         <Text as="h2" size="lg">
-          Options
+          Criteria
         </Text>
         {branchLinks.length === 0 ? (
           <EmptyState>No options added yet.</EmptyState>
         ) : (
-          <ul className={styles.linkList}>
-            {branchLinks.map((link) => {
-              const branch = linkedBranchesById.get(link.linked_id);
-              const isChosen = decision.branch_id === link.linked_id;
-              return (
-                <li key={link.linked_id} className={styles.linkRow}>
-                  {branch ? (
-                    <>
-                      {isChosen && <Chip tone="ok">chosen</Chip>}
-                      <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
-                      <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`}>
-                        <Text as="span">{intentHeaderLine(branch)}</Text>
-                      </Link>
-                      <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${branch.id}/landscape`}>
-                        <Text as="span" size="sm">
-                          View diagram →
-                        </Text>
-                      </Link>
-                      {canChoose && branch.status === 'draft' && (
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            setChoosingBranchId(link.linked_id);
-                            setReasons('');
-                          }}
-                        >
-                          Choose
-                        </Button>
-                      )}
-                    </>
-                  ) : (
-                    <Text as="span" tone="muted" size="sm">
-                      A linked change that no longer resolves.
-                    </Text>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          (() => {
+            const criteriaOptions: DecisionCriteriaOption[] = branchLinks
+              .map((link) => linkedBranchesById.get(link.linked_id))
+              .filter((b): b is NonNullable<typeof b> => b !== undefined)
+              .map((b) => ({
+                branchId: b.id,
+                label: intentHeaderLine(b),
+                status: b.status,
+                isChosen: decision.branch_id === b.id,
+                summary: comparison.status === 'ready' ? (comparison.optionSummaries.get(b.id) ?? null) : null,
+                canChoose: canChoose && b.status === 'draft',
+              }));
+            return (
+              <DecisionCriteriaGrid
+                modelId={modelId}
+                decisionId={decisionId}
+                options={criteriaOptions}
+                canRate={canRate}
+                userId={userId}
+                neededBy={decision.needed_by}
+                orgSlug={orgSlug}
+                modelSlug={modelSlug}
+                onChoose={(branchId) => {
+                  setChoosingBranchId(branchId);
+                  setReasons('');
+                }}
+              />
+            );
+          })()
+        )}
+        {branchLinks.some((link) => !linkedBranchesById.get(link.linked_id)) && (
+          <Text as="p" tone="muted" size="sm">
+            A linked change that no longer resolves.
+          </Text>
         )}
 
         {choosingBranchId !== null && (
@@ -270,87 +271,6 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             </div>
           </div>
         )}
-
-        {comparisonOptions.length > 0 && (
-          <div className={styles.field}>
-            <Text as="h3" size="md">
-              Criteria
-            </Text>
-            <DecisionCriteriaGrid
-              modelId={modelId}
-              decisionId={decisionId}
-              options={comparisonOptions.map((o) => ({ branchId: o.branchId, label: o.label }))}
-              canRate={canRate}
-              userId={userId}
-            />
-          </div>
-        )}
-
-        {comparisonOptions.length > 0 && (
-          <Text as="h3" size="md">
-            What changes
-          </Text>
-        )}
-
-        {comparison.status === 'ready' && concernedCapabilityIds.length > 0 && (() => {
-          // F6/ADR-023: every stream reached at *any* row (main or an
-          // option) — a stream absent from one option's own `affectedValueStreams`
-          // genuinely means "not reached there" (`—`), not a value to hide
-          // the whole row over, since a different option reaching it is
-          // exactly the comparison this table exists to show.
-          const allValueStreamRows = [...comparison.main.affectedValueStreams, ...comparison.options.flatMap((o) => o.affectedValueStreams)];
-          const streamNameById = new Map(allValueStreamRows.map((r) => [r.stream.element_id, r.stream.name]));
-          const streamIds = [...streamNameById.keys()].sort((a, b) => (streamNameById.get(a) ?? '').localeCompare(streamNameById.get(b) ?? ''));
-
-          return (
-            <div className={styles.tableWrap}>
-              <table className={styles.comparisonTable}>
-                <thead>
-                  <tr>
-                    <th>Capability</th>
-                    <th>{comparison.main.label}</th>
-                    {comparison.options.map((o) => (
-                      <th key={o.branchId}>{o.label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {concernedCapabilityIds.map((capabilityId) => (
-                    <tr key={capabilityId}>
-                      <td>{linkedElementsById.get(capabilityId)?.name ?? capabilityId}</td>
-                      <td>{formatCapabilityMetrics(comparison.main.metricsByCapabilityId.get(capabilityId))}</td>
-                      {comparison.options.map((o) => (
-                        <td key={o.branchId}>{formatCapabilityMetrics(o.metricsByCapabilityId.get(capabilityId))}</td>
-                      ))}
-                    </tr>
-                  ))}
-                  <tr>
-                    <td>Boundary crossings (model-wide)</td>
-                    <td>{comparison.main.boundaryCrossingCount}</td>
-                    {comparison.options.map((o) => (
-                      <td key={o.branchId}>{o.boundaryCrossingCount}</td>
-                    ))}
-                  </tr>
-                  {streamIds.map((streamId) => (
-                    <tr key={streamId}>
-                      <td>Affected value stream: {streamNameById.get(streamId)}</td>
-                      <td>{formatValueStreamTone(comparison.main.affectedValueStreams.find((r) => r.stream.element_id === streamId)?.tone)}</td>
-                      {comparison.options.map((o) => (
-                        <td key={o.branchId}>{formatValueStreamTone(o.affectedValueStreams.find((r) => r.stream.element_id === streamId)?.tone)}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          );
-        })()}
-        {comparison.status === 'loading' && (
-          <Text as="p" tone="muted" size="sm">
-            Comparing…
-          </Text>
-        )}
-        {comparison.status === 'error' && <Text as="p">{comparison.message}</Text>}
 
         {canAddOption && !addingOption && (
           <Button
@@ -409,6 +329,118 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         {optionsState.error !== null && <Text as="p">{optionsState.error}</Text>}
       </Panel>
 
+      {comparisonOptions.length > 0 && (
+        <Panel>
+          <div className={styles.meta}>
+            <Text as="h2" size="lg">
+              What changes
+            </Text>
+            {comparison.status === 'ready' && (
+              <Text as="span" size="sm" tone="muted">
+                Boundary crossings (model-wide): {comparison.main.boundaryCrossingCount}
+              </Text>
+            )}
+          </div>
+
+          {comparison.status === 'loading' && (
+            <Text as="p" tone="muted" size="sm">
+              Comparing…
+            </Text>
+          )}
+          {comparison.status === 'error' && <Text as="p">{comparison.message}</Text>}
+
+          {comparison.status === 'ready' &&
+            (() => {
+              const { visible, collapsed } = groupWhatChangesRows(comparison.whatChangesRows);
+              const visibleGroups = groupConsecutiveByLabel(visible);
+              // `OptionComparisonRow.branchId` is `UUID | null` only because the type is shared with the "Current (main)" row — every row in `comparison.options` always has a real branch id.
+              const optionBranchIds = comparison.options.map((o) => o.branchId).filter((id): id is UUID => id !== null);
+              return (
+                <>
+                  {visible.length === 0 ? (
+                    <Text as="p">These options don't change the structure of anything in scope.</Text>
+                  ) : (
+                    <div className={styles.tableWrap}>
+                      <table className={styles.comparisonTable}>
+                        <thead>
+                          <tr>
+                            <th>Row</th>
+                            <th>{comparison.main.label}</th>
+                            {comparison.options.map((o) => (
+                              <th key={o.branchId}>{o.label}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visibleGroups.map((group) => (
+                            <WhatChangesRowGroup key={group.groupLabel} group={group} optionBranchIds={optionBranchIds} />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {collapsed.length > 0 && (
+                    <div className={styles.field}>
+                      <button
+                        type="button"
+                        className={styles.collapsedToggle}
+                        onClick={() => {
+                          setWhatChangesExpanded((e) => !e);
+                        }}
+                      >
+                        {collapsed.length} row{collapsed.length === 1 ? '' : 's'} unchanged in all options {whatChangesExpanded ? '▲' : '▼'}
+                      </button>
+                      {whatChangesExpanded && (
+                        <div className={styles.tableWrap}>
+                          <table className={styles.comparisonTable}>
+                            <tbody>
+                              {groupConsecutiveByLabel(collapsed).map((group) => (
+                                <WhatChangesRowGroup key={group.groupLabel} group={group} optionBranchIds={optionBranchIds} />
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {comparison.options.map((o) => {
+                    if (o.branchId === null) return null;
+                    const alsoAffected = comparison.alsoAffectedByBranchId.get(o.branchId) ?? [];
+                    if (alsoAffected.length === 0) return null;
+                    return (
+                      <div key={o.branchId} className={styles.field}>
+                        <Text as="h3" size="sm">
+                          Also affected — {o.label}
+                        </Text>
+                        <ul className={styles.linkList}>
+                          {alsoAffected.map((a: AlsoAffectedElement) => {
+                            const owners = [...a.ownersByRole.entries()].flatMap(([role, list]) => list.map((owner) => `${owner.name} (${role})`));
+                            return (
+                              <li key={a.element.element_id} className={styles.linkRow}>
+                                <ElementTypeGlyph type={a.element.element_type} />
+                                <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${a.element.element_id}`}>
+                                  <Text as="span">{a.element.name}</Text>
+                                </Link>
+                                {owners.length > 0 && (
+                                  <Text as="span" size="sm" tone="muted">
+                                    Owned by {owners.join(', ')}
+                                  </Text>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
+        </Panel>
+      )}
+
       <Panel>
         <Text as="h2" size="lg">
           Arguments
@@ -439,22 +471,54 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   );
 }
 
-function formatCapabilityMetrics(metrics: { coverage: number; oldestLifecycleStage: string | null; criticality: string | null } | undefined): string {
-  if (!metrics) return '—';
-  const parts = [`${String(metrics.coverage)} system${metrics.coverage === 1 ? '' : 's'}`];
-  if (metrics.oldestLifecycleStage) parts.push(metrics.oldestLifecycleStage);
-  if (metrics.criticality) parts.push(metrics.criticality);
-  return parts.join(' · ');
+interface WhatChangesRowGroupData {
+  groupLabel: string;
+  rows: WhatChangesRow[];
 }
 
-/** F6/ADR-023: this cell's own tone word, plain text (never colour-only, §8.7) — same labels `ValueStreamsView.tsx`/`ValueStreamInspectorContent.tsx` already use for the identical tone. `—` for an option that doesn't reach this stream at all (`ValueStreamComparisonRow`'s own doc comment: absence is real, not a blank to hide). */
-const VALUE_STREAM_TONE_LABEL: Record<ValueStreamTone, string> = {
-  ok: 'no known exposure',
-  warn: 'lifecycle exposure',
-  info: 'replacement planned',
-  neutral: 'nothing recorded',
-};
+/**
+ * F6.3 (Part B) rendering-only grouping — chunks consecutive rows sharing
+ * the same `groupLabel` (decision 2: "group visible rows under the
+ * capability name") so the table shows the group name once, not once per
+ * metric row. `buildWhatChangesRows` already emits same-group rows
+ * consecutively; filtering out unchanged rows (`groupWhatChangesRows`)
+ * never interleaves two different groups, only shrinks a run, so this
+ * stays correct after that filter too. No comparison logic of its own —
+ * every row's own `changed`/`display` value was already decided by
+ * `whatChangesRows.ts`.
+ */
+function groupConsecutiveByLabel(rows: readonly WhatChangesRow[]): WhatChangesRowGroupData[] {
+  const groups: WhatChangesRowGroupData[] = [];
+  for (const row of rows) {
+    const last = groups[groups.length - 1];
+    if (last?.groupLabel === row.groupLabel) last.rows.push(row);
+    else groups.push({ groupLabel: row.groupLabel, rows: [row] });
+  }
+  return groups;
+}
 
-function formatValueStreamTone(tone: ValueStreamTone | undefined): string {
-  return tone === undefined ? '—' : VALUE_STREAM_TONE_LABEL[tone];
+function WhatChangesRowGroup({ group, optionBranchIds }: { group: WhatChangesRowGroupData; optionBranchIds: readonly UUID[] }) {
+  const showGroupHeader = group.rows.length > 1 || group.rows[0]?.rowLabel !== group.groupLabel;
+  return (
+    <>
+      {showGroupHeader && (
+        <tr>
+          <td colSpan={99}>
+            <Text as="span" size="sm" tone="muted">
+              {group.groupLabel}
+            </Text>
+          </td>
+        </tr>
+      )}
+      {group.rows.map((row) => (
+        <tr key={row.id}>
+          <td>{showGroupHeader ? row.rowLabel : row.groupLabel}</td>
+          <td>{row.main.display}</td>
+          {optionBranchIds.map((branchId) => (
+            <td key={branchId}>{row.options.get(branchId)?.display ?? '—'}</td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
 }

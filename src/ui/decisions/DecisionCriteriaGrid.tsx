@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { DECISION_CRITERIA, DECISION_RATING_LEVELS, decisionRatingLevelTone, type DecisionCriterionKey, type DecisionRatingLevel } from '../../contracts/decisionCriteria';
-import type { DecisionOptionRatingRow } from '../../db/types';
+import type { BranchStatus, DecisionOptionRatingRow } from '../../db/types';
+import { branchStatusTone } from '../changes/branchStatus';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { Text } from '../components/Text/Text';
@@ -10,7 +12,13 @@ import styles from './DecisionCriteriaGrid.module.css';
 
 export interface DecisionCriteriaOption {
   branchId: UUID;
+  /** `intentHeaderLine(branch)` — may carry the "Exploring: " prefix this grid's own header strips before display (rule: "merge Options list into column headers... drop 'Exploring:' prefix"). */
   label: string;
+  status: BranchStatus;
+  isChosen: boolean;
+  /** One-line derived summary of what this option does vs main ("Retires PM, adds Hana equivalent, re-points 4 flows"), or `null` for an empty-delta option — this header column renders muted and shows "No changes recorded yet" instead (decision 3, the sprint's own go-ahead). */
+  summary: string | null;
+  canChoose: boolean;
 }
 
 export interface DecisionCriteriaGridProps {
@@ -20,6 +28,11 @@ export interface DecisionCriteriaGridProps {
   /** `canRateDecisionOption` at the call site — decision-status-and-role gated, same as `canAddOption`/`canChoose`. `false` renders every cell read-only, with no tap affordance at all (the grid at time-of-choosing still needs to render, just never editable). */
   canRate: boolean;
   userId: UUID | null;
+  /** The decision's own needed-by date, shown beside the Timing row (rule 5) — `null` when the decision never recorded one. */
+  neededBy: string | null;
+  orgSlug: string;
+  modelSlug: string;
+  onChoose: (branchId: UUID) => void;
 }
 
 interface EditingCell {
@@ -29,16 +42,26 @@ interface EditingCell {
   criterionLabel: string;
 }
 
+const EXPLORING_PREFIX = /^Exploring:\s*/;
+
+function stripExploringPrefix(label: string): string {
+  return label.replace(EXPLORING_PREFIX, '');
+}
+
 /**
  * The judgement-criteria grid above the structural "What changes" table
  * (the decision-criteria-ratings brief's own rule 1/5) — one row per
- * `DECISION_CRITERIA` entry, one column per linked option. A cell is a
- * single tap target; editing happens in one shared panel below the grid
- * (mirroring `DecisionView.tsx`'s own "Choose" confirm form, not a
- * per-cell popover) so the editor never has to fit inside a narrow table
- * cell at the ~380px width this sprint's own constraint names.
+ * `DECISION_CRITERIA` entry, one column per linked option. F6.3 (Part B)
+ * folded the old separate "Options" list into this grid's own column
+ * headers: name (prefix stripped), status, "View diagram", "Choose", a
+ * compact rated-count fraction, and the option's own one-line change
+ * summary — options no longer appear twice on the page. Editing still
+ * happens in one shared panel below the grid (mirroring `DecisionView.tsx`'s
+ * own "Choose" confirm form, not a per-cell popover) so the editor never
+ * has to fit inside a narrow table cell at the ~380px width this sprint's
+ * own constraint names.
  */
-export function DecisionCriteriaGrid({ modelId, decisionId, options, canRate, userId }: DecisionCriteriaGridProps) {
+export function DecisionCriteriaGrid({ modelId, decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, onChoose }: DecisionCriteriaGridProps) {
   const ratingsState = useDecisionRatings(modelId, decisionId);
   const ratings = ratingsState.ratings;
   const [editing, setEditing] = useState<EditingCell | null>(null);
@@ -70,29 +93,64 @@ export function DecisionCriteriaGrid({ modelId, decisionId, options, canRate, us
   }
 
   return (
-    <div className={styles.wrap}>
-      <div className={styles.progressRow}>
-        {options.map((o) => (
-          <Text key={o.branchId} as="span" size="sm" tone="muted">
-            {o.label}: {ratedCount(o.branchId)} of {DECISION_CRITERIA.length} rated
-          </Text>
-        ))}
-      </div>
-
+    <div className={styles.wrap} data-testid="decision-criteria-grid">
       <div className={styles.tableWrap}>
         <table className={styles.grid}>
           <thead>
             <tr>
-              <th>Criterion</th>
+              <th className={styles.criterionHeaderCell} />
               {options.map((o) => (
-                <th key={o.branchId}>{o.label}</th>
+                <th key={o.branchId} className={o.summary === null ? styles.mutedHeaderCell : undefined}>
+                  <div className={styles.optionHeader}>
+                    <div className={styles.optionHeaderTop}>
+                      {o.isChosen && <Chip tone="ok">chosen</Chip>}
+                      <Chip tone={branchStatusTone(o.status)}>{o.status}</Chip>
+                    </div>
+                    <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${o.branchId}`}>
+                      <Text as="span" size="md">
+                        {stripExploringPrefix(o.label)}
+                      </Text>
+                    </Link>
+                    <Text as="p" size="sm" tone={o.summary === null ? 'muted' : 'default'}>
+                      {o.summary ?? 'No changes recorded yet'}
+                    </Text>
+                    <div className={styles.optionHeaderActions}>
+                      <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${o.branchId}/landscape`}>
+                        <Text as="span" size="sm">
+                          View diagram →
+                        </Text>
+                      </Link>
+                      {o.canChoose && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            onChoose(o.branchId);
+                          }}
+                        >
+                          Choose
+                        </Button>
+                      )}
+                    </div>
+                    <Text as="span" size="sm" tone="muted">
+                      {ratedCount(o.branchId)}/{DECISION_CRITERIA.length}
+                    </Text>
+                  </div>
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {DECISION_CRITERIA.map((criterion) => (
               <tr key={criterion.key}>
-                <td className={styles.criterionLabel}>{criterion.label}</td>
+                <td className={styles.criterionLabel}>
+                  {criterion.label}
+                  {criterion.key === 'timing' && neededBy !== null && (
+                    <Text as="span" size="sm" tone="muted">
+                      {' '}
+                      (needed by {neededBy})
+                    </Text>
+                  )}
+                </td>
                 {options.map((o) => {
                   const rating = ratingFor(o.branchId, criterion.key);
                   return (
@@ -102,7 +160,7 @@ export function DecisionCriteriaGrid({ modelId, decisionId, options, canRate, us
                         className={styles.cell}
                         disabled={!canRate}
                         onClick={() => {
-                          openEditor(o.branchId, o.label, criterion.key, criterion.label);
+                          openEditor(o.branchId, stripExploringPrefix(o.label), criterion.key, criterion.label);
                         }}
                       >
                         {rating ? <Chip tone={decisionRatingLevelTone(rating.level)}>{criterion.levelLabels[rating.level]}</Chip> : <span className={styles.notRated}>Not rated</span>}

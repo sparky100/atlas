@@ -21,9 +21,10 @@ export type DecisionComparisonState = { status: 'empty' } | { status: 'loading' 
  * the decision page can render "add an option to compare" without a
  * flash of a loading spinner that never resolves to anything.
  */
-export function useDecisionComparison(modelId: UUID, mainHeadCommitId: UUID | null, capabilityIds: readonly UUID[], options: readonly DecisionComparisonOption[]): DecisionComparisonState {
+export function useDecisionComparison(modelId: UUID, mainHeadCommitId: UUID | null, capabilityIds: readonly UUID[], otherConcernElementIds: readonly UUID[], options: readonly DecisionComparisonOption[]): DecisionComparisonState {
   const [state, setState] = useState<DecisionComparisonState>({ status: 'empty' });
   const capabilityIdsKey = capabilityIds.join(',');
+  const otherConcernElementIdsKey = otherConcernElementIds.join(',');
   const optionsKey = options.map((o) => `${o.branchId}:${o.headCommitId}`).join(',');
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export function useDecisionComparison(modelId: UUID, mainHeadCommitId: UUID | nu
     }
     let cancelled = false;
     setState({ status: 'loading' });
-    compareDecisionOptions(supabase, { modelId, mainHeadCommitId, capabilityIds, options })
+    compareDecisionOptions(supabase, { modelId, mainHeadCommitId, capabilityIds, otherConcernElementIds, options })
       .then((result) => {
         if (!cancelled) setState({ status: 'ready', ...result });
       })
@@ -44,8 +45,8 @@ export function useDecisionComparison(modelId: UUID, mainHeadCommitId: UUID | nu
     return () => {
       cancelled = true;
     };
-    // capabilityIdsKey/optionsKey stand in for capabilityIds/options, fresh arrays every render.
-  }, [modelId, mainHeadCommitId, capabilityIdsKey, optionsKey]);
+    // capabilityIdsKey/otherConcernElementIdsKey/optionsKey stand in for their own fresh-array-every-render props.
+  }, [modelId, mainHeadCommitId, capabilityIdsKey, otherConcernElementIdsKey, optionsKey]);
 
   return state;
 }
