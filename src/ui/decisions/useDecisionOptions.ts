@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { createChangeBranch, getMainBranch } from '../../db/branches';
 import { chooseDecisionOption, createDecisionLink } from '../../db/decisions';
+import type { BranchRow, DecisionLinkRow, DecisionRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 
 export type DecisionOptionsStatus = 'idle' | 'adding' | 'choosing';
@@ -32,8 +33,33 @@ export interface UseDecisionOptionsResult {
   chooseOption: (decisionId: UUID, branchId: UUID, reasons: string) => Promise<boolean>;
 }
 
-/** `onDone` is called after either action succeeds — the caller's own `reload()` (`useDecision.ts`), so the decision page's links/comparison table/status all refresh from the one source of truth rather than this hook guessing at optimistic local state. */
-export function useDecisionOptions(onDone: () => void): UseDecisionOptionsResult {
+/**
+ * Neither action calls the decision page's own full `reload()` any more
+ * (decision-side-completion follow-up: "Choose... still unmount[ed]
+ * everything after each action") — each patches local state directly
+ * from its own write's already-known result, the same "no full-page
+ * loading state after the first load" approach `useDecisionRatings.ts`
+ * already established for ratings. `addOption` needs no server re-read
+ * at all (`createChangeBranch`/`createDecisionLink` already return
+ * everything `applyNewOption` needs); `chooseOption` patches the decision
+ * row immediately, then awaits `refreshOptionsAndArguments` for the one
+ * side effect (every other option's status/intent) the RPC's own return
+ * doesn't carry.
+ *
+ * Three direct callbacks, not one bundled object — a call site would
+ * have to build a fresh object literal every render to pass a single
+ * param, which would change identity every render even when the
+ * individual callbacks are themselves `useCallback`-stable, defeating
+ * the `useCallback` memoization below.
+ */
+export function useDecisionOptions(
+  /** `useDecision.ts`'s own patch — see that file's doc comment. Called with `createChangeBranch`/`createDecisionLink`'s own already-known results; no re-fetch. */
+  applyNewOption: (link: DecisionLinkRow, branch: BranchRow) => void,
+  /** `useDecision.ts`'s own patch — called with `chooseDecisionOption`'s own return value; no re-fetch. */
+  applyDecisionUpdate: (decision: DecisionRow) => void,
+  /** `useDecision.ts`'s own targeted refresh for exactly what Choose's RPC changes beyond the decision row itself (every option branch's status, the new argument row) — see that file's doc comment. */
+  refreshOptionsAndArguments: () => Promise<void>,
+): UseDecisionOptionsResult {
   const [status, setStatus] = useState<DecisionOptionsStatus>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -62,8 +88,8 @@ export function useDecisionOptions(onDone: () => void): UseDecisionOptionsResult
           mainHeadCommitId: main.head_commit_id,
           intent: 'explore',
         });
-        await createDecisionLink(supabase, { decisionId: input.decisionId, linkedType: 'branch', linkedId: branch.id, createdBy: input.userId });
-        onDone();
+        const link = await createDecisionLink(supabase, { decisionId: input.decisionId, linkedType: 'branch', linkedId: branch.id, createdBy: input.userId });
+        applyNewOption(link, branch);
         return true;
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not add this option.');
@@ -72,7 +98,7 @@ export function useDecisionOptions(onDone: () => void): UseDecisionOptionsResult
         setStatus('idle');
       }
     },
-    [onDone],
+    [applyNewOption],
   );
 
   const chooseOption = useCallback(
@@ -84,8 +110,9 @@ export function useDecisionOptions(onDone: () => void): UseDecisionOptionsResult
       setError(null);
       setStatus('choosing');
       try {
-        await chooseDecisionOption(supabase, decisionId, branchId, reasons.trim());
-        onDone();
+        const decision = await chooseDecisionOption(supabase, decisionId, branchId, reasons.trim());
+        applyDecisionUpdate(decision);
+        await refreshOptionsAndArguments();
         return true;
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not choose this option.');
@@ -94,7 +121,7 @@ export function useDecisionOptions(onDone: () => void): UseDecisionOptionsResult
         setStatus('idle');
       }
     },
-    [onDone],
+    [applyDecisionUpdate, refreshOptionsAndArguments],
   );
 
   return { status, error, addOption, chooseOption };
