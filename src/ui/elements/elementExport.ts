@@ -23,7 +23,7 @@
  * the original F8 note worried about.
  */
 import type { ElementType, UUID } from '../../contracts/delta';
-import { ATTRIBUTE_SCHEMA_BY_TYPE } from '../../contracts/attributeSchema';
+import { ATTRIBUTE_SCHEMA_BY_TYPE, attributeFieldSchema } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { AttributeDefinitionRow, SourceRow } from '../../db/types';
 import type { BrowseRow } from '../../db/elementBrowse';
@@ -137,7 +137,18 @@ function cellValue(row: BrowseRow, key: string, provenanceById: ReadonlyMap<UUID
   if (key === 'owner') return row.owner?.name ?? '';
   if (key === 'source') return provenanceById.get(row.element.element_id)?.sourceName ?? '';
   if (key === 'age') return provenanceById.get(row.element.element_id)?.age ?? '';
-  return formatValue(attributesRecord(row.element.attributes)[key]);
+  const raw = attributesRecord(row.element.attributes)[key];
+  // A core enum field with a human label distinct from its stored key
+  // (Run cost's bands) — same lookup AttributeRow.tsx's read display
+  // uses, so an exported cell reads the same as the element page. Custom
+  // attributes (no core field schema) and every enum without one of
+  // these fall straight through to the raw formatter, unchanged.
+  const field = attributeFieldSchema(row.element.element_type, key);
+  if (field?.kind === 'enum' && typeof raw === 'string') {
+    const label = field.optionLabels?.[raw];
+    if (label !== undefined) return label;
+  }
+  return formatValue(raw);
 }
 
 function rowCells(row: BrowseRow, columns: readonly ExportColumn[], provenanceById: ReadonlyMap<UUID, ExportProvenance>): string[] {

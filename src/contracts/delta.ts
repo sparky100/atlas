@@ -136,6 +136,23 @@ export type OwnsRole = 'business' | 'technical' | 'service';
 export type FitForPurpose = 'poor' | 'adequate' | 'good' | 'excellent';
 
 /**
+ * The avoidable annual run cost of a System/Container — what stops if the
+ * element is retired, never an allocation of a platform's own cost onto
+ * its modules (`ContainerAttributes.annualRunCost`'s own doc comment).
+ * Banded and judged, deliberately never a figure (ADR-001's own
+ * `DELIBERATELY_NOT_MODELLED` excludes "cost/budget figures" as a *type*,
+ * not a categorical judgement attribute in the same family as
+ * `Criticality`/`FitForPurpose` — this is the latter, not the former).
+ * Ordered ascending by cost (`src/ui/elements/runCostBand.ts`'s
+ * `RUN_COST_BAND_ORDER`, the same "worst-of = max" shape `Criticality`'s
+ * own order gives `worstCriticality`, for a future portfolio view's
+ * highest-band rollup). Absent means "not entered", never `none_included`
+ * — the same "an unset fact isn't the same as a recorded low/none value"
+ * stance every other optional judged attribute here takes.
+ */
+export type AnnualRunCostBand = 'none_included' | 'under_50k' | '50k_250k' | '250k_1m' | '1m_5m' | 'over_5m';
+
+/**
  * Attributes stored in `elements_head.attributes` (jsonb). `name` and
  * `parentId` are promoted columns and are NOT in this object.
  *
@@ -219,6 +236,15 @@ export interface SystemAttributes {
   supportEndsAt?: ISODate;
   /** S1 item 11: the deployed release/build a system is currently on (e.g. "3.4.1", "2026-Q1") — free text, since the estate's own version schemes vary too widely for an enum; optional, unrecorded until someone sets it. */
   version?: string;
+  /**
+   * The portfolio-view data step: the avoidable annual cost that stops if
+   * this system (including a platform — `kind: 'platform'` is still a
+   * plain `System`) is retired. Optional, unrated until someone records
+   * it — same "absent is silent, never a recorded low value" stance
+   * `criticality` already takes. See `AnnualRunCostBand`'s own doc
+   * comment for why this is banded, not a figure.
+   */
+  annualRunCost?: AnnualRunCostBand;
 }
 
 export interface ContainerAttributes {
@@ -256,6 +282,19 @@ export interface ContainerAttributes {
   domain?: SystemDomain;
   /** S1 item 11: see `SystemAttributes.version`. Not part of the platform-module inheritance set above (`effectiveModuleAttributes`) — a container's own version is a fact about that container, never inherited from its parent system. */
   version?: string;
+  /**
+   * The portfolio-view data step: the avoidable annual cost that stops if
+   * *this container* (a module or solution container) is retired —
+   * deliberately never an allocation of the parent platform's own cost
+   * onto its modules, and deliberately **not** part of the platform-
+   * module inheritance set above (`effectiveModuleAttributes`), the same
+   * "a fact about this container, never inherited" stance `version`
+   * already takes: a platform's total run cost and a module's own
+   * avoidable run cost are two different facts, never one resolved from
+   * the other. See `AnnualRunCostBand`'s own doc comment (and
+   * `SystemAttributes.annualRunCost`) for the shared band definition.
+   */
+  annualRunCost?: AnnualRunCostBand;
 }
 
 export interface ActorAttributes {

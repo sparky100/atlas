@@ -24,6 +24,11 @@ export function AttributeEditRow({ field, value, onChange, error }: AttributeEdi
         </Text>
       </label>
       <div className={styles.value}>
+        {field.helpText !== undefined && (
+          <Text tone="faint" size="sm" as="p">
+            {field.helpText}
+          </Text>
+        )}
         <AttributeValueInput id={id} field={field} value={value} onChange={onChange} invalid={error !== undefined} />
         {error !== undefined && (
           <Text as="span" className={styles.error} size="sm">

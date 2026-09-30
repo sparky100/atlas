@@ -23,6 +23,7 @@
  */
 import type {
   ActorAttributes,
+  AnnualRunCostBand,
   CapabilityAttributes,
   ContainerAttributes,
   ElementType,
@@ -49,6 +50,34 @@ export interface AttributeFieldMeta {
   kind: AttributeKind;
   /** `kind: 'enum'` only — the exact allowed values. */
   options?: readonly string[];
+  /**
+   * `kind: 'enum'` only — a human label for a stored value that doesn't
+   * read well raw (Run cost's `under_50k`, unlike `criticality`'s own
+   * `critical`/`high`/`medium`/`low`, which already read fine as-is).
+   * Falls back to the raw stored value when a key has no entry here (or
+   * this field is absent entirely) — every existing enum keeps showing
+   * its raw value unchanged; only a field that sets this opts in.
+   */
+  optionLabels?: Record<string, string>;
+  /**
+   * The text shown for this field when it's optional and unset — in the
+   * read-only Attributes row (`AttributeRow.tsx`) and the edit dropdown's
+   * own blank option (`AttributeValueInput.tsx`). Falls back to the
+   * existing bare `—` when absent. Exists because a field can have a
+   * real enum value that reads like "none" (Run cost's own
+   * `none_included`) — "not entered" has to be visibly distinct from
+   * that, not the same dash every other unset optional field already
+   * uses.
+   */
+  emptyLabel?: string;
+  /**
+   * Shown under the label while this field is being edited
+   * (`AttributeEditRow.tsx`) — for a field whose meaning isn't obvious
+   * from the label alone (Run cost: "the annual cost that stops if this
+   * is retired," not "this element's total cost"). Most fields don't need
+   * one; absent renders nothing extra.
+   */
+  helpText?: string;
   /** False only for a field no one sets by hand (Capability.templateRef, seed-derived) — excluded from the edit form entirely. Defaults to true. */
   editable?: boolean;
   /** Sprint U4-1 D2: true only for Capability.templateRef — "not a user-facing attribute... hide from the attributes list". Excluded from the read-only Attributes display entirely (`ElementPage.tsx`'s `AttributesTable`), not merely non-editable — its information still surfaces, reworded, on the provenance card of any fact seeded alongside it (`ProvenanceCard.tsx`'s `seededFrom`). Defaults to false/shown; distinct from `editable: false`, which several other fields (`Capability.order`, e.g.) also set while staying genuinely useful to see. */
@@ -112,6 +141,19 @@ const DOMAIN_OPTIONS = ['it', 'ot', 'hybrid'] as const;
 /** Prompt 7k item 4 (plus "platforms and modules"'s own `'platform'` addition) — see `SystemKind`'s own doc comment (`delta.ts`) for why absent reads as `'application'`. */
 const KIND_OPTIONS = ['application', 'integration_platform', 'data_platform', 'infrastructure', 'platform'] as const;
 
+/** The portfolio-view data step — see `AnnualRunCostBand`'s own doc comment (`delta.ts`) for the ordering/judgement rationale. Ascending by cost; GBP assumed for now (no currency setting exists yet — out of this step's scope). */
+const ANNUAL_RUN_COST_BAND_OPTIONS = ['none_included', 'under_50k', '50k_250k', '250k_1m', '1m_5m', 'over_5m'] as const;
+/** Every one of these reads as a snake_case-ish key raw (`under_50k`) — `AttributeFieldMeta.optionLabels`'s own doc comment explains why this field needs one when most enums here don't. */
+const ANNUAL_RUN_COST_BAND_LABELS: Record<AnnualRunCostBand, string> = {
+  none_included: 'None / included',
+  under_50k: 'Under £50k',
+  '50k_250k': '£50k–£250k',
+  '250k_1m': '£250k–£1m',
+  '1m_5m': '£1m–£5m',
+  over_5m: 'Over £5m',
+};
+const ANNUAL_RUN_COST_HELP_TEXT = "Annual cost that stops if this is retired. Not a share of the platform's cost.";
+
 const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   lifecycleStatus: { label: 'Lifecycle', required: true, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
   // S1 item 11: "shown by lifecycle in the header" — ElementHeader.tsx
@@ -124,6 +166,9 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   introduced: { label: 'Introduced', required: false, kind: 'date' },
   plannedEnd: { label: 'Planned end', required: false, kind: 'date' },
   criticality: { label: 'Criticality', required: false, kind: 'enum', options: CRITICALITY_OPTIONS },
+  // The portfolio-view data step — see `AnnualRunCostBand`'s own doc
+  // comment (delta.ts).
+  annualRunCost: { label: 'Run cost', required: false, kind: 'enum', options: ANNUAL_RUN_COST_BAND_OPTIONS, optionLabels: ANNUAL_RUN_COST_BAND_LABELS, emptyLabel: 'Not entered', helpText: ANNUAL_RUN_COST_HELP_TEXT },
   hostingModel: { label: 'Hosting model', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
   hostingProvider: { label: 'Hosting provider', required: false, kind: 'text' },
   domain: { label: 'Domain', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
@@ -143,6 +188,7 @@ const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
   'plannedEnd',
   'supportEndsAt',
   'criticality',
+  'annualRunCost',
   'hostingModel',
   'hostingProvider',
   'kind',
@@ -162,6 +208,11 @@ const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   // an ordinary container that isn't a platform's module.
   lifecycleStatus: { label: 'Lifecycle (module override)', required: false, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
   criticality: { label: 'Criticality (module override)', required: false, kind: 'enum', options: CRITICALITY_OPTIONS },
+  // The portfolio-view data step — never a module-override of the
+  // platform's own run cost (see ContainerAttributes.annualRunCost's own
+  // doc comment, delta.ts, and AnnualRunCostBand's), so this label has no
+  // "(module override)" suffix, unlike the five real overrides above.
+  annualRunCost: { label: 'Run cost', required: false, kind: 'enum', options: ANNUAL_RUN_COST_BAND_OPTIONS, optionLabels: ANNUAL_RUN_COST_BAND_LABELS, emptyLabel: 'Not entered', helpText: ANNUAL_RUN_COST_HELP_TEXT },
   hostingModel: { label: 'Hosting model (module override)', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
   hostingProvider: { label: 'Hosting provider (module override)', required: false, kind: 'text' },
   domain: { label: 'Domain (module override)', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
@@ -179,6 +230,7 @@ const CONTAINER_ORDER: (keyof ContainerAttributes)[] = [
   'lifecycleStatus',
   'version',
   'criticality',
+  'annualRunCost',
   'hostingModel',
   'hostingProvider',
   'domain',

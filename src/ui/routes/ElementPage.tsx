@@ -796,7 +796,7 @@ function AttributesTable({
         // — distinct from `hidden` above, which excludes it regardless of
         // whether a fact exists.
         if (field.hideWhenEmpty === true && !fact) return null;
-        return <AttributeRow key={field.key} label={field.label} required={field.required} fact={fact} source={fact ? sources.get(fact.source_id) : undefined} />;
+        return <AttributeRow key={field.key} label={field.label} required={field.required} fact={fact} source={fact ? sources.get(fact.source_id) : undefined} field={field} />;
       })}
       <AliasRows elementId={element.element_id} aliases={aliases} aliasSources={aliasSources} />
     </div>

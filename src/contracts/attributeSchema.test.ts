@@ -124,6 +124,66 @@ describe('validateAttributeValue', () => {
   });
 });
 
+describe('Run cost (annualRunCost)', () => {
+  it('is a system and container attribute only — not on capability, actor, or value_stream', () => {
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.system.some((f) => f.key === 'annualRunCost')).toBe(true);
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.container.some((f) => f.key === 'annualRunCost')).toBe(true);
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.capability.some((f) => f.key === 'annualRunCost')).toBe(false);
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.actor.some((f) => f.key === 'annualRunCost')).toBe(false);
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.value_stream.some((f) => f.key === 'annualRunCost')).toBe(false);
+  });
+
+  it('declares all six bands, in ascending-cost order, each with a distinct human label', () => {
+    for (const type of ['system', 'container'] as const) {
+      const field = ATTRIBUTE_SCHEMA_BY_TYPE[type].find((f) => f.key === 'annualRunCost');
+      expect(field?.options).toEqual(['none_included', 'under_50k', '50k_250k', '250k_1m', '1m_5m', 'over_5m']);
+      expect(field?.optionLabels).toEqual({
+        none_included: 'None / included',
+        under_50k: 'Under £50k',
+        '50k_250k': '£50k–£250k',
+        '250k_1m': '£250k–£1m',
+        '1m_5m': '£1m–£5m',
+        over_5m: 'Over £5m',
+      });
+      // Every label distinct — a label collision would make two different
+      // bands read identically in the UI.
+      expect(new Set(Object.values(field?.optionLabels ?? {})).size).toBe(6);
+    }
+  });
+
+  it('is optional, carries the required help text, and shows "Not entered" instead of a bare "—" when unset', () => {
+    for (const type of ['system', 'container'] as const) {
+      const field = ATTRIBUTE_SCHEMA_BY_TYPE[type].find((f) => f.key === 'annualRunCost');
+      expect(field?.required).toBe(false);
+      expect(field?.helpText).toBe("Annual cost that stops if this is retired. Not a share of the platform's cost.");
+      expect(field?.emptyLabel).toBe('Not entered');
+    }
+  });
+
+  it("the container label carries no \"(module override)\" suffix — unlike criticality/hostingModel/hostingProvider/domain, it is never inherited from the parent platform", () => {
+    const field = ATTRIBUTE_SCHEMA_BY_TYPE.container.find((f) => f.key === 'annualRunCost');
+    expect(field?.label).toBe('Run cost');
+  });
+
+  it('validates a real band on both eligible types, and rejects an invalid key', () => {
+    expect(validateAttributeValue('system', 'annualRunCost', 'under_50k')).toEqual({ ok: true, value: 'under_50k' });
+    expect(validateAttributeValue('container', 'annualRunCost', 'over_5m')).toEqual({ ok: true, value: 'over_5m' });
+    expect(validateAttributeValue('system', 'annualRunCost', 'cheap')).toMatchObject({ ok: false });
+    expect(validateAttributeValue('system', 'annualRunCost', 'low')).toMatchObject({ ok: false });
+  });
+
+  it('rejects it outright on an ineligible element type (capability, actor)', () => {
+    expect(validateAttributeValue('capability', 'annualRunCost', 'under_50k')).toMatchObject({ ok: false });
+    expect(validateAttributeValue('actor', 'annualRunCost', 'under_50k')).toMatchObject({ ok: false });
+  });
+
+  it('clearing it normalises to null (unset), never to the none_included key', () => {
+    const result = validateAttributeValue('system', 'annualRunCost', '');
+    expect(result).toEqual({ ok: true, value: null });
+    expect(result).not.toEqual({ ok: true, value: 'none_included' });
+  });
+});
+
 describe('F1: validateCustomAttributeValue (number/date/link/enum kinds via an ad hoc field schema)', () => {
   it('validates a number field, accepting both a numeric and a numeric-string raw value and rejecting non-numeric text', () => {
     const field = { key: 'headcount', label: 'Headcount', required: false, kind: 'number' } as const;

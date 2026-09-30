@@ -67,10 +67,10 @@ export function AttributeValueInput({ id, field, value, onChange, invalid }: Att
         }}
         aria-invalid={invalid}
       >
-        <option value="">{field.required ? 'Select…' : '—'}</option>
+        <option value="">{field.required ? 'Select…' : field.emptyLabel ?? '—'}</option>
         {field.options?.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {field.optionLabels?.[option] ?? option}
           </option>
         ))}
       </select>
