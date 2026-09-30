@@ -23,6 +23,7 @@
  */
 import type {
   ActorAttributes,
+  AnnualRunCost,
   CapabilityAttributes,
   ContainerAttributes,
   ElementType,
@@ -76,6 +77,36 @@ export interface AttributeFieldMeta {
    * false.
    */
   hideWhenEmpty?: boolean;
+  /**
+   * `kind: 'enum'` only — a display label per stored option key, so the
+   * read-only row (`AttributeRow`) and the edit `<select>`
+   * (`AttributeValueInput`) show "£50k–£250k" rather than the raw stored
+   * key `50k_250k`. Exactly the "keys stored, labels in code" stance
+   * ADR-022 records for decision-criterion levels. Absent (every enum
+   * today but Run cost) keeps today's raw-key rendering unchanged — no
+   * other enum's on-screen text moves as a side effect. Must cover every
+   * entry of `options` (locked by `attributeSchema.test.ts`'s own
+   * invariant), so a stored value can never render as an unlabelled key
+   * on a field that declared labels.
+   */
+  optionLabels?: Readonly<Record<string, string>>;
+  /**
+   * Help text rendered under the control in the edit form only (§4.2's
+   * `Edit`), wired to it via `aria-describedby`. No help text exists
+   * anywhere else in the attribute row today — this is deliberately scoped
+   * to where someone is choosing a value, not the read-only list. Defaults
+   * to absent: no row renders text it wasn't given.
+   */
+  help?: string;
+  /**
+   * What an *unset optional* value reads as instead of §4.3's default bare
+   * "—" — "Not entered" on Run cost, where an unset band must be visibly
+   * distinct from the recorded `none_included` ("None / included") band.
+   * Only consulted when no fact exists; a recorded value always renders its
+   * own text (or `optionLabels`'s label). Defaults to absent, so every
+   * other optional field keeps the bare "—".
+   */
+  emptyLabel?: string;
 }
 
 export interface AttributeFieldSchema extends AttributeFieldMeta {
@@ -112,6 +143,33 @@ const DOMAIN_OPTIONS = ['it', 'ot', 'hybrid'] as const;
 /** Prompt 7k item 4 (plus "platforms and modules"'s own `'platform'` addition) — see `SystemKind`'s own doc comment (`delta.ts`) for why absent reads as `'application'`. */
 const KIND_OPTIONS = ['application', 'integration_platform', 'data_platform', 'infrastructure', 'platform'] as const;
 
+/**
+ * Run cost's six bands, cheapest → most expensive — the single declaration
+ * of both the option keys (what's stored) and their display labels (what's
+ * shown), consumed by `SYSTEM_META`/`CONTAINER_META` below and by
+ * `src/ui/elements/annualRunCost.ts`'s ordering/roll-up helpers. GBP
+ * assumed for now (no currency settings — out of scope). `none_included`
+ * is a *recorded* value, distinct from an absent one ("Not entered", the
+ * field's own `emptyLabel`); the en-dashes are the label text verbatim.
+ */
+export const ANNUAL_RUN_COST_BANDS = [
+  { key: 'none_included', label: 'None / included' },
+  { key: 'under_50k', label: 'Under £50k' },
+  { key: '50k_250k', label: '£50k–£250k' },
+  { key: '250k_1m', label: '£250k–£1m' },
+  { key: '1m_5m', label: '£1m–£5m' },
+  { key: 'over_5m', label: 'Over £5m' },
+] as const satisfies readonly { key: AnnualRunCost; label: string }[];
+
+export const ANNUAL_RUN_COST_OPTIONS = ANNUAL_RUN_COST_BANDS.map((band) => band.key) as readonly AnnualRunCost[];
+
+export const ANNUAL_RUN_COST_LABELS: Readonly<Record<AnnualRunCost, string>> = Object.fromEntries(
+  ANNUAL_RUN_COST_BANDS.map((band) => [band.key, band.label]),
+) as Readonly<Record<AnnualRunCost, string>>;
+
+/** The exact help text §"Run cost" specifies — shown under the edit control (`AttributeFieldMeta.help`). */
+export const ANNUAL_RUN_COST_HELP = "Annual cost that stops if this is retired. Not a share of the platform's cost.";
+
 const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   lifecycleStatus: { label: 'Lifecycle', required: true, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
   // S1 item 11: "shown by lifecycle in the header" — ElementHeader.tsx
@@ -124,6 +182,11 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   introduced: { label: 'Introduced', required: false, kind: 'date' },
   plannedEnd: { label: 'Planned end', required: false, kind: 'date' },
   criticality: { label: 'Criticality', required: false, kind: 'enum', options: CRITICALITY_OPTIONS },
+  // Portfolio groundwork: a banded judgement, not a figure — `AnnualRunCost`'s
+  // own doc comment (delta.ts). Placed right after `criticality` (the only
+  // other judged enum on a system) in SYSTEM_ORDER below; labels/help/
+  // "Not entered" empty state all via the meta members added for it.
+  annualRunCost: { label: 'Run cost', required: false, kind: 'enum', options: ANNUAL_RUN_COST_OPTIONS, optionLabels: ANNUAL_RUN_COST_LABELS, help: ANNUAL_RUN_COST_HELP, emptyLabel: 'Not entered' },
   hostingModel: { label: 'Hosting model', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
   hostingProvider: { label: 'Hosting provider', required: false, kind: 'text' },
   domain: { label: 'Domain', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
@@ -143,6 +206,7 @@ const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
   'plannedEnd',
   'supportEndsAt',
   'criticality',
+  'annualRunCost',
   'hostingModel',
   'hostingProvider',
   'kind',
@@ -162,6 +226,12 @@ const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   // an ordinary container that isn't a platform's module.
   lifecycleStatus: { label: 'Lifecycle (module override)', required: false, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
   criticality: { label: 'Criticality (module override)', required: false, kind: 'enum', options: CRITICALITY_OPTIONS },
+  // A container's *own* avoidable run cost — deliberately NOT a
+  // "(module override)" row like the five fields above it: it is not part
+  // of `effectiveModuleAttributes`'s inheritance set (delta.ts's
+  // `ContainerAttributes.annualRunCost` doc comment), so there is no
+  // platform value behind it to override.
+  annualRunCost: { label: 'Run cost', required: false, kind: 'enum', options: ANNUAL_RUN_COST_OPTIONS, optionLabels: ANNUAL_RUN_COST_LABELS, help: ANNUAL_RUN_COST_HELP, emptyLabel: 'Not entered' },
   hostingModel: { label: 'Hosting model (module override)', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
   hostingProvider: { label: 'Hosting provider (module override)', required: false, kind: 'text' },
   domain: { label: 'Domain (module override)', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
@@ -179,6 +249,7 @@ const CONTAINER_ORDER: (keyof ContainerAttributes)[] = [
   'lifecycleStatus',
   'version',
   'criticality',
+  'annualRunCost',
   'hostingModel',
   'hostingProvider',
   'domain',
@@ -233,6 +304,24 @@ export const ATTRIBUTE_SCHEMA_BY_TYPE: Record<ElementType, readonly AttributeFie
 
 export function attributeFieldSchema(elementType: ElementType, key: string): AttributeFieldSchema | undefined {
   return ATTRIBUTE_SCHEMA_BY_TYPE[elementType].find((field) => field.key === key);
+}
+
+/**
+ * The reserved-key guard for org-defined custom attributes: is `key` the
+ * key of a core attribute on *any* element type? A custom definition with
+ * such a key would collide with the core one on every element page the type
+ * applies to — rendering twice (`ElementPage`'s `[...schema, ...customFields]`
+ * concat, with no de-duplication), shadowing the core field in the edit
+ * form (whichever schema owns the key at save time wins), and silently
+ * dropping out of CSV/XLSX export (`elementExport`'s first-occurrence-wins
+ * column union). Checked by `createAttributeDefinition` before any insert,
+ * so the collision is refused at the one place a key enters the system.
+ *
+ * Scope: core schema keys only — `name`/`parentId` are promoted columns,
+ * not schema attributes, and are outside this function's remit.
+ */
+export function isCoreAttributeKey(key: string): boolean {
+  return Object.values(ATTRIBUTE_SCHEMA_BY_TYPE).some((schema) => schema.some((field) => field.key === key));
 }
 
 /**

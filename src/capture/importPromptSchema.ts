@@ -33,6 +33,7 @@ Fields (only what's actually known has to be filled in): \`${IMPORT_COLUMNS.join
 - \`kind\` is one of: application, integration_platform, data_platform, infrastructure, platform. Only meaningful for a top-level system (no \`platform\`) — leave it out on a module.
 - \`lifecycle\` is one of: planned, active, retiring, retired.
 - \`criticality\` is one of: critical, high, medium, low.
+- \`annual_run_cost\` is one of: none_included, under_50k, 50k_250k, 250k_1m, 1m_5m, over_5m — a banded judgement of the avoidable annual run cost of this system or module ("None / included" … "Over £5m"). Leave it out if it isn't known; never guess, and never set it for a capability (it isn't a field there).
 - \`domain\` is one of: it, ot, hybrid.
 - \`hosting_model\` is one of: on_premises, private_cloud, public_cloud, saas, hybrid.
 - \`vendor\` is free text. Only meaningful for a top-level system — leave it out on a module.

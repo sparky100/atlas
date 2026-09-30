@@ -110,8 +110,8 @@ function wordSubsequenceMatch(normalisedHaystack: string, normalisedPassage: str
     let matched = false;
     for (let k = h; k < haystackWords.length; k++) {
       const candidate = haystackWords[k];
-      if (candidate !== undefined && candidate.word === passageWord) {
-        if (first === null) first = candidate;
+      if (candidate?.word === passageWord) {
+        first ??= candidate;
         last = candidate;
         h = k + 1;
         matched = true;

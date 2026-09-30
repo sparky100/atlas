@@ -15,6 +15,8 @@ export interface AttributeEditRowProps {
 /** Edit-mode counterpart to AttributeRow (§4.3's read-only row) — one per editable field, `Edit` (§4.2) replaces the whole Attributes section with these. Non-editable fields (Capability.templateRef) never reach here — src/ui/elements/useElementEditor.ts skips them building its draft state, the same place ATTRIBUTE_SCHEMA_BY_TYPE says they aren't. */
 export function AttributeEditRow({ field, value, onChange, error }: AttributeEditRowProps) {
   const id = useId();
+  const helpId = useId();
+  const helpIdAttr = field.help !== undefined ? helpId : undefined;
   return (
     <div className={styles.row}>
       <label htmlFor={id}>
@@ -24,7 +26,12 @@ export function AttributeEditRow({ field, value, onChange, error }: AttributeEdi
         </Text>
       </label>
       <div className={styles.value}>
-        <AttributeValueInput id={id} field={field} value={value} onChange={onChange} invalid={error !== undefined} />
+        <AttributeValueInput id={id} field={field} value={value} onChange={onChange} invalid={error !== undefined} describedBy={helpIdAttr} />
+        {field.help !== undefined && (
+          <Text as="span" size="sm" tone="muted" id={helpId}>
+            {field.help}
+          </Text>
+        )}
         {error !== undefined && (
           <Text as="span" className={styles.error} size="sm">
             {error}

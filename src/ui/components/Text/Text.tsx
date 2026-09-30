@@ -17,6 +17,8 @@ export interface TextProps {
   // under noUncheckedIndexedAccess, and exactOptionalPropertyTypes treats
   // "optional" and "may be undefined" as different things.
   className?: string | undefined;
+  /** The rendered element's own `id`, when something must reference it (`aria-describedby` wiring, e.g. `AttributeEditRow`'s field help text). Absent everywhere else. */
+  id?: string | undefined;
   children: ReactNode;
 }
 
@@ -26,7 +28,11 @@ export interface TextProps {
  * Deliberately narrow: no arbitrary size, weight or colour props, so the
  * type scale in tokens.css stays the only scale in the product (§8.1).
  */
-export function Text({ size = 'md', tone = 'default', mono = false, as: Component = 'span', className, children }: TextProps) {
+export function Text({ size = 'md', tone = 'default', mono = false, as: Component = 'span', className, id, children }: TextProps) {
   const classes = [styles.text, styles[`size-${size}`], styles[`tone-${tone}`], mono ? styles.mono : '', className].filter(Boolean).join(' ');
-  return <Component className={classes}>{children}</Component>;
+  return (
+    <Component className={classes} id={id}>
+      {children}
+    </Component>
+  );
 }

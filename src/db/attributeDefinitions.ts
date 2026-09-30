@@ -13,6 +13,7 @@
  * reorder — this table is settings, not versioned model content.
  */
 import type { AttributeDefinitionKind } from '../contracts/attributeSchema';
+import { isCoreAttributeKey } from '../contracts/attributeSchema';
 import type { ElementType, UUID } from '../contracts/delta';
 import type { Client } from './client';
 import type { AttributeDefinitionRow } from './types';
@@ -41,10 +42,11 @@ export interface CreateAttributeDefinitionInput {
   createdBy: UUID;
 }
 
-export type CreateAttributeDefinitionResult = { status: 'created'; definition: AttributeDefinitionRow } | { status: 'duplicate_key' };
+export type CreateAttributeDefinitionResult = { status: 'created'; definition: AttributeDefinitionRow } | { status: 'duplicate_key' } | { status: 'reserved_key' };
 
-/** Owner only (`attribute_definitions_insert`'s RLS). A second definition with the same key at this org is a duplicate, not a new row — `attribute_definitions_org_id_key_key`'s own unique constraint refuses it (`23505`, the same code `createInvite`'s own module comment names for its own unique-index conflict), returned here as a structured result rather than a raw Postgres error. */
+/** Owner only (`attribute_definitions_insert`'s RLS). A second definition with the same key at this org is a duplicate, not a new row — `attribute_definitions_org_id_key_key`'s own unique constraint refuses it (`23505`, the same code `createInvite`'s own module comment names for its own unique-index conflict), returned here as a structured result rather than a raw Postgres error. A key that is already a *core* attribute's key is refused before the insert (`isCoreAttributeKey`) — the DB's unique constraint only covers one org's own custom keys, and nothing downstream de-duplicates a custom key against the core schema (`ElementPage`'s `[...schema, ...customFields]` concat renders both, the edit form shadows the core field, export drops the custom column), so this is the one place the collision can be stopped. */
 export async function createAttributeDefinition(supabase: Client, input: CreateAttributeDefinitionInput): Promise<CreateAttributeDefinitionResult> {
+  if (isCoreAttributeKey(input.key.trim())) return { status: 'reserved_key' };
   const row = {
     id: input.id,
     org_id: input.orgId,

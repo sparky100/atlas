@@ -12,6 +12,7 @@ import {
   ELEMENT_TYPES,
   RELATIONSHIP_TYPES,
   type ActorAttributes,
+  type AnnualRunCost,
   type CapabilityAttributes,
   type ContainerAttributes,
   type Criticality,
@@ -53,6 +54,7 @@ const criticality: Criticality[] = ['critical', 'high', 'medium', 'low'];
 const hostingModel: HostingModel[] = ['on_premises', 'private_cloud', 'public_cloud', 'saas', 'hybrid'];
 const systemDomain: SystemDomain[] = ['it', 'ot', 'hybrid'];
 const systemKind: SystemKind[] = ['application', 'integration_platform', 'data_platform', 'infrastructure'];
+const annualRunCost: AnnualRunCost[] = ['none_included', 'under_50k', '50k_250k', '250k_1m', '1m_5m', 'over_5m'];
 
 const capabilityAttributes: fc.Arbitrary<CapabilityAttributes> = fc.record(
   { description: fc.string(), code: fc.string({ minLength: 1, maxLength: 6 }), templateRef: fc.uuid() },
@@ -73,11 +75,12 @@ const systemAttributes: fc.Arbitrary<SystemAttributes> = fc.record(
     domain: fc.constantFrom(...systemDomain),
     kind: fc.constantFrom(...systemKind),
     version: fc.string(),
+    annualRunCost: fc.constantFrom(...annualRunCost),
   },
   { requiredKeys: ['lifecycleStatus', 'isExternal'] },
 );
 const containerAttributes: fc.Arbitrary<ContainerAttributes> = fc.record(
-  { description: fc.string(), technology: fc.string(), isExternal: fc.boolean(), introduced: isoDate, plannedEnd: isoDate, version: fc.string() },
+  { description: fc.string(), technology: fc.string(), isExternal: fc.boolean(), introduced: isoDate, plannedEnd: isoDate, version: fc.string(), annualRunCost: fc.constantFrom(...annualRunCost) },
   { requiredKeys: ['isExternal'] },
 );
 const actorAttributes: fc.Arbitrary<ActorAttributes> = fc.record(

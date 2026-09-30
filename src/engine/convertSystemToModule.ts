@@ -76,9 +76,9 @@ function relationshipCreateDelta(id: UUID, relationshipId: UUID, relationshipTyp
  * (`vendor`, `externalOrganisation`, `kind`, `supportEndsAt`) — real facts
  * that simply don't carry over, surfaced here rather than silently dropped
  * (CLAUDE.md rule 7). Every other `SystemAttributes` field (`description`,
- * `isExternal`, `introduced`, `plannedEnd`, `criticality`, `hostingModel`,
- * `hostingProvider`, `domain`, `lifecycleStatus`, `version`) has a same-
- * named `ContainerAttributes` field and carries straight over.
+ * `isExternal`, `introduced`, `plannedEnd`, `criticality`, `annualRunCost`,
+ * `hostingModel`, `hostingProvider`, `domain`, `lifecycleStatus`, `version`)
+ * has a same-named `ContainerAttributes` field and carries straight over.
  */
 const SYSTEM_ONLY_ATTRIBUTE_KEYS = ['vendor', 'externalOrganisation', 'kind', 'supportEndsAt'] as const satisfies readonly (keyof SystemAttributes)[];
 
@@ -88,6 +88,11 @@ function containerAttributesFromSystem(systemAttributes: SystemAttributes): { at
   if (systemAttributes.introduced !== undefined) attributes.introduced = systemAttributes.introduced;
   if (systemAttributes.plannedEnd !== undefined) attributes.plannedEnd = systemAttributes.plannedEnd;
   if (systemAttributes.criticality !== undefined) attributes.criticality = systemAttributes.criticality;
+  // The system's own avoidable run cost is the same software's avoidable
+  // run cost after conversion — it carries over as the module's own value
+  // (recorded decision: it is NOT inherited *from* a platform the other way
+  // round, `ContainerAttributes.annualRunCost`'s doc comment).
+  if (systemAttributes.annualRunCost !== undefined) attributes.annualRunCost = systemAttributes.annualRunCost;
   if (systemAttributes.hostingModel !== undefined) attributes.hostingModel = systemAttributes.hostingModel;
   if (systemAttributes.hostingProvider !== undefined) attributes.hostingProvider = systemAttributes.hostingProvider;
   if (systemAttributes.domain !== undefined) attributes.domain = systemAttributes.domain;

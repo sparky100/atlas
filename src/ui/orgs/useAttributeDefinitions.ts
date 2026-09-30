@@ -27,7 +27,7 @@ export interface UseAttributeDefinitionsResult {
   definitions: AttributeDefinitionRow[];
   loading: boolean;
   error: string | null;
-  /** `null` on a real failure (already reported); the result's own `status` distinguishes 'created' from 'duplicate_key', shown inline by the caller — same convention `useInvites.ts`'s own `create` established. */
+  /** `null` on a real failure (already reported); the result's own `status` distinguishes 'created' from 'duplicate_key'/'reserved_key', shown inline by the caller — same convention `useInvites.ts`'s own `create` established. */
   create: (input: NewAttributeDefinitionInput) => Promise<CreateAttributeDefinitionResult | null>;
   moveUp: (id: UUID) => Promise<void>;
   moveDown: (id: UUID) => Promise<void>;

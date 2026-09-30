@@ -214,7 +214,6 @@ export async function invokeCaptureRun(supabase: Client, jobId: UUID): Promise<I
  * "creator (contributor+) or owner/architect" and the pending/parsed gate.
  */
 export async function discardCaptureJob(supabase: Client, jobId: UUID): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { error } = await supabase.schema('atlas').rpc('discard_capture_job', { p_job_id: jobId });
   if (error) throw new Error(`discardCaptureJob: ${error.message}`);
 }

@@ -8,6 +8,8 @@ export interface AttributeValueInputProps {
   value: DraftValue;
   onChange: (value: DraftValue) => void;
   invalid: boolean;
+  /** `AttributeEditRow`'s help-text element id, when the field declares `field.help` — wired onto the control so screen readers announce the guidance with it. Absent on every field with no help text. */
+  describedBy?: string | undefined;
 }
 
 /**
@@ -23,7 +25,7 @@ export interface AttributeValueInputProps {
  * `.textarea`'s own `field-sizing: content` (`AttributeValueInput.module.css`),
  * not a fixed-height box the value scrolls inside from the first line.
  */
-export function AttributeValueInput({ id, field, value, onChange, invalid }: AttributeValueInputProps) {
+export function AttributeValueInput({ id, field, value, onChange, invalid, describedBy }: AttributeValueInputProps) {
   const stringValue = typeof value === 'string' ? value : '';
 
   if (field.kind === 'boolean') {
@@ -37,6 +39,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid }: Att
           onChange(e.target.checked);
         }}
         aria-invalid={invalid}
+        aria-describedby={describedBy}
       />
     );
   }
@@ -52,6 +55,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid }: Att
           onChange(e.target.value);
         }}
         aria-invalid={invalid}
+        aria-describedby={describedBy}
       />
     );
   }
@@ -66,11 +70,12 @@ export function AttributeValueInput({ id, field, value, onChange, invalid }: Att
           onChange(e.target.value);
         }}
         aria-invalid={invalid}
+        aria-describedby={describedBy}
       >
-        <option value="">{field.required ? 'Select…' : '—'}</option>
+        <option value="">{field.required ? 'Select…' : (field.emptyLabel ?? '—')}</option>
         {field.options?.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {field.optionLabels?.[option] ?? option}
           </option>
         ))}
       </select>
@@ -88,6 +93,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid }: Att
           onChange(e.target.value);
         }}
         aria-invalid={invalid}
+        aria-describedby={describedBy}
       />
     );
   }
@@ -103,6 +109,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid }: Att
           onChange(e.target.value);
         }}
         aria-invalid={invalid}
+        aria-describedby={describedBy}
       />
     );
   }
@@ -118,6 +125,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid }: Att
           onChange(e.target.value);
         }}
         aria-invalid={invalid}
+        aria-describedby={describedBy}
       />
     );
   }
@@ -132,6 +140,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid }: Att
         onChange(e.target.value);
       }}
       aria-invalid={invalid}
+      aria-describedby={describedBy}
     />
   );
 }

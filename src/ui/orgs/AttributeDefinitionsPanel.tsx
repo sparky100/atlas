@@ -102,6 +102,8 @@ export function AttributeDefinitionsPanel({ orgId, userId }: AttributeDefinition
             if (!result) return;
             if (result.status === 'duplicate_key') {
               setFormError(`"${trimmedKey}" is already defined for this organisation.`);
+            } else if (result.status === 'reserved_key') {
+              setFormError(`"${trimmedKey}" is a core attribute key — choose a different key.`);
             } else {
               resetForm();
             }

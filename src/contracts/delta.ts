@@ -54,6 +54,14 @@ export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
  * a stage is a label grouping the capabilities that deliver it, with no
  * sequence, timing, actor or flow semantics — that ADR argues the
  * distinction in full, and this list keeps the exclusion.
+ *
+ * Same shape of amendment for cost: "cost/budget figures" above excludes
+ * cost as an *element type* (and unformatted cost figures as modelled
+ * facts). `AnnualRunCost` (below) is not that — it is a banded, judged
+ * attribute on existing element types, recorded the same way `criticality`
+ * is, with no cost figure stored anywhere. The exclusion list itself is
+ * unchanged; the distinction is recorded here so the next request can see
+ * it was argued, not skipped.
  */
 export const DELIBERATELY_NOT_MODELLED = [
   'business-process',
@@ -134,6 +142,33 @@ export type OwnsRole = 'business' | 'technical' | 'service';
  * here takes.
  */
 export type FitForPurpose = 'poor' | 'adequate' | 'good' | 'excellent';
+/**
+ * A banded, judged estimate of the avoidable annual run cost of a system or
+ * container — the annual cost that stops if *that element* is retired, never
+ * a share of a platform's cost (its own help text says so, and no roll-up
+ * ever adds bands: they are ordered for comparison only, see
+ * `src/ui/elements/annualRunCost.ts`). Ordered cheapest → most expensive,
+ * `none_included` first; the stored value is always one of these keys and
+ * the display labels live in `src/contracts/attributeSchema.ts`
+ * (`ANNUAL_RUN_COST_BANDS`), the same "keys stored, labels in code" stance
+ * ADR-022 records for decision-criterion levels.
+ *
+ * Absent means *not entered* and is never treated as `none_included` or as
+ * the lowest band — the "an unset fact isn't a recorded fact" stance every
+ * optional attribute here takes; the UI makes that distinction explicit with
+ * the field's own `emptyLabel` ("Not entered").
+ *
+ * Portfolio groundwork: deliberately NOT a `cost-or-budget` modelled type —
+ * this is a judged band on existing element types, not a cost figure or cost
+ * element (see `DELIBERATELY_NOT_MODELLED`'s own amendment below). No engine
+ * rule, health finding or colour-by reads it.
+ *
+ * Restricted to `SystemAttributes` and `ContainerAttributes` structurally:
+ * the field simply does not exist on `CapabilityAttributes`/
+ * `ActorAttributes`/`ValueStreamAttributes`, so
+ * `validateAttributeValue` rejects it for those types on its own.
+ */
+export type AnnualRunCost = 'none_included' | 'under_50k' | '50k_250k' | '250k_1m' | '1m_5m' | 'over_5m';
 
 /**
  * Attributes stored in `elements_head.attributes` (jsonb). `name` and
@@ -219,6 +254,8 @@ export interface SystemAttributes {
   supportEndsAt?: ISODate;
   /** S1 item 11: the deployed release/build a system is currently on (e.g. "3.4.1", "2026-Q1") — free text, since the estate's own version schemes vary too widely for an enum; optional, unrecorded until someone sets it. */
   version?: string;
+  /** Banded judged avoidable run cost — see `AnnualRunCost`'s own doc comment. Optional: absent means "Not entered", never `none_included`. */
+  annualRunCost?: AnnualRunCost;
 }
 
 export interface ContainerAttributes {
@@ -256,6 +293,15 @@ export interface ContainerAttributes {
   domain?: SystemDomain;
   /** S1 item 11: see `SystemAttributes.version`. Not part of the platform-module inheritance set above (`effectiveModuleAttributes`) — a container's own version is a fact about that container, never inherited from its parent system. */
   version?: string;
+  /**
+   * See `AnnualRunCost`'s own doc comment. Deliberately NOT part of the
+   * `effectiveModuleAttributes` inheritance set above: a module's avoidable
+   * run cost is the module's own judged fact, and inheriting the platform's
+   * band onto every module would read as exactly the "share of the
+   * platform's cost" the help text rules out. For an ordinary (non-module)
+   * container it is simply that container's own cost.
+   */
+  annualRunCost?: AnnualRunCost;
 }
 
 export interface ActorAttributes {
