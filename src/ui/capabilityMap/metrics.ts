@@ -140,7 +140,8 @@ export function worstCriticality(capabilityId: UUID, supportsEdges: readonly Rel
   return worst;
 }
 
-function fitForPurposeOf(edge: RelationshipsHeadRow): FitForPurpose | null {
+/** A `supports` edge's own `fitForPurpose` rating, or `null` if unset/unrecognised. Exported for the Portfolio view's own system-side worst-fit read (`worstFitForPurposeOfSupporter` below) — the identical leaf-level read `worstFitForPurpose` already makes capability-side. */
+export function fitForPurposeOf(edge: RelationshipsHeadRow): FitForPurpose | null {
   const value = attributesRecord(edge.attributes).fitForPurpose;
   return typeof value === 'string' && value in FIT_FOR_PURPOSE_ORDER ? (value as FitForPurpose) : null;
 }
@@ -157,6 +158,25 @@ export function worstFitForPurpose(capabilityId: UUID, supportsEdges: readonly R
   let worst: FitForPurpose | null = null;
   for (const edge of supportsEdges) {
     if (edge.to_element_id !== capabilityId) continue;
+    const fit = fitForPurposeOf(edge);
+    if (fit !== null && (worst === null || FIT_FOR_PURPOSE_ORDER[fit] > FIT_FOR_PURPOSE_ORDER[worst])) worst = fit;
+  }
+  return worst;
+}
+
+/**
+ * The mirror of `worstFitForPurpose`, keyed on the *supporting* element
+ * (a system or a module container, `edge.from_element_id`) rather than the
+ * capability it supports — the Portfolio view's own "fit (worst across
+ * its supports edges)" column, since nothing before it needed a system's
+ * own worst fit rather than a capability's. Same worst-of/unrated
+ * semantics: an edge with no rating is skipped, and a supporter with
+ * zero rated edges reads `null`, never a recorded value.
+ */
+export function worstFitForPurposeOfSupporter(supporterId: UUID, supportsEdges: readonly RelationshipsHeadRow[]): FitForPurpose | null {
+  let worst: FitForPurpose | null = null;
+  for (const edge of supportsEdges) {
+    if (edge.from_element_id !== supporterId) continue;
     const fit = fitForPurposeOf(edge);
     if (fit !== null && (worst === null || FIT_FOR_PURPOSE_ORDER[fit] > FIT_FOR_PURPOSE_ORDER[worst])) worst = fit;
   }

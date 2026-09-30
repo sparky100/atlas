@@ -1,4 +1,4 @@
-import { GitBranch, History, Home, Inbox, Map, Milestone, Scale, Upload, Workflow, Grid as GridIcon, type LucideIcon } from 'lucide-react';
+import { GitBranch, History, Home, Inbox, Map, Milestone, Scale, Upload, Wallet, Workflow, Grid as GridIcon, type LucideIcon } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { Chip } from '../Chip/Chip';
 import { Text } from '../Text/Text';
@@ -18,7 +18,7 @@ type RealSection = Exclude<ModelNavSection, null>;
 
 /** V2b: three named groups (UI-principles §2.0's own table) — a caption + 1px divider between each on the rail, dividers alone (no caption — no room) on the mobile bottom bar. Order here is display order, both grouped and flattened. */
 const NAV_GROUPS: { caption: string; sections: RealSection[] }[] = [
-  { caption: 'Model', sections: ['home', 'capability-map', 'landscape', 'roadmap', 'value-streams'] },
+  { caption: 'Model', sections: ['home', 'capability-map', 'landscape', 'roadmap', 'value-streams', 'portfolio'] },
   { caption: 'Work', sections: ['changes', 'capture', 'decisions', 'review'] },
   { caption: 'Record', sections: ['versions'] },
 ];
@@ -29,6 +29,7 @@ const SECTION_LABELS: Record<RealSection, string> = {
   landscape: 'Landscape',
   roadmap: 'Roadmap',
   'value-streams': 'Value streams',
+  portfolio: 'Portfolio',
   changes: 'Changes',
   capture: 'Capture',
   decisions: 'Decisions',
@@ -43,6 +44,7 @@ const SECTION_ICONS: Record<RealSection, LucideIcon> = {
   landscape: Map,
   roadmap: Milestone,
   'value-streams': Workflow,
+  portfolio: Wallet,
   changes: GitBranch,
   capture: Upload,
   decisions: Scale,
@@ -129,7 +131,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
             <ul className={styles.list}>
               {group.sections.map((section) => {
                 const path = sectionPath(section);
-                const carriesViewing = section === 'landscape' || section === 'capability-map' || section === 'roadmap' || section === 'value-streams';
+                const carriesViewing = section === 'landscape' || section === 'capability-map' || section === 'roadmap' || section === 'value-streams' || section === 'portfolio';
                 const query = carriesViewing ? refParamViewing : refParam;
                 const href = `${base}${path ? `/${path}` : ''}${ref.kind !== 'main' ? `?${query}` : ''}`;
                 const isActive = section === activeSection;
@@ -170,6 +172,8 @@ function sectionPath(section: RealSection): string {
       return 'roadmap';
     case 'value-streams':
       return 'value-streams';
+    case 'portfolio':
+      return 'portfolio';
     case 'changes':
       return 'changes';
     case 'capture':
