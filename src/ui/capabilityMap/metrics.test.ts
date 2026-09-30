@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateTileColourFor, fitAssessmentSupportsEdges, lifecycleExposure, oldestLifecycleStage, otShareOf, poorFitSupportsEdges, resolveDefaultColourBy, supportingSystemIds, tileColourFor, worstCriticality, worstFitForPurpose } from './metrics';
+import {
+  aggregateTileColourFor,
+  fitAssessmentSupportsEdges,
+  lifecycleExposure,
+  oldestLifecycleStage,
+  otShareOf,
+  poorFitSupportsEdges,
+  resolveDefaultColourBy,
+  supportingSystemIds,
+  tileColourFor,
+  worstCriticality,
+  worstFitForPurpose,
+  worstFitForPurposeOfSupporter,
+} from './metrics';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 
 function system(id: string, lifecycleStatus?: string, plannedEnd?: string, criticality?: string, domain?: string): ElementsHeadRow {
@@ -109,6 +122,26 @@ describe('worstFitForPurpose', () => {
 
   it('returns null for a capability with no supporting systems at all', () => {
     expect(worstFitForPurpose('cap-1', [])).toBeNull();
+  });
+});
+
+describe('worstFitForPurposeOfSupporter', () => {
+  it("returns the worst rating among a supporter's own outgoing supports edges", () => {
+    const edges = [supports('sys-1', 'cap-1', 'good'), supports('sys-1', 'cap-2', 'poor')];
+    expect(worstFitForPurposeOfSupporter('sys-1', edges)).toBe('poor');
+  });
+
+  it('ignores edges from other supporters', () => {
+    const edges = [supports('sys-1', 'cap-1', 'good'), supports('sys-2', 'cap-1', 'poor')];
+    expect(worstFitForPurposeOfSupporter('sys-1', edges)).toBe('good');
+  });
+
+  it('returns null when none of the supporter\'s own edges have a recorded fitForPurpose', () => {
+    expect(worstFitForPurposeOfSupporter('sys-1', [supports('sys-1', 'cap-1')])).toBeNull();
+  });
+
+  it('returns null for a supporter with no outgoing supports edges at all', () => {
+    expect(worstFitForPurposeOfSupporter('sys-1', [])).toBeNull();
   });
 });
 
