@@ -36,7 +36,7 @@ test('a field conflict renders with its three-way context, resolves with one cli
   // F3a's own architect floor — see addArchitectMember's own doc comment.
   // The owner (userId) is included in the reviewer set too: they cast the
   // approve verdict below, which needs them to actually be one.
-  const architectUserId = await addArchitectMember(env, orgId, userId);
+  const { userId: architectUserId } = await addArchitectMember(env, orgId, userId);
 
   // The change branch: forks at the seed commit, then edits vendor independently of main.
   const branchId = randomUUID();

@@ -19,7 +19,7 @@ import type { CommitEnvelope, Delta } from '../src/contracts/delta';
 import { getBranch, getMainBranch } from '../src/db/branches';
 import { commitToBranch } from '../src/db/commits';
 import { loadEnv } from '../src/db/env';
-import { addArchitectMember, bootstrapChangeBranchFixture, submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
+import { addArchitectMember, bootstrapChangeBranchFixture, signInExistingUser, submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
 
 function makeCapability(id: string, elementId: string, name: string, sourceId: string): Delta {
   return { kind: 'element.create', id, elementId, elementType: 'capability', name, parentId: null, attributes: {}, sourceId, confidence: 1 };
@@ -31,14 +31,14 @@ function makeSupports(id: string, relationshipId: string, fromElementId: string,
   return { kind: 'relationship.create', id, relationshipId, relationshipType: 'supports', fromElementId, toElementId, attributes: { role: 'secondary' }, sourceId, confidence: 1 };
 }
 
-test('add three options to a decision, compare them, choose one; the chosen option flips to propose and merges through the ordinary review path; the others show cancelled', async ({ page }) => {
+test('add three options to a decision, compare them, choose one; the chosen option flips to propose and merges through the ordinary review path; the others show cancelled', async ({ page, browser }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'decisioncompare', 'Ledger Service');
   const { signedIn: owner, orgId, userId, orgSlug, modelId, modelSlug, systemId, seedSourceId } = fixture;
   // F3a's own architect floor — see addArchitectMember's own doc comment.
   // Chosen decision options flip to propose intent (below), so the owner
   // needs to be in the reviewer set too: they cast the approve verdict.
-  await addArchitectMember(env, orgId, userId);
+  const architect = await addArchitectMember(env, orgId, userId);
 
   // A capability the decision will concern, with the fixture's own system
   // already supporting it — the comparison table's one real row.
@@ -147,9 +147,28 @@ test('add three options to a decision, compare them, choose one; the chosen opti
   await expect(page.getByRole('heading', { name: /^Proposing: Option 2/ })).toBeVisible();
   await submitForReviewWithReviewers(page, true);
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
+  const reviewUrl = page.url();
   const approveButton = page.getByRole('button', { name: 'Approve' });
   await expect(approveButton).toBeEnabled();
   await approveButton.click();
+
+  // `pickArchitect` (`deriveReviewers.ts`) always prefers a real architect
+  // over the owner once one exists, so the owner's own reviewer row above
+  // is `optional` — only the architect's own approval counts toward "N of
+  // N required approvers". Sign in as them in a second browser context
+  // (the pattern `golden-path-propose-review-merge.spec.ts` already uses)
+  // and cast their verdict too.
+  const architectContext = await browser.newContext();
+  const architectPage = await architectContext.newPage();
+  await signInExistingUser(architectPage, architect.email, architect.password);
+  await architectPage.goto(reviewUrl);
+  await architectPage.getByRole('button', { name: 'Approve' }).click();
+  await expect(architectPage.getByText('approved', { exact: true }).first()).toBeVisible();
+  await architectContext.close();
+
+  // `page` has no realtime subscription onto the request it's already
+  // loaded, so a reload is needed to see the architect's own verdict.
+  await page.reload();
   await expect(page.getByText('approved', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Merge' }).click();
   await expect(page.getByText('merged', { exact: true }).first()).toBeVisible();

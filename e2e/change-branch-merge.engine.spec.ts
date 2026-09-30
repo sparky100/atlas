@@ -24,9 +24,9 @@ import type { CommitEnvelope } from '../src/contracts/delta';
 import { createChangeBranch } from '../src/db/branches';
 import { commitToBranch } from '../src/db/commits';
 import { loadEnv } from '../src/db/env';
-import { addArchitectMember, bootstrapChangeBranchFixture, submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
+import { addArchitectMember, bootstrapChangeBranchFixture, signInExistingUser, submitForReviewWithReviewers } from './fixtures/changeBranchFixture';
 
-test('create a change, edit it on its own branch, view it, submit, approve, and merge', async ({ page }) => {
+test('create a change, edit it on its own branch, view it, submit, approve, and merge', async ({ page, browser }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'cbmerge', 'Billing Service');
   const { orgId, userId, orgSlug, modelSlug, systemId } = fixture;
@@ -34,7 +34,7 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   // The owner needs to be in the reviewer set too: they cast the approve
   // verdict below (`isMultiReviewer` path, `ReviewRequestView.tsx`'s own
   // `rr.castVerdict`), which needs them to actually be one.
-  await addArchitectMember(env, orgId, userId);
+  const architect = await addArchitectMember(env, orgId, userId);
 
   // 1. Create the change branch through the real "Changes" form.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
@@ -118,31 +118,31 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   // change, nothing blocking, Approve enabled straight away.
   await expect(page.getByText('Clean changes — no conflicts or warnings (1)')).toBeVisible();
   await expect(page.getByText('0 blocking')).toBeVisible();
+  const reviewUrl = page.url();
   const approveButton = page.getByRole('button', { name: 'Approve' });
   await expect(approveButton).toBeEnabled();
   await approveButton.click();
+
+  // `pickArchitect` (`deriveReviewers.ts`) always prefers a real architect
+  // over the owner once one exists, so the owner's own reviewer row above
+  // is `optional` — only the architect's own approval counts toward "N of
+  // N required approvers". Sign in as them in a second browser context
+  // (the pattern `golden-path-propose-review-merge.spec.ts` already uses)
+  // and cast their verdict too.
+  const architectContext = await browser.newContext();
+  const architectPage = await architectContext.newPage();
+  await signInExistingUser(architectPage, architect.email, architect.password);
+  await architectPage.goto(reviewUrl);
+  await architectPage.getByRole('button', { name: 'Approve' }).click();
+  await expect(architectPage.getByText('approved', { exact: true }).first()).toBeVisible();
+  await architectContext.close();
+
   // Both the request's and the branch's own status chips read "approved"
   // at this point (atlas.approve_merge_request moves both) — `.first()`
-  // rather than a strict-mode violation on the duplicate text.
-  //
-  // Decision-side-completion item 8: this still fails, pre-existing (not
-  // a regression from #319/#320 — reproduces identically before #301, at
-  // #301, and on current main). Root cause: `submitForReviewWithReviewers`
-  // checks two reviewers (the org's real `architect` member, added by
-  // `addArchitectMember` so the submit RPC's own architect floor is met,
-  // plus this session's own signed-in owner via `includeSelf`) —
-  // `pickArchitect` (`deriveReviewers.ts`) always prefers a real architect
-  // over the owner when one exists, so the owner's own reviewer row is
-  // `optional`, not `required`; only the architect's approval counts
-  // toward "N of N required approvers". Nobody in this test ever signs in
-  // as the separately-created architect account to cast that approval, so
-  // the request never reaches "approved" from this one session alone.
-  // Smallest real fix: a second `browser.newContext()` signed in as the
-  // architect (the pattern `golden-path-propose-review-merge.spec.ts`
-  // already uses) — but `addArchitectMember` only returns the new user's
-  // id today, not the password it generated, so that helper needs a small
-  // change first (return `{ userId, password }`) before a second context
-  // could actually sign in as them.
+  // rather than a strict-mode violation on the duplicate text. `page` has
+  // no realtime subscription onto the request it's already loaded, so a
+  // reload is needed to see the architect's own verdict reflected here.
+  await page.reload();
   await expect(page.getByText('approved', { exact: true }).first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Merge' }).click();

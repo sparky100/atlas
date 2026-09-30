@@ -58,13 +58,19 @@ describe('llm_proxy_requests against a real local Supabase', () => {
     await createOrganisation(owner.client, { id: orgId, name: 'LLM Proxy Test Org', slug: `llmproxy-${orgId.slice(0, 8)}`, createdBy: owner.id });
 
     // Simulates the edge function's own service-role writes — one 'ok', one
-    // 'rate_limited', an hour apart, so ordering is unambiguous.
+    // 'rate_limited', an hour apart, so ordering is unambiguous. Both rows
+    // set `created_at` explicitly rather than letting the second one rely
+    // on the column's own `default now()`: postgrest-js computes the union
+    // of keys across a single array `.insert()` call and sends an explicit
+    // `null` for any row that omits a key another row in the same call
+    // supplies, which would violate this column's `not null` here instead
+    // of ever reaching the database default.
     olderRequestId = randomUUID();
     newerRequestId = randomUUID();
     const anHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { error: seedError } = await service.from('llm_proxy_requests').insert([
       { id: olderRequestId, org_id: orgId, model: 'claude-opus-5', status: 'ok', input_tokens: 120, output_tokens: 40, latency_ms: 850, created_at: anHourAgo },
-      { id: newerRequestId, org_id: orgId, model: 'claude-opus-5', status: 'rate_limited', input_tokens: null, output_tokens: null, latency_ms: 2 },
+      { id: newerRequestId, org_id: orgId, model: 'claude-opus-5', status: 'rate_limited', input_tokens: null, output_tokens: null, latency_ms: 2, created_at: new Date().toISOString() },
     ]);
     if (seedError) throw new Error(`seed llm_proxy_requests: ${seedError.message}`);
   });

@@ -79,6 +79,14 @@ describe('repository layer against a real local Supabase', () => {
   let modelSlug: string;
   let mainGenesisCommitId: string;
   let capabilityMapId: string;
+  // Unique per run, not the literal 'public_body': this describe block's
+  // own capability_maps row has no afterAll cleanup (only orgId/users do,
+  // for the "re-running against a persistent local supabase start"
+  // developer case its comment names), so a fixed (sector, version)
+  // collides on capability_maps_sector_version_key the moment this suite
+  // — or this file alone — runs a second time against the same,
+  // not-freshly-reset database.
+  let capabilityMapSector: string;
   let aliceManualSourceId: string;
 
   beforeAll(async () => {
@@ -123,7 +131,8 @@ describe('repository layer against a real local Supabase', () => {
     // rejects any item write once the map is published, matching the real
     // draft → load items → publish order scripts/loadCapabilityMaps.ts and
     // scripts/publishCapabilityMap.ts actually use.
-    const { error: mapError } = await service.from('capability_maps').insert({ id: capabilityMapId, sector: 'public_body', version: 1, status: 'draft', source_description: 'Integration test fixture' });
+    capabilityMapSector = `public_body_${randomUUID().slice(0, 8)}`;
+    const { error: mapError } = await service.from('capability_maps').insert({ id: capabilityMapId, sector: capabilityMapSector, version: 1, status: 'draft', source_description: 'Integration test fixture' });
     if (mapError) throw new Error(`capability_maps fixture: ${mapError.message}`);
     const { error: itemsError } = await service.from('capability_map_items').insert([
       { id: rootItemId, map_id: capabilityMapId, code: '1', parent_code: null, name: 'Root Capability', description: 'Top-level fixture capability.', level: 1, item_order: 10 },
@@ -145,7 +154,7 @@ describe('repository layer against a real local Supabase', () => {
       expectedHeadCommitId: main.head_commit_id,
       authorId: alice.id,
       capabilityMapId,
-      sector: 'public_body',
+      sector: capabilityMapSector,
       version: 1,
       items,
     });
@@ -249,7 +258,7 @@ describe('repository layer against a real local Supabase', () => {
         expectedHeadCommitId: main.head_commit_id,
         authorId: alice.id,
         capabilityMapId,
-        sector: 'public_body',
+        sector: capabilityMapSector,
         version: 1,
         items,
       });
@@ -291,7 +300,7 @@ describe('repository layer against a real local Supabase', () => {
         expectedHeadCommitId: genesisCommitId,
         authorId: alice.id,
         capabilityMapId,
-        sector: 'public_body',
+        sector: capabilityMapSector,
         version: 1,
         items: freshItems,
       });
@@ -1262,15 +1271,20 @@ describe('repository layer against a real local Supabase', () => {
 
   describe('capability map publishing (scripts/publishCapabilityMap.ts, immutability once published)', () => {
     it('refuses to publish with no sources, then with only a placeholder source; publishes once a real reviewer replaces it; deprecates the previous published version; and locks items against further writes', async () => {
+      // Unique per run, not the literal 'nhs': this test's own rows are
+      // never cleaned up afterward, so a fixed (sector, version) collides
+      // on capability_maps_sector_version_key the moment this file runs a
+      // second time against the same, not-freshly-reset database.
+      const sector = `nhs_${randomUUID().slice(0, 8)}`;
       const draftMapId = randomUUID();
-      const { error: draftMapError } = await service.from('capability_maps').insert({ id: draftMapId, sector: 'nhs', version: 999, status: 'draft', source_description: 'Publish-flow integration test fixture' });
+      const { error: draftMapError } = await service.from('capability_maps').insert({ id: draftMapId, sector, version: 999, status: 'draft', source_description: 'Publish-flow integration test fixture' });
       if (draftMapError) throw new Error(`draft map fixture: ${draftMapError.message}`);
       const itemId = randomUUID();
       const { error: itemError } = await service.from('capability_map_items').insert({ id: itemId, map_id: draftMapId, code: '1', parent_code: null, name: 'Test Capability', level: 1, item_order: 10 });
       if (itemError) throw new Error(`item fixture: ${itemError.message}`);
 
       // No sources at all.
-      await expect(publishCapabilityMap(service, 'nhs', 999)).rejects.toThrow(/no capability_map_sources row/);
+      await expect(publishCapabilityMap(service, sector, 999)).rejects.toThrow(/no capability_map_sources row/);
 
       // A source, but still the drafting placeholder.
       const sourceId = randomUUID();
@@ -1278,12 +1292,12 @@ describe('repository layer against a real local Supabase', () => {
         .from('capability_map_sources')
         .insert({ id: sourceId, map_id: draftMapId, citation: 'Test source', reviewed_by: 'Pending human review — drafted by Claude Code', reviewed_at: '2026-01-01' });
       if (sourceError) throw new Error(`source fixture: ${sourceError.message}`);
-      await expect(publishCapabilityMap(service, 'nhs', 999)).rejects.toThrow(/still the drafting placeholder/);
+      await expect(publishCapabilityMap(service, sector, 999)).rejects.toThrow(/still the drafting placeholder/);
 
       // A real reviewer's name replaces the placeholder — publishing now succeeds.
       const { error: reviewError } = await service.from('capability_map_sources').update({ reviewed_by: 'A. Reviewer' }).eq('id', sourceId);
       if (reviewError) throw new Error(`review-name fixture update: ${reviewError.message}`);
-      const firstPublish = await publishCapabilityMap(service, 'nhs', 999);
+      const firstPublish = await publishCapabilityMap(service, sector, 999);
       expect(firstPublish.deprecated).toEqual([]);
       const { data: publishedRow } = await service.from('capability_maps').select('status, published_at').eq('id', draftMapId).maybeSingle();
       expect(publishedRow).toMatchObject({ status: 'published' });
@@ -1299,13 +1313,13 @@ describe('repository layer against a real local Supabase', () => {
 
       // A second, later version of the same sector supersedes the first: publishing it deprecates v999.
       const secondMapId = randomUUID();
-      const { error: secondMapError } = await service.from('capability_maps').insert({ id: secondMapId, sector: 'nhs', version: 1000, status: 'draft', source_description: 'Publish-flow integration test fixture, v2' });
+      const { error: secondMapError } = await service.from('capability_maps').insert({ id: secondMapId, sector, version: 1000, status: 'draft', source_description: 'Publish-flow integration test fixture, v2' });
       if (secondMapError) throw new Error(`second draft map fixture: ${secondMapError.message}`);
       const { error: secondSourceError } = await service
         .from('capability_map_sources')
         .insert({ id: randomUUID(), map_id: secondMapId, citation: 'Test source v2', reviewed_by: 'A. Reviewer', reviewed_at: '2026-01-02' });
       if (secondSourceError) throw new Error(`second source fixture: ${secondSourceError.message}`);
-      const secondPublish = await publishCapabilityMap(service, 'nhs', 1000);
+      const secondPublish = await publishCapabilityMap(service, sector, 1000);
       expect(secondPublish.deprecated).toEqual([999]);
       const { data: firstMapAfter } = await service.from('capability_maps').select('status').eq('id', draftMapId).maybeSingle();
       expect(firstMapAfter).toMatchObject({ status: 'deprecated' });

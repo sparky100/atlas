@@ -164,8 +164,14 @@ describe('F6: value-stream rollup and impact through the real commit path', () =
     // A draft map: one capability, two streams (one stage each), `enables`
     // onto both stages — seeded through `seedModelFromCapabilityMap` (the
     // real seed path, which now carries value streams and their edges).
+    // `sector` is unique per run, not the literal 'electricity_network':
+    // this row is never cleaned up afterward (only orgId/owner are, in
+    // afterAll above), so a fixed (sector, version) collides on
+    // capability_maps_sector_version_key the moment this test runs a
+    // second time against the same, not-freshly-reset database.
     const mapId = randomUUID();
-    const { error: mapError } = await service.from('capability_maps').insert({ id: mapId, sector: 'electricity_network', version: 1, status: 'draft', title: 'VS impact fixture', summary: 'value-stream impact fixture', source_description: 'Written by valueStreams.integration.test.ts.' });
+    const sector = `electricity_network_${randomUUID().slice(0, 8)}`;
+    const { error: mapError } = await service.from('capability_maps').insert({ id: mapId, sector, version: 1, status: 'draft', title: 'VS impact fixture', summary: 'value-stream impact fixture', source_description: 'Written by valueStreams.integration.test.ts.' });
     if (mapError) throw new Error(`capability_maps: ${mapError.message}`);
     const { error: itemError } = await service.from('capability_map_items').insert({ id: randomUUID(), map_id: mapId, code: '1', parent_code: null, name: 'Connections', level: 1, item_order: 10 });
     if (itemError) throw new Error(`capability_map_items: ${itemError.message}`);
@@ -185,7 +191,7 @@ describe('F6: value-stream rollup and impact through the real commit path', () =
     const items = await listCapabilityMapItems(service, mapId);
     const main0 = await getMainBranch(owner.client, modelId);
     if (!main0) throw new Error('main branch not found');
-    const seed = await seedModelFromCapabilityMap(owner.client, { modelId, branchId: main0.id, expectedHeadCommitId: main0.head_commit_id, authorId: owner.id, capabilityMapId: mapId, sector: 'electricity_network', version: 1, items });
+    const seed = await seedModelFromCapabilityMap(owner.client, { modelId, branchId: main0.id, expectedHeadCommitId: main0.head_commit_id, authorId: owner.id, capabilityMapId: mapId, sector, version: 1, items });
     if (!seed.ok) throw new Error(`seed: ${seed.message}`);
 
     const idByName = new Map<string, UUID>([...seed.newHead.elements].map(([id, row]) => [row.name, id]));
