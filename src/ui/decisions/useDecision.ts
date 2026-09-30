@@ -24,6 +24,28 @@ export interface DecisionPageData {
 export type DecisionPageState = { status: 'loading' } | { status: 'not_found' } | { status: 'error'; message: string } | ({ status: 'ready' } & DecisionPageData);
 
 /**
+ * Choose's own already-known result (`chooseDecisionOption`'s return)
+ * applied directly to ready state — no fetch, no loading flash. Pure and
+ * exported so it's unit-testable on its own (this repo's hooks aren't
+ * rendered in tests — see `decisionComparisonKey.ts`'s own module
+ * comment for why "does this ever produce `loading`" has to be proven
+ * against the pure function, not the hook). A no-op before the first
+ * load completes — nothing to patch yet, and a write can't happen before
+ * then anyway (Choose needs a real option, which needs a loaded page).
+ */
+export function applyDecisionUpdate(state: DecisionPageState, decision: DecisionRow): DecisionPageState {
+  return state.status === 'ready' ? { ...state, decision } : state;
+}
+
+/** "Add an option"'s own two already-known results (the new branch, the link connecting it to this decision) appended directly — no fetch, no loading flash. Same reasoning and same no-op-before-ready stance as `applyDecisionUpdate`. */
+export function applyNewOption(state: DecisionPageState, link: DecisionLinkRow, branch: BranchRow): DecisionPageState {
+  if (state.status !== 'ready') return state;
+  const linkedBranchesById = new Map(state.linkedBranchesById);
+  linkedBranchesById.set(branch.id, branch);
+  return { ...state, links: [...state.links, link], linkedBranchesById };
+}
+
+/**
  * F6.2 (fast rating saves): `decision_option_ratings` is deliberately
  * *not* fetched here — `useDecisionRatings.ts` owns that data as its own
  * lifecycle now, so a rating save patches its own local state instead of
@@ -55,7 +77,22 @@ async function loadDecisionPageData(modelId: UUID, decisionId: UUID): Promise<De
 
 export interface UseDecisionResult {
   state: DecisionPageState;
+  /** A full manual reload — re-fetches everything and does show the page-level `loading` state, same as the first load. Not called by Add-an-option/Choose any more (see `applyNewOption`/`applyDecisionUpdate`/`refreshOptionsAndArguments` below) — kept as a general-purpose escape hatch, e.g. for a future error retry. */
   reload: () => void;
+  /** Choose's own decision-row patch — see `applyDecisionUpdate`'s own doc comment. */
+  applyDecisionUpdate: (decision: DecisionRow) => void;
+  /** Add-an-option's own link+branch patch — see `applyNewOption`'s own doc comment. */
+  applyNewOption: (link: DecisionLinkRow, branch: BranchRow) => void;
+  /**
+   * Choose's own "refresh only the affected data": re-reads just the
+   * branch-linked options' rows (every other draft option gets cancelled
+   * by `atlas.choose_decision_option` itself, and the chosen one's own
+   * intent flips — neither comes back in that RPC's own return) and the
+   * arguments list (the RPC's own new `decision_arguments` row) — never
+   * `links`/`main`/`linkedElementsById`, which Choose never touches. No
+   * loading flash, same as the two `apply*` patches above.
+   */
+  refreshOptionsAndArguments: () => Promise<void>;
 }
 
 /** A single decision's own page (prompt pack F3 PR4) — mirrors `useChange.ts`'s load/reload shape. No edit action yet (PR4's own scope is "plain create/list/detail"); PR5 adds "Add an option"/"Choose", PR6 adds "Start a decision"/"why is this here". */
@@ -92,5 +129,20 @@ export function useDecision(modelId: UUID, decisionId: UUID): UseDecisionResult 
     setReloadToken((t) => t + 1);
   }, []);
 
-  return { state, reload };
+  const applyDecisionUpdateCallback = useCallback((decision: DecisionRow) => {
+    setState((prev) => applyDecisionUpdate(prev, decision));
+  }, []);
+
+  const applyNewOptionCallback = useCallback((link: DecisionLinkRow, branch: BranchRow) => {
+    setState((prev) => applyNewOption(prev, link, branch));
+  }, []);
+
+  const refreshOptionsAndArguments = useCallback(async () => {
+    if (state.status !== 'ready') return;
+    const branchLinkIds = state.links.filter((l) => l.linked_type === 'branch').map((l) => l.linked_id);
+    const [branches, args] = await Promise.all([listBranchesByIds(supabase, branchLinkIds), listDecisionArgumentsForDecision(supabase, decisionId)]);
+    setState((prev) => (prev.status === 'ready' ? { ...prev, linkedBranchesById: new Map(branches.map((b) => [b.id, b])), args } : prev));
+  }, [state, decisionId]);
+
+  return { state, reload, applyDecisionUpdate: applyDecisionUpdateCallback, applyNewOption: applyNewOptionCallback, refreshOptionsAndArguments };
 }

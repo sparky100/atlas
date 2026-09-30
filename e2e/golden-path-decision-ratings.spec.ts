@@ -83,6 +83,17 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   const timingRow = criteriaTable.locator('tr', { hasText: 'Timing' });
   await expect(timingRow.locator('button').nth(optionBColumn - 1)).toContainText('After end date');
 
+  // Choose/Add-option follow-up ("no full-page loading state after the
+  // first load"): a hand-set attribute with no React counterpart, on a
+  // node that sits inside useDecision's own state — it only survives an
+  // action if that action never unmounts-and-remounts this subtree (the
+  // historical bug: useDecision's reload() always showed a page-level
+  // "Loading…" first, tearing this whole tree down and rebuilding it).
+  const mountMarker = 'stayed-mounted';
+  await criteriaGrid.evaluate((el, marker) => {
+    el.setAttribute('data-e2e-marker', marker);
+  }, mountMarker);
+
   // Choose option 1 — unrated criteria did not block it. The "Choose"
   // action now lives in the criteria grid's own merged header (F6.3 folded
   // the old separate Options list into these headers).
@@ -94,6 +105,10 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   // The decision shows the chosen option and the rationale recorded at Choose time.
   await expect(optionAHeader).toContainText('chosen');
   await expect(page.getByText('Option 1 is cheaper and ready sooner.')).toBeVisible();
+
+  // The page never blanked during Choose — the marker set above is still
+  // on the same DOM node.
+  await expect(criteriaGrid).toHaveAttribute('data-e2e-marker', mountMarker);
 
   // The ratings recorded before choosing are still shown afterwards...
   await expect(costRow.locator('button').nth(optionAColumn - 1)).toContainText('Low');
@@ -107,6 +122,17 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   await expect(optionBHeader).toBeVisible();
   await expect(optionBHeader).toContainText('cancelled');
   await expect(timingRow.locator('button').nth(optionBColumn - 1)).toContainText('After end date');
+
+  // A comment write doesn't blank the page either — same marker, still
+  // there after posting, and the ratings/chosen state Choose just
+  // recorded are still exactly as they were, undisturbed by an unrelated
+  // write.
+  await page.getByPlaceholder('Write a comment…').fill('Noting this for the record.');
+  await page.getByRole('button', { name: 'Post' }).click();
+  await expect(page.getByText('Noting this for the record.')).toBeVisible();
+  await expect(criteriaGrid).toHaveAttribute('data-e2e-marker', mountMarker);
+  await expect(optionAHeader).toContainText('chosen');
+  await expect(costRow.locator('button').nth(optionAColumn - 1)).toContainText('Low');
 
   // Decision-side-completion item 5: "Work on this as a change" enters the
   // change workspace and selects the chosen option as the session's

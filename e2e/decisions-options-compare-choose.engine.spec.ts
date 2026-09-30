@@ -121,6 +121,18 @@ test('add three options to a decision, compare them, choose one; the chosen opti
   await expect(coverageRow).toContainText('1 system'); // main's own column, still just Ledger Service
   await expect(coverageRow).toContainText('1 → 2 systems (+1)'); // option B's own column
 
+  // Choose/Add-option follow-up ("no full-page loading state after the
+  // first load"): a hand-set attribute with no React counterpart — it
+  // only survives Choose if the page never unmounts-and-remounts this
+  // table (the historical bug: useDecision's reload() always showed a
+  // page-level "Loading…" first, tearing the whole tree down and
+  // rebuilding it, which would also have reset this table to whatever
+  // its own first fetch produced).
+  const mountMarker = 'stayed-mounted';
+  await whatChangesTable.evaluate((el, marker) => {
+    el.setAttribute('data-e2e-marker', marker);
+  }, mountMarker);
+
   // 5. Choose option B — the criteria grid's own merged option header now
   // carries the "Choose" action (F6.3 folded the old separate Options list
   // into these headers).
@@ -132,6 +144,12 @@ test('add three options to a decision, compare them, choose one; the chosen opti
   await expect(page.getByText('accepted', { exact: true })).toBeVisible();
   await expect(page.getByText('chosen', { exact: true })).toBeVisible();
   await expect(page.getByText('Option B is the only one that actually adds the replacement capacity.')).toBeVisible();
+
+  // The comparison table never blanked or refetched during Choose — same
+  // DOM node (the marker survived), same per-option numbers as before.
+  await expect(whatChangesTable).toHaveAttribute('data-e2e-marker', mountMarker);
+  await expect(coverageRow).toContainText('1 system');
+  await expect(coverageRow).toContainText('1 → 2 systems (+1)');
 
   // 6. Options A and C read cancelled; option B's own page now reads
   // "Proposing: ..." (F0's own intent-flip) and goes through the ordinary

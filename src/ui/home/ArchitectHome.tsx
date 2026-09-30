@@ -314,14 +314,21 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
       // didn't exist when those were agreed).
       key: 'poor-fit-no-replacement',
       count: insightsData.capabilitiesWithPoorFitPrimarySupporter.length,
-      summary: `${String(insightsData.capabilitiesWithPoorFitPrimarySupporter.length)} ${plural(insightsData.capabilitiesWithPoorFitPrimarySupporter.length, 'capability', 'capabilities')} whose primary supporter is rated a poor or adequate fit, with no planned replacement`,
-      items: elementItems(insightsData.capabilitiesWithPoorFitPrimarySupporter),
+      summary: `${String(insightsData.capabilitiesWithPoorFitPrimarySupporter.length)} ${plural(insightsData.capabilitiesWithPoorFitPrimarySupporter.length, 'capability', 'capabilities')} whose supporter is rated a poor or adequate fit, with no planned replacement`,
+      items: elementItems(insightsData.capabilitiesWithPoorFitPrimarySupporter.map((r) => r.capability)),
       // No `browseHref` — this filter has no browse-table home (same as
       // before this redesign, `itemAction`'s own predecessor never had one
       // either); a multi-item finding here gets no card action at all,
       // only the single-item "Start a decision" case below.
       severity: 'medium',
-      ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromPoorFitCapabilityFinding({ id: item.id, name: item.label })) } : {}),
+      ...(canStartDecision(role)
+        ? {
+            singleItemAction: (item: HealthFindingItem) =>
+              startDecisionAction(
+                prefillFromPoorFitCapabilityFinding({ id: item.id, name: item.label }, insightsData.capabilitiesWithPoorFitPrimarySupporter.find((r) => r.capability.element_id === item.id)?.usedSecondaryFallback ?? false),
+              ),
+          }
+        : {}),
     },
     {
       // The architect door's third decision-shaped finding

@@ -32,11 +32,11 @@ export function DecisionPage() {
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
   // The one `useDecision` call for this page — `DecisionView` below reads
-  // this same `state`/`reload` as props rather than fetching its own
-  // second, independent copy (it used to; see `DecisionView.tsx`'s own
-  // doc comment on why that duplication was worth removing, not just
-  // wasteful).
-  const { state, reload } = useDecision(model?.id ?? '', decisionId ?? '');
+  // this same `state` and its write-result patches as props rather than
+  // fetching its own second, independent copy (it used to; see
+  // `DecisionView.tsx`'s own doc comment on why that duplication was
+  // worth removing, not just wasteful).
+  const { state, applyNewOption, applyDecisionUpdate, refreshOptionsAndArguments } = useDecision(model?.id ?? '', decisionId ?? '');
   const title = state.status === 'ready' ? state.decision.title : 'Decision';
 
   if (orgLoading || modelsLoading || !model) {
@@ -66,7 +66,18 @@ export function DecisionPage() {
               {title}
             </Text>
           </div>
-          <DecisionView modelId={model.id} decisionId={decisionId ?? ''} orgId={organisation?.id ?? ''} orgSlug={orgSlug ?? ''} modelSlug={model.slug} role={role} state={state} reload={reload} />
+          <DecisionView
+            modelId={model.id}
+            decisionId={decisionId ?? ''}
+            orgId={organisation?.id ?? ''}
+            orgSlug={orgSlug ?? ''}
+            modelSlug={model.slug}
+            role={role}
+            state={state}
+            applyNewOption={applyNewOption}
+            applyDecisionUpdate={applyDecisionUpdate}
+            refreshOptionsAndArguments={refreshOptionsAndArguments}
+          />
         </main>
       </div>
     </div>

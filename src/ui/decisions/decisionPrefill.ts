@@ -64,11 +64,23 @@ export function prefillFromWeakCapability(capability: { id: UUID; name: string }
   };
 }
 
-/** `findCapabilitiesWithPoorFitPrimarySupporter`'s own finding (`ArchitectHome.tsx`'s `poor-fit-no-replacement` check) — a third "Start a decision" trigger alongside `critical-support-end` above and the director door's weak-capability tile. */
-export function prefillFromPoorFitCapabilityFinding(capability: { id: UUID; name: string }): DecisionPrefill {
+/**
+ * `findCapabilitiesWithPoorFitPrimarySupporter`'s own finding
+ * (`ArchitectHome.tsx`'s `poor-fit-no-replacement` check) — a third "Start
+ * a decision" trigger alongside `critical-support-end` above and the
+ * director door's weak-capability tile.
+ *
+ * `usedSecondaryFallback` (that finding's own `CapabilityWithPoorFitSupporter`
+ * field) says "supporter" rather than "primary supporter" — accurate for a
+ * capability flagged via `fitAssessmentSupportsEdges`'s secondary-edge
+ * fallback (no live primary edge at all), never assuming primary just
+ * because most flagged capabilities still have one.
+ */
+export function prefillFromPoorFitCapabilityFinding(capability: { id: UUID; name: string }, usedSecondaryFallback: boolean): DecisionPrefill {
+  const supporterWord = usedSecondaryFallback ? 'supporter' : 'primary supporter';
   return {
-    title: `What replaces ${capability.name}'s primary supporter?`,
-    statement: `${capability.name}'s primary supporter is rated a poor or adequate fit, with no planned replacement — a decision is needed on what to do about it.`,
+    title: `What replaces ${capability.name}'s ${supporterWord}?`,
+    statement: `${capability.name}'s ${supporterWord} is rated a poor or adequate fit, with no planned replacement — a decision is needed on what to do about it.`,
     sourceFindingKey: 'poor-fit-no-replacement',
     linkedElements: [{ id: capability.id, name: capability.name }],
   };
