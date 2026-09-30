@@ -15,6 +15,7 @@ import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { FactBadge } from '../FactBadge/FactBadge';
+import { fitNotRatedRelationshipIds } from './fitNotRatedEdges';
 import { endpointDisplayName } from './relationshipEndpointLabel';
 import { RelationshipAdd } from './RelationshipAdd';
 import { RelationshipRemove, type RelationshipsSectionRemoveConfig } from './RelationshipRemove';
@@ -263,6 +264,11 @@ function RelationshipDirectionGroup({
   // anchor a single `primary` is scoped to.
   const siblingSupportsRows = direction === 'outbound' && rows.length > 0 && rows[0]?.relationship_type === 'supports' ? rows : [];
 
+  // "Fit not rated" soft prompt (`fitNotRatedEdges.ts`'s own doc comment
+  // for the full rule) — the capability page's own inbound `supports`
+  // group only.
+  const fitNotRatedIds = fitNotRatedRelationshipIds(direction, elementType, elementId, rows);
+
   return (
     <div className={styles.directionGroup}>
       <Text as="h3" size="md" className={styles.groupLabel}>
@@ -290,6 +296,7 @@ function RelationshipDirectionGroup({
         // system's outbound and the capability's inbound group" reasoning
         // `supportsRole` just above already gives.
         const fitForPurpose = rel.relationship_type === 'supports' && typeof attrs.fitForPurpose === 'string' && isFitForPurpose(attrs.fitForPurpose) ? attrs.fitForPurpose : null;
+        const fitNotRated = fitNotRatedIds.has(rel.relationship_id);
         // The verb-phrase label (Sprint U4-1 B5: required at creation for
         // uses/flows_to, optional elsewhere) — shown whenever one exists,
         // not gated to those two types, since `description` is the same
@@ -329,6 +336,7 @@ function RelationshipDirectionGroup({
               )}
               {supportsRole !== null && <Chip tone={supportsRole === 'primary' ? 'info' : 'neutral'}>{supportsRole}</Chip>}
               {fitForPurpose !== null && <Chip tone={fitForPurposeToneFor(fitForPurpose)}>{fitForPurpose}</Chip>}
+              {fitNotRated && <Chip tone="neutral">fit not rated</Chip>}
               {ownsRole !== null && <Chip tone="neutral">{ownsRole} owner</Chip>}
               {typeof dataClassification === 'string' && dataClassification.length > 0 && <Chip tone="info">{dataClassification}</Chip>}
               {justAdded && <Chip tone="info">just added</Chip>}
