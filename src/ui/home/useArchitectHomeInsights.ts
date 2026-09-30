@@ -30,6 +30,7 @@ import {
   listFactsForCommit,
   listUsesAndFlowsToEndpointElements,
   type BoundaryCrossing,
+  type CapabilityWithPoorFitSupporter,
   type ExternalInterfaceCrossing,
   type ExternalOrganisationAccess,
   type PlatformFlowEndpoint,
@@ -91,8 +92,8 @@ export interface ArchitectHomeInsightsData {
   externalInterfacesMissingClassification: ExternalInterfaceCrossing[];
   /** S1 item 11a's own second Assurance row: purely informational — every external actor `uses` edge, naming the organisation and which system it reaches. No classification requirement (see that finding's own doc comment for why). */
   externalOrganisationAccess: ExternalOrganisationAccess[];
-  /** The minimal fit-for-purpose finding: capabilities whose primary supporter is rated poor/adequate, with no planned replacement recorded (`findCapabilitiesWithPoorFitPrimarySupporter`'s own doc comment). */
-  capabilitiesWithPoorFitPrimarySupporter: ElementsHeadRow[];
+  /** The minimal fit-for-purpose finding: capabilities whose fit-assessment supporter is rated poor/adequate, with no planned replacement recorded (`findCapabilitiesWithPoorFitPrimarySupporter`'s own doc comment). */
+  capabilitiesWithPoorFitPrimarySupporter: CapabilityWithPoorFitSupporter[];
   /** A third decision-shaped finding, alongside `criticalExposedSystems` and `criticalSystemsPastOrNearSupportEnd`: level-1 capabilities with zero supporting systems anywhere in their own subtree (`findCapabilitiesWithNoSupporters`'s own doc comment — the same "nothing recorded" classification the director door's weak-capability grid already flags). */
   capabilitiesWithNoSupporters: ElementsHeadRow[];
 }

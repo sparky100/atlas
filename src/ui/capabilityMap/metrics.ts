@@ -168,14 +168,63 @@ export function worstFitForPurpose(capabilityId: UUID, supportsEdges: readonly R
  * edge-level detail `worstFitForPurpose`'s single worst-value summary
  * doesn't carry. Needed by the director door's own "poor fit" pill
  * (`src/db/modelHome.ts`'s `buildCapabilityTiles`) to check each poor
- * edge's own supporter against a planned replacement (`groupPlannedReplacementsByCapability`),
- * the same per-edge check `findCapabilitiesWithPoorFitPrimarySupporter`
- * (`src/db/healthFindings.ts`) already makes for its own, primary-only
- * finding — this reuses the identical `fitForPurposeOf` read, just without
- * that finding's own `role === 'primary'` restriction.
+ * edge's own supporter against a planned replacement (`groupPlannedReplacementsByCapability`).
+ * Deliberately reads every edge regardless of `role` — kept that way by
+ * design (the Director roll-up is unchanged by the fix below); see
+ * `fitAssessmentSupportsEdges` for the narrower, primary-first read
+ * `findCapabilitiesWithPoorFitPrimarySupporter` (`src/db/healthFindings.ts`)
+ * makes instead.
  */
 export function poorFitSupportsEdges(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[]): RelationshipsHeadRow[] {
   return supportsEdges.filter((edge) => edge.to_element_id === capabilityId && fitForPurposeOf(edge) === 'poor');
+}
+
+/** A capability's own direct `supports` edges, regardless of role. */
+function directSupportsEdges(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[]): RelationshipsHeadRow[] {
+  return supportsEdges.filter((edge) => edge.relationship_type === 'supports' && edge.to_element_id === capabilityId);
+}
+
+function supportsRoleOf(edge: RelationshipsHeadRow): string | undefined {
+  const value = attributesRecord(edge.attributes).role;
+  return typeof value === 'string' ? value : undefined;
+}
+
+export interface FitAssessmentEdges {
+  edges: RelationshipsHeadRow[];
+  /**
+   * true when this capability has no live primary `supports` edge and
+   * `edges` are its secondary edges instead. Callers use this to word
+   * "supporter" rather than "primary supporter" copy accurately —
+   * never assume primary once this is true.
+   */
+  usedSecondaryFallback: boolean;
+}
+
+/**
+ * The `supports` edges that count toward a capability's own
+ * fit-for-purpose *assessment* (as opposed to the Director roll-up above,
+ * which deliberately reads every edge): its primary edges when at least
+ * one exists, or every secondary edge only when it has none.
+ *
+ * `SupportsRole`'s own cardinality rule ("at most one live primary edge
+ * per FROM system") is per-*system*, not per-capability — nothing stops
+ * every one of a capability's supporting systems from naming `primary`
+ * toward some *other* capability, leaving this one with real supporters
+ * but zero primary edges into it. Before this function, that state was
+ * invisible to `findCapabilitiesWithPoorFitPrimarySupporter`
+ * (`src/db/healthFindings.ts`) even though the Director's own fit pill
+ * (`worstFitForPurpose`/`poorFitSupportsEdges` above, which never
+ * restricts by role) could already flag it — this closes that gap by
+ * falling back to secondary edges, rather than by dropping the
+ * primary-first read entirely (a capability with even one good-fit
+ * primary edge stays judged on its primary edges alone, never on a
+ * separately poor-fit secondary one).
+ */
+export function fitAssessmentSupportsEdges(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[]): FitAssessmentEdges {
+  const direct = directSupportsEdges(capabilityId, supportsEdges);
+  const primary = direct.filter((edge) => supportsRoleOf(edge) === 'primary');
+  if (primary.length > 0) return { edges: primary, usedSecondaryFallback: false };
+  return { edges: direct.filter((edge) => supportsRoleOf(edge) === 'secondary'), usedSecondaryFallback: true };
 }
 
 /** `worstFitForPurpose` maximised over a set of descendant capability ids — a poor rating anywhere below makes the group read as poor. */

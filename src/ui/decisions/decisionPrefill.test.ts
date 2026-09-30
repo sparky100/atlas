@@ -27,13 +27,24 @@ describe('decisionPrefill', () => {
     expect(prefill.sourceFindingKey).toBe('weak-capability');
   });
 
-  it('builds a poor-fit-no-replacement prefill naming the capability', () => {
-    const prefill = prefillFromPoorFitCapabilityFinding({ id: 'cap-1', name: 'Claims Intake' });
+  it('builds a poor-fit-no-replacement prefill naming the capability and its primary supporter', () => {
+    const prefill = prefillFromPoorFitCapabilityFinding({ id: 'cap-1', name: 'Claims Intake' }, false);
     expect(prefill.title).toContain('Claims Intake');
+    expect(prefill.title).toContain('primary supporter');
     expect(prefill.statement).toContain('Claims Intake');
+    expect(prefill.statement).toContain('primary supporter');
     expect(prefill.statement).toContain('poor or adequate fit');
     expect(prefill.sourceFindingKey).toBe('poor-fit-no-replacement');
     expect(prefill.linkedElements).toEqual([{ id: 'cap-1', name: 'Claims Intake' }]);
+  });
+
+  it('builds a poor-fit-no-replacement prefill worded from "supporter", not "primary supporter", when the finding used the secondary-edge fallback', () => {
+    const prefill = prefillFromPoorFitCapabilityFinding({ id: 'cap-1', name: 'Claims Intake' }, true);
+    expect(prefill.title).toContain('supporter');
+    expect(prefill.title).not.toContain('primary supporter');
+    expect(prefill.statement).toContain('supporter');
+    expect(prefill.statement).not.toContain('primary supporter');
+    expect(prefill.sourceFindingKey).toBe('poor-fit-no-replacement');
   });
 
   it('builds a critical-exposed prefill naming the system', () => {

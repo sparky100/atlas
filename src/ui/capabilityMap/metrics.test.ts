@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateTileColourFor, lifecycleExposure, oldestLifecycleStage, otShareOf, poorFitSupportsEdges, resolveDefaultColourBy, supportingSystemIds, tileColourFor, worstCriticality, worstFitForPurpose } from './metrics';
+import { aggregateTileColourFor, fitAssessmentSupportsEdges, lifecycleExposure, oldestLifecycleStage, otShareOf, poorFitSupportsEdges, resolveDefaultColourBy, supportingSystemIds, tileColourFor, worstCriticality, worstFitForPurpose } from './metrics';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 
 function system(id: string, lifecycleStatus?: string, plannedEnd?: string, criticality?: string, domain?: string): ElementsHeadRow {
@@ -11,8 +11,9 @@ function system(id: string, lifecycleStatus?: string, plannedEnd?: string, criti
   return { element_id: id, element_type: 'system', name: id, parent_id: null, attributes: attrs, exists_delta_id: `d-${id}` };
 }
 
-function supports(systemId: string, capabilityId: string, fitForPurpose?: string): RelationshipsHeadRow {
+function supports(systemId: string, capabilityId: string, fitForPurpose?: string, role?: string): RelationshipsHeadRow {
   const attrs: Record<string, Json> = fitForPurpose === undefined ? {} : { fitForPurpose };
+  if (role !== undefined) attrs.role = role;
   return { relationship_id: `r-${systemId}-${capabilityId}`, relationship_type: 'supports', from_element_id: systemId, to_element_id: capabilityId, attributes: attrs, exists_delta_id: `d-r-${systemId}` };
 }
 
@@ -119,6 +120,36 @@ describe('poorFitSupportsEdges', () => {
 
   it('returns an empty array when nothing is rated poor', () => {
     expect(poorFitSupportsEdges('cap-1', [supports('sys-1', 'cap-1', 'good'), supports('sys-2', 'cap-1')])).toEqual([]);
+  });
+});
+
+describe('fitAssessmentSupportsEdges', () => {
+  it('returns the primary edge when the capability has one, with usedSecondaryFallback false', () => {
+    const primaryEdge = supports('sys-1', 'cap-1', 'poor', 'primary');
+    const result = fitAssessmentSupportsEdges('cap-1', [primaryEdge]);
+    expect(result).toEqual({ edges: [primaryEdge], usedSecondaryFallback: false });
+  });
+
+  it('falls back to the secondary edge when the capability has no primary edge at all', () => {
+    const secondaryEdge = supports('sys-1', 'cap-1', 'poor', 'secondary');
+    const result = fitAssessmentSupportsEdges('cap-1', [secondaryEdge]);
+    expect(result).toEqual({ edges: [secondaryEdge], usedSecondaryFallback: true });
+  });
+
+  it('returns only the primary edges, ignoring a secondary edge, once at least one primary edge exists', () => {
+    const primaryEdge = supports('sys-1', 'cap-1', 'good', 'primary');
+    const secondaryEdge = supports('sys-2', 'cap-1', 'poor', 'secondary');
+    const result = fitAssessmentSupportsEdges('cap-1', [primaryEdge, secondaryEdge]);
+    expect(result).toEqual({ edges: [primaryEdge], usedSecondaryFallback: false });
+  });
+
+  it('ignores edges into other capabilities', () => {
+    const result = fitAssessmentSupportsEdges('cap-1', [supports('sys-1', 'cap-2', 'poor', 'primary')]);
+    expect(result).toEqual({ edges: [], usedSecondaryFallback: true });
+  });
+
+  it('returns no edges (still usedSecondaryFallback true) for a capability with no supporting systems at all', () => {
+    expect(fitAssessmentSupportsEdges('cap-1', [])).toEqual({ edges: [], usedSecondaryFallback: true });
   });
 });
 

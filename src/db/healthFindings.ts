@@ -28,6 +28,7 @@ import { isStale, monthsSince, monthsUntil, STALE_AFTER_MONTHS } from '../contra
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { SystemDomain, UUID } from '../contracts/delta';
 import { computeCapabilityRollup } from '../ui/capabilityMap/capabilityRollup';
+import { fitAssessmentSupportsEdges } from '../ui/capabilityMap/metrics';
 import { attributesRecord } from '../ui/elements/attributesRecord';
 import { isFitForPurpose } from '../ui/elements/fitForPurposeTone';
 import { isPlatform } from '../ui/elements/systemKind';
@@ -642,10 +643,17 @@ export function findCriticalSystemsPastOrNearSupportEnd(systems: readonly Elemen
   });
 }
 
+/** One capability flagged by `findCapabilitiesWithPoorFitPrimarySupporter`, alongside whether it was flagged via that function's own secondary-edge fallback (`fitAssessmentSupportsEdges`'s own doc comment) — callers word "supporter" rather than "primary supporter" copy accordingly (`decisionPrefill.ts`'s `prefillFromPoorFitCapabilityFinding`). */
+export interface CapabilityWithPoorFitSupporter {
+  capability: ElementsHeadRow;
+  usedSecondaryFallback: boolean;
+}
+
 /**
- * The minimal fit-for-purpose finding: capabilities whose *primary*
- * supporter (`SupportsAttributes.role === 'primary'`, `SupportsRole`'s own
- * doc comment) is rated `poor` or `adequate`
+ * The minimal fit-for-purpose finding: capabilities whose fit-assessment
+ * edges (`fitAssessmentSupportsEdges`, `src/ui/capabilityMap/metrics.ts` —
+ * primary `supports` edges when at least one exists, secondary edges only
+ * as a fallback when it has none) include one rated `poor` or `adequate`
  * (`src/ui/elements/fitForPurposeTone.ts`'s `isFitForPurpose`), with no
  * planned replacement recorded for that supporter — a third "Start a
  * decision" trigger alongside `findCriticalSystemsPastOrNearSupportEnd` (a
@@ -653,13 +661,15 @@ export function findCriticalSystemsPastOrNearSupportEnd(systems: readonly Elemen
  * weak-capability tile (`DirectorHome.tsx`'s "no known supporters" case,
  * `prefillFromWeakCapability`).
  *
- * `role: 'primary'` is a per-*system* cardinality rule (`SupportsRole`'s
- * own doc comment: at most one live primary edge per system, "which
- * capability lane a system's landscape tile sits in"), not a per-capability
- * one — nothing in `relationship_type_rules` stops two different systems
- * from each naming `primary` toward the *same* capability, so every
- * matching edge is checked here, not just the first found; a capability is
- * flagged the moment any one of them qualifies.
+ * Originally checked only `role === 'primary'` edges — but `SupportsRole`'s
+ * cardinality rule (at most one live primary edge per *system*) is not a
+ * per-capability one, so a capability whose supporters all name `primary`
+ * toward some *other* capability had zero primary edges into it and was
+ * invisible here, even though the Director's own fit pill
+ * (`worstFitForPurpose`/`poorFitSupportsEdges`, unrestricted by role) could
+ * already flag it. `fitAssessmentSupportsEdges` closes that gap by falling
+ * back to secondary edges only when a capability has no primary one; the
+ * Director roll-up itself is intentionally unchanged.
  *
  * `plannedReplacementSystemIdsByCapability` is
  * `src/db/modelHome.ts`'s `groupPlannedReplacementsByCapability` result —
@@ -671,27 +681,33 @@ export function findCapabilitiesWithPoorFitPrimarySupporter(
   capabilities: readonly ElementsHeadRow[],
   supportsEdges: readonly RelationshipsHeadRow[],
   plannedReplacementSystemIdsByCapability: ReadonlyMap<UUID, ReadonlySet<UUID>>,
-): ElementsHeadRow[] {
+): CapabilityWithPoorFitSupporter[] {
   const capabilitiesById = new Map(capabilities.map((c) => [c.element_id, c]));
-  const flaggedIds = new Set<UUID>();
+  const flagged = new Map<UUID, boolean>();
 
-  for (const edge of supportsEdges) {
-    if (edge.relationship_type !== 'supports') continue;
-    const attrs = attributesRecord(edge.attributes);
-    if (attrs.role !== 'primary') continue;
-    if (typeof attrs.fitForPurpose !== 'string' || !isFitForPurpose(attrs.fitForPurpose)) continue;
-    if (attrs.fitForPurpose !== 'poor' && attrs.fitForPurpose !== 'adequate') continue;
-    const capability = capabilitiesById.get(edge.to_element_id);
-    if (!capability) continue;
-    const replacedSystemIds = plannedReplacementSystemIdsByCapability.get(capability.element_id);
-    if (replacedSystemIds?.has(edge.from_element_id)) continue;
-    flaggedIds.add(capability.element_id);
+  const capabilityIdsWithSupport = new Set(supportsEdges.filter((edge) => edge.relationship_type === 'supports').map((edge) => edge.to_element_id));
+
+  for (const capabilityId of capabilityIdsWithSupport) {
+    if (!capabilitiesById.has(capabilityId)) continue;
+    const { edges, usedSecondaryFallback } = fitAssessmentSupportsEdges(capabilityId, supportsEdges);
+    const replacedSystemIds = plannedReplacementSystemIdsByCapability.get(capabilityId);
+    for (const edge of edges) {
+      const attrs = attributesRecord(edge.attributes);
+      if (typeof attrs.fitForPurpose !== 'string' || !isFitForPurpose(attrs.fitForPurpose)) continue;
+      if (attrs.fitForPurpose !== 'poor' && attrs.fitForPurpose !== 'adequate') continue;
+      if (replacedSystemIds?.has(edge.from_element_id)) continue;
+      flagged.set(capabilityId, usedSecondaryFallback);
+      break;
+    }
   }
 
-  return [...flaggedIds]
-    .map((id) => capabilitiesById.get(id))
-    .filter((c): c is ElementsHeadRow => c !== undefined)
-    .sort((a, b) => a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id));
+  return [...flagged.entries()]
+    .map(([id, usedSecondaryFallback]) => {
+      const capability = capabilitiesById.get(id);
+      return capability ? { capability, usedSecondaryFallback } : null;
+    })
+    .filter((r): r is CapabilityWithPoorFitSupporter => r !== null)
+    .sort((a, b) => a.capability.name.localeCompare(b.capability.name) || a.capability.element_id.localeCompare(b.capability.element_id));
 }
 
 /**
