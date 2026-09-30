@@ -85,13 +85,11 @@ describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
     }
   });
 
-  it('only annualRunCost declares an emptyLabel or help text — the two mechanisms are for Run cost alone, every other field keeps §4.3\'s bare "—" and a silent row', () => {
+  it('only annualRunCost and importance declare an emptyLabel, and only annualRunCost declares help text — every other field keeps §4.3\'s bare "—" and a silent row', () => {
     for (const type of ELEMENT_TYPES) {
       for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[type]) {
-        if (field.key !== 'annualRunCost') {
-          expect(field.emptyLabel, `${type}.${field.key}`).toBeUndefined();
-          expect(field.help, `${type}.${field.key}`).toBeUndefined();
-        }
+        if (field.key !== 'annualRunCost') expect(field.help, `${type}.${field.key}`).toBeUndefined();
+        if (field.key !== 'annualRunCost' && field.key !== 'importance') expect(field.emptyLabel, `${type}.${field.key}`).toBeUndefined();
       }
     }
   });

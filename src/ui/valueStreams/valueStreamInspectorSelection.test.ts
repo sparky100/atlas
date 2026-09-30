@@ -13,7 +13,7 @@ function capability(id: string, name: string): ElementsHeadRow {
 }
 
 function tile(id: string, name: string): CapabilityTileData {
-  return { capability: capability(id, name), supportingSystems: [], exposedSystems: [], tone: 'ok', supportedCapabilityCount: 0, totalCapabilityCount: 0, isOwned: false, fitForPurpose: null, poorFitCapabilities: [], poorFitAllReplacementPlanned: false };
+  return { capability: capability(id, name), supportingSystems: [], exposedSystems: [], tone: 'ok', supportedCapabilityCount: 0, totalCapabilityCount: 0, isOwned: false, fitForPurpose: null, poorFitCapabilities: [], poorFitAllReplacementPlanned: false, importance: null };
 }
 
 function stageRollup(stageId: string, enablingCapabilityIds: readonly string[]): ValueStreamStageRollup {

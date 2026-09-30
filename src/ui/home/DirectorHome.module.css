@@ -201,6 +201,10 @@
   margin: 0;
 }
 
+.tileImportance {
+  margin: 0;
+}
+
 .dot {
   display: inline-block;
   width: var(--status-dot-size);

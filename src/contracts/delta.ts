@@ -171,6 +171,36 @@ export type FitForPurpose = 'poor' | 'adequate' | 'good' | 'excellent';
 export type AnnualRunCost = 'none_included' | 'under_50k' | '50k_250k' | '250k_1m' | '1m_5m' | 'over_5m';
 
 /**
+ * How much a capability matters, judged by its own business owner or an
+ * architect — ordered `low < medium < high`, but the *opposite* direction
+ * from every other ordered enum here (`Criticality`, `FitForPurpose`,
+ * `AnnualRunCost`): those all order worst-first for a "worst-of" roll-up,
+ * this orders best/most-important-first, because its one consumer is a
+ * display sort (Director home's weak-capability tiles, `high` first), never
+ * a roll-up. `src/ui/home/capabilityImportance.ts`'s `IMPORTANCE_ORDER` is
+ * named apart from `CRITICALITY_ORDER`/`FIT_FOR_PURPOSE_ORDER` on purpose,
+ * so a later reader never assumes the usual "higher number = worse"
+ * direction here.
+ *
+ * Absent means *not assessed* and is never treated as `'low'` — the same
+ * "an unset fact isn't a recorded fact" stance `AnnualRunCost` takes; the
+ * unset state sorts last among weak tiles (least, not most, prominent),
+ * and the UI shows it as a gentle prompt ("importance not set"), never a
+ * blank cell.
+ *
+ * Ordering only — never a score, never a health finding, never a capability-
+ * map colour-by mode (`src/ui/capabilityMap/metrics.ts`'s own closed
+ * `COLOUR_BY_OPTIONS` list; this field is deliberately not one of them).
+ * Distinct from `essentialFunction` below: that's a regulatory (NIS/CAF)
+ * fact with its own health finding; this is a judgement call with none.
+ *
+ * Restricted to `CapabilityAttributes` structurally, the same way
+ * `AnnualRunCost` is restricted to System/Container — the field simply does
+ * not exist on any other element type's attributes.
+ */
+export type Importance = 'low' | 'medium' | 'high';
+
+/**
  * Attributes stored in `elements_head.attributes` (jsonb). `name` and
  * `parentId` are promoted columns and are NOT in this object.
  *
@@ -218,6 +248,8 @@ export interface CapabilityAttributes {
    * not, themselves, an essential function under the regulation.
    */
   essentialFunction?: boolean;
+  /** See `Importance`'s own doc comment above — ordering only, unset means "not assessed." */
+  importance?: Importance;
 }
 
 export interface SystemAttributes {

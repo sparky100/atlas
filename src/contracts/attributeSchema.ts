@@ -27,6 +27,7 @@ import type {
   CapabilityAttributes,
   ContainerAttributes,
   ElementType,
+  Importance,
   SystemAttributes,
   ValueStreamAttributes,
 } from './delta';
@@ -117,6 +118,25 @@ function schemaOf<T extends string>(order: readonly T[], meta: Record<T, Attribu
   return order.map((key) => ({ key, ...meta[key] }));
 }
 
+/**
+ * Importance's three levels, low → high — the single declaration of both
+ * the stored keys and their display labels, the same "keys stored, labels
+ * in code" shape `ANNUAL_RUN_COST_BANDS` uses below. Consumed here and by
+ * `src/ui/home/capabilityImportance.ts`'s own display/ordering helpers, so
+ * neither can drift from the other.
+ */
+export const IMPORTANCE_LEVELS = [
+  { key: 'low', label: 'Low' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'high', label: 'High' },
+] as const satisfies readonly { key: Importance; label: string }[];
+
+export const IMPORTANCE_OPTIONS = IMPORTANCE_LEVELS.map((level) => level.key) as readonly Importance[];
+
+export const IMPORTANCE_LABELS: Readonly<Record<Importance, string>> = Object.fromEntries(
+  IMPORTANCE_LEVELS.map((level) => [level.key, level.label]),
+) as Readonly<Record<Importance, string>>;
+
 const CAPABILITY_META: Record<keyof CapabilityAttributes, AttributeFieldMeta> = {
   code: { label: 'Reference', required: false, kind: 'text', hideWhenEmpty: true },
   description: { label: 'Description', required: false, kind: 'text', multiline: true },
@@ -131,8 +151,14 @@ const CAPABILITY_META: Record<keyof CapabilityAttributes, AttributeFieldMeta> = 
   // Prompt 7k item 5 — see `CapabilityAttributes.essentialFunction`'s own
   // doc comment (delta.ts) for why this is a capability-level field.
   essentialFunction: { label: 'Essential function (NIS/CAF)', required: false, kind: 'boolean' },
+  // See `Importance`'s own doc comment (delta.ts): ordering only, never a
+  // score or a colour-by mode — used solely to order Director home's weak-
+  // capability tiles. Editable under the same whole-form `canEdit` gate
+  // every other attribute already uses (no bespoke "business owner" gate —
+  // see this field's own investigation note on why one isn't built here).
+  importance: { label: 'Importance', required: false, kind: 'enum', options: IMPORTANCE_OPTIONS, optionLabels: IMPORTANCE_LABELS, emptyLabel: 'Not assessed' },
 };
-const CAPABILITY_ORDER: (keyof CapabilityAttributes)[] = ['code', 'description', 'templateRef', 'order', 'essentialFunction'];
+const CAPABILITY_ORDER: (keyof CapabilityAttributes)[] = ['code', 'description', 'templateRef', 'order', 'importance', 'essentialFunction'];
 
 const LIFECYCLE_STATUS_OPTIONS = ['planned', 'active', 'retiring', 'retired'] as const;
 /** Prompt 7k item 1 — see `Criticality`'s own doc comment (`delta.ts`) for the ordering these options mirror. */

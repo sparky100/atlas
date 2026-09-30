@@ -126,8 +126,16 @@ describe('buildCapabilityTiles', () => {
         fitForPurpose: null,
         poorFitCapabilities: [],
         poorFitAllReplacementPlanned: false,
+        importance: null,
       },
     ]);
+  });
+
+  it('reads importance off the capability\'s own attributes, and null when unset', () => {
+    const rated: ElementsHeadRow = { ...capability('cap-1'), attributes: { importance: 'high' } };
+    const unrated = capability('cap-2');
+    const tiles = buildCapabilityTiles([rated, unrated], [rated, unrated], [], new Map(), [], new Set());
+    expect(tiles.map((t) => t.importance)).toEqual(['high', null]);
   });
 
   it('is ok for a capability whose supporting systems are all active', () => {
