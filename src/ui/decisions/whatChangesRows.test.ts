@@ -7,13 +7,16 @@ import { deriveOptionTouch } from './optionTouch';
 import {
   buildBoundaryCrossingsRow,
   buildCapabilityMetricRows,
+  buildRunCostRow,
   buildSystemConcernOutcomeRow,
   buildTriggerResolvedRow,
   buildValueStreamRow,
   buildWhatChangesRows,
+  computeRunCostChanges,
   computeScopedBoundaryCrossings,
   computeSystemConcernOutcome,
   computeTriggerResolution,
+  formatRunCostCell,
   groupWhatChangesRows,
   valueStreamToneLabel,
 } from './whatChangesRows';
@@ -39,6 +42,10 @@ function retractDelta(elementId: string): Delta {
 
 function lifecycleUpdateDelta(elementId: string): Delta {
   return { kind: 'element.update', id: `update-lifecycle-${elementId}`, elementId, elementType: 'system', attribute: 'lifecycleStatus', value: 'retiring', previousDeltaId: 'prev', sourceId: 's1', confidence: 1 };
+}
+
+function createDelta(elementId: string): Delta {
+  return { kind: 'element.create', id: `create-${elementId}`, elementId, elementType: 'system', name: elementId, parentId: null, attributes: {}, sourceId: 's1', confidence: 1 } as Delta;
 }
 
 function relationshipSubject(id: string, relationshipType: RelationshipType, from: string, to: string): ChangeSubjectSummary {
@@ -287,6 +294,103 @@ describe('buildBoundaryCrossingsRow / groupWhatChangesRows', () => {
   });
 });
 
+describe('computeRunCostChanges / formatRunCostCell', () => {
+  it('replace pair: bands read from the retiring element on main at fork and the added element on the option head', () => {
+    const optionElementsById = new Map([
+      ['pm', elementRow('pm', 'system', 'PM', { lifecycleStatus: 'retiring' })],
+      ['hana', elementRow('hana', 'system', 'Hana equivalent', { annualRunCost: '50k_250k' })],
+    ]);
+    const mainAtForkElementsById = new Map([['pm', elementRow('pm', 'system', 'PM', { annualRunCost: '250k_1m' })]]);
+    const optionRelationshipsHead = [relRow('r1', 'replaces', 'hana', 'pm')];
+    const touch = deriveOptionTouch(
+      [elementSubject('pm', 'PM', lifecycleUpdateDelta('pm')), elementSubject('hana', 'Hana equivalent', createDelta('hana')), relationshipSubject('r1', 'replaces', 'hana', 'pm')],
+      optionElementsById,
+      optionRelationshipsHead,
+    );
+
+    const changes = computeRunCostChanges(touch, optionElementsById, mainAtForkElementsById);
+    expect(changes).toEqual([{ kind: 'replace', retiring: { name: 'PM', band: '250k_1m' }, added: { name: 'Hana equivalent', band: '50k_250k' } }]);
+    expect(formatRunCostCell(changes)).toBe('PM £250k–£1m → Hana equivalent £50k–£250k');
+  });
+
+  it('retire only: no replaces edge, band read from main at fork (this option only changed lifecycleStatus, never annualRunCost itself)', () => {
+    const optionElementsById = new Map([['pm', elementRow('pm', 'system', 'PM', { lifecycleStatus: 'retiring' })]]);
+    const mainAtForkElementsById = new Map([['pm', elementRow('pm', 'system', 'PM', { annualRunCost: '1m_5m' })]]);
+    const touch = deriveOptionTouch([elementSubject('pm', 'PM', lifecycleUpdateDelta('pm'))], optionElementsById, []);
+
+    const changes = computeRunCostChanges(touch, optionElementsById, mainAtForkElementsById);
+    expect(changes).toEqual([{ kind: 'retire', retiring: { name: 'PM', band: '1m_5m' } }]);
+    expect(formatRunCostCell(changes)).toBe('PM retired (£1m–£5m)');
+  });
+
+  it('add only: no replaces edge, band read from the option head', () => {
+    const optionElementsById = new Map([['hana', elementRow('hana', 'system', 'Hana equivalent', { annualRunCost: '50k_250k' })]]);
+    const touch = deriveOptionTouch([elementSubject('hana', 'Hana equivalent', createDelta('hana'))], optionElementsById, []);
+
+    const changes = computeRunCostChanges(touch, optionElementsById, new Map());
+    expect(changes).toEqual([{ kind: 'add', added: { name: 'Hana equivalent', band: '50k_250k' } }]);
+    expect(formatRunCostCell(changes)).toBe('Hana equivalent added (£50k–£250k)');
+  });
+
+  it('unset bands: "cost incomplete" replaces the whole list rather than showing a partial pairing that could read as a saving', () => {
+    const optionElementsById = new Map([
+      ['pm', elementRow('pm', 'system', 'PM', { lifecycleStatus: 'retiring' })],
+      ['hana', elementRow('hana', 'system', 'Hana equivalent')], // no annualRunCost set
+    ]);
+    const mainAtForkElementsById = new Map([['pm', elementRow('pm', 'system', 'PM', { annualRunCost: '250k_1m' })]]);
+    const optionRelationshipsHead = [relRow('r1', 'replaces', 'hana', 'pm')];
+    const touch = deriveOptionTouch(
+      [elementSubject('pm', 'PM', lifecycleUpdateDelta('pm')), elementSubject('hana', 'Hana equivalent', createDelta('hana')), relationshipSubject('r1', 'replaces', 'hana', 'pm')],
+      optionElementsById,
+      optionRelationshipsHead,
+    );
+
+    const changes = computeRunCostChanges(touch, optionElementsById, mainAtForkElementsById);
+    expect(changes).toEqual([{ kind: 'replace', retiring: { name: 'PM', band: '250k_1m' }, added: { name: 'Hana equivalent', band: null } }]);
+    expect(formatRunCostCell(changes)).toBe('cost incomplete');
+  });
+
+  it('none_included is a real, complete band — shown as such, never read as incomplete', () => {
+    const optionElementsById = new Map([['pm', elementRow('pm', 'system', 'PM', { lifecycleStatus: 'retiring' })]]);
+    const mainAtForkElementsById = new Map([['pm', elementRow('pm', 'system', 'PM', { annualRunCost: 'none_included' })]]);
+    const touch = deriveOptionTouch([elementSubject('pm', 'PM', lifecycleUpdateDelta('pm'))], optionElementsById, []);
+
+    const changes = computeRunCostChanges(touch, optionElementsById, mainAtForkElementsById);
+    expect(formatRunCostCell(changes)).toBe('PM retired (None / included)');
+  });
+
+  it('no cost-bearing changes: a touched capability (never system/container) is excluded, and the cell reads "no change"', () => {
+    const optionElementsById = new Map([['cap1', elementRow('cap1', 'capability', 'New Capability')]]);
+    const touch = deriveOptionTouch([elementSubject('cap1', 'New Capability', createDelta('cap1'))], optionElementsById, []);
+
+    const changes = computeRunCostChanges(touch, optionElementsById, new Map());
+    expect(changes).toEqual([]);
+    expect(formatRunCostCell(changes)).toBe('no change');
+  });
+});
+
+describe('buildRunCostRow', () => {
+  it("names the row 'Run cost' and marks it changed only for an option with at least one cost-bearing change", () => {
+    const touched = new Map([['hana', elementRow('hana', 'system', 'Hana equivalent', { annualRunCost: '50k_250k' })]]);
+    const changedTouch = deriveOptionTouch([elementSubject('hana', 'Hana equivalent', createDelta('hana'))], touched, []);
+    const untouched = deriveOptionTouch([], new Map(), []);
+
+    const row = buildRunCostRow(
+      new Map([
+        ['changed-branch', { touch: changedTouch, elementsById: touched, mainAtForkElementsById: new Map() }],
+        ['unchanged-branch', { touch: untouched, elementsById: new Map(), mainAtForkElementsById: new Map() }],
+      ]),
+    );
+
+    expect(row.id).toBe('run-cost');
+    expect(row.groupLabel).toBe('Run cost');
+    expect(row.rowLabel).toBe('Run cost');
+    expect(row.anyChanged).toBe(true);
+    expect(row.options.get('changed-branch')).toEqual({ display: 'Hana equivalent added (£50k–£250k)', changed: true });
+    expect(row.options.get('unchanged-branch')).toEqual({ display: 'no change', changed: false });
+  });
+});
+
 describe('buildValueStreamRow / valueStreamToneLabel', () => {
   it('treats "not reached" as its own comparable state, distinct from every real tone', () => {
     expect(valueStreamToneLabel(null)).toBe('not reached');
@@ -325,14 +429,15 @@ describe('buildWhatChangesRows (full orchestration)', () => {
     const { visible, collapsed } = groupWhatChangesRows(rows);
     expect(visible).toEqual([]);
     // 4 capability metric rows + 1 trigger-resolved row (no supporting
-    // systems on either side, so "not exposed") + 1 boundary-crossings row.
-    expect(collapsed).toHaveLength(6);
+    // systems on either side, so "not exposed") + 1 boundary-crossings row
+    // + 1 run-cost row (always present, no cost-bearing touch here).
+    expect(collapsed).toHaveLength(7);
     const triggerRow = collapsed.find((r) => r.rowLabel === 'Trigger resolved');
     expect(triggerRow?.options.get('b1')).toEqual({ display: 'not exposed', changed: false });
     expect(collapsed.filter((r) => r.rowLabel !== 'Trigger resolved').every((r) => r.options.get('b1')?.display === 'no change')).toBe(true);
   });
 
-  it('an empty-delta option (no capability/system concerns, two like-for-like options) produces only the boundary-crossings row, and it collapses', () => {
+  it('an empty-delta option (no capability/system concerns, two like-for-like options) produces only the boundary-crossings and run-cost rows, and both collapse', () => {
     const mainRow: OptionComparisonRow = { branchId: null, label: 'main', metricsByCapabilityId: new Map(), boundaryCrossingCount: 0, affectedValueStreams: [] };
     const optionRow: OptionComparisonRow = { branchId: 'b1', label: 'Option', metricsByCapabilityId: new Map(), boundaryCrossingCount: 0, affectedValueStreams: [] };
     const touch = deriveOptionTouch([], new Map(), []);
@@ -342,7 +447,8 @@ describe('buildWhatChangesRows (full orchestration)', () => {
       main: { row: mainRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [] },
       options: [{ branchId: 'b1', row: optionRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [], touch, mainAtFork: { row: mainRow, elementsById: new Map(), relationshipsHead: [], supportsEdges: [] } }],
     });
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.rowLabel)).toEqual(['Scoped crossings', 'Run cost']);
     expect(groupWhatChangesRows(rows).visible).toEqual([]);
   });
 

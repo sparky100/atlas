@@ -18,9 +18,20 @@
  */
 import { ANNUAL_RUN_COST_BANDS, ANNUAL_RUN_COST_LABELS, ANNUAL_RUN_COST_OPTIONS } from '../../contracts/attributeSchema';
 import type { AnnualRunCost } from '../../contracts/delta';
+import type { ElementsHeadRow } from '../../contracts/rows';
+import { attributesRecord } from './attributesRecord';
 
 /** The bands cheapest → most expensive: the canonical order for sorting and for `annualRunCostRank`. */
 export const ANNUAL_RUN_COST_ORDER: readonly AnnualRunCost[] = ANNUAL_RUN_COST_OPTIONS;
+
+/** Same "Not entered" wording the element page's own attribute editor uses for this field (`attributeSchema.ts`'s `emptyLabel`) — the one string every reader of an unset `annualRunCost` should show, so a second caller never invents its own. */
+export const ANNUAL_RUN_COST_NOT_ENTERED_LABEL = 'Not entered';
+
+/** `element`'s own `annualRunCost`, or `null` if unset or not a recognised band — the one place any caller (a roll-up, a decision-page comparison row, …) reads this attribute off a `system`/`container` row, rather than each re-deriving its own `attributesRecord`/membership check. */
+export function annualRunCostOf(element: ElementsHeadRow): AnnualRunCost | null {
+  const value = attributesRecord(element.attributes).annualRunCost;
+  return typeof value === 'string' && (ANNUAL_RUN_COST_ORDER as readonly string[]).includes(value) ? (value as AnnualRunCost) : null;
+}
 
 /** A band's position in the order (0 = `none_included`, cheapest; 5 = `over_5m`). Inputs are typed as `AnnualRunCost`, so this is never negative in practice. */
 export function annualRunCostRank(band: AnnualRunCost): number {

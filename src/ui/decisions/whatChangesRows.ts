@@ -44,6 +44,16 @@
  *   is `OptionTouch.touchedElementIds` — own-deltas, not a diff. Main's own
  *   scoped *count* is, like the metric rows above, computed against main
  *   folded at this option's own fork point, not main's current head.
+ * - Exactly one "Run cost" row, evidence only (never prefills or rates the
+ *   judged Cost criterion — `decision_option_ratings` is a wholly separate
+ *   table, ADR-022): what leaves (a retired or lifecycle-retired element,
+ *   band read off main at this option's own fork point) against what
+ *   arrives (an added element, band read off this option's own head), a
+ *   `replaces` edge pairing the two when one exists. No totals, no
+ *   differences, no "saving" — bands are ordinal and non-additive
+ *   (`annualRunCost.ts`'s own rule); "cost incomplete" replaces the whole
+ *   cell the moment any listed element's band is unset, rather than
+ *   showing a partial pairing a reader could misread as a saving.
  * - One row per value stream reached by *any* row (main or an option) —
  *   "not reached" is a real, comparable state of its own, never the same
  *   as an empty cell. Deliberately NOT drift-proofed the same way — the
@@ -51,9 +61,10 @@
  *   capability metric rows, the crossing count, and the trigger-resolved
  *   row only.
  */
-import type { UUID } from '../../contracts/delta';
+import type { AnnualRunCost, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { findBoundaryCrossings } from '../../db/healthFindings';
+import { annualRunCostLabel, annualRunCostOf, ANNUAL_RUN_COST_NOT_ENTERED_LABEL } from '../elements/annualRunCost';
 import { hasLifecycleExposureData, supportingSystemIds, systemsExposedByLifecycle } from '../capabilityMap/metrics';
 import type { ValueStreamTone } from '../valueStreams/valueStreamRollup';
 import type { CapabilityComparisonMetrics, OptionComparisonRow } from './compareOptions';
@@ -285,6 +296,144 @@ export function buildBoundaryCrossingsRow(concernElementIds: readonly UUID[], op
 }
 
 // ---------------------------------------------------------------------------
+// Run cost -> exactly one row, evidence only (never touches the judged Cost
+// criterion in decision_option_ratings — ADR-022's own decisions-tier/
+// model-tier split; whatChangesRows.ts has no dependency on that table at
+// all, and nothing here writes anything). annualRunCost is banded and
+// non-additive (annualRunCost.ts's own module comment) — never summed,
+// never a "saving": this only ever lists what leaves and what arrives,
+// each side's own band read at the state where it actually applies (a
+// retiring/removed element's band as main had it just before this option's
+// own changes; an added element's band as this option's own head has it).
+// ---------------------------------------------------------------------------
+
+export type RunCostChange =
+  | { kind: 'replace'; retiring: { name: string; band: AnnualRunCost | null }; added: { name: string; band: AnnualRunCost | null } }
+  | { kind: 'retire'; retiring: { name: string; band: AnnualRunCost | null } }
+  | { kind: 'add'; added: { name: string; band: AnnualRunCost | null } };
+
+function isCostBearing(element: ElementsHeadRow): boolean {
+  return element.element_type === 'system' || element.element_type === 'container';
+}
+
+/**
+ * This option's own run-cost-relevant changes, derived from its `OptionTouch`
+ * — never a version-diff, same "own deltas, not main drift" reasoning every
+ * other row in this file already follows. A `replaces` edge pairs a retiring
+ * element (read off `mainAtForkElementsById` — its state just before this
+ * option's own changes, since "retire" only changes `lifecycleStatus`/
+ * retracts, it never rewrites `annualRunCost` itself) with its replacement
+ * (read off `elementsById` — this option's own head); everything else in
+ * `retiredElements`/`lifecycleRetiredElements`/`addedElements` that isn't
+ * part of a pair is listed on its own. "Retired" here means either outcome
+ * the rest of this file's own `computeSystemConcernOutcome` already
+ * distinguishes — a true removal (`retiredElements`) or a lifecycle-only
+ * retirement that leaves the element in place (`lifecycleRetiredElements`):
+ * both are "leaving" for run-cost purposes, since a system the "Retire…"
+ * action marks `retiring` is exactly the case the task's own "retire
+ * option" names, and it never appears in `retiredElements` (ADR-000: Retire
+ * sets `lifecycleStatus`, it never retracts). Non-cost-bearing elements
+ * (a capability, an actor, a value stream) are never included — only
+ * `system`/`container` carries `annualRunCost` at all.
+ */
+export function computeRunCostChanges(touch: OptionTouch, elementsById: ReadonlyMap<UUID, ElementsHeadRow>, mainAtForkElementsById: ReadonlyMap<UUID, ElementsHeadRow>): RunCostChange[] {
+  const changes: RunCostChange[] = [];
+  const pairedRetiringIds = new Set<UUID>();
+  const pairedAddedIds = new Set<UUID>();
+
+  for (const edge of touch.replacesEdges) {
+    const retiring = mainAtForkElementsById.get(edge.toElementId);
+    const added = elementsById.get(edge.fromElementId);
+    if (!retiring || !added || !isCostBearing(retiring) || !isCostBearing(added)) continue;
+    pairedRetiringIds.add(edge.toElementId);
+    pairedAddedIds.add(edge.fromElementId);
+    changes.push({ kind: 'replace', retiring: { name: retiring.name, band: annualRunCostOf(retiring) }, added: { name: added.name, band: annualRunCostOf(added) } });
+  }
+
+  const soloLeaving = [...touch.retiredElements, ...touch.lifecycleRetiredElements].filter((e) => !pairedRetiringIds.has(e.id));
+  for (const leaving of soloLeaving) {
+    const element = mainAtForkElementsById.get(leaving.id);
+    if (!element || !isCostBearing(element)) continue;
+    changes.push({ kind: 'retire', retiring: { name: element.name, band: annualRunCostOf(element) } });
+  }
+
+  const soloAdded = touch.addedElements.filter((e) => !pairedAddedIds.has(e.id));
+  for (const added of soloAdded) {
+    const element = elementsById.get(added.id);
+    if (!element || !isCostBearing(element)) continue;
+    changes.push({ kind: 'add', added: { name: element.name, band: annualRunCostOf(element) } });
+  }
+
+  return changes;
+}
+
+function bandDisplay(band: AnnualRunCost | null): string {
+  return band === null ? ANNUAL_RUN_COST_NOT_ENTERED_LABEL : annualRunCostLabel(band);
+}
+
+function formatRunCostChange(change: RunCostChange): string {
+  switch (change.kind) {
+    case 'replace':
+      return `${change.retiring.name} ${bandDisplay(change.retiring.band)} → ${change.added.name} ${bandDisplay(change.added.band)}`;
+    case 'retire':
+      return `${change.retiring.name} retired (${bandDisplay(change.retiring.band)})`;
+    case 'add':
+      return `${change.added.name} added (${bandDisplay(change.added.band)})`;
+  }
+}
+
+function runCostChangeIncomplete(change: RunCostChange): boolean {
+  switch (change.kind) {
+    case 'replace':
+      return change.retiring.band === null || change.added.band === null;
+    case 'retire':
+      return change.retiring.band === null;
+    case 'add':
+      return change.added.band === null;
+  }
+}
+
+/**
+ * No totals, no differences, no "saving" (the task's own rule) — each
+ * change is listed on its own, joined, never combined into one figure.
+ * "Cost incomplete" replaces the whole list the moment *any* listed
+ * element's own band is unset, for this option, rather than half-showing a
+ * pairing with a guessed-at gap — a partial "PM £250k–£1m → not entered"
+ * line reads exactly like a saving to an inattentive reader, which the task
+ * explicitly rules out.
+ */
+export function formatRunCostCell(changes: readonly RunCostChange[]): string {
+  if (changes.length === 0) return 'no change';
+  if (changes.some(runCostChangeIncomplete)) return 'cost incomplete';
+  return changes.map(formatRunCostChange).join('; ');
+}
+
+export interface RunCostOptionInput {
+  touch: OptionTouch;
+  /** This option's own head — the "arrives" side. */
+  elementsById: ReadonlyMap<UUID, ElementsHeadRow>;
+  /** Main folded at *this option's own* `baseCommitId` — the "leaves" side's own state just before this option's changes, same drift-proofing every other row family in this file already applies. */
+  mainAtForkElementsById: ReadonlyMap<UUID, ElementsHeadRow>;
+}
+
+/** Collapse rule (item 4): `anyChanged` — and therefore this row's own visibility — is `true` the moment any one option retires or adds at least one cost-bearing element, regardless of whether every band involved is actually set; an option with only non-cost-bearing changes (or none at all) reads as `changed: false`, same as `computeRunCostChanges` returning `[]`. */
+export function buildRunCostRow(optionsInput: ReadonlyMap<UUID, RunCostOptionInput>): WhatChangesRow {
+  const options = new Map<UUID, WhatChangesCell>();
+  for (const [branchId, input] of optionsInput) {
+    const changes = computeRunCostChanges(input.touch, input.elementsById, input.mainAtForkElementsById);
+    options.set(branchId, cell(formatRunCostCell(changes), changes.length > 0));
+  }
+  return {
+    id: 'run-cost',
+    groupLabel: 'Run cost',
+    rowLabel: 'Run cost',
+    main: cell('—', false),
+    options,
+    anyChanged: [...options.values()].some((c) => c.changed),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Trigger resolved -> one row per declared concern (capability or
 // system/container), reusing the exact same lifecycle-exposure definition
 // the health finding and capability-map colour-by mode already use
@@ -483,6 +632,11 @@ export function buildWhatChangesRows(input: WhatChangesInput): WhatChangesRow[] 
     ]),
   );
   rows.push(buildBoundaryCrossingsRow(concernElementIds, crossingsInput));
+
+  const runCostInput = new Map(
+    input.options.map((o) => [o.branchId, { touch: o.touch, elementsById: o.elementsById, mainAtForkElementsById: o.mainAtFork.elementsById }]),
+  );
+  rows.push(buildRunCostRow(runCostInput));
 
   const streamNameById = new Map<UUID, string>();
   for (const r of input.main.row.affectedValueStreams) streamNameById.set(r.stream.element_id, r.stream.name);
