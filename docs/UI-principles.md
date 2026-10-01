@@ -32,23 +32,31 @@ The incumbents fail most of these: Sparx has no provenance and hand-drawn diagra
 
 ### 2.0 Persistent model navigation
 
-Every model-scoped route (home, capability map, landscape and the zoom chain beneath it, changes, decisions, versions, review) renders the same seven-item navigation alongside the page, grouped into three named clusters:
+Every model-scoped route renders the same navigation alongside the page, grouped into four named clusters (**amended, F9 step 1, 2026-10-01** — see §10 item 18; the table as originally written listed seven items in three groups, and had grown to eleven in three by the time F9 replaced it):
 
 | Group | Items |
 | --- | --- |
-| **Model** | Home, Capability map, Landscape |
-| **Work** | Changes, Decisions, Review queue |
+| **Model** | Home, Capability map, Landscape, Value streams, Elements |
+| **Analyse** | Portfolio, Roadmap, Reports |
+| **Work** | Projects *(added by F10)*, Changes, Decisions, Capture |
 | **Record** | Versions |
+
+- **Elements** is the browse table (`/elements`), previously reachable only from the model home's "Browse all elements →" link.
+- **Reports** is a small hub page listing the model's standing reports — Boundary crossings, External interfaces, Duplicates — each with its current count; those pages keep their own URLs and had no nav entry before.
+- **Review queue is a tab inside Changes, not a nav item.** The Changes nav item carries a count badge of items waiting for review (visible text, never colour alone, §8.4). `/review`, `/review/{id}` and `/review/capture/{id}` keep working as URLs (§2.4) and open with the Changes item highlighted.
+- **Projects** joins Work when F10 ships (`docs/ADR-024-projects.md`); until then the group has three items. Nothing renders a placeholder for it before then (CLAUDE.md rule 7).
 
 It is chrome, not a per-page affordance — a page never grows its own "back to X" link, or any other hand-rolled equivalent, to stand in for it: one shared component (`ModelNav`), everywhere, not a per-route re-implementation of the same nav (**amended, S1 item 17 — see §10 item 10: this is not a ban on `<ul>`/`<li>` markup itself, which §8 has never actually prohibited**).
 
 - **Desktop (≥ 1024px)**: a left rail, 200px wide, between the app header and the page content — icon and label side by side for every item.
 - **Narrow desktop (768–1023px)**: the same left rail, but icon-only — the label is still present for assistive tech (visually hidden, not removed) and available as a native tooltip (`title`) on hover/focus.
-- **Mobile** (< 768px): a bottom bar, fixed to the viewport, below the page content (which gains bottom padding so nothing sits underneath it) — icon-only, same as the narrow-desktop tier.
-- Each group is visually separated by a 1px divider and a small uppercase caption naming it (**"Model" / "Work" / "Record"**, table above) — on the bottom bar (mobile), captions are omitted (no room) and the dividers alone still separate the groups.
+- **Mobile** (< 768px): a bottom bar, fixed to the viewport, below the page content (which gains bottom padding so nothing sits underneath it) — icon plus a short label, **five items only**: Home, Capability map, Landscape, Changes, **More**. Every tap target is at least 44 × 44px. **More** opens a sheet listing every other item, grouped and captioned exactly as the rail is; the More item is shown as current whenever the current route belongs to one of the items inside it. (**Amended, F9 step 1:** the bar previously showed every nav item icon-only, which at eleven items left each one about 35px wide at 390px.)
+- On the rail, each group is visually separated by a 1px divider and a small uppercase caption naming it (**"Model" / "Analyse" / "Work" / "Record"**, table above). The bottom bar has no groups; the More sheet carries the captions.
 - The item for the current route is highlighted: a filled background (`--accent-surface`, a low-opacity tint of `--accent` — the same "tinted, not solid" formula `--status-weak-bg` already uses off `--status-warn`) with accent-coloured text, plus `aria-current="page"`. There is no separate edge-bar treatment — the fill alone (with the colour-contrasted text, never colour-only per §8.4/§8.7) carries the active state.
-- The `[ref]` chip (§2.2) sits alongside the nav items — same `main` / tag / branch-title rendering as the breadcrumb's chip — so which state you're looking at travels with you across a jump, not just within one page's breadcrumb. Home, Changes, Decisions, and Review queue aren't ref-scoped, so their links carry no `?ref=`; Capability map, Landscape, and Versions preserve the current ref.
-- Because every section is one tap away from every other on the bottom bar, any model route is reachable from any other within two taps on a mobile viewport (one to leave the current section, at most one more to land on an element within it).
+- The `[ref]` chip (§2.2) sits alongside the nav items — same `main` / tag / branch-title rendering as the breadcrumb's chip — so which state you're looking at travels with you across a jump, not just within one page's breadcrumb. Every nav link carries the selected ref (`ModelNav.tsx`'s own "Bug fix" comment — this bullet previously said Home/Changes/Decisions/Review queue carried none, which stopped being true before F9).
+- Any section is reachable from any other within two taps on a mobile viewport: one tap for the four bar items, More plus one tap for everything else. Playwright at 390 proves both this and the 44px targets.
+
+**Search anywhere** (F9 step 5): `Ctrl+K` / `⌘K` on any model route, and the search box on Home, open one search dialog over elements (name and aliases), changes, decisions, and projects once F10 ships. It is fully keyboard-operable (arrows, `Enter` opens, `Esc` closes), results are grouped by kind, and each result opens its canonical URL (§2.4) with the current ref. It never shows a result the viewer can't open. The shortcut does nothing while focus is in a text field that uses it itself.
 
 **Icons** (added alongside this grouping, V2b): one icon library, one weight — [lucide-react](https://lucide.dev/), stroke icons, imported directly (no wrapper/abstraction layer). This is a deliberate amendment to this repo's earlier "no icon library" stance (still true for *element-type* glyphs — `ElementTypeGlyph`'s own module comment, §9's "what we will not build," is unchanged): lucide is for **chrome only** — navigation, panel controls, view actions — never a per-element or per-type icon, and never used interchangeably with `ElementTypeGlyph`. The curated set, and the only icons in use anywhere in the product — extend this list here before using anything not on it:
 
@@ -57,16 +65,25 @@ It is chrome, not a per-page affordance — a page never grows its own "back to 
 | `Home` | Nav: Home |
 | `Grid` | Nav: Capability map |
 | `Map` | Nav: Landscape |
+| `Workflow` | Nav: Value streams |
+| `List` | Nav: Elements *(F9)* |
+| `Wallet` | Nav: Portfolio |
+| `Milestone` | Nav: Roadmap |
+| `ClipboardList` | Nav: Reports *(F9)* |
+| `FolderKanban` | Nav: Projects *(F10)* |
 | `GitBranch` | Nav: Changes |
 | `Scale` | Nav: Decisions |
+| `Upload` | Nav: Capture |
 | `History` | Nav: Versions |
-| `Inbox` | Nav: Review queue |
+| `Inbox` | Changes page: the Review tab (no longer a nav item, F9) |
+| `Ellipsis` | Mobile bottom bar: More *(F9)* |
+| `Search` | Search anywhere: the Home search box and the dialog's input *(F9)* |
 | `SlidersHorizontal` | Inspector panel (§6.5): the Filters section |
 | `ChevronLeft` / `ChevronRight` | Inspector panel (§6.5): collapse/expand toggle |
 | `Info` | Capability map (§6.5): each domain/card row's own small inline "Inspect" button (capability map density redesign — no longer a tile-corner overlay) — the view's only way into the Inspector, since it has no click-to-focus concept of its own (every row's primary link still navigates) |
 | `CircleHelp` | App header (`AppHeader.tsx`): the Help chat toggle — shown only when the current route has an org in scope (`AppHeader`'s own `orgId` prop comment) |
 
-Implementation: `src/ui/components/ModelNav/ModelNav.tsx`, section membership resolved by path in `src/ui/nav/modelNavSection.ts`.
+Implementation: `src/ui/components/ModelNav/ModelNav.tsx`, section membership resolved by path in `src/ui/nav/modelNavSection.ts`. (`Workflow`, `Wallet`, `Milestone` and `Upload` were already in use before F9 without being listed here; F9 step 1 adds them to the list rather than leaving the code ahead of this table. Icons marked *(F9)*/*(F10)* are listed ahead of the code that uses them.)
 
 The app header's own user menu (`src/ui/components/AppHeader/AppHeader.tsx`/`UserMenu.tsx`, Sprint U3b — email/theme/density/sign-out, the same < 768px collapse-behind-a-toggle shape as above but its own separate component, unconditional on every route) is untouched by this sprint. Sprint U4-1 E2 re-verified it specifically on the two pages that gained their own header-level disclosure this sprint (the element page's D1/D3 "⋯" menu, Landscape's E1 "+ Add"/"⋯" menus) — distinct accessible names keep the three from colliding, and opening one never disturbs another (`e2e/element-header.spec.ts`, `e2e/landscape-actions.spec.ts`).
 
@@ -265,6 +282,8 @@ The side panel (§7) docked to the right column on wide screens, filtered to thi
 ---
 
 ## 5. The review queue
+
+**Where it lives (amended, F9 step 1):** the queue is the **Review** tab of the Changes page, not its own nav item (§2.0); its URLs are unchanged.
 
 The queue is where capture becomes fact and where a change becomes reality. It has two item kinds with different units of review (ADR-004): a **capture draft** is reviewed delta by delta; a **merge request** is reviewed as a whole with its conflicts. Both use the same three-pane layout and the same keys.
 
@@ -649,3 +668,5 @@ Raised as open items in the first draft; resolved by the product owner and now b
 "Export as ADR markdown" (`exportDecisionAsAdr.ts`) is copied to the clipboard, never offered as a file download — `ElementHeader.tsx`'s own "Copy element ID" is the only clipboard precedent anywhere in this app, and nothing here has ever built a download mechanism to extend instead. Every section of the exported markdown renders only what the decision actually has (CLAUDE.md rule 7): "Options considered" is omitted entirely for a decision with no options linked yet, and "Decision" reads "Not yet decided" rather than inventing a reasons paragraph before one exists.
 
 17. **V3 ("container context pages, and platform context simplified to structure-only"): a container gets a real Context page of its own, and a platform-with-modules hub is split off the ordinary Context diagram entirely, onto its own structure-only page — never both a module grid and a set of neighbours on the same diagram again.** Raised because "component"'s earlier removal (S1 item 18) left a container structurally terminal — it had a Structure page listing its own containers, in reverse, but nothing scoped to itself the way a system's Context page always was — and because V1's own "platform tile contains its module tiles, neighbours wrapped around it" design (decision 11, above) only postponed the crowding problem V1's own scope-narrowing paragraph already worried about: a platform with several modules and several neighbours each attached to different modules eventually needs real edge-routing and label-collision engineering at platform scale, not just at a single hub's scale. Resolved by removing the shared diagram's third dimension (module) rather than engineering around it: `useElementContext.ts` now branches before building anything — `isPlatform(hub) && modules.length > 0` renders `PlatformStructureView.tsx` (the platform tile, its own module tiles with name/capability chip/lifecycle tone, no neighbours, no edges, no labels; a genuine direct edge on the platform itself lists as plain text via `computePlatformConnections`, never a canvas node) — anything else (a plain system, a container, or a platform with zero modules) keeps the ordinary `ContextView.tsx`/`ContextDiagramCanvas.tsx` diagram, now provably simpler: `contextDiagramLayout.ts` lost every module/column-alignment concept it used to carry (`ModuleTile`, a widened hub tile, `anchorFor`'s `isPlatformFallback`, `layoutNeighbourBand`'s column-stacking), because every hub this diagram lays out now has a bounded set of its own direct neighbours and nothing else — decision 11's own neighbour-module restriction is superseded outright, not narrowed further, since there is no module nesting left to restrict. A container's own breadcrumb segment (`elementBreadcrumbSegments.ts`) now points at its own Context page rather than the old `/container/:parentId` structure list, and every "a container has no Context view of its own" assumption scattered across the landscape/element-page/breadcrumb code (`ElementPage.tsx`'s `contextHref`, `LandscapePage.tsx`'s `nodeHref`, `LandscapeMobileList.tsx`'s `hasNoContextView`) narrows to actor-only, the one element type that still has no Context page at all.
+
+18. **F9 ("navigation and findability"), approved by the product owner on 2026-10-01: the nav is four groups — Model, Analyse, Work, Record — with Elements and a Reports hub added, the review queue moved into Changes as a tab with a count badge, a five-item mobile bottom bar with a grouped "More" sheet, and one search dialog on `Ctrl+K`/`⌘K`.** Raised by the 2026-10-01 product review (`docs/PLAN-2026-10-recommendations.md`): the nav had grown to eleven items, the bottom bar's icon-only targets were about 35px wide at 390px (under the 44px minimum), the Elements browse table and three report pages had no nav entry, and search existed only on Home. The review queue moves rather than disappears because its items are always about changes (a merge request is a change asking to merge; a capture draft is a change of a different kind), and the architect door's own queue column (§3.2) is unaffected. Projects (F10, `docs/ADR-024-projects.md`) joins Work when it ships, not before.

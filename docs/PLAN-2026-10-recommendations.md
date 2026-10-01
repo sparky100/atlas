@@ -1,6 +1,6 @@
 # Plan — October 2026 recommendations (items 1–6)
 
-**Status:** Proposed 2026-10-01, for the human's review. Nothing here is scheduled until it is folded into `docs/prompts/atlas-prompt-pack.md` §3/§4 (the single source for what is next); this file is the proposal that change would be made from.
+**Status:** Approved by the human on 2026-10-01 — ADR-024 approved, navigation (F9) first, F9's nav grouping confirmed as written. Folded into `docs/prompts/atlas-prompt-pack.md` §3 item 9 and §4 (F9–F13) the same day; this file holds the detail those entries point to.
 **Source:** the product review held in conversation on 2026-10-01 (UI, gaps against LeanIX/Ardoq/Bizzdesign/ServiceNow APM/Sparx, recommendations 1–6), and `docs/ADR-024-projects.md`.
 
 Every sprint below follows CLAUDE.md as it stands: schema changes ship migration + type + round-trip/integration test together; every flow gets a click-only golden path from Home at 1280 and 390; all suites run locally on the final commit (cloud-session PRs carry `needs-local-verify`); UI strings follow the pack's language rule ("change", never "branch"). Each step below is one PR unless marked otherwise, and work stops for a summary after each.
@@ -26,7 +26,7 @@ This reorders the review's 1→6 by putting item 3 first. If you'd rather start 
 
 **Goal:** fewer, clearer nav groups; every page reachable; jump to anything from anywhere; usable bottom bar on a phone.
 
-**Decision needed before step 1 (human):** the grouping. Recommended:
+**Grouping — confirmed by the human, 2026-10-01:**
 
 | Group | Items |
 |---|---|
@@ -127,10 +127,10 @@ Each "yes" becomes a short ADR or ADR-001 amendment, then a sprint in this forma
 
 ## Decisions needed from the human, in order
 
-1. ADR-024 — approve, or mark up.
-2. Order — F9 (nav) first, or F10 (projects) first.
-3. F9 nav grouping — the table above, or changes to it.
-4. F11 — disposition values and whether modules can override.
-5. F12 — ADR-025 option (a) or (b).
-6. F13 — first scheduled import source, and who sets up SSO.
-7. Item 6 — the three recommendations.
+1. ~~ADR-024 — approve, or mark up.~~ **Approved 2026-10-01.**
+2. ~~Order — F9 (nav) first, or F10 (projects) first.~~ **F9 first, 2026-10-01.**
+3. ~~F9 nav grouping — the table above, or changes to it.~~ **Confirmed as written, 2026-10-01** — recorded in `docs/UI-principles.md` §2.0 and §10 item 18 (F9 step 1).
+4. F11 — disposition values and whether modules can override. *(Before F11 step 1.)*
+5. F12 — ADR-025 option (a) or (b). *(Before F12 step 3.)*
+6. F13 — first scheduled import source, and who sets up SSO. *(Before F13 steps 3–4.)*
+7. Item 6 — the three recommendations. *(Any time; no code depends on it.)*

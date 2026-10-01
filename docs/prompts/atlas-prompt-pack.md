@@ -50,6 +50,7 @@ Applied by every session, cloud or desktop. Put into CLAUDE.md by prompt P1.
 
 7. Then features, in order: **F0 + F3 as one sprint — decisions and options** (intent, decisions, explore changes as high-level options, the comparison view; the product's centre: which capabilities are changing or weak → options → a documented decision → a change) → **F3a** multiple reviewers and sign-up shape → **F7** accounts and access → **F1** custom attributes → **F8** export → **E2** C2b → **E7** merge_elements → **F2** capture (K1) *(done — PR1–PR16)* → **F4** duplicates report → **F5** roadmap → **F6** value streams. E2 and E7 must precede F2: capture review is where structural conflicts and merge-into-X become daily events.
 8. Plumbing alongside, desktop only, never the same files as the active S/F sprint, each with its own prompt below: **E3** delta-apply in SQL and **E4** LLM proxy edge function (both before F2); **E5** typed Supabase client (any time after S2); **E6** landscape p5 fps profile (after S2); **E8** performance (after S2, before features).
+9. **October 2026 plan** (approved 2026-10-01; detail in `docs/PLAN-2026-10-recommendations.md`): **F9** navigation and findability → **F10** projects (`docs/ADR-024-projects.md`) → **F11** TIME disposition → **F12** filling gaps fast and owner confirmation (ADR-025 first) → **F13** exports and connectors. The wider-model questions (data objects, technology, objectives) are decisions for the human, not sprints, until answered.
 
 ---
 
@@ -225,6 +226,26 @@ Rows by capability or system; time horizontal; lifecycle bars from `introduced`/
 ### F6 — value streams
 
 New ADR: value stream → stages, `enables` from capability to stage; one view; no other taxonomy change. Written and decided before any code. **ADR-023 (`docs/ADR-023-value-streams.md`) is that ADR** — Step 1 of the sprint, docs only; the build (contract/engine/migration, rollup and impact hop, the Value streams page plus the director "By outcome" toggle, roadmap group-by and capability-map/page surfaces, editing behind the "main or a correct-intent change" gate, starter-map content, JSON import, tests) follows it step by step, one PR each.
+
+### F9 — navigation and findability
+
+Prerequisite: none. Design: `docs/UI-principles.md` §2.0 and §10 item 18 (F9 step 1, done 2026-10-01). Steps, one PR each: (1) UI-principles amendment — done; (2) nav regroup into Model/Analyse/Work/Record, Elements and Reports in the nav, review queue as a Changes tab with a count badge, every golden path that clicks a nav item updated; (3) the Reports hub page; (4) five-item mobile bottom bar plus grouped More sheet, 44px targets, two-tap reachability at 390; (5) search anywhere on Ctrl/⌘-K, reusing `useHomeSearch`'s queries. Golden paths: `golden-path-nav-groups`, `golden-path-search-anywhere`, at 1280 and 390.
+
+### F10 — projects
+
+Prerequisite: F9 merged; ADR-024 approved (2026-10-01). Eight steps in `docs/PLAN-2026-10-recommendations.md` §F10, starting with the one migration (tables, columns, P1–P4, RPCs, RLS, integration tests). Golden paths: `golden-path-project-lifecycle`, `golden-path-project-roadmap`. Done flips ADR-024 to Accepted and adds a Projects section to `docs/USER-GUIDE.md`.
+
+### F11 — TIME disposition
+
+Prerequisite: F10; the human's answer on values and module override; an ADR-001 amendment (step 1). Steps in the plan file §F11. Golden path: `golden-path-disposition`.
+
+### F12 — filling gaps fast, owner confirmation
+
+Prerequisite: F9 (Elements in the nav). ADR-025 (how a confirmation is recorded) decided before step 3. Steps in the plan file §F12.
+
+### F13 — exports and connectors
+
+Prerequisite: F10 for the project pack; the human's choice of first import source; SSO needs a human with Supabase dashboard access. Steps in the plan file §F13.
 
 ---
 

@@ -1,6 +1,6 @@
 # ADR-024: Projects — the container for a piece of architecture work
 
-**Status:** Proposed 2026-10-01 — docs only, no code. Accepted once its migration lands (the ADR-023 precedent).
+**Status:** Proposed 2026-10-01 — docs only, no code. **Approved for build by the human on 2026-10-01** as sprint F10 (`docs/PLAN-2026-10-recommendations.md`), scheduled after F9. Accepted once its migration lands (the ADR-023 precedent).
 **Numbering:** ADR-023 is the current highest (`docs/ADR-023-value-streams.md`), so this is ADR-024. `docs/ADR-000-foundations.md`'s own index gains a one-line pointer to this file, per that document's established convention for ADR-021 and every later one.
 **Depends on:** ADR-001 (`docs/ADR-000-foundations.md` — its "explicit non-types" list names `project-or-programme`, which this ADR has to argue against, and does not overturn), ADR-002 (branches), ADR-010 (comment anchors), ADR-013/ADR-022 (decisions, `decision_links`, `evidence`), F0 (`branches.intent`), F5 (roadmap group-by), ADR-023 (the roadmap's second group-by mode — this ADR adds a third).
 
