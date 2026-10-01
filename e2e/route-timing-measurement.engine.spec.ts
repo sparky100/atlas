@@ -243,7 +243,7 @@ test('E8 phase 1: measure resolve/paint/data timing and network waterfalls acros
   {
     const t0 = Date.now();
     await addUsesRelationship(page, relTargetName, 'reads status from');
-    await expect(page.getByRole('link', { name: new RegExp(relTargetName) })).toBeVisible();
+    await expect(page.getByRole('link', { name: new RegExp(relTargetName) }).first()).toBeVisible();
     actions.push({ actionKey: 'add-relationship', label: 'Add relationship (uses)', wallClockMs: Date.now() - t0 });
   }
 

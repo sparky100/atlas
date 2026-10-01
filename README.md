@@ -24,6 +24,8 @@ pnpm check:case-collisions   # case-only path collisions (e.g. Foo.ts / foo.ts) 
 
 `pnpm db:reset` replays every migration in `supabase/migrations` against a fresh database.
 
+Starter capability maps are content, not migrations, so a fresh local database has none — and several Playwright specs seed a model from one (the electricity map in particular). Before running `pnpm test:e2e` against a fresh stack, load and publish them: `pnpm content:load-capability-maps`, then `pnpm content:publish-capability-map <sector> <version>` for each sector's latest reviewed version (`electricity_network 4`, `hei 2`, `housing 2`, `local_government_england 2`, `local_government_scotland 2`, `nhs 2`, `public_body 2` as of October 2026 — `utility` has no reviewed version yet). The scripts read `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` from the environment (`set -a; . ./.env; set +a`).
+
 `pnpm build` / `pnpm build-storybook` — run them locally before pushing a UI change that touches build config or addon wiring, since typecheck/lint alone don't catch every build-time failure.
 
 The browser only ever reads the `VITE_`-prefixed environment variables (`src/ui/env.ts`) — `SUPABASE_SERVICE_ROLE_KEY` has no `VITE_` counterpart and must never get one.

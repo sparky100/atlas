@@ -64,7 +64,7 @@ test('upload a spreadsheet, accept and reject candidates by keyboard, and see th
 
   await goToModelHome(page);
   await clickNavItem(page, 'Capture');
-  await expect(page.getByRole('heading', { name: 'Capture' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Capture', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'New capture run' }).click();
 
   await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toBeVisible();
@@ -136,7 +136,7 @@ test('a scanned PDF with no text layer fails with a plain explanation', async ({
   // `runCapture.ts`'s own `NO_TEXT_LAYER` message ("This PDF is scanned...")
   // — this fails before any LLM call at all, so it needs no live model
   // connectivity, unlike the first test above.
-  await expect(page.getByText(/scanned/i)).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText(/This PDF is scanned/i)).toBeVisible({ timeout: 60_000 });
 });
 
 test('upload a JSON file, bulk-accept every new candidate by keyboard, and apply', async ({ page }, testInfo) => {

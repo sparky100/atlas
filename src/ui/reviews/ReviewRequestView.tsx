@@ -339,7 +339,13 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
               <Text as="span" size="sm" tone="muted">
                 Your review:
               </Text>
-              <Button variant="primary" disabled={rr.actionStatus === 'working' || myVerdict.verdict === 'approve'} onClick={() => void rr.castVerdict('approve')}>
+              {/* Same conditions as the single-approver path's Approve (`canApproveNow`, SPEC §7.4): a reviewer can't approve while a blocking conflict is open or the change is behind main — it couldn't merge yet anyway (merge_branch would send it back for a refresh). Request changes and Abstain stay available. */}
+              <Button
+                variant="primary"
+                disabled={rr.actionStatus === 'working' || myVerdict.verdict === 'approve' || classification.hasBlockingConflict || !threeWay.upToDateWithMain}
+                title={classification.hasBlockingConflict || !threeWay.upToDateWithMain ? 'Needs no blocking conflicts and an up-to-date change' : undefined}
+                onClick={() => void rr.castVerdict('approve')}
+              >
                 Approve
               </Button>
               <Button variant="secondary" disabled={rr.actionStatus === 'working'} onClick={() => void rr.castVerdict('request_changes')}>

@@ -92,7 +92,7 @@ test('integration platform context: two sources sharing one target, both via-flo
   if (!seedResult.ok) throw new Error(`seeding integration-platform-context fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/context/${platformId}`);
-  await expect(page.getByText('Enterprise Bus', { exact: true })).toBeVisible();
+  await expect(page.getByText('Enterprise Bus', { exact: true }).first()).toBeVisible();
 
   // Header: "N flows via this platform · M sources · K targets".
   await expect(page.getByText('2 flows via this platform')).toBeVisible();

@@ -31,8 +31,30 @@ test('a record change merges in one click from its own page and never appears in
   // gating it, and a second, unused member doesn't affect the record half.
   await addArchitectMember(env, orgId, userId);
 
+  // The director's door only shows "What's changing" (and its "What
+  // happened" entry point) once the capability map has something on it —
+  // an empty map shows its own empty state instead.
+  const capabilityResult = await commitToBranch(owner, {
+    modelId,
+    branchId: fixture.main.id,
+    expectedHeadCommitId: fixture.seedCommitId,
+    envelope: {
+      id: randomUUID(),
+      branchId: fixture.main.id,
+      parentCommitId: fixture.seedCommitId,
+      mergedBranchHeadCommitId: null,
+      kind: 'manual',
+      title: 'seed one capability',
+      body: null,
+      deltas: [{ kind: 'element.create', id: randomUUID(), elementId: randomUUID(), elementType: 'capability', name: 'Finance', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 }],
+    },
+  });
+  if (!capabilityResult.ok) throw new Error(`seeding a capability: ${capabilityResult.message}`);
+
   // 1. Record: "What happened" (F0's own record-default entry point).
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
+  // "What happened" lives on the director's door; an owner lands on the architect's.
+  await page.getByRole('button', { name: 'Director view' }).click();
   await page.getByRole('button', { name: 'What happened' }).click();
   const recordName = `deployed-ledger-${randomUUID().slice(0, 8)}`;
   await page.getByPlaceholder('Name (e.g. retire-northgate)').fill(recordName);
@@ -66,7 +88,7 @@ test('a record change merges in one click from its own page and never appears in
   await page.reload();
   await page.getByRole('button', { name: 'Submit for review' }).click();
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
-  await expect(page.getByText('pending', { exact: true })).toBeVisible();
+  await expect(page.getByText('pending', { exact: true }).first()).toBeVisible();
 
   // While pending, this record change is real and open, but never listed
   // in the shared queue (`useReviewQueue.ts`'s own intent filter) — the

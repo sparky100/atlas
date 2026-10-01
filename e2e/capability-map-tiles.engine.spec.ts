@@ -99,7 +99,8 @@ test('capability map cards: the name link navigates, a plain-text tone indicator
   // own, so it had nothing left to click once fixed. Oldest lifecycle
   // stage's own label is the stage name itself, a real, distinct fact.
   await page.getByLabel('Colour by').selectOption({ label: 'Oldest lifecycle stage' });
-  await expect(page.getByText('active', { exact: true })).toBeVisible();
+  // The card's own indicator (the domain header shows its rolled-up stage too).
+  await expect(page.getByRole('list', { name: 'Digital Services capabilities' }).getByText('active', { exact: true })).toBeVisible();
 
   // "Plain-text name, no underline": the primary link is the capability's
   // own name, and it's what actually navigates.
@@ -114,13 +115,13 @@ test('capability map cards: the name link navigates, a plain-text tone indicator
   // a click target of any kind.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await page.getByRole('button', { name: /Digital Services/ }).click();
-  await page.getByText('active', { exact: true }).click();
+  await page.getByRole('list', { name: 'Digital Services capabilities' }).getByText('active', { exact: true }).click();
   await expect(page).toHaveURL(/\/capability-map/);
   await expect(page).not.toHaveURL(new RegExp(`/e/${housingId}$`));
 
   // The "→ Landscape" drill-through is its own real link, unaffected by
   // any of the above.
-  await page.getByRole('link', { name: '1 system →' }).click();
+  await page.getByRole('list', { name: 'Digital Services capabilities' }).getByRole('link', { name: '1 system →' }).click();
   await expect(page).toHaveURL(/\/landscape\?/);
 });
 

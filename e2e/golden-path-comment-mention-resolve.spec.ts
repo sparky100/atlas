@@ -81,8 +81,8 @@ test('comment on an element from a change\'s view, mention a member, see it in t
   // also unchecked) also in the org — the owner is always the earliest-
   // joined member (`listMembers`'s own `order('joined_at')`), so their row
   // is always first regardless of how many others exist.
-  await submitForReviewWithReviewers(page, true);
-  await expect(page.getByText('pending', { exact: true })).toBeVisible();
+  await submitForReviewWithReviewers(page, true, { selfApproves: true });
+  await expect(page.getByText('pending', { exact: true }).first()).toBeVisible();
   const approveButton = page.getByRole('button', { name: 'Approve' });
   await expect(approveButton).toBeEnabled();
   await approveButton.click();

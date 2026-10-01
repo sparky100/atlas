@@ -114,15 +114,34 @@ export async function signInExistingUser(page: Page, email: string, password: st
  * `bootstrapChangeBranchFixture` + `addArchitectMember` — exactly two
  * members at this point) when a later step needs them to actually cast a
  * verdict (`atlas.set_review_verdict`'s own "you are not a reviewer on
- * this request" check) — their own row is the only *unchecked* checkbox
- * in that two-member case, so no display name is needed to find it.
+ * this request" check) — their own row is the first *unchecked* checkbox
+ * (earliest-joined), so no display name is needed to find it. With
+ * `selfApproves`, it is also made the required reviewer in place of the
+ * architect, for a test where the caller's own approval approves.
  * `.last()` on the second click: the outer trigger button keeps the same
  * label and stays mounted once the picker opens.
  */
-export async function submitForReviewWithReviewers(page: Page, includeSelf: boolean): Promise<void> {
+export async function submitForReviewWithReviewers(page: Page, includeSelf: boolean, options: { selfApproves?: boolean } = {}): Promise<void> {
   await page.getByRole('button', { name: 'Submit for review' }).click();
+  // The picker loads its member list first ("Loading reviewers…"); until it
+  // has, the only "Submit for review" on the page is the trigger itself, so
+  // clicking `.last()` too early just re-clicks the trigger and nothing is
+  // submitted. Wait for the picker's own second button.
+  await expect(page.getByRole('button', { name: 'Submit for review' })).toHaveCount(2);
   if (includeSelf) {
     await page.getByRole('checkbox', { checked: false }).first().check();
+    if (options.selfApproves) {
+      // F3a: only *required* reviewers' approvals count, and the picker
+      // pre-checks the org's architect as required. When the caller's own
+      // approval is meant to be the one that approves, it becomes the
+      // required reviewer (an owner counts toward the org's architect floor,
+      // 20260926010000) and the architect stays on as optional. The caller's
+      // row is listed first (earliest-joined), so its "required" box is first.
+      const requiredBoxes = page.getByRole('checkbox', { name: 'required' });
+      await expect(requiredBoxes).toHaveCount(2);
+      await requiredBoxes.nth(0).check();
+      await requiredBoxes.nth(1).uncheck();
+    }
   }
   await page.getByRole('button', { name: 'Submit for review' }).last().click();
 }

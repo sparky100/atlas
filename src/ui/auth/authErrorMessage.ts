@@ -25,7 +25,8 @@ export function authErrorMessage(rawMessage: string): string {
   if (lower.includes('invalid login credentials')) return "That email or password doesn't match an account.";
   if (lower.includes('already registered')) return 'An account already exists for that email — sign in instead.';
   if (lower.includes('email not confirmed')) return 'Confirm your email first — check your inbox for the link, then sign in.';
-  if (lower.includes('email rate limit') || lower.includes('rate limit') || lower.includes('too many requests')) return 'Too many attempts — wait a few minutes and try again.';
+  // GoTrue's own over_email_send_rate_limit / per-user frequency wording: "For security purposes, you can only request this after N seconds."
+  if (lower.includes('rate limit') || lower.includes('too many requests') || lower.includes('for security purposes')) return 'Too many attempts — wait a few minutes and try again.';
   if (lower.includes('new password should be different')) return 'Choose a different password than your current one.';
   if (lower.includes('should be at least')) return 'Choose a password with at least 6 characters.';
   if (lower.includes('unable to validate email') || lower.includes('invalid email')) return "That doesn't look like a valid email address.";

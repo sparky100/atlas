@@ -73,3 +73,14 @@
   background: var(--surface-raised);
   color: var(--text);
 }
+
+/* Stabilisation: below 768px the Inspector stacks under the view it
+   belongs to (each page's own row turns into a column at the same width)
+   and takes the full width there — side by side, its fixed 300px left a
+   phone's capability map about 50px, collapsing every card name to
+   nothing. */
+@media (max-width: 768px) {
+  .panel {
+    width: 100%;
+  }
+}

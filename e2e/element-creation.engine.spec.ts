@@ -76,17 +76,15 @@ test('from an empty model, add two systems and a uses relationship between them,
   await page.getByRole('button', { name: '+ Add uses' }).click();
   await page.getByPlaceholder('Search…').fill('Billing');
   await page.getByRole('button', { name: /Billing Service/ }).click();
-  await page.getByPlaceholder('e.g. reads customer records from').fill('reads invoices from');
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
-
   // Sprint U4-1 B5: uses requires a verb-phrase label before the
-  // relationship is actually created — "Add" stays disabled until one is
+  // relationship is actually created — "Next" stays disabled until one is
   // typed.
-  const addLabelButton = page.getByRole('button', { name: 'Add', exact: true });
+  const addLabelButton = page.getByRole('button', { name: 'Next' });
   await expect(addLabelButton).toBeDisabled();
   await page.getByPlaceholder('e.g. reads customer records from').fill('calls for payment authorisation');
   await expect(addLabelButton).toBeEnabled();
   await addLabelButton.click();
+  await page.getByRole('button', { name: 'Skip — direct edge' }).click();
 
   // The relationship now shows on Payment Gateway's own element page — a
   // link to Billing Service, in the Relationships section. Following it

@@ -118,7 +118,10 @@ test('add a system: search finds nothing, the create sheet asks description and 
   await page.getByRole('button', { name: /Council Tax System/ }).click();
   await expect(page.getByText('Verb phrase')).toBeVisible();
   await page.getByPlaceholder('e.g. reads customer records from').fill('shares address data with');
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  // Since Prompt 7k: after the verb phrase, a second stage asks whether the
+  // link goes via an integration platform — a direct edge here.
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('button', { name: 'Skip — direct edge' }).click();
 
   // Step 7: the relationship shows its phrase and a just-added chip.
   await expect(page.getByText('“shares address data with”')).toBeVisible();

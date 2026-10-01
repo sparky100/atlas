@@ -84,9 +84,12 @@ test('a platform\'s modules get their own capability-lane tiles, the platform la
   const platformsGroup = page.getByRole('button', { name: /^Platforms\b/ });
   await expect(platformsGroup).toBeVisible();
   await platformsGroup.click();
-  await expect(page.getByText('SAP', { exact: true })).toBeVisible();
-  await expect(page.getByText('SAP · FI', { exact: true })).toHaveCount(1);
-  await expect(page.getByText('SAP · PM', { exact: true })).toHaveCount(1);
+  // The list opens one group at a time, so Platforms is now the only one
+  // open: SAP is listed there, once, and neither module is (they live in
+  // their capabilities' groups, checked above).
+  const platformsList = page.getByRole('list').filter({ has: page.getByRole('link', { name: /SAP/ }) });
+  await expect(platformsList.getByText('SAP', { exact: true })).toHaveCount(1);
+  await expect(platformsList.getByText(/SAP · /)).toHaveCount(0);
 
   // 3. Retire PM with a replacement module.
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -100,7 +103,7 @@ test('a platform\'s modules get their own capability-lane tiles, the platform la
   await page.getByRole('button', { name: /PM Replacement/ }).click();
   await expect(page.getByText('Replaced by', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Retire', exact: true }).click();
-  await expect(page.getByText('retiring', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('retiring', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
 
   // 4. Asset Management's own exposure has cleared — the replacement
   // module has no plannedEnd of its own.

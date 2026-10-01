@@ -31,7 +31,7 @@ test('creates a change from the UI, lands inside it, and lists it', async ({ pag
 
   // Landed inside: this change's own page, selected as the active ref.
   await expect(page.getByRole('heading', { name: changeTitle })).toBeVisible();
-  await expect(page).toHaveURL(/ref=branch:/);
+  await expect(page).toHaveURL(/ref=branch(:|%3A)/);
   await expect(page.getByText(`Editing in change: ${changeTitle}`)).toBeVisible();
 
   // The real point of this bug's own report: a working create shows the
@@ -59,7 +59,7 @@ test('a failed create surfaces a visible error, not a silent no-op', async ({ pa
   // The first create succeeds and lands inside — back to the Changes page
   // to attempt the real point of this test, a second create with the same
   // name.
-  await expect(page).toHaveURL(/ref=branch:/);
+  await expect(page).toHaveURL(/ref=branch(:|%3A)/);
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
   await expect(page.locator('li', { hasText: duplicateName })).toBeVisible();
 
@@ -78,6 +78,6 @@ test('a failed create surfaces a visible error, not a silent no-op', async ({ pa
   // named: previously neither did. A failed create must not navigate
   // anywhere, unlike a successful one.
   await expect(page.getByRole('alert')).toBeVisible({ timeout: 15_000 });
-  await expect(page).toHaveURL(`/o/${orgSlug}/m/${modelSlug}/changes`);
+  await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/changes(\\?|$)`));
   await expect(page.locator('li', { hasText: duplicateName })).toHaveCount(1);
 });

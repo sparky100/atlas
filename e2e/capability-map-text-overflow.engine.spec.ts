@@ -99,7 +99,8 @@ test('capability map: the longest real starter-map names never cause page-level 
   if (!seedResult.ok) throw new Error(`seeding capability-map-text-overflow fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
-  const domainToggle = page.getByRole('button', { name: new RegExp(LONGEST_L1_NAME.slice(0, 20)) });
+  // `^`: each domain also has its own "Inspect <name>" button now.
+  const domainToggle = page.getByRole('button', { name: new RegExp('^' + LONGEST_L1_NAME.slice(0, 20)) });
   await expect(domainToggle).toBeVisible();
 
   for (const width of [1280, 1920]) {

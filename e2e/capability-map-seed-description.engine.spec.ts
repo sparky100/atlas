@@ -99,6 +99,7 @@ test('seeding from a starter map carries the map item\'s own description onto th
   // compact title, "template, <age> old") — the same template source
   // `atlas.seed_from_map` recorded for every other seeded attribute, not a
   // manual edit standing in for it.
-  const descriptionBadge = descriptionValue.locator('[title]');
+  // The badge's own title (its confidence dots carry a title too).
+  const descriptionBadge = descriptionValue.locator('[title^="template"]');
   await expect(descriptionBadge).toHaveAttribute('title', /^template,/);
 });

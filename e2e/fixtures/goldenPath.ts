@@ -140,7 +140,9 @@ export async function acceptInviteViaSignUp(page: Page, email: string, displayNa
 export async function seedStarterCapabilityMap(page: Page, cardTitleMatch: string | RegExp): Promise<void> {
   await page.getByRole('link', { name: 'Capability map' }).click();
   await expect(page.getByRole('heading', { name: 'Start from a capability map' })).toBeVisible();
-  const card = page.locator('li').filter({ hasText: cardTitleMatch }).first();
+  // Match the card's own title, never a draft: other specs leave draft maps
+  // in the shared catalogue whose version line can match too.
+  const card = page.locator('li').filter({ has: page.getByRole('heading', { name: cardTitleMatch }) }).filter({ hasNotText: /\bDraft\b/ }).first();
   await card.getByRole('button', { name: 'Import' }).click();
   await expect(page.getByRole('button', { name: 'Import' })).toHaveCount(0, { timeout: 15_000 });
 }
@@ -180,8 +182,10 @@ export async function addSystemFromHome(page: Page, options: AddSystemOptions): 
   // below 768px (`add-a-system-flow.spec.ts`'s own mobile test) — right
   // where ModelNav's own bottom bar and, on an element page, comment/
   // relationship controls also sit. Dismissing it here, once, means every
-  // caller doesn't have to work around it individually.
+  // caller doesn't have to work around it individually. It can render a
+  // beat after the heading, so wait for it rather than checking once.
   const toastDismiss = page.getByTestId('add-system-toast').getByRole('button', { name: 'Dismiss' });
+  await toastDismiss.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => undefined);
   if (await toastDismiss.isVisible().catch(() => false)) await toastDismiss.click();
 }
 
@@ -194,7 +198,8 @@ export async function addContainerFromHome(page: Page, name: string, platformNam
   const searchBox = page.getByPlaceholder('Search or create a capability, system, or actor…');
   await expect(searchBox).toBeVisible();
   await searchBox.fill(name);
-  await page.getByRole('combobox').selectOption('container');
+  // The type select beside Home's search box (Home now has other selects too).
+  await searchBox.locator('xpath=following::select[1]').selectOption('container');
   await page.getByRole('button', { name: `Create container "${name}"` }).click();
 
   await expect(page.getByText('Which platform is this a module of? (required)')).toBeVisible();
@@ -202,7 +207,7 @@ export async function addContainerFromHome(page: Page, name: string, platformNam
   await page.getByRole('button', { name: new RegExp(platformNameMatch) }).click();
   await page.getByRole('button', { name: 'Create', exact: true }).click();
 
-  await expect(page.getByRole('heading', { name })).toBeVisible();
+  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
 }
 
 /**
@@ -224,6 +229,10 @@ export async function addUsesRelationship(page: Page, targetNameMatch: string, v
   await page.getByRole('button', { name: 'Next' }).click();
   await expect(page.getByText('Does this go via an integration platform?')).toBeVisible();
   await page.getByRole('button', { name: 'Skip — direct edge' }).click();
+  // Saved once its row shows the quoted verb phrase — returning before then
+  // let a caller's next click land mid-refresh (an opened menu reset, a
+  // report counting before the link was on main).
+  await expect(page.getByText(`“${verbPhrase}”`).first()).toBeVisible({ timeout: 15_000 });
 }
 
 /**
@@ -245,11 +254,18 @@ export async function addSupportsRelationship(page: Page, capabilityNameMatch: s
 
 /** Rename the element on the currently-open element page, via the header's "⋯" menu — `element-rename.spec.ts`'s own locator convention (a bare `getByRole('textbox')` also matches the Comments composer, so this is scoped to `<header>`). */
 export async function renameElement(page: Page, newName: string): Promise<void> {
-  await page.getByRole('button', { name: 'Element actions' }).click();
-  await page.getByRole('button', { name: 'Rename', exact: true }).click();
+  // Right after landing on a page (a merge or conversion's result), the
+  // page can still be settling and re-render once, closing a menu opened
+  // in that instant — reopen until Rename actually takes.
   const renameInput = page.locator('header').getByRole('textbox');
+  await expect(async () => {
+    if (!(await page.getByRole('button', { name: 'Rename', exact: true }).isVisible())) await page.getByRole('button', { name: 'Element actions' }).click();
+    await page.getByRole('button', { name: 'Rename', exact: true }).click({ timeout: 2_000 });
+    await expect(renameInput).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
   await renameInput.fill(newName);
-  await page.getByRole('button', { name: 'Save' }).click();
+  // The rename's own Save, in the header (the Attributes section has its own).
+  await page.locator('header').getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { name: newName })).toBeVisible();
 }
 

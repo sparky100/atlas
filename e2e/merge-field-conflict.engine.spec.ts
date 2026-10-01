@@ -80,8 +80,11 @@ test('a field conflict renders with its three-way context, resolves with one cli
   expect(computed.review.classification.hasBlockingConflict).toBe(true);
   const mergeRequestId = randomUUID();
   await submitMergeRequest(signedIn, mergeRequestId, branchId, computed.review, [
+    // The owner is the one required reviewer (an owner counts toward the
+    // org's architect floor since 20260926010000); the architect reviews
+    // optionally, so the owner's own approval below is what approves it.
     { userId, required: true },
-    { userId: architectUserId, required: true },
+    { userId: architectUserId, required: false },
   ]);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/review/${mergeRequestId}`);

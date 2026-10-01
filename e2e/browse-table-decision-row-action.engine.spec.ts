@@ -46,13 +46,14 @@ test('start a decision from one row of the critical-support-end finding\'s own f
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
   await expect(page.getByText('2 critical systems past or near vendor support end')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Start a decision →' })).toHaveCount(0);
-  await page.getByRole('link', { name: 'Review →' }).click();
+  // Several findings each have their own "Review →" now; this one's leads to its own filtered list.
+  await page.locator('a[href*="filter=critical-support-end"]', { hasText: 'Review →' }).click();
 
   // 2. The browse table, filtered to this finding — both systems show up,
   // each with its own "Start a decision" row action.
   await expect(page).toHaveURL(/\/elements\?filter=critical-support-end/);
-  await expect(page.getByRole('link', { name: 'SAP PM', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'SAP FI', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /SAP PM$/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /SAP FI$/ })).toBeVisible();
   const sapFiRow = page.getByRole('row', { name: /SAP FI/ });
   await sapFiRow.getByRole('link', { name: 'Start a decision →' }).click();
 

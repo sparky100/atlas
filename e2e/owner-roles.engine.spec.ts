@@ -60,7 +60,8 @@ test('adding an owner on a system asks for a role; a second owner in a different
 
   // 3. The context page's header lists both, grouped by role.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/context/${systemId}?ref=main`);
-  const ownerLine = page.getByText('Business owner:', { exact: false });
+  // The whole owners line (each role is its own span inside it).
+  const ownerLine = page.getByRole('paragraph').filter({ hasText: 'Business owner:' });
   await expect(ownerLine).toBeVisible();
   await expect(ownerLine.getByRole('link', { name: 'Housing' })).toBeVisible();
   await expect(ownerLine.getByRole('link', { name: 'IT Operations' })).toBeVisible();

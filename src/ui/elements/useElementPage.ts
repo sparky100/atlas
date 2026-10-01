@@ -104,7 +104,8 @@ export type ElementPageState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   /** The ref resolved to a real commit, but this element doesn't exist there — §2.4's "not present at this ref" state, not a 404. */
-  | { status: 'notPresentAtRef'; commitId: UUID }
+  /** `elementId`: which element this was decided for — the page stays mounted when it moves to another element (a merge or conversion lands on the survivor), so a reader checks this before acting on a state left over from the previous one. */
+  | { status: 'notPresentAtRef'; commitId: UUID; elementId: UUID }
   | { status: 'refNotFound' }
   | { status: 'ready'; data: ElementPageData };
 
@@ -238,7 +239,7 @@ export function useElementPage(
 
       const element = await source.element(elementId);
       if (!element) {
-        if (!cancelled) setState({ status: 'notPresentAtRef', commitId });
+        if (!cancelled) setState({ status: 'notPresentAtRef', commitId, elementId });
         return;
       }
 

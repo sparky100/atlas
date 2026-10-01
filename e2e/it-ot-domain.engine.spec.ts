@@ -43,7 +43,10 @@ test('a flow between an IT and an OT system is listed as a boundary crossing, an
   await page.getByPlaceholder('Search…').fill('PLC Controller');
   await page.getByRole('button', { name: /PLC Controller/ }).click();
   await page.getByPlaceholder('e.g. reads customer records from').fill('sends setpoints to');
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  // Since Prompt 7k: after the verb phrase, a second stage asks whether the
+  // link goes via an integration platform — a direct edge here.
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('button', { name: 'Skip — direct edge' }).click();
   await expect(page.getByRole('link', { name: /PLC Controller/ })).toBeVisible();
 
   // 2. "Boundary crossings" — reachable from the architect door (S1 item 6:
@@ -55,7 +58,7 @@ test('a flow between an IT and an OT system is listed as a boundary crossing, an
   // page below is the real content check.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await expect(page.getByRole('heading', { name: 'Health findings' })).toBeVisible();
-  await page.getByRole('link', { name: 'View all →' }).click();
+  await page.getByRole('link', { name: 'View boundary crossings →' }).click();
   await expect(page.getByRole('heading', { name: 'Boundary crossings' })).toBeVisible();
   await expect(page.getByText('Billing Platform → PLC Controller')).toBeVisible();
   await expect(page.getByText('it', { exact: true }).first()).toBeVisible();

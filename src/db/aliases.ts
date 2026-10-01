@@ -70,3 +70,20 @@ export async function createAlias(supabase: Client, input: CreateAliasInput): Pr
   if (error) throw new Error(`createAlias: ${error.message}`);
   return data as AliasRow;
 }
+
+/**
+ * `createAlias`, except an alias this model already records (same type and
+ * value, case-insensitively — `aliases_model_id_alias_type_value_idx` is
+ * model-wide) is left as it is and `null` returned, rather than failing.
+ * For a caller recording a name that may already be recorded: a rename of
+ * a converted module, whose old name the conversion already kept, used to
+ * fail outright with the raw unique-violation message.
+ */
+export async function createAliasIfAbsent(supabase: Client, input: CreateAliasInput): Promise<AliasRow | null> {
+  try {
+    return await createAlias(supabase, input);
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('aliases_model_id_alias_type_value_idx')) return null;
+    throw e;
+  }
+}

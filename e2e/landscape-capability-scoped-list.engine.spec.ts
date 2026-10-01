@@ -99,8 +99,10 @@ test('the capability-scoped landscape lists Primary and Also-supports systems, n
   const childRow = page.locator('li').filter({ hasText: 'Invoicing Service' });
 
   // Primary vs. Also supports sectioning.
-  await expect(page.getByRole('heading', { name: 'Primary (1)' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Also supports (2)' })).toBeVisible();
+  // A row is sectioned by its own edge's role — Invoicing Service's edge to
+  // the child is `primary`, so it's Primary here (named "via Invoicing").
+  await expect(page.getByRole('heading', { name: 'Primary (2)' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Also supports (1)' })).toBeVisible();
 
   // The child-capability rollup names its own capability, on a row that
   // has no direct edge to Billing itself.
@@ -111,10 +113,11 @@ test('the capability-scoped landscape lists Primary and Also-supports systems, n
   await expect(primaryRow.getByRole('link', { name: 'Finance Team' })).toBeVisible();
   await expect(secondaryRow.getByText('—', { exact: true })).toBeVisible();
 
-  // "uses N · used by N" only when non-zero — Billing Platform has one of
-  // each (via the seeded `uses` edge), the other two systems have none.
+  // "uses N · used by N" only when non-zero — the seeded `uses` edge runs
+  // Billing Platform → Legacy Ledger, so each shows its own side of it and
+  // Invoicing Service (with none) shows nothing.
   await expect(primaryRow.getByText('uses 1 · used by 0')).toBeVisible();
-  await expect(secondaryRow.getByText(/uses \d+ · used by \d+/)).toHaveCount(0);
+  await expect(secondaryRow.getByText('uses 0 · used by 1')).toBeVisible();
   await expect(childRow.getByText(/uses \d+ · used by \d+/)).toHaveCount(0);
 
   // Context → navigates to the right system.

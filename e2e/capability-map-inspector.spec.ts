@@ -105,6 +105,6 @@ test('capability map inspector: the per-tile Inspect button opens Selection/Conn
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/capability-map`));
   await expect(inspector.getByText('Housing', { exact: true })).toBeVisible();
   await expect(inspector.getByText('Capability (L1)')).toBeVisible();
-  await expect(inspector.getByText('critical')).toBeVisible();
+  await expect(inspector.getByText('critical', { exact: true })).toBeVisible();
   await expect(inspector.getByRole('link', { name: 'Housing Portal' })).toBeVisible();
 });

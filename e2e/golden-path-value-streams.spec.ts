@@ -43,6 +43,9 @@ test('a retired capability supporter reads as weakness up the value stream', asy
   // Mobile (390): each stream is a collapsed accordion — expand Getting
   // Connected. Desktop (1280): streams render flat, and there is no such
   // button, so this is a no-op.
+  // Wait for the streams to render first — `isVisible()` doesn't wait, so
+  // checking it before the list loads skipped the expand on a phone.
+  await expect(page.getByText(/Getting Connected/).first()).toBeVisible();
   const streamAccordion = page.getByRole('button', { name: /Getting Connected/ });
   if (await streamAccordion.isVisible()) await streamAccordion.click();
 

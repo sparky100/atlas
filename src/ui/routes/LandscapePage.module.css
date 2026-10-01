@@ -69,6 +69,12 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   flex: 0 0 auto;
+  /* Stabilisation: never wider than the header row. On its own line its
+     natural width (a summary plus two export buttons on the capability-
+     scoped view) still overran a 390px phone; capped here, its own
+     `flex-wrap` takes over instead of the page scrolling sideways. */
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* Prompt 7k item 1: the colour-by control — same shape as

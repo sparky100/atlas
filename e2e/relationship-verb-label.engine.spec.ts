@@ -20,7 +20,7 @@ import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
 
-test('flows_to requires a label; cancelling the label step returns to search; adding an owner correctly marks it primary', async ({ page }) => {
+test('flows_to requires a label; cancelling the label step returns to search; adding an owner records its role', async ({ page }) => {
   const env = loadEnv();
 
   const email = `verb-label-${randomUUID()}@example.test`;
@@ -100,27 +100,28 @@ test('flows_to requires a label; cancelling the label step returns to search; ad
 
   await page.getByPlaceholder('Search…').fill('Billing Platform');
   await page.getByRole('button', { name: /Billing Platform/ }).click();
-  const addLabelButton = page.getByRole('button', { name: 'Add', exact: true });
+  // The verb phrase is required: "Next" stays disabled until it's typed,
+  // then the via-platform stage follows (a direct edge here).
+  const addLabelButton = page.getByRole('button', { name: 'Next' });
   await expect(addLabelButton).toBeDisabled();
   await page.getByPlaceholder('e.g. reads customer records from').fill('sends interval reads to');
   await addLabelButton.click();
+  await page.getByRole('button', { name: 'Skip — direct edge' }).click();
 
   await expect(page.getByRole('link', { name: /Billing Platform/ })).toBeVisible();
   await expect(page.getByText('“sends interval reads to”')).toBeVisible();
 
-  // --- owns bugfix: adding an owner through "+ Add owned by" actually marks it primary ---
+  // --- owns: adding an owner through "+ Add owned by" records its role (Prompt 7k item 2 replaced the old primary flag with business/technical/service) ---
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${gridSensorArrayId}`);
   await expect(page.getByRole('heading', { name: 'Grid Sensor Array' })).toBeVisible();
-  await expect(page.locator('[aria-label="primary owner"]')).toHaveCount(0);
 
   await page.getByRole('button', { name: '+ Add owned by' }).click();
   await page.getByPlaceholder('Search…').fill('Network Control');
   await page.getByRole('button', { name: /Network Control/ }).click();
 
-  // No label prompt for owns (that's uses/flows_to only) — the link and its
-  // ★ primary badge show up directly, proving the edge got `primary: true`,
-  // not the `{ role: 'secondary' }` this control used to hand every
-  // non-supports type before this sprint's fix.
+  // No verb-phrase prompt for owns (that's uses/flows_to only); on a system
+  // target it asks which kind of owner instead, and the row shows that role.
+  await page.getByRole('button', { name: 'Technical' }).click();
   await expect(page.getByRole('link', { name: /Network Control/ })).toBeVisible();
-  await expect(page.locator('[aria-label="primary owner"]')).toBeVisible();
+  await expect(page.getByText('technical owner', { exact: true })).toBeVisible();
 });

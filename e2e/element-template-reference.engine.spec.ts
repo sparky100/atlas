@@ -73,7 +73,10 @@ test('element page: templateRef is hidden from Attributes, and its own "seeded f
   await expect(page.getByRole('heading', { name: 'Start from a capability map' })).toHaveCount(0);
   await expect(page.getByText('Network Operations')).toBeVisible();
 
-  await page.getByRole('link', { name: 'Network Operations' }).click();
+  // A top-level capability's header is the domain's expand/collapse button
+  // now, not a link — reach its element page through the Elements list.
+  await page.getByRole('navigation', { name: 'Model navigation' }).getByRole('link', { name: 'Elements' }).click();
+  await page.getByRole('link', { name: /Network Operations$/ }).first().click();
   await expect(page.getByRole('heading', { name: 'Network Operations' })).toBeVisible();
 
   // Hidden from the attributes list — no "Template reference" row at all,

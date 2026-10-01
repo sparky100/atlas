@@ -162,9 +162,35 @@ export function ElementPage() {
   // real "back", not a fallback route, since there's no single correct
   // page to land on instead (a search result, a history entry, another
   // element's relationship list...).
+  //
+  // One exception: when the element was showing a moment ago at a
+  // different ref and the user just switched ref on this page ("Back to
+  // main" from an element that only exists in the change), going back in
+  // history lands on the previous page *at the old ref* — whose URL then
+  // re-selects the change the user just left (SelectedRefProvider treats
+  // the URL as the truth). The model's home at the newly chosen ref is
+  // the honest landing place there.
+  const currentRefParam = refParamOf(ref);
+  // The ref this page opened at (a lazy initial value, so it's fixed for
+  // the page's life). If the element is missing at a *different* ref, the
+  // user switched ref here — not a stale link.
+  const [refAtOpen] = useState(currentRefParam);
   useEffect(() => {
-    if (state.status === 'notPresentAtRef') void navigate(-1);
-  }, [state.status, navigate]);
+    // Only for the element this page is showing now: after a merge or a
+    // conversion moves the page to another element, the previous one's
+    // not-present state can still be here for a render, and acting on it
+    // stepped back out of the survivor's page.
+    if (state.status !== 'notPresentAtRef' || state.elementId !== elementId) return;
+    // A merge or conversion in progress retracts this element itself and
+    // then navigates to its result (`onMerged`/`onConverted`); stepping back
+    // here first would race it and leave the user on the previous page.
+    if (merging || converting) return;
+    if (currentRefParam !== refAtOpen) {
+      void navigate(`/o/${orgSlug ?? ''}/m/${modelSlug ?? ''}`, { replace: true });
+    } else {
+      void navigate(-1);
+    }
+  }, [state, elementId, merging, converting, navigate, currentRefParam, refAtOpen, orgSlug, modelSlug]);
   // F1 ("custom attributes") PR3: this org's own definitions — read-only
   // here (any member, per attribute_definitions_select's RLS), filtered
   // below to the ones that actually apply to this element's type. Called

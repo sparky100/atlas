@@ -47,7 +47,7 @@ test('start a decision with context/owner/needed-by/a linked system; see it list
   // 1. Start a decision from the model nav's own "Decisions" section.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await page.getByRole('link', { name: 'Decisions' }).click();
-  await expect(page.getByRole('heading', { name: 'Decisions' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Decisions', level: 1 })).toBeVisible();
 
   const decisionTitle = `What replaces Ledger Service? ${randomUUID().slice(0, 8)}`;
   await page.getByPlaceholder('Title (e.g. What replaces SAP PM?)').fill(decisionTitle);
@@ -80,7 +80,8 @@ test('start a decision with context/owner/needed-by/a linked system; see it list
   // 4. Comment on it, mentioning bob — the same anchor_type='decision'
   // comment thread `decisions.integration.test.ts` proves at the API
   // level, now through the real composer.
-  const commentsSection = page.locator('section').filter({ has: page.getByRole('button', { name: /^Comments/ }) });
+  // The decision page's comments live in a panel under a plain "Comments" heading.
+  const commentsSection = page.getByRole('heading', { name: 'Comments', level: 2 }).locator('xpath=..');
   await commentsSection.scrollIntoViewIfNeeded();
   const commentBody = `@${bobProfile.handle} — thoughts on this one?`;
   await commentsSection.getByPlaceholder('Write a comment…').fill(commentBody);

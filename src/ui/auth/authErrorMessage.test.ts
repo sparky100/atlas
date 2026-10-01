@@ -14,6 +14,7 @@ describe('authErrorMessage', () => {
     expect(authErrorMessage('Invalid login credentials')).toBe("That email or password doesn't match an account.");
     expect(authErrorMessage('User already registered')).toBe('An account already exists for that email — sign in instead.');
     expect(authErrorMessage('Email not confirmed')).toBe('Confirm your email first — check your inbox for the link, then sign in.');
+    expect(authErrorMessage('For security purposes, you can only request this after 42 seconds.')).toBe('Too many attempts — wait a few minutes and try again.');
     expect(authErrorMessage('Email rate limit exceeded')).toBe('Too many attempts — wait a few minutes and try again.');
     expect(authErrorMessage('Password should be at least 6 characters')).toBe('Choose a password with at least 6 characters.');
     expect(authErrorMessage('New password should be different from the old password.')).toBe('Choose a different password than your current one.');

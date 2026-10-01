@@ -65,6 +65,10 @@ test('tapping a "+N" chip lists the system\'s other capabilities, and each one l
   const capAId = randomUUID();
   const capZId = randomUUID();
   const systemId = randomUUID();
+  // "Most recently added" compares delta ids as strings, assuming UUID v7
+  // (src/contracts/delta.ts). Plain random ids would make the winner
+  // random, so give cap-z's edge the later-sorting id explicitly.
+  const [alphaEdgeDeltaId, zetaEdgeDeltaId] = [randomUUID(), randomUUID()].sort() as [string, string];
   const envelope: CommitEnvelope = {
     id: randomUUID(),
     branchId: main.id,
@@ -80,8 +84,8 @@ test('tapping a "+N" chip lists the system\'s other capabilities, and each one l
       // Neither edge is 'primary' — cap-z's is added second (most recently
       // added wins, layout.ts's own placementFor), so the tile lands in
       // Zeta's lane with a "+N" (here "+1") chip referencing Alpha.
-      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemId, toElementId: capAId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
-      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemId, toElementId: capZId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'relationship.create', id: alphaEdgeDeltaId, relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemId, toElementId: capAId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
+      { kind: 'relationship.create', id: zetaEdgeDeltaId, relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemId, toElementId: capZId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
     ],
   };
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });

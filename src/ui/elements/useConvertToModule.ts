@@ -1,8 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { convertSystemToModule } from '../../db/convertSystemToModule';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 
 export type ConvertToModuleStatus = 'idle' | 'converting';
@@ -33,6 +35,7 @@ export interface UseConvertToModuleInput {
  * own doc comment explains why.
  */
 export function useConvertToModule(input: UseConvertToModuleInput): UseConvertToModuleResult {
+  const queryClient = useQueryClient();
   const { modelId, orgId, userId, systemId, branch, expectedHeadCommitId, onConverted } = input;
   const [status, setStatus] = useState<ConvertToModuleStatus>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -66,13 +69,16 @@ export function useConvertToModule(input: UseConvertToModuleInput): UseConvertTo
         }
 
         setStatus('idle');
+        // Same as a merge (useElementMerge.ts): refetch the cached head before
+        // landing on the new module, or its page reads the old commit.
+        await invalidateModelHead(queryClient, modelId);
         onConverted(result.newContainerId);
       } catch (e) {
         setStatus('idle');
         setError(e instanceof Error ? e.message : 'Could not convert.');
       }
     },
-    [modelId, orgId, userId, systemId, branch, expectedHeadCommitId, onConverted],
+    [modelId, orgId, userId, systemId, branch, expectedHeadCommitId, onConverted, queryClient],
   );
 
   return { status, error, convert };

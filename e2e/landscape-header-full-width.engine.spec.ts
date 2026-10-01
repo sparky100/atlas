@@ -78,7 +78,7 @@ test('landscape header: a long capability-filter title never clips or pushes the
   if (!seedResult.ok) throw new Error(`seeding landscape-header fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/landscape?ref=main&capability=${capabilityId}`);
-  await expect(page.getByRole('heading', { name: `Landscape: systems supporting ${LONGEST_L1_NAME}` })).toBeVisible();
+  await expect(page.getByRole('heading', { name: `Systems supporting ${LONGEST_L1_NAME} (1)` })).toBeVisible();
 
   for (const width of [768, 900]) {
     await page.setViewportSize({ width, height: 900 });
@@ -86,8 +86,10 @@ test('landscape header: a long capability-filter title never clips or pushes the
     // The actions row this width shows (>= 768px: inline, per LandscapePage.tsx's
     // own module comment) stays fully visible and clickable — not clipped
     // off-screen by the long title sharing its row.
-    const addSystemButton = page.getByRole('button', { name: '+ Add system' });
-    await expect(addSystemButton).toBeVisible();
-    await expect(addSystemButton).toBeInViewport();
+    // The capability-scoped view's own header actions are its two exports;
+    // the rightmost one is the first a long title would push off-screen.
+    const lastAction = page.getByRole('button', { name: 'Export XLSX' });
+    await expect(lastAction).toBeVisible();
+    await expect(lastAction).toBeInViewport();
   }
 });

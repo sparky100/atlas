@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
-import { createAlias } from '../../db/aliases';
+import { createAliasIfAbsent } from '../../db/aliases';
 import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
@@ -90,7 +90,9 @@ export function useElementRename(input: UseElementRenameInput): UseElementRename
     try {
       const source = await getOrCreateManualSource(supabase, { id: crypto.randomUUID(), orgId, modelId, userId });
 
-      await createAlias(supabase, {
+      // Already recorded (a converted module keeps its old name as an alias,
+      // for one) is fine — the old name stays searchable either way.
+      await createAliasIfAbsent(supabase, {
         id: crypto.randomUUID(),
         orgId,
         modelId,
@@ -147,7 +149,11 @@ export function useElementRename(input: UseElementRenameInput): UseElementRename
       onSaved();
     } catch (e) {
       setStatus('renaming');
-      setSubmitError(e instanceof Error ? e.message : 'Could not rename.');
+      // One plain sentence for the user; the detail goes to the console
+      // (prompt pack §2's errors rule) — the raw database message used to
+      // show here verbatim.
+      console.error('rename failed', e);
+      setSubmitError("Couldn't rename this element. Please try again.");
     }
   }, [value, element, facts, modelId, orgId, userId, branch, expectedHeadCommitId, onSaved, queryClient]);
 

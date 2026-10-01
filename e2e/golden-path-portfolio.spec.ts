@@ -12,6 +12,8 @@ async function setRunCost(page: Page, band: string): Promise<void> {
   await page.getByRole('button', { name: '✎ Edit' }).click();
   await page.getByLabel('Run cost').selectOption(band);
   await page.getByRole('button', { name: 'Save' }).click();
+  // Saved once the edit form closes — moving on before then raced the page's refresh.
+  await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible({ timeout: 15_000 });
 }
 
 test('set run cost and fit, see the expected signal in Portfolio, sort, filter and expand', async ({ page }) => {
@@ -41,12 +43,14 @@ test('set run cost and fit, see the expected signal in Portfolio, sort, filter a
   await expect(page.getByRole('heading', { name: 'Portfolio' })).toBeVisible();
 
   // Default sort is cost band descending — Ledger System (£1m–£5m) before
-  // Cheap App (Under £50k).
+  // Cheap App (Under £50k). Wait for both rows before reading the order.
+  await expect(page.getByText('Ledger System').first()).toBeVisible();
+  await expect(page.getByText('Cheap App').first()).toBeVisible();
   const defaultOrderText = await page.locator('body').innerText();
   expect(defaultOrderText.indexOf('Ledger System')).toBeLessThan(defaultOrderText.indexOf('Cheap App'));
 
   // Ledger System's own signal chip is visible.
-  await expect(page.getByText('Costly, poor fit', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Costly, poor fit', { exact: true }).filter({ visible: true }).first()).toBeVisible();
 
   // Sort by name: Cheap App (C) now comes before Ledger System (L).
   await page.getByLabel('Sort by').selectOption('name');
@@ -54,7 +58,7 @@ test('set run cost and fit, see the expected signal in Portfolio, sort, filter a
   expect(nameOrderText.indexOf('Cheap App')).toBeLessThan(nameOrderText.indexOf('Ledger System'));
 
   // Filter by signal: only Ledger System remains.
-  await page.getByLabel('Signal').selectOption('costly_poor_fit');
+  await page.getByRole('combobox', { name: /^Signal/ }).selectOption('costly_poor_fit');
   await expect(page.getByText('Ledger System', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('Cheap App', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Clear filters' }).click();
@@ -65,7 +69,7 @@ test('set run cost and fit, see the expected signal in Portfolio, sort, filter a
   // card's own tap target share this accessible name.
   await page.getByRole('button', { name: 'Expand Ledger System' }).click();
   await expect(page.getByRole('link', { name: 'Finance', exact: true }).first()).toBeVisible();
-  await expect(page.getByText('No business owner', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^No business owner\.?$/).first()).toBeVisible();
 
   // No horizontal overflow (checked at both 1280 and 390 — meaningful at
   // 390, where a wide table most easily spills past the viewport).

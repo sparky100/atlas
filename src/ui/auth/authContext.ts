@@ -6,6 +6,13 @@ export interface AuthContextValue {
   status: AuthStatus;
   userId: string | null;
   email: string | null;
+  /**
+   * Bumps each time a sign-in's invite consumption (`consume_my_invites`)
+   * finishes. That runs in the background, so anything listing the user's
+   * memberships re-fetches on a change — otherwise an invited existing
+   * account sees "not a member of any organisation" until a reload.
+   */
+  membershipsGeneration: number;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signUpWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   /** Sprint F7 item 3: `supabase.auth.signInWithOtp` — emails a one-click sign-in link, no password involved. */

@@ -44,7 +44,8 @@ test('marking a capability essential surfaces a supporting system with no techni
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
   await expect(page.getByText('1 system supporting an essential function with no technical owner')).toBeVisible();
-  await expect(page.getByText('Meter Reading Service', { exact: true })).toBeVisible();
+  // Named in the finding (and again in the Assurance card's own list).
+  await expect(page.getByText('Meter Reading Service', { exact: true }).first()).toBeVisible();
 
   // 3. Adding a technical owner clears it.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=main`);
