@@ -105,7 +105,9 @@ export const PM_CONTEXT_SCENARIO: ContainerContextScenario = {
       isExternal: false,
       flows: [
         { relationshipType: 'uses', direction: 'in', verb: 'raises customer fault reports to' },
-        { relationshipType: 'uses', direction: 'in', verb: 'requests asset location lookups from' },
+        // `flows_to`, not a second `uses`: two live edges of one type between the
+        // same pair are a V6 violation (SPEC §5.2), so a seeded fixture can't hold both.
+        { relationshipType: 'flows_to', direction: 'in', verb: 'requests asset location lookups from' },
       ],
     },
     {
@@ -122,7 +124,7 @@ export const PM_CONTEXT_SCENARIO: ContainerContextScenario = {
       isExternal: false,
       flows: [
         { relationshipType: 'uses', direction: 'out', verb: 'posts maintenance cost actuals to' },
-        { relationshipType: 'uses', direction: 'out', verb: 'synchronises asset hierarchy to' },
+        { relationshipType: 'flows_to', direction: 'out', verb: 'synchronises asset hierarchy to' }, // V6: not a second `uses` to the same target
       ],
     },
     {
@@ -132,7 +134,7 @@ export const PM_CONTEXT_SCENARIO: ContainerContextScenario = {
       isExternal: false,
       flows: [
         { relationshipType: 'flows_to', direction: 'out', verb: 'sends planned maintenance outage requests to' },
-        { relationshipType: 'flows_to', direction: 'out', verb: 'sends emergency switching escalations to' },
+        { relationshipType: 'uses', direction: 'out', verb: 'sends emergency switching escalations to' }, // V6: not a second `flows_to` to the same target
       ],
     },
     {

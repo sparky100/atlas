@@ -38,7 +38,8 @@ test('removing a uses relationship clears it from Relationships/Context and keep
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=main`);
   await expect(page.getByRole('heading', { name: 'System A' })).toBeVisible();
 
-  const usesRow = page.locator('div').filter({ hasText: 'System B' }).last();
+  // One relationship's own row: the innermost element holding both its link and its actions menu.
+  const usesRow = page.locator('div').filter({ has: page.getByRole('link', { name: /System B/ }) }).filter({ has: page.getByRole('button', { name: 'Relationship actions' }) }).last();
   await usesRow.getByRole('button', { name: 'Relationship actions' }).click();
   await page.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(page.getByText('System A will no longer use System B.')).toBeVisible();
@@ -51,12 +52,12 @@ test('removing a uses relationship clears it from Relationships/Context and keep
 
   // 3. Present in History, both the creation and the retraction.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=main`);
-  await expect(page.getByText('created (uses)')).toBeVisible();
-  await expect(page.getByText('retracted')).toBeVisible();
+  await expect(page.getByText('created — uses System B')).toBeVisible();
+  await expect(page.getByText('retracted — uses System B')).toBeVisible();
 
   // 4. Remove the primary `supports` edge — System A's only one, so no
   // "make <other> primary" candidates render, just the plain confirm.
-  const supportsRow = page.locator('div').filter({ hasText: 'Ops' }).last();
+  const supportsRow = page.locator('div').filter({ has: page.getByRole('link', { name: /Ops/ }) }).filter({ has: page.getByRole('button', { name: 'Relationship actions' }) }).last();
   await supportsRow.getByRole('button', { name: 'Relationship actions' }).click();
   await page.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(page.getByText('System A will no longer support Ops.')).toBeVisible();

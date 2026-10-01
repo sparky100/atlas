@@ -34,7 +34,7 @@ import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
 
-test('context inspector default view: a system with supports but no uses shows "Supports:" (primary first) and "Owned by:", both linked, alongside the no-connections empty state', async ({ page }) => {
+test('context inspector default view: a system with supports but no uses shows "Supports:" (primary first) and its owner by role, both linked', async ({ page }) => {
   const env = loadEnv();
 
   const email = `context-header-${randomUUID()}@example.test`;
@@ -91,7 +91,9 @@ test('context inspector default view: a system with supports but no uses shows "
   if (!seedResult.ok) throw new Error(`seeding context-header fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/context/${systemId}?ref=main`);
-  await expect(page.getByRole('heading', { name: 'Billing Service' })).toBeVisible();
+  // The page's own heading reads "Context"; the system is named in the link beneath it.
+  await expect(page.getByRole('heading', { name: 'Context', level: 1 })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('link', { name: 'Billing Service', exact: true }).last()).toBeVisible();
 
   // "Supports:", primary (Zeta) first, both linked — the Inspector's
   // default hub view, nothing clicked yet.
@@ -110,10 +112,11 @@ test('context inspector default view: a system with supports but no uses shows "
   await expect(ownedByLine).toBeVisible();
   await expect(ownedByLine.getByRole('link', { name: 'Platform Team' })).toBeVisible();
 
-  // No uses/flows_to/owns-something-else connections at all — the empty
-  // state still shows, alongside (not instead of) the two lines above.
-  await expect(page.getByText('No connections to other systems or actors yet.')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Add a relationship on the element page →' })).toBeVisible();
+  // No uses/flows_to edges — but the owner is a connection in its own
+  // right (V1's diagram draws an owning actor as a neighbour), so the
+  // "no connections" empty state is not shown here; it's for a system
+  // with nothing at all (the next test).
+  await expect(page.getByText('No connections to other systems or actors yet.')).toHaveCount(0);
 
   // Each link actually navigates to that element's own page.
   await zetaLink.click();
@@ -167,7 +170,9 @@ test('context inspector default view: a system with no relationships at all show
   if (!seedResult.ok) throw new Error(`seeding context-header-empty fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/context/${systemId}?ref=main`);
-  await expect(page.getByRole('heading', { name: 'Isolated Service' })).toBeVisible();
+  // The page's own heading reads "Context"; the system is named in the link beneath it.
+  await expect(page.getByRole('heading', { name: 'Context', level: 1 })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('link', { name: 'Isolated Service', exact: true }).last()).toBeVisible();
 
   await expect(page.getByText('Supports:', { exact: false })).toHaveCount(0);
   await expect(page.getByText('Owned by:', { exact: false })).toHaveCount(0);

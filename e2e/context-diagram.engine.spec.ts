@@ -76,7 +76,8 @@ test('SAP as a platform renders its own module tiles only — no edges, no label
   // plain substring, since a two-letter module code can otherwise land
   // inside an unrelated capability name (e.g. "CO" inside "Controlling").
   function moduleTile(code: string) {
-    return page.getByRole('listitem', { name: new RegExp(`^${code}\\b`) });
+    // A list item's text, not an accessible name (list items take none from content).
+    return page.getByRole('listitem').filter({ has: page.getByText(code, { exact: true }) });
   }
   for (const m of SAP_MODULES) {
     const tile = moduleTile(m.code);

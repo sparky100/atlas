@@ -178,6 +178,7 @@ test('tapping the title on the element page opens the same inline rename as the 
   const renameInput = page.locator('header').getByRole('textbox');
   await expect(renameInput).toHaveValue(oldName);
   await renameInput.fill('Network Control');
-  await page.getByRole('button', { name: 'Save' }).click();
+  // The rename's own Save, in the header (the Attributes section has its own).
+  await page.locator('header').getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { name: 'Network Control' })).toBeVisible();
 });

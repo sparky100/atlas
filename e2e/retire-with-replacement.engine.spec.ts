@@ -68,7 +68,7 @@ test('retiring a system with a replacement transfers its supports edges and clea
   // The RetireAction panel closes on success and the header's own
   // lifecycle Chip now reads "retiring" — distinct from the submitting
   // button's own "Retiring…" label, which is gone by this point.
-  await expect(page.getByText('retiring', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('retiring', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
 
   // 3. The replacement now supports Billing (a real relationship link, not
   // just its own name happening to contain the word); the capability's own
@@ -76,7 +76,8 @@ test('retiring a system with a replacement transfers its supports edges and clea
   // ADR-001 amendment: it also carries a real `replaces` edge back to the
   // retiring system, not just the transferred supports edge.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${replacementId}?ref=main`);
-  await expect(page.getByRole('link', { name: 'Billing', exact: true })).toBeVisible();
+  // Relationship links carry their type glyph in their name now ("capability Billing").
+  await expect(page.getByRole('link', { name: /^(capability )?Billing$/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'replaces (1)' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Legacy Billing System' })).toBeVisible();
 

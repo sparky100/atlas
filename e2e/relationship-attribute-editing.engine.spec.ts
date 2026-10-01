@@ -95,8 +95,8 @@ test('editing a uses edge\'s verb phrase updates the row on the element page and
   await expect(page.getByRole('heading', { name: 'Meter Reading Service' })).toBeVisible();
   await expect(page.getByText('“reads customer records from”')).toBeVisible();
 
-  const usesRow = page.locator('div').filter({ hasText: 'Billing Platform' }).last();
-  const usesRowGroup = usesRow.locator('xpath=..');
+  // One relationship's own row group: the innermost element holding both its link and its row controls.
+  const usesRowGroup = page.locator('div').filter({ has: page.getByRole('link', { name: /Billing Platform/ }) }).filter({ has: page.getByRole('button', { name: /(Show|Hide) attributes/ }) }).last();
   await usesRowGroup.getByRole('button', { name: 'Show attributes' }).click();
   await usesRowGroup.getByRole('button', { name: 'Edit', exact: true }).click();
 
@@ -158,8 +158,8 @@ test('promoting a secondary supports edge demotes the current primary in the sam
   // --- Before: the element page's own row chips match the seed. ---
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}`);
   await expect(page.getByRole('heading', { name: systemName })).toBeVisible();
-  const capOneRow = page.locator('div').filter({ hasText: 'Capability One' }).last();
-  const capTwoRow = page.locator('div').filter({ hasText: 'Capability Two' }).last();
+  const capOneRow = page.locator('div').filter({ has: page.getByRole('link', { name: /Capability One/ }) }).filter({ has: page.getByRole('button', { name: /(Show|Hide) attributes/ }) }).last();
+  const capTwoRow = page.locator('div').filter({ has: page.getByRole('link', { name: /Capability Two/ }) }).filter({ has: page.getByRole('button', { name: /(Show|Hide) attributes/ }) }).last();
   await expect(capOneRow.getByText('secondary', { exact: true })).toBeVisible();
   await expect(capTwoRow.getByText('primary', { exact: true })).toBeVisible();
 
@@ -200,7 +200,7 @@ test('promoting a secondary supports edge demotes the current primary in the sam
 
   // --- Promote Capability One to primary from the system's own element page. ---
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}`);
-  const capOneRowGroup = page.locator('div').filter({ hasText: 'Capability One' }).last().locator('xpath=..');
+  const capOneRowGroup = page.locator('div').filter({ has: page.getByRole('link', { name: /Capability One/ }) }).filter({ has: page.getByRole('button', { name: /(Show|Hide) attributes/ }) }).last();
   await capOneRowGroup.getByRole('button', { name: 'Show attributes' }).click();
   await capOneRowGroup.getByRole('button', { name: 'Edit', exact: true }).click();
   await capOneRowGroup.getByLabel('Role').selectOption('primary');
@@ -209,8 +209,8 @@ test('promoting a secondary supports edge demotes the current primary in the sam
   // Same-commit auto-demote: Capability Two's own row chip flips to
   // secondary without a second edit (C17, useRelationshipEditor.ts's own
   // module comment).
-  await expect(page.locator('div').filter({ hasText: 'Capability One' }).last().getByText('primary', { exact: true })).toBeVisible();
-  await expect(page.locator('div').filter({ hasText: 'Capability Two' }).last().getByText('secondary', { exact: true })).toBeVisible();
+  await expect(page.locator('div').filter({ has: page.getByRole('link', { name: /Capability One/ }) }).filter({ has: page.getByRole('button', { name: /(Show|Hide) attributes/ }) }).last().getByText('primary', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('div').filter({ has: page.getByRole('link', { name: /Capability Two/ }) }).filter({ has: page.getByRole('button', { name: /(Show|Hide) attributes/ }) }).last().getByText('secondary', { exact: true }).first()).toBeVisible();
 
   // --- After: the tile has moved to Capability One's lane. ---
   const afterEdges = [
