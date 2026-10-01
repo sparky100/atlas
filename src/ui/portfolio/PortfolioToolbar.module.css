@@ -16,6 +16,12 @@
   color: var(--text-muted);
 }
 
+.sortControl {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .select {
   height: var(--row-height);
   padding: 0 var(--space-2);

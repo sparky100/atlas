@@ -59,4 +59,10 @@ test('add and remove a uses relationship, then promote a secondary supports edge
 
   await expect(capabilityRow('Capability One').getByText('primary', { exact: true })).toBeVisible();
   await expect(capabilityRow('Capability Two').getByText('secondary', { exact: true })).toBeVisible();
+
+  // No horizontal overflow (meaningful at 390): each relationship row packs
+  // an endpoint link, a role chip and a provenance badge onto one flex
+  // line, which must wrap rather than spill past the viewport.
+  const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+  expect(hasHorizontalOverflow).toBe(false);
 });

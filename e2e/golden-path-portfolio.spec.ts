@@ -71,4 +71,13 @@ test('set run cost and fit, see the expected signal in Portfolio, sort, filter a
   // 390, where a wide table most easily spills past the viewport).
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(hasHorizontalOverflow).toBe(false);
+
+  // The "Sort by" select and its direction toggle sit inline on the same
+  // line, at any viewport — they must not stack into two separate
+  // full-width rows (regression: PortfolioToolbar.module.css's `.field`
+  // used to apply `flex-direction: column` to both as siblings).
+  const selectBox = await page.getByLabel('Sort by').boundingBox();
+  const directionButtonBox = await page.getByRole('button', { name: /Sort direction/ }).boundingBox();
+  if (selectBox === null || directionButtonBox === null) throw new Error('expected both the sort select and its direction toggle to be visible');
+  expect(Math.abs(selectBox.y - directionButtonBox.y)).toBeLessThan(selectBox.height);
 });
