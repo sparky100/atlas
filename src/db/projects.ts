@@ -6,6 +6,7 @@
  * re-checks them, same division of labour as `decisions.ts`.
  */
 import { assertRealId } from './assertRealId';
+import { selectAll } from './selectAll';
 import type { Client } from './client';
 import type { BranchRow, DecisionRow, ProjectLinkedType, ProjectLinkRow, ProjectRow, ProjectStatus } from './types';
 import type { UUID } from '../contracts/delta';
@@ -195,20 +196,30 @@ export interface TouchedElement {
  */
 export async function listElementsTouchedByChange(supabase: Client, modelId: UUID, branchId: UUID): Promise<TouchedElement[]> {
   assertRealId('listElementsTouchedByChange', 'branch_id', branchId);
-  const { data, error } = await supabase
+  // Routed through selectAll (SPEC §6.7): a long-lived change can carry more
+  // delta rows than max_rows returns in one page.
+  const query = supabase
     .from('deltas')
-    .select('subject_id, kind, name, commits!inner(branch_id)')
+    .select('id, subject_id, kind, name, commits!inner(branch_id)', { count: 'exact' })
     .eq('model_id', modelId)
     .eq('subject_type', 'element')
     .eq('commits.branch_id', branchId)
-    .order('seq');
-  if (error) throw new Error(`listElementsTouchedByChange: ${error.message}`);
+    .order('id');
+  const rows = await selectAll<{ subject_id: UUID; kind: string; name: string | null }>(query);
   const byId = new Map<UUID, TouchedElement>();
-  for (const row of data as unknown as { subject_id: UUID; kind: string; name: string | null }[]) {
+  for (const row of rows) {
     const existing = byId.get(row.subject_id);
     const createdName = row.kind === 'element_create' ? row.name : null;
     if (!existing) byId.set(row.subject_id, { elementId: row.subject_id, createdName });
     else if (createdName !== null) existing.createdName = createdName;
   }
   return [...byId.values()];
+}
+
+/** Whether a change is an option of some decision (`decision_links` 'branch') — such a change moves with its decision, never on its own (P1). */
+export async function isDecisionOption(supabase: Client, branchId: UUID): Promise<boolean> {
+  assertRealId('isDecisionOption', 'linked_id', branchId);
+  const { count, error } = await supabase.from('decision_links').select('decision_id', { count: 'exact', head: true }).eq('linked_type', 'branch').eq('linked_id', branchId);
+  if (error) throw new Error(`isDecisionOption: ${error.message}`);
+  return (count ?? 0) > 0;
 }

@@ -7,6 +7,7 @@ import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { ChangeView } from '../changes/ChangeView';
 import { intentHeaderLine } from '../changes/branchIntent';
+import { ChangeProjectAssignment } from '../projects/ChangeProjectAssignment';
 import { useChange } from '../changes/useChange';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
@@ -67,7 +68,7 @@ export function ChangePage() {
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const canEdit = canCreateChangeBranch(role);
-  const { branch } = useChange(branchId ?? '');
+  const { branch, reload: reloadBranch } = useChange(branchId ?? '');
   const isSelected = ref.kind === 'branch' && ref.branchId === branchId;
 
   if (orgLoading || modelsLoading || !model) {
@@ -130,6 +131,7 @@ export function ChangePage() {
               </div>
             )}
           </div>
+          {branch && <ChangeProjectAssignment branch={branch} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canEdit={canEdit} onMoved={reloadBranch} />}
           <ChangeView orgId={organisation?.id ?? ''} modelId={model.id} branchId={branchId ?? ''} orgSlug={orgSlug ?? ''} modelSlug={model.slug} role={role} canEdit={canEdit} />
         </main>
       </div>
