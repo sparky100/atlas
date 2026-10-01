@@ -1,4 +1,4 @@
-import { ClipboardList, Ellipsis, GitBranch, History, Home, List, Map, Milestone, Scale, Upload, Wallet, Workflow, Grid as GridIcon, type LucideIcon } from 'lucide-react';
+import { ClipboardList, Ellipsis, GitBranch, History, Home, List, Search, Map, Milestone, Scale, Upload, Wallet, Workflow, Grid as GridIcon, type LucideIcon } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { Chip } from '../Chip/Chip';
@@ -7,6 +7,7 @@ import { useBranchLabel } from '../../branches/useBranchLabel';
 import { useModels } from '../../models/useModels';
 import { useOrganisationBySlug } from '../../orgs/useOrganisationBySlug';
 import { useReviewQueueCount } from '../../reviews/useReviewQueueCount';
+import { SearchDialog } from '../../search/SearchDialog';
 import { useSelectedRef } from '../../branches/useSelectedRef';
 import { isViewingMode } from '../../branches/viewingMode';
 import { refLabelOf, refQueryParam } from '../../../db/ref';
@@ -149,9 +150,45 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
   // button, which is hidden above 768px, so the sheet never shows on the
   // rail. Every page renders its own nav, so moving to a new page always
   // starts with the sheet closed.
-  const [moreOpen, setMoreOpen] = useState(false);
+  // Each holds the path it was opened on rather than a plain flag, so
+  // moving to any other page — even one of the same kind, which keeps this
+  // nav mounted — reads as closed without an effect to reset it.
+  const [moreOpenAt, setMoreOpenAt] = useState<string | null>(null);
+  const moreOpen = moreOpenAt === location.pathname;
+  const setMoreOpen = (open: boolean) => {
+    setMoreOpenAt(open ? location.pathname : null);
+  };
   const sheetId = useId();
   const moreButtonRef = useRef<HTMLButtonElement>(null);
+  // F9 step 5: the search-anywhere dialog, opened by the Search button (the
+  // rail's first item, the More sheet's first row) or Ctrl/⌘-K anywhere in
+  // the model.
+  const [searchOpenAt, setSearchOpenAt] = useState<string | null>(null);
+  const searchOpen = searchOpenAt === location.pathname;
+  const setSearchOpen = (open: boolean) => {
+    setSearchOpenAt(open ? location.pathname : null);
+  };
+  const shortcutHint = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘K' : 'Ctrl K';
+  const pathnameRef = useRef(location.pathname);
+  useEffect(() => {
+    pathnameRef.current = location.pathname;
+  });
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      // A field that handles the shortcut itself (and says so) keeps it.
+      if (event.defaultPrevented) return;
+      if (event.target instanceof HTMLElement && event.target.isContentEditable) return;
+      event.preventDefault();
+      setMoreOpenAt(null);
+      setSearchOpenAt(pathnameRef.current);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
   const sheetRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLElement>(null);
   // The More button names the current section when it's one of the sheet's.
@@ -159,15 +196,15 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
 
   useEffect(() => {
     if (!moreOpen) return;
-    sheetRef.current?.querySelector('a')?.focus();
+    sheetRef.current?.querySelector<HTMLElement>('a, button')?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setMoreOpen(false);
+        setMoreOpenAt(null);
         moreButtonRef.current?.focus();
       }
     };
     const onPointerDown = (event: PointerEvent) => {
-      if (navRef.current && event.target instanceof Node && !navRef.current.contains(event.target)) setMoreOpen(false);
+      if (navRef.current && event.target instanceof Node && !navRef.current.contains(event.target)) setMoreOpenAt(null);
     };
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('pointerdown', onPointerDown);
@@ -209,6 +246,22 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
           same reversal would also flip the groups' order (Record first),
           which isn't wanted. */}
       <div className={styles.groupsWrapper}>
+        <button
+          type="button"
+          className={styles.searchButton}
+          title={`Search (${shortcutHint})`}
+          onClick={() => {
+            setSearchOpen(true);
+          }}
+        >
+          <Search size={18} className={styles.icon} aria-hidden="true" />
+          <Text as="span" size="sm" className={styles.linkLabel}>
+            Search
+          </Text>
+          <kbd className={styles.shortcut} aria-hidden="true">
+            {shortcutHint}
+          </kbd>
+        </button>
         {NAV_GROUPS.map((group, groupIndex) => (
           <div key={group.caption} className={styles.group}>
             {groupIndex > 0 && <div className={styles.divider} aria-hidden="true" />}
@@ -232,7 +285,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
           aria-expanded={moreOpen}
           aria-controls={sheetId}
           onClick={() => {
-            setMoreOpen((open) => !open);
+            setMoreOpen(!moreOpen);
           }}
         >
           <Ellipsis size={18} className={styles.icon} aria-hidden="true" />
@@ -242,6 +295,19 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
       </div>
       {moreOpen && (
         <div id={sheetId} ref={sheetRef} className={styles.sheet} role="region" aria-label="More sections">
+          <button
+            type="button"
+            className={styles.sheetLink}
+            onClick={() => {
+              setMoreOpen(false);
+              setSearchOpen(true);
+            }}
+          >
+            <Search size={18} className={styles.icon} aria-hidden="true" />
+            <Text as="span" size="sm">
+              Search
+            </Text>
+          </button>
           {NAV_GROUPS.map((group) => {
             const sections = group.sections.filter((section) => !BAR_SECTIONS.includes(section));
             if (sections.length === 0) return null;
@@ -263,6 +329,17 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
       <div className={styles.refChip}>
         <Chip tone="neutral">{refLabelOf(ref, branchLabel)}</Chip>
       </div>
+      {searchOpen && modelId !== null && (
+        <SearchDialog
+          orgSlug={orgSlug}
+          modelSlug={modelSlug}
+          modelId={modelId}
+          activeRef={ref}
+          onClose={() => {
+            setSearchOpen(false);
+          }}
+        />
+      )}
     </nav>
   );
 }

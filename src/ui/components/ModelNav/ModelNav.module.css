@@ -160,6 +160,40 @@
   flex-shrink: 0;
 }
 
+/* F9 step 5: the rail's Search button — styled as one more rail row, with
+   its keyboard shortcut shown at the end (label and hint both hidden on
+   the icon-only rail; the shortcut lives in the `title` tooltip there). */
+.searchButton {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.searchButton:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.shortcut {
+  margin-left: auto;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--text-muted);
+  border: var(--border-width) solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
 .link:hover {
   background: var(--surface-raised);
 }
@@ -202,6 +236,10 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+
+  .shortcut {
+    display: none;
   }
 
   .badge {
@@ -263,7 +301,8 @@
 
   .groupCaption,
   .divider,
-  .moreItem {
+  .moreItem,
+  .searchButton {
     display: none;
   }
 
@@ -381,6 +420,12 @@
   }
 
   .sheetLink {
+    width: 100%;
+    border: none;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
     display: flex;
     align-items: center;
     gap: var(--space-3);

@@ -54,6 +54,8 @@ Every model-scoped page shares the same navigation, grouped into four clusters:
 - **Reports** gathers the standing checks — Boundary crossings, External interfaces and Duplicates — each with its current count and a link to the full report.
 - **The review queue** lives inside **Changes**, as its *Review queue* tab. The Changes item in the navigation shows a number when items are waiting for review.
 
+**Search anywhere.** Press **Ctrl K** (**⌘K** on a Mac), or use **Search** at the top of the navigation (inside **More** on a phone), from any page in a model to find an element, a change or a decision by name and jump straight to it. The search box on Home works the same way for elements, and is also where you create new ones.
+
 **Zooming in.** Atlas is one continuous zoom through four levels: **capability map** (all your capabilities) → **landscape** (systems grouped by the capability they support) → **system context** (one system and its neighbours) → **containers** (inside one system). Scrolling/pinching zooms the current level; zooming into a specific element crosses down a level, the same way you'd zoom into a map.
 
 **The breadcrumb**, top-left on any canvas or element page, always shows where you are: `Org › Model › [ref] › Capability › System › Container`. The `[ref]` chip tells you which version of the model you're looking at — `main`, a tagged version like `v2026-Q1`, or a change branch like `Change: Housing CRM replacement`. Click it to switch.
