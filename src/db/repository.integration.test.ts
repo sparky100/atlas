@@ -38,6 +38,7 @@ import { splitAndMergeSubset } from './split';
 import { getOrCreateManualSource } from './sources';
 import { createTag, listTagsForModel } from './tags';
 import { getUserPreferences, upsertUserPreferences } from './userPreferences';
+import { CAPABILITY_MAP_COLOUR_BY_MODES } from '../contracts/userPreferences';
 import { publishCapabilityMap } from '../../scripts/publishCapabilityMap';
 
 const env = loadEnv();
@@ -498,6 +499,15 @@ describe('repository layer against a real local Supabase', () => {
       const updated = await upsertUserPreferences(alice.client, { userId: alice.id, density: 'compact' });
       // theme survives the second upsert untouched — this is a merge, not a replace.
       expect(updated).toMatchObject({ user_id: alice.id, theme: 'dark', density: 'compact' });
+    });
+
+    it('accepts every capability-map colour-by mode the contract names (F11: metric:disposition), and rejects one it does not', async () => {
+      for (const mode of CAPABILITY_MAP_COLOUR_BY_MODES) {
+        const saved = await upsertUserPreferences(alice.client, { userId: alice.id, capabilityMapColourBy: mode });
+        expect(saved.capability_map_colour_by).toBe(mode);
+        expect((await getUserPreferences(alice.client, alice.id))?.capability_map_colour_by).toBe(mode);
+      }
+      await expect(upsertUserPreferences(alice.client, { userId: alice.id, capabilityMapColourBy: 'metric:notAMode' as never })).rejects.toThrow();
     });
 
     it("bob cannot read alice's preferences, and cannot write a row under her id (RLS is user-scoped, not org-scoped)", async () => {
