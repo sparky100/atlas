@@ -44,7 +44,16 @@ describe('filterPortfolioRows: combined', () => {
       fakeRow({ name: 'wrong-cost', cost: '50k_250k', criticality: 'low', signals: [{ key: 'costly_low_criticality', calm: false, reason: 'x' }] }),
       fakeRow({ name: 'wrong-criticality', cost: '1m_5m', criticality: 'high', signals: [] }),
     ];
-    const result = filterPortfolioRows(rows, { kind: 'all', signal: 'costly_low_criticality', cost: '1m_5m', criticality: 'low' });
+    const result = filterPortfolioRows(rows, { kind: 'all', signal: 'costly_low_criticality', cost: '1m_5m', criticality: 'low', disposition: 'all' });
     expect(result.map((r) => r.name)).toEqual(['match']);
+  });
+});
+
+describe('disposition filter (F11)', () => {
+  it('matches one disposition, or rows with none recorded', () => {
+    const rows = [fakeRow({ name: 'migrate', disposition: 'migrate' }), fakeRow({ name: 'invest', disposition: 'invest' }), fakeRow({ name: 'none', disposition: null })];
+    expect(filterPortfolioRows(rows, { ...DEFAULT_PORTFOLIO_FILTERS, disposition: 'migrate' }).map((r) => r.name)).toEqual(['migrate']);
+    expect(filterPortfolioRows(rows, { ...DEFAULT_PORTFOLIO_FILTERS, disposition: 'not_assessed' }).map((r) => r.name)).toEqual(['none']);
+    expect(filterPortfolioRows(rows, DEFAULT_PORTFOLIO_FILTERS)).toHaveLength(3);
   });
 });

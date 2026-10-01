@@ -14,12 +14,12 @@
  * here), so every signal in this file is checkable from plain, literal
  * inputs alone.
  */
-import type { Criticality, FitForPurpose } from '../../contracts/delta';
+import type { Criticality, Disposition, FitForPurpose } from '../../contracts/delta';
 import type { AnnualRunCost } from '../../contracts/delta';
 import { CRITICALITY_ORDER } from '../elements/criticalityTone';
 import { isCheapCostBand, isHighCostBand } from './portfolioOverlap';
 
-export type PortfolioSignalKey = 'costly_poor_fit' | 'costly_low_criticality' | 'costly_exposed' | 'costly_overlap' | 'cheap_poor_fit' | 'justified';
+export type PortfolioSignalKey = 'costly_poor_fit' | 'costly_low_criticality' | 'costly_exposed' | 'costly_overlap' | 'cheap_poor_fit' | 'invest_poor_fit' | 'tolerate_costly_poor_fit' | 'justified';
 
 export interface PortfolioSignal {
   key: PortfolioSignalKey;
@@ -36,6 +36,8 @@ export interface PortfolioSignalInput {
   lifecycleExposed: boolean | null;
   /** Names of capabilities (already resolved by the caller) that make this row's own top-level system one of two-or-more high-cost supporters — empty when there's no overlap. */
   overlapCapabilityNames: readonly string[];
+  /** F11: this row's own recorded disposition (never inherited) — `null` when not assessed, which never fires a disposition signal. Not one of `missingPortfolioInputs`: the cost/fit signals don't need it. */
+  disposition: Disposition | null;
 }
 
 /** high or critical — the task's own motivating example ("an excellent-fit, critical system can rightly be expensive") names a *critical* system as the calm case, so `justified` reads at or above `high`, not `high` alone. */
@@ -78,6 +80,17 @@ export function computePortfolioSignals(input: PortfolioSignalInput): PortfolioS
 
   if (cheapCost && input.fit === 'poor') {
     signals.push({ key: 'cheap_poor_fit', calm: false, reason: 'Low run cost despite a poor fit rating.' });
+  }
+
+  // F11: where the recorded disposition disagrees with the recorded facts.
+  // Both need the disposition *and* the facts they compare against — a
+  // missing input never fires either one.
+  if (input.disposition === 'invest' && input.fit === 'poor') {
+    signals.push({ key: 'invest_poor_fit', calm: false, reason: 'Marked Invest, but rated a poor fit.' });
+  }
+
+  if (input.disposition === 'tolerate' && highCost && (input.fit === 'poor' || input.fit === 'adequate')) {
+    signals.push({ key: 'tolerate_costly_poor_fit', calm: false, reason: `Marked Tolerate, with high run cost and a ${input.fit} fit rating.` });
   }
 
   if (highCost && (input.fit === 'good' || input.fit === 'excellent') && isJustifyingCriticality(input.criticality) && input.criticality !== null) {

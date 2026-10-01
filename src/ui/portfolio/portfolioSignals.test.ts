@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { computePortfolioSignals, missingPortfolioInputs, type PortfolioSignalInput } from './portfolioSignals';
 
 function input(overrides: Partial<PortfolioSignalInput> = {}): PortfolioSignalInput {
-  return { cost: null, fit: null, criticality: null, lifecycleExposed: null, overlapCapabilityNames: [], ...overrides };
+  return { cost: null, fit: null, criticality: null, lifecycleExposed: null, overlapCapabilityNames: [], disposition: null, ...overrides };
 }
 
 function keys(input: PortfolioSignalInput): string[] {
@@ -137,5 +137,21 @@ describe('missingPortfolioInputs', () => {
 
   it('lists only the specific inputs that are missing', () => {
     expect(missingPortfolioInputs(input({ cost: '1m_5m', fit: 'good' }))).toEqual(['criticality', 'lifecycle exposure']);
+  });
+});
+
+describe('disposition signals (F11)', () => {
+  it('invest_poor_fit fires for Invest on a poor-fit system, and never when either input is missing', () => {
+    expect(keys(input({ disposition: 'invest', fit: 'poor' }))).toContain('invest_poor_fit');
+    expect(keys(input({ disposition: 'invest', fit: 'adequate' }))).not.toContain('invest_poor_fit');
+    expect(keys(input({ disposition: 'invest', fit: null }))).not.toContain('invest_poor_fit');
+    expect(keys(input({ disposition: null, fit: 'poor' }))).not.toContain('invest_poor_fit');
+  });
+
+  it('tolerate_costly_poor_fit fires for Tolerate with high cost and a poor or adequate fit, never on a missing input', () => {
+    expect(keys(input({ disposition: 'tolerate', cost: '1m_5m', fit: 'adequate' }))).toContain('tolerate_costly_poor_fit');
+    expect(keys(input({ disposition: 'tolerate', cost: '1m_5m', fit: 'good' }))).not.toContain('tolerate_costly_poor_fit');
+    expect(keys(input({ disposition: 'tolerate', cost: 'under_50k', fit: 'poor' }))).not.toContain('tolerate_costly_poor_fit');
+    expect(keys(input({ disposition: 'tolerate', cost: null, fit: 'poor' }))).not.toContain('tolerate_costly_poor_fit');
   });
 });

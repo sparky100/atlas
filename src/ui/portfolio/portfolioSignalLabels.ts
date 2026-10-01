@@ -7,7 +7,7 @@
  */
 import type { PortfolioSignalKey } from './portfolioSignals';
 
-export const PORTFOLIO_SIGNAL_KEYS: readonly PortfolioSignalKey[] = ['costly_poor_fit', 'costly_low_criticality', 'costly_exposed', 'costly_overlap', 'cheap_poor_fit', 'justified'];
+export const PORTFOLIO_SIGNAL_KEYS: readonly PortfolioSignalKey[] = ['costly_poor_fit', 'costly_low_criticality', 'costly_exposed', 'costly_overlap', 'cheap_poor_fit', 'invest_poor_fit', 'tolerate_costly_poor_fit', 'justified'];
 
 export const PORTFOLIO_SIGNAL_LABEL: Record<PortfolioSignalKey, string> = {
   costly_poor_fit: 'Costly, poor fit',
@@ -15,5 +15,7 @@ export const PORTFOLIO_SIGNAL_LABEL: Record<PortfolioSignalKey, string> = {
   costly_exposed: 'Costly, exposed',
   costly_overlap: 'Costly overlap',
   cheap_poor_fit: 'Cheap, poor fit',
+  invest_poor_fit: 'Invest, poor fit',
+  tolerate_costly_poor_fit: 'Tolerate, costly poor fit',
   justified: 'Justified',
 };

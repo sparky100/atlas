@@ -6,6 +6,7 @@ import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { annualRunCostLabel } from '../elements/annualRunCost';
 import { criticalityToneFor } from '../elements/criticalityTone';
+import { dispositionLabel, dispositionTone } from '../elements/disposition';
 import { fitForPurposeToneFor } from '../elements/fitForPurposeTone';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { PortfolioRowDetail } from './PortfolioRowDetail';
@@ -31,6 +32,7 @@ const COLUMNS: { key: PortfolioSortKey; label: string }[] = [
   { key: 'cost', label: 'Run cost' },
   { key: 'fit', label: 'Fit' },
   { key: 'criticality', label: 'Criticality' },
+  { key: 'disposition', label: 'Disposition' },
   { key: 'lifecycle', label: 'Lifecycle' },
   { key: 'capabilities', label: 'Capabilities served' },
   { key: 'owner', label: 'Business owner' },
@@ -88,6 +90,7 @@ export function PortfolioTable({ rows, sortKey, sortDirection, onSort, expandedR
                   <td>{row.cost ? <Text as="span" size="sm">{annualRunCostLabel(row.cost)}</Text> : <Text as="span" tone="faint" size="sm">Not entered</Text>}</td>
                   <td>{row.fit ? <Chip tone={fitForPurposeToneFor(row.fit)}>{row.fit}</Chip> : <Text as="span" tone="faint" size="sm">Unrated</Text>}</td>
                   <td>{row.criticality ? <Chip tone={criticalityToneFor(row.criticality) ?? 'neutral'}>{row.criticality}</Chip> : <Text as="span" tone="faint" size="sm">—</Text>}</td>
+                  <td>{row.disposition ? <Chip tone={dispositionTone(row.disposition)}>{dispositionLabel(row.disposition)}</Chip> : <Text as="span" tone="faint" size="sm">Not assessed</Text>}</td>
                   <td>{row.lifecycleStatus ? <Chip tone={lifecycleToneFor(row.lifecycleStatus) ?? 'neutral'}>{row.lifecycleStatus}</Chip> : <Text as="span" tone="faint" size="sm">—</Text>}</td>
                   <td>
                     <Text as="span" size="sm">

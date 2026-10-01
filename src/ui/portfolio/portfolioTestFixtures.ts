@@ -22,6 +22,7 @@ export function fakeRow(overrides: Partial<PortfolioRow> = {}): PortfolioRow {
     cost: null,
     fit: null,
     criticality: null,
+    disposition: null,
     lifecycleStatus: null,
     lifecycleExposed: null,
     capabilities: [],

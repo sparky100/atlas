@@ -13,13 +13,14 @@
  * go-ahead.
  */
 import { useEffect, useState } from 'react';
-import type { AnnualRunCost, Criticality, FitForPurpose, UUID } from '../../contracts/delta';
+import type { AnnualRunCost, Criticality, Disposition, FitForPurpose, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
 import { listActorsForLandscape, listContainersForLandscape, listOwnsEdgesForSystems, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
 import { attributesRecord } from '../elements/attributesRecord';
 import { CRITICALITY_ORDER } from '../elements/criticalityTone';
+import { dispositionOf } from '../elements/disposition';
 import { fitForPurposeOf, hasLifecycleExposureData, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../capabilityMap/metrics';
 import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
 import { ownersByRole } from '../elements/ownersByRole';
@@ -52,6 +53,8 @@ export interface PortfolioRow {
   cost: AnnualRunCost | null;
   fit: FitForPurpose | null;
   criticality: Criticality | null;
+  /** F11: this row's own disposition — a module's own, never its platform's. */
+  disposition: Disposition | null;
   lifecycleStatus: string | null;
   /** `null` when this row's own family has no recorded `plannedEnd` at all — unknown, never "not exposed" (decision 4). */
   lifecycleExposed: boolean | null;
@@ -165,7 +168,8 @@ export function usePortfolio(modelId: UUID, ref: Ref, mainCommitIdHint: UUID | n
         const businessOwner = ownersByRole(element.element_id, ownsEdges, actorsById).get('business')?.[0] ?? null;
 
         const overlapCapabilityNames = overlapCapabilityIdsFor(topLevelSystemId, overlapsByCapability).map((id) => capabilitiesById.get(id)?.name ?? '(unknown capability)');
-        const signals = computePortfolioSignals({ cost, fit, criticality, lifecycleExposed, overlapCapabilityNames });
+        const disposition = dispositionOf(element);
+        const signals = computePortfolioSignals({ cost, fit, criticality, lifecycleExposed, overlapCapabilityNames, disposition });
         const missingInputs = missingPortfolioInputs({ cost, fit, criticality, lifecycleExposed });
 
         return {
@@ -175,6 +179,7 @@ export function usePortfolio(modelId: UUID, ref: Ref, mainCommitIdHint: UUID | n
           cost,
           fit,
           criticality,
+          disposition,
           lifecycleStatus,
           lifecycleExposed,
           capabilities: capabilityLinks,
