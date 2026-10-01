@@ -62,6 +62,12 @@
  *   (ADR-000 preface #6's maturity-scoring objection never applies: this
  *   is a sourced, per-edge assertion, worst-of'd exactly like criticality).
  *   Silent when no edge is rated.
+ * - **Disposition** (`worstDispositionOf`), F11: worst-of the TIME
+ *   dispositions (`invest` < `tolerate` < `migrate` < `eliminate`) among a
+ *   capability's supporting systems and modules — each element's own
+ *   recorded value, never a module inheriting its platform's (ADR-001's
+ *   amendment; `effectiveModuleAttributes` deliberately leaves it out).
+ *   Silent when none is assessed: "not assessed" never reads as Tolerate.
  *
  * `isExternal` was considered and dropped: a capability isn't external,
  * only (some of) its supporting systems are, and "any support system is
@@ -70,7 +76,7 @@
  * alongside two metrics that need no such judgment call.
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import type { Criticality, FitForPurpose, LifecycleStatus, UUID } from '../../contracts/delta';
+import type { Criticality, Disposition, FitForPurpose, LifecycleStatus, UUID } from '../../contracts/delta';
 import type { HomeMode } from '../../contracts/userPreferences';
 import type { ChipTone } from '../components/Chip/Chip';
 import { monthsUntil, STALE_AFTER_MONTHS } from '../../contracts/thresholds';
@@ -78,6 +84,7 @@ import { attributesRecord } from '../elements/attributesRecord';
 import { CRITICALITY_ORDER, CRITICALITY_TONE } from '../elements/criticalityTone';
 import { FIT_FOR_PURPOSE_ORDER, FIT_FOR_PURPOSE_TONE } from '../elements/fitForPurposeTone';
 import { LIFECYCLE_ORDER, LIFECYCLE_TONE } from '../elements/lifecycleTone';
+import { dispositionLabel, dispositionOf, dispositionTone, worstDisposition } from '../elements/disposition';
 import { domainOf } from '../elements/systemDomain';
 
 // The mode identifiers themselves are canonical in src/contracts/userPreferences.ts
@@ -94,6 +101,7 @@ export const COLOUR_BY_OPTIONS: { value: ColourByMode; label: string }[] = [
   { value: 'metric:criticality', label: 'Criticality' },
   { value: 'metric:otShare', label: 'OT share' },
   { value: 'metric:fitForPurpose', label: 'Fit' },
+  { value: 'metric:disposition', label: 'Disposition' },
 ];
 
 export interface TileColour {
@@ -257,6 +265,20 @@ export function worstFitForPurposeAcross(descendantCapabilityIds: readonly UUID[
   return worst;
 }
 
+/** The worst own disposition among a capability's supporting systems and modules, or `null` if none is assessed. */
+export function worstDispositionOf(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): Disposition | null {
+  return worstDisposition(
+    supportingSystemIds(capabilityId, supportsEdges).map((id) => {
+      const system = systemsById.get(id);
+      return system ? dispositionOf(system) : null;
+    }),
+  );
+}
+
+function dispositionColour(value: Disposition | null): TileColour {
+  return value === null ? { tone: undefined, label: undefined } : { tone: dispositionTone(value), label: dispositionLabel(value) };
+}
+
 /** The count of a capability's supporting systems whose domain resolves to `'ot'`, out of the total — Prompt 7k item 3's "OT share". */
 export function otShareOf(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): { ot: number; total: number } {
   const ids = supportingSystemIds(capabilityId, supportsEdges);
@@ -341,6 +363,8 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
       const worst = worstFitForPurpose(capabilityId, supportsEdges);
       return worst === null ? { tone: undefined, label: undefined } : { tone: FIT_FOR_PURPOSE_TONE[worst], label: worst };
     }
+    case 'metric:disposition':
+      return dispositionColour(worstDispositionOf(capabilityId, supportsEdges, systemsById));
   }
 }
 
@@ -422,6 +446,8 @@ export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityI
       const worst = worstFitForPurposeAcross(descendantCapabilityIds, supportsEdges);
       return worst === null ? { tone: undefined, label: undefined } : { tone: FIT_FOR_PURPOSE_TONE[worst], label: worst };
     }
+    case 'metric:disposition':
+      return dispositionColour(worstDisposition(descendantCapabilityIds.map((id) => worstDispositionOf(id, supportsEdges, systemsById))));
   }
 }
 

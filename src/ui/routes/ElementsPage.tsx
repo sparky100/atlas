@@ -26,7 +26,7 @@ import { useElementBrowse, type ElementBrowseFilter } from '../elements/useEleme
 import type { BrowseRow } from '../../db/elementBrowse';
 import { StartProjectLink } from '../projects/StartProjectLink';
 import { canStartProject } from '../orgs/roleGates';
-import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromCriticalExposedFinding, prefillFromCriticalSupportEndFinding } from '../decisions/decisionPrefill';
+import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromCriticalExposedFinding, prefillFromCriticalSupportEndFinding, prefillFromOutgoingDisposition } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { useRouteTiming } from '../perf/useRouteTiming';
 import styles from './ElementsPage.module.css';
@@ -48,6 +48,7 @@ const VALID_FILTERS: readonly ElementBrowseFilter[] = [
   'essential-no-technical-owner',
   'critical-support-end',
   'capability-no-supporters',
+  'outgoing-no-retiring-change',
 ];
 
 function parseFilterParam(value: string | null): ElementBrowseFilter {
@@ -218,7 +219,21 @@ export function ElementsPage() {
             </span>
           );
         }
-      : undefined;
+      : canStartProject(role) && filter === 'outgoing-no-retiring-change'
+        ? (row: BrowseRow) => {
+            // F11: the work an outgoing disposition implies is a project, not a decision — the decision was the disposition itself.
+            const prefill = prefillFromOutgoingDisposition(
+              { id: row.element.element_id, name: row.element.name },
+              row.disposition === 'eliminate' ? 'eliminate' : 'migrate',
+            );
+            const params = decisionPrefillToSearchParams(prefill).toString();
+            return (
+              <span className={styles.rowActions}>
+                <StartProjectLink href={`/o/${orgSlug ?? ''}/m/${model.slug}/projects?${params}`} />
+              </span>
+            );
+          }
+        : undefined;
 
   return (
     <div>

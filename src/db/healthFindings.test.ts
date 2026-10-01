@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../contracts/rows';
 import {
+  findOutgoingWithoutRetiringChange,
   computeSelfOwnedCapabilityIds,
   computeStaleAttributesFinding,
   findBoundaryCrossings,
@@ -968,5 +969,34 @@ describe('findCapabilitiesWithNoSupporters (per-item-actions prompt)', () => {
     const other = capability('cap-other');
     const supports = [relationship('r1', 'supports', 'sys-1', 'cap-other', { role: 'secondary' })];
     expect(findCapabilitiesWithNoSupporters([root], [root, other], supports, []).map((c) => c.element_id)).toEqual(['cap-root']);
+  });
+});
+
+describe('findOutgoingWithoutRetiringChange (F11)', () => {
+  it('flags Migrate and Eliminate with no open retiring change; ignores Tolerate, Invest and unset', () => {
+    const elements = [
+      system('migrate', { disposition: 'migrate', lifecycleStatus: 'active' }),
+      system('eliminate', { disposition: 'eliminate', lifecycleStatus: 'active' }),
+      system('tolerate', { disposition: 'tolerate', lifecycleStatus: 'active' }),
+      system('unset', { lifecycleStatus: 'active' }),
+    ];
+    expect(findOutgoingWithoutRetiringChange(elements, new Set()).map((e) => e.element_id)).toEqual(['migrate', 'eliminate']);
+  });
+
+  it('clears once an open change retires it, or main already shows it retiring or retired', () => {
+    const elements = [
+      system('in-change', { disposition: 'migrate', lifecycleStatus: 'active' }),
+      system('retiring', { disposition: 'eliminate', lifecycleStatus: 'retiring' }),
+      system('retired', { disposition: 'eliminate', lifecycleStatus: 'retired' }),
+    ];
+    expect(findOutgoingWithoutRetiringChange(elements, new Set(['in-change']))).toEqual([]);
+  });
+
+  it('a module uses its own disposition, and its platform\'s lifecycle when it has none', () => {
+    const platform = system('platform', { lifecycleStatus: 'retiring', disposition: 'invest' });
+    const module: ElementsHeadRow = { element_id: 'module', element_type: 'container', name: 'module', parent_id: 'platform', attributes: { disposition: 'migrate', isExternal: false }, exists_delta_id: 'd-module' };
+    const ownActive: ElementsHeadRow = { ...module, element_id: 'module-2', attributes: { disposition: 'migrate', lifecycleStatus: 'active', isExternal: false } };
+    const byId = new Map([[platform.element_id, platform]]);
+    expect(findOutgoingWithoutRetiringChange([platform, module, ownActive], new Set(), byId).map((e) => e.element_id)).toEqual(['module-2']);
   });
 });

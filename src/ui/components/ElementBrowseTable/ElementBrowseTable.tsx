@@ -17,6 +17,9 @@ import { EmptyState } from '../EmptyState/EmptyState';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
 import { criticalityToneFor } from '../../elements/criticalityTone';
+import { dispositionLabel, dispositionTone } from '../../elements/disposition';
+import type { DispositionFilter } from '../../elements/useElementBrowse';
+import { DISPOSITION_LEVELS } from '../../../contracts/attributeSchema';
 import { useElementExport } from '../../elements/useElementExport';
 import { sortKeyEquals, type ElementBrowseSortKey, type ElementBrowseState } from '../../elements/useElementBrowse';
 import { useIsNarrowViewport } from '../../landscape/useIsNarrowViewport';
@@ -93,12 +96,13 @@ export interface ElementBrowseTableProps {
 // never includes the `{ custom }` variant (that's the one dynamic column,
 // added separately below), and `key={column.key}` needs a valid React key,
 // which an object isn't.
-const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle' | 'criticality'; label: string }[] = [
+const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle' | 'criticality' | 'disposition'; label: string }[] = [
   { key: 'name', label: 'Name' },
   { key: 'type', label: 'Type' },
   { key: 'owner', label: 'Owner' },
   { key: 'lifecycle', label: 'Lifecycle' },
   { key: 'criticality', label: 'Criticality' },
+  { key: 'disposition', label: 'Disposition' },
 ];
 
 function customAttrValueToDraft(kind: AttributeDefinitionKind, raw: string | null): DraftValue {
@@ -401,6 +405,20 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
         </select>
         <select
           className={styles.select}
+          aria-label="Disposition"
+          value={state.dispositionFilter}
+          onChange={(e) => { state.setDispositionFilter(e.target.value as DispositionFilter); }}
+        >
+          <option value="all">All dispositions</option>
+          {DISPOSITION_LEVELS.map((level) => (
+            <option key={level.key} value={level.key}>
+              {level.label}
+            </option>
+          ))}
+          <option value="not_assessed">Not assessed</option>
+        </select>
+        <select
+          className={styles.select}
           aria-label="Finding"
           value={findingFilter}
           onChange={(e) => { onFindingFilterChange(e.target.value); }}
@@ -567,6 +585,15 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                     <td headers={`${headerIdBase}-criticality`}>
                       {row.criticality ? (
                         <Chip tone={criticalityToneFor(row.criticality) ?? 'neutral'}>{row.criticality}</Chip>
+                      ) : (
+                        <Text as="span" tone="faint" size="sm">
+                          —
+                        </Text>
+                      )}
+                    </td>
+                    <td headers={`${headerIdBase}-disposition`}>
+                      {row.disposition ? (
+                        <Chip tone={dispositionTone(row.disposition)}>{dispositionLabel(row.disposition)}</Chip>
                       ) : (
                         <Text as="span" tone="faint" size="sm">
                           —

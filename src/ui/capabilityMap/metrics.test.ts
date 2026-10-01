@@ -11,6 +11,7 @@ import {
   tileColourFor,
   worstCriticality,
   worstFitForPurpose,
+  worstDispositionOf,
   worstFitForPurposeOfSupporter,
 } from './metrics';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
@@ -376,5 +377,48 @@ describe('resolveDefaultColourBy (Sprint U4-1 C4)', () => {
   it('exposure for a director, coverage for an architect, once the model has real systems', () => {
     expect(resolveDefaultColourBy(null, 'director', true)).toBe('metric:lifecycleExposure');
     expect(resolveDefaultColourBy(null, 'architect', true)).toBe('metric:supportingSystemCount');
+  });
+});
+
+describe('disposition colour-by (F11)', () => {
+  function withDisposition(row: ElementsHeadRow, disposition: string): ElementsHeadRow {
+    return { ...row, attributes: { ...(row.attributes as Record<string, Json>), disposition } };
+  }
+  function moduleOf(id: string, platformId: string, disposition?: string): ElementsHeadRow {
+    const attrs: Record<string, Json> = disposition === undefined ? {} : { disposition };
+    return { element_id: id, element_type: 'container', name: id, parent_id: platformId, attributes: attrs, exists_delta_id: `d-${id}` };
+  }
+
+  it('worst-of across supporting systems and modules: eliminate beats migrate beats tolerate beats invest', () => {
+    const systemsById = new Map([
+      ['sys-1', withDisposition(system('sys-1'), 'invest')],
+      ['sys-2', withDisposition(system('sys-2'), 'tolerate')],
+      ['mod-1', moduleOf('mod-1', 'sys-1', 'migrate')],
+    ]);
+    const edges = [supports('sys-1', 'cap-1'), supports('sys-2', 'cap-1'), supports('mod-1', 'cap-1')];
+    expect(worstDispositionOf('cap-1', edges, systemsById)).toBe('migrate');
+    expect(tileColourFor('metric:disposition', 'cap-1', edges, systemsById)).toEqual({ tone: 'warn', label: 'Migrate' });
+  });
+
+  it('a module with no disposition of its own does not borrow its platform\'s', () => {
+    const systemsById = new Map([
+      ['sys-1', withDisposition(system('sys-1'), 'eliminate')],
+      ['mod-1', moduleOf('mod-1', 'sys-1')],
+    ]);
+    expect(worstDispositionOf('cap-1', [supports('mod-1', 'cap-1')], systemsById)).toBeNull();
+  });
+
+  it('silent when nothing supporting is assessed — not assessed never reads as Tolerate', () => {
+    const systemsById = new Map([['sys-1', system('sys-1')]]);
+    expect(tileColourFor('metric:disposition', 'cap-1', [supports('sys-1', 'cap-1')], systemsById)).toEqual({ tone: undefined, label: undefined });
+  });
+
+  it('L1 aggregate: the worst across every descendant capability', () => {
+    const systemsById = new Map([
+      ['sys-1', withDisposition(system('sys-1'), 'invest')],
+      ['sys-2', withDisposition(system('sys-2'), 'eliminate')],
+    ]);
+    const edges = [supports('sys-1', 'cap-l2'), supports('sys-2', 'cap-l3')];
+    expect(aggregateTileColourFor('metric:disposition', ['cap-l2', 'cap-l3'], edges, systemsById)).toEqual({ tone: 'danger', label: 'Eliminate' });
   });
 });

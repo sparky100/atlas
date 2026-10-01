@@ -15,17 +15,17 @@ fails the test, not just this table.
 
 | Route | resolve→data | < 300ms |
 |---|---|---|
-| Model home | 147ms | ✅ |
-| Capability map | 723ms | ❌ |
-| Landscape | 413ms | ❌ |
-| Elements (browse) | 387ms | ❌ |
-| Element detail | 698ms | ❌ |
-| Changes | 24ms | ✅ |
+| Model home | 127ms | ✅ |
+| Capability map | 321ms | ❌ |
+| Landscape | 302ms | ❌ |
+| Elements (browse) | 370ms | ❌ |
+| Element detail | 361ms | ❌ |
+| Changes | 43ms | ✅ |
 
 ## Actions: click → updated UI (wall clock)
 
 | Action | time | < 500ms |
 |---|---|---|
-| Add relationship (uses) | 652ms | ❌ |
-| Save attribute (vendor) | 1387ms | ❌ |
-| Add system | 1483ms | ❌ |
+| Add relationship (uses) | 1433ms | ❌ |
+| Save attribute (vendor) | 1335ms | ❌ |
+| Add system | 699ms | ❌ |

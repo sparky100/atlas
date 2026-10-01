@@ -1,5 +1,6 @@
 import { ANNUAL_RUN_COST_OPTIONS } from '../../contracts/attributeSchema';
 import type { Criticality } from '../../contracts/delta';
+import { DISPOSITION_LEVELS } from '../../contracts/attributeSchema';
 import { annualRunCostLabel } from '../elements/annualRunCost';
 import { CRITICALITY_ORDER } from '../elements/criticalityTone';
 import { DEFAULT_PORTFOLIO_FILTERS, type PortfolioFilters } from './portfolioFilter';
@@ -126,7 +127,26 @@ export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters
         </select>
       </label>
 
-      {(filters.kind !== 'all' || filters.signal !== 'all' || filters.cost !== 'all' || filters.criticality !== 'all') && (
+      <label className={styles.field}>
+        <span>Disposition</span>
+        <select
+          className={styles.select}
+          value={filters.disposition}
+          onChange={(e) => {
+            onFiltersChange({ ...filters, disposition: e.target.value as PortfolioFilters['disposition'] });
+          }}
+        >
+          <option value="all">All dispositions</option>
+          {DISPOSITION_LEVELS.map((level) => (
+            <option key={level.key} value={level.key}>
+              {level.label}
+            </option>
+          ))}
+          <option value="not_assessed">Not assessed</option>
+        </select>
+      </label>
+
+      {(filters.kind !== 'all' || filters.signal !== 'all' || filters.cost !== 'all' || filters.criticality !== 'all' || filters.disposition !== 'all') && (
         <button
           type="button"
           className={styles.clearButton}

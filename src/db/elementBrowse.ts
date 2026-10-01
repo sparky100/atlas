@@ -6,6 +6,7 @@
  * (src/db/landscape.ts, src/db/elementSearch.ts), not a live filter/sort
  * endpoint per keystroke.
  */
+import type { Disposition } from '../contracts/delta';
 import type { ElementType, UUID } from '../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
 import { attributesRecord } from '../ui/elements/attributesRecord';
@@ -83,6 +84,8 @@ export interface BrowseRow {
   lifecycleStatus: string | null;
   /** `SystemAttributes.criticality`, with the identical own-value-else-parent's resolution `lifecycleStatus` above has. `null` under the same conditions. */
   criticality: string | null;
+  /** F11: `element`'s own TIME disposition (a system's, or a module's own override — never inherited from a platform). `null` when not assessed or for any other type. */
+  disposition: Disposition | null;
   /** `element`'s own parent, for `moduleDisplayName`'s "Platform · Module" convention — the whole model's elements are already loaded for this table (`useElementBrowse.ts`), so this is a free Map lookup, never a second query. `null` for every element without a parent. */
   parent: ElementsHeadRow | null;
 }
@@ -140,4 +143,5 @@ export const FINDING_FILTER_OPTIONS: readonly { value: string; label: string }[]
   { value: 'essential-no-technical-owner', label: 'Essential systems with no technical owner' },
   { value: 'critical-support-end', label: 'Critical systems past or near support end' },
   { value: 'capability-no-supporters', label: 'Capabilities with no supporters' },
+  { value: 'outgoing-no-retiring-change', label: 'Marked Migrate or Eliminate, nothing retiring it' },
 ];

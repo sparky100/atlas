@@ -7,6 +7,7 @@ import { annualRunCostLabel } from '../elements/annualRunCost';
 import { fitForPurposeToneFor } from '../elements/fitForPurposeTone';
 import { PortfolioRowDetail } from './PortfolioRowDetail';
 import { PortfolioSignalChip } from './PortfolioSignalChip';
+import { dispositionLabel, dispositionTone } from '../elements/disposition';
 import { rowKindLabel } from './portfolioRowKind';
 import type { PortfolioRow } from './usePortfolio';
 import styles from './PortfolioCards.module.css';
@@ -54,6 +55,7 @@ export function PortfolioCards({ rows, expandedRowId, onToggleExpand, elementHre
               <div className={styles.cardMeta}>
                 {row.cost ? <Text as="span" size="sm">{annualRunCostLabel(row.cost)}</Text> : <Text as="span" size="sm" tone="faint">Not entered</Text>}
                 {row.fit ? <Chip tone={fitForPurposeToneFor(row.fit)}>{row.fit}</Chip> : <Text as="span" size="sm" tone="faint">Unrated fit</Text>}
+                {row.disposition && <Chip tone={dispositionTone(row.disposition)}>{dispositionLabel(row.disposition)}</Chip>}
               </div>
               {row.signals.length > 0 && (
                 <div className={styles.cardSignals}>

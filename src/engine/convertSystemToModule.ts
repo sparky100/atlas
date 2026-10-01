@@ -93,6 +93,8 @@ function containerAttributesFromSystem(systemAttributes: SystemAttributes): { at
   // (recorded decision: it is NOT inherited *from* a platform the other way
   // round, `ContainerAttributes.annualRunCost`'s doc comment).
   if (systemAttributes.annualRunCost !== undefined) attributes.annualRunCost = systemAttributes.annualRunCost;
+  // F11: the same software's disposition carries over too (ADR-001 amendment).
+  if (systemAttributes.disposition !== undefined) attributes.disposition = systemAttributes.disposition;
   if (systemAttributes.hostingModel !== undefined) attributes.hostingModel = systemAttributes.hostingModel;
   if (systemAttributes.hostingProvider !== undefined) attributes.hostingProvider = systemAttributes.hostingProvider;
   if (systemAttributes.domain !== undefined) attributes.domain = systemAttributes.domain;

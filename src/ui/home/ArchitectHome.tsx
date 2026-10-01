@@ -17,10 +17,12 @@ import {
   prefillFromCapabilityNoSupportersFinding,
   prefillFromCriticalExposedFinding,
   prefillFromCriticalSupportEndFinding,
+  prefillFromOutgoingDisposition,
   prefillFromPoorFitCapabilityFinding,
   type DecisionPrefill,
 } from '../decisions/decisionPrefill';
 import { canStartDecision } from '../orgs/useMembership';
+import { attributesRecord } from '../elements/attributesRecord';
 import { canStartProject } from '../orgs/roleGates';
 import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
 import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
@@ -351,6 +353,30 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
       browseHref: browseHref('capability-no-supporters'),
       ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromCapabilityNoSupportersFinding({ id: item.id, name: item.label })) } : {}),
         },
+    {
+      // F11: a recorded Migrate/Eliminate with no open change retiring it.
+      // Each item names the open project already scoped to it, and its one
+      // action opens that project — or starts one when there is none.
+      key: 'outgoing-no-retiring-change',
+      count: insightsData.outgoingWithoutRetiringChange.length,
+      summary: `${String(insightsData.outgoingWithoutRetiringChange.length)} ${plural(insightsData.outgoingWithoutRetiringChange.length, 'system', 'systems')} marked Migrate or Eliminate with no open change retiring ${insightsData.outgoingWithoutRetiringChange.length === 1 ? 'it' : 'them'}`,
+      items: insightsData.outgoingWithoutRetiringChange.map((el) => {
+        const project = insightsData.projectByElementId.get(el.element_id);
+        return { id: el.element_id, label: project ? `${el.name} (project: ${project.projectTitle})` : el.name };
+      }),
+      severity: 'medium',
+      browseHref: browseHref('outgoing-no-retiring-change'),
+      singleItemAction: (item: HealthFindingItem): FindingCardAction => {
+        const project = insightsData.projectByElementId.get(item.id);
+        if (project) return { href: `/o/${orgSlug}/m/${modelSlug}/projects/${project.projectId}`, label: `Open ${project.projectTitle} →` };
+        const element = insightsData.outgoingWithoutRetiringChange.find((el) => el.element_id === item.id);
+        const disposition = element ? attributesRecord(element.attributes).disposition : undefined;
+        const prefill = prefillFromOutgoingDisposition({ id: item.id, name: element?.name ?? item.label }, disposition === 'eliminate' ? 'eliminate' : 'migrate');
+        return canStartProject(role)
+          ? { href: `/o/${orgSlug}/m/${modelSlug}/projects?${decisionPrefillToSearchParams(prefill).toString()}`, label: 'Start a project →' }
+          : { href: `/o/${orgSlug}/m/${modelSlug}/e/${item.id}`, label: 'View →' };
+      },
+    },
       ];
   const { active: activeHealthChecks, clear: clearHealthChecks } = partitionHealthChecks(healthChecks);
   // Item 3: informational findings never sit in the grid — they render as

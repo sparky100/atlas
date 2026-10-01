@@ -105,9 +105,14 @@ You can leave comments directly on elements and other objects in the model — u
 ## Capability map, roadmap, and value streams
 
 - The **Capability map** is the all-capabilities view — your organisation's business functions, and (via colour/heat) what's changing or at risk.
+  Colour it by **Disposition** to see, for each capability, the worst TIME disposition among the systems and modules supporting it.
 - **Roadmap** shows planned and in-flight change over time.
 - **Value streams** show how the organisation delivers its outcomes, stage by stage.
 - **Reports** (Analyse) lists **Boundary crossings** (links across the IT/OT boundary), **External interfaces** (where your model touches systems and organisations you don't own) and **Duplicates**.
+
+## Disposition (TIME)
+
+Each system can be marked **Tolerate**, **Invest**, **Migrate** or **Eliminate** on its page; a module can set its own value, but doesn't take its platform's (unset reads **Not assessed**, never Tolerate). The Elements and Portfolio tables can show, sort and filter by it, and spreadsheet capture reads a "TIME" or "Disposition" column. A system marked Migrate or Eliminate that nothing is retiring — no open change retires it, and it isn't already retiring — shows up as a health finding on Home, with a link to its project or to start one.
 
 ## Getting help
 

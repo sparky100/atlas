@@ -6,6 +6,7 @@ import type { AttributeDefinitionRow } from '../../../db/types';
 import type { ThreadCount } from '../../comments/useThreadCounts';
 import { attributesRecord, formatCustomAttributeValue } from '../../elements/attributesRecord';
 import { criticalityToneFor } from '../../elements/criticalityTone';
+import { dispositionLabel, dispositionTone } from '../../elements/disposition';
 import { lifecycleToneFor } from '../../elements/lifecycleTone';
 import { moduleDisplayName } from '../../elements/moduleDisplayName';
 import { Chip } from '../Chip/Chip';
@@ -99,6 +100,7 @@ function ElementBrowseCard({
         </Text>
         {row.lifecycleStatus && <Chip tone={lifecycleTone ?? 'neutral'}>{row.lifecycleStatus}</Chip>}
         {row.criticality && <Chip tone={criticalityTone ?? 'neutral'}>{row.criticality}</Chip>}
+        {row.disposition && <Chip tone={dispositionTone(row.disposition)}>{dispositionLabel(row.disposition)}</Chip>}
       </Link>
       <div className={styles.cardSecondary}>
         <Text as="span" size="sm" tone="muted">

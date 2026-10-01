@@ -643,6 +643,90 @@ export function findCriticalSystemsPastOrNearSupportEnd(systems: readonly Elemen
   });
 }
 
+/**
+ * F11 (ADR-001 "Amended (Disposition, TIME)"): systems and modules whose own
+ * recorded disposition is Migrate or Eliminate, with no open change retiring
+ * them — a recorded intention with no work behind it. "Retiring" means an
+ * open change retracts the element or sets its lifecycle to retiring or
+ * retired (`retiringElementIds`, `loadElementsRetiredByOpenChanges`). Also
+ * skipped when main already shows it retiring or retired (a module reads its
+ * platform's lifecycle when it has none of its own) — that work is done or
+ * under way. A module's disposition is its own, never its platform's.
+ */
+export function findOutgoingWithoutRetiringChange(elements: readonly ElementsHeadRow[], retiringElementIds: ReadonlySet<UUID>, elementsById: ReadonlyMap<UUID, ElementsHeadRow> = new Map()): ElementsHeadRow[] {
+  return elements.filter((element) => {
+    if (element.element_type !== 'system' && element.element_type !== 'container') return false;
+    const attrs = attributesRecord(element.attributes);
+    if (attrs.disposition !== 'migrate' && attrs.disposition !== 'eliminate') return false;
+    if (retiringElementIds.has(element.element_id)) return false;
+    const parent = element.parent_id !== null ? elementsById.get(element.parent_id) : undefined;
+    const lifecycle = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : parent ? attributesRecord(parent.attributes).lifecycleStatus : undefined;
+    return lifecycle !== 'retiring' && lifecycle !== 'retired';
+  });
+}
+
+/** F11: the change statuses still open (`atlas.branch_status_is_open`) — a fixed, small enum, safe in an `.in()` filter. */
+const OPEN_CHANGE_STATUSES = ['draft', 'proposed', 'in_review', 'approved'] as const;
+
+/**
+ * F11: every element an open change retires — retracts it, or sets its
+ * lifecycle to retiring/retired. One delta query per open change, filtered
+ * by `commits.branch_id` through an inner embed and routed through
+ * `selectAll` (SPEC §6.7) — never an `.in()` over a growing id list
+ * (CLAUDE.md rule 8). RLS applies: another member's unshared draft is
+ * invisible, so its retirement doesn't count here.
+ */
+export async function loadElementsRetiredByOpenChanges(supabase: Client, modelId: UUID): Promise<Set<UUID>> {
+  interface RetiringDeltaRow { subject_id: UUID; kind: string; attribute: string | null; value: unknown }
+  const { data, error } = await supabase.from('branches').select('id').eq('model_id', modelId).eq('kind', 'change').in('status', [...OPEN_CHANGE_STATUSES]);
+  if (error) throw new Error(`loadElementsRetiredByOpenChanges: ${error.message}`);
+  const retiring = new Set<UUID>();
+  for (const branch of data as { id: UUID }[]) {
+    const rows = await selectAll<RetiringDeltaRow>(
+      supabase
+        .from('deltas')
+        .select('id, subject_id, kind, attribute, value, commits!inner(branch_id)', { count: 'exact' })
+        .eq('model_id', modelId)
+        .eq('subject_type', 'element')
+        .eq('commits.branch_id', branch.id)
+        .order('id'),
+    );
+    for (const row of rows) {
+      if (row.kind === 'element_retract') retiring.add(row.subject_id);
+      else if (row.kind === 'element_update' && row.attribute === 'lifecycleStatus' && (row.value === 'retiring' || row.value === 'retired')) retiring.add(row.subject_id);
+    }
+  }
+  return retiring;
+}
+
+/** F11: an open project whose declared scope includes an element — the finding names it, and its row opens it rather than starting another. */
+export interface ElementProjectScope {
+  elementId: UUID;
+  projectId: UUID;
+  projectTitle: string;
+}
+
+/** F11: declared-scope links of the model's open (active/on-hold) projects, through one inner embed on `projects.model_id` — no id list. */
+export async function listOpenProjectScopeForModel(supabase: Client, modelId: UUID): Promise<ElementProjectScope[]> {
+  interface EmbeddedProject { id: UUID; title: string; status: string }
+  // A many-to-one embed returns one object at runtime; postgrest-js's
+  // inference types it as an array, so accept either.
+  const rows = await selectAll<{ linked_id: UUID; projects: EmbeddedProject | EmbeddedProject[] }>(
+    supabase
+      .from('project_links')
+      .select('linked_id, project_id, linked_type, projects!inner(id, title, status, model_id)', { count: 'exact' })
+      .eq('linked_type', 'element')
+      .eq('projects.model_id', modelId)
+      .order('project_id')
+      .order('linked_id'),
+  );
+  return rows.flatMap((r) => {
+    const project = Array.isArray(r.projects) ? r.projects[0] : r.projects;
+    if (!project || (project.status !== 'active' && project.status !== 'on_hold')) return [];
+    return [{ elementId: r.linked_id, projectId: project.id, projectTitle: project.title }];
+  });
+}
+
 /** One capability flagged by `findCapabilitiesWithPoorFitPrimarySupporter`, alongside whether it was flagged via that function's own secondary-edge fallback (`fitAssessmentSupportsEdges`'s own doc comment) — callers word "supporter" rather than "primary supporter" copy accordingly (`decisionPrefill.ts`'s `prefillFromPoorFitCapabilityFinding`). */
 export interface CapabilityWithPoorFitSupporter {
   capability: ElementsHeadRow;

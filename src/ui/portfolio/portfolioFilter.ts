@@ -7,7 +7,7 @@
  * (`PortfolioView.tsx`'s own state, not this file) — these filters apply
  * to whichever rows that toggle currently makes visible.
  */
-import type { AnnualRunCost, Criticality } from '../../contracts/delta';
+import type { AnnualRunCost, Criticality, Disposition } from '../../contracts/delta';
 import type { PortfolioSignalKey } from './portfolioSignals';
 import { rowKindOf, type PortfolioRowKind } from './portfolioRowKind';
 import type { PortfolioRow } from './usePortfolio';
@@ -17,15 +17,19 @@ export interface PortfolioFilters {
   signal: PortfolioSignalKey | 'all';
   cost: AnnualRunCost | 'all';
   criticality: Criticality | 'all';
+  /** F11: one disposition, or rows with none recorded. */
+  disposition: Disposition | 'not_assessed' | 'all';
 }
 
-export const DEFAULT_PORTFOLIO_FILTERS: PortfolioFilters = { kind: 'all', signal: 'all', cost: 'all', criticality: 'all' };
+export const DEFAULT_PORTFOLIO_FILTERS: PortfolioFilters = { kind: 'all', signal: 'all', cost: 'all', criticality: 'all', disposition: 'all' };
 
 export function matchesPortfolioFilters(row: PortfolioRow, filters: PortfolioFilters): boolean {
   if (filters.kind !== 'all' && rowKindOf(row.element) !== filters.kind) return false;
   if (filters.signal !== 'all' && !row.signals.some((s) => s.key === filters.signal)) return false;
   if (filters.cost !== 'all' && row.cost !== filters.cost) return false;
   if (filters.criticality !== 'all' && row.criticality !== filters.criticality) return false;
+  if (filters.disposition === 'not_assessed' && row.disposition !== null) return false;
+  if (filters.disposition !== 'all' && filters.disposition !== 'not_assessed' && row.disposition !== filters.disposition) return false;
   return true;
 }
 
