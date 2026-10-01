@@ -45,7 +45,7 @@
        but none of them were *why* one too-wide line could force the
        whole page open — `<main>` was never actually held to 390px. */
     align-items: stretch;
-    padding-bottom: 64px;
+    padding-bottom: 96px;
   }
 
   .body > main {
@@ -117,6 +117,7 @@
    but the same defensive reasoning `.columnLink`'s own `min-width: 0`
    comments elsewhere in this codebase give). */
 .link {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -125,8 +126,72 @@
   color: var(--text);
 }
 
+/* F9 step 2: the review queue count on the Changes item (ModelNav.tsx's
+   `ReviewBadge`). After the label on the full rail; pinned over the
+   icon's top-right corner below 1024px, where the label is visually
+   hidden (below). Solid accent with its own foreground token, so the
+   digits read on both themes and in either the active or idle state. */
+.badge {
+  margin-left: auto;
+  min-width: 18px;
+  padding: 0 var(--space-1);
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .icon {
   flex-shrink: 0;
+}
+
+/* F9 step 5: the rail's Search button — styled as one more rail row, with
+   its keyboard shortcut shown at the end (label and hint both hidden on
+   the icon-only rail; the shortcut lives in the `title` tooltip there). */
+.searchButton {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.searchButton:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.shortcut {
+  margin-left: auto;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--text-muted);
+  border: var(--border-width) solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
 }
 
 .link:hover {
@@ -172,10 +237,33 @@
     white-space: nowrap;
     border: 0;
   }
+
+  .shortcut {
+    display: none;
+  }
+
+  .badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin-left: 0;
+    min-width: 16px;
+    font-size: 10px;
+    line-height: 16px;
+  }
 }
 
 .refChip {
   padding: 0 var(--space-2);
+}
+
+/* F9 step 4: the phone bar's More button, its visible short labels and its
+   sheet exist only below 768px. On the rail every section is listed, so
+   none of the three is shown there. */
+.moreButton,
+.barLabel,
+.sheet {
+  display: none;
 }
 
 @media (max-width: 768px) {
@@ -183,7 +271,7 @@
     width: 100%;
     flex-direction: column-reverse;
     gap: var(--space-1);
-    padding: var(--space-2);
+    padding: var(--space-1) var(--space-2);
     border-right: none;
     border-top: var(--border-width) solid var(--border-strong);
     position: fixed;
@@ -194,55 +282,166 @@
     z-index: 10;
   }
 
-  /* V2b: the three groups sit in one row instead of stacked — takes over
-     `.list`'s old role of spreading every item edge-to-edge
-     (`justify-content: space-between`) at the *group* level now, since
-     items are one level deeper (each group's own `.list`) than before. */
+  /* F9 step 4 (UI-principles §2.0): five items in one row — Home,
+     Capability map, Landscape, Changes, More — each a fifth of the width
+     and at least 44px tall. Groups, lists, captions and dividers flatten
+     away (`display: contents` / `none`) so the four bar items and the More
+     button are the row's only children; every other section is hidden
+     here and reached through the sheet. */
   .groupsWrapper {
     flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    align-items: stretch;
     gap: 0;
-    overflow-x: auto;
   }
 
-  /* Each group's own caption/divider/list, inline instead of stacked —
-     the caption itself is hidden just below (no room for a heading above
-     a cluster of icons this narrow), so what's left is the divider and
-     the list sitting side by side. */
-  .group {
-    flex-direction: row;
-    align-items: center;
-    gap: 0;
-    flex-shrink: 0;
+  .group,
+  .list {
+    display: contents;
   }
 
-  .groupCaption {
+  .groupCaption,
+  .divider,
+  .moreItem,
+  .searchButton {
     display: none;
   }
 
-  /* A vertical rule instead of the desktop horizontal one — the groups
-     now sit side by side, not stacked, so the divider between them turns
-     90 degrees with them. */
-  .divider {
-    width: var(--border-width);
-    height: 24px;
-    margin: 0 var(--space-2);
+  .barItem {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
   }
 
-  .list {
-    flex-direction: row;
-    gap: 0;
+  .link,
+  .moreButton {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: var(--space-1) 2px;
+    border-radius: var(--radius-sm);
   }
 
-  .link {
-    padding: var(--space-1) var(--space-2);
+  .moreButton {
+    border: none;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .moreButton:hover {
+    background: var(--surface-raised);
+  }
+
+  /* The shared `.active` fill, restated: `.moreButton`'s own `background:
+     none` above would otherwise win, leaving More unmarked while the
+     current page is one of the sheet's. */
+  .moreButton.active {
+    background: var(--accent-surface);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* F9 step 4: on the bar each item's own label shows again (it's
+     visually hidden on the icon-only rail above 768px), small enough for a
+     fifth of the width. A section with a short bar label keeps its full
+     label hidden here and shows `.barLabel` instead. */
+  .barItem .link:not(.hasShortLabel) .linkLabel {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    clip: auto;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  .barLabel {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  /* The review count sits on the icon's top-right corner, which in a
+     column-stacked item is just right of centre. */
+  .badge {
+    right: calc(50% - 22px);
+    top: 2px;
+  }
+
+  /* F9 step 4: the More sheet — opens upward from the bar, grouped and
+     captioned like the rail, every row a 44px target. */
+  .sheet {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface);
+    border-top: var(--border-width) solid var(--border-strong);
+    box-shadow: 0 -8px 24px rgb(0 0 0 / 12%);
+  }
+
+  .sheetGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .sheetCaption {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .sheetList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sheetLink {
+    width: 100%;
+    border: none;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 44px;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+  }
+
+  .sheetLink:hover {
+    background: var(--surface-raised);
   }
 
   /* `.nav` is `position: fixed; left: 0; right: 0`, so nothing clips a
      child that overflows it — a long branch/tag ref label bled past the
-     fixed rail's own edges and widened the whole page's scrollable area
+     fixed bar's own edges and widened the whole page's scrollable area
      (`Chip.module.css`'s `.chip` is `white-space: nowrap` by design,
      §6.3/§8.4, so it never wraps on its own). `min-width: 0` lets this
      flex item shrink below its content size so the chip's own `overflow:
@@ -251,7 +450,7 @@
   .refChip {
     display: flex;
     justify-content: center;
-    padding: var(--space-1) var(--space-2) 0;
+    padding: 0 var(--space-2);
     min-width: 0;
   }
 

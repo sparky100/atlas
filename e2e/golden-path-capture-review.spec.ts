@@ -55,7 +55,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
-import { goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { goToModelHome, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
 const FIXTURES_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'capture', 'fixtures');
 
@@ -63,7 +63,7 @@ test('upload a spreadsheet, accept and reject candidates by keyboard, and see th
   await signUpCreateOrgAndModel(page, 'capturegolden');
 
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Capture' }).click();
+  await clickNavItem(page, 'Capture');
   await expect(page.getByRole('heading', { name: 'Capture' })).toBeVisible();
   await page.getByRole('button', { name: 'New capture run' }).click();
 
@@ -124,7 +124,7 @@ test('a scanned PDF with no text layer fails with a plain explanation', async ({
   await signUpCreateOrgAndModel(page, 'capturescanned');
 
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Capture' }).click();
+  await clickNavItem(page, 'Capture');
   await page.getByRole('button', { name: 'New capture run' }).click();
   await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toBeVisible();
   await page.getByLabel('Choose a CSV, XLSX, JSON, or PDF file').setInputFiles(path.join(FIXTURES_DIR, '09-scanned', 'input.pdf'));
@@ -161,7 +161,7 @@ test('upload a JSON file, bulk-accept every new candidate by keyboard, and apply
   await signUpCreateOrgAndModel(page, 'capturejson');
 
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Capture' }).click();
+  await clickNavItem(page, 'Capture');
   await page.getByRole('button', { name: 'New capture run' }).click();
   await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toBeVisible();
   await page.getByLabel('Choose a CSV, XLSX, JSON, or PDF file').setInputFiles(inputPath);

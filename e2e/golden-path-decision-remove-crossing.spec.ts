@@ -19,7 +19,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
-import { addSystemFromHome, addUsesRelationship, goToModelHome, retireElement, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addSystemFromHome, addUsesRelationship, goToModelHome, retireElement, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
 test('an option that removes an IT/OT boundary crossing shows only the scoped-crossings row and the summary line, and "Also affected" lists the unrelated system it also retired', async ({ page }) => {
   await signUpCreateOrgAndModel(page, 'decisioncrossing');
@@ -50,7 +50,7 @@ test('an option that removes an IT/OT boundary crossing shows only the scoped-cr
   // 3. Start the decision, declaring System A and System B (not System C)
   // as its own concerns.
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Decisions' }).click();
+  await clickNavItem(page, 'Decisions');
   const decisionTitle = `Should we drop the A-to-B link? ${randomUUID().slice(0, 8)}`;
   await page.getByPlaceholder('Title (e.g. What replaces SAP PM?)').fill(decisionTitle);
   await page.getByPlaceholder('Context — why this decision needs making').fill('The A-to-B integration may no longer be needed.');
@@ -110,7 +110,7 @@ test('an option that removes an IT/OT boundary crossing shows only the scoped-cr
   // scoped crossings row), the option's own summary line, and "Also
   // affected" naming System C.
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Decisions' }).click();
+  await clickNavItem(page, 'Decisions');
   const decisionRow = page.locator('li', { hasText: decisionTitle });
   await decisionRow.getByRole('link', { name: 'Open →' }).click();
   await expect(page.getByRole('heading', { name: decisionTitle })).toBeVisible();

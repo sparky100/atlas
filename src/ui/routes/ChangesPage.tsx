@@ -5,6 +5,7 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { ChangesView } from '../changes/ChangesView';
+import { ChangesTabs } from '../changes/ChangesTabs/ChangesTabs';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
@@ -64,6 +65,7 @@ export function ChangesPage() {
               Changes
             </Text>
           </div>
+          <ChangesTabs orgSlug={orgSlug ?? ''} modelSlug={model.slug} modelId={model.id} current="all" />
           <ChangesView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} />
         </main>
       </div>

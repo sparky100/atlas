@@ -6,7 +6,7 @@
  * this cost", and confirm no horizontal overflow at 390.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { addCapability, addSystemFromHome, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addCapability, addSystemFromHome, goToModelHome, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
 async function setRunCost(page: Page, band: string): Promise<void> {
   await page.getByRole('button', { name: '✎ Edit' }).click();
@@ -37,7 +37,7 @@ test('set run cost and fit, see the expected signal in Portfolio, sort, filter a
   await setRunCost(page, 'under_50k');
 
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Portfolio' }).click();
+  await clickNavItem(page, 'Portfolio');
   await expect(page.getByRole('heading', { name: 'Portfolio' })).toBeVisible();
 
   // Default sort is cost band descending — Ledger System (£1m–£5m) before

@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { SelectedRefProvider } from './branches/SelectedRefProvider';
 import { BoundaryCrossingsPage } from './routes/BoundaryCrossingsPage';
+import { ReportsPage } from './routes/ReportsPage';
 import { CapabilityMapPage } from './routes/CapabilityMapPage';
 import { CaptureJobListPage } from './routes/CaptureJobListPage';
 import { CaptureReviewPage } from './routes/CaptureReviewPage';
@@ -84,6 +85,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/review" element={<ReviewQueuePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/review/:mergeRequestId" element={<ReviewRequestPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/review/capture/:jobId" element={<CaptureReviewPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/reports" element={<ReportsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/boundary-crossings" element={<BoundaryCrossingsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/external-interfaces" element={<ExternalInterfacesPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/duplicates" element={<DuplicatesReportPage />} />

@@ -68,6 +68,26 @@ export async function listOpenMergeRequestsForModel(supabase: Client, modelId: U
   return data as MergeRequestRow[];
 }
 
+/**
+ * F9 step 2: how many merge requests the review queue shows — the count
+ * behind the Changes nav item's badge and the Changes page's "Review queue"
+ * tab. Same rule as `useReviewQueue`: open requests only, and never a
+ * `record`/`correct` change's (those merge in one click from the change
+ * page, never through the shared queue — F0). One head-only request with
+ * an inner join to `branches` for the intent, so no id list is ever sent
+ * (CLAUDE.md rule 8).
+ */
+export async function countReviewQueueMergeRequests(supabase: Client, modelId: UUID): Promise<number> {
+  const { count, error } = await supabase
+    .from('merge_requests')
+    .select('id, branches!inner(intent)', { count: 'exact', head: true })
+    .eq('model_id', modelId)
+    .in('status', OPEN_STATUSES)
+    .not('branches.intent', 'in', '(record,correct)');
+  if (error) throw new Error(`countReviewQueueMergeRequests: ${error.message}`);
+  return count ?? 0;
+}
+
 export interface BranchMergeReview {
   review: MergeReview;
   /** Main's current head — distinct from `review.threeWay.mergeBaseCommitId` whenever the branch is behind (`!review.threeWay.upToDateWithMain`); a refresh's `mergedBranchHeadCommitId` needs this one, not the merge base. */

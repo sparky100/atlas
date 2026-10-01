@@ -106,7 +106,11 @@ export async function inviteMemberFromHome(page: Page, orgName: string, memberEm
   // exact: true — an existing member's own row has a "Role for <name>"
   // select too; the invite form's own field is the bare "Role" label.
   await page.getByLabel('Role', { exact: true }).selectOption(role);
-  await page.getByRole('button', { name: 'Send invite' }).click();
+  // exact: true — once one invite is pending, its row's "Resend invite for
+  // <email>" button also contains "send invite" (a case-insensitive
+  // substring match), so a second invite from the same page would be
+  // ambiguous without it.
+  await page.getByRole('button', { name: 'Send invite', exact: true }).click();
   await expect(page.getByText(memberEmail)).toBeVisible({ timeout: 15_000 });
 }
 
@@ -307,4 +311,30 @@ export async function goToModelHome(page: Page): Promise<void> {
   const toastDismiss = page.getByTestId('add-system-toast').getByRole('button', { name: 'Dismiss' });
   if (await toastDismiss.isVisible().catch(() => false)) await toastDismiss.click();
   await page.getByRole('link', { name: 'Home', exact: true }).click();
+}
+
+/**
+ * F9 step 4 (UI-principles §2.0): click a model nav item by name, at any
+ * width. Below 768px only Home, Capability map, Landscape and Changes sit
+ * on the bottom bar — every other section is behind More, so this opens
+ * the sheet first when the item isn't on screen.
+ */
+export async function clickNavItem(page: Page, name: string): Promise<void> {
+  const nav = page.getByRole('navigation', { name: 'Model navigation' });
+  const link = nav.getByRole('link', { name });
+  if (!(await link.isVisible())) await nav.getByRole('button', { name: /^More/ }).click();
+  await link.click();
+}
+
+/**
+ * F9 step 4: assert which nav section is current, at any width. On the rail
+ * (or the bar, for its four items) the link itself carries
+ * `aria-current="page"`; for a section behind More on a phone, the More
+ * button names it instead.
+ */
+export async function expectNavCurrent(page: Page, name: string): Promise<void> {
+  const nav = page.getByRole('navigation', { name: 'Model navigation' });
+  const link = nav.getByRole('link', { name });
+  if (await link.isVisible()) await expect(link).toHaveAttribute('aria-current', 'page');
+  else await expect(nav.getByRole('button', { name: `More (current: ${name})` })).toBeVisible();
 }

@@ -121,6 +121,13 @@ export async function listCaptureJobs(supabase: Client, modelId: UUID): Promise<
   return ((data as CaptureJobRow[] | null) ?? []).map(rowToWire);
 }
 
+/** F9 step 2: how many capture drafts are waiting for review — the review queue's own "Capture drafts" section (`ReviewQueueView.tsx`: jobs whose status is `parsed`), as a count only, for the Changes nav badge and the "Review queue" tab. */
+export async function countCaptureDraftsAwaitingReview(supabase: Client, modelId: UUID): Promise<number> {
+  const { count, error } = await supabase.from('capture_jobs').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('status', 'parsed');
+  if (error) throw new Error(`countCaptureDraftsAwaitingReview: ${error.message}`);
+  return count ?? 0;
+}
+
 /** One capture job by id — the review page's own header read (`capture_jobs_select`'s RLS: any member). `null` for an unknown or not-yet-visible id, never a thrown error, matching `getBranch`'s own convention. */
 export async function getCaptureJob(supabase: Client, jobId: UUID): Promise<CaptureJob | null> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.

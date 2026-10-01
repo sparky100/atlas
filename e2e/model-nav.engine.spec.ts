@@ -17,7 +17,7 @@ import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
 
-test('model nav: every model route reachable from every other within two taps on a mobile viewport', async ({ page }) => {
+test('model nav: five-item bottom bar with a More sheet; every model route within two taps on a mobile viewport', async ({ page }) => {
   const env = loadEnv();
 
   const email = `modelnav-${randomUUID()}@example.test`;
@@ -94,9 +94,26 @@ test('model nav: every model route reachable from every other within two taps on
   // Home is the current section on landing.
   await expect(nav.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
 
-  // One tap each reaches every other section, in a chain that visits all
-  // seven (prompt pack F3 PR4 added Decisions) — never more than one tap
-  // away from the bar since it's rendered on every page.
+  // F9 step 4 (UI-principles §2.0): the bar holds exactly five targets —
+  // Home, Capability map, Landscape, Changes and More — each at least 44px
+  // in both directions.
+  const barTargets = [
+    nav.getByRole('link', { name: 'Home' }),
+    nav.getByRole('link', { name: 'Capability map' }),
+    nav.getByRole('link', { name: 'Landscape' }),
+    nav.getByRole('link', { name: 'Changes' }),
+    nav.getByRole('button', { name: /^More/ }),
+  ];
+  for (const target of barTargets) {
+    const box = await target.boundingBox();
+    if (!box) throw new Error('a bottom bar target has no box');
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+  }
+  // Nothing else is on the bar: every other section's link is hidden until More opens.
+  await expect(nav.getByRole('link')).toHaveCount(4);
+
+  // One tap reaches each bar section.
   await nav.getByRole('link', { name: 'Capability map' }).click();
   await expect(page.getByRole('heading', { name: 'Capability map' })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Capability map' })).toHaveAttribute('aria-current', 'page');
@@ -109,17 +126,47 @@ test('model nav: every model route reachable from every other within two taps on
   await expect(page.getByRole('heading', { name: 'Changes', level: 1 })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Changes' })).toHaveAttribute('aria-current', 'page');
 
-  await nav.getByRole('link', { name: 'Decisions' }).click();
-  await expect(page.getByRole('heading', { name: 'Decisions', level: 1 })).toBeVisible();
-  await expect(nav.getByRole('link', { name: 'Decisions' })).toHaveAttribute('aria-current', 'page');
+  // Two taps — More, then the item — reach every other section; the sheet
+  // is grouped like the rail, and once there, More names the current
+  // section (the item itself is no longer on screen).
+  const more = nav.getByRole('button', { name: /^More/ });
+  const sheet = nav.getByRole('region', { name: 'More sections' });
+  const moreSections: { name: string; heading: string | RegExp }[] = [
+    { name: 'Value streams', heading: /Value streams/ },
+    { name: 'Elements', heading: /Elements|Browse/ },
+    { name: 'Portfolio', heading: 'Portfolio' },
+    { name: 'Roadmap', heading: /Roadmap/ },
+    { name: 'Reports', heading: 'Reports' },
+    { name: 'Decisions', heading: 'Decisions' },
+    { name: 'Capture', heading: /Capture/ },
+    { name: 'Versions', heading: 'Versions' },
+  ];
+  for (const section of moreSections) {
+    await more.click();
+    await expect(more).toHaveAttribute('aria-expanded', 'true');
+    await expect(sheet.getByText('Analyse', { exact: true })).toBeVisible();
+    await sheet.getByRole('link', { name: section.name }).click();
+    await expect(page.getByRole('heading', { name: section.heading, level: 1 }).first()).toBeVisible();
+    await expect(nav.getByRole('button', { name: `More (current: ${section.name})` })).toBeVisible();
+    await expect(sheet).toHaveCount(0);
+  }
 
-  await nav.getByRole('link', { name: 'Versions' }).click();
-  await expect(page.getByRole('heading', { name: 'Versions', level: 1 })).toBeVisible();
-  await expect(nav.getByRole('link', { name: 'Versions' })).toHaveAttribute('aria-current', 'page');
+  // Escape closes the sheet and returns focus to More; so does a tap outside it.
+  await more.click();
+  await expect(sheet).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  await expect(more).toBeFocused();
+  await more.click();
+  await page.getByRole('heading', { level: 1 }).first().click();
+  await expect(sheet).toHaveCount(0);
 
-  await nav.getByRole('link', { name: 'Review queue' }).click();
-  await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();
-  await expect(nav.getByRole('link', { name: 'Review queue' })).toHaveAttribute('aria-current', 'page');
+  // F9 step 2: the review queue is the Changes page's second tab, not a
+  // nav item — reached from Changes, and Changes stays the current item.
+  await nav.getByRole('link', { name: 'Changes' }).click();
+  await page.getByRole('navigation', { name: 'Changes views' }).getByRole('link', { name: 'Review queue' }).click();
+  await expect(page.getByRole('navigation', { name: 'Changes views' }).getByRole('link', { name: 'Review queue' })).toHaveAttribute('aria-current', 'page');
+  await expect(nav.getByRole('link', { name: 'Changes' })).toHaveAttribute('aria-current', 'page');
 
   // Non-adjacent jump — from the review queue straight to the capability
   // map, skipping the sections visited in between — proves the bar isn't
@@ -142,10 +189,14 @@ test('model nav: every model route reachable from every other within two taps on
   // don't name directly — still carries the same persistent bar, so a
   // second tap reaches any of the six sections from there too.
   await page.getByPlaceholder('Search or create a capability, system, or actor…').fill('Payment Gateway');
-  await page.getByRole('link', { name: /Payment Gateway/ }).click();
+  // The search result's own link (its name carries the relationship count) —
+  // the architect door's Recent activity can also link to the same system
+  // once it loads, which made a bare /Payment Gateway/ match racy.
+  await page.getByRole('link', { name: /Payment Gateway.*relationship/ }).click();
   await expect(page.getByRole('heading', { name: 'Payment Gateway' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Model navigation' })).toBeVisible();
-  await page.getByRole('navigation', { name: 'Model navigation' }).getByRole('link', { name: 'Versions' }).click();
+  await page.getByRole('navigation', { name: 'Model navigation' }).getByRole('button', { name: /^More/ }).click();
+  await page.getByRole('navigation', { name: 'Model navigation' }).getByRole('region', { name: 'More sections' }).getByRole('link', { name: 'Versions' }).click();
   await expect(page.getByRole('heading', { name: 'Versions', level: 1 })).toBeVisible();
 });
 
@@ -195,6 +246,7 @@ test('model nav: icons and groups at desktop width, icon-only with tooltips belo
   await expect(nav.getByText('Capability map', { exact: true })).toBeVisible();
   await expect(nav.getByText('Landscape', { exact: true })).toBeVisible();
   await expect(nav.getByText('Model', { exact: true })).toBeVisible();
+  await expect(nav.getByText('Analyse', { exact: true })).toBeVisible();
   await expect(nav.getByText('Work', { exact: true })).toBeVisible();
   await expect(nav.getByText('Record', { exact: true })).toBeVisible();
 
@@ -205,11 +257,14 @@ test('model nav: icons and groups at desktop width, icon-only with tooltips belo
   await page.setViewportSize({ width: 1000, height: 900 });
   const capabilityMapLink = nav.getByRole('link', { name: 'Capability map' });
   await expect(capabilityMapLink).toBeVisible();
-  await expect(nav.getByText('Capability map', { exact: true })).not.toBeVisible();
+  // Visually hidden, not removed: the sr-only label is clipped to a 1px
+  // box, which Playwright still counts as "visible" (any non-empty box is),
+  // so the check is the clipping itself rather than `.not.toBeVisible()`.
+  await expect(nav.getByText('Capability map', { exact: true })).toHaveCSS('width', '1px');
   await expect(capabilityMapLink).toHaveAttribute('title', 'Capability map');
 
   const landscapeLink = nav.getByRole('link', { name: 'Landscape' });
-  await expect(nav.getByText('Landscape', { exact: true })).not.toBeVisible();
+  await expect(nav.getByText('Landscape', { exact: true })).toHaveCSS('width', '1px');
   await expect(landscapeLink).toHaveAttribute('title', 'Landscape');
 
   // The rail is still tall enough at this width for a group caption above

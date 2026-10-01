@@ -10,12 +10,12 @@
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
-import { signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
 test('two like-for-like options with no commits of their own show the empty-state sentence and "No changes recorded yet" on each', async ({ page }) => {
   await signUpCreateOrgAndModel(page, 'decisionempty');
 
-  await page.getByRole('link', { name: 'Decisions' }).click();
+  await clickNavItem(page, 'Decisions');
   const decisionTitle = `Which vendor for the new ledger? ${randomUUID().slice(0, 8)}`;
   await page.getByPlaceholder('Title (e.g. What replaces SAP PM?)').fill(decisionTitle);
   await page.getByPlaceholder('Context — why this decision needs making').fill('Two vendors are shortlisted; neither has been explored yet.');
