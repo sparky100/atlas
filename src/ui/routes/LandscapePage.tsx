@@ -204,6 +204,17 @@ export function LandscapePage() {
     () => (displayInput ? listLandscapeLaneOptions([...displayInput.systemsById.values()], displayInput.supportsEdges, displayInput.l1AncestorByCapabilityId, [...displayInput.actorsById.values()]) : []),
     [displayInput],
   );
+  // The Inspector lists lanes in the order the canvas draws them: pinned
+  // lanes first, in the user's own pin order (what its ↑/↓ buttons
+  // reorder), then the rest in their existing order (`layout.ts`'s `pinTier`).
+  const orderedLaneOptions = useMemo(() => {
+    if (pinnedLaneKeys.length === 0) return laneOptions;
+    const tier = (key: string) => {
+      const index = pinnedLaneKeys.indexOf(key);
+      return index === -1 ? pinnedLaneKeys.length : index;
+    };
+    return [...laneOptions].sort((a, b) => tier(a.key) - tier(b.key));
+  }, [laneOptions, pinnedLaneKeys]);
   // V2: click-to-focus — plain, unpersisted view state, the same shape
   // `routeViaPlatforms`/`commentsOnlyFilter` already use below.
   const [rawFocusedElementId, setFocusedElementId] = useState<UUID | null>(null);
@@ -756,7 +767,7 @@ export function LandscapePage() {
                     showConnections={showConnections}
                     onShowConnectionsChange={setShowConnections}
                     lanes={displayState.display.layout.lanes}
-                    laneOptions={laneOptions}
+                    laneOptions={orderedLaneOptions}
                     pinnedLaneKeys={pinnedLaneKeys}
                     hiddenLaneKeys={hiddenLaneKeys}
                     onSetLaneCollapsed={setLaneCollapsed}

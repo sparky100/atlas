@@ -247,7 +247,7 @@ test('landscape bands: four systems across four level-1 lanes fill the canvas wi
   expect(hasHorizontalOverflow).toBe(false);
 });
 
-test('landscape actors and boundary: an internal and an external actor render above the top band, and an actor tile navigates straight to its own element page', async ({ page }) => {
+test('landscape actors and boundary: the internal actor renders above the top band and the external one in the external lane below the boundary, and an actor tile navigates straight to its own element page', async ({ page }) => {
   const { signedIn, modelId, orgSlug, modelSlug, main, genesisCommitId, seedSourceId } = await signUpAndCreateModel(page, 'landscape-actors');
 
   const capabilityId = randomUUID();
@@ -277,7 +277,9 @@ test('landscape actors and boundary: an internal and an external actor render ab
   const canvas = page.locator('canvas');
   // Item 3: both actors, external and internal together, in the aria-
   // label's own accessible summary of what the canvas drew.
-  await expect(canvas).toHaveAttribute('aria-label', /1 systems across 1 lanes, 2 actors/, { timeout: 30_000 });
+  // Two lanes: the capability's, and the external lane an external actor
+  // now gets below the boundary (`layout.ts`'s EXTERNAL_LANE_KEY).
+  await expect(canvas).toHaveAttribute('aria-label', /1 systems across 2 lanes, 2 actors/, { timeout: 30_000 });
 
   // The exact same pure layout function the app calls, given this
   // fixture's own data — deterministic, so this is the real, expected
@@ -289,10 +291,16 @@ test('landscape actors and boundary: an internal and an external actor render ab
   const supportsEdges = [{ relationship_id: 'r1', relationship_type: 'supports' as const, from_element_id: systemId, to_element_id: capabilityId, attributes: { role: 'primary' }, exists_delta_id: 'd1' }];
   const layout = computeLandscapeLayout([systemRow], supportsEdges, new Map([[capabilityId, capabilityRow]]), [internalActorRow, externalActorRow]);
 
-  // Both actors sit above the boundary (item 3: "actors above the top
-  // band"), which itself starts strictly below them.
+  // The internal actor sits above the boundary (item 3: "actors above the
+  // top band"); the external one sits in the external lane below it
+  // (S1 item 11a, `layout.ts`'s EXTERNAL_LANE_KEY placement).
   expect(layout.actorNodes).toHaveLength(2);
-  for (const actorNode of layout.actorNodes) expect(actorNode.y).toBeLessThan(layout.boundary.top);
+  const internalActorNode = layout.actorNodes.find((n) => n.elementId === internalActorId);
+  if (!internalActorNode) throw new Error('computeLandscapeLayout did not place the internal actor');
+  expect(internalActorNode.y).toBeLessThan(layout.boundary.top);
+  const externalActorPlaced = layout.actorNodes.find((n) => n.elementId === externalActorId);
+  if (!externalActorPlaced) throw new Error('computeLandscapeLayout did not place the external actor');
+  expect(externalActorPlaced.y).toBeGreaterThan(layout.boundary.bottom);
 
   // An actor tile navigates straight to its own element page (no Context
   // view of its own, unlike a system).

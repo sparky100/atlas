@@ -94,7 +94,8 @@ test('landscape actions: "+ Add" collapses into a disclosure below 768px, with n
   if (!seedResult.ok) throw new Error(`seeding landscape-actions fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/landscape`);
-  await expect(page.getByText('Billing')).toBeVisible();
+  // The desktop landscape is a canvas (its systems aren't DOM text): wait for it to draw.
+  await expect(page.getByRole('img', { name: /Landscape diagram: 1 systems/ })).toBeVisible();
 
   // >= 768px: both controls sit inline, no disclosure involved.
   await page.setViewportSize({ width: 1024, height: 900 });

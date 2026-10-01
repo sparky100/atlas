@@ -160,7 +160,9 @@ test('landscape filters: checking one capability narrows the canvas to its own s
   await expect(canvas).toHaveAttribute('aria-label', /3 systems across 2 lanes/, { timeout: 30_000 });
 
   await page.locator('summary', { hasText: 'Capability' }).click();
-  await page.getByRole('checkbox', { name: 'Alpha Capability' }).check();
+  // The checkbox reflects the URL, which updates a beat after the click — `.check()` reads it too early.
+  await page.getByRole('checkbox', { name: 'Alpha Capability' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Alpha Capability' })).toBeChecked();
 
   await expect(page).toHaveURL(new RegExp(`capabilities=${capAlphaId}`));
   // "Canvas shows only matches" — the two Alpha-supporting systems remain, across the one lane; Beta System One (and its own lane) are gone entirely.
@@ -177,7 +179,11 @@ test('landscape filters: a facet stays open across two selections, no re-opening
   await expect(canvas).toHaveAttribute('aria-label', /1 systems/, { timeout: 30_000 });
 
   await page.locator('summary', { hasText: 'Lifecycle' }).click();
-  await page.getByRole('checkbox', { name: 'Active' }).check();
+  // `.click()` then an assertion, not `.check()`: these checkboxes follow
+  // the URL's own filter state, which settles a tick after the click —
+  // `.check()` reads the state back immediately and calls that a failure.
+  await page.getByRole('checkbox', { name: 'Active' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Active' })).toBeChecked();
   // Regression: a filter change used to reset `useLandscapeDisplay`'s own
   // state to 'loading' while the worker recomputed the layout, which
   // unmounted the whole canvas+Inspector subtree gated on it
@@ -186,7 +192,7 @@ test('landscape filters: a facet stays open across two selections, no re-opening
   // the *same* facet with no intervening `summary` click proves it never
   // closed; a closed `<details>` would make this `.check()` time out
   // (the checkbox inside it is not visible to Playwright).
-  await page.getByRole('checkbox', { name: 'Planned' }).check();
+  await page.getByRole('checkbox', { name: 'Planned' }).click();
   await expect(page.getByRole('checkbox', { name: 'Active' })).toBeChecked();
   await expect(page.getByRole('checkbox', { name: 'Planned' })).toBeChecked();
 });
@@ -250,8 +256,11 @@ test('landscape lanes: collapse/expand and pin, each remembered per user across 
   // Beta leads, Alpha second, Gamma (never pinned) trails, regardless of
   // the plain alphabetical order the three would otherwise sort in. Pin
   // state doesn't affect collapse — still 1 system, Alpha still collapsed.
-  await page.getByRole('button', { name: 'Pin Beta Capability lane' }).click();
-  await page.getByRole('button', { name: 'Pin Alpha Capability lane' }).click();
+  // Each pin is saved to the user's preferences in the background; wait for
+  // each save to land before reloading, or the reload can outrun them.
+  const savedPreference = () => page.waitForResponse((r) => r.url().includes('/user_preferences') && r.request().method() !== 'GET' && r.ok());
+  await Promise.all([savedPreference(), page.getByRole('button', { name: 'Pin Beta Capability lane' }).click()]);
+  await Promise.all([savedPreference(), page.getByRole('button', { name: 'Pin Alpha Capability lane' }).click()]);
   await page.reload();
   await expect(canvas).toHaveAttribute('aria-label', /1 systems across 3 lanes/, { timeout: 30_000 });
   const laneTexts = await page.getByRole('listitem').allTextContents();
