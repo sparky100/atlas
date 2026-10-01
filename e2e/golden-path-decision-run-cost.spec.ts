@@ -10,7 +10,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { addSystemFromHome, goToModelHome, retireElement, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addSystemFromHome, goToModelHome, retireElement, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
 async function setRunCost(page: Page, band: string): Promise<void> {
   await page.getByRole('button', { name: '✎ Edit' }).click();
@@ -28,7 +28,7 @@ test('replacing a costed system with a costed alternative on an option shows the
 
   // Start the decision, linking PM as its one concern.
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Decisions' }).click();
+  await clickNavItem(page, 'Decisions');
   const decisionTitle = `What replaces PM? ${randomUUID().slice(0, 8)}`;
   await page.getByPlaceholder('Title (e.g. What replaces SAP PM?)').fill(decisionTitle);
   await page.getByPlaceholder('Context — why this decision needs making').fill('PM is end of life; Hana equivalent is the named replacement.');
@@ -64,7 +64,7 @@ test('replacing a costed system with a costed alternative on an option shows the
   // Back on the decision: the Run cost row pairs the two, evidence only —
   // no total, no difference, no "saving" text anywhere in the row.
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Decisions' }).click();
+  await clickNavItem(page, 'Decisions');
   const decisionRow = page.locator('li', { hasText: decisionTitle });
   await decisionRow.getByRole('link', { name: 'Open →' }).click();
   await expect(page.getByRole('heading', { name: decisionTitle })).toBeVisible();

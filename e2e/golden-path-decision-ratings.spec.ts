@@ -10,12 +10,12 @@
  * options, not the (separately-covered) structural comparison table.
  */
 import { expect, test } from '@playwright/test';
-import { signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
 test('rate decision options on judgement criteria, leave some unrated, choose one with a rationale; ratings stay recorded and read-only afterwards', async ({ page }) => {
   await signUpCreateOrgAndModel(page, 'ratings');
 
-  await page.getByRole('link', { name: 'Decisions' }).click();
+  await clickNavItem(page, 'Decisions');
   const decisionTitle = `Which replaces the ledger system? ${Date.now().toString()}`;
   await page.getByPlaceholder('Title (e.g. What replaces SAP PM?)').fill(decisionTitle);
   await page.getByPlaceholder('Context — why this decision needs making').fill('The current ledger system is past its support end date.');

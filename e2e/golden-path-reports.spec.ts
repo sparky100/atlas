@@ -7,7 +7,7 @@
  * Reports item staying current throughout.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { addSystemFromHome, addUsesRelationship, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addSystemFromHome, addUsesRelationship, clickNavItem, expectNavCurrent, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 async function setDomain(page: Page, domain: 'it' | 'ot'): Promise<void> {
   await page.getByRole('button', { name: '✎ Edit' }).click();
@@ -28,11 +28,12 @@ test('Reports: reach every standing report from the nav, see its real count, and
   // The link is saved once it shows on the page — only then is it on main for the hub to count.
   await expect(page.getByText('reads sensor readings from').first()).toBeVisible({ timeout: 15_000 });
 
-  const nav = page.getByRole('navigation', { name: 'Model navigation' });
-  const reportsItem = nav.getByRole('link', { name: 'Reports' });
-  await reportsItem.click();
+  // At 390 Reports is behind the bottom bar's More (F9 step 4); the
+  // helpers open it when needed and check the More button names Reports
+  // as the current section there.
+  await clickNavItem(page, 'Reports');
   await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible();
-  await expect(reportsItem).toHaveAttribute('aria-current', 'page');
+  await expectNavCurrent(page, 'Reports');
 
   // Each count is what the report behind it lists: the one crossing built
   // above, and genuine zeros everywhere else (no duplicate check has run).
@@ -46,20 +47,20 @@ test('Reports: reach every standing report from the nav, see its real count, and
   await page.getByRole('link', { name: 'Open Boundary crossings' }).click();
   await expect(page.getByRole('heading', { name: 'Boundary crossings', level: 1 })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Asset Register' }).first()).toBeVisible();
-  await expect(reportsItem).toHaveAttribute('aria-current', 'page');
+  await expectNavCurrent(page, 'Reports');
 
-  await reportsItem.click();
+  await clickNavItem(page, 'Reports');
   await page.getByRole('link', { name: 'Open External interfaces' }).click();
   await expect(page.getByRole('heading', { name: 'External interfaces', level: 1 })).toBeVisible();
-  await expect(reportsItem).toHaveAttribute('aria-current', 'page');
+  await expectNavCurrent(page, 'Reports');
 
-  await reportsItem.click();
+  await clickNavItem(page, 'Reports');
   await page.getByRole('link', { name: 'Open Duplicates' }).click();
   await expect(page.getByRole('heading', { name: 'Duplicates report', level: 1 })).toBeVisible();
-  await expect(reportsItem).toHaveAttribute('aria-current', 'page');
+  await expectNavCurrent(page, 'Reports');
 
   // No horizontal overflow on the hub (meaningful at 390).
-  await reportsItem.click();
+  await clickNavItem(page, 'Reports');
   await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible();
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(hasHorizontalOverflow).toBe(false);

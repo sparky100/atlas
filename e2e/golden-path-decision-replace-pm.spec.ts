@@ -8,7 +8,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
-import { addSystemFromHome, goToModelHome, retireElement, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addSystemFromHome, goToModelHome, retireElement, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
 test('retiring PM on an option, with a real replacement picked, shows the Outcome row as "replaced by <name>"', async ({ page }) => {
   await signUpCreateOrgAndModel(page, 'decisionreplacepm');
@@ -20,7 +20,7 @@ test('retiring PM on an option, with a real replacement picked, shows the Outcom
   // Start the decision, linking PM (a system, not a capability) as its
   // one concern.
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Decisions' }).click();
+  await clickNavItem(page, 'Decisions');
   const decisionTitle = `What replaces PM? ${randomUUID().slice(0, 8)}`;
   await page.getByPlaceholder('Title (e.g. What replaces SAP PM?)').fill(decisionTitle);
   await page.getByPlaceholder('Context — why this decision needs making').fill('PM is end of life; Hana equivalent is the named replacement.');
@@ -61,7 +61,7 @@ test('retiring PM on an option, with a real replacement picked, shows the Outcom
   // Back on the decision: the Outcome row reads "replaced by Hana
   // equivalent" for this option; main's own column stays "unchanged".
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Decisions' }).click();
+  await clickNavItem(page, 'Decisions');
   const decisionRow = page.locator('li', { hasText: decisionTitle });
   await decisionRow.getByRole('link', { name: 'Open →' }).click();
   await expect(page.getByRole('heading', { name: decisionTitle })).toBeVisible();

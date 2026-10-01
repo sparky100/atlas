@@ -312,3 +312,29 @@ export async function goToModelHome(page: Page): Promise<void> {
   if (await toastDismiss.isVisible().catch(() => false)) await toastDismiss.click();
   await page.getByRole('link', { name: 'Home', exact: true }).click();
 }
+
+/**
+ * F9 step 4 (UI-principles §2.0): click a model nav item by name, at any
+ * width. Below 768px only Home, Capability map, Landscape and Changes sit
+ * on the bottom bar — every other section is behind More, so this opens
+ * the sheet first when the item isn't on screen.
+ */
+export async function clickNavItem(page: Page, name: string): Promise<void> {
+  const nav = page.getByRole('navigation', { name: 'Model navigation' });
+  const link = nav.getByRole('link', { name });
+  if (!(await link.isVisible())) await nav.getByRole('button', { name: /^More/ }).click();
+  await link.click();
+}
+
+/**
+ * F9 step 4: assert which nav section is current, at any width. On the rail
+ * (or the bar, for its four items) the link itself carries
+ * `aria-current="page"`; for a section behind More on a phone, the More
+ * button names it instead.
+ */
+export async function expectNavCurrent(page: Page, name: string): Promise<void> {
+  const nav = page.getByRole('navigation', { name: 'Model navigation' });
+  const link = nav.getByRole('link', { name });
+  if (await link.isVisible()) await expect(link).toHaveAttribute('aria-current', 'page');
+  else await expect(nav.getByRole('button', { name: `More (current: ${name})` })).toBeVisible();
+}

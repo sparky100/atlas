@@ -16,7 +16,7 @@
  * replacement marker.
  */
 import { expect, test } from '@playwright/test';
-import { addCapability, addSystemFromHome, goToModelHome, retireElement, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addCapability, addSystemFromHome, goToModelHome, retireElement, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
 function isoDateDaysFromNow(days: number): string {
   const d = new Date();
@@ -84,7 +84,7 @@ test('a retire-and-replace change, once merged, appears as an arrow on the roadm
   // org/model names contain the word — only visible at the 1280 viewport,
   // where the breadcrumb renders (collapsed at 390, where this spec also
   // runs — S2's own "fix until they pass at 1280 and 390").
-  await page.getByRole('link', { name: 'Roadmap', exact: true }).click();
+  await clickNavItem(page, 'Roadmap');
   await expect(page.getByRole('heading', { name: 'Roadmap' })).toBeVisible();
   await expect(page.getByText(quarterLabelDaysFromNow(120))).toBeVisible();
   await expect(page.locator('[data-kind="replace"]').first()).toBeVisible();

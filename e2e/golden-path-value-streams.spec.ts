@@ -21,7 +21,7 @@
  * the seeded map has no value streams and this path has nothing to show.
  */
 import { expect, test } from '@playwright/test';
-import { addSystemFromHome, goToModelHome, retireElement, seedStarterCapabilityMap, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addSystemFromHome, goToModelHome, retireElement, seedStarterCapabilityMap, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
 test('a retired capability supporter reads as weakness up the value stream', async ({ page }) => {
   await signUpCreateOrgAndModel(page, 'goldenpath-vs');
@@ -37,7 +37,7 @@ test('a retired capability supporter reads as weakness up the value stream', asy
   // Retire it — the stage rollup rolls up to warn.
   await retireElement(page, '2026-12-31');
 
-  await page.getByRole('link', { name: 'Value streams' }).click();
+  await clickNavItem(page, 'Value streams');
   await expect(page.getByRole('heading', { name: 'Value streams' })).toBeVisible();
 
   // Mobile (390): each stream is a collapsed accordion — expand Getting
