@@ -7,7 +7,7 @@ import { createEvidence } from '../../db/evidence';
 import { addProjectLink, removeProjectLink, setProjectStatus, updateProject } from '../../db/projects';
 import type { BranchIntent, BranchRow, DecisionRow, MemberRole, ProjectRow } from '../../db/types';
 import { useMainBranch } from '../branches/useMainBranch';
-import { INTENT_LABEL, NEW_CHANGE_INTENT_OPTIONS } from '../changes/branchIntent';
+import { dateFieldLabelForIntent, INTENT_LABEL, isDateRequiredForIntent, NEW_CHANGE_INTENT_OPTIONS } from '../changes/branchIntent';
 import { branchStatusTone } from '../changes/branchStatus';
 import { profileLabel } from '../comments/profileLabel';
 import { Button } from '../components/Button/Button';
@@ -382,6 +382,9 @@ function NewChangeForm({ project, userId, mainHeadCommitId, base }: { project: P
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [intent, setIntent] = useState<BranchIntent>('propose');
+  const [targetDate, setTargetDate] = useState('');
+  const dateLabel = dateFieldLabelForIntent(intent);
+  const dateMissing = isDateRequiredForIntent(intent) && targetDate === '';
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -389,7 +392,7 @@ function NewChangeForm({ project, userId, mainHeadCommitId, base }: { project: P
       className={styles.inlineForm}
       onSubmit={(e) => {
         e.preventDefault();
-        if (name.trim().length === 0) return;
+        if (name.trim().length === 0 || dateMissing) return;
         setBusy(true);
         setError(null);
         void createChangeBranch(supabase, {
@@ -401,6 +404,7 @@ function NewChangeForm({ project, userId, mainHeadCommitId, base }: { project: P
           createdBy: userId,
           mainHeadCommitId,
           intent,
+          ...(dateLabel !== null && targetDate !== '' ? { targetDate } : {}),
           projectId: project.id,
         })
           .then((b) => navigate(`${base}/changes/${b.id}?ref=branch:${b.id}`))
@@ -447,7 +451,18 @@ function NewChangeForm({ project, userId, mainHeadCommitId, base }: { project: P
           </option>
         ))}
       </select>
-      <Button type="submit" disabled={busy || name.trim().length === 0}>
+      {dateLabel !== null && (
+        <input
+          className={styles.input}
+          type="date"
+          aria-label={dateLabel}
+          value={targetDate}
+          onChange={(e) => {
+            setTargetDate(e.target.value);
+          }}
+        />
+      )}
+      <Button type="submit" disabled={busy || name.trim().length === 0 || dateMissing}>
         {busy ? 'Starting…' : 'Start change'}
       </Button>
       {error !== null && <Text as="p">{error}</Text>}
