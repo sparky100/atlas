@@ -11,6 +11,8 @@ import { moduleDisplayName } from './moduleDisplayName';
 import {
   computeStaleAttributesFinding,
   findCapabilitiesWithNoSupporters,
+  findOutgoingWithoutRetiringChange,
+  loadElementsRetiredByOpenChanges,
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
@@ -69,6 +71,8 @@ export type ElementBrowseFilter =
   | 'critical-support-end'
   /** Per-item-actions prompt: the third decision-shaped finding, `findCapabilitiesWithNoSupporters`'s own filter key (`ArchitectHome.tsx`'s `capability-no-supporters` check). */
   | 'capability-no-supporters'
+  /** F11: systems and modules marked Migrate or Eliminate with no open change retiring them (`findOutgoingWithoutRetiringChange`). */
+  | 'outgoing-no-retiring-change'
   | CustomAttributeBrowseFilter
   | null;
 
@@ -302,6 +306,10 @@ export function useElementBrowse(
         const capabilities = elements.filter((e) => e.element_type === 'capability');
         const level1Capabilities = computeCapabilityMapTree(capabilities).l1.map((column) => column.capability);
         ids = new Set(findCapabilitiesWithNoSupporters(level1Capabilities, capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'outgoing-no-retiring-change') {
+        const retiring = await loadElementsRetiredByOpenChanges(supabase, modelId);
+        const candidates = elements.filter((e) => e.element_type === 'system' || e.element_type === 'container');
+        ids = new Set(findOutgoingWithoutRetiringChange(candidates, retiring, elementsById).map((e) => e.element_id));
       } else if (filter !== null && typeof filter === 'object') {
         // F1 PR4: an org-defined attribute's own equality filter — `value`
         // arrives already parsed to the definition's `kind` by the caller,

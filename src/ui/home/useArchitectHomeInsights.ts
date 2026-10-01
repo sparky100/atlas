@@ -15,6 +15,10 @@ import {
   findCapabilitiesWithPoorFitPrimarySupporter,
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
+  findOutgoingWithoutRetiringChange,
+  listOpenProjectScopeForModel,
+  loadElementsRetiredByOpenChanges,
+  type ElementProjectScope,
   findCriticalSystemsWithoutBusinessOwner,
   findExternalInterfacesMissingClassification,
   findExternalOrganisationAccess,
@@ -88,6 +92,10 @@ export interface ArchitectHomeInsightsData {
   boundaryCrossingsMissingClassification: BoundaryCrossing[];
   /** Prompt 7k item 5's third Assurance finding: critical systems past or within `STALE_AFTER_MONTHS` of vendor support end. */
   criticalSystemsPastOrNearSupportEnd: ElementsHeadRow[];
+  /** F11: systems and modules marked Migrate or Eliminate with no open change retiring them (`findOutgoingWithoutRetiringChange`). */
+  outgoingWithoutRetiringChange: ElementsHeadRow[];
+  /** F11: the open project whose declared scope includes each element, when there is one — the finding names it. */
+  projectByElementId: Map<UUID, ElementProjectScope>;
   /** S1 item 11a's own first Assurance finding: a `uses`/`flows_to` edge crossing the enterprise/external boundary (`isExternal`/`externalOrganisation`, not IT/OT domain) with no data classification. */
   externalInterfacesMissingClassification: ExternalInterfaceCrossing[];
   /** S1 item 11a's own second Assurance row: purely informational — every external actor `uses` edge, naming the organisation and which system it reaches. No classification requirement (see that finding's own doc comment for why). */
@@ -129,7 +137,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         return;
       }
 
-      const [commits, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, plannedReplacements, duplicateCandidates] = await Promise.all([
+      const [commits, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, plannedReplacements, duplicateCandidates, retiringElementIds, projectScope] = await Promise.all([
         // S1 item 6: "recent activity" now groups consecutive same-subject
         // commits into one line and prefers others' activity when trimming
         // to five displayed items (groupRecentActivity.ts) — both can
@@ -164,6 +172,9 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         // since the last check (that function's own doc comment), so this
         // count never lags a merge the way "next scheduled check" alone would.
         listDuplicateCandidates(supabase, modelId, main.head_commit_id),
+        // F11: what open changes retire, and which open projects claim which elements.
+        loadElementsRetiredByOpenChanges(supabase, modelId),
+        listOpenProjectScopeForModel(supabase, modelId),
       ]);
 
       const usesAndFlowsToEndpointsById = new Map([...usesAndFlowsToEndpoints, ...actors].map((el) => [el.element_id, el]));
@@ -232,6 +243,8 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             systemsSupportingEssentialFunctionWithoutTechnicalOwner: findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...systems, ...containers], capabilities, supportsEdges, ownsEdges),
             boundaryCrossingsMissingClassification: findBoundaryCrossingsMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             criticalSystemsPastOrNearSupportEnd: findCriticalSystemsPastOrNearSupportEnd(systems),
+            outgoingWithoutRetiringChange: findOutgoingWithoutRetiringChange([...systems, ...containers], retiringElementIds, new Map(systems.map((el) => [el.element_id, el]))),
+            projectByElementId: new Map(projectScope.map((scope) => [scope.elementId, scope])),
             externalInterfacesMissingClassification: findExternalInterfacesMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             externalOrganisationAccess: findExternalOrganisationAccess(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             capabilitiesWithPoorFitPrimarySupporter: findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supportsEdges, groupPlannedReplacementsByCapability(plannedReplacements)),

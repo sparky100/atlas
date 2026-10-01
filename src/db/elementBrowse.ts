@@ -143,4 +143,5 @@ export const FINDING_FILTER_OPTIONS: readonly { value: string; label: string }[]
   { value: 'essential-no-technical-owner', label: 'Essential systems with no technical owner' },
   { value: 'critical-support-end', label: 'Critical systems past or near support end' },
   { value: 'capability-no-supporters', label: 'Capabilities with no supporters' },
+  { value: 'outgoing-no-retiring-change', label: 'Marked Migrate or Eliminate, nothing retiring it' },
 ];

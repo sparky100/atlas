@@ -141,6 +141,21 @@ export function prefillFromWeakStage(stage: { id: UUID; name: string }, toneLabe
   };
 }
 
+/**
+ * F11's own finding (`findOutgoingWithoutRetiringChange`, the architect
+ * door's `outgoing-no-retiring-change` check): a system or module marked
+ * Migrate or Eliminate with no open change retiring it. Phrased for its
+ * one entry point, "Start a project" — the work, not a question.
+ */
+export function prefillFromOutgoingDisposition(element: { id: UUID; name: string }, disposition: 'migrate' | 'eliminate'): DecisionPrefill {
+  return {
+    title: disposition === 'migrate' ? `Migrate ${element.name}` : `Eliminate ${element.name}`,
+    statement: `${element.name} is marked ${disposition === 'migrate' ? 'Migrate' : 'Eliminate'}, with no open change retiring it yet.`,
+    sourceFindingKey: 'outgoing-no-retiring-change',
+    linkedElements: [{ id: element.id, name: element.name }],
+  };
+}
+
 const TITLE_PARAM = 'startTitle';
 const STATEMENT_PARAM = 'startStatement';
 const FINDING_KEY_PARAM = 'startFindingKey';
