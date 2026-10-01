@@ -67,7 +67,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
                 ownerId,
                 startDate,
                 targetDate,
-                ...(initial ? { sourceFindingKey: initial.sourceFindingKey } : {}),
+                ...(initial?.sourceFindingKey ? { sourceFindingKey: initial.sourceFindingKey } : {}),
                 scopeElementIds: scope.map((s) => s.elementId),
               }).then((project) => {
                 if (project) void navigate(`/o/${orgSlug}/m/${modelSlug}/projects/${project.id}`);

@@ -24,6 +24,8 @@ import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { useElementBrowse, type ElementBrowseFilter } from '../elements/useElementBrowse';
 import type { BrowseRow } from '../../db/elementBrowse';
+import { StartProjectLink } from '../projects/StartProjectLink';
+import { canStartProject } from '../orgs/roleGates';
 import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromCriticalExposedFinding, prefillFromCriticalSupportEndFinding } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { useRouteTiming } from '../perf/useRouteTiming';
@@ -208,7 +210,13 @@ export function ElementsPage() {
               : filter === 'critical-exposed'
                 ? prefillFromCriticalExposedFinding(element)
                 : prefillFromCapabilityNoSupportersFinding(element);
-          return <StartDecisionLink href={`/o/${orgSlug ?? ''}/m/${model.slug}/decisions?${decisionPrefillToSearchParams(prefill).toString()}`} />;
+          const params = decisionPrefillToSearchParams(prefill).toString();
+          return (
+            <span className={styles.rowActions}>
+              <StartDecisionLink href={`/o/${orgSlug ?? ''}/m/${model.slug}/decisions?${params}`} />
+              {canStartProject(role) && <StartProjectLink href={`/o/${orgSlug ?? ''}/m/${model.slug}/projects?${params}`} />}
+            </span>
+          );
         }
       : undefined;
 

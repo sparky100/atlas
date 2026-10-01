@@ -12,7 +12,8 @@ import { loadMainCommittedRoadmapEventsForModel, loadRoadmapChangeEventsForModel
 import { listAllEnablesEdges } from '../../db/valueStreams';
 import { reportError } from '../errors/errorBannerStore';
 import { isRoadmapEligibleBranch } from './roadmapEligibility';
-import { groupBarsByValueStream, groupRoadmapLifecycleBars, type RoadmapGroup } from './roadmapLifecycleRows';
+import { groupBarsByProject, groupBarsByValueStream, groupRoadmapLifecycleBars, type RoadmapGroup, type RoadmapProjectRef } from './roadmapLifecycleRows';
+import { listProjectsForModel } from '../../db/projects';
 import { systemsAndModulesFor } from './roadmapModules';
 import { supabase } from '../supabaseClient';
 
@@ -21,6 +22,8 @@ export interface RoadmapData {
   groups: RoadmapGroup[];
   /** F6 Step 6: the same bars grouped by value stream instead of capability (`groupBarsByValueStream`) — computed alongside `groups` so switching `?groupBy=` never refetches. */
   valueStreamGroups: RoadmapGroup[];
+  /** F10 step 6: the same bars grouped by the project(s) whose changes touch each system (`groupBarsByProject`). */
+  projectGroups: RoadmapGroup[];
   /**
    * Every change branch eligible under *either* as-is or to-be
    * (`isRoadmapEligibleBranch`'s own to-be superset — merged, or still
@@ -84,7 +87,7 @@ export function useRoadmap(
       const capabilityIds = capabilities.map((c) => c.element_id);
       const valueStreamsById = new Map(allElements.filter((e) => e.element_type === 'value_stream').map((e) => [e.element_id, e]));
 
-      const [supportsEdges, ownsEdges, changeBranches, enablesEdges, mainBranch] = await Promise.all([listSupportsEdgesForCapabilities(supabase, commitId, capabilityIds), listOwnsEdges(supabase, commitId), listChangeBranches(supabase, modelId), listAllEnablesEdges(supabase, commitId), getMainBranch(supabase, modelId)]);
+      const [supportsEdges, ownsEdges, changeBranches, enablesEdges, mainBranch, projects] = await Promise.all([listSupportsEdgesForCapabilities(supabase, commitId, capabilityIds), listOwnsEdges(supabase, commitId), listChangeBranches(supabase, modelId), listAllEnablesEdges(supabase, commitId), getMainBranch(supabase, modelId), listProjectsForModel(supabase, modelId)]);
 
       const elementHref = (id: UUID): string => `/o/${orgSlug}/m/${modelSlug}/e/${id}`;
       const groups = groupRoadmapLifecycleBars(systemsAndModules, supportsEdges, ownsEdges, capabilitiesById, elementHref);
@@ -103,8 +106,10 @@ export function useRoadmap(
       // (`deriveMainCommittedChangeEvents`), one pseudo-branch per event.
       const mainCommittedEvents = mainBranch ? await loadMainCommittedRoadmapEventsForModel(supabase, modelId, mainBranch, branchEvents, commitLoader) : [];
       const allBranchEvents = [...branchEvents, ...mainCommittedEvents];
+      const projectsById = new Map<UUID, RoadmapProjectRef>(projects.map((p) => [p.id, { id: p.id, title: p.title, href: `/o/${orgSlug}/m/${modelSlug}/projects/${p.id}` }]));
+      const projectGroups = groupBarsByProject(systemsAndModules, supportsEdges, ownsEdges, capabilitiesById, allBranchEvents, projectsById);
 
-      if (!cancelled) setState({ status: 'ready', data: { commitId, groups, valueStreamGroups, branchEvents: allBranchEvents, capabilitiesById, ownerActorsById } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, groups, valueStreamGroups, projectGroups, branchEvents: allBranchEvents, capabilitiesById, ownerActorsById } });
     }
 
     load().catch((e: unknown) => {

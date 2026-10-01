@@ -4,8 +4,20 @@ import type { DecisionPrefill } from '../decisions/decisionPrefill';
 export interface ProjectFormPrefill {
   title: string;
   purpose: string;
-  sourceFindingKey: string;
+  /** `null` when the start didn't come from a health finding (the element page's own "Start a project…"). */
+  sourceFindingKey: string | null;
   scope: { elementId: UUID; name: string }[];
+}
+
+/** F10 step 7: the element page's "Start a project…" — that element as the declared scope, its name as a starting title, no finding key. */
+export function startProjectFromElementHref(projectsHref: string, element: { id: UUID; name: string }): string {
+  const params = new URLSearchParams();
+  params.set('startTitle', element.name);
+  params.set('startStatement', '');
+  params.set('startFindingKey', '');
+  params.append('startElementId', element.id);
+  params.append('startElementName', element.name);
+  return `${projectsHref}?${params.toString()}`;
 }
 
 /**
@@ -19,7 +31,7 @@ export function projectFormFromPrefill(prefill: DecisionPrefill): ProjectFormPre
   return {
     title: prefill.title.replace(/\?\s*$/, ''),
     purpose: prefill.statement,
-    sourceFindingKey: prefill.sourceFindingKey,
+    sourceFindingKey: prefill.sourceFindingKey === '' ? null : prefill.sourceFindingKey,
     scope: prefill.linkedElements.map((e) => ({ elementId: e.id, name: e.name })),
   };
 }

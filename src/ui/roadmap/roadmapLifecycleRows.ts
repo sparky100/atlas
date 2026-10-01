@@ -198,3 +198,70 @@ export function groupBarsByValueStream(
 
   return finishGroups(groups);
 }
+
+/** F10 step 6: what `groupBarsByProject` needs to know of each project — its id, title and page link. */
+export interface RoadmapProjectRef {
+  id: UUID;
+  title: string;
+  href: string;
+}
+
+/** F10 step 6: the project-mode label for a system no project's change touches. */
+export const NO_PROJECT_LABEL = 'No project';
+
+/**
+ * F10 step 6 (ADR-024 §6.3): a third grouping mode — the same bars,
+ * grouped by the project(s) whose changes touch each system (a change's
+ * own roadmap events: an add, a retire, or either end of a replacement).
+ * A system touched by two projects' changes appears under both; one no
+ * project's change touches falls under "No project".
+ *
+ * @param branchEvents Each eligible change's own roadmap events, with its branch (`branch.project_id`).
+ * @param projectsById Every project on the model, keyed by id.
+ */
+export function groupBarsByProject(
+  systems: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  ownsEdges: readonly RelationshipsHeadRow[],
+  capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>,
+  branchEvents: readonly { branch: { project_id: UUID | null }; events: readonly ({ kind: 'add' | 'retire'; elementId: UUID } | { kind: 'replace'; fromSystemId: UUID; toSystemId: UUID })[] }[],
+  projectsById: ReadonlyMap<UUID, RoadmapProjectRef>,
+): RoadmapGroup[] {
+  const projectsBySystem = new Map<UUID, Set<UUID>>();
+  const note = (systemId: UUID, projectId: UUID) => {
+    const set = projectsBySystem.get(systemId) ?? new Set<UUID>();
+    set.add(projectId);
+    projectsBySystem.set(systemId, set);
+  };
+  for (const { branch, events } of branchEvents) {
+    if (branch.project_id === null || !projectsById.has(branch.project_id)) continue;
+    for (const event of events) {
+      if (event.kind === 'replace') {
+        note(event.fromSystemId, branch.project_id);
+        note(event.toSystemId, branch.project_id);
+      } else {
+        note(event.elementId, branch.project_id);
+      }
+    }
+  }
+
+  const groups = new Map<string, RoadmapGroup>();
+  for (const system of systems) {
+    const bar = lifecycleBarOf(system, ownsEdges);
+    if (!bar) continue;
+    const primaryCapabilityId = primarySupportsCapabilityId(system.element_id, supportsEdges);
+    const l1 = primaryCapabilityId !== null ? l1AncestorOf(primaryCapabilityId, capabilitiesById) : null;
+    if (l1 !== null) bar.capabilityKey = l1.element_id;
+
+    const projectIds = projectsBySystem.get(system.element_id);
+    if (!projectIds || projectIds.size === 0) {
+      pushBar(groups, UNASSIGNED_GROUP_KEY, NO_PROJECT_LABEL, null, bar);
+      continue;
+    }
+    for (const projectId of projectIds) {
+      const project = projectsById.get(projectId);
+      if (project) pushBar(groups, projectId, project.title, project.href, bar);
+    }
+  }
+  return finishGroups(groups);
+}

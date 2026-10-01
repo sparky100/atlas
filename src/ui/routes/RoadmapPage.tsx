@@ -97,7 +97,7 @@ export function RoadmapPage() {
   const roadmapData = state.status === 'ready' ? state.data : null;
   // F6 Step 6: the same bars, grouped by capability or value stream — both
   // were computed by `useRoadmap`, so switching the toggle never refetches.
-  const groups = groupBy === 'valueStream' ? (roadmapData?.valueStreamGroups ?? []) : (roadmapData?.groups ?? []);
+  const groups = groupBy === 'valueStream' ? (roadmapData?.valueStreamGroups ?? []) : groupBy === 'project' ? (roadmapData?.projectGroups ?? []) : (roadmapData?.groups ?? []);
   const roadmapExport = useRoadmapExport({
     groups,
     branchEvents: roadmapData?.branchEvents ?? [],

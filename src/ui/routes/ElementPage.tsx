@@ -44,6 +44,8 @@ import { parseMergePrefillFromSearchParams } from '../duplicates/mergePrefill';
 import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditBranch, canEditValueStreamStructure, useMembership } from '../orgs/useMembership';
+import { canStartProject } from '../orgs/roleGates';
+import { startProjectFromElementHref } from '../projects/projectPrefill';
 import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { refLabelOf, refParamOf, refQueryParam } from '../../db/ref';
@@ -353,6 +355,11 @@ export function ElementPage() {
               contextHref={
                 state.data.element.element_type === 'system' || state.data.element.element_type === 'container'
                   ? `/o/${orgSlug ?? ''}/m/${model.slug}/context/${state.data.element.element_id}?${refQueryParam(ref, viewing)}`
+                  : undefined
+              }
+              startProjectHref={
+                canStartProject(role) && (state.data.element.element_type === 'capability' || state.data.element.element_type === 'system' || state.data.element.element_type === 'container')
+                  ? startProjectFromElementHref(`/o/${orgSlug ?? ''}/m/${model.slug}/projects`, { id: state.data.element.element_id, name: state.data.element.name })
                   : undefined
               }
             />

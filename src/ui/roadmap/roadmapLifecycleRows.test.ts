@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
-import { groupBarsByValueStream, groupRoadmapLifecycleBars, UNASSIGNED_GROUP_KEY } from './roadmapLifecycleRows';
+import { groupBarsByProject, groupBarsByValueStream, groupRoadmapLifecycleBars, NO_PROJECT_LABEL, UNASSIGNED_GROUP_KEY } from './roadmapLifecycleRows';
 
 const href = (id: string): string => `/e/${id}`;
 
@@ -128,5 +128,29 @@ describe('groupBarsByValueStream', () => {
     expect(groups[0]?.key).toBe(UNASSIGNED_GROUP_KEY);
     expect(groups[0]?.label).toBe('Unassigned');
     expect(groups[0]?.href).toBeNull();
+  });
+});
+
+describe('groupBarsByProject (F10 step 6)', () => {
+  const projects = new Map([
+    ['p1', { id: 'p1', title: 'CRM replacement', href: '/projects/p1' }],
+    ['p2', { id: 'p2', title: 'Data platform', href: '/projects/p2' }],
+  ]);
+
+  it('groups each system under the projects whose changes touch it, and the rest under "No project"', () => {
+    const systems = [system('crm', 'Old CRM', { plannedEnd: '2027-01-01' }), system('new', 'New CRM', { introduced: '2026-12-01' }), system('lake', 'Lake', { introduced: '2026-01-01' }), system('other', 'Other', { introduced: '2025-01-01' })];
+    const branchEvents = [
+      { branch: { project_id: 'p1' }, events: [{ kind: 'replace' as const, fromSystemId: 'crm', toSystemId: 'new' }] },
+      { branch: { project_id: 'p2' }, events: [{ kind: 'add' as const, elementId: 'lake' }, { kind: 'retire' as const, elementId: 'crm' }] },
+      { branch: { project_id: null }, events: [{ kind: 'add' as const, elementId: 'other' }] },
+    ];
+    const groups = groupBarsByProject(systems, [], [], new Map(), branchEvents, projects);
+    expect(groups.map((g) => [g.label, g.bars.map((b) => b.name)])).toEqual([
+      ['CRM replacement', ['New CRM', 'Old CRM']],
+      ['Data platform', ['Lake', 'Old CRM']],
+      [NO_PROJECT_LABEL, ['Other']],
+    ]);
+    expect(groups.find((g) => g.key === 'p1')?.href).toBe('/projects/p1');
+    expect(groups.find((g) => g.key === UNASSIGNED_GROUP_KEY)?.href).toBeNull();
   });
 });

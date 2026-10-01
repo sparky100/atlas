@@ -21,6 +21,7 @@ import {
   type DecisionPrefill,
 } from '../decisions/decisionPrefill';
 import { canStartDecision } from '../orgs/useMembership';
+import { canStartProject } from '../orgs/roleGates';
 import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
 import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
 import type { ArchitectHomeData } from './useArchitectHome';
@@ -169,6 +170,9 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
   const startDecisionAction = (prefill: DecisionPrefill): FindingCardAction => ({
     href: `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefill).toString()}`,
     label: 'Start a decision →',
+    // F10 step 7 (ADR-024 §6.4): the same finding can start a project
+    // instead — same prefill params, the project form reads them too.
+    ...(canStartProject(role) ? { also: { href: `/o/${orgSlug}/m/${modelSlug}/projects?${decisionPrefillToSearchParams(prefill).toString()}`, label: 'Start a project →' } } : {}),
   });
   // F4 (ADR-019 "Amended (F4, ...)"): the architect door's own link into the
   // standing duplicates report.

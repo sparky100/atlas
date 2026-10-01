@@ -21,6 +21,8 @@ import { compareWeakTiles, formatPoorFitPillLabel, isCapabilityTileWeak, poorFit
 import { ProposeChangePicker } from './ProposeChangePicker';
 import { ValueStreamsOutcomeView } from '../valueStreams/ValueStreamsOutcomeView';
 import { canCreateChangeBranch, canStartDecision } from '../orgs/useMembership';
+import { canStartProject } from '../orgs/roleGates';
+import { StartProjectLink } from '../projects/StartProjectLink';
 import type { CapabilityTileData } from '../../db/modelHome';
 import type { DirectorHomeData } from './useDirectorHome';
 import styles from './DirectorHome.module.css';
@@ -335,6 +337,10 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
       ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefillFromPoorFitCapabilities(tile.capability.name, tile.poorFitCapabilities.map((c) => ({ id: c.element_id, name: c.name })))).toString()}`
       : null;
   const decisionActionHrefs = [startDecisionHref, startFitDecisionHref].filter((href): href is string => href !== null);
+  // F10 step 7 (ADR-024 §6.4): a weak tile can start a project instead —
+  // the same prefill as its exposure decision, read by the project form.
+  const startProjectHref = startDecisionHref !== null && canStartProject(role) ? startDecisionHref.replace('/decisions?', '/projects?') : null;
+  const actionCount = decisionActionHrefs.length + (startProjectHref !== null ? 1 : 0);
   const content = (
     <>
       <span className={styles.statusBar} data-tone={tile.tone} aria-hidden="true" />
@@ -429,17 +435,18 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
           ))}
         </ul>
       )}
-      {decisionActionHrefs.length > 0 && (
+      {actionCount > 0 && (
         // The common case (0 or 1 action) keeps the exact corner-overlay
         // layout every existing tile already uses (`.tileAction`); the
         // rare case of both a tone- and a fit-triggered action on the
         // same tile falls back to an ordinary in-flow stack
         // (`.tileActionsStacked`) rather than risking two absolutely-
         // positioned links overlapping in the same corner.
-        <div className={decisionActionHrefs.length > 1 ? styles.tileActionsStacked : styles.tileAction}>
+        <div className={actionCount > 1 ? styles.tileActionsStacked : styles.tileAction}>
           {decisionActionHrefs.map((href) => (
             <StartDecisionLink key={href} href={href} />
           ))}
+          {startProjectHref !== null && <StartProjectLink href={startProjectHref} />}
         </div>
       )}
     </div>
