@@ -20,6 +20,9 @@ import { useMembers } from '../orgs/useMembers';
 import type { AlsoAffectedElement } from './alsoAffected';
 import { DecisionCriteriaGrid, type DecisionCriteriaOption } from './DecisionCriteriaGrid';
 import { decisionStatusTone } from './decisionStatus';
+import { setDecisionProject } from '../../db/projects';
+import { ProjectAssignment } from '../projects/ProjectAssignment';
+import { supabase } from '../supabaseClient';
 import { exportDecisionAsAdrMarkdown } from './exportDecisionAsAdr';
 import type { DecisionPageState } from './useDecision';
 import { useDecisionComparison, type DecisionComparisonOption } from './useDecisionComparison';
@@ -182,6 +185,19 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           {adrCopied ? 'Copied' : 'Copy as ADR markdown'}
         </Button>
       </div>
+      {/* F10 step 4 (ADR-024 P1): moving a proposed decision moves its draft options with it. */}
+      <ProjectAssignment
+        modelId={modelId}
+        orgSlug={orgSlug}
+        modelSlug={modelSlug}
+        currentProjectId={decision.project_id}
+        canMove={decision.status === 'proposed' && (decision.created_by === userId || role === 'owner' || role === 'architect')}
+        onMove={async (projectId) => {
+          const updated = await setDecisionProject(supabase, decision.id, projectId);
+          applyDecisionUpdate(updated);
+          await refreshOptionsAndArguments();
+        }}
+      />
 
       <Panel>
         <div className={styles.field}>
@@ -347,7 +363,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               disabled={optionsState.status === 'adding' || optionName.trim().length === 0}
               onClick={() => {
                 if (!userId) return;
-                void optionsState.addOption({ orgId, modelId, decisionId, name: optionName, title: optionTitle, userId }).then((added) => {
+                void optionsState.addOption({ orgId, modelId, decisionId, name: optionName, title: optionTitle, userId, projectId: decision.project_id }).then((added) => {
                   if (added) setAddingOption(false);
                 });
               }}

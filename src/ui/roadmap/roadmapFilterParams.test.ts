@@ -66,6 +66,11 @@ describe('parseRoadmapGroupBy', () => {
     expect(parseRoadmapGroupBy(new URLSearchParams('groupBy=bogus'))).toBe('capability');
   });
 
+  it('reads groupBy=project as project (F10 step 6)', () => {
+    expect(parseRoadmapGroupBy(new URLSearchParams('groupBy=project'))).toBe('project');
+    expect(roadmapGroupByToSearchParams('project', new URLSearchParams()).get('groupBy')).toBe('project');
+  });
+
   it('reads groupBy=valueStream as valueStream', () => {
     expect(parseRoadmapGroupBy(new URLSearchParams('groupBy=valueStream'))).toBe('valueStream');
   });

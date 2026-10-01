@@ -28,6 +28,8 @@ export interface CreateDecisionInput {
   neededBy?: string;
   sourceFindingKey?: string;
   lensMapUrl?: string;
+  /** ADR-024: start the decision inside this project (its decision log). */
+  projectId?: UUID | null;
   createdBy: UUID;
 }
 
@@ -42,6 +44,7 @@ export async function createDecision(supabase: Client, input: CreateDecisionInpu
     needed_by: input.neededBy ?? null,
     source_finding_key: input.sourceFindingKey ?? null,
     lens_map_url: input.lensMapUrl ?? null,
+    project_id: input.projectId ?? null,
     created_by: input.createdBy,
   };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.

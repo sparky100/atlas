@@ -14,6 +14,8 @@ export interface AddOptionInput {
   name: string;
   title: string;
   userId: UUID;
+  /** ADR-024 P1: the decision's own project — an option is always created in it (the database refuses a mismatched option link). */
+  projectId: UUID | null;
 }
 
 export interface UseDecisionOptionsResult {
@@ -87,6 +89,7 @@ export function useDecisionOptions(
           createdBy: input.userId,
           mainHeadCommitId: main.head_commit_id,
           intent: 'explore',
+          projectId: input.projectId,
         });
         const link = await createDecisionLink(supabase, { decisionId: input.decisionId, linkedType: 'branch', linkedId: branch.id, createdBy: input.userId });
         applyNewOption(link, branch);

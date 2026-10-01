@@ -47,7 +47,7 @@ Every model-scoped page shares the same navigation, grouped into four clusters:
 |---|---|
 | **Model** | Home, Capability map, Landscape, Value streams, Elements |
 | **Analyse** | Portfolio, Roadmap, Reports |
-| **Work** | Changes, Decisions, Capture |
+| **Work** | Projects, Changes, Decisions, Capture |
 | **Record** | Versions |
 
 - **Elements** is the full list of everything in the model, with filters and export.
@@ -75,6 +75,20 @@ Nothing is written to your model without going through this review — an AI sug
 ## Changes, branches, and merging
 
 Editing directly on `main` is for small, uncontroversial edits. For anything bigger, you work on a **change** (a branch): a named, isolated set of edits you can review and discuss before merging. The **Changes** page lists your organisation's open and past changes; opening one shows what it touches and lets you merge it back into main once it's ready, going through the same kind of review a capture draft does.
+
+## Projects
+
+A **project** holds one piece of architecture work — "Housing CRM replacement", say — together with the decisions it raises and the changes that deliver it. Open **Projects** (under Work) to see every project, grouped as active, on hold, closed or cancelled.
+
+- **Start a project** from the Projects page, from a health finding or weak capability tile ("Start a project →", beside "Start a decision →"), or from a capability's or system's own page (its ⋯ menu). Give it a title, its purpose, an owner, optional start and target dates, and the capabilities and systems it is about (its **declared scope**).
+- **Its decision log** lists the decisions that are part of the project. Start one from the project page, or move an existing proposed decision in with **Add to project…** on the decision's page — its draft options move with it. A decision made elsewhere that the project must follow (e.g. "standardise on Azure") can be linked as a **constraining decision**. A decision doesn't have to belong to a project: portfolio-level decisions stand on their own.
+- **Its changes** are its design deliverables, shown by stage: options being explored, the chosen design, in review, merged. Options you add to a decision in the project are created in the project; choosing one keeps it there. Start a change from the project page, or use **Add to project…** on any open change.
+- **Scope against what it touches.** The page compares the declared scope with the elements the project's changes actually touch, and lists any difference as a prompt — it never changes either for you.
+- **Evidence** — business cases, vendor documents and links — can be attached to the project.
+- **On hold, close or cancel.** Close or cancel only once nothing in the project is still open; the page lists anything that is, with a link to each. Cancelling asks why. A closed or cancelled project can't be reopened — start a new one.
+- **Roadmap → By project** groups the roadmap by the projects whose changes touch each system.
+
+A project is part of how your team works, not part of the model itself: it never appears on the capability map or landscape, and it isn't in a version.
 
 ## Decisions
 

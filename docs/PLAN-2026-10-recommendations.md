@@ -50,6 +50,8 @@ Mobile bottom bar: Home, Capability map, Landscape, Changes, **More** (a sheet l
 
 ## F10 — projects (item 1, ADR-024)
 
+**Status: built 2026-10-02** on branch `f10-projects` — all eight steps; ADR-024 accepted. Golden paths `golden-path-project-lifecycle` and `golden-path-project-roadmap` pass at 1280 and 390. What the build decided beyond the ADR is in ADR-024 §7.
+
 **Prerequisite:** ADR-024 reviewed and approved by the human (Status stays Proposed until the migration merges).
 
 **Steps**

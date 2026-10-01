@@ -44,6 +44,8 @@ import { parseMergePrefillFromSearchParams } from '../duplicates/mergePrefill';
 import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditBranch, canEditValueStreamStructure, useMembership } from '../orgs/useMembership';
+import { canStartProject } from '../orgs/roleGates';
+import { startProjectFromElementHref } from '../projects/projectPrefill';
 import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { refLabelOf, refParamOf, refQueryParam } from '../../db/ref';
@@ -353,6 +355,11 @@ export function ElementPage() {
               contextHref={
                 state.data.element.element_type === 'system' || state.data.element.element_type === 'container'
                   ? `/o/${orgSlug ?? ''}/m/${model.slug}/context/${state.data.element.element_id}?${refQueryParam(ref, viewing)}`
+                  : undefined
+              }
+              startProjectHref={
+                canStartProject(role) && (state.data.element.element_type === 'capability' || state.data.element.element_type === 'system' || state.data.element.element_type === 'container')
+                  ? startProjectFromElementHref(`/o/${orgSlug ?? ''}/m/${model.slug}/projects`, { id: state.data.element.element_id, name: state.data.element.name })
                   : undefined
               }
             />
@@ -778,6 +785,7 @@ const PLACEHOLDER_BRANCH: BranchRow = {
   cancelled_by: null,
   dismissed_identity_pairs: [],
   intent: null,
+  project_id: null,
 };
 
 /** Sprint U4-1 D1: "alias moves into attributes" — each alias renders as its own read-only row, same shape as any other attribute (`aliasAsFact` gives `AttributeRow` a `FactsRow` to work with), labelled by its real `alias_type` (`ALIAS_TYPE_LABELS`) rather than the header's old single undifferentiated "aka" bucket. Appended after the schema-driven fields — an alias is always additional identifying information, never a substitute for one of them. */

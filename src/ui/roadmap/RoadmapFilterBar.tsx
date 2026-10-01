@@ -105,6 +105,9 @@ export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange,
         <button type="button" className={groupBy === 'valueStream' ? styles.modeActive : styles.mode} aria-pressed={groupBy === 'valueStream'} onClick={() => { onGroupByChange('valueStream'); }}>
           By value stream
         </button>
+        <button type="button" className={groupBy === 'project' ? styles.modeActive : styles.mode} aria-pressed={groupBy === 'project'} onClick={() => { onGroupByChange('project'); }}>
+          By project
+        </button>
       </div>
       <div className={styles.modeToggle} role="group" aria-label="Timeline granularity">
         <button type="button" className={granularity === 'months' ? styles.modeActive : styles.mode} aria-pressed={granularity === 'months'} onClick={() => { onGranularityChange('months'); }}>

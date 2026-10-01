@@ -14,6 +14,8 @@ import styles from './RoadmapView.module.css';
 const AXIS_WIDTH_FALLBACK_PX = 300;
 
 export interface RoadmapViewProps {
+  /** The groups list's accessible name — what the groups are (F10: capability domains, value streams or projects). */
+  groupsLabel?: string;
   groups: readonly RoadmapGroup[];
   branchEvents: readonly RoadmapBranchEvents[];
   mode: RoadmapMode;
@@ -158,7 +160,7 @@ function RoadmapChangesList({ eligibleEvents }: { eligibleEvents: readonly Roadm
  * same role-boundary stance the capability map redesign already
  * established for this app's other structural-reference views.
  */
-export function RoadmapView({ groups, branchEvents, mode, filters, granularity, horizon, windowStart, orgSlug, modelSlug, now = new Date() }: RoadmapViewProps) {
+export function RoadmapView({ groupsLabel = 'Capability domains', groups, branchEvents, mode, filters, granularity, horizon, windowStart, orgSlug, modelSlug, now = new Date() }: RoadmapViewProps) {
   const { filteredGroups, eligibleEvents } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now);
   const fullRange = computeRoadmapTimelineRange(allDatesFor(groups, branchEvents, mode), now);
   const range = computeRoadmapWindow(horizon, fullRange, now, windowStart);
@@ -173,7 +175,7 @@ export function RoadmapView({ groups, branchEvents, mode, filters, granularity, 
       {filteredGroups.length > 0 && (
         <>
           <RoadmapAxis range={range} granularity={granularity} />
-          <div role="list" aria-label="Capability domains">
+          <div role="list" aria-label={groupsLabel}>
             {filteredGroups.map((group) => (
               <div key={group.key} className={styles.group} role="listitem">
                 {group.href !== null ? (

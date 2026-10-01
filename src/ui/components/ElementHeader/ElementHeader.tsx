@@ -5,6 +5,7 @@ import { attributesRecord } from '../../elements/attributesRecord';
 import { lifecycleToneFor } from '../../elements/lifecycleTone';
 import type { UseElementRenameResult } from '../../elements/useElementRename';
 import { Button } from '../Button/Button';
+import { Link } from 'react-router';
 import { LinkButton } from '../Button/LinkButton';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
@@ -91,6 +92,8 @@ export interface ElementHeaderProps {
    * already uses for its own children check.
    */
   onConvertToModule?: (() => void) | undefined;
+  /** F10 step 7 (ADR-024 §6.4): "Start a project…" with this element as declared scope — a `/projects?…` link, present only for a capability, system or container and a role that may start one. */
+  startProjectHref?: string | null | undefined;
   /**
    * ADR-023/F6's "a stream is deactivated, never deleted" — a value stream
    * only (never a stage; a stage follows its own stream), same
@@ -166,7 +169,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, contextHref }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, contextHref, startProjectHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
@@ -302,6 +305,17 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onPro
                 {element.element_id.slice(0, 8)}…
               </Text>
             </button>
+            {startProjectHref && (
+              <Link
+                to={startProjectHref}
+                className={styles.menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                }}
+              >
+                <Text as="span">Start a project…</Text>
+              </Link>
+            )}
             {onRetire && (
               <button
                 type="button"

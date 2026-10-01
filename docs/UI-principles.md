@@ -38,13 +38,13 @@ Every model-scoped route renders the same navigation alongside the page, grouped
 | --- | --- |
 | **Model** | Home, Capability map, Landscape, Value streams, Elements |
 | **Analyse** | Portfolio, Roadmap, Reports |
-| **Work** | Projects *(added by F10)*, Changes, Decisions, Capture |
+| **Work** | Projects *(F10)*, Changes, Decisions, Capture |
 | **Record** | Versions |
 
 - **Elements** is the browse table (`/elements`), previously reachable only from the model home's "Browse all elements →" link.
 - **Reports** is a small hub page listing the model's standing reports — Boundary crossings, External interfaces, Duplicates — each with its current count; those pages keep their own URLs and had no nav entry before.
 - **Review queue is a tab inside Changes, not a nav item.** The Changes page (`h1` "Changes") has two tabs, **All** and **Review queue**, each a plain link to its own URL with `aria-current="page"` on the current one (F9 step 2). "All" rather than "All changes", so no tab's name repeats the nav item's. The Changes nav item carries a count badge of items waiting for review (visible text, never colour alone, §8.4; read by assistive tech as "Changes (N waiting for review)"; zero shows nothing). The count is exactly what the queue lists — open requests for propose/explore changes plus capture drafts waiting — so a viewer, who can't see merge requests, gets neither a badge nor queue items. The Review queue tab shows the same number. The architect door's "review queue" stat links to the queue. `/review`, `/review/{id}` and `/review/capture/{id}` keep working as URLs (§2.4) and open with the Changes item highlighted.
-- **Projects** joins Work when F10 ships (`docs/ADR-024-projects.md`); until then the group has three items. Nothing renders a placeholder for it before then (CLAUDE.md rule 7).
+- **Projects** joined Work with F10 (`docs/ADR-024-projects.md`), first in the group: the list, each project page, and "Start a project" from findings and element pages. On a phone it sits in the More sheet with the rest of Work except Changes.
 
 It is chrome, not a per-page affordance — a page never grows its own "back to X" link, or any other hand-rolled equivalent, to stand in for it: one shared component (`ModelNav`), everywhere, not a per-route re-implementation of the same nav (**amended, S1 item 17 — see §10 item 10: this is not a ban on `<ul>`/`<li>` markup itself, which §8 has never actually prohibited**).
 

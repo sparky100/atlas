@@ -12,6 +12,8 @@ import { ContextPage } from './routes/ContextPage';
 import { DecisionOptionLandscapePage } from './routes/DecisionOptionLandscapePage';
 import { DecisionPage } from './routes/DecisionPage';
 import { DecisionsPage } from './routes/DecisionsPage';
+import { ProjectPage } from './routes/ProjectPage';
+import { ProjectsPage } from './routes/ProjectsPage';
 import { DuplicatesReportPage } from './routes/DuplicatesReportPage';
 import { ElementPage } from './routes/ElementPage';
 import { ElementsPage } from './routes/ElementsPage';
@@ -78,6 +80,8 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/capture" element={<CaptureJobListPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/changes" element={<ChangesPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/changes/:branchId" element={<ChangePage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/projects" element={<ProjectsPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/projects/:projectId" element={<ProjectPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/decisions" element={<DecisionsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/decisions/:decisionId" element={<DecisionPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/decisions/:decisionId/options/:branchId/landscape" element={<DecisionOptionLandscapePage />} />

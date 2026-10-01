@@ -97,7 +97,7 @@ export function RoadmapPage() {
   const roadmapData = state.status === 'ready' ? state.data : null;
   // F6 Step 6: the same bars, grouped by capability or value stream — both
   // were computed by `useRoadmap`, so switching the toggle never refetches.
-  const groups = groupBy === 'valueStream' ? (roadmapData?.valueStreamGroups ?? []) : (roadmapData?.groups ?? []);
+  const groups = groupBy === 'valueStream' ? (roadmapData?.valueStreamGroups ?? []) : groupBy === 'project' ? (roadmapData?.projectGroups ?? []) : (roadmapData?.groups ?? []);
   const roadmapExport = useRoadmapExport({
     groups,
     branchEvents: roadmapData?.branchEvents ?? [],
@@ -155,7 +155,7 @@ export function RoadmapPage() {
           {state.status === 'ready' && (
             <>
               <RoadmapFilterBar filters={filters} onFiltersChange={setFilters} mode={mode} onModeChange={setMode} groupBy={groupBy} onGroupByChange={setGroupBy} granularity={granularity} onGranularityChange={setGranularity} horizon={horizon} onHorizonChange={setHorizon} onNudge={nudge} onResetToday={resetToday} capabilitiesById={state.data.capabilitiesById} ownerActorsById={state.data.ownerActorsById} />
-              <RoadmapView groups={groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} granularity={granularity} horizon={horizon} windowStart={windowStart} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+              <RoadmapView groupsLabel={groupBy === 'valueStream' ? 'Value streams' : groupBy === 'project' ? 'Projects' : 'Capability domains'} groups={groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} granularity={granularity} horizon={horizon} windowStart={windowStart} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
             </>
           )}
         </main>
