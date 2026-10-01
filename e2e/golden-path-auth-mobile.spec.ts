@@ -48,8 +48,13 @@ test('auth: sign up, sign out, request a magic link, request a password reset, t
   await page.getByRole('button', { name: 'Forgot password?' }).click();
   await expect(page.getByRole('heading', { name: 'Reset your password' })).toBeVisible();
   await page.getByLabel('Email').fill(email);
-  await page.getByRole('button', { name: 'Send reset link' }).click();
-  await expect(page.getByText('Check your email for a link to reset your password.')).toBeVisible();
+  // Auth allows one email per address per second (supabase/config.toml
+  // `[auth.email] max_frequency`), and the magic link above was just sent —
+  // a too-soon request shows "Too many attempts", so retry as a user would.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Send reset link' }).click();
+    await expect(page.getByText('Check your email for a link to reset your password.')).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
 
   // The original password still works — neither request-only flow above
   // signed the user in or changed anything about the real account.

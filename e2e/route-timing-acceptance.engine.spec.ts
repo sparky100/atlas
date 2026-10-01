@@ -185,7 +185,7 @@ test('E8 acceptance: route change under 300ms, action-to-updated-UI under 500ms 
   {
     const t0 = Date.now();
     await addUsesRelationship(page, relTargetName, 'reads status from');
-    await expect(page.getByRole('link', { name: new RegExp(relTargetName) })).toBeVisible();
+    await expect(page.getByRole('link', { name: new RegExp(relTargetName) }).first()).toBeVisible();
     actions.push({ actionKey: 'add-relationship', label: 'Add relationship (uses)', wallClockMs: Date.now() - t0 });
   }
 

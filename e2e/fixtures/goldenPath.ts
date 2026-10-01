@@ -140,7 +140,9 @@ export async function acceptInviteViaSignUp(page: Page, email: string, displayNa
 export async function seedStarterCapabilityMap(page: Page, cardTitleMatch: string | RegExp): Promise<void> {
   await page.getByRole('link', { name: 'Capability map' }).click();
   await expect(page.getByRole('heading', { name: 'Start from a capability map' })).toBeVisible();
-  const card = page.locator('li').filter({ hasText: cardTitleMatch }).first();
+  // Match the card's own title, never a draft: other specs leave draft maps
+  // in the shared catalogue whose version line can match too.
+  const card = page.locator('li').filter({ has: page.getByRole('heading', { name: cardTitleMatch }) }).filter({ hasNotText: /\bDraft\b/ }).first();
   await card.getByRole('button', { name: 'Import' }).click();
   await expect(page.getByRole('button', { name: 'Import' })).toHaveCount(0, { timeout: 15_000 });
 }
@@ -180,8 +182,10 @@ export async function addSystemFromHome(page: Page, options: AddSystemOptions): 
   // below 768px (`add-a-system-flow.spec.ts`'s own mobile test) — right
   // where ModelNav's own bottom bar and, on an element page, comment/
   // relationship controls also sit. Dismissing it here, once, means every
-  // caller doesn't have to work around it individually.
+  // caller doesn't have to work around it individually. It can render a
+  // beat after the heading, so wait for it rather than checking once.
   const toastDismiss = page.getByTestId('add-system-toast').getByRole('button', { name: 'Dismiss' });
+  await toastDismiss.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => undefined);
   if (await toastDismiss.isVisible().catch(() => false)) await toastDismiss.click();
 }
 
