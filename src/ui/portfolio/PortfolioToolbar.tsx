@@ -27,29 +27,31 @@ export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters
     <div className={styles.toolbar}>
       <label className={styles.field}>
         <span>Sort by</span>
-        <select
-          className={styles.select}
-          value={sortKey}
-          onChange={(e) => {
-            onSortChange(e.target.value as PortfolioSortKey);
-          }}
-        >
-          {PORTFOLIO_SORT_COLUMNS.map((column) => (
-            <option key={column.key} value={column.key}>
-              {column.label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className={styles.directionButton}
-          aria-label={`Sort direction: ${sortDirection === 'asc' ? 'ascending' : 'descending'}`}
-          onClick={() => {
-            onSortChange(sortKey);
-          }}
-        >
-          {sortDirection === 'asc' ? '▲' : '▼'}
-        </button>
+        <div className={styles.sortControl}>
+          <select
+            className={styles.select}
+            value={sortKey}
+            onChange={(e) => {
+              onSortChange(e.target.value as PortfolioSortKey);
+            }}
+          >
+            {PORTFOLIO_SORT_COLUMNS.map((column) => (
+              <option key={column.key} value={column.key}>
+                {column.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className={styles.directionButton}
+            aria-label={`Sort direction: ${sortDirection === 'asc' ? 'ascending' : 'descending'}`}
+            onClick={() => {
+              onSortChange(sortKey);
+            }}
+          >
+            {sortDirection === 'asc' ? '▲' : '▼'}
+          </button>
+        </div>
       </label>
 
       <label className={styles.field}>

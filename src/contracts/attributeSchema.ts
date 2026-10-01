@@ -223,9 +223,9 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
 };
 const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
   'lifecycleStatus',
+  'description',
   'version',
   'vendor',
-  'description',
   'isExternal',
   'externalOrganisation',
   'introduced',
