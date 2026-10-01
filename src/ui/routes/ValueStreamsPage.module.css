@@ -26,3 +26,13 @@
   flex: 1;
   min-width: 0;
 }
+
+/* Stabilisation: below 768px the map and its Inspector stack (the
+   Inspector below) instead of sharing a phone's width side by side —
+   see Inspector.module.css's own matching rule. */
+@media (max-width: 768px) {
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

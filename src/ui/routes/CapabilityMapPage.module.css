@@ -104,3 +104,13 @@
 .menu.open {
   display: flex;
 }
+
+/* Stabilisation: below 768px the map and its Inspector stack (the
+   Inspector below) instead of sharing a phone's width side by side —
+   see Inspector.module.css's own matching rule. */
+@media (max-width: 768px) {
+  .mapRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

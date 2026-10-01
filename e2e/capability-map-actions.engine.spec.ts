@@ -58,7 +58,7 @@ test('capability map actions: "+ Add capability" is a page action, available eve
 
   // No seed commit at all — main's own genesis, zero capabilities.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
-  await expect(page.getByText('No capabilities yet.')).toBeVisible();
+  await expect(page.getByText(/^No capabilities yet\./)).toBeVisible();
 
   // The page action is there even though the map itself has nothing to
   // show; the view's own colour-by control isn't, since there's no view
