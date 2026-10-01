@@ -167,6 +167,34 @@ describe('attribute_definitions against a real local Supabase', () => {
     expect(definitions.find((d) => d.id === b.definition.id)?.order_index).toBe(100);
   });
 
+  it('an owner cannot rename a definition\'s key or rewrite its created_by — the column grant excludes identity columns (20261001010000)', async () => {
+    const originalKey = `immutable-${randomUUID().slice(0, 8)}`;
+    const created = await createAttributeDefinition(owner.client, {
+      id: randomUUID(),
+      orgId,
+      key: originalKey,
+      label: 'Immutable key',
+      kind: 'text',
+      options: null,
+      appliesTo: ['system'],
+      required: false,
+      description: null,
+      orderIndex: 200,
+      createdBy: owner.id,
+    });
+    if (created.status !== 'created') throw new Error('unreachable');
+
+    const { data: keyData, error: keyError } = await owner.client.from('attribute_definitions').update({ key: `${originalKey}-renamed` }).eq('id', created.definition.id).select('id');
+    expect(keyError !== null || keyData.length === 0).toBe(true);
+    const { data: createdByData, error: createdByError } = await owner.client.from('attribute_definitions').update({ created_by: architect.id }).eq('id', created.definition.id).select('id');
+    expect(createdByError !== null || createdByData.length === 0).toBe(true);
+
+    const definitions = await listAttributeDefinitions(owner.client, orgId);
+    const row = definitions.find((d) => d.id === created.definition.id);
+    expect(row?.key).toBe(originalKey);
+    expect(row?.created_by).toBe(owner.id);
+  });
+
   it('an owner can deprecate and restore a definition; a value already set keeps its own row unaffected by the flag', async () => {
     const created = await createAttributeDefinition(owner.client, {
       id: randomUUID(),

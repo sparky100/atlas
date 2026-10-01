@@ -23,7 +23,7 @@ test('inviting an email that has never signed up: they sign up and land in the o
   await expect(page.getByRole('heading', { name: 'Organisation settings' })).toBeVisible();
   const email = `orgsettingsinvitefresh-${randomUUID()}@example.test`;
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Role').selectOption('contributor');
+  await page.getByLabel('Role', { exact: true }).selectOption('contributor');
   await page.getByRole('button', { name: 'Send invite' }).click();
   await expect(page.getByText(email)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Pending')).toBeVisible();
@@ -53,7 +53,7 @@ test('inviting an email that has never signed up: they sign up and land in the o
 
   // 4. The owner's own invite list reflects the consumption too.
   await page.reload();
-  await expect(page.getByText('Joined')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Joined', { exact: true })).toBeVisible({ timeout: 15_000 });
 });
 
 test('inviting an email that already has an account: consumed at their next sign-in, not automatically', async ({ page, browser }) => {
@@ -86,7 +86,7 @@ test('inviting an email that already has an account: consumed at their next sign
   // 3. Owner invites that already-registered email.
   await page.goto(`/o/${orgSlug}/settings`);
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Role').selectOption('viewer');
+  await page.getByLabel('Role', { exact: true }).selectOption('viewer');
   await page.getByRole('button', { name: 'Send invite' }).click();
   await expect(page.getByText(email)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Pending')).toBeVisible();
@@ -110,5 +110,5 @@ test('inviting an email that already has an account: consumed at their next sign
 
   // 6. The owner's own invite list reflects the consumption too.
   await page.reload();
-  await expect(page.getByText('Joined')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Joined', { exact: true })).toBeVisible({ timeout: 15_000 });
 });

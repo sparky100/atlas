@@ -1,6 +1,8 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { consumeMyInvites } from '../../db/invites';
+import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
 import { AuthContext, type AuthContextValue, type AuthStatus } from './authContext';
 
@@ -15,6 +17,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [membershipsGeneration, setMembershipsGeneration] = useState(0);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const {
@@ -33,13 +37,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // blocked by an unrelated invite-consumption hiccup, and a hiccup
       // just leaves the invite pending for the next sign-in to retry.
       if (event === 'SIGNED_IN') {
-        void consumeMyInvites(supabase).catch(() => undefined);
+        // Once it settles, memberships may have changed: re-fetch the org
+        // list and the profile (a first membership creates the profile row).
+        const signedInUserId = session?.user.id ?? null;
+        void consumeMyInvites(supabase)
+          .catch(() => undefined)
+          .then(() => {
+            setMembershipsGeneration((g) => g + 1);
+            void queryClient.invalidateQueries({ queryKey: queryKeys.ownProfile(signedInUserId) });
+          });
       }
     });
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [queryClient]);
 
   const signInWithPassword = useCallback(async (emailInput: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email: emailInput, password });
@@ -71,8 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, userId, email, signInWithPassword, signUpWithPassword, signOut, sendMagicLink, sendPasswordResetEmail, updatePassword }),
-    [status, userId, email, signInWithPassword, signUpWithPassword, signOut, sendMagicLink, sendPasswordResetEmail, updatePassword],
+    () => ({ status, userId, email, membershipsGeneration, signInWithPassword, signUpWithPassword, signOut, sendMagicLink, sendPasswordResetEmail, updatePassword }),
+    [status, userId, email, membershipsGeneration, signInWithPassword, signUpWithPassword, signOut, sendMagicLink, sendPasswordResetEmail, updatePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

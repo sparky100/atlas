@@ -164,14 +164,19 @@ describe('model_shares against a real local Supabase (P-24)', () => {
   });
 
   describe('unpinned share ("current main")', () => {
-    it("resolves the model, sees main's own commits and heads at every commit", async () => {
+    it("resolves the model, sees every main commit, and sees every head main retains", async () => {
       expect(await getModelById(unpinnedOrg.member.client, modelId)).not.toBeNull();
 
       for (const commitId of [commit1Id, commit2Id, commit3Id]) {
         const { data: commitRow, error } = await unpinnedOrg.member.client.from('commits').select('id').eq('id', commitId).maybeSingle();
         expect(error).toBeNull();
         expect(commitRow?.id).toBe(commitId);
+      }
 
+      // Head rows exist only for main's current head and tagged commits
+      // (ADR-015, SPEC P-6) — commit3 and the tagged commit2 here; commit1's
+      // were garbage-collected, so there is nothing for any reader to see.
+      for (const commitId of [commit2Id, commit3Id]) {
         const { data: headRows, error: headError } = await unpinnedOrg.member.client.from('elements_head').select('element_id').eq('commit_id', commitId).eq('element_id', elementId);
         expect(headError).toBeNull();
         expect(headRows).toHaveLength(1);

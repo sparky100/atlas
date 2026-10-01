@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createOrganisation, listOrganisationsForUser } from '../../db/organisations';
 import type { OrganisationRow } from '../../db/types';
+import { useAuth } from '../auth/useAuth';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -19,6 +20,8 @@ export function useOrganisations(): UseOrganisationsResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generation, setGeneration] = useState(0);
+  // A background invite consumption can add a membership after this first loads.
+  const { membershipsGeneration } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
@@ -37,7 +40,7 @@ export function useOrganisations(): UseOrganisationsResult {
     return () => {
       cancelled = true;
     };
-  }, [generation]);
+  }, [generation, membershipsGeneration]);
 
   const refresh = useCallback(() => {
     setGeneration((g) => g + 1);

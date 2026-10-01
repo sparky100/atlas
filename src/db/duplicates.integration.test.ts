@@ -84,8 +84,8 @@ describe('duplicates schema (F4 step 2) against a real local Supabase', () => {
     modelId = randomUUID();
     await createModel(owner.client, { id: modelId, orgId, name: 'Duplicates Test Model', slug: `duplicates-model-${modelId.slice(0, 8)}`, createdBy: owner.id });
 
-    elementAId = randomUUID();
-    elementBId = randomUUID();
+    // The tables require element_a_id < element_b_id (one canonical order per pair).
+    [elementAId, elementBId] = [randomUUID(), randomUUID()].sort() as [string, string];
     runId = randomUUID();
   });
 
