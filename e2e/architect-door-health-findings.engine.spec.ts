@@ -383,9 +383,9 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // line, mirroring the old "No findings." x2 behaviour it replaces.
   // Assurance is 5, as of S1 item 11a's own two new checks (external
   // interfaces missing classification, external organisation access) —
-  // both zero on an element-less model. Health findings is 13, as of the
-  // architect-door layout prompt's own `capability-no-supporters` check
-  // (the third decision-shaped finding) — also zero here.
+  // both zero on an element-less model. Health findings is 14, as of
+  // F11's own `outgoing-no-retiring-change` check (after the architect-door
+  // layout prompt's `capability-no-supporters`) — also zero here.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // `exact: true`: this model's own title, "Health Findings Clean Test
   // Model", contains "Health Findings" as a substring, so a non-exact
@@ -396,7 +396,7 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // match into a reliable strict-mode violation.
   await expect(page.getByRole('heading', { name: 'Health findings', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
-  const healthClear = page.getByRole('button', { name: '13 checks clear' });
+  const healthClear = page.getByRole('button', { name: '14 checks clear' });
   const assuranceClear = page.getByRole('button', { name: '5 checks clear' });
   await expect(healthClear).toBeVisible();
   await expect(assuranceClear).toBeVisible();
@@ -409,11 +409,12 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   await expect(page.getByTestId('health-findings-panel').getByText(/duplicates flagged/)).toHaveCount(0);
 
   // Expanding the Health findings group's own line reveals each of its
-  // 13 checks' own "0 X" summary — including ones the panel above never
+  // 14 checks' own "0 X" summary — including ones the panel above never
   // showed a live example of.
   await healthClear.click();
   await expect(page.getByText('0 systems not linked to a capability', { exact: true })).toBeVisible();
   await expect(page.getByText('0 capabilities with no owner', { exact: true })).toBeVisible();
+  await expect(page.getByText('0 systems marked Migrate or Eliminate with no open change retiring them', { exact: true })).toBeVisible();
   // Assurance's own line is still collapsed — expanding one group doesn't
   // expand the other.
   await expect(page.getByText(/supporting an essential function/)).toHaveCount(0);
