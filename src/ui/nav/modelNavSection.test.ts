@@ -29,6 +29,8 @@ describe('modelNavSectionFor', () => {
   it('matches decisions, list and detail', () => {
     expect(modelNavSectionFor('/decisions')).toBe('decisions');
     expect(modelNavSectionFor('/decisions/abc')).toBe('decisions');
+    expect(modelNavSectionFor('/projects')).toBe('projects');
+    expect(modelNavSectionFor('/projects/abc')).toBe('projects');
   });
 
   it('matches versions, including the diff page', () => {

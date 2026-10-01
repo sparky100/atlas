@@ -12,6 +12,8 @@ export interface DecisionLinkPickerProps {
   selected: readonly { elementId: UUID; name: string }[];
   onAdd: (elementId: UUID, name: string) => void;
   onRemove: (elementId: UUID) => void;
+  /** F10: the project form's own wording; defaults to the decision form's. */
+  placeholder?: string;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface DecisionLinkPickerProps {
  * (`useDecisions.ts`'s own `createDecisionWithLinks`) — this component only
  * manages the in-progress selection, it never writes anything itself.
  */
-export function DecisionLinkPicker({ commitId, modelId, selected, onAdd, onRemove }: DecisionLinkPickerProps) {
+export function DecisionLinkPicker({ commitId, modelId, selected, onAdd, onRemove, placeholder = 'Search capabilities or systems this decision concerns…' }: DecisionLinkPickerProps) {
   const search = useRelationshipTargetSearch(commitId, modelId, ['capability', 'system', 'container'], '00000000-0000-0000-0000-000000000000');
   const selectedIds = new Set(selected.map((s) => s.elementId));
   const results = search.results.filter((r) => !selectedIds.has(r.element_id));
@@ -59,7 +61,7 @@ export function DecisionLinkPicker({ commitId, modelId, selected, onAdd, onRemov
       <input
         type="text"
         className={styles.input}
-        placeholder="Search capabilities or systems this decision concerns…"
+        placeholder={placeholder}
         value={search.query}
         onChange={(e) => {
           search.setQuery(e.target.value);

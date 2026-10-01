@@ -179,3 +179,36 @@ export async function removeProjectLink(supabase: Client, projectId: UUID, linke
   if (error) throw new Error(`removeProjectLink: ${error.message}`);
   if (data.length === 0) throw new Error('removeProjectLink: this link could not be removed — the project may be closed, or you may not be allowed to edit it');
 }
+
+export interface TouchedElement {
+  elementId: UUID;
+  /** The name the change created it with, when the change created it; `null` for an existing element it only edited (the caller resolves those against main). */
+  createdName: string | null;
+}
+
+/**
+ * The elements one change's own commits touch (ADR-024 §5, "what the
+ * project touches", derived, never stored). One query per change, filtered
+ * by `commits.branch_id` through an inner embed — never an `.in()` over a
+ * growing id list (CLAUDE.md rule 8). RLS applies: a viewer sees nothing
+ * for another person's unshared draft.
+ */
+export async function listElementsTouchedByChange(supabase: Client, modelId: UUID, branchId: UUID): Promise<TouchedElement[]> {
+  assertRealId('listElementsTouchedByChange', 'branch_id', branchId);
+  const { data, error } = await supabase
+    .from('deltas')
+    .select('subject_id, kind, name, commits!inner(branch_id)')
+    .eq('model_id', modelId)
+    .eq('subject_type', 'element')
+    .eq('commits.branch_id', branchId)
+    .order('seq');
+  if (error) throw new Error(`listElementsTouchedByChange: ${error.message}`);
+  const byId = new Map<UUID, TouchedElement>();
+  for (const row of data as unknown as { subject_id: UUID; kind: string; name: string | null }[]) {
+    const existing = byId.get(row.subject_id);
+    const createdName = row.kind === 'element_create' ? row.name : null;
+    if (!existing) byId.set(row.subject_id, { elementId: row.subject_id, createdName });
+    else if (createdName !== null) existing.createdName = createdName;
+  }
+  return [...byId.values()];
+}
