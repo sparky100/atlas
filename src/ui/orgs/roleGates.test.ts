@@ -24,6 +24,7 @@ function branch(overrides: Partial<BranchRow>): BranchRow {
     cancelled_by: null,
     dismissed_identity_pairs: [],
     intent: null,
+    project_id: null,
     ...overrides,
   };
 }

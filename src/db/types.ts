@@ -143,6 +143,8 @@ export interface BranchRow {
   dismissed_identity_pairs: string[];
   /** Prompt pack F0: `null` for `main`/`capture_draft`; always set for a `change` branch. See `BranchIntent`'s own doc comment. */
   intent: BranchIntent | null;
+  /** ADR-024: the project this change belongs to — `null` for main/capture drafts and for a change in no project. Changeable only while the change is open (P2), and an option's always matches its decision's (P1). */
+  project_id: UUID | null;
 }
 
 export type MergeRequestStatus = 'pending' | 'changes_requested' | 'approved' | 'merged' | 'rejected';
@@ -405,7 +407,7 @@ export interface NotificationRow {
 export type DecisionStatus = 'proposed' | 'accepted' | 'superseded' | 'rejected';
 export type DecisionArgumentStance = 'for' | 'against' | 'neutral';
 /** SPEC-data-model.md §3.8's own already-corrected value list — `'branch'`, not ADR-013's original `'change_branch'`. An option (F3) is a `decision_links` row with `linked_type: 'branch'` pointing at an `explore`-intent branch (F0) — no separate `decision_options` table. */
-export type DecisionLinkedType = 'element' | 'relationship' | 'branch' | 'assumption' | 'evidence';
+export type DecisionLinkedType = 'element' | 'relationship' | 'branch' | 'assumption' | 'evidence' | 'project';
 export type AssumptionStatus = 'open' | 'validated' | 'invalidated';
 export type EvidenceKind = 'document' | 'link' | 'capture_job_ref' | 'comment_ref';
 
@@ -430,6 +432,8 @@ export interface DecisionRow {
   /** The chosen option's branch, once accepted (PR5). */
   branch_id: UUID | null;
   superseded_decision_id: UUID | null;
+  /** ADR-024: the project this decision is part of (its decision log); `null` is a portfolio-level decision. Moved only through `atlas.set_decision_project`, so option changes follow (P1). */
+  project_id: UUID | null;
   created_by: UUID;
   created_at: string;
 }
@@ -566,6 +570,47 @@ export interface AttributeDefinitionRow {
   description: string | null;
   order_index: number;
   deprecated_at: string | null;
+  created_by: UUID;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Projects (ADR-024, F10 — docs/ADR-024-projects.md and
+// supabase/migrations/20261002020000_projects.sql). Workflow rows, not model
+// facts: never in deltas, heads or versions.
+// ---------------------------------------------------------------------------
+
+export type ProjectStatus = 'active' | 'on_hold' | 'closed' | 'cancelled';
+/** `element` is the project's declared scope; `evidence` attaches a business case, document or link. */
+export type ProjectLinkedType = 'element' | 'evidence';
+
+/** The literal shape of a row in `projects`. `status`/`closed_*` move through `atlas.set_project_status` only; a project is never deleted. */
+export interface ProjectRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  title: string;
+  /** The problem or opportunity, in plain words. */
+  purpose: string;
+  /** Accountable for delivering the project — distinct from any decision's own owner. */
+  owner_id: UUID;
+  status: ProjectStatus;
+  start_date: string | null;
+  target_date: string | null;
+  /** Which health-finding check "Start a project" traced back to — a stable string key. */
+  source_finding_key: string | null;
+  closed_by: UUID | null;
+  closed_at: string | null;
+  close_reason: string | null;
+  created_by: UUID;
+  created_at: string;
+}
+
+/** The literal shape of a row in `project_links` — primary key `(project_id, linked_type, linked_id)`, so no `id` of its own. */
+export interface ProjectLinkRow {
+  project_id: UUID;
+  linked_type: ProjectLinkedType;
+  linked_id: UUID;
   created_by: UUID;
   created_at: string;
 }

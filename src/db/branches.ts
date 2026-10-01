@@ -34,6 +34,8 @@ export interface CreateChangeBranchInput {
   mainHeadCommitId: UUID;
   /** Prompt pack F0: required for every change branch — see `BranchIntent`'s own doc comment. */
   intent: BranchIntent;
+  /** ADR-024: the project this change belongs to. An option created from a decision must carry the decision's own project (P1). */
+  projectId?: UUID | null;
 }
 
 export async function createChangeBranch(supabase: Client, input: CreateChangeBranchInput): Promise<BranchRow> {
@@ -51,6 +53,7 @@ export async function createChangeBranch(supabase: Client, input: CreateChangeBr
     target_date: input.targetDate ?? null,
     created_by: input.createdBy,
     intent: input.intent,
+    project_id: input.projectId ?? null,
   };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('branches').insert(row).select('*').single();

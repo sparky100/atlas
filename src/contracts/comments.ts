@@ -10,7 +10,8 @@
  * everything here is a pure function.
  */
 
-export type AnchorType = 'element' | 'relationship' | 'change' | 'decision' | 'version';
+/** ADR-024 adds `project` (`20261002010000_anchor_type_project.sql`) — a project page's own thread. */
+export type AnchorType = 'element' | 'relationship' | 'change' | 'decision' | 'version' | 'project';
 export type CommentStatus = 'open' | 'resolved';
 /** Sprint M1b adds `reply` (`supabase/migrations/20260906340000_notification_kind_reply.sql`/`20260906350000_comment_reply_notifications.sql`) — a reply notifies its thread's other participants, not just an @handle. F3a adds `review_assigned` (`supabase/migrations/20260914070000_notification_kind_review_assigned.sql`) — a review-assignment notification names a merge request (`notifications.merge_request_id`), not a comment. */
 export type NotificationKind = 'mention' | 'reply' | 'review_assigned';

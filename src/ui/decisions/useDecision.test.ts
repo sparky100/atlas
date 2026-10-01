@@ -22,6 +22,7 @@ function makeDecision(overrides: Partial<DecisionRow> = {}): DecisionRow {
     decided_at: null,
     branch_id: null,
     superseded_decision_id: null,
+    project_id: null,
     created_by: 'user-1',
     created_at: '2026-01-01T00:00:00Z',
     ...overrides,
@@ -50,6 +51,7 @@ function makeBranch(overrides: Partial<BranchRow> = {}): BranchRow {
     cancelled_by: null,
     dismissed_identity_pairs: [],
     intent: 'explore',
+    project_id: null,
     ...overrides,
   };
 }

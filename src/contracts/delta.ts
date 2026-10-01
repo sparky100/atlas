@@ -54,6 +54,11 @@ export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
  * a stage is a label grouping the capabilities that deliver it, with no
  * sequence, timing, actor or flow semantics — that ADR argues the
  * distinction in full, and this list keeps the exclusion.
+ * A project (ADR-024/F10) is *not* the `project-or-programme` exclusion
+ * either: it is a workflow record (the `projects` table, beside
+ * `decisions`) that holds decisions and changes — metadata about change
+ * branches, exactly as ADR-001 says — never a landscape fact, never in a
+ * delta, head or version. This list keeps the exclusion.
  *
  * Same shape of amendment for cost: "cost/budget figures" above excludes
  * cost as an *element type* (and unformatted cost figures as modelled
