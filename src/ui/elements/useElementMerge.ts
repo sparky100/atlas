@@ -1,9 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { mergeElements, undoElementMerge } from '../../db/elementMerges';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
+import { invalidateModelHead } from '../query/invalidateModelHead';
 import { supabase } from '../supabaseClient';
 import { reportToast } from '../toasts/toastStore';
 
@@ -41,6 +43,7 @@ export interface UseElementMergeInput {
  */
 export function useElementMerge(input: UseElementMergeInput): UseElementMergeResult {
   const { modelId, orgId, userId, loserId, loserName, branch, expectedHeadCommitId, onMerged } = input;
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<ElementMergeStatus>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -94,6 +97,7 @@ export function useElementMerge(input: UseElementMergeInput): UseElementMergeRes
                   reportError('Could not undo the merge.', new Error(undoResult.message));
                   return;
                 }
+                await invalidateModelHead(queryClient, modelId);
                 reportToast(`Undid merge of "${loserName}" into "${survivorName}"`);
               } catch (e) {
                 reportError('Could not undo the merge.', e);
@@ -101,13 +105,18 @@ export function useElementMerge(input: UseElementMergeInput): UseElementMergeRes
             })();
           },
         });
+        // The merge moved main's (or the change's) head; every page reading
+        // the cached head must refetch before the survivor's page loads —
+        // reading the materialised head at the old commit (which only holds
+        // rows for the *current* head) made every element look absent.
+        await invalidateModelHead(queryClient, modelId);
         onMerged(survivorId);
       } catch (e) {
         setStatus('idle');
         setError(e instanceof Error ? e.message : 'Could not merge.');
       }
     },
-    [modelId, orgId, userId, loserId, loserName, branch, expectedHeadCommitId, onMerged],
+    [modelId, orgId, userId, loserId, loserName, branch, expectedHeadCommitId, onMerged, queryClient],
   );
 
   return { status, error, merge };

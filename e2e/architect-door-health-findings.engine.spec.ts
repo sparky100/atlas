@@ -151,7 +151,8 @@ test('architect door: health findings name systems with no capability, capabilit
   await expect(healthFindingsPanel.getByText('Consumer System → Well Owned System')).toBeVisible();
   await expect(healthFindingsPanel.getByText('Labeled Consumer System → Well Owned System')).toHaveCount(0);
 
-  await expect(healthFindingsPanel.getByText('0 duplicates flagged')).toBeVisible();
+  // The duplicates count is one of the door's stats now, above the panel, and links to the report.
+  await expect(page.getByRole('link', { name: '0 duplicates flagged' })).toBeVisible();
 });
 
 test('architect-door layout prompt: a finding with more than three items collapses to "and N more" on its own card, with a browse-table link to the full list', async ({ page }) => {
@@ -405,7 +406,7 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // least one real, non-zero check).
   await expect(page.getByText(/not linked to a capability/)).toHaveCount(0);
   await expect(page.getByText(/with no owner/)).toHaveCount(0);
-  await expect(page.getByText(/duplicates flagged/)).toHaveCount(0);
+  await expect(page.getByTestId('health-findings-panel').getByText(/duplicates flagged/)).toHaveCount(0);
 
   // Expanding the Health findings group's own line reveals each of its
   // 13 checks' own "0 X" summary — including ones the panel above never

@@ -43,7 +43,7 @@ test('convert a system into a module of an existing platform, carrying its relat
   await expect(page.getByRole('heading', { name: 'Freight Tracker' })).toBeVisible();
 
   // The relationship carried over onto the new module, unchanged.
-  await expect(page.getByText('Customs Clearance')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Customs Clearance$/ }).first()).toBeVisible();
 
   // Rename the module so the next search can only succeed via the old
   // name's alias, not the module's current name.
@@ -59,6 +59,6 @@ test('convert a system into a module of an existing platform, carrying its relat
   await goToModelHome(page);
   const searchBox = page.getByPlaceholder('Search or create a capability, system, or actor…');
   await searchBox.fill('Freight Tracker');
-  await page.getByRole('link', { name: 'SAP · FT', exact: true }).click();
+  await page.getByRole('link', { name: /SAP · FT\b/ }).click();
   await expect(page.getByRole('heading', { name: 'FT' })).toBeVisible();
 });

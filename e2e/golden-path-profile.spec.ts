@@ -14,7 +14,7 @@ test('profile: edit display name/handle/avatar from the account menu, then sign 
 
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('link', { name: 'Profile' }).click();
-  await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Profile', exact: true })).toBeVisible();
 
   const newDisplayName = `Renamed ${randomUUID().slice(0, 8)}`;
   const newHandle = `handle-${randomUUID().slice(0, 8)}`;

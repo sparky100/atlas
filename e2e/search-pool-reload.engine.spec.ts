@@ -140,7 +140,7 @@ test('the landscape finds a just-created system when adding a second one', async
 
   // Back to the Landscape through the app's own persistent nav (not a hard
   // page.goto) — an in-app route change, same as a user clicking around.
-  await page.getByRole('link', { name: 'Landscape' }).click();
+  await page.getByRole('navigation', { name: 'Model navigation' }).getByRole('link', { name: 'Landscape' }).click();
   await expect(page.getByRole('button', { name: '+ Add system' })).toBeVisible();
 
   // Second system: search first, for the system the first add just
