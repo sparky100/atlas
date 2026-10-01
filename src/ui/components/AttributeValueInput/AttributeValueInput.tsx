@@ -10,6 +10,8 @@ export interface AttributeValueInputProps {
   invalid: boolean;
   /** `AttributeEditRow`'s help-text element id, when the field declares `field.help` — wired onto the control so screen readers announce the guidance with it. Absent on every field with no help text. */
   describedBy?: string | undefined;
+  /** F12 bulk edit: a grid cell has no visible `<label>`, so it names the control directly ("Criticality for Payroll"). */
+  ariaLabel?: string | undefined;
 }
 
 /**
@@ -25,7 +27,7 @@ export interface AttributeValueInputProps {
  * `.textarea`'s own `field-sizing: content` (`AttributeValueInput.module.css`),
  * not a fixed-height box the value scrolls inside from the first line.
  */
-export function AttributeValueInput({ id, field, value, onChange, invalid, describedBy }: AttributeValueInputProps) {
+export function AttributeValueInput({ id, field, value, onChange, invalid, describedBy, ariaLabel }: AttributeValueInputProps) {
   const stringValue = typeof value === 'string' ? value : '';
 
   if (field.kind === 'boolean') {
@@ -40,6 +42,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid, descr
         }}
         aria-invalid={invalid}
         aria-describedby={describedBy}
+        aria-label={ariaLabel}
       />
     );
   }
@@ -56,6 +59,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid, descr
         }}
         aria-invalid={invalid}
         aria-describedby={describedBy}
+        aria-label={ariaLabel}
       />
     );
   }
@@ -71,6 +75,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid, descr
         }}
         aria-invalid={invalid}
         aria-describedby={describedBy}
+        aria-label={ariaLabel}
       >
         <option value="">{field.required ? 'Select…' : (field.emptyLabel ?? '—')}</option>
         {field.options?.map((option) => (
@@ -94,6 +99,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid, descr
         }}
         aria-invalid={invalid}
         aria-describedby={describedBy}
+        aria-label={ariaLabel}
       />
     );
   }
@@ -110,6 +116,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid, descr
         }}
         aria-invalid={invalid}
         aria-describedby={describedBy}
+        aria-label={ariaLabel}
       />
     );
   }
@@ -126,6 +133,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid, descr
         }}
         aria-invalid={invalid}
         aria-describedby={describedBy}
+        aria-label={ariaLabel}
       />
     );
   }
@@ -141,6 +149,7 @@ export function AttributeValueInput({ id, field, value, onChange, invalid, descr
       }}
       aria-invalid={invalid}
       aria-describedby={describedBy}
+      aria-label={ariaLabel}
     />
   );
 }

@@ -25,7 +25,9 @@ import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { useElementBrowse, type ElementBrowseFilter } from '../elements/useElementBrowse';
 import type { BrowseRow } from '../../db/elementBrowse';
 import { StartProjectLink } from '../projects/StartProjectLink';
-import { canStartProject } from '../orgs/roleGates';
+import { canEditBranch, canStartProject } from '../orgs/roleGates';
+import { attributeDefinitionToFieldSchema } from '../../contracts/attributeSchema';
+import { useBulkEdit } from '../elements/useBulkEdit';
 import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromCriticalExposedFinding, prefillFromCriticalSupportEndFinding, prefillFromOutgoingDisposition } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { useRouteTiming } from '../perf/useRouteTiming';
@@ -177,6 +179,16 @@ export function ElementsPage() {
   // one batched RPC over every row currently on screen (post-filter/search/
   // sort, same as everywhere else `useThreadCounts` is used), not a query
   // per row.
+  // F12 step 1: the grid writes where the element page's own Edit writes —
+  // the selected draft change, or main — behind the same gate
+  // (`canEditBranch`).
+  const bulkEditBranch = editingBranch ?? (ref.kind === 'main' ? mainBranch : null);
+  const bulkEditCustomFields = useMemo(
+    () => new Map(attributeDefinitions.filter((d) => d.deprecated_at === null).map((d) => [d.key, { field: attributeDefinitionToFieldSchema(d), appliesTo: d.applies_to }])),
+    [attributeDefinitions],
+  );
+  const bulkEdit = useBulkEdit({ modelId: model?.id ?? '', orgId: organisation?.id ?? '', userId, branch: bulkEditBranch, customFields: bulkEditCustomFields, onSaved: onLinked });
+  const canBulkEdit = bulkEditBranch !== null && canEditBranch(role, bulkEditBranch);
   const threadCountsState = useThreadCounts(model?.id ?? null, state.status === 'ready' ? state.rows.map((r) => r.element.element_id) : []);
   const threadCounts = threadCountsState.status === 'ready' ? threadCountsState.counts : undefined;
 
@@ -297,6 +309,7 @@ export function ElementsPage() {
             }
             decisionRowAction={decisionRowAction}
             onImportClick={canEdit ? () => { void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/capture`); } : undefined}
+            bulkEdit={canBulkEdit ? bulkEdit : undefined}
           />
         </main>
       </div>

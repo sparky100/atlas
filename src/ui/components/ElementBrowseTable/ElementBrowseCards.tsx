@@ -13,6 +13,9 @@ import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
 import { InlineSupportsPicker, type ElementBrowseLinkSupportsConfig } from './ElementBrowseTable';
+import type { BulkEditController } from '../../elements/useBulkEdit';
+import { BulkEditCell } from './BulkEditCell';
+import { BULK_EDIT_CORE_KEYS, bulkEditFieldFor } from '../../elements/bulkEditFields';
 import styles from './ElementBrowseCards.module.css';
 
 export interface ElementBrowseCardsProps {
@@ -25,6 +28,8 @@ export interface ElementBrowseCardsProps {
   decisionRowAction?: ((row: BrowseRow) => ReactNode | null) | undefined;
   /** Only read when `linkSupportsInline` is present — the inline picker's own search scope, same as the table's identical call site. */
   commitId: UUID;
+  /** F12 step 1: present only while the grid is in edit mode — each card then shows its editable attributes as controls. */
+  bulkEdit?: BulkEditController | undefined;
 }
 
 /**
@@ -46,7 +51,7 @@ export interface ElementBrowseCardsProps {
  * maintain: every value is inline, labelled by position/tone rather than by
  * a column header, so there's nothing to lose off either scroll axis.
  */
-export function ElementBrowseCards({ rows, elementHref, unresolvedCounts, selectedCustomDefinition, linkSupportsInline, decisionRowAction, commitId }: ElementBrowseCardsProps) {
+export function ElementBrowseCards({ rows, elementHref, unresolvedCounts, selectedCustomDefinition, linkSupportsInline, decisionRowAction, commitId, bulkEdit }: ElementBrowseCardsProps) {
   return (
     <ul className={styles.list}>
       {rows.map((row) => (
@@ -59,6 +64,7 @@ export function ElementBrowseCards({ rows, elementHref, unresolvedCounts, select
           linkSupportsInline={linkSupportsInline}
           decisionRowAction={decisionRowAction}
           commitId={commitId}
+          bulkEdit={bulkEdit}
         />
       ))}
     </ul>
@@ -73,6 +79,7 @@ function ElementBrowseCard({
   linkSupportsInline,
   decisionRowAction,
   commitId,
+  bulkEdit,
 }: {
   row: BrowseRow;
   elementHref: (elementId: UUID) => string;
@@ -81,7 +88,16 @@ function ElementBrowseCard({
   linkSupportsInline: ElementBrowseLinkSupportsConfig | undefined;
   decisionRowAction: ((row: BrowseRow) => ReactNode | null) | undefined;
   commitId: UUID;
+  bulkEdit: BulkEditController | undefined;
 }) {
+  const editableFields = bulkEdit
+    ? [
+        bulkEditFieldFor(row.element, BULK_EDIT_CORE_KEYS.lifecycle),
+        bulkEditFieldFor(row.element, BULK_EDIT_CORE_KEYS.criticality),
+        bulkEditFieldFor(row.element, BULK_EDIT_CORE_KEYS.disposition),
+        selectedCustomDefinition ? bulkEditFieldFor(row.element, selectedCustomDefinition.key, selectedCustomDefinition) : null,
+      ].filter((field) => field !== null)
+    : [];
   const lifecycleTone = row.lifecycleStatus ? lifecycleToneFor(row.lifecycleStatus) : undefined;
   const criticalityTone = row.criticality ? criticalityToneFor(row.criticality) : undefined;
   // "type · owner", owner omitted rather than shown as a dash — a table
@@ -120,6 +136,13 @@ function ElementBrowseCard({
       {linkSupportsInline && row.element.element_type === 'system' && (
         <div className={styles.cardActions}>
           <InlineSupportsPicker system={{ elementId: row.element.element_id, name: row.element.name }} config={linkSupportsInline} searchCommitId={commitId} />
+        </div>
+      )}
+      {bulkEdit && editableFields.length > 0 && (
+        <div className={styles.cardActions}>
+          {editableFields.map((field) => (
+            <BulkEditCell key={field.key} element={row.element} field={field} controller={bulkEdit} />
+          ))}
         </div>
       )}
       {decisionAction && <div className={styles.cardActions}>{decisionAction}</div>}

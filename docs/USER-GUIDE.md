@@ -50,7 +50,7 @@ Every model-scoped page shares the same navigation, grouped into four clusters:
 | **Work** | Projects, Changes, Decisions, Capture |
 | **Record** | Versions |
 
-- **Elements** is the full list of everything in the model, with filters and export.
+- **Elements** is the full list of everything in the model, with filters and export. **Edit in grid** lets you change Lifecycle, Criticality, Disposition (and a custom attribute, when its column is shown) across many rows at once; **Save** records them all as one edit, on main or in the change you're working in — the same people who can edit an element's page can use it.
 - **Reports** gathers the standing checks — Boundary crossings, External interfaces and Duplicates — each with its current count and a link to the full report.
 - **The review queue** lives inside **Changes**, as its *Review queue* tab. The Changes item in the navigation shows a number when items are waiting for review.
 

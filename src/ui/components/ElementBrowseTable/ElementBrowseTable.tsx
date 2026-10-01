@@ -23,7 +23,10 @@ import { DISPOSITION_LEVELS } from '../../../contracts/attributeSchema';
 import { useElementExport } from '../../elements/useElementExport';
 import { sortKeyEquals, type ElementBrowseSortKey, type ElementBrowseState } from '../../elements/useElementBrowse';
 import { useIsNarrowViewport } from '../../landscape/useIsNarrowViewport';
+import { BulkEditCell } from './BulkEditCell';
+import { BULK_EDIT_CORE_KEYS, bulkEditFieldFor } from '../../elements/bulkEditFields';
 import { ElementBrowseCards } from './ElementBrowseCards';
+import type { BulkEditController } from '../../elements/useBulkEdit';
 import styles from './ElementBrowseTable.module.css';
 
 /** Same breakpoint every other "table/canvas → mobile list" swap in this app uses (`LandscapePage.tsx`/`ContextPage.tsx`/`ValueStreamsPage.tsx`, all `useIsNarrowViewport(768)`) — one convention, not a bespoke value per view. */
@@ -90,6 +93,8 @@ export interface ElementBrowseTableProps {
   decisionRowAction?: ((row: BrowseRow) => ReactNode | null) | undefined;
   /** F2-lite: renders "Import…" beside Export when present, omitted (same presence-gates-visibility convention as `linkSupportsInline`) for a viewer who can't edit main. Owns opening the dialog itself — this table only renders the button. */
   onImportClick?: (() => void) | undefined;
+  /** F12 step 1: the grid's edit mode — present only for a viewer who can edit the branch being browsed (`canEditBranch`, the element page's own gate); absent, the table stays read-only. */
+  bulkEdit?: BulkEditController | undefined;
 }
 
 // A narrower key type than `ElementBrowseSortKey` — this fixed column list
@@ -104,6 +109,12 @@ const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle' | 'criticality' | 
   { key: 'criticality', label: 'Criticality' },
   { key: 'disposition', label: 'Disposition' },
 ];
+
+/** The edit bar's hint mentions the custom column too, when one is shown. */
+function selectedCustomDefinitionLabel(definitions: readonly AttributeDefinitionRow[], selection: ElementBrowseCustomAttrSelection): string | null {
+  const definition = selection.key ? definitions.find((d) => d.key === selection.key) : undefined;
+  return definition ? ` (or ${definition.label})` : null;
+}
 
 function customAttrValueToDraft(kind: AttributeDefinitionKind, raw: string | null): DraftValue {
   if (kind === 'boolean') return raw === 'true';
@@ -211,7 +222,7 @@ export function InlineSupportsPicker({ system, config, searchCommitId }: { syste
 }
 
 /** Sprint U3b: "filterable, sortable table of elements by type with owner and lifecycle." A real `<table>` — semantic tabular data, not a design-system gap (native `<table>`/`<th>`/`<td>` is the correct element here, the same way `<ul>`/`<li>` already is for plain lists elsewhere in this app). */
-export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenameBase, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange, findingFilter, onFindingFilterChange, decisionRowAction, onImportClick }: ElementBrowseTableProps) {
+export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenameBase, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange, findingFilter, onFindingFilterChange, decisionRowAction, onImportClick, bulkEdit }: ElementBrowseTableProps) {
   // Called unconditionally (Rules of Hooks) — `commitId`/`rows` are only real
   // once `state.status === 'ready'`, and the export loader refuses to run on
   // the null/empty fallbacks until then.
@@ -381,6 +392,15 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
   );
   const headerTableStyle = colWidths ? { width: colWidths.reduce((sum, width) => sum + width, 0) } : undefined;
 
+  // F12 step 1: in edit mode, a cell whose attribute applies to its row's
+  // type becomes that attribute's own control; every other cell keeps its
+  // read-only rendering (`null` here means "render the usual value").
+  const editableCell = (element: BrowseRow['element'], key: string, customDefinition?: AttributeDefinitionRow) => {
+    if (!bulkEdit?.editing) return null;
+    const field = bulkEditFieldFor(element, key, customDefinition);
+    return field ? <BulkEditCell element={element} field={field} controller={bulkEdit} /> : null;
+  };
+
   return (
     <div>
       <div className={styles.toolbar}>
@@ -484,7 +504,40 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
             Import…
           </Button>
         )}
+        {bulkEdit && !bulkEdit.editing && (
+          <Button variant="secondary" disabled={state.rows.length === 0} onClick={bulkEdit.start}>
+            Edit in grid
+          </Button>
+        )}
       </div>
+      {bulkEdit?.editing && (
+        <div className={styles.bulkEditBar} role="region" aria-label="Grid editing">
+          <Text as="span" size="sm">
+            {bulkEdit.changedCount === 0 ? 'Change any Lifecycle, Criticality or Disposition cell' + (selectedCustomDefinitionLabel(attributeDefinitions, customAttr) ?? '') + ', then save.' : `${String(bulkEdit.changedCount)} ${bulkEdit.changedCount === 1 ? 'change' : 'changes'} not saved yet`}
+          </Text>
+          <Button
+            disabled={bulkEdit.changedCount === 0 || bulkEdit.submitting}
+            onClick={() => {
+              void bulkEdit.save(state.rows.map((row) => row.element));
+            }}
+          >
+            {bulkEdit.submitting ? 'Saving…' : `Save ${String(bulkEdit.changedCount)} ${bulkEdit.changedCount === 1 ? 'change' : 'changes'}`}
+          </Button>
+          <Button variant="secondary" disabled={bulkEdit.submitting} onClick={bulkEdit.cancel}>
+            Cancel
+          </Button>
+          {bulkEdit.errors.size > 0 && (
+            <Text as="span" size="sm" className={styles.bulkEditError}>
+              Nothing was saved: fix the {bulkEdit.errors.size === 1 ? 'cell' : `${String(bulkEdit.errors.size)} cells`} marked below.
+            </Text>
+          )}
+          {bulkEdit.submitError !== null && (
+            <Text as="span" size="sm" className={styles.bulkEditError}>
+              {bulkEdit.submitError}
+            </Text>
+          )}
+        </div>
+      )}
       {exportState.error !== null && <Text as="p">{exportState.error}</Text>}
 
       {state.rows.length === 0 ? (
@@ -498,6 +551,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
           linkSupportsInline={linkSupportsInline}
           decisionRowAction={decisionRowAction}
           commitId={state.commitId}
+          bulkEdit={bulkEdit?.editing ? bulkEdit : undefined}
         />
       ) : (
         <>
@@ -572,7 +626,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                       )}
                     </td>
                     <td headers={`${headerIdBase}-lifecycle`}>
-                      {row.lifecycleStatus ? (
+                      {editableCell(row.element, BULK_EDIT_CORE_KEYS.lifecycle) ?? (row.lifecycleStatus ? (
                         <Text as="span" size="sm">
                           {row.lifecycleStatus}
                         </Text>
@@ -580,29 +634,29 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                         <Text as="span" tone="faint" size="sm">
                           —
                         </Text>
-                      )}
+                      ))}
                     </td>
                     <td headers={`${headerIdBase}-criticality`}>
-                      {row.criticality ? (
+                      {editableCell(row.element, BULK_EDIT_CORE_KEYS.criticality) ?? (row.criticality ? (
                         <Chip tone={criticalityToneFor(row.criticality) ?? 'neutral'}>{row.criticality}</Chip>
                       ) : (
                         <Text as="span" tone="faint" size="sm">
                           —
                         </Text>
-                      )}
+                      ))}
                     </td>
                     <td headers={`${headerIdBase}-disposition`}>
-                      {row.disposition ? (
+                      {editableCell(row.element, BULK_EDIT_CORE_KEYS.disposition) ?? (row.disposition ? (
                         <Chip tone={dispositionTone(row.disposition)}>{dispositionLabel(row.disposition)}</Chip>
                       ) : (
                         <Text as="span" tone="faint" size="sm">
                           —
                         </Text>
-                      )}
+                      ))}
                     </td>
                     {selectedCustomDefinition && (
                       <td headers={`${headerIdBase}-custom`}>
-                        {(() => {
+                        {editableCell(row.element, selectedCustomDefinition.key, selectedCustomDefinition) ?? (() => {
                           const formatted = formatCustomAttributeValue(attributesRecord(row.element.attributes)[selectedCustomDefinition.key]);
                           return formatted === '' ? (
                             <Text as="span" tone="faint" size="sm">
