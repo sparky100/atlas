@@ -47,8 +47,10 @@ test('removing a system from the model retracts every one of its relationships a
   // menu's own "Remove from model…" item.
   await page.getByRole('button', { name: 'Remove from model', exact: true }).click();
 
-  // One commit later, the element is gone from this ref entirely.
-  await expect(page.getByText('This element is not present here', { exact: false })).toBeVisible({ timeout: 15_000 });
+  // One commit later, the element is gone from this ref entirely — and an
+  // element page with nothing to show sends you back rather than leaving
+  // a dead end (#313, ElementPage.tsx's own `notPresentAtRef` effect).
+  await expect(page.getByRole('heading', { name: 'Field Devices Gateway', level: 1 })).toHaveCount(0, { timeout: 15_000 });
 
   // Its relationships went with it, in the same commit — Metering no
   // longer lists Field Devices Gateway as a supporter.

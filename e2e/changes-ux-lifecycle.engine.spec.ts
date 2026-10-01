@@ -89,7 +89,7 @@ test('propose a change from an element page as a contributor, edit, submit; appr
 
   await contributorPage.getByRole('button', { name: 'Submit for review' }).click();
   await expect(contributorPage).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
-  await expect(contributorPage.getByText('pending', { exact: true })).toBeVisible();
+  await expect(contributorPage.getByText('pending', { exact: true }).first()).toBeVisible();
 
   // 5. Back on the change's own page: Draft/Proposed passed, In review current.
   await contributorPage.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
@@ -102,7 +102,7 @@ test('propose a change from an element page as a contributor, edit, submit; appr
   // session could get this far but no further, per role.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
   await page.getByRole('link', { name: 'Open review →' }).click();
-  await expect(page.getByText('pending', { exact: true })).toBeVisible();
+  await expect(page.getByText('pending', { exact: true }).first()).toBeVisible();
   const approveButton = page.getByRole('button', { name: 'Approve' });
   await expect(approveButton).toBeEnabled();
   await approveButton.click();

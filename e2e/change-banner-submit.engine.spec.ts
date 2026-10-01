@@ -45,7 +45,8 @@ test('submitting for review from the banner on an element page (not the change p
   await expect(page.getByText(`Editing in change: ${changeName}`)).toBeVisible();
   await submitForReviewWithReviewers(page, false);
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
-  await expect(page.getByText('pending', { exact: true })).toBeVisible();
+  // The request's own status chip (each reviewer's verdict reads "pending" too).
+  await expect(page.getByText('pending', { exact: true }).first()).toBeVisible();
 
   // 4. "Finish," not "leave": the session ref is cleared back to main (no
   // more banner), and the change is Proposed, not still Draft.

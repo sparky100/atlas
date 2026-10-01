@@ -107,8 +107,10 @@ test('comment on a branch-only element, merge the change, see the comment on mai
   // Not on main yet — the whole premise of "a comment on a branch element"
   // being distinct from an ordinary one (`useElementPage.ts`'s own
   // `notPresentAtRef` state, ElementPage.tsx's own rendering of it).
+  // An element page with nothing to show at this ref sends you back rather
+  // than leaving a dead end (#313) — so its heading never settles here.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${draftSystemId}`);
-  await expect(page.getByText('This element is not present here.', { exact: false })).toBeVisible();
+  await expect(page).not.toHaveURL(new RegExp(`/e/${draftSystemId}$`), { timeout: 15_000 });
 
   // 2. Comment on it from the branch's own view, mentioning bob.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${draftSystemId}?ref=branch:${branchId}`);
@@ -150,9 +152,9 @@ test('comment on a branch-only element, merge the change, see the comment on mai
   // Back to the change's own page — step 2 above left `page` on the
   // element page instead.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
-  await submitForReviewWithReviewers(page, true);
+  await submitForReviewWithReviewers(page, true, { selfApproves: true });
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
-  await expect(page.getByText('pending', { exact: true })).toBeVisible();
+  await expect(page.getByText('pending', { exact: true }).first()).toBeVisible();
   const approveButton = page.getByRole('button', { name: 'Approve' });
   await expect(approveButton).toBeEnabled();
   await approveButton.click();
