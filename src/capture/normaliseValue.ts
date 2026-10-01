@@ -5,7 +5,7 @@
  * nothing usable (the attribute is then omitted entirely — rule 5's "never
  * guess" spirit — never defaulted to a made-up value).
  */
-import type { HostingModel, LifecycleStatus } from '../contracts/delta';
+import type { Disposition, HostingModel, LifecycleStatus } from '../contracts/delta';
 
 export interface EnumParseResult<T extends string> {
   value: T;
@@ -78,6 +78,35 @@ const HOSTING_MODEL_SYNONYMS: Readonly<Record<string, HostingModel>> = {
 
 export function parseHostingModel(raw: string): EnumParseResult<HostingModel> | null {
   return parseEnumFuzzy(raw, HOSTING_MODEL_VALUES, HOSTING_MODEL_SYNONYMS);
+}
+
+const DISPOSITION_VALUES: readonly Disposition[] = ['tolerate', 'invest', 'migrate', 'eliminate'];
+
+/**
+ * F11: TIME disposition. A conservative synonym table: TIME's own one-letter
+ * codes, and direct register wording for each value only. Ambiguous words
+ * ("modernise", "review", "rationalise") stay unparsed — `ENUM_UNPARSED`,
+ * never a guess.
+ */
+const DISPOSITION_SYNONYMS: Readonly<Record<string, Disposition>> = {
+  t: 'tolerate',
+  retain: 'tolerate',
+  keep: 'tolerate',
+  maintain: 'tolerate',
+  i: 'invest',
+  grow: 'invest',
+  enhance: 'invest',
+  m: 'migrate',
+  replace: 'migrate',
+  replatform: 'migrate',
+  e: 'eliminate',
+  retire: 'eliminate',
+  decommission: 'eliminate',
+  sunset: 'eliminate',
+};
+
+export function parseDisposition(raw: string): EnumParseResult<Disposition> | null {
+  return parseEnumFuzzy(raw, DISPOSITION_VALUES, DISPOSITION_SYNONYMS);
 }
 
 export interface DateParseResult {

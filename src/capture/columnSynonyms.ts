@@ -18,7 +18,20 @@ import { normaliseName } from './normalise';
 import type { PromptAColumnRole } from './prompts/a';
 import type { EvidenceWarning } from '../contracts/capture';
 
-const COLUMN_SYNONYMS_RAW: Readonly<Record<PromptAColumnRole, readonly string[]>> = {
+/**
+ * F11: column roles reachable through this synonym table only, never
+ * offered to prompt A. Prompt A's text is frozen and its replay cassettes
+ * are keyed on the exact request, so a new LLM role waits until they can be
+ * re-recorded live; until then an exact synonym header ("TIME",
+ * "Disposition", …) maps deterministically and any other header can't
+ * reach the role at all.
+ */
+export type SynonymOnlyColumnRole = 'disposition';
+
+/** Every role a column can end up with: prompt A's own, plus the synonym-only ones. */
+export type ColumnRole = PromptAColumnRole | SynonymOnlyColumnRole;
+
+const COLUMN_SYNONYMS_RAW: Readonly<Record<ColumnRole, readonly string[]>> = {
   atlasId: ['atlas_id', 'Atlas ID'],
   sourceKey: ['Asset ID', 'App ID', 'Ref', 'CMDB ID', 'Application number'],
   name: ['Application', 'System', 'Application name', 'Product', 'Solution', 'Module'],
@@ -31,6 +44,7 @@ const COLUMN_SYNONYMS_RAW: Readonly<Record<PromptAColumnRole, readonly string[]>
   externalOrganisation: ['Operated by', 'Third party'],
   hostingModel: ['Hosting model', 'Deployment model', 'On-prem/cloud'],
   hostingProvider: ['Hosting provider', 'Data centre', 'Cloud provider'],
+  disposition: ['TIME', 'Disposition', 'Rationalisation', 'Rationalization', 'TIME category', 'TIME disposition'],
   technology: ['Technology', 'Platform', 'Stack'],
   parent: ['Parent system', 'Part of'],
   owner: ['Owner', 'Business owner', 'Service owner', 'Accountable', 'Team'],
@@ -44,18 +58,18 @@ const COLUMN_SYNONYMS_RAW: Readonly<Record<PromptAColumnRole, readonly string[]>
   ignore: [],
 };
 
-const COLUMN_SYNONYMS: ReadonlyMap<string, PromptAColumnRole> = new Map(
-  Object.entries(COLUMN_SYNONYMS_RAW).flatMap(([role, headers]) => headers.map((header) => [normaliseName(header), role as PromptAColumnRole] as const)),
+const COLUMN_SYNONYMS: ReadonlyMap<string, ColumnRole> = new Map(
+  Object.entries(COLUMN_SYNONYMS_RAW).flatMap(([role, headers]) => headers.map((header) => [normaliseName(header), role as ColumnRole] as const)),
 );
 
-export function lookupColumnSynonym(header: string): PromptAColumnRole | null {
+export function lookupColumnSynonym(header: string): ColumnRole | null {
   return COLUMN_SYNONYMS.get(normaliseName(header)) ?? null;
 }
 
 export const LOW_MAPPING_CONFIDENCE_THRESHOLD = 0.7;
 
 export interface ColumnRoleAssignment {
-  role: PromptAColumnRole;
+  role: ColumnRole;
   confidence: number;
   source: 'synonym' | 'llm';
 }

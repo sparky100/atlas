@@ -309,6 +309,7 @@ A workbook over 5,000 data rows, a PDF over 200 pages, text over 200,000 chars �
 | `externalOrganisation` | `externalOrganisation` | `Operated by`, `Third party` |
 | `hostingModel` | `System.hostingModel` (Prompt 7k item 1) | `Hosting model`, `Deployment model`, `On-prem/cloud` |
 | `hostingProvider` | `System.hostingProvider` (Prompt 7k item 1; free text, not the closed `hostingModel` set) | `Hosting provider`, `Data centre`, `Cloud provider` |
+| `disposition` | `System.disposition` / `Container.disposition` (F11, TIME; values fuzzy-matched by `parseDisposition`: T/I/M/E, retain/keep, grow, replace, retire…; anything ambiguous stays `ENUM_UNPARSED`). **Synonym-table only:** not offered to prompt A, whose text and recorded cassettes stay unchanged until they can be re-recorded live — an unlisted header never maps to it | `TIME`, `Disposition`, `Rationalisation`, `TIME category` |
 | `technology` | `Container.technology` | `Technology`, `Platform`, `Stack` |
 | `parent` | container parent (system name) | `Parent system`, `Part of`, `System`, `Application` (on a Modules sheet) |
 | `owner` | Actor candidate (`team` unless the value looks like a person) + `owns` (`role: 'business'`) | `Owner`, `Business owner`, `Service owner`, `Accountable`, `Team` |

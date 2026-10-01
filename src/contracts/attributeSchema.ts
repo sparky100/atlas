@@ -24,6 +24,7 @@
 import type {
   ActorAttributes,
   AnnualRunCost,
+  Disposition,
   CapabilityAttributes,
   ContainerAttributes,
   ElementType,
@@ -196,6 +197,25 @@ export const ANNUAL_RUN_COST_LABELS: Readonly<Record<AnnualRunCost, string>> = O
 /** The exact help text §"Run cost" specifies — shown under the edit control (`AttributeFieldMeta.help`). */
 export const ANNUAL_RUN_COST_HELP = "Annual cost that stops if this is retired. Not a share of the platform's cost.";
 
+/**
+ * F11: TIME disposition's four values — the single declaration of keys and
+ * labels, in the order the edit control lists them (Tolerate, Invest,
+ * Migrate, Eliminate: TIME's own reading order), consumed by
+ * `SYSTEM_META`/`CONTAINER_META` and `src/ui/elements/disposition.ts`.
+ */
+export const DISPOSITION_LEVELS = [
+  { key: 'tolerate', label: 'Tolerate' },
+  { key: 'invest', label: 'Invest' },
+  { key: 'migrate', label: 'Migrate' },
+  { key: 'eliminate', label: 'Eliminate' },
+] as const satisfies readonly { key: Disposition; label: string }[];
+
+export const DISPOSITION_OPTIONS = DISPOSITION_LEVELS.map((level) => level.key) as readonly Disposition[];
+
+export const DISPOSITION_LABELS: Readonly<Record<Disposition, string>> = Object.fromEntries(DISPOSITION_LEVELS.map((level) => [level.key, level.label])) as Readonly<Record<Disposition, string>>;
+
+export const DISPOSITION_HELP = 'What we intend to do with this: keep it as it is (Tolerate), develop it (Invest), move it to something else (Migrate), or retire it (Eliminate).';
+
 const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   lifecycleStatus: { label: 'Lifecycle', required: true, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
   // S1 item 11: "shown by lifecycle in the header" — ElementHeader.tsx
@@ -213,6 +233,7 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   // other judged enum on a system) in SYSTEM_ORDER below; labels/help/
   // "Not entered" empty state all via the meta members added for it.
   annualRunCost: { label: 'Run cost', required: false, kind: 'enum', options: ANNUAL_RUN_COST_OPTIONS, optionLabels: ANNUAL_RUN_COST_LABELS, help: ANNUAL_RUN_COST_HELP, emptyLabel: 'Not entered' },
+  disposition: { label: 'Disposition', required: false, kind: 'enum', options: DISPOSITION_OPTIONS, optionLabels: DISPOSITION_LABELS, help: DISPOSITION_HELP, emptyLabel: 'Not assessed' },
   hostingModel: { label: 'Hosting model', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
   hostingProvider: { label: 'Hosting provider', required: false, kind: 'text' },
   domain: { label: 'Domain', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
@@ -233,6 +254,7 @@ const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
   'supportEndsAt',
   'criticality',
   'annualRunCost',
+  'disposition',
   'hostingModel',
   'hostingProvider',
   'kind',
@@ -258,6 +280,9 @@ const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   // `ContainerAttributes.annualRunCost` doc comment), so there is no
   // platform value behind it to override.
   annualRunCost: { label: 'Run cost', required: false, kind: 'enum', options: ANNUAL_RUN_COST_OPTIONS, optionLabels: ANNUAL_RUN_COST_LABELS, help: ANNUAL_RUN_COST_HELP, emptyLabel: 'Not entered' },
+  // F11: a module's own disposition, never inherited from its platform —
+  // so, like run cost, not labelled "(module override)" of an inherited value.
+  disposition: { label: 'Disposition', required: false, kind: 'enum', options: DISPOSITION_OPTIONS, optionLabels: DISPOSITION_LABELS, help: DISPOSITION_HELP, emptyLabel: 'Not assessed' },
   hostingModel: { label: 'Hosting model (module override)', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
   hostingProvider: { label: 'Hosting provider (module override)', required: false, kind: 'text' },
   domain: { label: 'Domain (module override)', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
@@ -276,6 +301,7 @@ const CONTAINER_ORDER: (keyof ContainerAttributes)[] = [
   'version',
   'criticality',
   'annualRunCost',
+  'disposition',
   'hostingModel',
   'hostingProvider',
   'domain',

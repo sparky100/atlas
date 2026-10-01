@@ -34,7 +34,7 @@ describe('buildConvertSystemToModuleDeltas', () => {
   it('creates a container parented on the target platform, carrying over shared attributes', () => {
     const head = headFrom([
       createElement('d-sap', 'sap', 'system', 'SAP', null, SYSTEM_ATTRS),
-      createElement('d-sys', 'sys', 'system', 'Freight Tracker', null, { lifecycleStatus: 'active', isExternal: false, criticality: 'high', domain: 'ot', version: '2.1' }),
+      createElement('d-sys', 'sys', 'system', 'Freight Tracker', null, { lifecycleStatus: 'active', isExternal: false, criticality: 'high', domain: 'ot', version: '2.1', disposition: 'migrate' }),
     ]);
     const { deltas, newContainerId } = buildConvertSystemToModuleDeltas(cloneHead(head), 'sys', 'sap', SOURCE_ID, mintId);
     const create = deltas.find((d) => d.kind === 'element.create');
@@ -44,7 +44,7 @@ describe('buildConvertSystemToModuleDeltas', () => {
       elementType: 'container',
       name: 'Freight Tracker',
       parentId: 'sap',
-      attributes: { lifecycleStatus: 'active', isExternal: false, criticality: 'high', domain: 'ot', version: '2.1' },
+      attributes: { lifecycleStatus: 'active', isExternal: false, criticality: 'high', domain: 'ot', version: '2.1', disposition: 'migrate' },
     });
 
     const resultingHead = fold(cloneHead(head), deltas, ctx);

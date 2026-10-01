@@ -176,6 +176,26 @@ export type FitForPurpose = 'poor' | 'adequate' | 'good' | 'excellent';
 export type AnnualRunCost = 'none_included' | 'under_50k' | '50k_250k' | '250k_1m' | '1m_5m' | 'over_5m';
 
 /**
+ * F11 (ADR-001 "Amended (Disposition, TIME)"): what the estate intends to
+ * do with a system — Gartner's TIME vocabulary. A recorded *decision about*
+ * a system, judged and owned by someone, never a score or a blend of other
+ * facts. Keys stored, labels in code (`attributeSchema.ts`'s
+ * `DISPOSITION_LEVELS`).
+ *
+ * Absent means *not assessed* and is never read as `'tolerate'`. On a
+ * module (a platform's container) it is an optional override that is NOT
+ * inherited: an unset module has no disposition, whatever its platform's —
+ * deliberately outside `effectiveModuleAttributes`'s inheritance set.
+ *
+ * Worst-of order for display roll-ups only (the capability map's
+ * disposition colour-by): `eliminate > migrate > tolerate > invest`
+ * (`src/ui/elements/disposition.ts`'s `DISPOSITION_ORDER`). Read by one
+ * health finding — "marked Migrate or Eliminate, with no open change
+ * retiring it" — and by Portfolio's disagreement signals.
+ */
+export type Disposition = 'tolerate' | 'invest' | 'migrate' | 'eliminate';
+
+/**
  * How much a capability matters, judged by its own business owner or an
  * architect — ordered `low < medium < high`, but the *opposite* direction
  * from every other ordered enum here (`Criticality`, `FitForPurpose`,
@@ -293,6 +313,8 @@ export interface SystemAttributes {
   version?: string;
   /** Banded judged avoidable run cost — see `AnnualRunCost`'s own doc comment. Optional: absent means "Not entered", never `none_included`. */
   annualRunCost?: AnnualRunCost;
+  /** F11: TIME disposition — see `Disposition`'s own doc comment. Optional: absent means "Not assessed". */
+  disposition?: Disposition;
 }
 
 export interface ContainerAttributes {
@@ -339,6 +361,8 @@ export interface ContainerAttributes {
    * container it is simply that container's own cost.
    */
   annualRunCost?: AnnualRunCost;
+  /** F11: a module's own disposition — an override that is NOT inherited from its platform (see `Disposition`'s own doc comment). Absent means "Not assessed" for this module. */
+  disposition?: Disposition;
 }
 
 export interface ActorAttributes {

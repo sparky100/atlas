@@ -85,11 +85,11 @@ describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
     }
   });
 
-  it('only annualRunCost and importance declare an emptyLabel, and only annualRunCost declares help text — every other field keeps §4.3\'s bare "—" and a silent row', () => {
+  it('only annualRunCost, importance and disposition declare an emptyLabel, and only annualRunCost and disposition declare help text — every other field keeps §4.3\'s bare "—" and a silent row', () => {
     for (const type of ELEMENT_TYPES) {
       for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[type]) {
-        if (field.key !== 'annualRunCost') expect(field.help, `${type}.${field.key}`).toBeUndefined();
-        if (field.key !== 'annualRunCost' && field.key !== 'importance') expect(field.emptyLabel, `${type}.${field.key}`).toBeUndefined();
+        if (field.key !== 'annualRunCost' && field.key !== 'disposition') expect(field.help, `${type}.${field.key}`).toBeUndefined();
+        if (field.key !== 'annualRunCost' && field.key !== 'importance' && field.key !== 'disposition') expect(field.emptyLabel, `${type}.${field.key}`).toBeUndefined();
       }
     }
   });
@@ -332,5 +332,17 @@ describe('defaultCreateAttributes', () => {
 
   it('defaults onMain to true when omitted', () => {
     expect(defaultCreateAttributes('system')).toEqual({ lifecycleStatus: 'active', isExternal: false });
+  });
+});
+
+describe('Disposition (F11, TIME)', () => {
+  it('is an optional enum on system and container — tolerate/invest/migrate/eliminate, labelled, "Not assessed" when unset — and absent elsewhere', () => {
+    for (const type of ['system', 'container'] as const) {
+      const field = ATTRIBUTE_SCHEMA_BY_TYPE[type].find((f) => f.key === 'disposition');
+      expect(field).toMatchObject({ label: 'Disposition', required: false, kind: 'enum', options: ['tolerate', 'invest', 'migrate', 'eliminate'], emptyLabel: 'Not assessed' });
+      expect(field?.optionLabels).toEqual({ tolerate: 'Tolerate', invest: 'Invest', migrate: 'Migrate', eliminate: 'Eliminate' });
+    }
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.capability.some((f) => f.key === 'disposition')).toBe(false);
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.actor.some((f) => f.key === 'disposition')).toBe(false);
   });
 });

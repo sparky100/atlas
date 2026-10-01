@@ -29,12 +29,12 @@ import { validateAttributeValue } from '../contracts/attributeSchema';
 import { normalizeName } from '../engine/merge';
 
 /** The exact header names a row must use — order doesn't matter, extra columns are ignored, case-sensitive (matching every other attribute key in this product). Snake_case, this session's own plan's spelling — distinct from the camelCase attribute keys they map onto below. */
-export const IMPORT_COLUMNS = ['name', 'description', 'kind', 'lifecycle', 'criticality', 'annual_run_cost', 'domain', 'hosting_model', 'vendor', 'is_external', 'external_organisation', 'platform', 'capability', 'business_owner', 'technical_owner'] as const;
+export const IMPORT_COLUMNS = ['name', 'description', 'kind', 'lifecycle', 'criticality', 'annual_run_cost', 'disposition', 'domain', 'hosting_model', 'vendor', 'is_external', 'external_organisation', 'platform', 'capability', 'business_owner', 'technical_owner'] as const;
 export type ImportColumn = (typeof IMPORT_COLUMNS)[number];
 
 export type ImportRowElementType = 'system' | 'container';
 
-export type ImportRowAttributeKey = 'description' | 'kind' | 'lifecycleStatus' | 'criticality' | 'annualRunCost' | 'domain' | 'hostingModel' | 'vendor' | 'externalOrganisation';
+export type ImportRowAttributeKey = 'description' | 'kind' | 'lifecycleStatus' | 'criticality' | 'annualRunCost' | 'disposition' | 'domain' | 'hostingModel' | 'vendor' | 'externalOrganisation';
 
 /** An owner column's own cell — either a plain name, or "Name (External: Org)" (import close-out), which creates the owner as an external organisation actor (`subtype: 'organisation'`, `isExternal: true`, `externalOrganisation: Org`) if no existing actor named `name` already resolves it. */
 export interface OwnerReference {
@@ -89,6 +89,7 @@ const ATTRIBUTE_COLUMNS: readonly (readonly [ImportColumn, ImportRowAttributeKey
   ['lifecycle', 'lifecycleStatus'],
   ['criticality', 'criticality'],
   ['annual_run_cost', 'annualRunCost'],
+  ['disposition', 'disposition'],
   ['domain', 'domain'],
   ['hosting_model', 'hostingModel'],
   ['vendor', 'vendor'],

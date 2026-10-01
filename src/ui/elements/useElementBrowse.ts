@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Criticality, ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 import { CRITICALITY_ORDER } from './criticalityTone';
+import { DISPOSITION_ORDER, dispositionOf } from './disposition';
+import type { Disposition } from '../../contracts/delta';
 import { listAllElements, loadOwnersByElementId, ownersByElementIdFromOwnsEdges, lifecycleStatusOf, criticalityOf, type BrowseRow } from '../../db/elementBrowse';
 import { attributesRecord } from './attributesRecord';
 import { compareCustomAttributeValues, sortKeyEquals, type ElementBrowseSortKey } from './elementBrowseSort';
@@ -70,6 +72,16 @@ export type ElementBrowseFilter =
   | CustomAttributeBrowseFilter
   | null;
 
+/** F11: the browse table's disposition filter — one value, or systems and modules with none recorded. */
+export type DispositionFilter = 'all' | Disposition | 'not_assessed';
+
+/** `not_assessed` matches only systems and containers (the types that carry the attribute) with nothing recorded. */
+export function matchesDispositionFilter(row: Pick<BrowseRow, 'element' | 'disposition'>, filter: DispositionFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'not_assessed') return (row.element.element_type === 'system' || row.element.element_type === 'container') && row.disposition === null;
+  return row.disposition === filter;
+}
+
 export type ElementBrowseState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
@@ -79,6 +91,9 @@ export type ElementBrowseState =
       rows: BrowseRow[];
       typeFilter: ElementType | 'all';
       setTypeFilter: (type: ElementType | 'all') => void;
+      /** F11: narrow to one disposition, or to systems/modules not yet assessed. */
+      dispositionFilter: DispositionFilter;
+      setDispositionFilter: (value: DispositionFilter) => void;
       query: string;
       setQuery: (query: string) => void;
       sortKey: ElementBrowseSortKey;
@@ -114,7 +129,14 @@ function compareRows(a: BrowseRow, b: BrowseRow, key: ElementBrowseSortKey): num
       return (a.lifecycleStatus ?? '').localeCompare(b.lifecycleStatus ?? '') || displayName(a).localeCompare(displayName(b));
     case 'criticality':
       return criticalityOrderOf(a.criticality) - criticalityOrderOf(b.criticality) || displayName(a).localeCompare(displayName(b));
+    case 'disposition':
+      // Unset first, then best → worst (invest, tolerate, migrate, eliminate) — the same "unset sorts first" convention as criticality.
+      return dispositionRankOf(a.disposition) - dispositionRankOf(b.disposition) || displayName(a).localeCompare(displayName(b));
   }
+}
+
+function dispositionRankOf(value: Disposition | null): number {
+  return value === null ? -1 : DISPOSITION_ORDER.indexOf(value);
 }
 
 /** A missing or unrecognised criticality sorts before every recognised value — same "unset sorts first" convention `?? ''` already gives `owner`/`lifecycle` above. */
@@ -171,6 +193,7 @@ export function useElementBrowse(
   const [loaded, setLoaded] = useState<{ allRows: BrowseRow[]; commitId: UUID; filteredIds: ReadonlySet<UUID> | null } | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [typeFilter, setTypeFilter] = useState<ElementType | 'all'>('all');
+  const [dispositionFilter, setDispositionFilter] = useState<DispositionFilter>('all');
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<ElementBrowseSortKey>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -296,6 +319,7 @@ export function useElementBrowse(
           // blank — `lifecycleStatusOf`/`criticalityOf`'s own doc comment.
           lifecycleStatus: lifecycleStatusOf(element, parent),
           criticality: criticalityOf(element, parent),
+          disposition: element.element_type === 'system' || element.element_type === 'container' ? dispositionOf(element) : null,
           parent,
         };
       });
@@ -337,12 +361,13 @@ export function useElementBrowse(
     const filtered = loaded.allRows.filter((row) => {
       if (loaded.filteredIds && !loaded.filteredIds.has(row.element.element_id)) return false;
       if (typeFilter !== 'all' && row.element.element_type !== typeFilter) return false;
+      if (!matchesDispositionFilter(row, dispositionFilter)) return false;
       if (q === '') return true;
       return row.element.name.toLowerCase().includes(q) || (row.owner?.name.toLowerCase().includes(q) ?? false);
     });
     const sorted = [...filtered].sort((a, b) => compareRows(a, b, sortKey));
     return sortDirection === 'asc' ? sorted : sorted.reverse();
-  }, [loaded, typeFilter, query, sortKey, sortDirection]);
+  }, [loaded, typeFilter, dispositionFilter, query, sortKey, sortDirection]);
 
   if (status === 'error') return { status: 'error', message: error ?? 'Failed to load elements.' };
   if (status === 'refNotFound') return { status: 'refNotFound' };
@@ -352,6 +377,8 @@ export function useElementBrowse(
     rows,
     typeFilter,
     setTypeFilter,
+    dispositionFilter,
+    setDispositionFilter,
     query,
     setQuery,
     sortKey,

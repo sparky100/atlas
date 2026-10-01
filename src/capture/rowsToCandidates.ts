@@ -39,9 +39,9 @@ import type { SourceRef } from '../contracts/sourceRef';
 import { DEFAULTED_ATTRIBUTE_CONFIDENCE, parseFactorFor, rowFactorFor, sheetAttrConf } from './confidence';
 import type { ColumnRoleAssignment } from './columnSynonyms';
 import { normaliseName } from './normalise';
-import { looksLikePersonName, parseBool, parseDate, parseEmail, parseHostingModel, parseLifecycle, parseName, parseOwnerCell } from './normaliseValue';
+import { looksLikePersonName, parseBool, parseDate, parseDisposition, parseEmail, parseHostingModel, parseLifecycle, parseName, parseOwnerCell } from './normaliseValue';
 import { extractDataRows, type CellMeta, type RawSheet } from './parse/sheetGrid';
-import type { PromptAColumnRole } from './prompts/a';
+import type { ColumnRole } from './columnSynonyms';
 
 export interface RowCandidate {
   seq: number;
@@ -88,7 +88,7 @@ export interface RowsToCandidatesResult {
   capabilityRows: CapabilityColumnRow[];
 }
 
-type Role = PromptAColumnRole;
+type Role = ColumnRole;
 
 const PLAIN_ATTRIBUTES: ReadonlySet<Role> = new Set(['description', 'vendor', 'technology', 'externalOrganisation', 'hostingProvider']);
 const MULTI_VALUE_SEPARATOR = / \/ /;
@@ -349,6 +349,20 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
         }
         const warnings = parsed.fuzzy ? [...baseWarnings, { code: 'ENUM_FUZZY', cell: refText, raw, parsedAs: parsed.value } as const] : baseWarnings;
         recordAttribute(group, 'hostingModel', parsed.value, warnings, rowFactor, assignment.confidence, ref, isFirst);
+        continue;
+      }
+      if (role === 'disposition') {
+        if (raw === '') {
+          bailOnBlank();
+          continue;
+        }
+        const parsed = parseDisposition(raw);
+        if (!parsed) {
+          group.warnings.push({ code: 'ENUM_UNPARSED', cell: refText, raw });
+          continue;
+        }
+        const warnings = parsed.fuzzy ? [...baseWarnings, { code: 'ENUM_FUZZY', cell: refText, raw, parsedAs: parsed.value } as const] : baseWarnings;
+        recordAttribute(group, 'disposition', parsed.value, warnings, rowFactor, assignment.confidence, ref, isFirst);
         continue;
       }
       if (role === 'introduced' || role === 'plannedEnd') {

@@ -8,9 +8,9 @@
  */
 import { z } from 'zod';
 import { clampMappingConfidence } from './confidence';
-import { lookupColumnSynonym, resolveColumnRoles, type LlmColumnAssignment, type ResolveColumnRolesResult } from './columnSynonyms';
+import { lookupColumnSynonym, resolveColumnRoles, type ColumnRole, type LlmColumnAssignment, type ResolveColumnRolesResult } from './columnSynonyms';
 import type { LlmClient } from './llm/client';
-import { buildPromptAUserMessage, PROMPT_A_COLUMN_ROLES, PROMPT_A_SCHEMA, PROMPT_A_SHEET_TYPES, PROMPT_A_SYSTEM, type PromptAColumnRole, type PromptASheetType } from './prompts/a';
+import { buildPromptAUserMessage, PROMPT_A_COLUMN_ROLES, PROMPT_A_SCHEMA, PROMPT_A_SHEET_TYPES, PROMPT_A_SYSTEM, type PromptAMappedHeader, type PromptASheetType } from './prompts/a';
 
 /** §6: "Effort: prompt A `medium`." */
 const PROMPT_A_EFFORT = 'medium';
@@ -40,7 +40,7 @@ interface MapColumnsViaLlmInput {
   inputName: string;
   sheetName: string;
   rowCount: number;
-  mappedHeaders: readonly { header: string; role: PromptAColumnRole }[];
+  mappedHeaders: readonly { header: string; role: ColumnRole }[];
   unmappedHeaders: readonly UnmappedHeader[];
   /** Aligned to `unmappedHeaders` (not the sheet's own column order) — up to 5 rows. */
   sampleRows: readonly (readonly string[])[];
@@ -57,7 +57,9 @@ async function mapColumnsViaLlm(input: MapColumnsViaLlmInput): Promise<MapColumn
     inputName: input.inputName,
     sheetName: input.sheetName,
     rowCount: input.rowCount,
-    mappedHeaders: input.mappedHeaders,
+    // Synonym-only roles (F11, `SynonymOnlyColumnRole`) aren't in prompt A's
+    // vocabulary; those headers are already resolved, so the model isn't told.
+    mappedHeaders: input.mappedHeaders.filter((h): h is PromptAMappedHeader => (PROMPT_A_COLUMN_ROLES as readonly string[]).includes(h.role)),
     unmappedHeaders: input.unmappedHeaders.map((h) => ({ columnRef: h.columnRef, header: h.header })),
     sampleRows: input.sampleRows,
   });
@@ -114,7 +116,7 @@ const SAMPLE_ROW_COUNT = 5;
 
 /** §5.2 step 2, whole: synonym table first; prompt A only for what's left, and only if anything is left at all (an all-synonym sheet never calls the model). */
 export async function mapSheetColumns(input: MapSheetColumnsInput): Promise<MapSheetColumnsResult> {
-  const mappedHeaders: { header: string; role: PromptAColumnRole }[] = [];
+  const mappedHeaders: { header: string; role: ColumnRole }[] = [];
   const unmappedHeaders: UnmappedHeader[] = [];
 
   for (let i = 0; i < input.headers.length; i++) {

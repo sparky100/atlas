@@ -219,7 +219,7 @@ function isBlankRow(row: readonly string[]): boolean {
 // fixtures 01-07 needs the warning attached through one of those roles.
 // ---------------------------------------------------------------------------
 
-const PLAIN_ATTRIBUTE_ROLES: ReadonlySet<string> = new Set(['description', 'vendor', 'technology', 'externalOrganisation', 'hostingProvider', 'lifecycleStatus', 'introduced', 'plannedEnd', 'isExternal', 'hostingModel']);
+const PLAIN_ATTRIBUTE_ROLES: ReadonlySet<string> = new Set(['description', 'vendor', 'technology', 'externalOrganisation', 'hostingProvider', 'lifecycleStatus', 'introduced', 'plannedEnd', 'isExternal', 'hostingModel', 'disposition']);
 
 function attachLowMappingConfidenceWarnings(candidates: readonly RowCandidate[], sheetWarnings: readonly EvidenceWarning[], headers: readonly string[], roles: readonly (ColumnRoleAssignment | null)[]): RowCandidate[] {
   const lowConfidenceByRole = new Map<string, { column: string; confidence: number }>();
