@@ -1,5 +1,6 @@
 import type { ChipTone } from '../components/Chip/Chip';
 import type { CapabilityTileData } from '../../db/modelHome';
+import { IMPORTANCE_ORDER } from './capabilityImportance';
 
 /**
  * F6.1 ("make capability fit-for-purpose visible to directors"): a tile
@@ -13,6 +14,37 @@ import type { CapabilityTileData } from '../../db/modelHome';
  */
 export function isCapabilityTileWeak(tile: Pick<CapabilityTileData, 'tone' | 'poorFitCapabilities'>): boolean {
   return tile.tone !== 'ok' || tile.poorFitCapabilities.length > 0;
+}
+
+/**
+ * Tone's own severity among *weak* tiles specifically (a weak tile's tone
+ * can be `'ok'` — flagged only by a poor-fit capability, per
+ * `isCapabilityTileWeak` above — so this ranks all four, not just the
+ * three a tile-by-tone-alone view would ever show): an unresolved
+ * lifecycle exposure (`warn`) is the most urgent; "nothing recorded"
+ * (`neutral`, no known supporters at all) the next; a replacement already
+ * planned (`info`) reads calmer, since it's already being handled; `ok`
+ * (weak purely via fit, tone itself is fine) least urgent of the four.
+ * This ranking is this file's own judgement call — there's no existing
+ * order for the derived `tone` union to mirror the way `Importance`/
+ * `Criticality`/`FitForPurpose` each have one.
+ */
+const WEAK_TONE_SEVERITY: Record<CapabilityTileData['tone'], number> = { warn: 0, neutral: 1, info: 2, ok: 3 };
+
+/** `importance` treated as least-important (ranks after `'low'`) when unset — "not assessed" is never mistaken for "assessed as low," it's simply the last thing Director home surfaces among weak tiles. */
+function importanceRank(importance: CapabilityTileData['importance']): number {
+  return importance === null ? Object.keys(IMPORTANCE_ORDER).length : IMPORTANCE_ORDER[importance];
+}
+
+/**
+ * Director home's own weak-tile order (the task's own rule): importance
+ * high → low, unset last; ties broken by fit/exposure severity
+ * (`WEAK_TONE_SEVERITY` above); remaining ties broken by name. Pure and
+ * unit-tested — `DirectorHome.tsx` only ever calls `weakTiles.sort(...)`
+ * with this, never re-derives the rule inline.
+ */
+export function compareWeakTiles(a: CapabilityTileData, b: CapabilityTileData): number {
+  return importanceRank(a.importance) - importanceRank(b.importance) || WEAK_TONE_SEVERITY[a.tone] - WEAK_TONE_SEVERITY[b.tone] || a.capability.name.localeCompare(b.capability.name);
 }
 
 /**

@@ -16,7 +16,8 @@ import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPa
 import { attributesRecord } from '../elements/attributesRecord';
 import { decisionPrefillToSearchParams, prefillFromPoorFitCapabilities, prefillFromWeakCapability } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
-import { formatPoorFitPillLabel, isCapabilityTileWeak, poorFitPillTone } from './capabilityTileFit';
+import { importanceLabel } from './capabilityImportance';
+import { compareWeakTiles, formatPoorFitPillLabel, isCapabilityTileWeak, poorFitPillTone } from './capabilityTileFit';
 import { ProposeChangePicker } from './ProposeChangePicker';
 import { ValueStreamsOutcomeView } from '../valueStreams/ValueStreamsOutcomeView';
 import { canCreateChangeBranch, canStartDecision } from '../orgs/useMembership';
@@ -88,7 +89,12 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
   // is weak when its exposure tone says so *or* it has a poor-fit
   // capability — a display rule only (`isCapabilityTileWeak`'s own doc
   // comment); fit itself never becomes part of `tone` (ADR-023).
-  const weakTiles = data.tiles.filter((t) => isCapabilityTileWeak(t));
+  // Ordering only (the task's own rule): importance high → low, unset
+  // last, then fit/exposure severity, then name — `compareWeakTiles`'s
+  // own doc comment (`capabilityTileFit.ts`). Healthy tiles keep the
+  // existing capability-map tree order; only the weak ones, the ones a
+  // director is actually deciding what to do about, are reordered.
+  const weakTiles = data.tiles.filter((t) => isCapabilityTileWeak(t)).sort(compareWeakTiles);
   const healthyTiles = data.tiles.filter((t) => !isCapabilityTileWeak(t));
 
   return (
@@ -359,6 +365,15 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
         {' · '}
         {tile.supportedCapabilityCount}/{tile.totalCapabilityCount} supported
       </Text>
+      {/* The task's own rule: a real level shows on every tile; the
+          gentle "Importance not set" prompt shows only on a flagged
+          (emphasised) tile — a healthy tile with nothing assessed isn't
+          worth nudging about. */}
+      {(tile.importance !== null || emphasised) && (
+        <Text as="p" tone={tile.importance === null ? 'faint' : 'muted'} size="xs" className={styles.tileImportance}>
+          {importanceLabel(tile.importance)}
+        </Text>
+      )}
       {/* Ownership is an informational-tier finding (the agreed Health
           findings severity tiers, ArchitectHome.tsx's own `unowned-
           capabilities`/`no-technical-owner` checks) — a director doesn't

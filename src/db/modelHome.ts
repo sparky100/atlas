@@ -10,10 +10,11 @@
  * the top). Those stay real gaps, not faked — see each component's own
  * comment for exactly what's deferred and why.
  */
-import type { FitForPurpose, UUID } from '../contracts/delta';
+import type { FitForPurpose, Importance, UUID } from '../contracts/delta';
 import type { CommitRow, DeltaRow, ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
 import { attributesRecord } from '../ui/elements/attributesRecord';
 import { computeCapabilityRollup } from '../ui/capabilityMap/capabilityRollup';
+import { importanceOf } from '../ui/home/capabilityImportance';
 import { poorFitSupportsEdges, worstFitForPurpose } from '../ui/capabilityMap/metrics';
 import type { Client } from './client';
 import { assertInFilterSize } from './inFilterLimit';
@@ -283,6 +284,16 @@ export interface CapabilityTileData {
    * for).
    */
   poorFitAllReplacementPlanned: boolean;
+  /**
+   * The level-1 capability's *own* `importance` (never rolled up across
+   * its subtree — unlike `fitForPurpose`/`tone` above, this is a fact
+   * about this one capability, judged by its own business owner or an
+   * architect, not a "worst of its descendants" aggregate). `null` means
+   * not assessed — Director home's own weak-tile ordering
+   * (`capabilityTileFit.ts`'s `compareWeakTiles`) sorts that last, never
+   * as `'low'`.
+   */
+  importance: Importance | null;
 }
 
 /**
@@ -375,6 +386,7 @@ export function buildCapabilityTiles(
       fitForPurpose: rollup.fitForPurpose,
       poorFitCapabilities,
       poorFitAllReplacementPlanned,
+      importance: importanceOf(capability),
     };
   });
 }
