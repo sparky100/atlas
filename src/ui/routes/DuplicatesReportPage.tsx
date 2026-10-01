@@ -18,11 +18,11 @@ import styles from './ViewPage.module.css';
 
 /**
  * F4 (ADR-019 "Amended (F4, ...)"): the duplicates report route
- * (`/duplicates`) — same "real route, reached only by a link, not one of
- * `ModelNav`'s fixed seven rail entries" precedent `BoundaryCrossingsPage.tsx`/
- * `ExternalInterfacesPage.tsx` already establish (`modelNavSection.ts`'s own
- * `modelNavSectionFor` has no case for this path, so no rail item lights up
- * here — deliberate, not an oversight). Not scoped to one ref, same as
+ * (`/duplicates`) — one of the reports the Reports hub lists (F9 step 3,
+ * `ReportsPage.tsx`), alongside `BoundaryCrossingsPage.tsx`/
+ * `ExternalInterfacesPage.tsx`; the nav's Reports item lights up here
+ * (`modelNavSection.ts`). Before F9 these three had no nav entry and were
+ * reached only by links. Not scoped to one ref, same as
  * Capture/Changes/Versions — the report always reads main's own current
  * head (ADR-019), never a change branch.
  */

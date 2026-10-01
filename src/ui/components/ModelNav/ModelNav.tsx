@@ -1,4 +1,4 @@
-import { GitBranch, History, Home, List, Map, Milestone, Scale, Upload, Wallet, Workflow, Grid as GridIcon, type LucideIcon } from 'lucide-react';
+import { ClipboardList, GitBranch, History, Home, List, Map, Milestone, Scale, Upload, Wallet, Workflow, Grid as GridIcon, type LucideIcon } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { Chip } from '../Chip/Chip';
 import { Text } from '../Text/Text';
@@ -19,10 +19,10 @@ export interface ModelNavProps {
 
 type RealSection = Exclude<ModelNavSection, null>;
 
-/** F9 step 2: four named groups (UI-principles §2.0's own table, amended by F9 step 1) — a caption + 1px divider between each on the rail, dividers alone (no caption — no room) on the mobile bottom bar until F9 step 4 replaces it. Order here is display order, both grouped and flattened. Reports (F9 step 3) and Projects (F10) join when their pages exist, not before (CLAUDE.md rule 7). */
+/** F9 step 2: four named groups (UI-principles §2.0's own table, amended by F9 step 1) — a caption + 1px divider between each on the rail, dividers alone (no caption — no room) on the mobile bottom bar until F9 step 4 replaces it. Order here is display order, both grouped and flattened. Reports joined with its hub page (F9 step 3); Projects (F10) joins when its page exists, not before (CLAUDE.md rule 7). */
 const NAV_GROUPS: { caption: string; sections: RealSection[] }[] = [
   { caption: 'Model', sections: ['home', 'capability-map', 'landscape', 'value-streams', 'elements'] },
-  { caption: 'Analyse', sections: ['portfolio', 'roadmap'] },
+  { caption: 'Analyse', sections: ['portfolio', 'roadmap', 'reports'] },
   { caption: 'Work', sections: ['changes', 'decisions', 'capture'] },
   { caption: 'Record', sections: ['versions'] },
 ];
@@ -32,6 +32,7 @@ const SECTION_LABELS: Record<RealSection, string> = {
   'capability-map': 'Capability map',
   landscape: 'Landscape',
   roadmap: 'Roadmap',
+  reports: 'Reports',
   'value-streams': 'Value streams',
   elements: 'Elements',
   portfolio: 'Portfolio',
@@ -47,6 +48,7 @@ const SECTION_ICONS: Record<RealSection, LucideIcon> = {
   'capability-map': GridIcon,
   landscape: Map,
   roadmap: Milestone,
+  reports: ClipboardList,
   'value-streams': Workflow,
   elements: List,
   portfolio: Wallet,
@@ -189,6 +191,8 @@ function sectionPath(section: RealSection): string {
       return 'elements';
     case 'portfolio':
       return 'portfolio';
+    case 'reports':
+      return 'reports';
     case 'changes':
       return 'changes';
     case 'capture':

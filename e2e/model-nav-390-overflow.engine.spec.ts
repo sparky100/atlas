@@ -144,6 +144,7 @@ test('model-scoped routes: no horizontal scroll at 390px, including a long branc
     { path: `/o/${orgSlug}/m/${modelSlug}/changes`, heading: 'Changes' },
     { path: `/o/${orgSlug}/m/${modelSlug}/decisions`, heading: 'Decisions' },
     { path: `/o/${orgSlug}/m/${modelSlug}/versions${refQuery}`, heading: 'Versions' },
+    { path: `/o/${orgSlug}/m/${modelSlug}/reports`, heading: 'Reports' },
     // F9 step 2: the review queue is the Changes page's second tab — same `h1`.
     { path: `/o/${orgSlug}/m/${modelSlug}/review`, heading: 'Changes' },
   ];

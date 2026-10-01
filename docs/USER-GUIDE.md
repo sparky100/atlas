@@ -41,13 +41,18 @@ Elements connect through relationships — "owns", "uses", "supports", and simil
 
 ## Finding your way around
 
-Every model-scoped page shares the same navigation, grouped into three clusters:
+Every model-scoped page shares the same navigation, grouped into four clusters:
 
 | Group | Pages |
 |---|---|
-| **Model** | Home, Capability map, Landscape |
-| **Work** | Changes, Decisions, Review queue |
+| **Model** | Home, Capability map, Landscape, Value streams, Elements |
+| **Analyse** | Portfolio, Roadmap, Reports |
+| **Work** | Changes, Decisions, Capture |
 | **Record** | Versions |
+
+- **Elements** is the full list of everything in the model, with filters and export.
+- **Reports** gathers the standing checks — Boundary crossings, External interfaces and Duplicates — each with its current count and a link to the full report.
+- **The review queue** lives inside **Changes**, as its *Review queue* tab. The Changes item in the navigation shows a number when items are waiting for review.
 
 **Zooming in.** Atlas is one continuous zoom through four levels: **capability map** (all your capabilities) → **landscape** (systems grouped by the capability they support) → **system context** (one system and its neighbours) → **containers** (inside one system). Scrolling/pinching zooms the current level; zooming into a specific element crosses down a level, the same way you'd zoom into a map.
 
@@ -85,8 +90,8 @@ You can leave comments directly on elements and other objects in the model — u
 
 - The **Capability map** is the all-capabilities view — your organisation's business functions, and (via colour/heat) what's changing or at risk.
 - **Roadmap** shows planned and in-flight change over time.
-- **Value streams** and **Boundary crossings** show how work and data move across your systems and organisational boundaries.
-- **External interfaces** lists where your model touches systems you don't own.
+- **Value streams** show how the organisation delivers its outcomes, stage by stage.
+- **Reports** (Analyse) lists **Boundary crossings** (links across the IT/OT boundary), **External interfaces** (where your model touches systems and organisations you don't own) and **Duplicates**.
 
 ## Getting help
 

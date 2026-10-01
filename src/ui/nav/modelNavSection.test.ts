@@ -42,6 +42,13 @@ describe('modelNavSectionFor', () => {
     expect(modelNavSectionFor('/review/capture/abc')).toBe('changes');
   });
 
+  it('treats the Reports hub and each report it lists as Reports (F9 step 3)', () => {
+    expect(modelNavSectionFor('/reports')).toBe('reports');
+    expect(modelNavSectionFor('/boundary-crossings')).toBe('reports');
+    expect(modelNavSectionFor('/external-interfaces')).toBe('reports');
+    expect(modelNavSectionFor('/duplicates')).toBe('reports');
+  });
+
   it('matches the Elements browse table (F9)', () => {
     expect(modelNavSectionFor('/elements')).toBe('elements');
   });
