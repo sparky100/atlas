@@ -1,6 +1,6 @@
 # ADR-024: Projects — the container for a piece of architecture work
 
-**Status:** Proposed 2026-10-01 — docs only, no code. **Approved for build by the human on 2026-10-01** as sprint F10 (`docs/PLAN-2026-10-recommendations.md`), scheduled after F9. Accepted once its migration lands (the ADR-023 precedent).
+**Status:** **Accepted 2026-10-02** — built as sprint F10 (`docs/PLAN-2026-10-recommendations.md`); migrations `supabase/migrations/20261002010000_anchor_type_project.sql` and `20261002020000_projects.sql`. Proposed and approved for build by the human on 2026-10-01.
 **Numbering:** ADR-023 is the current highest (`docs/ADR-023-value-streams.md`), so this is ADR-024. `docs/ADR-000-foundations.md`'s own index gains a one-line pointer to this file, per that document's established convention for ADR-021 and every later one.
 **Depends on:** ADR-001 (`docs/ADR-000-foundations.md` — its "explicit non-types" list names `project-or-programme`, which this ADR has to argue against, and does not overturn), ADR-002 (branches), ADR-010 (comment anchors), ADR-013/ADR-022 (decisions, `decision_links`, `evidence`), F0 (`branches.intent`), F5 (roadmap group-by), ADR-023 (the roadmap's second group-by mode — this ADR adds a third).
 
@@ -92,6 +92,19 @@ Three things need deciding that neither ADR-001 nor ADR-013/022 answers:
 2. **Project** page — purpose and owner, declared scope, decision log, changes (by stage: options being explored → chosen design → in review → merged), evidence, comments, and a roadmap slice of its changes.
 3. **Roadmap** — a third `groupBy` mode, `project`, beside `capability` and `valueStream` (`src/ui/roadmap/roadmapFilterParams.ts`).
 4. **Entry points** — "Start a project" from a health finding and from a capability or system's own page; "Add to project…" on a change and on a decision; on Choose, the chosen option is already in the decision's project (P1).
+
+### 7. Built as (F10, 2026-10-02)
+
+Recorded so nothing in the build is an unwritten decision:
+
+- **Two migrations, not one.** `anchor_type` gaining `'project'` is its own migration (`20261002010000`): Postgres won't use a new enum value in the transaction that adds it, and the main migration's anchor functions compare against it.
+- **A closed or cancelled project accepts nothing new** (`atlas.assert_project_accepts_members`, on decision insert, `decisions.project_id` change and `branches.project_id` set). This is P4 kept true after closing, not a new rule: without it a decision or change could join a closed project and leave it closed with open work.
+- **`branches.project_id` is a plain, column-granted update** (same roles as `title`/`intent`), guarded by `atlas.guard_branch_project` for P1/P2 — no third RPC. `decisions.project_id` is not client-updatable at all; it moves only through `atlas.set_decision_project`, which moves the decision first so its own option updates pass the P1 guard.
+- **Scope and evidence links can be removed** (`project_links_delete`) by the same people who may edit the project, while it is open — the declared scope is part of the project's own record, editable like its title (the accepted no-field-history risk below covers it too). An element link is checked against permanent `element_create` history, like a comment anchor.
+- **"What the project touches"** is computed per change from its own commits' element deltas (`listElementsTouchedByChange`, an inner embed on `commits.branch_id` routed through `selectAll`, never an `.in()` list).
+- **Roadmap "By project"** groups each system bar under every project whose changes' roadmap events (add, retire, either end of a replacement) name it; systems no project touches sit under "No project".
+- **Evidence authoring** is a link (http/https only) or a document reference with an optional description, attached to the project — the first `evidence` authoring path anywhere.
+- **Found and fixed on the way:** `atlas.delete_model` never deleted `decision_option_ratings` (added after it was last rewritten), so deleting an archived model with a rated option failed on a foreign key. The F10 rewrite clears ratings, project links and projects.
 
 ## Alternatives rejected
 
