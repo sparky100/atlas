@@ -43,7 +43,7 @@ Every model-scoped route renders the same navigation alongside the page, grouped
 
 - **Elements** is the browse table (`/elements`), previously reachable only from the model home's "Browse all elements →" link.
 - **Reports** is a small hub page listing the model's standing reports — Boundary crossings, External interfaces, Duplicates — each with its current count; those pages keep their own URLs and had no nav entry before.
-- **Review queue is a tab inside Changes, not a nav item.** The Changes nav item carries a count badge of items waiting for review (visible text, never colour alone, §8.4). `/review`, `/review/{id}` and `/review/capture/{id}` keep working as URLs (§2.4) and open with the Changes item highlighted.
+- **Review queue is a tab inside Changes, not a nav item.** The Changes page (`h1` "Changes") has two tabs, **All** and **Review queue**, each a plain link to its own URL with `aria-current="page"` on the current one (F9 step 2). "All" rather than "All changes", so no tab's name repeats the nav item's. The Changes nav item carries a count badge of items waiting for review (visible text, never colour alone, §8.4; read by assistive tech as "Changes (N waiting for review)"; zero shows nothing). The count is exactly what the queue lists — open requests for propose/explore changes plus capture drafts waiting — so a viewer, who can't see merge requests, gets neither a badge nor queue items. The Review queue tab shows the same number. The architect door's "review queue" stat links to the queue. `/review`, `/review/{id}` and `/review/capture/{id}` keep working as URLs (§2.4) and open with the Changes item highlighted.
 - **Projects** joins Work when F10 ships (`docs/ADR-024-projects.md`); until then the group has three items. Nothing renders a placeholder for it before then (CLAUDE.md rule 7).
 
 It is chrome, not a per-page affordance — a page never grows its own "back to X" link, or any other hand-rolled equivalent, to stand in for it: one shared component (`ModelNav`), everywhere, not a per-route re-implementation of the same nav (**amended, S1 item 17 — see §10 item 10: this is not a ban on `<ul>`/`<li>` markup itself, which §8 has never actually prohibited**).
@@ -75,7 +75,6 @@ It is chrome, not a per-page affordance — a page never grows its own "back to 
 | `Scale` | Nav: Decisions |
 | `Upload` | Nav: Capture |
 | `History` | Nav: Versions |
-| `Inbox` | Changes page: the Review tab (no longer a nav item, F9) |
 | `Ellipsis` | Mobile bottom bar: More *(F9)* |
 | `Search` | Search anywhere: the Home search box and the dialog's input *(F9)* |
 | `SlidersHorizontal` | Inspector panel (§6.5): the Filters section |
@@ -283,7 +282,7 @@ The side panel (§7) docked to the right column on wide screens, filtered to thi
 
 ## 5. The review queue
 
-**Where it lives (amended, F9 step 1):** the queue is the **Review** tab of the Changes page, not its own nav item (§2.0); its URLs are unchanged.
+**Where it lives (amended, F9 steps 1–2):** the queue is the **Review queue** tab of the Changes page (`src/ui/changes/ChangesTabs/`), beside **All**, not its own nav item (§2.0); its URLs are unchanged.
 
 The queue is where capture becomes fact and where a change becomes reality. It has two item kinds with different units of review (ADR-004): a **capture draft** is reviewed delta by delta; a **merge request** is reviewed as a whole with its conflicts. Both use the same three-pane layout and the same keys.
 

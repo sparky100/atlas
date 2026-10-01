@@ -36,13 +36,21 @@ describe('modelNavSectionFor', () => {
     expect(modelNavSectionFor('/diff')).toBe('versions');
   });
 
-  it('matches the review queue, list and detail', () => {
-    expect(modelNavSectionFor('/review')).toBe('review');
-    expect(modelNavSectionFor('/review/abc')).toBe('review');
+  it('treats the review queue, its detail pages and capture review as part of Changes (F9: a tab, not a nav item)', () => {
+    expect(modelNavSectionFor('/review')).toBe('changes');
+    expect(modelNavSectionFor('/review/abc')).toBe('changes');
+    expect(modelNavSectionFor('/review/capture/abc')).toBe('changes');
   });
 
-  it('returns null for a route with no persistent-nav section (an element page, the browse table)', () => {
+  it('matches the Elements browse table (F9)', () => {
+    expect(modelNavSectionFor('/elements')).toBe('elements');
+  });
+
+  it('returns null for a route with no persistent-nav section (an element page)', () => {
     expect(modelNavSectionFor('/e/abc')).toBeNull();
-    expect(modelNavSectionFor('/elements')).toBeNull();
+  });
+
+  it('does not mistake a path that merely starts with "elements" for the browse table', () => {
+    expect(modelNavSectionFor('/elementsfoo')).toBeNull();
   });
 });

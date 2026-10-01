@@ -117,12 +117,43 @@
    but the same defensive reasoning `.columnLink`'s own `min-width: 0`
    comments elsewhere in this codebase give). */
 .link {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--text);
+}
+
+/* F9 step 2: the review queue count on the Changes item (ModelNav.tsx's
+   `ReviewBadge`). After the label on the full rail; pinned over the
+   icon's top-right corner below 1024px, where the label is visually
+   hidden (below). Solid accent with its own foreground token, so the
+   digits read on both themes and in either the active or idle state. */
+.badge {
+  margin-left: auto;
+  min-width: 18px;
+  padding: 0 var(--space-1);
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .icon {
@@ -171,6 +202,16 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+
+  .badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin-left: 0;
+    min-width: 16px;
+    font-size: 10px;
+    line-height: 16px;
   }
 }
 

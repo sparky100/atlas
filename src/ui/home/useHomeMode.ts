@@ -43,7 +43,10 @@ export function useHomeMode(userId: UUID | null, isOwnerOrArchitect: boolean): U
     let cancelled = false;
     getUserPreferences(supabase, userId)
       .then((row) => {
-        if (!cancelled) setSavedHomeMode(row?.home_mode ?? null);
+        // Never overwrite a switch the user made while this load was still
+        // in flight — clicking "Director view" straight after landing used
+        // to be silently undone when the (older) saved value arrived.
+        if (!cancelled) setSavedHomeMode((current) => (current === undefined ? (row?.home_mode ?? null) : current));
       })
       .catch((e: unknown) => {
         // S1 audit follow-up: the load half only — `setHomeMode`'s own

@@ -24,6 +24,7 @@ import type { FieldConflictChoice, StructuralChoice } from '../../engine/mergeRe
 import { reportError } from '../errors/errorBannerStore';
 import { applyCommitToCache } from '../query/applyCommitToCache';
 import { invalidateModelHead } from '../query/invalidateModelHead';
+import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
 
 /** `StructuralChoice`'s own key: a retraction choice is keyed by its element; a duplicate/cardinality pair choice by its own pair (order-independent — both sides of a pair should key to the same slot). */
@@ -136,7 +137,12 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
 
   const reload = useCallback(() => {
     setReloadToken((t) => t + 1);
-  }, []);
+    // F9 step 2: every action on this page (approve, reject, reopen, merge,
+    // resubmit) ends here, and any of them can move the review queue's
+    // count — the nav badge and the Changes tabs re-read it in place,
+    // without waiting for the next page change.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.reviewQueueCount(modelId) });
+  }, [queryClient, modelId]);
 
   const setFieldChoice = useCallback((choice: FieldConflictChoice) => {
     setFieldChoices((prev) => {

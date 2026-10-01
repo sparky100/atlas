@@ -541,13 +541,18 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
           door's own `.statsRow` uses — see this component's own module
           comment for what each of the four numbers counts and why. */}
       <div className={styles.statsRow}>
+        {/* F9 step 2: a link into the queue, like the duplicates stat below —
+            the queue stopped being its own nav item (it's a tab of
+            Changes now), so this is the door's one-click way in. */}
         <div className={styles.stat}>
-          <Text as="span" size="2xl">
-            {data.reviewQueueCount}
-          </Text>{' '}
-          <Text as="span" tone="muted" size="sm">
-            review queue
-          </Text>
+          <Link to={`/o/${orgSlug}/m/${modelSlug}/review`}>
+            <Text as="span" size="2xl">
+              {data.reviewQueueCount}
+            </Text>{' '}
+            <Text as="span" tone="muted" size="sm">
+              review queue
+            </Text>
+          </Link>
         </div>
         <div className={styles.stat}>
           <Text as="span" size="2xl" className={insightsData && findingsNeedingAttentionCount > 0 ? styles.statWarn : undefined}>

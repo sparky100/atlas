@@ -35,4 +35,6 @@ export const queryKeys = {
    * should share one cache entry.
    */
   headAtCommit: (modelId: UUID | null, commitId: UUID | null) => ['headAtCommit', modelId, commitId] as const,
+  /** F9 step 2: the review queue's item count (open merge requests the queue shows, plus capture drafts waiting) — the Changes nav badge and the Changes page's "Review queue" tab read the same entry. */
+  reviewQueueCount: (modelId: UUID | null) => ['reviewQueue', 'count', modelId] as const,
 };

@@ -229,7 +229,7 @@ New ADR: value stream → stages, `enables` from capability to stage; one view; 
 
 ### F9 — navigation and findability
 
-Prerequisite: none. Design: `docs/UI-principles.md` §2.0 and §10 item 18 (F9 step 1, done 2026-10-01). Steps, one PR each: (1) UI-principles amendment — done; (2) nav regroup into Model/Analyse/Work/Record, Elements and Reports in the nav, review queue as a Changes tab with a count badge, every golden path that clicks a nav item updated; (3) the Reports hub page; (4) five-item mobile bottom bar plus grouped More sheet, 44px targets, two-tap reachability at 390; (5) search anywhere on Ctrl/⌘-K, reusing `useHomeSearch`'s queries. Golden paths: `golden-path-nav-groups`, `golden-path-search-anywhere`, at 1280 and 390.
+Prerequisite: none. Design: `docs/UI-principles.md` §2.0 and §10 item 18 (F9 step 1, done 2026-10-01). Steps, one PR each: (1) UI-principles amendment — done; (2) — built 2026-10-01, awaiting merge — nav regroup into Model/Analyse/Work/Record, Elements and Reports in the nav, review queue as a Changes tab with a count badge, every golden path that clicks a nav item updated; (3) the Reports hub page; (4) five-item mobile bottom bar plus grouped More sheet, 44px targets, two-tap reachability at 390; (5) search anywhere on Ctrl/⌘-K, reusing `useHomeSearch`'s queries. Golden paths: `golden-path-nav-groups`, `golden-path-search-anywhere`, at 1280 and 390.
 
 ### F10 — projects
 

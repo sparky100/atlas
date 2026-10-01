@@ -106,7 +106,11 @@ export async function inviteMemberFromHome(page: Page, orgName: string, memberEm
   // exact: true — an existing member's own row has a "Role for <name>"
   // select too; the invite form's own field is the bare "Role" label.
   await page.getByLabel('Role', { exact: true }).selectOption(role);
-  await page.getByRole('button', { name: 'Send invite' }).click();
+  // exact: true — once one invite is pending, its row's "Resend invite for
+  // <email>" button also contains "send invite" (a case-insensitive
+  // substring match), so a second invite from the same page would be
+  // ambiguous without it.
+  await page.getByRole('button', { name: 'Send invite', exact: true }).click();
   await expect(page.getByText(memberEmail)).toBeVisible({ timeout: 15_000 });
 }
 

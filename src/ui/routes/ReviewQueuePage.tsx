@@ -6,12 +6,13 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { ReviewQueueView } from '../reviews/ReviewQueueView';
+import { ChangesTabs } from '../changes/ChangesTabs/ChangesTabs';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { useModels } from '../models/useModels';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import styles from './ViewPage.module.css';
 
-/** The review queue's list (Sprint C1 step 7, UI-principles §2.4's `/review` route). */
+/** The review queue's list (Sprint C1 step 7, UI-principles §2.4's `/review` route) — since F9 step 2, the Changes page's "Review queue" tab (UI-principles §2.0, §5): same `h1` as the All tab, with `ChangesTabs` marking which one is showing. Its URL is unchanged. */
 export function ReviewQueuePage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
   const { ref } = useSelectedRef();
@@ -44,9 +45,10 @@ export function ReviewQueuePage() {
           <Breadcrumb org={{ label: organisation.name, href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel="Review queue" />
           <div className={styles.header}>
             <Text as="h1" size="2xl">
-              Review queue
+              Changes
             </Text>
           </div>
+          <ChangesTabs orgSlug={orgSlug ?? ''} modelSlug={model.slug} modelId={model.id} current="review" />
           <ReviewQueueView modelId={model.id} orgId={organisation.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
         </main>
       </div>

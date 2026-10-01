@@ -51,7 +51,6 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   const architectContext = await browser.newContext();
   const architectPage = await architectContext.newPage();
   await acceptInviteViaSignUp(architectPage, architectEmail, 'Alex Architect');
-  await architectContext.close();
 
   const proposerContext = await browser.newContext();
   const proposerPage = await proposerContext.newPage();
@@ -119,15 +118,28 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   await proposerPage.getByRole('button', { name: 'Submit for review' }).click();
   await proposerPage.getByLabel(ownerDisplayName).check();
   await proposerPage.getByRole('button', { name: 'Submit for review' }).last().click();
-  await expect(proposerPage.getByText('pending', { exact: true })).toBeVisible();
+  await expect(proposerPage.getByText('pending', { exact: true }).first()).toBeVisible();
 
   // 4. Reviewer (the owner) views To-be, then requests changes. `page` is
   // already inside the model (the block above left it on ModelHome). Each
   // queue row's own navigable link just reads "Review →" — the change's
   // name is plain text alongside it, not the link itself.
-  await page.getByRole('link', { name: 'Review queue' }).click();
+  //
+  // F9 step 2: the queue is the Changes page's "Review queue" tab, not a
+  // nav item. Once on Changes, both the nav item's badge and the tab say
+  // one item is waiting (checked after the click: `page` has been sitting
+  // on Home since before the proposer submitted, and the count is
+  // re-read when a page mounts).
+  const nav = page.getByRole('navigation', { name: 'Model navigation' });
+  const changesTabs = page.getByRole('navigation', { name: 'Changes views' });
+  await nav.getByRole('link', { name: 'Changes' }).click();
+  await expect(nav.getByRole('link', { name: 'Changes (1 waiting for review)' })).toBeVisible();
+  await expect(changesTabs.getByRole('link', { name: 'Review queue (1 waiting)' })).toBeVisible();
+  await changesTabs.getByRole('link', { name: 'Review queue' }).click();
+  await expect(changesTabs.getByRole('link', { name: 'Review queue' })).toHaveAttribute('aria-current', 'page');
+  await expect(nav.getByRole('link', { name: 'Changes' })).toHaveAttribute('aria-current', 'page');
   await page.locator('li', { hasText: changeName }).getByRole('link', { name: 'Review →' }).click();
-  await expect(page.getByText('pending', { exact: true })).toBeVisible();
+  await expect(page.getByText('pending', { exact: true }).first()).toBeVisible();
   // "View this change" links to the Landscape read-only at this branch's
   // ref (`ReviewRequestView.tsx`), not the element page directly.
   await page.getByRole('link', { name: 'View this change' }).click();
@@ -149,21 +161,37 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   await expect(proposerPage.getByText(`Editing in change: ${changeName}`)).toBeVisible();
   await proposerPage.getByRole('link', { name: 'Open review →' }).click();
   await proposerPage.getByRole('button', { name: /resubmit/i }).click();
-  await expect(proposerPage.getByText('pending', { exact: true })).toBeVisible();
+  await expect(proposerPage.getByText('pending', { exact: true }).first()).toBeVisible();
 
-  // 6. Reviewer approves and merges.
-  await page.getByRole('link', { name: 'Review queue' }).click();
+  // 6. Reviewers approve; the owner merges. F3a: the proposer's picker
+  // pre-checked the architect as the one *required* reviewer and added the
+  // owner as optional, so the request only reaches `approved` once the
+  // architect approves — the owner's own Approve is a verdict, not the gate
+  // (`atlas.set_review_verdict`). The architect reaches the queue the same
+  // way any member does: Changes in the nav, then the Review queue tab.
+  await architectPage.getByRole('link', { name: orgName }).click();
+  await architectPage.getByRole('link', { name: /goldenpath5 Model/ }).click();
+  await architectPage.getByRole('navigation', { name: 'Model navigation' }).getByRole('link', { name: 'Changes' }).click();
+  await architectPage.getByRole('navigation', { name: 'Changes views' }).getByRole('link', { name: 'Review queue' }).click();
+  await architectPage.locator('li', { hasText: changeName }).getByRole('link', { name: 'Review →' }).click();
+  const architectApprove = architectPage.getByRole('button', { name: 'Approve' });
+  await expect(architectApprove).toBeEnabled();
+  await architectApprove.click();
+  await expect(architectPage.getByText('approved', { exact: true }).first()).toBeVisible();
+  await architectContext.close();
+
+  await nav.getByRole('link', { name: 'Changes' }).click();
+  await changesTabs.getByRole('link', { name: 'Review queue' }).click();
   await page.locator('li', { hasText: changeName }).getByRole('link', { name: 'Review →' }).click();
-  const approveButton = page.getByRole('button', { name: 'Approve' });
-  await expect(approveButton).toBeEnabled();
-  await approveButton.click();
   await expect(page.getByText('approved', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Merge' }).click();
   await expect(page.getByText('merged', { exact: true }).first()).toBeVisible();
 
   // 7. Director sees the result: the merged change on main, from the
-  // capability map door.
+  // capability map door. With the one request merged, the Changes item's
+  // badge is gone (zero shows nothing).
   await goToModelHome(page);
+  await expect(nav.getByRole('link', { name: /waiting for review/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Director view' }).click();
   await expect(page.getByRole('button', { name: 'Director view' })).toHaveAttribute('aria-pressed', 'true');
   // The capability map tile itself never links to a system by name — just
