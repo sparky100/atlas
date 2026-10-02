@@ -76,3 +76,10 @@
     align-items: stretch;
   }
 }
+
+/* F13 step 2: the project pack downloads, under the header. */
+.packActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

@@ -125,7 +125,8 @@ async function planToPngBlob(plan: ExportPlan): Promise<Blob> {
   });
 }
 
-function download(blob: Blob, filename: string): void {
+/** Saves `blob` as `filename` through a temporary link — shared by every export download. */
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -137,7 +138,7 @@ function download(blob: Blob, filename: string): void {
 }
 
 export async function downloadPlanAsPng(plan: ExportPlan, stamp: ExportStamp): Promise<void> {
-  download(await planToPngBlob(plan), exportFilename(stamp, 'png'));
+  downloadBlob(await planToPngBlob(plan), exportFilename(stamp, 'png'));
 }
 
 /** One page sized to the picture (1px = 0.75pt), the picture on it, and the stamp as the document's title. `pdf-lib` loads only when a PDF is asked for. */
@@ -150,7 +151,7 @@ export async function downloadPlanAsPdf(plan: ExportPlan, stamp: ExportStamp): P
   const page = pdf.addPage([plan.width * 0.75, plan.height * 0.75]);
   page.drawImage(image, { x: 0, y: 0, width: plan.width * 0.75, height: plan.height * 0.75 });
   const bytes = await pdf.save();
-  download(new Blob([bytes as BlobPart], { type: 'application/pdf' }), exportFilename(stamp, 'pdf'));
+  downloadBlob(new Blob([bytes as BlobPart], { type: 'application/pdf' }), exportFilename(stamp, 'pdf'));
 }
 
 /** The stamp's "which state" line: "Main", "Version v2026-Q1", "Change: Housing CRM", or a commit. */

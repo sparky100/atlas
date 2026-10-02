@@ -158,6 +158,7 @@ A **project** holds one piece of architecture work — "Housing CRM replacement"
 - **Scope against what it touches.** The page compares the declared scope with what the project's changes actually touch, and lists any difference — it never changes either for you.
 - **Evidence** — business cases, vendor documents and links — can be attached.
 - **On hold, close or cancel.** Close or cancel only once nothing in the project is still open; the page lists anything that is. Cancelling asks why. A closed or cancelled project can't be reopened.
+- **Project pack.** **Project pack (Markdown)** and **Project pack (PDF)** download the project as one document to hand over: its purpose, scope (and any gap with what the changes touch), the decision log — each decision written up as an ADR, the same as **Copy as ADR markdown** on the decision's page — the target state each change sets out (what it creates, changes and retires, and the capabilities it affects), and the evidence links. Any member can download it. It's a copy as of the moment you download it. The PDF uses a standard font; characters it can't show (for example non-Latin scripts) appear as "?" there, while the Markdown keeps them as written.
 
 A project is part of how your team works, not part of the model itself: it never appears on the capability map or landscape, and it isn't in a version.
 

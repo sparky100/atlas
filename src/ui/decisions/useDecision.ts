@@ -54,7 +54,7 @@ export function applyNewOption(state: DecisionPageState, link: DecisionLinkRow, 
  * time here would just be a redundant initial-load query with nothing to
  * show for it.
  */
-async function loadDecisionPageData(modelId: UUID, decisionId: UUID): Promise<DecisionPageState> {
+export async function loadDecisionPageData(modelId: UUID, decisionId: UUID): Promise<DecisionPageState> {
   const decision = await getDecision(supabase, decisionId);
   if (!decision) return { status: 'not_found' };
 

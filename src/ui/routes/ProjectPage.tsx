@@ -66,7 +66,7 @@ export function ProjectPage() {
           {state.status === 'not_found' && <Text as="p">This project doesn't exist in this model, or you can't see it.</Text>}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
           {state.status === 'ready' && (
-            <ProjectView data={state.data} orgId={organisation?.id ?? ''} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} userId={userId} role={role} today={today} reload={reload} />
+            <ProjectView data={state.data} modelName={model.name} orgId={organisation?.id ?? ''} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} userId={userId} role={role} today={today} reload={reload} />
           )}
         </main>
       </div>

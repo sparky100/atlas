@@ -33,11 +33,17 @@ import {
   projectStatusTone,
   scopeDifference,
 } from './projectModel';
+import { loadProjectPack } from '../exports/loadProjectPack';
+import { markdownToPdfBytes } from '../exports/markdownPdf';
+import { buildProjectPackMarkdown, projectPackFilename } from '../exports/projectPack';
+import { downloadBlob, exportDate } from '../exports/viewExport';
 import type { ProjectData } from './useProject';
 import styles from './ProjectView.module.css';
 
 export interface ProjectViewProps {
   data: ProjectData;
+  /** For the project pack's stamp and filename (F13 step 2). */
+  modelName: string;
   orgId: UUID;
   modelId: UUID;
   orgSlug: string;
@@ -57,7 +63,7 @@ export interface ProjectViewProps {
  * may close) is enforced in the database; the UI only offers what the
  * person can do and explains refusals in plain words.
  */
-export function ProjectView({ data, orgId, modelId, orgSlug, modelSlug, userId, role, today, reload }: ProjectViewProps) {
+export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlug, userId, role, today, reload }: ProjectViewProps) {
   const { project, decisions, constrainingDecisions, changes, links, evidence, touched, elementsById } = data;
   const { members } = useMembers(orgId);
   const { branch: main } = useMainBranch(modelId);
@@ -80,6 +86,8 @@ export function ProjectView({ data, orgId, modelId, orgSlug, modelSlug, userId, 
   return (
     <div className={styles.page}>
       <ProjectHeader project={project} ownerName={nameOfUser(project.owner_id)} progress={progress} />
+
+      <ProjectPackActions data={data} modelId={modelId} modelName={modelName} nameOfUser={nameOfUser} />
 
       {canEdit && <ProjectEditPanel project={project} members={members.map((m) => ({ id: m.member.user_id, label: profileLabel(m.profile) }))} onSaved={reload} />}
 
@@ -260,6 +268,45 @@ export function ProjectView({ data, orgId, modelId, orgSlug, modelSlug, userId, 
         </Text>
         <CommentsSection orgId={orgId} modelId={modelId} userId={userId} role={role} anchorType="project" anchorId={project.id} branchId={null} />
       </Panel>
+    </div>
+  );
+}
+
+/**
+ * F13 step 2: the project pack — purpose, scope, decision log, target state
+ * per change and evidence in one document, as Markdown or PDF. Any member
+ * can download it: it holds only what this page already shows them.
+ */
+function ProjectPackActions({ data, modelId, modelName, nameOfUser }: { data: ProjectData; modelId: UUID; modelName: string; nameOfUser: (id: UUID) => string }) {
+  const [busy, setBusy] = useState<'md' | 'pdf' | null>(null);
+
+  async function run(format: 'md' | 'pdf') {
+    setBusy(format);
+    try {
+      const date = exportDate();
+      const markdown = buildProjectPackMarkdown(await loadProjectPack({ modelId, modelName, date, data, nameOfUser }));
+      const filename = projectPackFilename(modelName, data.project.title, date, format);
+      if (format === 'md') {
+        downloadBlob(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }), filename);
+      } else {
+        const bytes = await markdownToPdfBytes(markdown, `Project pack: ${data.project.title}`);
+        downloadBlob(new Blob([bytes as BlobPart], { type: 'application/pdf' }), filename);
+      }
+    } catch (e) {
+      reportError("Couldn't export the project pack.", e);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className={styles.packActions}>
+      <Button variant="secondary" disabled={busy !== null} aria-label="Download project pack as Markdown" onClick={() => { void run('md'); }}>
+        {busy === 'md' ? 'Preparing…' : 'Project pack (Markdown)'}
+      </Button>
+      <Button variant="secondary" disabled={busy !== null} aria-label="Download project pack as PDF" onClick={() => { void run('pdf'); }}>
+        {busy === 'pdf' ? 'Preparing…' : 'Project pack (PDF)'}
+      </Button>
     </div>
   );
 }
