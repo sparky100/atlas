@@ -20,11 +20,11 @@
  */
 import type { SubjectType, UUID } from '../contracts/delta';
 import type { FactsRow } from '../contracts/rows';
-import type { Head } from '../engine/deltas';
+import type { FactRow, Head } from '../engine/deltas';
 import { foldFromGenesis } from '../engine/head';
 import { buildCommitLoader } from './commitLoader';
 import type { Client } from './client';
-import { listFactsForSubject } from './elements';
+import { listFactsForAttribute, listFactsForSubject } from './elements';
 import type { BranchRow } from './types';
 
 /** Exported for direct unit testing — the one pure part of this module (no database). */
@@ -32,21 +32,72 @@ export function factsRowsFromHead(head: Head, subjectType: SubjectType, subjectI
   const result = new Map<string, FactsRow>();
   for (const fact of head.facts.values()) {
     if (fact.subjectId !== subjectId) continue;
-    result.set(fact.attribute, {
-      subject_type: subjectType,
-      subject_id: fact.subjectId,
-      attribute: fact.attribute,
-      value: fact.value,
-      delta_id: fact.deltaId,
-      source_id: fact.sourceId,
-      source_ref: fact.sourceRef ?? null,
-      effective_date: fact.effectiveDate ?? null,
-      confidence: fact.confidence,
-      asserted_by: fact.authorId,
-      asserted_at: fact.createdAt,
-    });
+    result.set(fact.attribute, factsRowOf(fact, subjectType));
   }
   return result;
+}
+
+function factsRowOf(fact: FactRow, subjectType: SubjectType): FactsRow {
+  return {
+    subject_type: subjectType,
+    subject_id: fact.subjectId,
+    attribute: fact.attribute,
+    value: fact.value,
+    delta_id: fact.deltaId,
+    source_id: fact.sourceId,
+    source_ref: fact.sourceRef ?? null,
+    effective_date: fact.effectiveDate ?? null,
+    confidence: fact.confidence,
+    asserted_by: fact.authorId,
+    asserted_at: fact.createdAt,
+  };
+}
+
+/** Exported for direct unit testing: every element fact for one of `attributes` in a folded head, grouped by subject. */
+export function attributeFactsFromHead(head: Head, attributes: ReadonlySet<string>): Map<UUID, Map<string, FactsRow>> {
+  const result = new Map<UUID, Map<string, FactsRow>>();
+  for (const fact of head.facts.values()) {
+    if (!attributes.has(fact.attribute) || !head.elements.has(fact.subjectId)) continue;
+    let bySubject = result.get(fact.subjectId);
+    if (!bySubject) {
+      bySubject = new Map();
+      result.set(fact.subjectId, bySubject);
+    }
+    bySubject.set(fact.attribute, factsRowOf(fact, 'element'));
+  }
+  return result;
+}
+
+/**
+ * F12 step 1: the current facts for a handful of attributes across every
+ * element at `branch`'s head — what a grid save needs for each edited
+ * cell's `previousDeltaId`. Scoped by commit and attribute (one query per
+ * attribute at main, `listFactsForAttribute`), never by an element-id
+ * list, so it stays inside rule 8 however many rows were edited; a change
+ * branch has no materialised facts, so it folds once.
+ */
+export async function loadAttributeFactsAtBranch(
+  supabase: Client,
+  modelId: UUID,
+  branch: BranchRow,
+  attributes: readonly string[],
+): Promise<Map<UUID, Map<string, FactsRow>>> {
+  if (branch.kind === 'main') {
+    const result = new Map<UUID, Map<string, FactsRow>>();
+    for (const attribute of new Set(attributes)) {
+      for (const row of await listFactsForAttribute(supabase, branch.head_commit_id, attribute)) {
+        let bySubject = result.get(row.subject_id);
+        if (!bySubject) {
+          bySubject = new Map();
+          result.set(row.subject_id, bySubject);
+        }
+        bySubject.set(row.attribute, row);
+      }
+    }
+    return result;
+  }
+  const loader = await buildCommitLoader(supabase, modelId);
+  return attributeFactsFromHead(foldFromGenesis(branch.head_commit_id, loader), new Set(attributes));
 }
 
 export async function loadFactsForSubjectAtBranch(

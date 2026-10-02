@@ -14,7 +14,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { AnnualRunCost, Criticality, Disposition, FitForPurpose, UUID } from '../../contracts/delta';
-import type { ElementsHeadRow } from '../../contracts/rows';
+import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
 import { listActorsForLandscape, listContainersForLandscape, listOwnsEdgesForSystems, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
@@ -41,6 +41,8 @@ export interface PortfolioCapabilityLink {
   capabilityName: string;
   /** This row's own edge rating into this capability — `null` if unrated. */
   fit: FitForPurpose | null;
+  /** F12 step 2: the `supports` edge itself — the gaps queue rates it in place. */
+  relationship: RelationshipsHeadRow;
   otherSupporters: PortfolioOtherSupporter[];
 }
 
@@ -60,6 +62,8 @@ export interface PortfolioRow {
   lifecycleExposed: boolean | null;
   capabilities: PortfolioCapabilityLink[];
   businessOwner: ElementsHeadRow | null;
+  /** F12 step 2: every live `owns` edge into this element, any role — empty means it has no owner at all. */
+  ownsEdges: RelationshipsHeadRow[];
   signals: PortfolioSignal[];
   missingInputs: string[];
 }
@@ -162,7 +166,7 @@ export function usePortfolio(modelId: UUID, ref: Ref, mainCommitIdHint: UUID | n
             const otherSupporters: PortfolioOtherSupporter[] = [...bands]
               .filter(([id]) => id !== topLevelSystemId)
               .map(([id, band]) => ({ topLevelSystemId: id, name: nameOfTopLevel(id), cost: band }));
-            return { capabilityId: edge.to_element_id, capabilityName: capability?.name ?? '(unknown capability)', fit: fitForPurposeOf(edge), otherSupporters };
+            return { capabilityId: edge.to_element_id, capabilityName: capability?.name ?? '(unknown capability)', fit: fitForPurposeOf(edge), relationship: edge, otherSupporters };
           });
 
         const businessOwner = ownersByRole(element.element_id, ownsEdges, actorsById).get('business')?.[0] ?? null;
@@ -184,6 +188,7 @@ export function usePortfolio(modelId: UUID, ref: Ref, mainCommitIdHint: UUID | n
           lifecycleExposed,
           capabilities: capabilityLinks,
           businessOwner,
+          ownsEdges: ownsEdges.filter((edge) => edge.to_element_id === element.element_id),
           signals,
           missingInputs,
         };

@@ -33,6 +33,7 @@ export const AllSourceKinds: Story = {
             ['capture_job', 5, 0.62],
             ['template', 20, 0.9],
             ['merge_resolution', 14, 1],
+            ['attestation', 0, 1],
           ] as const
         ).map(([kind, age, confidence]) => (
           <tr key={kind}>

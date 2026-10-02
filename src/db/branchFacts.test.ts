@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyHead, factMapKey, type FactRow } from '../engine/deltas';
-import { factsRowsFromHead } from './branchFacts';
+import { attributeFactsFromHead, factsRowsFromHead } from './branchFacts';
 
 function fact(subjectId: string, attribute: string, overrides: Partial<FactRow> = {}): FactRow {
   return {
@@ -58,5 +58,23 @@ describe('factsRowsFromHead', () => {
     head.facts.set(factMapKey('el-1', 'name'), fact('el-1', 'name'));
 
     expect(factsRowsFromHead(head, 'element', 'el-404').size).toBe(0);
+  });
+});
+
+describe('attributeFactsFromHead (F12 bulk edit)', () => {
+  it('groups only the requested attributes, only for elements (not relationship facts)', () => {
+    const head = emptyHead();
+    head.elements.set('el-1', {} as never);
+    head.elements.set('el-2', {} as never);
+    head.facts.set(factMapKey('el-1', 'criticality'), fact('el-1', 'criticality', { value: 'high' }));
+    head.facts.set(factMapKey('el-1', 'name'), fact('el-1', 'name'));
+    head.facts.set(factMapKey('el-2', 'disposition'), fact('el-2', 'disposition', { value: 'migrate' }));
+    head.facts.set(factMapKey('rel-1', 'criticality'), fact('rel-1', 'criticality'));
+
+    const result = attributeFactsFromHead(head, new Set(['criticality', 'disposition']));
+
+    expect([...result.keys()].sort()).toEqual(['el-1', 'el-2']);
+    expect([...(result.get('el-1')?.keys() ?? [])]).toEqual(['criticality']);
+    expect(result.get('el-2')?.get('disposition')).toMatchObject({ subject_type: 'element', value: 'migrate', delta_id: 'delta-el-2-disposition' });
   });
 });

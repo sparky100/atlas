@@ -53,6 +53,7 @@ import { elementBreadcrumbSegments } from '../nav/elementBreadcrumbSegments';
 import { ALIAS_TYPE_LABELS, aliasAsFact } from '../elements/aliasLabels';
 import { useElementPage } from '../elements/useElementPage';
 import { useElementEditor, type DraftValue } from '../elements/useElementEditor';
+import { useAttestation } from '../elements/useAttestation';
 import { useElementRename } from '../elements/useElementRename';
 import { ActorMemberPicker } from '../elements/ActorMemberPicker';
 import { attributesRecord } from '../elements/attributesRecord';
@@ -278,6 +279,8 @@ export function ElementPage() {
     expectedHeadCommitId: data?.commitId ?? '',
     onSaved: reloadAfterCommit,
   });
+  // ADR-025: "Still accurate", behind the same gate as Edit.
+  const attestation = useAttestation({ modelId: model?.id ?? '', orgId: organisation?.id ?? '', userId, branch: editingBranch, onConfirmed: reloadAfterCommit });
   // Sprint U4-1 D3: called unconditionally, same reasoning as `editor`
   // above (the Rules of Hooks) — only actually offered to
   // ElementHeader.tsx (its `rename` prop) once `canEdit`. Prompt 7h bug
@@ -335,6 +338,8 @@ export function ElementPage() {
               existsFact={state.data.facts.get('$exists')}
               existsSource={state.data.sources.get(state.data.facts.get('$exists')?.source_id ?? '')}
               onEdit={canEdit && editor.status === 'idle' ? editor.startEditing : undefined}
+              onConfirmStillAccurate={canEdit && editor.status === 'idle' ? () => { void attestation.confirm(state.data.element, state.data.commitId); } : undefined}
+              confirming={attestation.confirmingId === state.data.element.element_id}
               onProposeChange={canPropose ? () => { setProposingChange(true); } : undefined}
               readOnlyReason={underReview ? 'Read-only: under review' : undefined}
               rename={canEdit ? rename : undefined}
@@ -363,6 +368,13 @@ export function ElementPage() {
                   : undefined
               }
             />
+            {attestation.error !== null && (
+              <div role="alert">
+                <Text as="p" size="sm">
+                  {attestation.error}
+                </Text>
+              </div>
+            )}
             {retiring && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') && (
               <RetireAction
                 modelId={model.id}

@@ -126,14 +126,14 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   // name is plain text alongside it, not the link itself.
   //
   // F9 step 2: the queue is the Changes page's "Review queue" tab, not a
-  // nav item. Once on Changes, both the nav item's badge and the tab say
-  // one item is waiting (checked after the click: `page` has been sitting
-  // on Home since before the proposer submitted, and the count is
-  // re-read when a page mounts).
+  // nav item. Once on Changes, the nav item's badge counts the one change
+  // and the tab the one item waiting (checked after the click:
+  // `page` has been sitting on Home since before the proposer submitted,
+  // and both counts are re-read when a page mounts).
   const nav = page.getByRole('navigation', { name: 'Model navigation' });
   const changesTabs = page.getByRole('navigation', { name: 'Changes views' });
   await nav.getByRole('link', { name: 'Changes' }).click();
-  await expect(nav.getByRole('link', { name: 'Changes (1 waiting for review)' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Changes (1 change)' })).toBeVisible();
   await expect(changesTabs.getByRole('link', { name: 'Review queue (1 waiting)' })).toBeVisible();
   await changesTabs.getByRole('link', { name: 'Review queue' }).click();
   await expect(changesTabs.getByRole('link', { name: 'Review queue' })).toHaveAttribute('aria-current', 'page');
@@ -188,10 +188,10 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   await expect(page.getByText('merged', { exact: true }).first()).toBeVisible();
 
   // 7. Director sees the result: the merged change on main, from the
-  // capability map door. With the one request merged, the Changes item's
-  // badge is gone (zero shows nothing).
+  // capability map door. A merged change still counts on the Changes
+  // item's badge — the page lists it — only a cancelled one drops out.
   await goToModelHome(page);
-  await expect(nav.getByRole('link', { name: /waiting for review/ })).toHaveCount(0);
+  await expect(nav.getByRole('link', { name: 'Changes (1 change)' })).toBeVisible();
   await page.getByRole('button', { name: 'Director view' }).click();
   await expect(page.getByRole('button', { name: 'Director view' })).toHaveAttribute('aria-pressed', 'true');
   // The capability map tile itself never links to a system by name — just

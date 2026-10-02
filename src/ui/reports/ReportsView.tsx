@@ -4,6 +4,9 @@ import type { UUID } from '../../contracts/delta';
 import { useBoundaryCrossings } from '../boundaryCrossings/useBoundaryCrossings';
 import { useDuplicateCheck } from '../duplicates/useDuplicateCheck';
 import { useExternalInterfaces } from '../externalInterfaces/useExternalInterfaces';
+import { GAP_KINDS, gapItems, gapSummary } from '../gaps/gaps';
+import { usePortfolio } from '../portfolio/usePortfolio';
+import type { Ref } from '../../db/ref';
 import { countLine, type ReportCount } from './reportCounts';
 import styles from './ReportsView.module.css';
 
@@ -24,15 +27,24 @@ export interface ReportsViewProps {
  * separate count query to drift from it. All three read at main, as their
  * own pages do.
  */
+/** Reports read at main, like every report page behind them. */
+const MAIN_REF: Ref = { kind: 'main' };
+
 export function ReportsView({ modelId, mainHeadCommitId, orgSlug, modelSlug }: ReportsViewProps) {
   const boundary = useBoundaryCrossings(modelId);
   const external = useExternalInterfaces(modelId);
   const duplicates = useDuplicateCheck(modelId, mainHeadCommitId);
+  const portfolio = usePortfolio(modelId, MAIN_REF, mainHeadCommitId).state;
   const base = `/o/${orgSlug}/m/${modelSlug}`;
 
   const boundaryCount: ReportCount = boundary.status === 'ready' ? boundary.crossings.length : boundary.status === 'error' ? 'error' : null;
   const unclassifiedCount: ReportCount = external.status === 'ready' ? external.crossings.length : external.status === 'error' ? 'error' : null;
   const accessCount: ReportCount = external.status === 'ready' ? external.organisationAccess.length : external.status === 'error' ? 'error' : null;
+  // F12 step 2: the gaps queue's own lines — one per gap that has anything missing.
+  const gapLines =
+    portfolio.status === 'ready'
+      ? GAP_KINDS.map((kind) => gapItems(kind, portfolio.data.rows)).flatMap((items, i) => (items.length > 0 ? [gapSummary(GAP_KINDS[i] ?? 'fit', items)] : []))
+      : [countLine(portfolio.status === 'error' ? 'error' : null, '', '')];
   const duplicatesCount: ReportCount = duplicates.error ? 'error' : duplicates.status === 'loading' ? null : duplicates.candidates.length;
 
   return (
@@ -54,6 +66,12 @@ export function ReportsView({ modelId, mainHeadCommitId, orgSlug, modelSlug }: R
         description="Elements that look like the same thing recorded twice, from the latest duplicate check."
         counts={[countLine(duplicatesCount, 'possible duplicate', 'possible duplicates')]}
         href={`${base}/duplicates`}
+      />
+      <ReportRow
+        title="Gaps"
+        description="Systems missing a fit rating, an owner, a run cost, a criticality or a disposition — and a quick way to fill them in."
+        counts={gapLines.length > 0 ? gapLines : ['Nothing missing']}
+        href={`${base}/gaps`}
       />
     </ul>
   );

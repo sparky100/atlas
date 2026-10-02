@@ -50,7 +50,7 @@ Every model-scoped page shares the same navigation, grouped into four clusters:
 | **Work** | Projects, Changes, Decisions, Capture |
 | **Record** | Versions |
 
-- **Elements** is the full list of everything in the model, with filters and export.
+- **Elements** is the full list of everything in the model, with filters and export. **Edit in grid** lets you change Lifecycle, Criticality, Disposition (and a custom attribute, when its column is shown) across many rows at once; **Save** records them all as one edit, on main or in the change you're working in — the same people who can edit an element's page can use it.
 - **Reports** gathers the standing checks — Boundary crossings, External interfaces and Duplicates — each with its current count and a link to the full report.
 - **The review queue** lives inside **Changes**, as its *Review queue* tab. The Changes item in the navigation shows a number when items are waiting for review.
 
@@ -108,7 +108,11 @@ You can leave comments directly on elements and other objects in the model — u
   Colour it by **Disposition** to see, for each capability, the worst TIME disposition among the systems and modules supporting it.
 - **Roadmap** shows planned and in-flight change over time.
 - **Value streams** show how the organisation delivers its outcomes, stage by stage.
-- **Reports** (Analyse) lists **Boundary crossings** (links across the IT/OT boundary), **External interfaces** (where your model touches systems and organisations you don't own) and **Duplicates**.
+- **Reports** (Analyse) lists **Boundary crossings** (links across the IT/OT boundary), **External interfaces** (where your model touches systems and organisations you don't own), **Duplicates** and **Gaps**. Gaps counts the systems missing a fit rating, an owner, a run cost, a criticality or a disposition; **Fill in** walks them one at a time — press a number to pick an answer and move on, **j** to skip, **k** to go back. Each answer is saved as you go.
+
+## Still accurate
+
+Values age: anything not updated for 12 months shows its age in the warning colour, and Home counts stale values on systems. If you've checked an element and everything on it is still right, press **✓ Still accurate** beside **✎ Edit** on its page (or in the Elements grid while editing). That records a confirmation — today's date, by you — for every value on it, without changing any of them; the original source stays in the element's history.
 
 ## Disposition (TIME)
 

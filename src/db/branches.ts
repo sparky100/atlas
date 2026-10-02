@@ -152,6 +152,19 @@ export async function listChangeBranches(supabase: Client, modelId: UUID): Promi
 }
 
 /**
+ * How many changes on a model aren't cancelled — the Changes nav item's
+ * badge, counting exactly what the Changes page lists above its collapsed
+ * "Cancelled" group (`ChangesView.tsx`'s `activeBranches`), merged ones
+ * included. A count only (`head: true`), no id list (rule 8).
+ */
+export async function countActiveChangeBranches(supabase: Client, modelId: UUID): Promise<number> {
+  assertRealId('countActiveChangeBranches', 'model_id', modelId);
+  const { count, error } = await supabase.from('branches').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('kind', 'change').neq('status', 'cancelled');
+  if (error) throw new Error(`countActiveChangeBranches: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
  * The columns an authenticated user can update directly on their own
  * (title/shared_for_review from supabase/migrations/20260906071400_history.sql,
  * description/target_date from 20260906160000_branches_change_metadata.sql,

@@ -6,7 +6,7 @@
  * (`portfolioSort.test.ts`, `portfolioFilter.test.ts`,
  * `portfolioVisibility.test.ts`) needed the identical row shape.
  */
-import type { ElementsHeadRow } from '../../contracts/rows';
+import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { Json } from '../../contracts/rows';
 import type { PortfolioRow } from './usePortfolio';
 
@@ -27,8 +27,14 @@ export function fakeRow(overrides: Partial<PortfolioRow> = {}): PortfolioRow {
     lifecycleExposed: null,
     capabilities: [],
     businessOwner: null,
+    ownsEdges: [],
     signals: [],
     missingInputs: [],
     ...overrides,
   };
+}
+
+/** A `supports` edge from `fromId` to `toId`, with optional attributes (e.g. `{ fitForPurpose: 'poor' }`). */
+export function fakeSupportsEdge(fromId: string, toId: string, attributes: Record<string, Json> = {}): RelationshipsHeadRow {
+  return { relationship_id: `r-${fromId}-${toId}`, relationship_type: 'supports', from_element_id: fromId, to_element_id: toId, attributes, exists_delta_id: `d-r-${fromId}-${toId}` };
 }

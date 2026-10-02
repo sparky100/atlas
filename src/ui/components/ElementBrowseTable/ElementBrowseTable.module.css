@@ -134,3 +134,24 @@
 .unresolvedBadge {
   white-space: nowrap;
 }
+
+/* F12 bulk edit: an editable grid cell — the attribute's own control, and
+   its save error (if any) stacked beneath it. */
+.bulkEditCell {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 9rem;
+}
+
+.bulkEditError {
+  color: var(--status-danger);
+  white-space: normal;
+}
+
+.bulkEditBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
