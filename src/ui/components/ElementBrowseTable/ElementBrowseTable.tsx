@@ -95,6 +95,14 @@ export interface ElementBrowseTableProps {
   onImportClick?: (() => void) | undefined;
   /** F12 step 1: the grid's edit mode — present only for a viewer who can edit the branch being browsed (`canEditBranch`, the element page's own gate); absent, the table stays read-only. */
   bulkEdit?: BulkEditController | undefined;
+  /** ADR-025 (F12 step 3): "Still accurate" per row, offered while the grid is in edit mode. */
+  attest?: GridAttestation | undefined;
+}
+
+/** The grid's own view of the confirm action (`useAttestation`, bound to the branch being edited). */
+export interface GridAttestation {
+  confirmingId: UUID | null;
+  confirm: (element: BrowseRow['element']) => void;
 }
 
 // A narrower key type than `ElementBrowseSortKey` — this fixed column list
@@ -222,7 +230,7 @@ export function InlineSupportsPicker({ system, config, searchCommitId }: { syste
 }
 
 /** Sprint U3b: "filterable, sortable table of elements by type with owner and lifecycle." A real `<table>` — semantic tabular data, not a design-system gap (native `<table>`/`<th>`/`<td>` is the correct element here, the same way `<ul>`/`<li>` already is for plain lists elsewhere in this app). */
-export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenameBase, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange, findingFilter, onFindingFilterChange, decisionRowAction, onImportClick, bulkEdit }: ElementBrowseTableProps) {
+export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenameBase, linkSupportsInline, unresolvedCounts, attributeDefinitions, customAttr, onCustomAttrChange, findingFilter, onFindingFilterChange, decisionRowAction, onImportClick, bulkEdit, attest }: ElementBrowseTableProps) {
   // Called unconditionally (Rules of Hooks) — `commitId`/`rows` are only real
   // once `state.status === 'ready'`, and the export loader refuses to run on
   // the null/empty fallbacks until then.
@@ -347,7 +355,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
       observer.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measures on anything that could change a rendered cell's natural width (including the header's own sort-arrow toggling); `tbodyRef.current`/`headerRowRef.current` themselves aren't valid deps.
-  }, [state.status === 'ready' ? state.rows : null, customAttr, linkSupportsInline, decisionRowAction, state.status === 'ready' ? state.sortKey : null, state.status === 'ready' ? state.sortDirection : null]);
+  }, [state.status === 'ready' ? state.rows : null, customAttr, linkSupportsInline, decisionRowAction, state.status === 'ready' ? state.sortKey : null, state.status === 'ready' ? state.sortDirection : null, bulkEdit?.editing]);
 
   function syncHeaderScroll() {
     if (headerClipRef.current && tableWrapRef.current) {
@@ -395,6 +403,21 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
   // F12 step 1: in edit mode, a cell whose attribute applies to its row's
   // type becomes that attribute's own control; every other cell keeps its
   // read-only rendering (`null` here means "render the usual value").
+  const attestButton = (element: BrowseRow['element']) =>
+    attest ? (
+      <Button
+        variant="ghost"
+        disabled={attest.confirmingId !== null}
+        aria-label={`Confirm ${element.name} still accurate`}
+        onClick={() => {
+          attest.confirm(element);
+        }}
+      >
+        {attest.confirmingId === element.element_id ? 'Confirming…' : '✓ Still accurate'}
+      </Button>
+    ) : null;
+  const showAttest = bulkEdit?.editing === true && attest !== undefined;
+
   const editableCell = (element: BrowseRow['element'], key: string, customDefinition?: AttributeDefinitionRow) => {
     if (!bulkEdit?.editing) return null;
     const field = bulkEditFieldFor(element, key, customDefinition);
@@ -552,6 +575,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
           decisionRowAction={decisionRowAction}
           commitId={state.commitId}
           bulkEdit={bulkEdit?.editing ? bulkEdit : undefined}
+          attestButton={showAttest ? attestButton : undefined}
         />
       ) : (
         <>
@@ -587,6 +611,11 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                   {decisionRowAction && (
                     <th id={`${headerIdBase}-decision`}>
                       <span>Decision</span>
+                    </th>
+                  )}
+                  {showAttest && (
+                    <th id={`${headerIdBase}-attest`}>
+                      <span>Confirm</span>
                     </th>
                   )}
                 </tr>
@@ -689,6 +718,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                       </td>
                     )}
                     {decisionRowAction && <td headers={`${headerIdBase}-decision`}>{decisionRowAction(row)}</td>}
+                    {showAttest && <td headers={`${headerIdBase}-attest`}>{attestButton(row.element)}</td>}
                   </tr>
                   );
                 })}

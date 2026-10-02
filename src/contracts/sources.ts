@@ -4,5 +4,5 @@
  * a provenance badge (UI-principles.md §4.3) is a presentation concern and
  * lives in `src/ui`, not here.
  */
-export const SOURCE_KINDS = ['document', 'spreadsheet', 'interview', 'capture_job', 'template', 'manual', 'merge_resolution'] as const;
+export const SOURCE_KINDS = ['document', 'spreadsheet', 'interview', 'capture_job', 'template', 'manual', 'merge_resolution', 'attestation'] as const;
 export type SourceKind = (typeof SOURCE_KINDS)[number];

@@ -12,6 +12,8 @@ const SOURCE_GLYPH: Record<SourceKind, string> = {
   capture_job: '⚙',
   template: '⌂',
   merge_resolution: '⇄',
+  // ADR-025: a value confirmed as still accurate.
+  attestation: '✓',
 };
 
 export interface ProvenanceBadgeProps {

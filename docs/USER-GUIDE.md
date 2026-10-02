@@ -110,6 +110,10 @@ You can leave comments directly on elements and other objects in the model — u
 - **Value streams** show how the organisation delivers its outcomes, stage by stage.
 - **Reports** (Analyse) lists **Boundary crossings** (links across the IT/OT boundary), **External interfaces** (where your model touches systems and organisations you don't own), **Duplicates** and **Gaps**. Gaps counts the systems missing a fit rating, an owner, a run cost, a criticality or a disposition; **Fill in** walks them one at a time — press a number to pick an answer and move on, **j** to skip, **k** to go back. Each answer is saved as you go.
 
+## Still accurate
+
+Values age: anything not updated for 12 months shows its age in the warning colour, and Home counts stale values on systems. If you've checked an element and everything on it is still right, press **✓ Still accurate** beside **✎ Edit** on its page (or in the Elements grid while editing). That records a confirmation — today's date, by you — for every value on it, without changing any of them; the original source stays in the element's history.
+
 ## Disposition (TIME)
 
 Each system can be marked **Tolerate**, **Invest**, **Migrate** or **Eliminate** on its page; a module can set its own value, but doesn't take its platform's (unset reads **Not assessed**, never Tolerate). The Elements and Portfolio tables can show, sort and filter by it, and spreadsheet capture reads a "TIME" or "Disposition" column. A system marked Migrate or Eliminate that nothing is retiring — no open change retires it, and it isn't already retiring — shows up as a health finding on Home, with a link to its project or to start one.

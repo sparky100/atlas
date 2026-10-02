@@ -29,6 +29,10 @@ export interface ElementHeaderProps {
    * not shown disabled, for the same reason `onProposeChange` below is.
    */
   onEdit?: (() => void) | undefined;
+  /** ADR-025 (F12 step 3): "Still accurate" — re-asserts every current value as confirmed today. Same gate as `onEdit`; omitted otherwise. */
+  onConfirmStillAccurate?: (() => void) | undefined;
+  /** While a confirmation is being saved. */
+  confirming?: boolean | undefined;
   /**
    * Sprint 7i item 4: "'Propose a change' on every element page" — the gap
    * `onEdit`'s own comment used to name (a contributor at `main` got no
@@ -169,7 +173,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, contextHref, startProjectHref }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, contextHref, startProjectHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
@@ -269,6 +273,11 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onPro
         {onEdit && (
           <Button variant="ghost" onClick={onEdit}>
             ✎ Edit
+          </Button>
+        )}
+        {onConfirmStillAccurate && (
+          <Button variant="ghost" onClick={onConfirmStillAccurate} disabled={confirming === true}>
+            {confirming === true ? 'Confirming…' : '✓ Still accurate'}
           </Button>
         )}
         {onProposeChange && (

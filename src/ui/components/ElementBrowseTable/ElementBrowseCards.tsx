@@ -30,6 +30,8 @@ export interface ElementBrowseCardsProps {
   commitId: UUID;
   /** F12 step 1: present only while the grid is in edit mode — each card then shows its editable attributes as controls. */
   bulkEdit?: BulkEditController | undefined;
+  /** ADR-025: the table's own "Still accurate" button, rendered per card while editing. */
+  attestButton?: ((element: BrowseRow['element']) => ReactNode) | undefined;
 }
 
 /**
@@ -51,7 +53,7 @@ export interface ElementBrowseCardsProps {
  * maintain: every value is inline, labelled by position/tone rather than by
  * a column header, so there's nothing to lose off either scroll axis.
  */
-export function ElementBrowseCards({ rows, elementHref, unresolvedCounts, selectedCustomDefinition, linkSupportsInline, decisionRowAction, commitId, bulkEdit }: ElementBrowseCardsProps) {
+export function ElementBrowseCards({ rows, elementHref, unresolvedCounts, selectedCustomDefinition, linkSupportsInline, decisionRowAction, commitId, bulkEdit, attestButton }: ElementBrowseCardsProps) {
   return (
     <ul className={styles.list}>
       {rows.map((row) => (
@@ -65,6 +67,7 @@ export function ElementBrowseCards({ rows, elementHref, unresolvedCounts, select
           decisionRowAction={decisionRowAction}
           commitId={commitId}
           bulkEdit={bulkEdit}
+          attestButton={attestButton}
         />
       ))}
     </ul>
@@ -80,6 +83,7 @@ function ElementBrowseCard({
   decisionRowAction,
   commitId,
   bulkEdit,
+  attestButton,
 }: {
   row: BrowseRow;
   elementHref: (elementId: UUID) => string;
@@ -89,6 +93,7 @@ function ElementBrowseCard({
   decisionRowAction: ((row: BrowseRow) => ReactNode | null) | undefined;
   commitId: UUID;
   bulkEdit: BulkEditController | undefined;
+  attestButton: ((element: BrowseRow['element']) => ReactNode) | undefined;
 }) {
   const editableFields = bulkEdit
     ? [
@@ -138,11 +143,12 @@ function ElementBrowseCard({
           <InlineSupportsPicker system={{ elementId: row.element.element_id, name: row.element.name }} config={linkSupportsInline} searchCommitId={commitId} />
         </div>
       )}
-      {bulkEdit && editableFields.length > 0 && (
+      {bulkEdit && (editableFields.length > 0 || attestButton) && (
         <div className={styles.cardActions}>
           {editableFields.map((field) => (
             <BulkEditCell key={field.key} element={row.element} field={field} controller={bulkEdit} />
           ))}
+          {attestButton?.(row.element)}
         </div>
       )}
       {decisionAction && <div className={styles.cardActions}>{decisionAction}</div>}

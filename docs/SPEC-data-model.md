@@ -65,7 +65,7 @@ Where an ADR left a choice open, this spec makes it. Every such choice is listed
 | `commit_kind` | `genesis`, `manual`, `capture`, `merge`, `template_seed`, `preparation` (ADR-021 §2a amendment 1, C2b — written only by `atlas.refresh_branch`, never directly by a client, §5.1) |
 | `delta_kind` | `element_create`, `element_update`, `element_retract`, `element_restore`, `relationship_create`, `relationship_update`, `relationship_retract`, `relationship_restore` |
 | `subject_type` | `element`, `relationship` |
-| `source_kind` | `document`, `spreadsheet`, `interview`, `capture_job`, `template`, `manual`, `merge_resolution` |
+| `source_kind` | `document`, `spreadsheet`, `interview`, `capture_job`, `template`, `manual`, `merge_resolution`, `attestation` (ADR-025: a "Still accurate" confirmation — one per confirmation, `user_id` null) |
 | `alias_type` | `name`, `code`, `external_ref`, `source_system_key`, `template_code`, `merged_id` |
 | `merge_request_status` | `pending`, `changes_requested`, `approved`, `merged`, `rejected` |
 | `capture_status` | `pending`, `parsed`, `reviewed`, `discarded` |

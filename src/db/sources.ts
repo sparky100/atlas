@@ -75,6 +75,27 @@ export async function createMergeResolutionSource(supabase: Client, input: Creat
   return data as SourceRow;
 }
 
+export interface CreateAttestationSourceInput {
+  /** Minted by the caller — one row per confirmation, like `merge_resolution`'s per-refresh row. */
+  id: UUID;
+  orgId: UUID;
+  modelId: UUID;
+  createdBy: UUID;
+  /** What was confirmed — shown in a provenance badge's hover card, e.g. "Confirmed still accurate — Payroll". */
+  elementName: string;
+  /** The confirmation's date (`YYYY-MM-DD`) — `sources.captured_at`. */
+  confirmedOn: string;
+}
+
+/** ADR-025: one `attestation` source per "Still accurate" — every delta re-asserting that element's facts shares it. `sources_insert` (20261004020000) requires `user_id` null for this kind; the confirming person is the commit's author. */
+export async function createAttestationSource(supabase: Client, input: CreateAttestationSourceInput): Promise<SourceRow> {
+  const row = { id: input.id, org_id: input.orgId, model_id: input.modelId, kind: 'attestation' as const, name: `Confirmed still accurate — ${input.elementName}`, captured_at: input.confirmedOn, created_by: input.createdBy };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.from('sources').insert(row).select('*').single();
+  if (error) throw new Error(`createAttestationSource: ${error.message}`);
+  return data as SourceRow;
+}
+
 export interface CreateSpreadsheetSourceInput {
   /** Minted by the caller — a fresh row every import run, not a per-user singleton (an import's provenance is naturally scoped to the one file it came from, same reasoning `createMergeResolutionSource`'s own doc comment gives for its own per-refresh row). */
   id: UUID;
