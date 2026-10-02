@@ -192,8 +192,8 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   // item's badge — the page lists it — only a cancelled one drops out.
   await goToModelHome(page);
   await expect(nav.getByRole('link', { name: 'Changes (1 change)' })).toBeVisible();
-  await page.getByRole('button', { name: 'Director view' }).click();
-  await expect(page.getByRole('button', { name: 'Director view' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Capability view' }).click();
+  await expect(page.getByRole('button', { name: 'Capability view' })).toHaveAttribute('aria-pressed', 'true');
   // The capability map tile itself never links to a system by name — just
   // its own supporting-system count and a "→ Landscape" zoom link
   // (`CapabilityMapView.tsx`'s own doc comment: "every tile's
