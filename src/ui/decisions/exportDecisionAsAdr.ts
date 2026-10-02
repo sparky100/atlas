@@ -61,7 +61,8 @@ export interface DecisionAdrExportInput {
 
 function statusLine(decision: DecisionRow): string {
   const label = decision.status.charAt(0).toUpperCase() + decision.status.slice(1);
-  return decision.decided_at ? `${label} — decided ${decision.decided_at}` : label;
+  // The date only — `decided_at` is a full timestamp, which reads as noise in a document.
+  return decision.decided_at ? `${label} — decided ${decision.decided_at.slice(0, 10)}` : label;
 }
 
 function optionLine(option: DecisionAdrExportOption): string {
@@ -131,8 +132,8 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
   lines.push('');
   if (decision.status === 'accepted') {
     const chosen = options.find((o) => o.isChosen);
-    const chosenLabel = chosen ? intentHeaderLine(chosen.branch) : 'the chosen option';
-    lines.push(`We will ${chosenLabel}.`);
+    // The option by its own title — not `intentHeaderLine`, whose "Proposing: …" prefix made "We will Proposing: X" read wrongly.
+    lines.push(chosen ? `Chosen option: **${chosen.branch.title ?? chosen.branch.name}**.` : 'An option was chosen, but it is no longer linked to this decision.');
     if (reasons && reasons.trim().length > 0) {
       lines.push('');
       lines.push(reasons);
