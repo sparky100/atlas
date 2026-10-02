@@ -46,13 +46,16 @@
    its own "+ Add system"/"+ Add actor". */
 .header {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
+  gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 

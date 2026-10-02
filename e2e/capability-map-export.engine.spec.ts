@@ -95,7 +95,7 @@ test('capability map export: "Export as starter map" writes a draft, flagged as 
   await page.getByRole('button', { name: 'Export as starter map' }).click();
   await page.getByLabel('Sector').selectOption('electricity_network');
   await page.getByLabel('Version').fill(String(version));
-  await page.getByRole('button', { name: 'Export' }).click();
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
 
   await expect(page.getByText(new RegExp(`Exported 2 item\\(s\\) as electricity_network v${String(version)} \\(draft\\)`))).toBeVisible();
 
