@@ -152,6 +152,19 @@ export async function listChangeBranches(supabase: Client, modelId: UUID): Promi
 }
 
 /**
+ * How many changes on a model are still open — not cancelled and not
+ * merged (`draft`, `proposed`, `in_review`, `approved`): the Changes nav
+ * item's badge. A count only (`head: true`), and the status list is a
+ * fixed enum, never an id list (rule 8).
+ */
+export async function countOpenChangeBranches(supabase: Client, modelId: UUID): Promise<number> {
+  assertRealId('countOpenChangeBranches', 'model_id', modelId);
+  const { count, error } = await supabase.from('branches').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('kind', 'change').in('status', ['draft', 'proposed', 'in_review', 'approved']);
+  if (error) throw new Error(`countOpenChangeBranches: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
  * The columns an authenticated user can update directly on their own
  * (title/shared_for_review from supabase/migrations/20260906071400_history.sql,
  * description/target_date from 20260906160000_branches_change_metadata.sql,

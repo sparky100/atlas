@@ -6,7 +6,7 @@ import { Text } from '../Text/Text';
 import { useBranchLabel } from '../../branches/useBranchLabel';
 import { useModels } from '../../models/useModels';
 import { useOrganisationBySlug } from '../../orgs/useOrganisationBySlug';
-import { useReviewQueueCount } from '../../reviews/useReviewQueueCount';
+import { useOpenChangeCount } from '../../changes/useOpenChangeCount';
 import { SearchDialog } from '../../search/SearchDialog';
 import { useSelectedRef } from '../../branches/useSelectedRef';
 import { isViewingMode } from '../../branches/viewingMode';
@@ -132,7 +132,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
   const { organisation } = useOrganisationBySlug(orgSlug);
   const { models } = useModels(organisation?.id ?? null);
   const modelId = models.find((m) => m.slug === modelSlug)?.id ?? null;
-  const reviewQueueCount = useReviewQueueCount(modelId);
+  const openChangeCount = useOpenChangeCount(modelId);
   const viewing = isViewingMode(searchParams);
   const refParam = refQueryParam(ref, false);
   const refParamViewing = refQueryParam(ref, viewing);
@@ -234,7 +234,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
             {shortLabel}
           </span>
         )}
-        {section === 'changes' && reviewQueueCount !== null && reviewQueueCount > 0 && <ReviewBadge count={reviewQueueCount} />}
+        {section === 'changes' && openChangeCount !== null && openChangeCount > 0 && <OpenChangesBadge count={openChangeCount} />}
       </Link>
     );
   };
@@ -378,21 +378,23 @@ function sectionPath(section: RealSection): string {
 }
 
 /**
- * F9 step 2: the review queue's count on the Changes item — the number
- * itself is visible text (never colour alone, §8.4) and sits after the
- * label on the full-width rail, over the icon's corner when the rail is
- * icon-only. The visible digits are hidden from assistive tech in favour
- * of a spelled-out phrase, so the link reads "Changes (2 waiting for
- * review)" rather than "Changes 2". Zero renders nothing (the caller's
- * check), the same "zero collapses" rule health findings follow.
+ * The Changes item's badge: how many changes are still open (not cancelled,
+ * not merged) — what the page it opens lists as live work. It used to show
+ * the review queue's count (merge requests plus capture drafts), which
+ * didn't match anything on the page the item leads to; the queue keeps its
+ * own count on its tab. The number is visible text (never colour alone,
+ * §8.4), after the label on the full-width rail and over the icon's corner
+ * when the rail is icon-only. The digits are hidden from assistive tech in
+ * favour of a spelled-out phrase ("Changes (2 open)"). Zero renders nothing
+ * (the caller's check).
  */
-function ReviewBadge({ count }: { count: number }) {
+function OpenChangesBadge({ count }: { count: number }) {
   return (
     <>
       <span className={styles.badge} aria-hidden="true">
         {count > 99 ? '99+' : count}
       </span>
-      <span className={styles.srOnly}>({count} waiting for review)</span>
+      <span className={styles.srOnly}>({count} open)</span>
     </>
   );
 }
