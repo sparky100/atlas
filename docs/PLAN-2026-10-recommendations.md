@@ -109,6 +109,8 @@ Mobile bottom bar: Home, Capability map, Landscape, Changes, **More** (a sheet l
 
 ## F13 — exports and connectors (item 5)
 
+**Status:** step 1 built 2026-10-02 on branch `f13-exports`. Each view builds a pure picture plan (`src/ui/exports/`) drawn by one canvas painter; the PDF is that picture on one page sized to it (`pdf-lib`, loaded only when a PDF is asked for). Built beyond the step: any member can export (it reads only what they can already see); the landscape picture leaves out connections and says so in a footnote. Golden path `golden-path-export-view` passes at 1280 and 390. Steps 3–4 not started.
+
 **Steps**
 1. **View export with stamp:** PNG and PDF of capability map (each colour-by), portfolio and landscape, stamped with model, version/change name and date — reusing `roadmapPngExport.ts`'s approach. A picture of a view is a rendering, not stored state, so rule 2 is unaffected.
 2. **Project pack export** (needs F10): one document — purpose, scope, decision log (each decision via the existing ADR markdown builder), target-state summary per change, evidence links — as Markdown and PDF.

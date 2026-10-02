@@ -169,6 +169,8 @@ A project is part of how your team works, not part of the model itself: it never
 - **Roadmap** — systems' lifecycles over time (introduced, planned end, support end) and changes' target dates, **by capability**, **by value stream** or **by project**, in months, quarters or years, with filters and **Export CSV**.
 - **Portfolio** — every system and module with run cost against fit, criticality, disposition, lifecycle and capabilities served, sortable and filterable, with **signals** where the combination matters (for example *Costly, poor fit*, *Costly overlap*, *Invest, poor fit*, *Justified*) and a note when a row is missing the inputs to judge it.
 
+**Export PNG** and **Export PDF** on the capability map, the landscape and Portfolio download a picture of the view as you see it: the current colour-by, and Portfolio's filters and sort. Every picture is stamped with the model, which state you are looking at (main, a version, or a change by name) and the date. Any member can export. The landscape picture shows systems in their lanes but not the connections between them, and says so. A picture is a copy, not part of the model: it doesn't update when the model changes.
+
 ## Reports and gaps
 
 **Reports** (Analyse) lists the standing checks, each with its current count:

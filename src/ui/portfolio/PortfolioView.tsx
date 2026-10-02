@@ -4,6 +4,9 @@ import { Text } from '../components/Text/Text';
 import { countAnnualRunCosts } from '../elements/annualRunCost';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { PortfolioCards } from './PortfolioCards';
+import { ExportViewButtons } from '../components/ExportViewButtons/ExportViewButtons';
+import { portfolioExportPlan } from '../exports/portfolioExport';
+import type { ExportStamp } from '../exports/viewExport';
 import { DEFAULT_PORTFOLIO_FILTERS, filterPortfolioRows, type PortfolioFilters } from './portfolioFilter';
 import { DEFAULT_PORTFOLIO_SORT_DIRECTION, DEFAULT_PORTFOLIO_SORT_KEY, sortPortfolioRows, type PortfolioSortKey } from './portfolioSort';
 import { visiblePortfolioRows } from './portfolioVisibility';
@@ -15,6 +18,8 @@ import styles from './PortfolioView.module.css';
 export interface PortfolioViewProps {
   data: PortfolioData;
   elementHref: (elementId: UUID) => string;
+  /** F13 step 1: the export stamp's model and state; the export is offered only when given. */
+  exportStamp?: Omit<ExportStamp, 'viewLabel'> | undefined;
 }
 
 /** Same breakpoint every other table/canvas → mobile-card swap in this app uses (`ElementBrowseTable.tsx`, `ValueStreamsPage.tsx`). */
@@ -32,7 +37,7 @@ const MOBILE_BREAKPOINT_PX = 768;
  * loaded rows, the same shape `useElementBrowse.ts`'s own table owns its
  * sort/filter state.
  */
-export function PortfolioView({ data, elementHref }: PortfolioViewProps) {
+export function PortfolioView({ data, elementHref, exportStamp }: PortfolioViewProps) {
   const [includeContainers, setIncludeContainers] = useState(false);
   const [sortKey, setSortKey] = useState<PortfolioSortKey>(DEFAULT_PORTFOLIO_SORT_KEY);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(DEFAULT_PORTFOLIO_SORT_DIRECTION);
@@ -68,6 +73,17 @@ export function PortfolioView({ data, elementHref }: PortfolioViewProps) {
         includeContainers={includeContainers}
         onIncludeContainersChange={setIncludeContainers}
       />
+      {exportStamp && (
+        <div className={styles.exportActions}>
+          <ExportViewButtons
+            what="portfolio"
+            build={() => {
+              const plan = portfolioExportPlan(rows, exportStamp);
+              return { plan, stamp: { ...exportStamp, viewLabel: 'Portfolio' } };
+            }}
+          />
+        </div>
+      )}
       {notEntered > 0 && (
         <Text as="p" size="sm" tone="muted" className={styles.notEnteredBanner}>
           {notEntered} {notEntered === 1 ? 'row has' : 'rows have'} no run cost entered — excluded from every cost-based signal below, not treated as low.
