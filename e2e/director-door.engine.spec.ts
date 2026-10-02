@@ -173,7 +173,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // The org's creator is its owner, so the default door is architect —
   // switch to director.
-  await page.getByRole('button', { name: 'Director view' }).click();
+  await page.getByRole('button', { name: 'Capability view' }).click();
 
   await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
   // Two capabilities are exposed (warn + info both count), one has
@@ -287,7 +287,7 @@ test('director door: a capability supported only by a container (a platform modu
   if (!seedResult.ok) throw new Error(`seeding director-door container fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
-  await page.getByRole('button', { name: 'Director view' }).click();
+  await page.getByRole('button', { name: 'Capability view' }).click();
 
   await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
   const tile = page.getByRole('link', { name: /Customer Contact/ });
@@ -326,7 +326,7 @@ test('director door: the empty-model state offers the real starter-map picker, n
   await createModel(signedIn, { id: modelId, orgId, name: 'Director Door Empty Model', slug: modelSlug, createdBy: userId });
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
-  await page.getByRole('button', { name: 'Director view' }).click();
+  await page.getByRole('button', { name: 'Capability view' }).click();
 
   await expect(page.getByRole('heading', { name: 'The map is empty' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Start from a capability map' })).toBeVisible();

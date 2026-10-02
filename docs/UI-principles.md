@@ -173,7 +173,7 @@ Below the fold: the same capability map as the director sees, at `main`, with th
 
 ### 3.3 The switch
 
-Top bar, right side: `Director view` / `Architect view` segmented control. Switching is instant, remembered, and never changes what the user is permitted to do — a viewer who switches to the architect door sees an empty queue and no branches, with a line explaining why, not an error.
+Top bar, right side: `Capability view` / `Application view` segmented control (labelled `Director view` / `Architect view` until 2026-10-02 — renamed because the two views are organised around capabilities and around applications, not around who reads them; "director door"/"architect door" below are the historical names for the same two views, and the stored preference still says `director`/`architect`). Switching is instant, remembered, and never changes what the user is permitted to do — a viewer who switches to the architect door sees an empty queue and no branches, with a line explaining why, not an error.
 
 ---
 
