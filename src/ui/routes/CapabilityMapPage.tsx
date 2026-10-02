@@ -30,6 +30,10 @@ import { tileCapabilityIds } from '../capabilityMap/layout';
 import { useBackfillCapabilityOrder } from '../capabilityMap/useBackfillCapabilityOrder';
 import { useCapabilityMap } from '../capabilityMap/useCapabilityMap';
 import { useColourByPreference } from '../capabilityMap/useColourByPreference';
+import { useBranchLabel } from '../branches/useBranchLabel';
+import { ExportViewButtons } from '../components/ExportViewButtons/ExportViewButtons';
+import { capabilityMapExportPlan, capabilityMapViewLabel } from '../exports/capabilityMapExport';
+import { exportDate, stampRefLabel } from '../exports/viewExport';
 import { Inspector } from '../components/Inspector/Inspector';
 import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
 import { useHomeMode } from '../home/useHomeMode';
@@ -140,6 +144,7 @@ export function CapabilityMapPage() {
   // transient default (colourBy isn't rendered anywhere until `ready`).
   const { homeMode } = useHomeMode(userId, canEditOnMain(role));
   const { colourBy, setColourBy } = useColourByPreference(userId, homeMode, state.status === 'ready' ? state.data.hasSystems : false);
+  const { label: branchLabel } = useBranchLabel(ref);
   // Sprint U4-2a item 3: owned here, not inside CapabilityMapView itself —
   // that component gets unmounted/remounted by this page's own
   // `state.status === 'ready' &&` gate every time a reorder's `onReordered`
@@ -251,6 +256,21 @@ export function CapabilityMapPage() {
           <Text as="h1" size="2xl">
             Capability map
           </Text>
+          {/* F13 step 1: a stamped picture of the map as shown — open to every member, unlike the editing actions beside it. */}
+          {state.status === 'ready' && state.data.tree.l1.length > 0 && (
+            <div className={styles.actions}>
+              <ExportViewButtons
+                what="capability map"
+                build={() => {
+                  const stamp = { modelName: model.name, refLabel: stampRefLabel(ref, branchLabel), date: exportDate() };
+                  return {
+                    plan: capabilityMapExportPlan({ tree: state.data.tree, mode: colourBy, supportsEdges: state.data.supportsEdges, systemsById: state.data.systemsById, stamp }),
+                    stamp: { ...stamp, viewLabel: capabilityMapViewLabel(colourBy) },
+                  };
+                }}
+              />
+            </div>
+          )}
           {canEdit && mainBranch && state.status === 'ready' && (
             <div className={styles.actions}>
               <CapabilityMapAddForm

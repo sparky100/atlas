@@ -14,6 +14,8 @@ import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { refLabelOf, refQueryParam } from '../../db/ref';
 import { PortfolioView } from '../portfolio/PortfolioView';
 import { usePortfolio } from '../portfolio/usePortfolio';
+import { useBranchLabel } from '../branches/useBranchLabel';
+import { exportDate, stampRefLabel } from '../exports/viewExport';
 import styles from './PortfolioPage.module.css';
 
 /**
@@ -38,6 +40,7 @@ export function PortfolioPage() {
   const { branch: mainBranch } = useMainBranch(model?.id ?? null);
 
   const { state } = usePortfolio(model?.id ?? '', ref, mainBranch?.head_commit_id ?? null);
+  const { label: branchLabel } = useBranchLabel(ref);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -73,7 +76,7 @@ export function PortfolioPage() {
           {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
           {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
-          {state.status === 'ready' && <PortfolioView data={state.data} elementHref={elementHref} />}
+          {state.status === 'ready' && <PortfolioView data={state.data} elementHref={elementHref} exportStamp={{ modelName: model.name, refLabel: stampRefLabel(ref, branchLabel), date: exportDate() }} />}
         </main>
       </div>
     </div>

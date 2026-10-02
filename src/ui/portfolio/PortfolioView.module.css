@@ -1,3 +1,11 @@
 .notEnteredBanner {
   margin-bottom: var(--space-3);
 }
+
+/* F13 step 1: Export PNG / Export PDF, under the toolbar. */
+.exportActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}

@@ -158,6 +158,7 @@ A **project** holds one piece of architecture work — "Housing CRM replacement"
 - **Scope against what it touches.** The page compares the declared scope with what the project's changes actually touch, and lists any difference — it never changes either for you.
 - **Evidence** — business cases, vendor documents and links — can be attached.
 - **On hold, close or cancel.** Close or cancel only once nothing in the project is still open; the page lists anything that is. Cancelling asks why. A closed or cancelled project can't be reopened.
+- **Project pack.** **Project pack (Markdown)** and **Project pack (PDF)** download the project as one document to hand over: its purpose, scope (and any gap with what the changes touch), the decision log — each decision written up as an ADR, the same as **Copy as ADR markdown** on the decision's page — the target state each change sets out (what it creates, changes and retires, and the capabilities it affects), and the evidence links. Any member can download it. It's a copy as of the moment you download it. The PDF uses a standard font; characters it can't show (for example non-Latin scripts) appear as "?" there, while the Markdown keeps them as written.
 
 A project is part of how your team works, not part of the model itself: it never appears on the capability map or landscape, and it isn't in a version.
 
@@ -168,6 +169,8 @@ A project is part of how your team works, not part of the model itself: it never
 - **Value streams** — how the organisation delivers its outcomes, stage by stage, and which capabilities enable each stage (weak supporting systems show up the stream). Value-stream structure is edited on main, or in a **Correct** change.
 - **Roadmap** — systems' lifecycles over time (introduced, planned end, support end) and changes' target dates, **by capability**, **by value stream** or **by project**, in months, quarters or years, with filters and **Export CSV**.
 - **Portfolio** — every system and module with run cost against fit, criticality, disposition, lifecycle and capabilities served, sortable and filterable, with **signals** where the combination matters (for example *Costly, poor fit*, *Costly overlap*, *Invest, poor fit*, *Justified*) and a note when a row is missing the inputs to judge it.
+
+**Export PNG** and **Export PDF** on the capability map, the landscape and Portfolio download a picture of the view as you see it: the current colour-by, and Portfolio's filters and sort. Every picture is stamped with the model, which state you are looking at (main, a version, or a change by name) and the date. Any member can export. The landscape picture shows systems in their lanes but not the connections between them, and says so. A picture is a copy, not part of the model: it doesn't update when the model changes.
 
 ## Reports and gaps
 

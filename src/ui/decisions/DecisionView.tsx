@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { DECISION_CRITERIA, decisionCriterionLevelLabel } from '../../contracts/decisionCriteria';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -23,6 +22,7 @@ import { decisionStatusTone } from './decisionStatus';
 import { setDecisionProject } from '../../db/projects';
 import { ProjectAssignment } from '../projects/ProjectAssignment';
 import { supabase } from '../supabaseClient';
+import { buildDecisionAdrExportInput } from './decisionAdrInput';
 import { exportDecisionAsAdrMarkdown } from './exportDecisionAsAdr';
 import type { DecisionPageState } from './useDecision';
 import { useDecisionComparison, type DecisionComparisonOption } from './useDecisionComparison';
@@ -106,52 +106,35 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   if (state.status === 'not_found') return <Text as="p">No decision found for this id.</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 
-  const { decision, linkedElementsById, linkedBranchesById, args } = state;
+  const { decision, links, linkedElementsById, linkedBranchesById, args } = state;
   const canAddOption = canCreateChangeBranch(role) && decision.status === 'proposed';
   const canChoose = canChooseDecisionOption(role) && decision.status === 'proposed';
   const canRate = canRateDecisionOption(role, decision);
 
   // Prompt pack F3 PR6's "Export as ADR markdown" — assembled from data
-  // this page has already loaded (no second round trip). `decisionArgLinks`
-  // filters to the `stance: 'for'` row `atlas.choose_decision_option`
-  // itself writes (PR5); `null` until the decision is `accepted`, the same
-  // "not yet decided" honesty `exportDecisionAsAdrMarkdown` itself renders.
+  // this page has already loaded (no second round trip).
   const ownerName = profileLabel(members.find((m) => m.member.user_id === decision.owner_id)?.profile);
-  // Distinct from the `reasons`/`setReasons` state above, which is the
-  // in-progress "Choose" confirm form's own textarea — this is the
-  // decision's own already-recorded `decision_arguments` row, once it has one.
-  const decidedReasons = args.find((a) => a.stance === 'for')?.body ?? null;
 
   // Decision-side-completion item 6: "Copy as ADR markdown" also carries
   // the decision's own declared concerns, each option's own ratings/notes
   // (`ratingsState.ratings`, lifted up above so this doesn't need a second
   // fetch), and the What-changes table's own evidence — only the rows it
   // renders visible, never the collapsed "unchanged" group, matching the
-  // table's own display exactly.
-  function optionRatingsFor(branchId: UUID) {
-    return DECISION_CRITERIA.map((criterion) => {
-      const rating = ratingsState.ratings.find((r) => r.branch_id === branchId && r.criterion === criterion.key);
-      if (!rating) return null;
-      return { criterionLabel: criterion.label, levelLabel: decisionCriterionLevelLabel(criterion.key, rating.level) ?? rating.level, note: rating.note };
-    }).filter((r): r is NonNullable<typeof r> => r !== null);
-  }
-
+  // table's own display exactly. Assembled by `decisionAdrInput.ts`, which
+  // the project pack (F13 step 2) shares.
   async function copyAdrMarkdown() {
-    const concernIds = [...concernedCapabilityIds, ...otherConcernElementIds];
-    const markdown = exportDecisionAsAdrMarkdown({
-      decision,
-      ownerName,
-      concerns: concernIds
-        .map((id) => linkedElementsById.get(id))
-        .filter((e): e is NonNullable<typeof e> => e !== undefined)
-        .map((e) => ({ name: e.name, typeLabel: e.element_type })),
-      options: branchLinks
-        .map((l) => linkedBranchesById.get(l.linked_id))
-        .filter((b): b is NonNullable<typeof b> => b !== undefined)
-        .map((b) => ({ branch: b, isChosen: b.id === decision.branch_id, ratings: optionRatingsFor(b.id) })),
-      whatChangesRows: comparison.status === 'ready' ? groupWhatChangesRows(comparison.whatChangesRows).visible : [],
-      reasons: decidedReasons,
-    });
+    const markdown = exportDecisionAsAdrMarkdown(
+      buildDecisionAdrExportInput({
+        decision,
+        links,
+        linkedElementsById,
+        linkedBranchesById,
+        args,
+        ratings: ratingsState.ratings,
+        whatChangesRows: comparison.status === 'ready' ? groupWhatChangesRows(comparison.whatChangesRows).visible : [],
+        ownerName,
+      }),
+    );
     try {
       await navigator.clipboard.writeText(markdown);
       setAdrCopied(true);

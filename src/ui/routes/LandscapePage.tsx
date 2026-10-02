@@ -38,6 +38,9 @@ import { ownersByRole } from '../elements/ownersByRole';
 import { parseLandscapeFilters, landscapeFiltersToSearchParams } from '../landscape/landscapeFilterParams';
 import { LANDSCAPE_COLOUR_BY_OPTIONS } from '../landscape/landscapeColour';
 import { LandscapeMobileList } from '../landscape/LandscapeMobileList';
+import { ExportViewButtons } from '../components/ExportViewButtons/ExportViewButtons';
+import { landscapeExportPlan, landscapeViewLabel } from '../exports/landscapeExport';
+import { exportDate, stampRefLabel } from '../exports/viewExport';
 import { listLandscapeLaneOptions, type LandscapeLaneDisplayOptions } from '../landscape/layout';
 import { useCanvasWidth } from '../landscape/useCanvasWidth';
 import { useCapabilityLandscape } from '../landscape/useCapabilityLandscape';
@@ -517,6 +520,21 @@ export function LandscapePage() {
             </div>
           )}
           {capabilityExport.error !== null && <Text as="p">{capabilityExport.error}</Text>}
+          {/* F13 step 1: a stamped picture of the landscape as laid out — every member, desktop and mobile alike (the layout is computed either way). Not for the flat capability-filtered list, which has its own CSV/XLSX export above. */}
+          {!capability && state.status === 'ready' && displayState.status === 'ready' && hasContent && (
+            <div className={styles.actions}>
+              <ExportViewButtons
+                what="landscape"
+                build={() => {
+                  const stamp = { modelName: model.name, refLabel: stampRefLabel(ref, branchLabel), date: exportDate() };
+                  return {
+                    plan: landscapeExportPlan({ layout: displayState.display.layout, systemsById: state.data.systemsById, actorsById: state.data.actorsById, colourBy, stamp }),
+                    stamp: { ...stamp, viewLabel: landscapeViewLabel(colourBy) },
+                  };
+                }}
+              />
+            </div>
+          )}
           {/* Prompt 7k item 1: the landscape's own colour-by mode — desktop canvas only, same scoping as the comments-only filter beside it. */}
           {state.status === 'ready' && showCanvas && (
             <div className={styles.actions}>
