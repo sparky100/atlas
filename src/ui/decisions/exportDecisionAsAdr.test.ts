@@ -104,7 +104,7 @@ describe('exportDecisionAsAdrMarkdown', () => {
     const cancelledOne = makeBranch({ id: 'branch-a', title: 'Option A', status: 'cancelled', cancel_reason: 'Not chosen: see decision dec-1' });
     const cancelledTwo = makeBranch({ id: 'branch-c', title: 'Option C', status: 'cancelled' });
     const markdown = exportDecisionAsAdrMarkdown({
-      decision: makeDecision({ status: 'accepted', decided_at: '2026-09-14', branch_id: 'branch-b' }),
+      decision: makeDecision({ status: 'accepted', decided_at: '2026-09-14T10:32:07.123456+00:00', branch_id: 'branch-b' }),
       ownerName: 'Alice',
       concerns: [],
       options: [
@@ -121,8 +121,8 @@ describe('exportDecisionAsAdrMarkdown', () => {
     expect(markdown).toContain('- Exploring: Option A — not chosen');
     expect(markdown).toContain('  - Cost: High');
     expect(markdown).toContain('- Exploring: Option C — not chosen');
-    expect(markdown).toContain('**Status:** Accepted — decided 2026-09-14');
-    expect(markdown).toContain('We will Proposing: Option B.');
+    expect(markdown).toContain('**Status:** Accepted — decided 2026-09-14\n');
+    expect(markdown).toContain('Chosen option: **Option B**.');
     expect(markdown).toContain('Option B is the only one that adds the replacement capacity.');
   });
 
@@ -136,8 +136,8 @@ describe('exportDecisionAsAdrMarkdown', () => {
       whatChangesRows: [],
       reasons: null,
     });
-    expect(markdown).toContain('We will Proposing: Option B.');
-    expect(markdown.trim().endsWith('We will Proposing: Option B.')).toBe(true);
+    expect(markdown).toContain('Chosen option: **Option B**.');
+    expect(markdown.trim().endsWith('Chosen option: **Option B**.')).toBe(true);
   });
 
   it('renders the What-changes evidence rows, naming each option by its own label, with the "Current (main)" value first', () => {
