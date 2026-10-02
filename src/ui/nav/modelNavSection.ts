@@ -21,8 +21,8 @@ export function modelNavSectionFor(modelRelativePath: string): ModelNavSection {
   if (path.startsWith('/value-streams')) return 'value-streams';
   if (path === '/elements' || path.startsWith('/elements/')) return 'elements';
   if (path.startsWith('/portfolio')) return 'portfolio';
-  // F9 step 3: the Reports hub and the three reports it lists.
-  if (path.startsWith('/reports') || path.startsWith('/boundary-crossings') || path.startsWith('/external-interfaces') || path.startsWith('/duplicates')) return 'reports';
+  // F9 step 3: the Reports hub and the reports it lists (F12: plus the gaps queue).
+  if (path.startsWith('/reports') || path.startsWith('/boundary-crossings') || path.startsWith('/external-interfaces') || path.startsWith('/duplicates') || path.startsWith('/gaps')) return 'reports';
   // F9 step 2 (UI-principles §2.0): the review queue is a tab of Changes, not
   // its own nav item — its list and both detail pages light up Changes.
   if (path.startsWith('/changes') || path.startsWith('/review')) return 'changes';

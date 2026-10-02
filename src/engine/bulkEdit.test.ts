@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AttributeFieldSchema } from '../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow, Json } from '../contracts/rows';
-import { buildBulkEditDeltas, bulkEditCellKey, draftEqualsFactValue, initialBulkEditDraft } from './bulkEdit';
+import { buildBulkEditDeltas, buildRelationshipAttributeDelta, bulkEditCellKey, draftEqualsFactValue, initialBulkEditDraft } from './bulkEdit';
 
 function element(id: string, type: ElementsHeadRow['element_type'] = 'system'): ElementsHeadRow {
   return { element_id: id, element_type: type, name: `Element ${id}`, parent_id: null, attributes: {}, exists_delta_id: `exists-${id}` };
@@ -98,5 +98,22 @@ describe('draft helpers', () => {
     expect(initialBulkEditDraft(null)).toBe('');
     expect(initialBulkEditDraft(7)).toBe('7');
     expect(initialBulkEditDraft(true)).toBe(true);
+  });
+});
+
+describe('buildRelationshipAttributeDelta', () => {
+  const edge = { relationship_id: 'r1', relationship_type: 'supports' as const, from_element_id: 'a', to_element_id: 'cap', attributes: {}, exists_delta_id: 'exists-r1' };
+
+  it('rates an unrated edge, superseding its existence delta', () => {
+    expect(buildRelationshipAttributeDelta({ relationship: edge, key: 'fitForPurpose', draft: 'good', current: undefined, sourceId: 's', newId: ids() })).toEqual({
+      ok: true,
+      delta: { kind: 'relationship.update', id: 'id-1', relationshipId: 'r1', relationshipType: 'supports', attribute: 'fitForPurpose', value: 'good', previousDeltaId: 'exists-r1', sourceId: 's', confidence: 1 },
+    });
+  });
+
+  it('writes nothing for an unchanged value, and refuses an invalid one', () => {
+    const current = { ...fact('r1', 'fitForPurpose', 'good'), subject_type: 'relationship' as const };
+    expect(buildRelationshipAttributeDelta({ relationship: edge, key: 'fitForPurpose', draft: 'good', current, sourceId: 's', newId: ids() })).toEqual({ ok: true, delta: null });
+    expect(buildRelationshipAttributeDelta({ relationship: edge, key: 'fitForPurpose', draft: 'splendid', current, sourceId: 's', newId: ids() }).ok).toBe(false);
   });
 });

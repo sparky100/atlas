@@ -108,7 +108,7 @@ You can leave comments directly on elements and other objects in the model — u
   Colour it by **Disposition** to see, for each capability, the worst TIME disposition among the systems and modules supporting it.
 - **Roadmap** shows planned and in-flight change over time.
 - **Value streams** show how the organisation delivers its outcomes, stage by stage.
-- **Reports** (Analyse) lists **Boundary crossings** (links across the IT/OT boundary), **External interfaces** (where your model touches systems and organisations you don't own) and **Duplicates**.
+- **Reports** (Analyse) lists **Boundary crossings** (links across the IT/OT boundary), **External interfaces** (where your model touches systems and organisations you don't own), **Duplicates** and **Gaps**. Gaps counts the systems missing a fit rating, an owner, a run cost, a criticality or a disposition; **Fill in** walks them one at a time — press a number to pick an answer and move on, **j** to skip, **k** to go back. Each answer is saved as you go.
 
 ## Disposition (TIME)
 

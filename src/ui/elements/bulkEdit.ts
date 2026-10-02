@@ -8,13 +8,13 @@
  */
 import type { AttributeFieldSchema } from '../../contracts/attributeSchema';
 import type { CommitEnvelope, UUID } from '../../contracts/delta';
-import type { ElementsHeadRow } from '../../contracts/rows';
-import { loadAttributeFactsAtBranch } from '../../db/branchFacts';
+import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
+import { loadAttributeFactsAtBranch, loadFactsForSubjectAtBranch } from '../../db/branchFacts';
 import type { Client } from '../../db/client';
 import { commitToBranch, type CommitResult } from '../../db/commits';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
-import { buildBulkEditDeltas, type BulkEditCell } from '../../engine/bulkEdit';
+import { buildBulkEditDeltas, buildRelationshipAttributeDelta, type BulkEditCell, type BulkEditDraft } from '../../engine/bulkEdit';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 
 export interface CommitBulkEditInput {
@@ -54,6 +54,43 @@ export async function commitBulkEdit(supabase: Client, input: CommitBulkEditInpu
     title: describeEnvelope(built.deltas, (id) => elementsById.get(id)?.name),
     body: `Bulk edit: ${String(built.deltas.length)} ${built.deltas.length === 1 ? 'value' : 'values'} across ${String(elementCount)} ${elementCount === 1 ? 'element' : 'elements'}`,
     deltas: built.deltas,
+  };
+  return commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });
+}
+
+export interface CommitRelationshipAttributeInput {
+  modelId: UUID;
+  orgId: UUID;
+  userId: UUID;
+  branch: BranchRow;
+  expectedHeadCommitId: UUID;
+  relationship: RelationshipsHeadRow;
+  /** For the commit title — "{from} → {to}". */
+  label: string;
+  key: string;
+  draft: BulkEditDraft;
+}
+
+/** F12 step 2: one relationship attribute (a supports edge's fit, from the gaps queue) as its own commit. */
+export async function commitRelationshipAttribute(
+  supabase: Client,
+  input: CommitRelationshipAttributeInput,
+): Promise<CommitResult | { ok: true; commitId: null; newHead: null } | { ok: false; reason: 'validation'; message: string }> {
+  const { modelId, orgId, userId, branch, expectedHeadCommitId, relationship, label, key, draft } = input;
+  const facts = await loadFactsForSubjectAtBranch(supabase, modelId, branch, 'relationship', relationship.relationship_id);
+  const source = await getOrCreateManualSource(supabase, { id: crypto.randomUUID(), orgId, modelId, userId });
+  const built = buildRelationshipAttributeDelta({ relationship, key, draft, current: facts.get(key), sourceId: source.id, newId: () => crypto.randomUUID() });
+  if (!built.ok) return { ok: false, reason: 'validation', message: built.error };
+  if (built.delta === null) return { ok: true, commitId: null, newHead: null };
+  const envelope: CommitEnvelope = {
+    id: crypto.randomUUID(),
+    branchId: branch.id,
+    parentCommitId: expectedHeadCommitId,
+    mergedBranchHeadCommitId: null,
+    kind: 'manual',
+    title: describeEnvelope([built.delta], () => undefined),
+    body: `Rated ${label}`,
+    deltas: [built.delta],
   };
   return commitToBranch(supabase, { modelId, branchId: branch.id, expectedHeadCommitId, envelope });
 }

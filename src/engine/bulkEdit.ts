@@ -14,7 +14,8 @@
  */
 import { validateAttributeValue, validateCustomAttributeValue, type AttributeFieldSchema } from '../contracts/attributeSchema';
 import type { Delta, UUID } from '../contracts/delta';
-import type { ElementsHeadRow, FactsRow, Json } from '../contracts/rows';
+import { validateRelationshipAttributeValue } from '../contracts/relationshipAttributeSchema';
+import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../contracts/rows';
 
 /** What a grid cell holds while being edited — the same shape the element page's form uses (`DraftValue`). */
 export type BulkEditDraft = string | boolean;
@@ -110,4 +111,41 @@ export function buildBulkEditDeltas(input: BuildBulkEditDeltasInput): BuildBulkE
       }) as Delta,
   );
   return { ok: true, deltas };
+}
+
+export interface BuildRelationshipAttributeDeltaInput {
+  relationship: RelationshipsHeadRow;
+  key: string;
+  draft: BulkEditDraft;
+  /** The relationship's current fact for `key`, if it has one. */
+  current: FactsRow | undefined;
+  sourceId: UUID;
+  newId: () => UUID;
+}
+
+/**
+ * F12 step 2: one relationship attribute — a `supports` edge's fit rated
+ * from the gaps queue — as a `relationship.update` delta, validated against
+ * the relationship type's own schema. `null` deltas means the draft equals
+ * the current value (nothing to write).
+ */
+export function buildRelationshipAttributeDelta(input: BuildRelationshipAttributeDeltaInput): { ok: true; delta: Delta | null } | { ok: false; error: string } {
+  const { relationship, key, draft, current, sourceId, newId } = input;
+  if (draftEqualsFactValue(draft, current?.value)) return { ok: true, delta: null };
+  const result = validateRelationshipAttributeValue(relationship.relationship_type, key, draft);
+  if (!result.ok) return { ok: false, error: result.error };
+  return {
+    ok: true,
+    delta: {
+      kind: 'relationship.update',
+      id: newId(),
+      relationshipId: relationship.relationship_id,
+      relationshipType: relationship.relationship_type,
+      attribute: key,
+      value: result.value,
+      previousDeltaId: current?.delta_id ?? relationship.exists_delta_id,
+      sourceId,
+      confidence: 1,
+    } as Delta,
+  };
 }

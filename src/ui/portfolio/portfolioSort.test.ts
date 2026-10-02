@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PORTFOLIO_SORT_DIRECTION, DEFAULT_PORTFOLIO_SORT_KEY, sortPortfolioRows } from './portfolioSort';
-import { fakeElement, fakeRow } from './portfolioTestFixtures';
+import { fakeElement, fakeRow, fakeSupportsEdge } from './portfolioTestFixtures';
 
 describe('default sort', () => {
   it('is cost band, descending', () => {
@@ -71,8 +71,8 @@ describe('sortPortfolioRows: lifecycle', () => {
 
 describe('sortPortfolioRows: capabilities', () => {
   it('sorts by number of capabilities served', () => {
-    const one = { capabilityId: 'c1', capabilityName: 'C1', fit: null, otherSupporters: [] };
-    const two = { capabilityId: 'c2', capabilityName: 'C2', fit: null, otherSupporters: [] };
+    const one = { capabilityId: 'c1', capabilityName: 'C1', fit: null, relationship: fakeSupportsEdge('sys-1', 'c1'), otherSupporters: [] };
+    const two = { capabilityId: 'c2', capabilityName: 'C2', fit: null, relationship: fakeSupportsEdge('sys-1', 'c2'), otherSupporters: [] };
     const rows = [fakeRow({ name: 'few', capabilities: [one] }), fakeRow({ name: 'many', capabilities: [one, two] })];
     expect(sortPortfolioRows(rows, 'capabilities', 'desc').map((r) => r.name)).toEqual(['many', 'few']);
   });

@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Criticality } from '../contracts/delta';
 import type { ElementsHeadRow } from '../contracts/rows';
-import { commitBulkEdit } from '../ui/elements/bulkEdit';
+import { commitBulkEdit, commitRelationshipAttribute } from '../ui/elements/bulkEdit';
 import { createChangeBranch, getBranch, getMainBranch } from './branches';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
@@ -244,5 +244,48 @@ describe('bulk edit (F12 step 1) against a real local Supabase', () => {
     }).catch((e: unknown) => ({ ok: false as const, reason: 'thrown' as const, message: String(e) }));
     expect(result.ok).toBe(false);
     expect((await main()).head_commit_id).toBe(before.head_commit_id);
+  });
+
+  it('the gaps queue rates a supports edge as one commit of one relationship_update, and re-rating it supersedes that fact', async () => {
+    const before = await main();
+    const source = await getOrCreateManualSource(owner.client, { id: randomUUID(), orgId, modelId, userId: owner.id });
+    const capabilityId = randomUUID();
+    const relationshipId = randomUUID();
+    const existsDeltaId = randomUUID();
+    const seeded = await commitToBranch(owner.client, {
+      modelId,
+      branchId: before.id,
+      expectedHeadCommitId: before.head_commit_id,
+      envelope: {
+        id: randomUUID(),
+        branchId: before.id,
+        parentCommitId: before.head_commit_id,
+        mergedBranchHeadCommitId: null,
+        kind: 'manual',
+        title: 'a capability Payroll supports',
+        body: null,
+        deltas: [
+          { kind: 'element.create', id: randomUUID(), elementId: capabilityId, elementType: 'capability', name: 'Pay People', parentId: null, attributes: {}, sourceId: source.id, confidence: 1 },
+          { kind: 'relationship.create', id: existsDeltaId, relationshipId, relationshipType: 'supports', fromElementId: ids.a, toElementId: capabilityId, attributes: { role: 'primary' }, sourceId: source.id, confidence: 1 },
+        ],
+      },
+    });
+    if (!seeded.ok) throw new Error(`seed: ${seeded.message}`);
+    const { data: edgeRow } = await service.from('relationships_head').select('relationship_id, relationship_type, from_element_id, to_element_id, attributes, exists_delta_id').eq('commit_id', seeded.commitId).eq('relationship_id', relationshipId).single();
+    const edge = edgeRow as Parameters<typeof commitRelationshipAttribute>[1]['relationship'];
+
+    const branch = await main();
+    const rated = await commitRelationshipAttribute(owner.client, { modelId, orgId, userId: owner.id, branch, expectedHeadCommitId: branch.head_commit_id, relationship: edge, label: 'Payroll → Pay People', key: 'fitForPurpose', draft: 'good' });
+    if (!rated.ok || rated.commitId === null) throw new Error('expected a commit');
+    const [delta, ...rest] = await deltasOf(rated.commitId);
+    expect(rest).toHaveLength(0);
+    expect(delta).toMatchObject({ kind: 'relationship_update', subject_id: relationshipId, attribute: 'fitForPurpose', value: 'good', previous_delta_id: edge.exists_delta_id, source_id: source.id, confidence: 1 });
+
+    const after = await main();
+    const rerated = await commitRelationshipAttribute(owner.client, { modelId, orgId, userId: owner.id, branch: after, expectedHeadCommitId: after.head_commit_id, relationship: edge, label: 'Payroll → Pay People', key: 'fitForPurpose', draft: 'poor' });
+    if (!rerated.ok || rerated.commitId === null) throw new Error('expected a second commit');
+    const { data: firstId } = await service.from('deltas').select('id').eq('commit_id', rated.commitId).single();
+    const [second] = await deltasOf(rerated.commitId);
+    expect(second?.previous_delta_id).toBe((firstId as { id: string }).id);
   });
 });
