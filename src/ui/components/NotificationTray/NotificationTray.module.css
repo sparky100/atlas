@@ -108,3 +108,17 @@
   gap: var(--space-1);
   min-width: 0;
 }
+
+/* Same as the account menu: on a phone the panel is pinned to the screen
+   with a 16px gutter each side, never to the bell — a fixed 360px panel
+   anchored to the bell's right edge ran off the left of a 390px screen. */
+@media (max-width: 768px) {
+  .panel {
+    position: fixed;
+    top: calc(var(--app-header-height) + var(--space-2));
+    left: var(--space-4);
+    right: var(--space-4);
+    width: auto;
+    max-height: calc(100dvh - var(--app-header-height) - var(--space-8));
+  }
+}

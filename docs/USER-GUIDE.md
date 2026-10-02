@@ -2,7 +2,7 @@
 
 **Status:** reviewed against the app on 2026-10-02 (after F10 projects, F11 disposition and F12 bulk edit / gaps / "Still accurate"). Written for the in-app AI help chat to ground its answers in — if something here doesn't match what you see, the app is right and this guide needs correcting.
 
-This is the guide the in-app **Help** assistant reads to answer your questions. It isn't reference documentation for developers (that's `docs/ADR-000-foundations.md` and `docs/SPEC-data-model.md`); it's written for the people who use Atlas day to day: architects modelling a landscape, and directors or service owners checking in on it.
+This is the guide the in-app **Help** assistant reads to answer your questions. It isn't reference documentation for developers (that's `docs/ADR-000-foundations.md` and `docs/SPEC-data-model.md`); it's written for the people who use Atlas: architects who maintain the model, and the senior people who read it.
 
 ---
 
@@ -11,7 +11,9 @@ This is the guide the in-app **Help** assistant reads to answer your questions. 
 Atlas is an enterprise-architecture tool for organisations with one or two architects — councils, NHS boards, housing associations, universities — sized for teams currently getting by on Sparx, Visio or spreadsheets. Two kinds of people use it:
 
 - **An architect**, who lives in it: capturing systems and relationships, reviewing AI-assisted imports, proposing and merging changes, recording decisions.
-- **A director or service owner**, who opens it a few times a quarter and should never need training to answer "what supports capability X, and what's changing about it?"
+- **A senior reader** — a director or other stakeholder — who opens it a few times a quarter and should never need training to answer "what supports capability X, and what's changing about it?"
+
+These are ways of using Atlas, not settings: what someone can do depends only on their role (below). Who **owns** a system or capability — its business, technical or service owner — is something recorded in the model against that element, whatever that person's job title.
 
 The core ideas:
 
@@ -82,10 +84,10 @@ On a phone, the bar at the bottom shows Home, Capabilities, Landscape and Change
 
 ## Home
 
-Home has two views; switch with **Director view** / **Architect view** at the top (Atlas remembers your choice).
+Home has two views; switch with **Capability view** / **Application view** at the top. Anyone can use either — it changes what Home shows, never what you're allowed to do — and Atlas remembers your choice.
 
-- **Director view** reads top to bottom: **Where are we weak** (capabilities at risk, with "Start a decision" and "Start a project" on each), **What's changing**, and **What's recent**. It has no editing controls, apart from **Propose a change** and **What happened** to record something that's already happened.
-- **Architect view** starts with a row of counts — the review queue, findings needing attention, assurance items, your own open changes, and duplicates flagged — then the review queue, **Health findings** and **Assurance**. Each finding names what it found and links to it; many offer **Start a decision →** or **Start a project →** pre-filled from the finding. When nothing is wrong, each group collapses to "N checks clear".
+- **Capability view** is organised around what the organisation does. It reads top to bottom: **Where are we weak** (capabilities at risk, with "Start a decision" and "Start a project" on each), **What's changing**, and **What's recent**. It has no editing controls, apart from **Propose a change** and **What happened** to record something that's already happened.
+- **Application view** is organised around the systems and the state of the model. It starts with a row of counts — the review queue, findings needing attention, assurance items, your own open changes, and duplicates flagged — then the review queue, **Health findings** and **Assurance**. Each finding names what it found and links to it; many offer **Start a decision →** or **Start a project →** pre-filled from the finding. When nothing is wrong, each group collapses to "N checks clear".
 
 Health findings include: systems not linked to a capability, capabilities with no owner or no supporting system, stale values, critical systems with no business owner or nearing end of life, critical systems near the end of vendor support, poor-fit capabilities with no planned replacement, relationships missing a verb or a data classification across the IT/OT or enterprise boundary, and systems marked Migrate or Eliminate that nothing is retiring.
 

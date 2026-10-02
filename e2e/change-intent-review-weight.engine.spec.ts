@@ -54,7 +54,7 @@ test('a record change merges in one click from its own page and never appears in
   // 1. Record: "What happened" (F0's own record-default entry point).
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // "What happened" lives on the director's door; an owner lands on the architect's.
-  await page.getByRole('button', { name: 'Director view' }).click();
+  await page.getByRole('button', { name: 'Capability view' }).click();
   await page.getByRole('button', { name: 'What happened' }).click();
   const recordName = `deployed-ledger-${randomUUID().slice(0, 8)}`;
   await page.getByPlaceholder('Name (e.g. retire-northgate)').fill(recordName);

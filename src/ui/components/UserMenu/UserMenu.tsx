@@ -40,7 +40,7 @@ export function UserMenu() {
       </button>
       <div id={menuId} className={[styles.menu, open ? styles.open : ''].filter(Boolean).join(' ')}>
         {email !== null && (
-          <Text tone="muted" size="sm">
+          <Text tone="muted" size="sm" className={styles.email}>
             {email}
           </Text>
         )}
