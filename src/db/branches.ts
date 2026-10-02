@@ -152,15 +152,15 @@ export async function listChangeBranches(supabase: Client, modelId: UUID): Promi
 }
 
 /**
- * How many changes on a model are still open — not cancelled and not
- * merged (`draft`, `proposed`, `in_review`, `approved`): the Changes nav
- * item's badge. A count only (`head: true`), and the status list is a
- * fixed enum, never an id list (rule 8).
+ * How many changes on a model aren't cancelled — the Changes nav item's
+ * badge, counting exactly what the Changes page lists above its collapsed
+ * "Cancelled" group (`ChangesView.tsx`'s `activeBranches`), merged ones
+ * included. A count only (`head: true`), no id list (rule 8).
  */
-export async function countOpenChangeBranches(supabase: Client, modelId: UUID): Promise<number> {
-  assertRealId('countOpenChangeBranches', 'model_id', modelId);
-  const { count, error } = await supabase.from('branches').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('kind', 'change').in('status', ['draft', 'proposed', 'in_review', 'approved']);
-  if (error) throw new Error(`countOpenChangeBranches: ${error.message}`);
+export async function countActiveChangeBranches(supabase: Client, modelId: UUID): Promise<number> {
+  assertRealId('countActiveChangeBranches', 'model_id', modelId);
+  const { count, error } = await supabase.from('branches').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('kind', 'change').neq('status', 'cancelled');
+  if (error) throw new Error(`countActiveChangeBranches: ${error.message}`);
   return count ?? 0;
 }
 
