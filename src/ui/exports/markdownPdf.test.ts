@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { layoutMarkdown, parseInline, toWinAnsi, type MeasureText, type PageGeometry } from './markdownPdf';
 
 /** Every character 0.5em wide — enough to test wrapping without a font. */
-const measure: MeasureText = (text, _bold, size) => [...text].length * size * 0.5;
+const measure: MeasureText = (text, _bold, size) => Array.from(text).length * size * 0.5;
 const SMALL: PageGeometry = { width: 200, height: 200, margin: 20, footer: 10 };
 
 describe('parseInline', () => {
