@@ -64,3 +64,25 @@
 .profileLink:hover {
   text-decoration: underline;
 }
+
+/* On a phone the menu is pinned to the screen, not to the avatar: anchored
+   to the avatar's right edge it grew leftwards past the screen's own edge
+   (the email line and the Theme/Density pair together are wider than a
+   390px screen). Full width less the 16px gutter each side; the email
+   breaks wherever it must, and the two toggle groups stack if they don't
+   fit side by side. */
+@media (max-width: 768px) {
+  .menu {
+    position: fixed;
+    top: calc(var(--app-header-height) + var(--space-2));
+    left: var(--space-4);
+    right: var(--space-4);
+    min-width: 0;
+    max-height: calc(100dvh - var(--app-header-height) - var(--space-8));
+    overflow-y: auto;
+  }
+}
+
+.email {
+  overflow-wrap: anywhere;
+}

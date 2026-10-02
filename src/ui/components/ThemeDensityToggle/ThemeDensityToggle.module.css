@@ -1,6 +1,7 @@
 .toggle {
   display: flex;
-  gap: var(--space-6);
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
 }
 
 .group {
