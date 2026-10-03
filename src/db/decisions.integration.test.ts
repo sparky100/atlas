@@ -27,7 +27,9 @@ import { createServiceRoleClient, createSupabaseClient } from './client';
 import { commitToBranch } from './commits';
 import { createComment, listCommentsForAnchor } from './comments';
 import {
+  cancelDecision,
   chooseDecisionOption,
+  countProposedDecisions,
   createDecision,
   createDecisionLink,
   getDecision,
@@ -35,6 +37,7 @@ import {
   listDecisionLinksForDecision,
   listDecisionsForModel,
   listDecisionsLinkingElements,
+  updateDecision,
 } from './decisions';
 import { loadEnv } from './env';
 import { createModel } from './models';
@@ -307,6 +310,109 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       const { error: submitError } = await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: randomUUID(), p_branch_id: option.id, p_classification: {}, p_reviewers: [{ user_id: architect.id, required: true }] });
       if (submitError) throw new Error(`submit_merge_request: ${submitError.message}`);
       await expect(chooseDecisionOption(alice.client, decision.id, option.id, 'no longer a draft')).rejects.toThrow();
+    });
+  });
+
+  describe('updateDecision (editing a proposed decision)', () => {
+    it("edits title, context, owner, needed-by and Lens map link; only the creator or an org owner/architect may; never once it's cancelled", async () => {
+      const creator = await createSignedInUser('decisions-edit-creator');
+      const other = await createSignedInUser('decisions-edit-other');
+      for (const u of [creator, other]) {
+        const { error } = await alice.client.from('members').insert({ org_id: orgId, user_id: u.id, role: 'contributor', invited_by: alice.id });
+        if (error) throw new Error(`inviting: ${error.message}`);
+      }
+      const decision = await createDecision(creator.client, { id: randomUUID(), orgId, modelId, title: 'Typo in titel', statement: '', ownerId: creator.id, createdBy: creator.id });
+
+      const edited = await updateDecision(creator.client, decision.id, { title: 'Typo fixed', statement: 'Now with context.', ownerId: alice.id, neededBy: '2026-12-31', lensMapUrl: 'https://lens.example/map/1' });
+      expect(edited).toMatchObject({ title: 'Typo fixed', statement: 'Now with context.', owner_id: alice.id, needed_by: '2026-12-31', lens_map_url: 'https://lens.example/map/1', status: 'proposed' });
+      expect(await updateDecision(creator.client, decision.id, { neededBy: null, lensMapUrl: null })).toMatchObject({ needed_by: null, lens_map_url: null });
+
+      // Another contributor can't; an org owner can.
+      await expect(updateDecision(other.client, decision.id, { title: 'Not mine' })).rejects.toThrow(/can no longer be edited, or you are not allowed/);
+      expect(await updateDecision(alice.client, decision.id, { title: 'Owner tidy-up' })).toMatchObject({ title: 'Owner tidy-up' });
+
+      // Closed once cancelled.
+      await cancelDecision(alice.client, decision.id, 'Done with it.');
+      await expect(updateDecision(alice.client, decision.id, { title: 'After cancelling' })).rejects.toThrow();
+
+      await service.auth.admin.deleteUser(creator.id);
+      await service.auth.admin.deleteUser(other.id);
+    });
+  });
+
+  describe('atlas.cancel_decision (ADR-022 amendment, 2026-10-03)', () => {
+    async function invite(label: string, role: 'contributor' | 'viewer') {
+      const user = await createSignedInUser(label);
+      const { error } = await alice.client.from('members').insert({ org_id: orgId, user_id: user.id, role, invited_by: alice.id });
+      if (error) throw new Error(`inviting ${label}: ${error.message}`);
+      return user;
+    }
+
+    it('cancels a proposed decision with its reason, who and when, and cancels its draft options; it is then closed to edits and to choosing', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'No longer needed', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const options = await Promise.all(
+        ['cancel-a', 'cancel-b'].map((name) =>
+          createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `${name}-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id }),
+        ),
+      );
+      await Promise.all(options.map((o) => createDecisionLink(alice.client, { decisionId: decision.id, linkedType: 'branch', linkedId: o.id, createdBy: alice.id })));
+
+      const cancelled = await cancelDecision(alice.client, decision.id, '  The vendor withdrew the product.  ');
+      expect(cancelled).toMatchObject({ status: 'rejected', cancel_reason: 'The vendor withdrew the product.', decided_by: alice.id, branch_id: null });
+      expect(cancelled.decided_at).not.toBeNull();
+      expect(await getDecision(alice.client, decision.id)).toMatchObject({ status: 'rejected', cancel_reason: 'The vendor withdrew the product.' });
+
+      for (const option of options) {
+        expect(await getBranch(alice.client, option.id)).toMatchObject({ status: 'cancelled', cancel_reason: `Decision cancelled: see decision ${decision.id}` });
+      }
+
+      const { error: editError } = await alice.client.from('decisions').update({ title: 'Edited after cancelling' }).eq('id', decision.id);
+      expect(editError).not.toBeNull();
+      await expect(cancelDecision(alice.client, decision.id, 'again')).rejects.toThrow();
+    });
+
+    it('needs a reason; only the decision owner or an org owner/architect may cancel; a cancel reason is never settable by a plain insert or update', async () => {
+      const contributor = await invite('decisions-cancel-contributor', 'contributor');
+      const other = await invite('decisions-cancel-other', 'contributor');
+      const theirs = await createDecision(contributor.client, { id: randomUUID(), orgId, modelId, title: 'Owned by a contributor', statement: '', ownerId: contributor.id, createdBy: contributor.id });
+
+      await expect(cancelDecision(contributor.client, theirs.id, '   ')).rejects.toThrow(/say why/);
+      await expect(cancelDecision(other.client, theirs.id, 'not my decision')).rejects.toThrow(/only the decision/);
+      expect(await cancelDecision(contributor.client, theirs.id, 'Raised by mistake.')).toMatchObject({ status: 'rejected', decided_by: contributor.id });
+
+      // An org owner may cancel a decision someone else owns.
+      const another = await createDecision(contributor.client, { id: randomUUID(), orgId, modelId, title: 'Owner cancels', statement: '', ownerId: contributor.id, createdBy: contributor.id });
+      expect(await cancelDecision(alice.client, another.id, 'Superseded by the platform strategy.')).toMatchObject({ status: 'rejected', decided_by: alice.id });
+
+      // The column is ungranted for update, and the check constraint keeps a reason off a proposed row.
+      const proposed = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Plain writes', statement: '', ownerId: alice.id, createdBy: alice.id });
+      const { error: updateError } = await alice.client.from('decisions').update({ cancel_reason: 'sneaky' }).eq('id', proposed.id);
+      expect(updateError).not.toBeNull();
+      const { error: insertError } = await alice.client.from('decisions').insert({ id: randomUUID(), org_id: orgId, model_id: modelId, title: 'Insert with a reason', owner_id: alice.id, created_by: alice.id, cancel_reason: 'sneaky' });
+      expect(insertError).not.toBeNull();
+
+      await service.auth.admin.deleteUser(contributor.id);
+      await service.auth.admin.deleteUser(other.id);
+    });
+
+    it('the Decisions badge counts proposed decisions only: a new one adds one, cancelling takes it away', async () => {
+      const before = await countProposedDecisions(alice.client, modelId);
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Counted', statement: '', ownerId: alice.id, createdBy: alice.id });
+      expect(await countProposedDecisions(alice.client, modelId)).toBe(before + 1);
+      await cancelDecision(alice.client, decision.id, 'Counted, then cancelled.');
+      expect(await countProposedDecisions(alice.client, modelId)).toBe(before);
+    });
+
+    it('an accepted decision cannot be cancelled', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Already chosen', statement: '', ownerId: alice.id, createdBy: alice.id });
+      const option = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `chosen-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
+      await createDecisionLink(alice.client, { decisionId: decision.id, linkedType: 'branch', linkedId: option.id, createdBy: alice.id });
+      await chooseDecisionOption(alice.client, decision.id, option.id, 'The only option.');
+      await expect(cancelDecision(alice.client, decision.id, 'too late')).rejects.toThrow(/only a proposed decision/);
     });
   });
 

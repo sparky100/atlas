@@ -16,6 +16,7 @@ function makeDecision(overrides: Partial<DecisionRow> = {}): DecisionRow {
     lens_map_url: null,
     decided_by: null,
     decided_at: null,
+    cancel_reason: null,
     branch_id: null,
     superseded_decision_id: null,
     project_id: null,
@@ -166,5 +167,19 @@ describe('exportDecisionAsAdrMarkdown', () => {
   it('omits the What-changes section entirely when nothing differs', () => {
     const markdown = exportDecisionAsAdrMarkdown({ decision: makeDecision(), ownerName: 'Alice', concerns: [], options: [], whatChangesRows: [], reasons: null });
     expect(markdown).not.toContain('## What changes');
+  });
+
+  it('writes up a cancelled decision as cancelled, with its date and reason', () => {
+    const markdown = exportDecisionAsAdrMarkdown({
+      decision: makeDecision({ status: 'rejected', decided_by: 'user-1', decided_at: '2026-10-03T08:00:00.000000+00:00', cancel_reason: 'The vendor withdrew the product.' }),
+      ownerName: 'Alice',
+      concerns: [],
+      options: [],
+      whatChangesRows: [],
+      reasons: null,
+    });
+    expect(markdown).toContain('**Status:** Cancelled — 2026-10-03\n');
+    expect(markdown).toContain('## Decision\n\nCancelled without choosing an option: The vendor withdrew the product.');
+    expect(markdown).not.toContain('Not yet decided');
   });
 });

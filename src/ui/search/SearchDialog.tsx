@@ -14,6 +14,7 @@ import { moduleDisplayName } from '../elements/moduleDisplayName';
 import { reportError } from '../errors/errorBannerStore';
 import { useHomeSearch } from '../home/useHomeSearch';
 import { supabase } from '../supabaseClient';
+import { decisionStatusLabel } from '../decisions/decisionStatus';
 import { matchTitled } from './searchAnywhereMatch';
 import styles from './SearchDialog.module.css';
 
@@ -148,7 +149,7 @@ function SearchBody({
     const decisionOptions: Option[] = matchTitled(
       (decisions ?? []).map((decision) => ({ decision, texts: [decision.title] })),
       query,
-    ).map(({ decision }) => ({ id: `d-${decision.id}`, group: 'Decisions', label: decision.title, detail: `decision · ${decision.status}`, href: `${base}/decisions/${decision.id}` }));
+    ).map(({ decision }) => ({ id: `d-${decision.id}`, group: 'Decisions', label: decision.title, detail: `decision · ${decisionStatusLabel(decision.status)}`, href: `${base}/decisions/${decision.id}` }));
     return [...elementOptions, ...changeOptions, ...decisionOptions];
   }, [search.results, changes, decisions, query, base, activeRef]);
 

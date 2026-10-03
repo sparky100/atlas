@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
-import { canApproveOrMergeRequest, canArchiveModel, canDeleteModel, canEditBranch, canEditValueStreamStructure, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
+import { canAddDecisionConcern, canApproveOrMergeRequest, canArchiveModel, canCancelDecision, canEditDecision, canDeleteModel, canEditBranch, canEditValueStreamStructure, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
   return {
@@ -158,5 +158,47 @@ describe('canManageAttributeDefinitions', () => {
     expect(canManageAttributeDefinitions('contributor')).toBe(false);
     expect(canManageAttributeDefinitions('viewer')).toBe(false);
     expect(canManageAttributeDefinitions(null)).toBe(false);
+  });
+});
+
+describe('canCancelDecision (mirrors atlas.cancel_decision)', () => {
+  const proposed = { status: 'proposed' as const, owner_id: 'owner-user' };
+  it('lets an org owner or architect cancel any proposed decision', () => {
+    expect(canCancelDecision('owner', proposed, 'someone')).toBe(true);
+    expect(canCancelDecision('architect', proposed, 'someone')).toBe(true);
+  });
+  it("lets the decision's own owner cancel it, at any role", () => {
+    expect(canCancelDecision('contributor', proposed, 'owner-user')).toBe(true);
+    expect(canCancelDecision('contributor', proposed, 'someone-else')).toBe(false);
+    expect(canCancelDecision('viewer', proposed, 'someone-else')).toBe(false);
+  });
+  it('refuses once the decision is no longer proposed, and for a non-member', () => {
+    expect(canCancelDecision('owner', { ...proposed, status: 'accepted' }, 'owner-user')).toBe(false);
+    expect(canCancelDecision('owner', { ...proposed, status: 'rejected' }, 'owner-user')).toBe(false);
+    expect(canCancelDecision(null, proposed, 'owner-user')).toBe(false);
+  });
+});
+
+describe('canEditDecision (mirrors decisions_update)', () => {
+  const proposed = { status: 'proposed' as const, created_by: 'creator' };
+  it('lets the creator, or an org owner/architect, edit a proposed decision', () => {
+    expect(canEditDecision('contributor', proposed, 'creator')).toBe(true);
+    expect(canEditDecision('owner', proposed, 'someone')).toBe(true);
+    expect(canEditDecision('architect', proposed, 'someone')).toBe(true);
+    expect(canEditDecision('contributor', proposed, 'someone')).toBe(false);
+  });
+  it('refuses viewers, non-members, and any decision no longer proposed', () => {
+    expect(canEditDecision('viewer', proposed, 'creator')).toBe(false);
+    expect(canEditDecision(null, proposed, 'creator')).toBe(false);
+    expect(canEditDecision('owner', { ...proposed, status: 'accepted' }, 'creator')).toBe(false);
+    expect(canEditDecision('owner', { ...proposed, status: 'rejected' }, 'creator')).toBe(false);
+  });
+});
+
+describe('canAddDecisionConcern (mirrors decision_links_insert)', () => {
+  it('owner, architect or contributor, while proposed', () => {
+    expect(canAddDecisionConcern('contributor', { status: 'proposed' })).toBe(true);
+    expect(canAddDecisionConcern('viewer', { status: 'proposed' })).toBe(false);
+    expect(canAddDecisionConcern('owner', { status: 'accepted' })).toBe(false);
   });
 });

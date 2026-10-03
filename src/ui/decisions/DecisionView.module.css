@@ -109,3 +109,29 @@
     min-width: 90px;
   }
 }
+
+/* Edit a proposed decision: one labelled field per row, full width. */
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.editForm label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.editForm input,
+.editForm select {
+  height: var(--row-height);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}

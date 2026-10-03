@@ -165,3 +165,54 @@ export async function chooseDecisionOption(supabase: Client, decisionId: UUID, c
   if (error) throw new Error(`chooseDecisionOption: ${error.message}`);
   return data as DecisionRow;
 }
+
+/**
+ * Cancel a proposed decision: `atlas.cancel_decision`
+ * (`20261005010000_cancel_decision.sql`). Atomically sets it `rejected`
+ * (shown as "Cancelled") with the reason and who/when, and cancels every
+ * option still in draft. Only the decision's own owner or an org
+ * owner/architect, and only while proposed — the RPC checks both.
+ */
+export async function cancelDecision(supabase: Client, decisionId: UUID, reason: string): Promise<DecisionRow> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.schema('atlas').rpc('cancel_decision', { p_decision_id: decisionId, p_reason: reason });
+  if (error) throw new Error(`cancelDecision: ${error.message}`);
+  return data as DecisionRow;
+}
+
+export interface UpdateDecisionInput {
+  title?: string;
+  /** The decision's context. */
+  statement?: string;
+  ownerId?: UUID;
+  neededBy?: string | null;
+  lensMapUrl?: string | null;
+}
+
+/**
+ * Edit a proposed decision's own fields — a plain update, the only columns
+ * granted for one (`20260913110000_decisions.sql`). RLS lets the decision's
+ * creator or an org owner/architect do it, and `atlas.guard_decision_update`
+ * refuses once the decision has left `proposed`; both surface here as "no
+ * row updated".
+ */
+export async function updateDecision(supabase: Client, decisionId: UUID, input: UpdateDecisionInput): Promise<DecisionRow> {
+  const patch: Record<string, unknown> = {};
+  if (input.title !== undefined) patch.title = input.title;
+  if (input.statement !== undefined) patch.statement = input.statement;
+  if (input.ownerId !== undefined) patch.owner_id = input.ownerId;
+  if (input.neededBy !== undefined) patch.needed_by = input.neededBy;
+  if (input.lensMapUrl !== undefined) patch.lens_map_url = input.lensMapUrl;
+  const { data, error } = await supabase.from('decisions').update(patch).eq('id', decisionId).select('*');
+  if (error) throw new Error(`updateDecision: ${error.message}`);
+  const row = (data as DecisionRow[])[0];
+  if (!row) throw new Error('updateDecision: this decision can no longer be edited, or you are not allowed to edit it');
+  return row;
+}
+
+/** How many decisions on a model are still proposed — the Decisions nav item's badge. A count only (`head: true`), no id list (rule 8). */
+export async function countProposedDecisions(supabase: Client, modelId: UUID): Promise<number> {
+  const { count, error } = await supabase.from('decisions').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('status', 'proposed');
+  if (error) throw new Error(`countProposedDecisions: ${error.message}`);
+  return count ?? 0;
+}

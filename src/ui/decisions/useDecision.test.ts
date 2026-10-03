@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow, DecisionArgumentRow, DecisionLinkRow, DecisionRow } from '../../db/types';
 import { decisionComparisonKey } from './decisionComparisonKey';
-import { applyDecisionUpdate, applyNewOption, type DecisionPageState } from './useDecision';
+import { applyDecisionUpdate, applyNewConcern, applyNewOption, type DecisionPageState } from './useDecision';
 
 const DECISION_ID = 'decision-1';
 const BRANCH_ID = 'branch-1';
@@ -20,6 +20,7 @@ function makeDecision(overrides: Partial<DecisionRow> = {}): DecisionRow {
     lens_map_url: null,
     decided_by: null,
     decided_at: null,
+    cancel_reason: null,
     branch_id: null,
     superseded_decision_id: null,
     project_id: null,
@@ -114,6 +115,24 @@ describe('applyNewOption', () => {
   it('never produces a loading state — a no-op before the first load completes', () => {
     const loading: DecisionPageState = { status: 'loading' };
     expect(applyNewOption(loading, makeLink(), makeBranch())).toBe(loading);
+  });
+});
+
+describe('applyNewConcern', () => {
+  it('appends the concern link and its element in ready state, keeping what was there', () => {
+    const optionLink = makeLink();
+    const state = readyState({ links: [optionLink] });
+    const link = makeLink({ linked_type: 'element', linked_id: 'cap-1' });
+    const element = { element_id: 'cap-1', element_type: 'capability', name: 'Billing', parent_id: null, attributes: {}, exists_delta_id: 'd-cap-1' } as const;
+    const next = applyNewConcern(state, link, element);
+    if (next.status !== 'ready') throw new Error('expected ready');
+    expect(next.links).toEqual([optionLink, link]);
+    expect(next.linkedElementsById.get('cap-1')).toBe(element);
+  });
+
+  it('is a no-op before the first load completes', () => {
+    const loading: DecisionPageState = { status: 'loading' };
+    expect(applyNewConcern(loading, makeLink(), { element_id: 'x', element_type: 'system', name: 'X', parent_id: null, attributes: {}, exists_delta_id: 'd' })).toBe(loading);
   });
 });
 

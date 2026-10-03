@@ -4,7 +4,7 @@ import type { BranchRow } from '../../../db/types';
 import { intentHeaderLine } from '../../changes/branchIntent';
 import { branchStatusTone } from '../../changes/branchStatus';
 import type { ElementPageDecisionEntry } from '../../elements/useElementPage';
-import { decisionStatusTone } from '../../decisions/decisionStatus';
+import { decisionStatusLabel, decisionStatusTone } from '../../decisions/decisionStatus';
 import { Chip } from '../Chip/Chip';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { Text } from '../Text/Text';
@@ -52,7 +52,7 @@ function DecisionEntryRow({ entry, orgSlug, modelSlug }: { entry: ElementPageDec
             {decision.title}
           </Text>
         </Link>
-        <Chip tone={decisionStatusTone(decision.status)}>{decision.status}</Chip>
+        <Chip tone={decisionStatusTone(decision.status)}>{decisionStatusLabel(decision.status)}</Chip>
       </div>
       {chosen && (
         <Text as="p" tone="muted" size="sm">

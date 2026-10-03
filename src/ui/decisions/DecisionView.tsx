@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
@@ -14,12 +15,18 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import type { BranchRow, DecisionLinkRow, DecisionRow, MemberRole } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { profileLabel } from '../comments/profileLabel';
-import { canChooseDecisionOption, canCreateChangeBranch, canRateDecisionOption } from '../orgs/useMembership';
+import { canAddDecisionConcern, canCancelDecision, canChooseDecisionOption, canCreateChangeBranch, canEditDecision, canRateDecisionOption } from '../orgs/useMembership';
 import { useMembers } from '../orgs/useMembers';
 import type { AlsoAffectedElement } from './alsoAffected';
 import { DecisionCriteriaGrid, type DecisionCriteriaOption } from './DecisionCriteriaGrid';
-import { decisionStatusTone } from './decisionStatus';
+import { DecisionLinkPicker } from './DecisionLinkPicker';
+import { decisionStatusLabel, decisionStatusTone } from './decisionStatus';
+import { cancelDecision, createDecisionLink, updateDecision } from '../../db/decisions';
+import { getElementsByIds } from '../../db/elements';
+import type { ElementsHeadRow } from '../../contracts/rows';
 import { setDecisionProject } from '../../db/projects';
+import { reportError } from '../errors/errorBannerStore';
+import { queryKeys } from '../query/keys';
 import { ProjectAssignment } from '../projects/ProjectAssignment';
 import { supabase } from '../supabaseClient';
 import { buildDecisionAdrExportInput } from './decisionAdrInput';
@@ -42,6 +49,7 @@ export interface DecisionViewProps {
   state: DecisionPageState;
   /** `useDecision.ts`'s own patches — see that file's doc comments. Passed straight through to `useDecisionOptions` so Add-an-option/Choose never trigger this page's own full `reload()`/loading flash any more. */
   applyNewOption: (link: DecisionLinkRow, branch: BranchRow) => void;
+  applyNewConcern: (link: DecisionLinkRow, element: ElementsHeadRow) => void;
   applyDecisionUpdate: (decision: DecisionRow) => void;
   refreshOptionsAndArguments: () => Promise<void>;
 }
@@ -61,7 +69,7 @@ export interface DecisionViewProps {
  * this here" (an element's own linked decisions) are also PR6, but live on
  * `DecisionsView.tsx`/`ElementDecisionsSection.tsx` respectively, not here.
  */
-export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role, state, applyNewOption, applyDecisionUpdate, refreshOptionsAndArguments }: DecisionViewProps) {
+export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role, state, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments }: DecisionViewProps) {
   const { userId } = useAuth();
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
@@ -101,6 +109,13 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         .map((b) => ({ branchId: b.id, baseCommitId: b.base_commit_id, headCommitId: b.head_commit_id, label: intentHeaderLine(b) }))
     : [];
   const comparison = useDecisionComparison(modelId, main?.head_commit_id ?? null, concernedCapabilityIds, otherConcernElementIds, comparisonOptions);
+
+  // Choosing or cancelling in place changes how many decisions are proposed — the Decisions nav badge re-reads.
+  const queryClient = useQueryClient();
+  const decisionStatus = state.status === 'ready' ? state.decision.status : null;
+  useEffect(() => {
+    if (decisionStatus !== null) void queryClient.invalidateQueries({ queryKey: queryKeys.proposedDecisionCount(modelId) });
+  }, [decisionStatus, modelId, queryClient]);
 
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (state.status === 'not_found') return <Text as="p">No decision found for this id.</Text>;
@@ -151,7 +166,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   return (
     <div>
       <div className={styles.meta}>
-        <Chip tone={decisionStatusTone(decision.status)}>{decision.status}</Chip>
+        <Chip tone={decisionStatusTone(decision.status)}>{decisionStatusLabel(decision.status)}</Chip>
         {decision.needed_by !== null && (
           <Text as="span" tone="muted" size="sm">
             Needed by: {decision.needed_by}
@@ -168,6 +183,23 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           {adrCopied ? 'Copied' : 'Copy as ADR markdown'}
         </Button>
       </div>
+      {canEditDecision(role, decision, userId) && (
+        <DecisionEdit
+          decision={decision}
+          members={members.map((m) => ({ id: m.member.user_id, label: profileLabel(m.profile) }))}
+          onSaved={applyDecisionUpdate}
+        />
+      )}
+      <DecisionCancel
+        decision={decision}
+        canCancel={canCancelDecision(role, decision, userId)}
+        cancelledByName={decision.decided_by !== null ? profileLabel(members.find((m) => m.member.user_id === decision.decided_by)?.profile) : null}
+        onCancelled={async (updated) => {
+          applyDecisionUpdate(updated);
+          // Its draft options were cancelled with it.
+          await refreshOptionsAndArguments();
+        }}
+      />
       {/* F10 step 4 (ADR-024 P1): moving a proposed decision moves its draft options with it. */}
       <ProjectAssignment
         modelId={modelId}
@@ -221,6 +253,28 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               );
             })}
           </ul>
+        )}
+        {canAddDecisionConcern(role, decision) && userId !== null && main?.head_commit_id && (
+          <DecisionLinkPicker
+            commitId={main.head_commit_id}
+            modelId={modelId}
+            selected={[]}
+            placeholder="Add a capability or system this decision concerns…"
+            onAdd={(elementId) => {
+              const headCommitId = main.head_commit_id;
+              if (!headCommitId || elementLinks.some((l) => l.linked_id === elementId)) return;
+              void (async () => {
+                try {
+                  const link = await createDecisionLink(supabase, { decisionId: decision.id, linkedType: 'element', linkedId: elementId, createdBy: userId });
+                  const element = (await getElementsByIds(supabase, headCommitId, [elementId])).get(elementId);
+                  if (element) applyNewConcern(link, element);
+                } catch (e) {
+                  reportError('Could not add this concern.', e);
+                }
+              })();
+            }}
+            onRemove={() => undefined}
+          />
         )}
       </Panel>
 
@@ -564,5 +618,250 @@ function WhatChangesRowGroup({ group, optionBranchIds }: { group: WhatChangesRow
         </tr>
       ))}
     </>
+  );
+}
+
+/**
+ * Cancel a decision (`atlas.cancel_decision`): for a proposed decision that
+ * is no longer needed — closed without choosing, with a reason, its draft
+ * options cancelled with it. Once cancelled, says who, when and why.
+ */
+function DecisionCancel({
+  decision,
+  canCancel,
+  cancelledByName,
+  onCancelled,
+}: {
+  decision: DecisionRow;
+  canCancel: boolean;
+  cancelledByName: string | null;
+  onCancelled: (updated: DecisionRow) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  if (decision.status === 'rejected') {
+    return (
+      <Panel>
+        <Text as="p">
+          Cancelled{cancelledByName !== null ? ` by ${cancelledByName}` : ''}
+          {decision.decided_at !== null ? ` on ${decision.decided_at.slice(0, 10)}` : ''}
+          {decision.cancel_reason !== null ? ` — ${decision.cancel_reason}` : ''}.
+        </Text>
+      </Panel>
+    );
+  }
+  if (!canCancel) return null;
+  if (!open) {
+    return (
+      <div className={styles.field}>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setOpen(true);
+          }}
+        >
+          Cancel decision…
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <Panel>
+      <div className={styles.field}>
+        <label htmlFor="cancel-decision-reason">
+          <Text as="span" size="sm" tone="muted">
+            Why is this decision being cancelled?
+          </Text>
+        </label>
+        <textarea
+          id="cancel-decision-reason"
+          className={styles.textarea}
+          placeholder="Reason (required)"
+          value={reason}
+          onChange={(e) => {
+            setReason(e.target.value);
+          }}
+        />
+        <Text as="p" size="sm" tone="muted">
+          It stays in the decision log, marked cancelled. Any options still in draft are cancelled with it.
+        </Text>
+        <div className={styles.addOptionForm}>
+          <Button
+            variant="primary"
+            disabled={busy || reason.trim().length === 0}
+            onClick={() => {
+              setBusy(true);
+              void cancelDecision(supabase, decision.id, reason)
+                .then(onCancelled)
+                .catch((e: unknown) => {
+                  reportError('Could not cancel this decision.', e);
+                })
+                .finally(() => {
+                  setBusy(false);
+                });
+            }}
+          >
+            {busy ? 'Cancelling…' : 'Confirm cancel'}
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setOpen(false);
+              setReason('');
+            }}
+          >
+            Keep it
+          </Button>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * Edit a proposed decision's own fields — title, context, owner, needed-by
+ * date and Lens map link (`updateDecision`, a plain RLS-gated update). Its
+ * creator or an org owner/architect, while proposed; closed once decided or
+ * cancelled, like everything else on the decision.
+ */
+function DecisionEdit({ decision, members, onSaved }: { decision: DecisionRow; members: { id: UUID; label: string }[]; onSaved: (updated: DecisionRow) => void }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState(decision.title);
+  const [statement, setStatement] = useState(decision.statement);
+  const [ownerId, setOwnerId] = useState(decision.owner_id);
+  const [neededBy, setNeededBy] = useState(decision.needed_by ?? '');
+  const [lensMapUrl, setLensMapUrl] = useState(decision.lens_map_url ?? '');
+  const [busy, setBusy] = useState(false);
+
+  function start() {
+    setTitle(decision.title);
+    setStatement(decision.statement);
+    setOwnerId(decision.owner_id);
+    setNeededBy(decision.needed_by ?? '');
+    setLensMapUrl(decision.lens_map_url ?? '');
+    setOpen(true);
+  }
+
+  if (!open) {
+    return (
+      <div className={styles.field}>
+        <Button variant="secondary" onClick={start}>
+          ✎ Edit decision
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <Panel>
+      <form
+        className={styles.editForm}
+        onSubmit={(e) => {
+          e.preventDefault();
+          setBusy(true);
+          void updateDecision(supabase, decision.id, {
+            title: title.trim(),
+            statement: statement.trim(),
+            ownerId,
+            neededBy: neededBy === '' ? null : neededBy,
+            lensMapUrl: lensMapUrl.trim() === '' ? null : lensMapUrl.trim(),
+          })
+            .then((updated) => {
+              onSaved(updated);
+              setOpen(false);
+            })
+            .catch((err: unknown) => {
+              reportError('Could not save this decision.', err);
+            })
+            .finally(() => {
+              setBusy(false);
+            });
+        }}
+      >
+        <label>
+          <Text as="span" size="sm" tone="muted">
+            Title
+          </Text>
+          <input
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+            }}
+          />
+        </label>
+        <label>
+          <Text as="span" size="sm" tone="muted">
+            Context
+          </Text>
+          <textarea
+            className={styles.textarea}
+            placeholder="What needs deciding, and why now"
+            value={statement}
+            onChange={(e) => {
+              setStatement(e.target.value);
+            }}
+          />
+        </label>
+        <label>
+          <Text as="span" size="sm" tone="muted">
+            Owner
+          </Text>
+          <select
+            value={ownerId}
+            onChange={(e) => {
+              setOwnerId(e.target.value);
+            }}
+          >
+            {!members.some((m) => m.id === ownerId) && <option value={ownerId}>A former member</option>}
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <Text as="span" size="sm" tone="muted">
+            Needed by
+          </Text>
+          <input
+            type="date"
+            value={neededBy}
+            onChange={(e) => {
+              setNeededBy(e.target.value);
+            }}
+          />
+        </label>
+        <label>
+          <Text as="span" size="sm" tone="muted">
+            Lens map link (optional)
+          </Text>
+          <input
+            type="url"
+            placeholder="https://…"
+            value={lensMapUrl}
+            onChange={(e) => {
+              setLensMapUrl(e.target.value);
+            }}
+          />
+        </label>
+        <div className={styles.addOptionForm}>
+          <Button variant="primary" type="submit" disabled={busy || title.trim().length === 0}>
+            {busy ? 'Saving…' : 'Save'}
+          </Button>
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={() => {
+              setOpen(false);
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </Panel>
   );
 }

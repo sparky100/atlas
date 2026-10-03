@@ -13,7 +13,7 @@ import { profileLabel } from '../comments/profileLabel';
 import type { DecisionRow } from '../../db/types';
 import type { DecisionPrefill } from './decisionPrefill';
 import { DecisionLinkPicker } from './DecisionLinkPicker';
-import { decisionStatusTone } from './decisionStatus';
+import { decisionStatusLabel, decisionStatusTone } from './decisionStatus';
 import { useDecisions } from './useDecisions';
 import styles from './DecisionsView.module.css';
 
@@ -188,7 +188,7 @@ function DecisionRowItem({ decision, orgSlug, modelSlug }: { decision: DecisionR
           </Text>
         )}
         <div className={styles.rowMeta}>
-          <Chip tone={decisionStatusTone(decision.status)}>{decision.status}</Chip>
+          <Chip tone={decisionStatusTone(decision.status)}>{decisionStatusLabel(decision.status)}</Chip>
           {decision.needed_by !== null && (
             <Text as="span" tone="faint" size="xs">
               Needed by: {decision.needed_by}

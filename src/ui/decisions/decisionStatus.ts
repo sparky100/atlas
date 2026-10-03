@@ -8,12 +8,23 @@ export function decisionStatusTone(status: DecisionStatus): ChipTone {
       return 'neutral';
     case 'accepted':
       return 'ok';
+    // Cancelled (`atlas.cancel_decision`): closed without a choice — not an
+    // error, the same `neutral` a cancelled change uses.
     case 'rejected':
-      return 'danger';
+      return 'neutral';
     // A decision is never deleted, only superseded (ADR-013) — closed, not
     // an error, the same `neutral` tone `branchStatusTone`'s own
     // `cancelled`/`archived` cases use for the same reason.
     case 'superseded':
       return 'neutral';
   }
+}
+
+/**
+ * Status as shown. `rejected` is stored by `atlas.cancel_decision` and reads
+ * as "cancelled" (ADR-022 amendment, 2026-10-03) — the word people use for
+ * a decision that was dropped rather than decided. The others show as stored.
+ */
+export function decisionStatusLabel(status: DecisionStatus): string {
+  return status === 'rejected' ? 'cancelled' : status;
 }
