@@ -15,7 +15,7 @@ import type { CommitRow, DeltaRow, ElementsHeadRow, RelationshipsHeadRow } from 
 import { attributesRecord } from '../ui/elements/attributesRecord';
 import { computeCapabilityRollup } from '../ui/capabilityMap/capabilityRollup';
 import { importanceOf } from '../ui/home/capabilityImportance';
-import { poorFitSupportsEdges, worstFitForPurpose } from '../ui/capabilityMap/metrics';
+import { weakFitSupportsEdges, worstFitForPurpose } from '../ui/capabilityMap/metrics';
 import type { Client } from './client';
 import { assertInFilterSize } from './inFilterLimit';
 import { selectAll } from './selectAll';
@@ -259,31 +259,32 @@ export interface CapabilityTileData {
    * "Make capability fit-for-purpose visible to directors" (F6.1): the
    * individual capabilities in this tile's own subtree whose own
    * `worstFitForPurpose` (`metrics.ts`, every `supports` edge — primary or
-   * secondary, unlike the Architect door's own primary-only finding) is
-   * exactly `poor` — never `adequate` (director-door threshold is
-   * narrower than the Architect finding's `poor`-or-`adequate`, by
-   * design). Distinct from `fitForPurpose` above, which only says whether
-   * *something* below is poor, not which capability(ies) — the director
-   * door's own "poor fit: N capabilities" pill and its links need the
-   * individual rows, not just the worst-of summary. Empty when nothing in
-   * the subtree is rated poor.
+   * secondary) is a weak fit: `poor` or `adequate`. The threshold was
+   * `poor` only until 2026-10-03, when Overview became the one home for
+   * fit weakness and My work's poor-or-adequate finding was retired
+   * (ADR-023's "director-door fit visibility" amendment, second
+   * revision). Distinct from `fitForPurpose` above, which only says what
+   * the worst rating below is, not which capability(ies) — Overview's fit
+   * pill and its links need the individual rows. Empty when nothing in
+   * the subtree is rated poor or adequate.
    */
-  poorFitCapabilities: ElementsHeadRow[];
+  weakFitCapabilities: ElementsHeadRow[];
+  /** How many of `weakFitCapabilities` are rated `adequate` at worst (the rest are `poor`) — Overview's fit pill names each rating separately, so "adequate" never reads as "poor". */
+  adequateFitCount: number;
   /**
-   * `true` only when `poorFitCapabilities` is non-empty and *every* one of
-   * those capabilities' own edges rated exactly `poor` already has a
+   * `true` only when `weakFitCapabilities` is non-empty and *every* one of
+   * those capabilities' own edges rated `poor` or `adequate` already has a
    * planned replacement recorded for its own supporting system
    * (`plannedReplacements`/`groupPlannedReplacementsByCapability` below —
    * the same "an approved branch retracts this exact supporter while
    * creating a new one for this capability" evidence
-   * `computeExposureTone`/`findCapabilitiesWithPoorFitPrimarySupporter`
-   * already use, reused here unchanged, not recomputed). The director
-   * door reads this to suppress its own "Start a decision" action and
-   * label the pill "replacement planned" instead — never true when
-   * `poorFitCapabilities` is empty (nothing to have a replacement planned
-   * for).
+   * `computeExposureTone` already uses, reused here unchanged, not
+   * recomputed). Overview reads this to suppress its own "Start a
+   * decision" action and label the pill "replacement planned" instead —
+   * never true when `weakFitCapabilities` is empty (nothing to have a
+   * replacement planned for).
    */
-  poorFitAllReplacementPlanned: boolean;
+  weakFitAllReplacementPlanned: boolean;
   /**
    * The level-1 capability's *own* `importance` (never rolled up across
    * its subtree — unlike `fitForPurpose`/`tone` above, this is a fact
@@ -362,18 +363,20 @@ export function buildCapabilityTiles(
     const tone: ExposureTone | 'neutral' =
       supportingSystems.length === 0 ? 'neutral' : computeExposureTone(rollup.subtreeSupportsEdges, systemsById, replacementsByCapability.get(capability.element_id) ?? new Set());
 
-    // F6.1: individual poor-fit capabilities in this tile's own subtree,
-    // and whether every one of their own poor-rated edges already has a
-    // planned replacement — both reuse `rollup`/`replacementsByCapability`
-    // (already computed above), no new query and no new calculation
-    // beyond a filter over data already in hand.
-    const poorFitCapabilityIds = rollup.subtreeCapabilityIds.filter((id) => worstFitForPurpose(id, rollup.subtreeSupportsEdges) === 'poor');
-    const poorFitCapabilities = poorFitCapabilityIds
+    // F6.1: individual weak-fit (poor or adequate) capabilities in this
+    // tile's own subtree, and whether every one of their own weak-rated
+    // edges already has a planned replacement — both reuse
+    // `rollup`/`replacementsByCapability` (already computed above), no new
+    // query and no new calculation beyond a filter over data already in hand.
+    const worstFitById = new Map(rollup.subtreeCapabilityIds.map((id) => [id, worstFitForPurpose(id, rollup.subtreeSupportsEdges)]));
+    const weakFitCapabilityIds = rollup.subtreeCapabilityIds.filter((id) => worstFitById.get(id) === 'poor' || worstFitById.get(id) === 'adequate');
+    const adequateFitCount = weakFitCapabilityIds.filter((id) => worstFitById.get(id) === 'adequate').length;
+    const weakFitCapabilities = weakFitCapabilityIds
       .map((id) => capabilitiesById.get(id))
       .filter((c): c is ElementsHeadRow => c !== undefined)
       .sort((a, b) => a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id));
-    const poorFitEdges = poorFitCapabilityIds.flatMap((id) => poorFitSupportsEdges(id, rollup.subtreeSupportsEdges));
-    const poorFitAllReplacementPlanned = poorFitEdges.length > 0 && poorFitEdges.every((edge) => replacementsByCapability.get(edge.to_element_id)?.has(edge.from_element_id) ?? false);
+    const weakFitEdges = weakFitCapabilityIds.flatMap((id) => weakFitSupportsEdges(id, rollup.subtreeSupportsEdges));
+    const weakFitAllReplacementPlanned = weakFitEdges.length > 0 && weakFitEdges.every((edge) => replacementsByCapability.get(edge.to_element_id)?.has(edge.from_element_id) ?? false);
 
     return {
       capability,
@@ -384,8 +387,9 @@ export function buildCapabilityTiles(
       totalCapabilityCount: rollup.totalCapabilityCount,
       isOwned: rollup.isOwned,
       fitForPurpose: rollup.fitForPurpose,
-      poorFitCapabilities,
-      poorFitAllReplacementPlanned,
+      weakFitCapabilities,
+      adequateFitCount,
+      weakFitAllReplacementPlanned,
       importance: importanceOf(capability),
     };
   });

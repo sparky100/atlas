@@ -69,28 +69,20 @@
   gap: var(--space-3);
 }
 
-/* Per-item-actions prompt: the grid item is still this wrapper, not the
-   tile's own `<Link>` directly, but "Start a decision" now renders
-   *inline* within the card's own content (the wrapper's bottom-right
-   corner) rather than trailing below it as its own block — still a DOM
-   sibling rendered after the link, never nested inside it (an `<a>` can't
-   legally contain another `<a>`), just positioned over the tile instead of
-   stacked under it. */
+/* The grid item. For an emphasised tile, BlueprintFrame wraps everything
+   in here — the primary link, the fit-capability links and the actions —
+   so the actions read as part of the card. They are DOM siblings after the
+   primary link, never nested inside it (an `<a>` can't legally contain
+   another `<a>`). */
 .tileWrapper {
   position: relative;
+  border-radius: var(--radius-sm);
 }
 
-.tileAction {
-  position: absolute;
-  right: var(--space-3);
-  bottom: var(--space-3);
-}
-
-/* F6.1: the rare case of both a tone- and a fit-triggered "Start a
-   decision" on the same tile — an ordinary in-flow stack instead of
-   `.tileAction`'s single absolutely-positioned corner slot, so the two
-   links never overlap. */
-.tileActionsStacked {
+/* "Start a decision" / "Start a project": in flow at the card's bottom
+   right, however many there are, never absolutely positioned over the
+   content. */
+.tileActions {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -100,7 +92,7 @@
 
 /* F6.1: the poor-fit capability links — real navigable links to each
    affected capability, kept outside the tile's own primary `<Link>`
-   (siblings, same reasoning `.tileAction` already documents) but still
+   (siblings, same reasoning `.tileWrapper` documents) but still
    visually grouped with the card above it. Compact enough to stay
    readable at ~380px without widening the single-column tile grid. */
 .fitCapabilityList {
@@ -144,17 +136,12 @@
 
 .tileEmphasised {
   min-height: var(--tile-min-height-emphasised);
-  /* Room for the inline "Start a decision" action in the corner above —
-     every emphasised tile reserves it, whether or not this particular one
-     ends up showing an action (only a *weak* emphasised tile does,
-     `CapabilityTile`'s own `isWeak`/`canStartDecision` gate), so every
-     tile in the emphasised row keeps the same height. */
-  padding-bottom: calc(var(--space-3) * 2 + 1em);
 }
 
 /* Visual pass item 1: "no known supporters" specifically (DirectorHome.tsx's
-   own `isWeak`) — BlueprintFrame's `.frame` sets no background of its own,
-   so this shows through it exactly the way the emphasised border does. */
+   own `isWeak`) — on the tile's wrapper, so it fills the whole card behind
+   BlueprintFrame (whose `.frame` sets no background of its own), never an
+   inner rectangle inside the frame's padding. */
 .tileWeak {
   background: var(--status-weak-bg);
 }

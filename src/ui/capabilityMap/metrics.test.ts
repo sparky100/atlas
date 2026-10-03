@@ -5,7 +5,7 @@ import {
   lifecycleExposure,
   oldestLifecycleStage,
   otShareOf,
-  poorFitSupportsEdges,
+  weakFitSupportsEdges,
   resolveDefaultColourBy,
   supportingSystemIds,
   tileColourFor,
@@ -146,14 +146,14 @@ describe('worstFitForPurposeOfSupporter', () => {
   });
 });
 
-describe('poorFitSupportsEdges', () => {
-  it('finds only the edges into this capability rated exactly poor, ignoring good/adequate edges and edges into other capabilities', () => {
-    const edges = [supports('sys-1', 'cap-1', 'good'), supports('sys-2', 'cap-1', 'poor'), supports('sys-3', 'cap-1', 'adequate'), supports('sys-4', 'cap-2', 'poor')];
-    expect(poorFitSupportsEdges('cap-1', edges).map((e) => e.from_element_id)).toEqual(['sys-2']);
+describe('weakFitSupportsEdges', () => {
+  it('finds the edges into this capability rated poor or adequate, ignoring good/unrated edges and edges into other capabilities', () => {
+    const edges = [supports('sys-1', 'cap-1', 'good'), supports('sys-2', 'cap-1', 'poor'), supports('sys-3', 'cap-1', 'adequate'), supports('sys-4', 'cap-2', 'poor'), supports('sys-5', 'cap-1')];
+    expect(weakFitSupportsEdges('cap-1', edges).map((e) => e.from_element_id)).toEqual(['sys-2', 'sys-3']);
   });
 
-  it('returns an empty array when nothing is rated poor', () => {
-    expect(poorFitSupportsEdges('cap-1', [supports('sys-1', 'cap-1', 'good'), supports('sys-2', 'cap-1')])).toEqual([]);
+  it('returns an empty array when nothing is rated poor or adequate', () => {
+    expect(weakFitSupportsEdges('cap-1', [supports('sys-1', 'cap-1', 'good'), supports('sys-2', 'cap-1')])).toEqual([]);
   });
 });
 

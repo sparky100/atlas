@@ -192,19 +192,22 @@ export function worstFitForPurposeOfSupporter(supporterId: UUID, supportsEdges: 
 }
 
 /**
- * This capability's own direct `supports` edges rated exactly `poor` — the
- * edge-level detail `worstFitForPurpose`'s single worst-value summary
- * doesn't carry. Needed by the director door's own "poor fit" pill
- * (`src/db/modelHome.ts`'s `buildCapabilityTiles`) to check each poor
- * edge's own supporter against a planned replacement (`groupPlannedReplacementsByCapability`).
- * Deliberately reads every edge regardless of `role` — kept that way by
- * design (the Director roll-up is unchanged by the fix below); see
- * `fitAssessmentSupportsEdges` for the narrower, primary-first read
- * `findCapabilitiesWithPoorFitPrimarySupporter` (`src/db/healthFindings.ts`)
- * makes instead.
+ * This capability's own direct `supports` edges rated `poor` or `adequate`
+ * — a weak fit, the threshold Overview's weak-capability tiles use since
+ * 2026-10-03 (ADR-023's "director-door fit visibility" amendment, second
+ * revision) — the edge-level detail `worstFitForPurpose`'s single
+ * worst-value summary doesn't carry. Needed by Overview's own fit pill
+ * (`src/db/modelHome.ts`'s `buildCapabilityTiles`) to check each weak
+ * edge's own supporter against a planned replacement
+ * (`groupPlannedReplacementsByCapability`). Deliberately reads every edge
+ * regardless of `role` (ADR-023's "secondary-only widening accepted").
  */
-export function poorFitSupportsEdges(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[]): RelationshipsHeadRow[] {
-  return supportsEdges.filter((edge) => edge.to_element_id === capabilityId && fitForPurposeOf(edge) === 'poor');
+export function weakFitSupportsEdges(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[]): RelationshipsHeadRow[] {
+  return supportsEdges.filter((edge) => {
+    if (edge.to_element_id !== capabilityId) return false;
+    const fit = fitForPurposeOf(edge);
+    return fit === 'poor' || fit === 'adequate';
+  });
 }
 
 /** A capability's own direct `supports` edges, regardless of role. */
@@ -238,15 +241,12 @@ export interface FitAssessmentEdges {
  * per FROM system") is per-*system*, not per-capability — nothing stops
  * every one of a capability's supporting systems from naming `primary`
  * toward some *other* capability, leaving this one with real supporters
- * but zero primary edges into it. Before this function, that state was
- * invisible to `findCapabilitiesWithPoorFitPrimarySupporter`
- * (`src/db/healthFindings.ts`) even though the Director's own fit pill
- * (`worstFitForPurpose`/`poorFitSupportsEdges` above, which never
- * restricts by role) could already flag it — this closes that gap by
- * falling back to secondary edges, rather than by dropping the
- * primary-first read entirely (a capability with even one good-fit
- * primary edge stays judged on its primary edges alone, never on a
- * separately poor-fit secondary one).
+ * but zero primary edges into it — so this falls back to secondary edges
+ * rather than dropping the primary-first read entirely (a capability with
+ * even one good-fit primary edge stays judged on its primary edges alone,
+ * never on a separately poor-fit secondary one). Its remaining caller is
+ * `fitNotRatedEdges.ts`; the Architect door's poor-fit finding that it was
+ * written for was retired on 2026-10-03 (ADR-023, fit threshold amendment).
  */
 export function fitAssessmentSupportsEdges(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[]): FitAssessmentEdges {
   const direct = directSupportsEdges(capabilityId, supportsEdges);

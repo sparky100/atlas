@@ -5,8 +5,7 @@ import {
   prefillFromCapabilityNoSupportersFinding,
   prefillFromCriticalExposedFinding,
   prefillFromCriticalSupportEndFinding,
-  prefillFromPoorFitCapabilities,
-  prefillFromPoorFitCapabilityFinding,
+  prefillFromWeakFitCapabilities,
   prefillFromWeakCapability,
 } from './decisionPrefill';
 
@@ -27,26 +26,6 @@ describe('decisionPrefill', () => {
     expect(prefill.sourceFindingKey).toBe('weak-capability');
   });
 
-  it('builds a poor-fit-no-replacement prefill naming the capability and its primary supporter', () => {
-    const prefill = prefillFromPoorFitCapabilityFinding({ id: 'cap-1', name: 'Claims Intake' }, false);
-    expect(prefill.title).toContain('Claims Intake');
-    expect(prefill.title).toContain('primary supporter');
-    expect(prefill.statement).toContain('Claims Intake');
-    expect(prefill.statement).toContain('primary supporter');
-    expect(prefill.statement).toContain('poor or adequate fit');
-    expect(prefill.sourceFindingKey).toBe('poor-fit-no-replacement');
-    expect(prefill.linkedElements).toEqual([{ id: 'cap-1', name: 'Claims Intake' }]);
-  });
-
-  it('builds a poor-fit-no-replacement prefill worded from "supporter", not "primary supporter", when the finding used the secondary-edge fallback', () => {
-    const prefill = prefillFromPoorFitCapabilityFinding({ id: 'cap-1', name: 'Claims Intake' }, true);
-    expect(prefill.title).toContain('supporter');
-    expect(prefill.title).not.toContain('primary supporter');
-    expect(prefill.statement).toContain('supporter');
-    expect(prefill.statement).not.toContain('primary supporter');
-    expect(prefill.sourceFindingKey).toBe('poor-fit-no-replacement');
-  });
-
   it('builds a critical-exposed prefill naming the system', () => {
     const prefill = prefillFromCriticalExposedFinding({ id: 'sys-2', name: 'Legacy Case System' });
     expect(prefill.title).toContain('Legacy Case System');
@@ -64,9 +43,9 @@ describe('decisionPrefill', () => {
     expect(prefill.linkedElements).toEqual([{ id: 'cap-2', name: 'Adult Social Care' }]);
   });
 
-  describe('prefillFromPoorFitCapabilities (F6.1: fit visible to directors)', () => {
+  describe('prefillFromWeakFitCapabilities (F6.1: fit visible to directors)', () => {
     it('names the single capability and the tile it lives under', () => {
-      const prefill = prefillFromPoorFitCapabilities('Claims', [{ id: 'cap-1', name: 'Claims Intake' }]);
+      const prefill = prefillFromWeakFitCapabilities('Claims', [{ id: 'cap-1', name: 'Claims Intake' }]);
       expect(prefill.title).toContain('Claims');
       expect(prefill.statement).toContain('Claims Intake');
       expect(prefill.statement).toContain('Claims');
@@ -79,7 +58,7 @@ describe('decisionPrefill', () => {
         { id: 'cap-1', name: 'Claims Intake' },
         { id: 'cap-2', name: 'Claims Triage' },
       ];
-      const prefill = prefillFromPoorFitCapabilities('Claims', capabilities);
+      const prefill = prefillFromWeakFitCapabilities('Claims', capabilities);
       expect(prefill.statement).toContain('2 capabilities');
       expect(prefill.statement).toContain('Claims Intake');
       expect(prefill.statement).toContain('Claims Triage');
@@ -95,7 +74,7 @@ describe('decisionPrefill', () => {
   });
 
   it('round-trips a multi-element prefill (order preserved) through URLSearchParams', () => {
-    const prefill = prefillFromPoorFitCapabilities('Claims', [
+    const prefill = prefillFromWeakFitCapabilities('Claims', [
       { id: 'cap-1', name: 'Claims Intake' },
       { id: 'cap-2', name: 'Claims Triage' },
     ]);

@@ -124,8 +124,9 @@ describe('buildCapabilityTiles', () => {
         totalCapabilityCount: 1,
         isOwned: false,
         fitForPurpose: null,
-        poorFitCapabilities: [],
-        poorFitAllReplacementPlanned: false,
+        weakFitCapabilities: [],
+        adequateFitCount: 0,
+        weakFitAllReplacementPlanned: false,
         importance: null,
       },
     ]);
@@ -198,14 +199,14 @@ describe('buildCapabilityTiles', () => {
     expect(tiles[0]?.isOwned).toBe(true);
   });
 
-  describe('poorFitCapabilities / poorFitAllReplacementPlanned (F6.1: fit visible to directors)', () => {
+  describe('weakFitCapabilities / weakFitAllReplacementPlanned (F6.1: fit visible to directors)', () => {
     it('flags a capability with a poor-rated primary supports edge', () => {
       const sys = system('sys-1', 'active');
       const systemsById = new Map([['sys-1', sys]]);
       const caps = [capability('cap-1')];
       const tiles = buildCapabilityTiles(caps, caps, [supportsEdge('sys-1', 'cap-1', { role: 'primary', fitForPurpose: 'poor' })], systemsById, [], new Set());
-      expect(tiles[0]?.poorFitCapabilities.map((c) => c.element_id)).toEqual(['cap-1']);
-      expect(tiles[0]?.poorFitAllReplacementPlanned).toBe(false);
+      expect(tiles[0]?.weakFitCapabilities.map((c) => c.element_id)).toEqual(['cap-1']);
+      expect(tiles[0]?.weakFitAllReplacementPlanned).toBe(false);
     });
 
     it('flags a capability whose only rated supporter is secondary — unlike the Architect finding, which is primary-only', () => {
@@ -213,20 +214,27 @@ describe('buildCapabilityTiles', () => {
       const systemsById = new Map([['sys-1', sys]]);
       const caps = [capability('cap-1')];
       const tiles = buildCapabilityTiles(caps, caps, [supportsEdge('sys-1', 'cap-1', { role: 'secondary', fitForPurpose: 'poor' })], systemsById, [], new Set());
-      expect(tiles[0]?.poorFitCapabilities.map((c) => c.element_id)).toEqual(['cap-1']);
+      expect(tiles[0]?.weakFitCapabilities.map((c) => c.element_id)).toEqual(['cap-1']);
     });
 
-    it('does not flag a capability whose fit is only good/adequate, or unrated', () => {
+    it('does not flag a capability whose fit is good, or unrated', () => {
       const sys = system('sys-1', 'active');
       const systemsById = new Map([['sys-1', sys]]);
-      const caps = [capability('cap-1'), capability('cap-2'), capability('cap-3')];
-      const edges = [
-        supportsEdge('sys-1', 'cap-1', { fitForPurpose: 'good' }),
-        supportsEdge('sys-1', 'cap-2', { fitForPurpose: 'adequate' }),
-        supportsEdge('sys-1', 'cap-3'),
-      ];
+      const caps = [capability('cap-1'), capability('cap-3')];
+      const edges = [supportsEdge('sys-1', 'cap-1', { fitForPurpose: 'good' }), supportsEdge('sys-1', 'cap-3')];
       const tiles = buildCapabilityTiles(caps, caps, edges, systemsById, [], new Set());
-      for (const tile of tiles) expect(tile.poorFitCapabilities).toEqual([]);
+      for (const tile of tiles) expect(tile.weakFitCapabilities).toEqual([]);
+    });
+
+    it('flags an adequate fit as weak too (2026-10-03), counting it separately from poor', () => {
+      const sys = system('sys-1', 'active');
+      const systemsById = new Map([['sys-1', sys]]);
+      const parent = capability('cap-p');
+      const caps = [parent, { ...capability('cap-a'), parent_id: 'cap-p' }, { ...capability('cap-b'), parent_id: 'cap-p' }];
+      const edges = [supportsEdge('sys-1', 'cap-a', { fitForPurpose: 'adequate' }), supportsEdge('sys-1', 'cap-b', { fitForPurpose: 'poor' })];
+      const tiles = buildCapabilityTiles([parent], caps, edges, systemsById, [], new Set());
+      expect(tiles[0]?.weakFitCapabilities.map((c) => c.element_id).sort()).toEqual(['cap-a', 'cap-b']);
+      expect(tiles[0]?.adequateFitCount).toBe(1);
     });
 
     it('a mixed subtree flags only its own poor-rated descendant, not the whole subtree', () => {
@@ -236,10 +244,10 @@ describe('buildCapabilityTiles', () => {
       const systemsById = new Map([['sys-1', system('sys-1', 'active')]]);
       const edges = [supportsEdge('sys-1', 'cap-l2-good', { fitForPurpose: 'good' }), supportsEdge('sys-1', 'cap-l2-poor', { fitForPurpose: 'poor' })];
       const tiles = buildCapabilityTiles([l1], [l1, l2Good, l2Poor], edges, systemsById, [], new Set());
-      expect(tiles[0]?.poorFitCapabilities.map((c) => c.element_id)).toEqual(['cap-l2-poor']);
+      expect(tiles[0]?.weakFitCapabilities.map((c) => c.element_id)).toEqual(['cap-l2-poor']);
     });
 
-    it('poorFitAllReplacementPlanned is true only once every poor-fit edge has its own planned replacement recorded', () => {
+    it('weakFitAllReplacementPlanned is true only once every poor-fit edge has its own planned replacement recorded', () => {
       const systemsById = new Map([
         ['sys-1', system('sys-1', 'active')],
         ['sys-2', system('sys-2', 'active')],
@@ -249,20 +257,20 @@ describe('buildCapabilityTiles', () => {
 
       const onlyOneReplaced: PlannedReplacement[] = [{ capabilityId: 'cap-1', exposedSystemId: 'sys-1', replacementSystemId: 'sys-3', branchId: 'branch-1' }];
       const partial = buildCapabilityTiles(caps, caps, edges, systemsById, onlyOneReplaced, new Set());
-      expect(partial[0]?.poorFitAllReplacementPlanned).toBe(false);
+      expect(partial[0]?.weakFitAllReplacementPlanned).toBe(false);
 
       const bothReplaced: PlannedReplacement[] = [
         { capabilityId: 'cap-1', exposedSystemId: 'sys-1', replacementSystemId: 'sys-3', branchId: 'branch-1' },
         { capabilityId: 'cap-1', exposedSystemId: 'sys-2', replacementSystemId: 'sys-4', branchId: 'branch-2' },
       ];
       const complete = buildCapabilityTiles(caps, caps, edges, systemsById, bothReplaced, new Set());
-      expect(complete[0]?.poorFitAllReplacementPlanned).toBe(true);
+      expect(complete[0]?.weakFitAllReplacementPlanned).toBe(true);
     });
 
-    it('poorFitAllReplacementPlanned is false, never true, when nothing is rated poor at all', () => {
+    it('weakFitAllReplacementPlanned is false, never true, when nothing is rated poor at all', () => {
       const caps = [capability('cap-1')];
       const tiles = buildCapabilityTiles(caps, caps, [], new Map(), [], new Set());
-      expect(tiles[0]?.poorFitAllReplacementPlanned).toBe(false);
+      expect(tiles[0]?.weakFitAllReplacementPlanned).toBe(false);
     });
   });
 });
