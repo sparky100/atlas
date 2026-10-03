@@ -28,9 +28,7 @@ import { isStale, monthsSince, monthsUntil, STALE_AFTER_MONTHS } from '../contra
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { SystemDomain, UUID } from '../contracts/delta';
 import { computeCapabilityRollup } from '../ui/capabilityMap/capabilityRollup';
-import { fitAssessmentSupportsEdges } from '../ui/capabilityMap/metrics';
 import { attributesRecord } from '../ui/elements/attributesRecord';
-import { isFitForPurpose } from '../ui/elements/fitForPurposeTone';
 import { isPlatform } from '../ui/elements/systemKind';
 import { resolveElementDomain } from '../ui/elements/systemDomain';
 import type { Client } from './client';
@@ -727,73 +725,6 @@ export async function listOpenProjectScopeForModel(supabase: Client, modelId: UU
   });
 }
 
-/** One capability flagged by `findCapabilitiesWithPoorFitPrimarySupporter`, alongside whether it was flagged via that function's own secondary-edge fallback (`fitAssessmentSupportsEdges`'s own doc comment) — callers word "supporter" rather than "primary supporter" copy accordingly (`decisionPrefill.ts`'s `prefillFromPoorFitCapabilityFinding`). */
-export interface CapabilityWithPoorFitSupporter {
-  capability: ElementsHeadRow;
-  usedSecondaryFallback: boolean;
-}
-
-/**
- * The minimal fit-for-purpose finding: capabilities whose fit-assessment
- * edges (`fitAssessmentSupportsEdges`, `src/ui/capabilityMap/metrics.ts` —
- * primary `supports` edges when at least one exists, secondary edges only
- * as a fallback when it has none) include one rated `poor` or `adequate`
- * (`src/ui/elements/fitForPurposeTone.ts`'s `isFitForPurpose`), with no
- * planned replacement recorded for that supporter — a third "Start a
- * decision" trigger alongside `findCriticalSystemsPastOrNearSupportEnd` (a
- * system's own vendor support horizon) and the director door's
- * weak-capability tile (`DirectorHome.tsx`'s "no known supporters" case,
- * `prefillFromWeakCapability`).
- *
- * Originally checked only `role === 'primary'` edges — but `SupportsRole`'s
- * cardinality rule (at most one live primary edge per *system*) is not a
- * per-capability one, so a capability whose supporters all name `primary`
- * toward some *other* capability had zero primary edges into it and was
- * invisible here, even though the Director's own fit pill
- * (`worstFitForPurpose`/`poorFitSupportsEdges`, unrestricted by role) could
- * already flag it. `fitAssessmentSupportsEdges` closes that gap by falling
- * back to secondary edges only when a capability has no primary one; the
- * Director roll-up itself is intentionally unchanged.
- *
- * `plannedReplacementSystemIdsByCapability` is
- * `src/db/modelHome.ts`'s `groupPlannedReplacementsByCapability` result —
- * the same real "no planned replacement" evidence `computeExposureTone`
- * already consults for Lifecycle Exposure, not a second, weaker
- * approximation of it.
- */
-export function findCapabilitiesWithPoorFitPrimarySupporter(
-  capabilities: readonly ElementsHeadRow[],
-  supportsEdges: readonly RelationshipsHeadRow[],
-  plannedReplacementSystemIdsByCapability: ReadonlyMap<UUID, ReadonlySet<UUID>>,
-): CapabilityWithPoorFitSupporter[] {
-  const capabilitiesById = new Map(capabilities.map((c) => [c.element_id, c]));
-  const flagged = new Map<UUID, boolean>();
-
-  const capabilityIdsWithSupport = new Set(supportsEdges.filter((edge) => edge.relationship_type === 'supports').map((edge) => edge.to_element_id));
-
-  for (const capabilityId of capabilityIdsWithSupport) {
-    if (!capabilitiesById.has(capabilityId)) continue;
-    const { edges, usedSecondaryFallback } = fitAssessmentSupportsEdges(capabilityId, supportsEdges);
-    const replacedSystemIds = plannedReplacementSystemIdsByCapability.get(capabilityId);
-    for (const edge of edges) {
-      const attrs = attributesRecord(edge.attributes);
-      if (typeof attrs.fitForPurpose !== 'string' || !isFitForPurpose(attrs.fitForPurpose)) continue;
-      if (attrs.fitForPurpose !== 'poor' && attrs.fitForPurpose !== 'adequate') continue;
-      if (replacedSystemIds?.has(edge.from_element_id)) continue;
-      flagged.set(capabilityId, usedSecondaryFallback);
-      break;
-    }
-  }
-
-  return [...flagged.entries()]
-    .map(([id, usedSecondaryFallback]) => {
-      const capability = capabilitiesById.get(id);
-      return capability ? { capability, usedSecondaryFallback } : null;
-    })
-    .filter((r): r is CapabilityWithPoorFitSupporter => r !== null)
-    .sort((a, b) => a.capability.name.localeCompare(b.capability.name) || a.capability.element_id.localeCompare(b.capability.element_id));
-}
-
 /**
  * A decision-shaped finding (architect-door per-item-action prompt):
  * level-1 capabilities with zero supporting systems anywhere in their own
@@ -806,7 +737,10 @@ export function findCapabilitiesWithPoorFitPrimarySupporter(
  * grid already flags as "nothing recorded" (`buildCapabilityTiles`,
  * `src/db/modelHome.ts`, `tone: 'neutral'` when `supportingSystems.length
  * === 0`) — named here as its own architect-door finding rather than a
- * second, driftable definition of the same gap.
+ * second, driftable definition of the same gap. Since 2026-10-03 the
+ * Home finding itself is gone (Overview's grid is its one home,
+ * UI-principles §3); this function backs the Elements browse table's
+ * `capability-no-supporters` filter.
  */
 export function findCapabilitiesWithNoSupporters(
   level1Capabilities: readonly ElementsHeadRow[],

@@ -1,4 +1,4 @@
-import { Button } from '../components/Button/Button';
+import { HomeViewLink } from './HomeViewLink';
 import { Fragment } from 'react';
 import { Link } from 'react-router';
 import { Chip } from '../components/Chip/Chip';
@@ -18,7 +18,6 @@ import {
   prefillFromCriticalExposedFinding,
   prefillFromCriticalSupportEndFinding,
   prefillFromOutgoingDisposition,
-  prefillFromPoorFitCapabilityFinding,
   type DecisionPrefill,
 } from '../decisions/decisionPrefill';
 import { canStartDecision } from '../orgs/useMembership';
@@ -312,31 +311,6 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
       // rather than the browse table; more than one still falls through to
       // `browseHref` above, since a single link can only point at one page.
       singleItemAction: (item: HealthFindingItem) => ({ href: contextHref(item.id), label: 'View context →' }),
-    },
-    {
-      // The minimal fit-for-purpose finding: structurally close to
-      // `critical-exposed` above (a real gap, nothing lined up to replace
-      // it, the same "Start a decision" action) but not gated on
-      // `criticality: 'critical'`, so it stays medium rather than high — a
-      // judgment call, not named in the agreed severity tiers (this check
-      // didn't exist when those were agreed).
-      key: 'poor-fit-no-replacement',
-      count: insightsData.capabilitiesWithPoorFitPrimarySupporter.length,
-      summary: `${String(insightsData.capabilitiesWithPoorFitPrimarySupporter.length)} ${plural(insightsData.capabilitiesWithPoorFitPrimarySupporter.length, 'capability', 'capabilities')} whose supporter is rated a poor or adequate fit, with no planned replacement`,
-      items: elementItems(insightsData.capabilitiesWithPoorFitPrimarySupporter.map((r) => r.capability)),
-      // No `browseHref` — this filter has no browse-table home (same as
-      // before this redesign, `itemAction`'s own predecessor never had one
-      // either); a multi-item finding here gets no card action at all,
-      // only the single-item "Start a decision" case below.
-      severity: 'medium',
-      ...(canStartDecision(role)
-        ? {
-            singleItemAction: (item: HealthFindingItem) =>
-              startDecisionAction(
-                prefillFromPoorFitCapabilityFinding({ id: item.id, name: item.label }, insightsData.capabilitiesWithPoorFitPrimarySupporter.find((r) => r.capability.element_id === item.id)?.usedSecondaryFallback ?? false),
-              ),
-          }
-        : {}),
     },
     {
       // F11: a recorded Migrate/Eliminate with no open change retiring it.
@@ -639,9 +613,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
               </Text>
             </Link>
             {/* UI-principles §3: where capabilities are weak is Overview's to show, not repeated here. */}
-            <Button variant="ghost" onClick={onShowOverview}>
-              Where capabilities are weak is on Overview →
-            </Button>
+            <HomeViewLink onClick={onShowOverview}>Where capabilities are weak is on Overview →</HomeViewLink>
 
             {/* E8 item (4): Health findings load after first paint
                 (`useArchitectHomeInsights.ts`) — everything below reads

@@ -11,7 +11,6 @@ import {
   findBoundaryCrossingsMissingClassification,
   findBoundaryCrossingsMissingVerb,
   findCapabilitiesWithoutOwner,
-  findCapabilitiesWithPoorFitPrimarySupporter,
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
   findOutgoingWithoutRetiringChange,
@@ -33,7 +32,6 @@ import {
   listFactsForCommit,
   listUsesAndFlowsToEndpointElements,
   type BoundaryCrossing,
-  type CapabilityWithPoorFitSupporter,
   type ExternalInterfaceCrossing,
   type ExternalOrganisationAccess,
   type PlatformFlowEndpoint,
@@ -41,7 +39,7 @@ import {
   type UnlabeledVerbRelationship,
 } from '../../db/healthFindings';
 import { listActorsForLandscape, listSystemsForLandscape } from '../../db/landscape';
-import { groupPlannedReplacementsByCapability, listAllSupportsEdges, listDeltasForCommits, listRecentCommits, loadPlannedReplacements } from '../../db/modelHome';
+import { listAllSupportsEdges, listDeltasForCommits, listRecentCommits } from '../../db/modelHome';
 import { listProfilesByIds } from '../../db/profiles';
 import type { ProfileRow } from '../../db/types';
 import { envelopeSubjects } from '../../engine/describeEnvelope';
@@ -98,8 +96,6 @@ export interface ArchitectHomeInsightsData {
   externalInterfacesMissingClassification: ExternalInterfaceCrossing[];
   /** S1 item 11a's own second Assurance row: purely informational — every external actor `uses` edge, naming the organisation and which system it reaches. No classification requirement (see that finding's own doc comment for why). */
   externalOrganisationAccess: ExternalOrganisationAccess[];
-  /** The minimal fit-for-purpose finding: capabilities whose fit-assessment supporter is rated poor/adequate, with no planned replacement recorded (`findCapabilitiesWithPoorFitPrimarySupporter`'s own doc comment). */
-  capabilitiesWithPoorFitPrimarySupporter: CapabilityWithPoorFitSupporter[];
 }
 
 export type ArchitectHomeInsightsState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeInsightsData };
@@ -133,7 +129,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         return;
       }
 
-      const [commits, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, plannedReplacements, duplicateCandidates, retiringElementIds, projectScope] = await Promise.all([
+      const [commits, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, duplicateCandidates, retiringElementIds, projectScope] = await Promise.all([
         // S1 item 6: "recent activity" now groups consecutive same-subject
         // commits into one line and prefers others' activity when trimming
         // to five displayed items (groupRecentActivity.ts) — both can
@@ -156,12 +152,6 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         // resolving an actor endpoint needs this separate fetch merged in
         // below, not a widened filter on that one.
         listActorsForLandscape(supabase, main.head_commit_id),
-        // The "poor fit, no planned replacement" finding's own evidence —
-        // the same real "planned replacement" signal `useDirectorHome.ts`
-        // already loads for Lifecycle Exposure, not a second, weaker
-        // approximation of it (`findCapabilitiesWithPoorFitPrimarySupporter`'s
-        // own doc comment).
-        loadPlannedReplacements(supabase, modelId),
         // F4 (ADR-019 "Amended (F4, ...)"): the standing duplicates report's
         // own open-candidate count — real from here on. `listDuplicateCandidates`
         // itself excludes a pair whose element was merged away or retracted
@@ -243,7 +233,6 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             projectByElementId: new Map(projectScope.map((scope) => [scope.elementId, scope])),
             externalInterfacesMissingClassification: findExternalInterfacesMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             externalOrganisationAccess: findExternalOrganisationAccess(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
-            capabilitiesWithPoorFitPrimarySupporter: findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supportsEdges, groupPlannedReplacementsByCapability(plannedReplacements)),
           },
         });
       }

@@ -1,0 +1,21 @@
+/* Reads as the in-page text links around it ("Open capability map →"),
+   left-aligned however it wraps — not the shared Button's centred label. */
+.link {
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: var(--space-2) 0;
+  font: inherit;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-lh);
+  color: inherit;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link:focus-visible {
+  outline: var(--border-width-emphasis) solid var(--accent);
+  outline-offset: 2px;
+}

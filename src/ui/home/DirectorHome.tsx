@@ -1,3 +1,4 @@
+import { HomeViewLink } from './HomeViewLink';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { BlueprintFrame } from '../components/BlueprintFrame/BlueprintFrame';
@@ -14,10 +15,10 @@ import { defaultIntentForEntryPoint } from '../changes/branchIntent';
 import type { BranchIntent } from '../../db/types';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { attributesRecord } from '../elements/attributesRecord';
-import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromPoorFitCapabilities, prefillFromWeakCapability } from '../decisions/decisionPrefill';
+import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromWeakFitCapabilities, prefillFromWeakCapability } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { importanceLabel } from './capabilityImportance';
-import { compareWeakTiles, formatPoorFitPillLabel, isCapabilityTileWeak, poorFitPillTone } from './capabilityTileFit';
+import { compareWeakTiles, formatWeakFitPillLabel, isCapabilityTileWeak, weakFitPillTone } from './capabilityTileFit';
 import { ProposeChangePicker } from './ProposeChangePicker';
 import { ValueStreamsOutcomeView } from '../valueStreams/ValueStreamsOutcomeView';
 import { canCreateChangeBranch, canStartDecision } from '../orgs/useMembership';
@@ -115,9 +116,7 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
           </Link>
         </div>
         {/* UI-principles §3: model-quality findings are My work's to show, not repeated here. */}
-        <Button variant="ghost" onClick={onShowMyWork}>
-          Missing owners, links, labels and stale values are on My work →
-        </Button>
+        <HomeViewLink onClick={onShowMyWork}>Missing owners, links, labels and stale values are on My work →</HomeViewLink>
         <div className={styles.viewToggle} role="group" aria-label="Weakness view">
           <Button variant={weaknessView === 'capability' ? 'primary' : 'ghost'} onClick={() => { setWeaknessView('capability'); }} aria-pressed={weaknessView === 'capability'}>
             By capability
@@ -340,14 +339,14 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
       : null;
   // F6.1: a second, independent "Start a decision" for the fit reason —
   // concerns are the individual poor-fit capabilities under this tile
-  // (`prefillFromPoorFitCapabilities`), never the level-1 tile itself.
+  // (`prefillFromWeakFitCapabilities`), never the level-1 tile itself.
   // Suppressed once every poor-fit edge already has a planned
-  // replacement recorded (`poorFitAllReplacementPlanned`) — the fit pill
+  // replacement recorded (`weakFitAllReplacementPlanned`) — the fit pill
   // reads "replacement planned" instead in that case, nothing left to
   // start a decision about.
   const startFitDecisionHref =
-    tile.poorFitCapabilities.length > 0 && !tile.poorFitAllReplacementPlanned && canStartDecision(role)
-      ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefillFromPoorFitCapabilities(tile.capability.name, tile.poorFitCapabilities.map((c) => ({ id: c.element_id, name: c.name })))).toString()}`
+    tile.weakFitCapabilities.length > 0 && !tile.weakFitAllReplacementPlanned && canStartDecision(role)
+      ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefillFromWeakFitCapabilities(tile.capability.name, tile.weakFitCapabilities.map((c) => ({ id: c.element_id, name: c.name })))).toString()}`
       : null;
   const decisionActionHrefs = [startDecisionHref, startFitDecisionHref].filter((href): href is string => href !== null);
   // F10 step 7 (ADR-024 §6.4): a weak tile can start a project instead —
@@ -413,31 +412,34 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
       {/* F6.1: a second, visually distinct pill — its own glyph shape (a
           triangle, not the tone chip's round dot) so the two never read as
           one combined status even before colour is considered (§6.3/§8.4's
-          "never colour alone"). Rendered off `poorFitCapabilities` directly,
+          "never colour alone"). Rendered off `weakFitCapabilities` directly,
           not `emphasised` — the instruction's own "independently of tone". */}
-      {tile.poorFitCapabilities.length > 0 && (
-        <Chip tone={poorFitPillTone(tile.poorFitAllReplacementPlanned)} glyph={<span className={styles.fitGlyph} aria-hidden="true" />}>
-          {formatPoorFitPillLabel(tile.poorFitCapabilities.length, tile.poorFitAllReplacementPlanned)}
+      {tile.weakFitCapabilities.length > 0 && (
+        <Chip tone={weakFitPillTone(tile.weakFitAllReplacementPlanned, tile.weakFitCapabilities.length - tile.adequateFitCount)} glyph={<span className={styles.fitGlyph} aria-hidden="true" />}>
+          {formatWeakFitPillLabel(tile.weakFitCapabilities.length - tile.adequateFitCount, tile.adequateFitCount, tile.weakFitAllReplacementPlanned)}
         </Chip>
       )}
     </>
   );
 
-  const linkClassName = [emphasised ? styles.tileEmphasised : styles.tile, isWeak ? styles.tileWeak : ''].filter(Boolean).join(' ');
-
-  return (
-    <div className={styles.tileWrapper}>
-      <Link to={href} className={linkClassName}>
-        {emphasised ? <BlueprintFrame>{content}</BlueprintFrame> : content}
+  // The frame (an emphasised tile's) wraps the whole tile — its primary
+  // link, the fit-capability links and the actions — so the actions sit
+  // inside the card they belong to rather than trailing below it after a
+  // gap (found at 390px: the link used to reserve room for them *outside*
+  // the frame, and a two-action tile stacked them below even that).
+  const body = (
+    <>
+      <Link to={href} className={emphasised ? styles.tileEmphasised : styles.tile}>
+        {content}
       </Link>
       {/* F6.1: "link to the capabilities concerned" — real, individually
           navigable links, rendered as DOM siblings after the tile's own
           primary link (never nested inside it, same reasoning as
           `StartDecisionLink` below — an `<a>` cannot legally contain
           another `<a>`). */}
-      {tile.poorFitCapabilities.length > 0 && (
+      {tile.weakFitCapabilities.length > 0 && (
         <ul className={styles.fitCapabilityList}>
-          {tile.poorFitCapabilities.map((capability) => (
+          {tile.weakFitCapabilities.map((capability) => (
             <li key={capability.element_id}>
               <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${capability.element_id}`}>
                 <Text as="span" size="xs">
@@ -449,19 +451,15 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
         </ul>
       )}
       {actionCount > 0 && (
-        // The common case (0 or 1 action) keeps the exact corner-overlay
-        // layout every existing tile already uses (`.tileAction`); the
-        // rare case of both a tone- and a fit-triggered action on the
-        // same tile falls back to an ordinary in-flow stack
-        // (`.tileActionsStacked`) rather than risking two absolutely-
-        // positioned links overlapping in the same corner.
-        <div className={actionCount > 1 ? styles.tileActionsStacked : styles.tileAction}>
+        <div className={styles.tileActions}>
           {decisionActionHrefs.map((href) => (
             <StartDecisionLink key={href} href={href} />
           ))}
           {startProjectHref !== null && <StartProjectLink href={startProjectHref} />}
         </div>
       )}
-    </div>
+    </>
   );
+
+  return <div className={[styles.tileWrapper, isWeak ? styles.tileWeak : ''].filter(Boolean).join(' ')}>{emphasised ? <BlueprintFrame>{body}</BlueprintFrame> : body}</div>;
 }

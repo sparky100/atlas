@@ -58,6 +58,15 @@ test('rate a primary supporter a poor fit; the Director door flags the capabilit
   const fitPill = page.getByText('poor fit: 1 capability', { exact: true });
   await expect(fitPill).toBeVisible();
 
+  // The tile's own actions sit inside the card, right under its content —
+  // not trailing below it after a gap (the 390px layout bug, where the
+  // tile reserved room for them outside its frame).
+  const startDecision = page.getByRole('link', { name: 'Start a decision →' });
+  const pillBox = await fitPill.boundingBox();
+  const actionBox = await startDecision.boundingBox();
+  if (!pillBox || !actionBox) throw new Error('fit pill or Start a decision link has no box');
+  expect(actionBox.y - (pillBox.y + pillBox.height)).toBeLessThan(80);
+
   // The pill links to the real, affected capability.
   const financeLink = page.getByRole('link', { name: 'Finance', exact: true });
   await expect(financeLink).toBeVisible();
@@ -75,4 +84,33 @@ test('rate a primary supporter a poor fit; the Director door flags the capabilit
   await page.getByRole('combobox').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByText('Finance', { exact: true })).toBeVisible();
+});
+
+test('an adequate fit is a weakness on Overview, named as adequate, and is not repeated on My work', async ({ page }) => {
+  await signUpCreateOrgAndModel(page, 'directorfitadequate');
+
+  await addCapability(page, 'Payroll');
+  await goToModelHome(page);
+  await addSystemFromHome(page, { name: 'Payroll System', description: 'The payroll system.', capabilityName: 'Payroll' });
+  await expect(page.getByRole('heading', { name: 'Payroll System' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Show attributes' }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByLabel('Role').selectOption('primary');
+  await page.getByLabel('Fit for purpose').selectOption('adequate');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Fit for purpose: adequate', { exact: false })).toBeVisible();
+
+  // My work (an owner's default) no longer carries a fit finding at all —
+  // Overview is fit weakness's one home (UI-principles §3, 2026-10-03).
+  await goToModelHome(page);
+  const healthFindings = page.getByTestId('health-findings-panel');
+  await expect(healthFindings.getByRole('heading', { name: 'Assurance' })).toBeVisible();
+  await expect(healthFindings.getByText(/adequate fit/)).toHaveCount(0);
+
+  // Overview flags the tile, naming the rating as adequate, never as poor.
+  await switchToDirectorView(page);
+  await expect(page.getByText('adequate fit: 1 capability', { exact: true })).toBeVisible();
+  await expect(page.getByText(/poor fit/)).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Payroll', exact: true })).toBeVisible();
 });
