@@ -460,3 +460,26 @@
     max-width: 100%;
   }
 }
+
+/* The More button's dot: a section inside the sheet has a count (today,
+   proposed decisions). Phone bar only — the More button doesn't show on
+   wider screens, where every section is on the rail. */
+.moreButton {
+  position: relative;
+}
+
+.moreDot {
+  position: absolute;
+  top: 6px;
+  right: calc(50% - 14px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* In the More sheet the badge sits at the end of its row, not over an icon. */
+.sheetLink .badge {
+  position: static;
+  margin-left: auto;
+}

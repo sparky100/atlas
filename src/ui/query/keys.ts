@@ -39,4 +39,6 @@ export const queryKeys = {
   reviewQueueCount: (modelId: UUID | null) => ['reviewQueue', 'count', modelId] as const,
   /** The Changes nav badge: how many changes are still open (`countOpenChangeBranches`). */
   openChangeCount: (modelId: UUID | null) => ['changes', 'openCount', modelId] as const,
+  /** The Decisions nav badge: how many decisions are still proposed (`countProposedDecisions`). */
+  proposedDecisionCount: (modelId: UUID | null) => ['decisions', 'proposedCount', modelId] as const,
 };

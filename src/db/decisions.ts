@@ -209,3 +209,10 @@ export async function updateDecision(supabase: Client, decisionId: UUID, input: 
   if (!row) throw new Error('updateDecision: this decision can no longer be edited, or you are not allowed to edit it');
   return row;
 }
+
+/** How many decisions on a model are still proposed — the Decisions nav item's badge. A count only (`head: true`), no id list (rule 8). */
+export async function countProposedDecisions(supabase: Client, modelId: UUID): Promise<number> {
+  const { count, error } = await supabase.from('decisions').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('status', 'proposed');
+  if (error) throw new Error(`countProposedDecisions: ${error.message}`);
+  return count ?? 0;
+}

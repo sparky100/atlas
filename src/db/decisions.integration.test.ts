@@ -29,6 +29,7 @@ import { createComment, listCommentsForAnchor } from './comments';
 import {
   cancelDecision,
   chooseDecisionOption,
+  countProposedDecisions,
   createDecision,
   createDecisionLink,
   getDecision,
@@ -394,6 +395,14 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
 
       await service.auth.admin.deleteUser(contributor.id);
       await service.auth.admin.deleteUser(other.id);
+    });
+
+    it('the Decisions badge counts proposed decisions only: a new one adds one, cancelling takes it away', async () => {
+      const before = await countProposedDecisions(alice.client, modelId);
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Counted', statement: '', ownerId: alice.id, createdBy: alice.id });
+      expect(await countProposedDecisions(alice.client, modelId)).toBe(before + 1);
+      await cancelDecision(alice.client, decision.id, 'Counted, then cancelled.');
+      expect(await countProposedDecisions(alice.client, modelId)).toBe(before);
     });
 
     it('an accepted decision cannot be cancelled', async () => {

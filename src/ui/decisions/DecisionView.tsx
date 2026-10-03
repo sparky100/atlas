@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
@@ -25,6 +26,7 @@ import { getElementsByIds } from '../../db/elements';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { setDecisionProject } from '../../db/projects';
 import { reportError } from '../errors/errorBannerStore';
+import { queryKeys } from '../query/keys';
 import { ProjectAssignment } from '../projects/ProjectAssignment';
 import { supabase } from '../supabaseClient';
 import { buildDecisionAdrExportInput } from './decisionAdrInput';
@@ -107,6 +109,13 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         .map((b) => ({ branchId: b.id, baseCommitId: b.base_commit_id, headCommitId: b.head_commit_id, label: intentHeaderLine(b) }))
     : [];
   const comparison = useDecisionComparison(modelId, main?.head_commit_id ?? null, concernedCapabilityIds, otherConcernElementIds, comparisonOptions);
+
+  // Choosing or cancelling in place changes how many decisions are proposed — the Decisions nav badge re-reads.
+  const queryClient = useQueryClient();
+  const decisionStatus = state.status === 'ready' ? state.decision.status : null;
+  useEffect(() => {
+    if (decisionStatus !== null) void queryClient.invalidateQueries({ queryKey: queryKeys.proposedDecisionCount(modelId) });
+  }, [decisionStatus, modelId, queryClient]);
 
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (state.status === 'not_found') return <Text as="p">No decision found for this id.</Text>;

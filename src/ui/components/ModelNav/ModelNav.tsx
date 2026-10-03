@@ -7,6 +7,7 @@ import { useBranchLabel } from '../../branches/useBranchLabel';
 import { useModels } from '../../models/useModels';
 import { useOrganisationBySlug } from '../../orgs/useOrganisationBySlug';
 import { useOpenChangeCount } from '../../changes/useOpenChangeCount';
+import { useProposedDecisionCount } from '../../decisions/useProposedDecisionCount';
 import { SearchDialog } from '../../search/SearchDialog';
 import { useSelectedRef } from '../../branches/useSelectedRef';
 import { isViewingMode } from '../../branches/viewingMode';
@@ -133,6 +134,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
   const { models } = useModels(organisation?.id ?? null);
   const modelId = models.find((m) => m.slug === modelSlug)?.id ?? null;
   const openChangeCount = useOpenChangeCount(modelId);
+  const proposedDecisionCount = useProposedDecisionCount(modelId);
   const viewing = isViewingMode(searchParams);
   const refParam = refQueryParam(ref, false);
   const refParamViewing = refQueryParam(ref, viewing);
@@ -195,6 +197,8 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
   const navRef = useRef<HTMLElement>(null);
   // The More button names the current section when it's one of the sheet's.
   const moreCurrentLabel = activeSection !== null && !BAR_SECTIONS.includes(activeSection) ? SECTION_LABELS[activeSection] : null;
+  // A count on a section behind More (today only Decisions) puts a dot on the More button, so a phone user can see there's something inside.
+  const moreHasCount = !BAR_SECTIONS.includes('decisions') && proposedDecisionCount !== null && proposedDecisionCount > 0;
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -234,7 +238,8 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
             {shortLabel}
           </span>
         )}
-        {section === 'changes' && openChangeCount !== null && openChangeCount > 0 && <ChangesBadge count={openChangeCount} />}
+        {section === 'changes' && openChangeCount !== null && openChangeCount > 0 && <CountBadge count={openChangeCount} singular="change" plural="changes" />}
+        {section === 'decisions' && proposedDecisionCount !== null && proposedDecisionCount > 0 && <CountBadge count={proposedDecisionCount} singular="proposed" plural="proposed" />}
       </Link>
     );
   };
@@ -293,6 +298,12 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
           <Ellipsis size={18} className={styles.icon} aria-hidden="true" />
           <span className={styles.barLabel}>More</span>
           {moreCurrentLabel !== null && <span className={styles.srOnly}> (current: {moreCurrentLabel})</span>}
+          {moreHasCount && (
+            <>
+              <span className={styles.moreDot} aria-hidden="true" />
+              <span className={styles.srOnly}> (decisions proposed)</span>
+            </>
+          )}
         </button>
       </div>
       {moreOpen && (
@@ -378,23 +389,22 @@ function sectionPath(section: RealSection): string {
 }
 
 /**
- * The Changes item's badge: how many changes aren't cancelled — exactly
- * what the page it opens lists outside its "Cancelled" group. It used to show
- * the review queue's count (merge requests plus capture drafts), which
- * didn't match anything on the page the item leads to; the queue keeps its
- * own count on its tab. The number is visible text (never colour alone,
- * §8.4), after the label on the full-width rail and over the icon's corner
- * when the rail is icon-only. The digits are hidden from assistive tech in
- * favour of a spelled-out phrase ("Changes (4 changes)"). Zero renders nothing
+ * A nav item's count of open work: Changes counts open changes (draft,
+ * proposed, in review, approved), Decisions counts proposed decisions —
+ * each the queue still waiting on someone. The number is visible text
+ * (never colour alone, §8.4), after the label on the full-width rail and in
+ * the More sheet, over the icon's corner when the rail is icon-only. The
+ * digits are hidden from assistive tech in favour of a spelled-out phrase
+ * ("Changes (4 changes)", "Decisions (2 proposed)"). Zero renders nothing
  * (the caller's check).
  */
-function ChangesBadge({ count }: { count: number }) {
+function CountBadge({ count, singular, plural }: { count: number; singular: string; plural: string }) {
   return (
     <>
       <span className={styles.badge} aria-hidden="true">
         {count > 99 ? '99+' : count}
       </span>
-      <span className={styles.srOnly}>({count} {count === 1 ? 'change' : 'changes'})</span>
+      <span className={styles.srOnly}>({count} {count === 1 ? singular : plural})</span>
     </>
   );
 }

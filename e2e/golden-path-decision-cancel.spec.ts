@@ -11,6 +11,20 @@ import { clickNavItem, goToModelHome, signUpCreateOrgAndModel } from './fixtures
 const PROJECT = 'Replace BW';
 const DECISION = 'What to replace BW with';
 
+/** The Decisions count: on the rail at 1280; at 390 Decisions is behind More, which carries a dot (and says so to a screen reader) instead. */
+async function expectProposedDecisions(page: Page, count: number): Promise<void> {
+  const nav = page.getByRole('navigation', { name: 'Model navigation' });
+  const more = nav.getByRole('button', { name: /^More/ });
+  if (await more.isVisible()) {
+    if (count > 0) await expect(more).toHaveAccessibleName(/decisions proposed/);
+    else await expect(more).not.toHaveAccessibleName(/decisions proposed/);
+  } else if (count > 0) {
+    await expect(nav.getByRole('link', { name: `Decisions (${String(count)} proposed)` })).toBeVisible();
+  } else {
+    await expect(nav.getByRole('link', { name: 'Decisions', exact: true })).toBeVisible();
+  }
+}
+
 async function openProject(page: Page): Promise<void> {
   await goToModelHome(page);
   await clickNavItem(page, 'Projects');
@@ -38,8 +52,9 @@ test('cancel a decision: it stays in the log as cancelled with its reason, its d
   await page.getByRole('button', { name: 'Add option' }).click();
   await expect(page.getByText('Move to Datasphere').first()).toBeVisible();
 
-  // The open decision blocks closing the project.
+  // The open decision blocks closing the project, and the Decisions item counts it.
   await openProject(page);
+  await expectProposedDecisions(page, 1);
   await expect(page.getByText('To close or cancel this project, first finish or cancel what is still open in it:')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Close project' })).toHaveCount(0);
 
@@ -56,7 +71,8 @@ test('cancel a decision: it stays in the log as cancelled with its reason, its d
   await expect(page.getByRole('button', { name: 'Cancel decision…' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '+ Add an option' })).toHaveCount(0);
 
-  // The project now lists nothing open and can close; its option is closed without merging.
+  // Cancelled: no longer counted. The project now lists nothing open and can close; its option is closed without merging.
+  await expectProposedDecisions(page, 0);
   await openProject(page);
   await expect(page.getByRole('region', { name: 'Closed without merging' }).getByRole('link', { name: 'Move to Datasphere' })).toBeVisible();
   await page.getByRole('button', { name: 'Close project' }).click();

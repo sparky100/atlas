@@ -72,7 +72,7 @@ Every model page shares the same navigation, in four groups:
 | **Work** | Projects, Changes, Decisions, Capture |
 | **Record** | Versions |
 
-On a phone, the bar at the bottom shows Home, Capabilities, Landscape and Changes; everything else is under **More**. The **Changes** item shows a number: how many changes there are that haven't been cancelled.
+On a phone, the bar at the bottom shows Home, Capabilities, Landscape and Changes; everything else is under **More**. Two items show a number of open items: **Changes** — changes still open (draft, proposed, in review or approved) — and **Decisions** — decisions still proposed. Projects has no number. On a phone, a dot on **More** means Decisions has a number inside it.
 
 **Search anywhere.** Press **Ctrl K** (**⌘K** on a Mac), or use **Search** at the top of the navigation (inside **More** on a phone), to find an element, a change or a decision by name and jump straight to it. The search box on Home works the same way for elements, and is also where you create new ones — it checks for an existing element with that name first.
 
