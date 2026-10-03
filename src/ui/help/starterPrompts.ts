@@ -2,6 +2,6 @@
 export const DEFAULT_STARTER_PROMPTS: readonly string[] = [
   "What's the difference between a Capability, System, and Container?",
   'How do I bring in data with an AI-assisted capture?',
-  'How do changes and branches work?',
+  'How do I make a change and get it merged?',
   'What are Versions, and how do I create one?',
 ];

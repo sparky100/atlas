@@ -1,6 +1,6 @@
 # Atlas User Guide
 
-**Status:** reviewed against the app on 2026-10-02 (after F10 projects, F11 disposition and F12 bulk edit / gaps / "Still accurate"). Written for the in-app AI help chat to ground its answers in — if something here doesn't match what you see, the app is right and this guide needs correcting.
+**Status:** reviewed against the app on 2026-10-03 (after F13 view exports and the project pack, open-only change counts, and cancelling and editing decisions). Written for the in-app AI help chat to ground its answers in — if something here doesn't match what you see, the app is right and this guide needs correcting.
 
 This is the guide the in-app **Help** assistant reads to answer your questions. It isn't reference documentation for developers (that's `docs/ADR-000-foundations.md` and `docs/SPEC-data-model.md`); it's written for the people who use Atlas: architects who maintain the model, and the senior people who read it.
 
@@ -35,8 +35,8 @@ Everyone in an organisation has one role:
 | Role | Can |
 |---|---|
 | **Viewer** | See everything. Can't change the model, comment, or see the review queue. |
-| **Contributor** | Everything a viewer can, plus comment, start changes and edit inside them, submit them for review, run a capture, start decisions and projects, rate decision options. Can't edit main directly. |
-| **Architect** | Everything a contributor can, plus edit main directly, approve and merge changes, choose a decision's option, create and archive models. |
+| **Contributor** | Everything a viewer can, plus comment, start changes and edit inside them, submit them for review, run a capture, start decisions and projects, rate decision options and add what a decision concerns, and edit or cancel decisions they started or own. Can't edit main directly. |
+| **Architect** | Everything a contributor can, plus edit main directly, approve and merge changes, choose a decision's option, edit or cancel any proposed decision, create and archive models. |
 | **Owner** | Everything an architect can, plus organisation settings, members and invites, custom attributes, restoring or deleting archived models. |
 
 ## The building blocks
@@ -144,20 +144,20 @@ Every change says **why** it exists:
 
 Architectural decisions — "why did we choose this?" — are first-class objects, not a comment somewhere. **Decisions** lists them as proposed, accepted, cancelled or superseded.
 
-A decision has its **context**, the elements it **concerns**, and its **options**. Each option is an Explore change — a candidate future you can design in the model and **View diagram →** for. Rate each option against the **criteria** (cost, effort, delivery risk, timing, vendor and strategic fit), add **arguments** for and against, and compare what each option **changes** and what else it affects. An architect or owner **Chooses** an option, giving the reasons; the other options are closed, and **Work on this as a change** takes the chosen one forward. **Copy as ADR markdown** exports the decision.
+A decision has its **context**, the elements it **concerns**, and its **options**. Each option is an Explore change — a candidate future you can design in the model and **View diagram →** for. Rate each option against the **criteria** (cost, effort, delivery risk, timing, vendor and strategic fit) and compare what each option **changes** and what else it affects. An architect or owner **Chooses** an option, giving the reasons; the other options are closed, and **Work on this as a change** takes the chosen one forward. **Copy as ADR markdown** exports the decision.
 
 While a decision is proposed, **✎ Edit decision** changes its title, context, owner, needed-by date and Lens map link (for whoever started it, or an architect or owner), and the **Concerns** panel has a search to add the capabilities and systems it's about (any contributor). A concern can't be removed once added. Once a decision is chosen or cancelled, nothing on it can be edited.
 
 A decision that's no longer needed can be **cancelled** while it's still proposed — **Cancel decision…** on its page, by its owner or an architect or owner, giving the reason. It isn't deleted: it stays in the decision log marked cancelled, with who cancelled it, when and why, and any options still in draft are cancelled with it. A cancelled decision can't be reopened; start a new one instead. Cancelling is also how you clear a decision that's stopping its project from closing.
 
-Start a decision from **Decisions**, a project, an element page, or a finding's **Start a decision →**.
+Start a decision from **Decisions**, from a project, or with **Start a decision →** on a Home finding, a weak capability or a value stream's panel. An element page's **Decisions** section shows the decisions that concern it.
 
 ## Projects
 
 A **project** holds one piece of architecture work — "Housing CRM replacement", say — together with the decisions it raises and the changes that deliver it. Open **Projects** (under Work) to see every project, grouped as active, on hold, closed or cancelled.
 
 - **Start a project** from the Projects page, from a health finding or weak capability ("Start a project →"), or from an element's ⋯ menu. Give it a title, its purpose, an owner, optional start and target dates, and the capabilities and systems it's about (its **declared scope**).
-- **Its decision log** lists the decisions that are part of the project. Start one from the project page, or move a proposed decision in with **Add to project…** on its page — its draft options move with it. A decision made elsewhere that the project must follow can be linked as a **constraining decision**. Decisions don't have to belong to a project.
+- **Its decision log** lists the decisions that are part of the project. Start one from the project page, or move a proposed decision in with **Add to project…** (or **Move…**, if it's already in another project) on its page — its draft options move with it. Decisions made elsewhere that constrain the project are listed separately as **constraining decisions**; linking one isn't possible from the app yet. Decisions don't have to belong to a project.
 - **Its changes** are its design deliverables, shown by stage: options being explored, the chosen design, in review, merged. Start one from the project page, or use **Add to project…** on any open change.
 - **Scope against what it touches.** The page compares the declared scope with what the project's changes actually touch, and lists any difference — it never changes either for you.
 - **Evidence** — business cases, vendor documents and links — can be attached.
@@ -168,10 +168,10 @@ A project is part of how your team works, not part of the model itself: it never
 
 ## Views
 
-- **Capability map** — every capability, in its hierarchy. **Colour by** coverage, oldest lifecycle stage, lifecycle exposure, criticality, OT share, fit or disposition (each the worst among the systems supporting it). If the model is empty, you can **start from a capability map** — a ready-made set for your sector.
-- **Landscape** — systems in lanes by the capability they mainly support, with OT systems in their own zone. Colour by criticality, hosting model or IT/OT domain. Zoom into a system for its **context**, and into a platform for its **modules**.
+- **Capability map** — every capability, in its hierarchy. **Colour by** coverage, oldest lifecycle stage, lifecycle exposure, criticality, OT share, fit or disposition (each the worst among the systems supporting it). If the model is empty, you can **start from a capability map** — a ready-made set for your sector. Owners can also **Export as starter map** (in the map's ⋯ actions), saving this model's capabilities as a draft starter map for seeding other models.
+- **Landscape** — systems in lanes by the capability they mainly support, with OT systems in their own zone. Colour by criticality, hosting model or IT/OT domain. Zoom into a system for its **context**, and into a platform for its **modules**. Opened from a capability (its supporting-system count on the capability map), it lists just the systems supporting that capability, with **Export CSV** and **Export XLSX**.
 - **Value streams** — how the organisation delivers its outcomes, stage by stage, and which capabilities enable each stage (weak supporting systems show up the stream). Value-stream structure is edited on main, or in a **Correct** change.
-- **Roadmap** — systems' lifecycles over time (introduced, planned end, support end) and changes' target dates, **by capability**, **by value stream** or **by project**, in months, quarters or years, with filters and **Export CSV**.
+- **Roadmap** — systems' lifecycles over time (introduced, planned end, support end) and changes' target dates, **by capability**, **by value stream** or **by project**, in months, quarters or years, with filters, **Export table** (CSV) and **Export PNG**.
 - **Portfolio** — every system and module with run cost against fit, criticality, disposition, lifecycle and capabilities served, sortable and filterable, with **signals** where the combination matters (for example *Costly, poor fit*, *Costly overlap*, *Invest, poor fit*, *Justified*) and a note when a row is missing the inputs to judge it.
 
 **Export PNG** and **Export PDF** on the capability map, the landscape and Portfolio download a picture of the view as you see it: the current colour-by, and Portfolio's filters and sort. Every picture is stamped with the model, which state you are looking at (main, a version, or a change by name) and the date. Any member can export. The landscape picture shows systems in their lanes but not the connections between them, and says so. A picture is a copy, not part of the model: it doesn't update when the model changes.
