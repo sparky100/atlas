@@ -47,6 +47,7 @@ function DirectorDoor({
   orgSlug,
   modelSlug,
   mainCommitIdHint,
+  onShowMyWork,
 }: {
   modelId: UUID;
   orgId: UUID;
@@ -56,13 +57,14 @@ function DirectorDoor({
   modelSlug: string;
   /** S1 item 15 (A2 remainder): `ModelHome`'s own already-resolved main head commit id — `useDirectorHome`'s own parameter comment. */
   mainCommitIdHint: UUID | null;
+  onShowMyWork: () => void;
 }) {
   const directorState = useDirectorHome(modelId, orgId, mainCommitIdHint);
   // E8 ("performance") phase 1: same route key as ArchitectDoor below — only one door ever mounts at a time (this file's own module comment), so they never race for the same marks.
   useRouteTiming('model-home', directorState.status === 'ready');
   if (directorState.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (directorState.status === 'error') return <Text as="p">{directorState.message}</Text>;
-  return <DirectorHome data={directorState.data} reload={directorState.reload} modelId={modelId} orgId={orgId} userId={userId} role={role} orgSlug={orgSlug} modelSlug={modelSlug} mainCommitIdHint={mainCommitIdHint} />;
+  return <DirectorHome data={directorState.data} reload={directorState.reload} modelId={modelId} orgId={orgId} userId={userId} role={role} orgSlug={orgSlug} modelSlug={modelSlug} mainCommitIdHint={mainCommitIdHint} onShowMyWork={onShowMyWork} />;
 }
 
 function ArchitectDoor({
@@ -71,6 +73,7 @@ function ArchitectDoor({
   role,
   orgSlug,
   modelSlug,
+  onShowOverview,
 }: {
   modelId: UUID;
   userId: UUID | null;
@@ -78,6 +81,7 @@ function ArchitectDoor({
   role: MemberRole | null;
   orgSlug: string;
   modelSlug: string;
+  onShowOverview: () => void;
 }) {
   const architectState = useArchitectHome(modelId, userId);
   // E8 item (4): Health findings/Recent activity load after first paint,
@@ -89,7 +93,7 @@ function ArchitectDoor({
   useRouteTiming('model-home', architectState.status === 'ready');
   if (architectState.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (architectState.status === 'error') return <Text as="p">{architectState.message}</Text>;
-  return <ArchitectHome data={architectState.data} insights={insightsState} role={role} orgSlug={orgSlug} modelSlug={modelSlug} />;
+  return <ArchitectHome data={architectState.data} insights={insightsState} role={role} orgSlug={orgSlug} modelSlug={modelSlug} onShowOverview={onShowOverview} />;
 }
 
 /**
@@ -220,9 +224,12 @@ export function ModelHome() {
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}
             mainCommitIdHint={mainBranch?.head_commit_id ?? null}
+            onShowMyWork={() => {
+              setHomeMode('architect');
+            }}
           />
         )}
-        {homeMode === 'architect' && <ArchitectDoor modelId={model.id} userId={userId} role={role} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
+        {homeMode === 'architect' && <ArchitectDoor modelId={model.id} userId={userId} role={role} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} onShowOverview={() => { setHomeMode('director'); }} />}
         </main>
       </div>
     </div>

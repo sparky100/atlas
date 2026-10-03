@@ -10,7 +10,6 @@ import {
   computeStaleAttributesFinding,
   findBoundaryCrossingsMissingClassification,
   findBoundaryCrossingsMissingVerb,
-  findCapabilitiesWithNoSupporters,
   findCapabilitiesWithoutOwner,
   findCapabilitiesWithPoorFitPrimarySupporter,
   findCriticalExposedSystems,
@@ -46,7 +45,6 @@ import { groupPlannedReplacementsByCapability, listAllSupportsEdges, listDeltasF
 import { listProfilesByIds } from '../../db/profiles';
 import type { ProfileRow } from '../../db/types';
 import { envelopeSubjects } from '../../engine/describeEnvelope';
-import { computeCapabilityMapTree } from '../capabilityMap/layout';
 import { reportError } from '../errors/errorBannerStore';
 import { useAfterFirstPaint } from '../perf/useAfterFirstPaint';
 import { supabase } from '../supabaseClient';
@@ -102,8 +100,6 @@ export interface ArchitectHomeInsightsData {
   externalOrganisationAccess: ExternalOrganisationAccess[];
   /** The minimal fit-for-purpose finding: capabilities whose fit-assessment supporter is rated poor/adequate, with no planned replacement recorded (`findCapabilitiesWithPoorFitPrimarySupporter`'s own doc comment). */
   capabilitiesWithPoorFitPrimarySupporter: CapabilityWithPoorFitSupporter[];
-  /** A third decision-shaped finding, alongside `criticalExposedSystems` and `criticalSystemsPastOrNearSupportEnd`: level-1 capabilities with zero supporting systems anywhere in their own subtree (`findCapabilitiesWithNoSupporters`'s own doc comment — the same "nothing recorded" classification the director door's weak-capability grid already flags). */
-  capabilitiesWithNoSupporters: ElementsHeadRow[];
 }
 
 export type ArchitectHomeInsightsState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeInsightsData };
@@ -248,7 +244,6 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             externalInterfacesMissingClassification: findExternalInterfacesMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             externalOrganisationAccess: findExternalOrganisationAccess(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             capabilitiesWithPoorFitPrimarySupporter: findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supportsEdges, groupPlannedReplacementsByCapability(plannedReplacements)),
-            capabilitiesWithNoSupporters: findCapabilitiesWithNoSupporters(computeCapabilityMapTree(capabilities).l1.map((column) => column.capability), capabilities, supportsEdges, ownsEdges),
           },
         });
       }

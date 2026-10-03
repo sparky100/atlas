@@ -145,7 +145,16 @@ Same model, same data, different first screen. Which door a user gets is stored 
 
 Default: Owners and Architects get the architect door; Contributors and Viewers get the director door.
 
-### 3.1 Director's door
+**The split is by job, not by subject or by reader** (2026-10-03). The two doors are labelled **Overview** (the director's door, §3.1) and **My work** (the architect's door, §3.2):
+
+- **Overview** is a briefing on the *state of the business*: where capabilities are weak, what's changing, what's recent. It states conclusions and is read-only apart from proposing or recording a change.
+- **My work** is a worklist for the *state of the model*: what's waiting on me, what I'm part-way through, what changed under me, and what's missing or wrong in the model. It states work to do.
+
+The rule that keeps them from overlapping: a finding about business state (a capability that is weak — exposed, unsupported, poorly fitted) has its one home on Overview; a finding about model state (a missing owner, link, label, classification or stale value; assurance) has its one home on My work. Neither door repeats the other's findings; each links across to the other instead. Applied 2026-10-03: My work's "capabilities with no known supporters" finding was the same classification as Overview's "nothing recorded" tiles and was removed from My work (the Elements browse filter for it stays). Two findings that look like duplicates are not, and stay on My work: "critical systems exposed" reads a critical system's own `plannedEnd` (within `STALE_AFTER_MONTHS`), whatever its lifecycle and whether or not it supports a capability, whereas Overview's exposure is a `retiring`/`retired` supporter of a capability; and "poor-fit capability" flags a primary supporter rated poor *or adequate*, whereas Overview's tiles flag only poor — whether "adequate" belongs on Overview is open, and until it's decided the finding stays where it is rather than dropping the adequate cases from Home. The role-based default above follows from the same split — the people who maintain the model land on their worklist, everyone else on the briefing — and stays a default, never a permission.
+
+§3.1 and §3.2 below are the original pre-build specs, kept for their reasoning; the built doors follow `docs/HANDOFF-7d-director-door.md` and `docs/HANDOFF-7d-architect-door.md` and the job split above, and where §3.1/§3.2 disagree with that, the built doors win.
+
+### 3.1 Director's door (Overview)
 
 Opens on **the capability map at `main`**, with three overlays and nothing else:
 
@@ -161,7 +170,7 @@ Opens on **the capability map at `main`**, with three overlays and nothing else:
 
 The director's door has no sidebar, no branch selector, no editing affordance. Comments are readable via the side panel toggle.
 
-### 3.2 Architect's door
+### 3.2 Architect's door (My work)
 
 Opens on a three-column dashboard:
 
@@ -169,11 +178,11 @@ Opens on a three-column dashboard:
 2. **My branches** (centre): change branches where the user has commits, with status, head validation, "behind main by N commits" and a `Refresh` affordance when behind.
 3. **Recent activity** (right): commits, comments, decisions and merges across the model in the last 14 days, each linking to the element/branch. Mentions and replies to the user float to the top.
 
-Below the fold: the same capability map as the director sees, at `main`, with the same health chips.
+Below the fold: the same capability map as the director sees, at `main`, with the same health chips. (Never built, and superseded by the job split above: capability-level weakness is Overview's, and My work links to it rather than repeating it.)
 
 ### 3.3 The switch
 
-Top bar, right side: `Capability view` / `Application view` segmented control (labelled `Director view` / `Architect view` until 2026-10-02 — renamed because the two views are organised around capabilities and around applications, not around who reads them; "director door"/"architect door" below are the historical names for the same two views, and the stored preference still says `director`/`architect`). Switching is instant, remembered, and never changes what the user is permitted to do — a viewer who switches to the architect door sees an empty queue and no branches, with a line explaining why, not an error.
+Top bar, right side: `Overview` / `My work` segmented control — named for the job each view does (see §3's opening). Labelled `Director view` / `Architect view` until 2026-10-02, which read as a role or a permission, then briefly `Capability view` / `Application view`, which described a split by subject that the views never had (My work's findings are as often about capabilities as systems). "Director door"/"architect door" are the historical names for the same two views, and the stored preference still says `director`/`architect`. Switching is instant, remembered, and never changes what the user is permitted to do — a viewer who switches to My work sees an empty queue and no branches, with a line explaining why, not an error.
 
 ---
 

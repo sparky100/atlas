@@ -32,6 +32,7 @@ test('project pack: decide and design inside a project, attach evidence, downloa
 
   await addCapability(page, 'Housing Repairs');
   await goToModelHome(page);
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
 
   // A project from the finding, its scope already filled in.
   await page.getByRole('link', { name: 'Start a project →' }).click();

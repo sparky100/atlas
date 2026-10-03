@@ -1,6 +1,6 @@
 /**
  * F10 (ADR-024) golden path, click-only from Home at 1280 and 390 (S2's
- * own rule): start a project from a health finding → start a decision in
+ * own rule): start a project from Overview's "nothing recorded" tile → start a decision in
  * it → two options → rate → choose → the chosen change is in the project
  * → design it, submit, approve, merge → close the project.
  */
@@ -20,9 +20,11 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   test.slow();
   await signUpCreateOrgAndModel(page, 'projectlifecycle');
 
-  // A capability nothing supports — the architect door's own finding.
+  // A capability nothing supports — flagged "nothing recorded" on Overview, that
+  // finding's one home (UI-principles §3).
   await addCapability(page, 'Housing Repairs');
   await goToModelHome(page);
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
 
   // 1. Start a project from the finding: the form opens already filled in.
   await page.getByRole('link', { name: 'Start a project →' }).click();

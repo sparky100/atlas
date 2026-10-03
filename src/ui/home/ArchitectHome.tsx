@@ -1,3 +1,4 @@
+import { Button } from '../components/Button/Button';
 import { Fragment } from 'react';
 import { Link } from 'react-router';
 import { Chip } from '../components/Chip/Chip';
@@ -14,7 +15,6 @@ import { formatRelativeTime } from '../time';
 import { branchStatusTone } from '../changes/branchStatus';
 import {
   decisionPrefillToSearchParams,
-  prefillFromCapabilityNoSupportersFinding,
   prefillFromCriticalExposedFinding,
   prefillFromCriticalSupportEndFinding,
   prefillFromOutgoingDisposition,
@@ -38,6 +38,8 @@ export interface ArchitectHomeProps {
   role: MemberRole | null;
   orgSlug: string;
   modelSlug: string;
+  /** Switches Home to Overview — UI-principles §3's one-home-per-finding rule: capability weakness lives on Overview, so this door links across to it rather than repeating it. */
+  onShowOverview: () => void;
 }
 
 function plural(count: number, singular: string, pluralForm: string): string {
@@ -143,7 +145,7 @@ function resolveCardAction(check: HealthCheck): FindingCardAction | null {
  *    (`gridAssuranceChecks`/`infoAssuranceChecks` below) rather than a
  *    second, parallel layout.
  */
-export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: ArchitectHomeProps) {
+export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShowOverview }: ArchitectHomeProps) {
   const now = new Date();
   // E8 item (4): `null` while Health findings/Recent activity are still
   // loading (or failed) — every array below built from it defaults to
@@ -336,23 +338,6 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
           }
         : {}),
     },
-    {
-      // The architect door's third decision-shaped finding
-      // (per-item-actions prompt): a level-1 capability with nothing
-      // recorded at all — the same classification the director door's own
-      // weak-capability grid already flags (`findCapabilitiesWithNoSupporters`'s
-      // own doc comment). Medium, not high, for the same reason
-      // `poor-fit-no-replacement` above is medium: a real gap, but not tied
-      // to an explicit `criticality: 'critical'` attribute the way
-      // `critical-exposed`/`critical-support-end` are.
-      key: 'capability-no-supporters',
-      count: insightsData.capabilitiesWithNoSupporters.length,
-      summary: `${String(insightsData.capabilitiesWithNoSupporters.length)} ${plural(insightsData.capabilitiesWithNoSupporters.length, 'capability', 'capabilities')} with no known supporters`,
-      items: elementItems(insightsData.capabilitiesWithNoSupporters),
-      severity: 'medium',
-      browseHref: browseHref('capability-no-supporters'),
-      ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromCapabilityNoSupportersFinding({ id: item.id, name: item.label })) } : {}),
-        },
     {
       // F11: a recorded Migrate/Eliminate with no open change retiring it.
       // Each item names the open project already scoped to it, and its one
@@ -653,6 +638,10 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
                 View boundary crossings →
               </Text>
             </Link>
+            {/* UI-principles §3: where capabilities are weak is Overview's to show, not repeated here. */}
+            <Button variant="ghost" onClick={onShowOverview}>
+              Where capabilities are weak is on Overview →
+            </Button>
 
             {/* E8 item (4): Health findings load after first paint
                 (`useArchitectHomeInsights.ts`) — everything below reads

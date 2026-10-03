@@ -14,7 +14,7 @@ import { defaultIntentForEntryPoint } from '../changes/branchIntent';
 import type { BranchIntent } from '../../db/types';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { attributesRecord } from '../elements/attributesRecord';
-import { decisionPrefillToSearchParams, prefillFromPoorFitCapabilities, prefillFromWeakCapability } from '../decisions/decisionPrefill';
+import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromPoorFitCapabilities, prefillFromWeakCapability } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { importanceLabel } from './capabilityImportance';
 import { compareWeakTiles, formatPoorFitPillLabel, isCapabilityTileWeak, poorFitPillTone } from './capabilityTileFit';
@@ -39,6 +39,8 @@ export interface DirectorHomeProps {
   modelSlug: string;
   /** The director door's own already-resolved main head commit id — passed straight to `ValueStreamsOutcomeView` (the "By outcome" reading) the same way `useDirectorHome` already uses it. */
   mainCommitIdHint: UUID | null;
+  /** Switches Home to My work — UI-principles §3's one-home-per-finding rule: model-quality findings live on My work, so this door links across to them rather than repeating them. */
+  onShowMyWork: () => void;
 }
 
 /**
@@ -52,7 +54,7 @@ export interface DirectorHomeProps {
  * title/search chrome stays the existing shared header rather than a
  * director-only redesign of it, to avoid touching the architect door).
  */
-export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSlug, modelSlug, mainCommitIdHint }: DirectorHomeProps) {
+export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSlug, modelSlug, mainCommitIdHint, onShowMyWork }: DirectorHomeProps) {
   const capabilityMapHref = `/o/${orgSlug}/m/${modelSlug}/capability-map`;
   // Prompt pack F0: which entry point (if either) is currently open, and
   // therefore which intent the picker it opens should default to —
@@ -112,6 +114,10 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
             </Text>
           </Link>
         </div>
+        {/* UI-principles §3: model-quality findings are My work's to show, not repeated here. */}
+        <Button variant="ghost" onClick={onShowMyWork}>
+          Missing owners, links, labels and stale values are on My work →
+        </Button>
         <div className={styles.viewToggle} role="group" aria-label="Weakness view">
           <Button variant={weaknessView === 'capability' ? 'primary' : 'ghost'} onClick={() => { setWeaknessView('capability'); }} aria-pressed={weaknessView === 'capability'}>
             By capability
@@ -321,9 +327,16 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
   // would be wrong for a tile that's only weak because of fit), and
   // rendered as a sibling *after* the tile's own primary link, not nested
   // inside it (an `<a>` cannot legally contain another `<a>`).
+  // A "nothing recorded" tile is the capability-no-supporters finding,
+  // whose one home is this grid since 2026-10-03 (UI-principles §3) — it
+  // keeps that finding's own, more specific prefill ("Who supports X?",
+  // `sourceFindingKey: 'capability-no-supporters'`) rather than the
+  // generic weak-capability one.
+  const tileCapability = { id: tile.capability.element_id, name: tile.capability.name };
+  const tilePrefill = tile.tone === 'neutral' ? prefillFromCapabilityNoSupportersFinding(tileCapability) : prefillFromWeakCapability(tileCapability, TONE_LABEL[tile.tone]);
   const startDecisionHref =
     tile.tone !== 'ok' && canStartDecision(role)
-      ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefillFromWeakCapability({ id: tile.capability.element_id, name: tile.capability.name }, TONE_LABEL[tile.tone])).toString()}`
+      ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(tilePrefill).toString()}`
       : null;
   // F6.1: a second, independent "Start a decision" for the fit reason —
   // concerns are the individual poor-fit capabilities under this tile

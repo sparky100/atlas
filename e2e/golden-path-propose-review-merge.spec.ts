@@ -192,8 +192,8 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   // Changes item's badge drops it: no count left at all.
   await goToModelHome(page);
   await expect(nav.getByRole('link', { name: 'Changes', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Capability view' }).click();
-  await expect(page.getByRole('button', { name: 'Capability view' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Overview', exact: true })).toHaveAttribute('aria-pressed', 'true');
   // The capability map tile itself never links to a system by name — just
   // its own supporting-system count and a "→ Landscape" zoom link
   // (`CapabilityMapView.tsx`'s own doc comment: "every tile's
