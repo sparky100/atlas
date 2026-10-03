@@ -39,6 +39,8 @@ export interface DirectorHomeProps {
   modelSlug: string;
   /** The director door's own already-resolved main head commit id — passed straight to `ValueStreamsOutcomeView` (the "By outcome" reading) the same way `useDirectorHome` already uses it. */
   mainCommitIdHint: UUID | null;
+  /** Switches Home to My work — UI-principles §3's one-home-per-finding rule: model-quality findings live on My work, so this door links across to them rather than repeating them. */
+  onShowMyWork: () => void;
 }
 
 /**
@@ -52,7 +54,7 @@ export interface DirectorHomeProps {
  * title/search chrome stays the existing shared header rather than a
  * director-only redesign of it, to avoid touching the architect door).
  */
-export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSlug, modelSlug, mainCommitIdHint }: DirectorHomeProps) {
+export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSlug, modelSlug, mainCommitIdHint, onShowMyWork }: DirectorHomeProps) {
   const capabilityMapHref = `/o/${orgSlug}/m/${modelSlug}/capability-map`;
   // Prompt pack F0: which entry point (if either) is currently open, and
   // therefore which intent the picker it opens should default to —
@@ -112,6 +114,10 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
             </Text>
           </Link>
         </div>
+        {/* UI-principles §3: model-quality findings are My work's to show, not repeated here. */}
+        <Button variant="ghost" onClick={onShowMyWork}>
+          Missing owners, links, labels and stale values are on My work →
+        </Button>
         <div className={styles.viewToggle} role="group" aria-label="Weakness view">
           <Button variant={weaknessView === 'capability' ? 'primary' : 'ghost'} onClick={() => { setWeaknessView('capability'); }} aria-pressed={weaknessView === 'capability'}>
             By capability
