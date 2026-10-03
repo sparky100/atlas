@@ -142,6 +142,8 @@ export function useReviewRequest(modelId: UUID, mergeRequestId: UUID, userId: UU
     // count — the nav badge and the Changes tabs re-read it in place,
     // without waiting for the next page change.
     void queryClient.invalidateQueries({ queryKey: queryKeys.reviewQueueCount(modelId) });
+    // Merge and reject end the change, so the open-changes badge moves too.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.openChangeCount(modelId) });
   }, [queryClient, modelId]);
 
   const setFieldChoice = useCallback((choice: FieldConflictChoice) => {

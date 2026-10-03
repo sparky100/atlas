@@ -138,7 +138,7 @@ Every change says **why** it exists:
 - **Propose** and **Explore** changes go through review: **Submit for review**, pick the reviewers, and they appear in the **Review queue** tab of Changes. Reviewers **Approve**, **Request changes** or **Abstain**; once the required reviewers approve, an architect or owner **Merges**.
 - If main moved on meanwhile, the review page shows any conflicts and lets you resolve them and **Push refresh** before merging.
 - A change in review can be **split**, sending some of its edits on ahead as their own change.
-- A change still in draft or proposed can be **cancelled** (with a reason); **Duplicate into a new draft** starts again from it. Cancelled changes are listed separately at the bottom of the Changes page.
+- A change still in draft or proposed can be **cancelled** (with a reason); **Duplicate into a new draft** starts again from it. The Changes page lists open changes (draft, proposed, in review or approved) grouped by intent — the number on the **Changes** menu item is how many there are. Merged, cancelled, and rejected or archived changes each have their own collapsed section at the bottom.
 
 ## Decisions
 

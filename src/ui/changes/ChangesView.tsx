@@ -14,7 +14,8 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import { useThreadCounts } from '../comments/useThreadCounts';
 import type { BranchIntent, BranchRow } from '../../db/types';
 import { branchStatusTone } from './branchStatus';
-import { dateFieldLabelForIntent, INTENT_LABEL, INTENT_OPTIONS, NEW_CHANGE_INTENT_OPTIONS } from './branchIntent';
+import { dateFieldLabelForIntent, INTENT_LABEL, NEW_CHANGE_INTENT_OPTIONS } from './branchIntent';
+import { groupChangesList } from './changesListGroups';
 import { useRouteTiming } from '../perf/useRouteTiming';
 import { useChangeSummaries } from './useChangeSummaries';
 import { useChanges } from './useChanges';
@@ -71,22 +72,19 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   // every card at once — see useChangeSummaries.ts's own comment.
   const summariesState = useChangeSummaries(modelId, branches);
   const summaries = summariesState.status === 'ready' ? summariesState.summaries : undefined;
-  // S1 item 4: "listed under a collapsed 'Cancelled' section" — same
-  // active/collapsed split `OrgHome.tsx` already uses for archived models
-  // (`activeModels`/`archivedModels`, its own `CollapsibleSection`).
-  const activeBranches = branches.filter((b) => b.status !== 'cancelled');
-  const cancelledBranches = branches.filter((b) => b.status === 'cancelled');
-  // Prompt pack F0: "Changes list groups by intent" — one CollapsibleSection
-  // per intent, in `INTENT_OPTIONS`' own order (record, propose, correct,
-  // explore), shown only when it actually has an active branch — same
-  // "skip when empty" convention the Cancelled section below already uses,
-  // rather than four sections where most read "nothing here" on a small
-  // model. `?? 'propose'` covers only a pre-F0 change branch (real `intent`
-  // is never null post-migration) — same fallback `ChangeView.tsx` uses.
-  const branchesByIntent = INTENT_OPTIONS.map((option) => ({
-    intent: option.value,
-    branches: activeBranches.filter((b) => (b.intent ?? 'propose') === option.value),
-  }));
+  // Open changes by intent — each group's count adds up to the nav badge
+  // (`countOpenChangeBranches`) — then merged, cancelled (S1 item 4) and
+  // otherwise-closed changes in their own collapsed sections, the same
+  // active/collapsed split `OrgHome.tsx` uses for archived models. An intent
+  // group shows only when it has an open change, rather than four sections
+  // where most read "nothing here" on a small model.
+  const { openByIntent, merged, cancelled, closed } = groupChangesList(branches);
+  const hasOpen = openByIntent.some((g) => g.branches.length > 0);
+  const endedSections = [
+    { title: 'Merged', branches: merged },
+    { title: 'Cancelled', branches: cancelled },
+    { title: 'Rejected or archived', branches: closed },
+  ];
 
   return (
     <div>
@@ -243,8 +241,9 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
           </Text>
         </Panel>
       )}
-      {activeBranches.length === 0 && status !== 'loading' && <EmptyState>No changes yet. {canCreate ? 'Create one above.' : 'Nobody has proposed one.'}</EmptyState>}
-      {branchesByIntent.map(
+      {branches.length === 0 && status !== 'loading' && <EmptyState>No changes yet. {canCreate ? 'Create one above.' : 'Nobody has proposed one.'}</EmptyState>}
+      {branches.length > 0 && !hasOpen && status !== 'loading' && <EmptyState>No open changes.{canCreate ? ' Create one above.' : ''}</EmptyState>}
+      {openByIntent.map(
         ({ intent, branches: group }) =>
           group.length > 0 && (
             <CollapsibleSection key={intent} title={INTENT_LABEL[intent]} meta={`(${String(group.length)})`}>
@@ -264,21 +263,24 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
           ),
       )}
 
-      {cancelledBranches.length > 0 && (
-        <CollapsibleSection title="Cancelled" meta={`(${String(cancelledBranches.length)})`} defaultOpen={false}>
-          <ul className={styles.list}>
-            {cancelledBranches.map((branch) => (
-              <ChangeRow
-                key={branch.id}
-                branch={branch}
-                orgSlug={orgSlug}
-                modelSlug={modelSlug}
-                unresolvedCount={threadCounts?.get(branch.id)?.open}
-                summary={summaries?.get(branch.id)}
-              />
-            ))}
-          </ul>
-        </CollapsibleSection>
+      {endedSections.map(
+        ({ title, branches: group }) =>
+          group.length > 0 && (
+            <CollapsibleSection key={title} title={title} meta={`(${String(group.length)})`} defaultOpen={false}>
+              <ul className={styles.list}>
+                {group.map((branch) => (
+                  <ChangeRow
+                    key={branch.id}
+                    branch={branch}
+                    orgSlug={orgSlug}
+                    modelSlug={modelSlug}
+                    unresolvedCount={threadCounts?.get(branch.id)?.open}
+                    summary={summaries?.get(branch.id)}
+                  />
+                ))}
+              </ul>
+            </CollapsibleSection>
+          ),
       )}
     </div>
   );

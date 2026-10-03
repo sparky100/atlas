@@ -10,7 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { UUID } from '../contracts/delta';
-import { cancelChange, countActiveChangeBranches, createChangeBranch, getBranch, getMainBranch } from './branches';
+import { cancelChange, countOpenChangeBranches, createChangeBranch, getBranch, getMainBranch } from './branches';
 import { countCaptureDraftsAwaitingReview } from './captureJobs';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
@@ -134,21 +134,33 @@ describe('review queue count against a real local Supabase', () => {
     expect(await countCaptureDraftsAwaitingReview(owner.client, modelId)).toBe(1);
   });
 
-  it('the Changes badge counts changes that aren\'t cancelled: a new draft adds one, cancelling it takes it away', async () => {
-    const before = await countActiveChangeBranches(owner.client, modelId);
+  it('the Changes badge counts only open changes: a new draft adds one; merging or cancelling takes it away', async () => {
+    const before = await countOpenChangeBranches(owner.client, modelId);
     const main = await getMainBranch(owner.client, modelId);
     if (!main) throw new Error('main branch missing');
-    const branchId = randomUUID();
-    await createChangeBranch(owner.client, { id: branchId, orgId, modelId, name: `open-${randomUUID().slice(0, 8)}`, createdBy: owner.id, intent: 'record', mainHeadCommitId: main.head_commit_id });
-    expect(await countActiveChangeBranches(owner.client, modelId)).toBe(before + 1);
-    await cancelChange(owner.client, branchId, 'Not needed.');
-    expect(await countActiveChangeBranches(owner.client, modelId)).toBe(before);
+    const createDraft = async () => {
+      const id = randomUUID();
+      await createChangeBranch(owner.client, { id, orgId, modelId, name: `open-${randomUUID().slice(0, 8)}`, createdBy: owner.id, intent: 'record', mainHeadCommitId: main.head_commit_id });
+      return id;
+    };
+
+    const cancelledId = await createDraft();
+    expect(await countOpenChangeBranches(owner.client, modelId)).toBe(before + 1);
+    await cancelChange(owner.client, cancelledId, 'Not needed.');
+    expect(await countOpenChangeBranches(owner.client, modelId)).toBe(before);
+
+    const mergedId = await createDraft();
+    expect(await countOpenChangeBranches(owner.client, modelId)).toBe(before + 1);
+    // Merging is the review queue's job; the status is set directly here as test setup only.
+    const { error } = await service.from('branches').update({ status: 'merged' }).eq('id', mergedId);
+    if (error) throw new Error(`mark merged: ${error.message}`);
+    expect(await countOpenChangeBranches(owner.client, modelId)).toBe(before);
   });
 
   it('a non-member counts nothing (RLS)', async () => {
     const outsider = await createSignedInUser('rqcount-outsider');
     expect(await countReviewQueueMergeRequests(outsider.client, modelId)).toBe(0);
     expect(await countCaptureDraftsAwaitingReview(outsider.client, modelId)).toBe(0);
-    expect(await countActiveChangeBranches(outsider.client, modelId)).toBe(0);
+    expect(await countOpenChangeBranches(outsider.client, modelId)).toBe(0);
   });
 });

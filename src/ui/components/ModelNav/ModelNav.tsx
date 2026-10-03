@@ -6,7 +6,7 @@ import { Text } from '../Text/Text';
 import { useBranchLabel } from '../../branches/useBranchLabel';
 import { useModels } from '../../models/useModels';
 import { useOrganisationBySlug } from '../../orgs/useOrganisationBySlug';
-import { useActiveChangeCount } from '../../changes/useActiveChangeCount';
+import { useOpenChangeCount } from '../../changes/useOpenChangeCount';
 import { SearchDialog } from '../../search/SearchDialog';
 import { useSelectedRef } from '../../branches/useSelectedRef';
 import { isViewingMode } from '../../branches/viewingMode';
@@ -132,7 +132,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
   const { organisation } = useOrganisationBySlug(orgSlug);
   const { models } = useModels(organisation?.id ?? null);
   const modelId = models.find((m) => m.slug === modelSlug)?.id ?? null;
-  const activeChangeCount = useActiveChangeCount(modelId);
+  const openChangeCount = useOpenChangeCount(modelId);
   const viewing = isViewingMode(searchParams);
   const refParam = refQueryParam(ref, false);
   const refParamViewing = refQueryParam(ref, viewing);
@@ -234,7 +234,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
             {shortLabel}
           </span>
         )}
-        {section === 'changes' && activeChangeCount !== null && activeChangeCount > 0 && <ChangesBadge count={activeChangeCount} />}
+        {section === 'changes' && openChangeCount !== null && openChangeCount > 0 && <ChangesBadge count={openChangeCount} />}
       </Link>
     );
   };

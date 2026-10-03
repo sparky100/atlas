@@ -188,10 +188,10 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   await expect(page.getByText('merged', { exact: true }).first()).toBeVisible();
 
   // 7. Director sees the result: the merged change on main, from the
-  // capability map door. A merged change still counts on the Changes
-  // item's badge — the page lists it — only a cancelled one drops out.
+  // capability map door. A merged change is no longer open, so the
+  // Changes item's badge drops it: no count left at all.
   await goToModelHome(page);
-  await expect(nav.getByRole('link', { name: 'Changes (1 change)' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Changes', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Capability view' }).click();
   await expect(page.getByRole('button', { name: 'Capability view' })).toHaveAttribute('aria-pressed', 'true');
   // The capability map tile itself never links to a system by name — just

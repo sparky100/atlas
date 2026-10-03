@@ -15,7 +15,7 @@
 import { assertRealId } from './assertRealId';
 import type { Client } from './client';
 import { assertInFilterSize } from './inFilterLimit';
-import type { BranchIntent, BranchRow } from './types';
+import type { BranchIntent, BranchRow, BranchStatus } from './types';
 import type { UUID } from '../contracts/delta';
 
 export interface CreateChangeBranchInput {
@@ -151,16 +151,25 @@ export async function listChangeBranches(supabase: Client, modelId: UUID): Promi
   return data as BranchRow[];
 }
 
+/** The change statuses that still have work to do — not merged, not ended (cancelled, rejected, archived). */
+export const OPEN_CHANGE_STATUSES: readonly BranchStatus[] = ['draft', 'proposed', 'in_review', 'approved'];
+
 /**
- * How many changes on a model aren't cancelled — the Changes nav item's
- * badge, counting exactly what the Changes page lists above its collapsed
- * "Cancelled" group (`ChangesView.tsx`'s `activeBranches`), merged ones
- * included. A count only (`head: true`), no id list (rule 8).
+ * How many changes on a model are still open — the Changes nav item's
+ * badge: drafts, and those proposed, in review or approved. Merged and
+ * ended (cancelled, rejected, archived) changes aren't counted. A count
+ * only (`head: true`); the `.in()` is over the fixed status list above,
+ * never an id list (rule 8).
  */
-export async function countActiveChangeBranches(supabase: Client, modelId: UUID): Promise<number> {
-  assertRealId('countActiveChangeBranches', 'model_id', modelId);
-  const { count, error } = await supabase.from('branches').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('kind', 'change').neq('status', 'cancelled');
-  if (error) throw new Error(`countActiveChangeBranches: ${error.message}`);
+export async function countOpenChangeBranches(supabase: Client, modelId: UUID): Promise<number> {
+  assertRealId('countOpenChangeBranches', 'model_id', modelId);
+  const { count, error } = await supabase
+    .from('branches')
+    .select('id', { count: 'exact', head: true })
+    .eq('model_id', modelId)
+    .eq('kind', 'change')
+    .in('status', [...OPEN_CHANGE_STATUSES]);
+  if (error) throw new Error(`countOpenChangeBranches: ${error.message}`);
   return count ?? 0;
 }
 
