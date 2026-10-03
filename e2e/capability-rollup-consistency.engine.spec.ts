@@ -100,7 +100,7 @@ test('capability rollup: the same "1 system, 1/7 supported" rollup appears on th
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // The org's creator is its owner, so the default door is architect —
   // switch to director, same precedent as e2e/director-door.engine.spec.ts.
-  await page.getByRole('button', { name: 'Overview' }).click();
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
   const directorTile = page.getByRole('link', { name: /Digital Services/ });
   await expect(directorTile).toBeVisible();
   await expect(directorTile.getByText('1 system', { exact: false })).toBeVisible();

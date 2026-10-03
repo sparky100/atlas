@@ -14,7 +14,7 @@ import { addCapability, addSystemFromHome, goToModelHome, signUpCreateOrgAndMode
 
 /** `HomeModeSwitch`'s own toggle occasionally doesn't register on the very first click right after a save+navigate — pre-existing, unrelated to this test's own feature; retried rather than masked, so a genuine break still fails loudly on the final assertion. */
 async function switchToDirectorView(page: Page): Promise<void> {
-  const button = page.getByRole('button', { name: 'Overview' });
+  const button = page.getByRole('button', { name: 'Overview', exact: true });
   for (let attempt = 0; attempt < 4; attempt++) {
     await button.click();
     try {

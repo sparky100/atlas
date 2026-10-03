@@ -19,8 +19,8 @@ test('a capability with no supporters shows on Overview only, and each Home view
 
   // An owner starts on My work. The unsupported capability isn't one of its
   // findings any more — My work points to Overview for that instead.
-  const myWork = page.getByRole('button', { name: 'My work' });
-  const overview = page.getByRole('button', { name: 'Overview' });
+  const myWork = page.getByRole('button', { name: 'My work', exact: true });
+  const overview = page.getByRole('button', { name: 'Overview', exact: true });
   await expect(myWork).toHaveAttribute('aria-pressed', 'true');
   const healthFindings = page.getByTestId('health-findings-panel');
   // Findings have loaded once the capability's own "no owner" finding (a

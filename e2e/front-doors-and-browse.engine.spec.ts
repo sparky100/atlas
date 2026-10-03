@@ -125,7 +125,7 @@ test('front doors and browse: both doors render for a seeded model, switching pe
   // Switching to the director door renders the weakness grid (Handoff 7d):
   // the exposed capability's own tile, naming the retiring system that
   // exposes it, plus the "N capabilities exposed" summary chip.
-  await page.getByRole('button', { name: 'Overview' }).click();
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Billing/ })).toBeVisible();
   await expect(page.getByText('1 capability exposed')).toBeVisible();
@@ -136,7 +136,7 @@ test('front doors and browse: both doors render for a seeded model, switching pe
   // just the in-memory toggle state.
   await page.reload();
   await expect(page.getByRole('link', { name: /Billing/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Overview' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Overview', exact: true })).toHaveAttribute('aria-pressed', 'true');
 
   // The search box is search-first and opens an existing element rather
   // than creating a duplicate.

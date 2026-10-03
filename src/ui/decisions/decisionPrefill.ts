@@ -121,7 +121,7 @@ export function prefillFromCriticalExposedFinding(system: { id: UUID; name: stri
   };
 }
 
-/** `findCapabilitiesWithNoSupporters`'s own finding (`ArchitectHome.tsx`'s `capability-no-supporters` check) — the third of the architect door's three named decision-shaped findings. */
+/** `findCapabilitiesWithNoSupporters`'s own finding — read from Overview's "nothing recorded" tile (`DirectorHome.tsx`, its one home since 2026-10-03, UI-principles §3) and the Elements browse table's `capability-no-supporters` filter. */
 export function prefillFromCapabilityNoSupportersFinding(capability: { id: UUID; name: string }): DecisionPrefill {
   return {
     title: `Who supports ${capability.name}?`,
