@@ -165,3 +165,17 @@ export async function chooseDecisionOption(supabase: Client, decisionId: UUID, c
   if (error) throw new Error(`chooseDecisionOption: ${error.message}`);
   return data as DecisionRow;
 }
+
+/**
+ * Cancel a proposed decision: `atlas.cancel_decision`
+ * (`20261005010000_cancel_decision.sql`). Atomically sets it `rejected`
+ * (shown as "Cancelled") with the reason and who/when, and cancels every
+ * option still in draft. Only the decision's own owner or an org
+ * owner/architect, and only while proposed — the RPC checks both.
+ */
+export async function cancelDecision(supabase: Client, decisionId: UUID, reason: string): Promise<DecisionRow> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.schema('atlas').rpc('cancel_decision', { p_decision_id: decisionId, p_reason: reason });
+  if (error) throw new Error(`cancelDecision: ${error.message}`);
+  return data as DecisionRow;
+}

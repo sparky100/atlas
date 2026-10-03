@@ -17,7 +17,7 @@ import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { DecisionLinkPicker } from '../decisions/DecisionLinkPicker';
-import { decisionStatusTone } from '../decisions/decisionStatus';
+import { decisionStatusLabel, decisionStatusTone } from '../decisions/decisionStatus';
 import { reportError } from '../errors/errorBannerStore';
 import { canCreateChangeBranch, canEditProject, canStartDecision } from '../orgs/roleGates';
 import { useMembers } from '../orgs/useMembers';
@@ -344,7 +344,7 @@ function DecisionLine({ decision, href, overdue, first }: { decision: DecisionRo
       <div>
         <Link to={href}>{decision.title}</Link>
         <div className={styles.meta}>
-          <Chip tone={decisionStatusTone(decision.status)}>{decision.status}</Chip>
+          <Chip tone={decisionStatusTone(decision.status)}>{decisionStatusLabel(decision.status)}</Chip>
           {overdue && <Chip tone="warn">Overdue — needed by {decision.needed_by}</Chip>}
           {first && (
             <Text as="span" size="xs" tone="faint">

@@ -146,6 +146,12 @@ export function canChooseDecisionOption(role: MemberRole | null): boolean {
   return role === 'owner' || role === 'architect';
 }
 
+/** Cancel a decision: mirrors `atlas.cancel_decision` (`20261005010000_cancel_decision.sql`) — an org owner/architect (as for choosing) or the decision's own owner, while it's still proposed. */
+export function canCancelDecision(role: MemberRole | null, decision: Pick<DecisionRow, 'status' | 'owner_id'>, userId: UUID | null): boolean {
+  if (role === null || decision.status !== 'proposed') return false;
+  return role === 'owner' || role === 'architect' || (userId !== null && decision.owner_id === userId);
+}
+
 /** F1 ("custom attributes"): mirrors `attribute_definitions_insert`/`_update`'s own RLS floor (`supabase/migrations/20260914020000_attribute_definitions.sql`) — same owner-only floor `canManageOrgSettings` uses; define/reorder/deprecate are all gated the same way. */
 export function canManageAttributeDefinitions(role: MemberRole | null): boolean {
   return role === 'owner';

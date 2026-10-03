@@ -14,12 +14,14 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import type { BranchRow, DecisionLinkRow, DecisionRow, MemberRole } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { profileLabel } from '../comments/profileLabel';
-import { canChooseDecisionOption, canCreateChangeBranch, canRateDecisionOption } from '../orgs/useMembership';
+import { canCancelDecision, canChooseDecisionOption, canCreateChangeBranch, canRateDecisionOption } from '../orgs/useMembership';
 import { useMembers } from '../orgs/useMembers';
 import type { AlsoAffectedElement } from './alsoAffected';
 import { DecisionCriteriaGrid, type DecisionCriteriaOption } from './DecisionCriteriaGrid';
-import { decisionStatusTone } from './decisionStatus';
+import { decisionStatusLabel, decisionStatusTone } from './decisionStatus';
+import { cancelDecision } from '../../db/decisions';
 import { setDecisionProject } from '../../db/projects';
+import { reportError } from '../errors/errorBannerStore';
 import { ProjectAssignment } from '../projects/ProjectAssignment';
 import { supabase } from '../supabaseClient';
 import { buildDecisionAdrExportInput } from './decisionAdrInput';
@@ -151,7 +153,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   return (
     <div>
       <div className={styles.meta}>
-        <Chip tone={decisionStatusTone(decision.status)}>{decision.status}</Chip>
+        <Chip tone={decisionStatusTone(decision.status)}>{decisionStatusLabel(decision.status)}</Chip>
         {decision.needed_by !== null && (
           <Text as="span" tone="muted" size="sm">
             Needed by: {decision.needed_by}
@@ -168,6 +170,16 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           {adrCopied ? 'Copied' : 'Copy as ADR markdown'}
         </Button>
       </div>
+      <DecisionCancel
+        decision={decision}
+        canCancel={canCancelDecision(role, decision, userId)}
+        cancelledByName={decision.decided_by !== null ? profileLabel(members.find((m) => m.member.user_id === decision.decided_by)?.profile) : null}
+        onCancelled={async (updated) => {
+          applyDecisionUpdate(updated);
+          // Its draft options were cancelled with it.
+          await refreshOptionsAndArguments();
+        }}
+      />
       {/* F10 step 4 (ADR-024 P1): moving a proposed decision moves its draft options with it. */}
       <ProjectAssignment
         modelId={modelId}
@@ -564,5 +576,104 @@ function WhatChangesRowGroup({ group, optionBranchIds }: { group: WhatChangesRow
         </tr>
       ))}
     </>
+  );
+}
+
+/**
+ * Cancel a decision (`atlas.cancel_decision`): for a proposed decision that
+ * is no longer needed — closed without choosing, with a reason, its draft
+ * options cancelled with it. Once cancelled, says who, when and why.
+ */
+function DecisionCancel({
+  decision,
+  canCancel,
+  cancelledByName,
+  onCancelled,
+}: {
+  decision: DecisionRow;
+  canCancel: boolean;
+  cancelledByName: string | null;
+  onCancelled: (updated: DecisionRow) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  if (decision.status === 'rejected') {
+    return (
+      <Panel>
+        <Text as="p">
+          Cancelled{cancelledByName !== null ? ` by ${cancelledByName}` : ''}
+          {decision.decided_at !== null ? ` on ${decision.decided_at.slice(0, 10)}` : ''}
+          {decision.cancel_reason !== null ? ` — ${decision.cancel_reason}` : ''}.
+        </Text>
+      </Panel>
+    );
+  }
+  if (!canCancel) return null;
+  if (!open) {
+    return (
+      <div className={styles.field}>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setOpen(true);
+          }}
+        >
+          Cancel decision…
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <Panel>
+      <div className={styles.field}>
+        <label htmlFor="cancel-decision-reason">
+          <Text as="span" size="sm" tone="muted">
+            Why is this decision being cancelled?
+          </Text>
+        </label>
+        <textarea
+          id="cancel-decision-reason"
+          className={styles.textarea}
+          placeholder="Reason (required)"
+          value={reason}
+          onChange={(e) => {
+            setReason(e.target.value);
+          }}
+        />
+        <Text as="p" size="sm" tone="muted">
+          It stays in the decision log, marked cancelled. Any options still in draft are cancelled with it.
+        </Text>
+        <div className={styles.addOptionForm}>
+          <Button
+            variant="primary"
+            disabled={busy || reason.trim().length === 0}
+            onClick={() => {
+              setBusy(true);
+              void cancelDecision(supabase, decision.id, reason)
+                .then(onCancelled)
+                .catch((e: unknown) => {
+                  reportError('Could not cancel this decision.', e);
+                })
+                .finally(() => {
+                  setBusy(false);
+                });
+            }}
+          >
+            {busy ? 'Cancelling…' : 'Confirm cancel'}
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setOpen(false);
+              setReason('');
+            }}
+          >
+            Keep it
+          </Button>
+        </div>
+      </div>
+    </Panel>
   );
 }

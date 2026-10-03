@@ -1,6 +1,7 @@
 import type { UUID } from '../../contracts/delta';
 import type { BranchRow, DecisionRow } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
+import { decisionStatusLabel } from './decisionStatus';
 import type { WhatChangesRow } from './whatChangesRows';
 
 /**
@@ -60,7 +61,9 @@ export interface DecisionAdrExportInput {
 }
 
 function statusLine(decision: DecisionRow): string {
-  const label = decision.status.charAt(0).toUpperCase() + decision.status.slice(1);
+  const shown = decisionStatusLabel(decision.status);
+  const label = shown.charAt(0).toUpperCase() + shown.slice(1);
+  if (decision.status === 'rejected') return decision.decided_at ? `${label} — ${decision.decided_at.slice(0, 10)}` : label;
   // The date only — `decided_at` is a full timestamp, which reads as noise in a document.
   return decision.decided_at ? `${label} — decided ${decision.decided_at.slice(0, 10)}` : label;
 }
@@ -138,6 +141,8 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
       lines.push('');
       lines.push(reasons);
     }
+  } else if (decision.status === 'rejected') {
+    lines.push(decision.cancel_reason ? `Cancelled without choosing an option: ${decision.cancel_reason}` : 'Cancelled without choosing an option.');
   } else {
     lines.push('Not yet decided.');
   }

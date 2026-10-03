@@ -427,8 +427,11 @@ export interface DecisionRow {
   source_finding_key: string | null;
   /** F3's own "may cite a Lens map by URL; no shared schema" — a bare column, no FK. */
   lens_map_url: string | null;
+  /** Who closed the decision — chose an option, or cancelled it. */
   decided_by: UUID | null;
   decided_at: string | null;
+  /** Why it was cancelled — set together with `status: 'rejected'` (shown as "Cancelled") by `atlas.cancel_decision`, `null` otherwise (and on any row rejected before that function existed). */
+  cancel_reason: string | null;
   /** The chosen option's branch, once accepted (PR5). */
   branch_id: UUID | null;
   superseded_decision_id: UUID | null;

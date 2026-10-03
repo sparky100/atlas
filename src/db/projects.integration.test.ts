@@ -15,7 +15,7 @@ import { createServiceRoleClient, createSupabaseClient } from './client';
 import { createComment } from './comments';
 import { commitToBranch } from './commits';
 import { upsertDecisionRating } from './decisionRatings';
-import { createDecision, createDecisionLink, getDecision } from './decisions';
+import { cancelDecision, createDecision, createDecisionLink, getDecision } from './decisions';
 import { loadEnv } from './env';
 import { archiveModel, createModel, deleteModel } from './models';
 import { createOrganisation } from './organisations';
@@ -184,7 +184,7 @@ describe('projects (ADR-024) against a real local Supabase', () => {
       // Close out the open items through their own actions, then close.
       await cancelChange(contributor.client, change.id, 'Not needed.');
       expect(await setProjectStatus(contributor.client, project.id, 'closed')).toEqual({ status: 'open_items' });
-      await service.from('decisions').update({ status: 'rejected' }).eq('id', decision.id); // test setup: no reject RPC exists yet
+      await cancelDecision(contributor.client, decision.id, 'Not needed any more.');
       const closed = await setProjectStatus(contributor.client, project.id, 'closed');
       expect(closed.status).toBe('updated');
       if (closed.status !== 'updated') return;

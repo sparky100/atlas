@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
-import { canApproveOrMergeRequest, canArchiveModel, canDeleteModel, canEditBranch, canEditValueStreamStructure, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
+import { canApproveOrMergeRequest, canArchiveModel, canCancelDecision, canDeleteModel, canEditBranch, canEditValueStreamStructure, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
   return {
@@ -158,5 +158,23 @@ describe('canManageAttributeDefinitions', () => {
     expect(canManageAttributeDefinitions('contributor')).toBe(false);
     expect(canManageAttributeDefinitions('viewer')).toBe(false);
     expect(canManageAttributeDefinitions(null)).toBe(false);
+  });
+});
+
+describe('canCancelDecision (mirrors atlas.cancel_decision)', () => {
+  const proposed = { status: 'proposed' as const, owner_id: 'owner-user' };
+  it('lets an org owner or architect cancel any proposed decision', () => {
+    expect(canCancelDecision('owner', proposed, 'someone')).toBe(true);
+    expect(canCancelDecision('architect', proposed, 'someone')).toBe(true);
+  });
+  it("lets the decision's own owner cancel it, at any role", () => {
+    expect(canCancelDecision('contributor', proposed, 'owner-user')).toBe(true);
+    expect(canCancelDecision('contributor', proposed, 'someone-else')).toBe(false);
+    expect(canCancelDecision('viewer', proposed, 'someone-else')).toBe(false);
+  });
+  it('refuses once the decision is no longer proposed, and for a non-member', () => {
+    expect(canCancelDecision('owner', { ...proposed, status: 'accepted' }, 'owner-user')).toBe(false);
+    expect(canCancelDecision('owner', { ...proposed, status: 'rejected' }, 'owner-user')).toBe(false);
+    expect(canCancelDecision(null, proposed, 'owner-user')).toBe(false);
   });
 });

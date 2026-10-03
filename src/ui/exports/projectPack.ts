@@ -13,6 +13,7 @@ import type { ChangeListSummary } from '../../db/changeSummary';
 import type { BranchRow, DecisionRow, EvidenceRow, ProjectRow } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { describeDelta } from '../changes/changeSummaryFormat';
+import { decisionStatusLabel } from '../decisions/decisionStatus';
 import { projectChangeStage, projectChangeStageLabel, projectProgress, projectStatusLabel } from '../projects/projectModel';
 
 export interface ProjectPackScopeItem {
@@ -163,7 +164,7 @@ export function buildProjectPackMarkdown(input: ProjectPackInput): string {
     lines.push('');
     lines.push('### Decisions that constrain this project');
     lines.push('');
-    for (const d of constrainingDecisions) lines.push(`- ${d.title} (${d.status}${d.decided_at ? `, decided ${d.decided_at.slice(0, 10)}` : ''})`);
+    for (const d of constrainingDecisions) lines.push(`- ${d.title} (${decisionStatusLabel(d.status)}${d.decided_at ? `, ${d.status === 'rejected' ? 'cancelled' : 'decided'} ${d.decided_at.slice(0, 10)}` : ''})`);
   }
 
   lines.push('');

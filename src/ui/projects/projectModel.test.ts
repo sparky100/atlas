@@ -52,6 +52,7 @@ function decision(overrides: Partial<DecisionRow>): DecisionRow {
     lens_map_url: null,
     decided_by: null,
     decided_at: null,
+    cancel_reason: null,
     branch_id: null,
     superseded_decision_id: null,
     project_id: 'p',
