@@ -36,6 +36,7 @@ import {
   listDecisionLinksForDecision,
   listDecisionsForModel,
   listDecisionsLinkingElements,
+  updateDecision,
 } from './decisions';
 import { loadEnv } from './env';
 import { createModel } from './models';
@@ -308,6 +309,33 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       const { error: submitError } = await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: randomUUID(), p_branch_id: option.id, p_classification: {}, p_reviewers: [{ user_id: architect.id, required: true }] });
       if (submitError) throw new Error(`submit_merge_request: ${submitError.message}`);
       await expect(chooseDecisionOption(alice.client, decision.id, option.id, 'no longer a draft')).rejects.toThrow();
+    });
+  });
+
+  describe('updateDecision (editing a proposed decision)', () => {
+    it("edits title, context, owner, needed-by and Lens map link; only the creator or an org owner/architect may; never once it's cancelled", async () => {
+      const creator = await createSignedInUser('decisions-edit-creator');
+      const other = await createSignedInUser('decisions-edit-other');
+      for (const u of [creator, other]) {
+        const { error } = await alice.client.from('members').insert({ org_id: orgId, user_id: u.id, role: 'contributor', invited_by: alice.id });
+        if (error) throw new Error(`inviting: ${error.message}`);
+      }
+      const decision = await createDecision(creator.client, { id: randomUUID(), orgId, modelId, title: 'Typo in titel', statement: '', ownerId: creator.id, createdBy: creator.id });
+
+      const edited = await updateDecision(creator.client, decision.id, { title: 'Typo fixed', statement: 'Now with context.', ownerId: alice.id, neededBy: '2026-12-31', lensMapUrl: 'https://lens.example/map/1' });
+      expect(edited).toMatchObject({ title: 'Typo fixed', statement: 'Now with context.', owner_id: alice.id, needed_by: '2026-12-31', lens_map_url: 'https://lens.example/map/1', status: 'proposed' });
+      expect(await updateDecision(creator.client, decision.id, { neededBy: null, lensMapUrl: null })).toMatchObject({ needed_by: null, lens_map_url: null });
+
+      // Another contributor can't; an org owner can.
+      await expect(updateDecision(other.client, decision.id, { title: 'Not mine' })).rejects.toThrow(/can no longer be edited, or you are not allowed/);
+      expect(await updateDecision(alice.client, decision.id, { title: 'Owner tidy-up' })).toMatchObject({ title: 'Owner tidy-up' });
+
+      // Closed once cancelled.
+      await cancelDecision(alice.client, decision.id, 'Done with it.');
+      await expect(updateDecision(alice.client, decision.id, { title: 'After cancelling' })).rejects.toThrow();
+
+      await service.auth.admin.deleteUser(creator.id);
+      await service.auth.admin.deleteUser(other.id);
     });
   });
 

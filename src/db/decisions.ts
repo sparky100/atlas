@@ -179,3 +179,33 @@ export async function cancelDecision(supabase: Client, decisionId: UUID, reason:
   if (error) throw new Error(`cancelDecision: ${error.message}`);
   return data as DecisionRow;
 }
+
+export interface UpdateDecisionInput {
+  title?: string;
+  /** The decision's context. */
+  statement?: string;
+  ownerId?: UUID;
+  neededBy?: string | null;
+  lensMapUrl?: string | null;
+}
+
+/**
+ * Edit a proposed decision's own fields — a plain update, the only columns
+ * granted for one (`20260913110000_decisions.sql`). RLS lets the decision's
+ * creator or an org owner/architect do it, and `atlas.guard_decision_update`
+ * refuses once the decision has left `proposed`; both surface here as "no
+ * row updated".
+ */
+export async function updateDecision(supabase: Client, decisionId: UUID, input: UpdateDecisionInput): Promise<DecisionRow> {
+  const patch: Record<string, unknown> = {};
+  if (input.title !== undefined) patch.title = input.title;
+  if (input.statement !== undefined) patch.statement = input.statement;
+  if (input.ownerId !== undefined) patch.owner_id = input.ownerId;
+  if (input.neededBy !== undefined) patch.needed_by = input.neededBy;
+  if (input.lensMapUrl !== undefined) patch.lens_map_url = input.lensMapUrl;
+  const { data, error } = await supabase.from('decisions').update(patch).eq('id', decisionId).select('*');
+  if (error) throw new Error(`updateDecision: ${error.message}`);
+  const row = (data as DecisionRow[])[0];
+  if (!row) throw new Error('updateDecision: this decision can no longer be edited, or you are not allowed to edit it');
+  return row;
+}

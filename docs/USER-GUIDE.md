@@ -146,6 +146,8 @@ Architectural decisions — "why did we choose this?" — are first-class object
 
 A decision has its **context**, the elements it **concerns**, and its **options**. Each option is an Explore change — a candidate future you can design in the model and **View diagram →** for. Rate each option against the **criteria** (cost, effort, delivery risk, timing, vendor and strategic fit), add **arguments** for and against, and compare what each option **changes** and what else it affects. An architect or owner **Chooses** an option, giving the reasons; the other options are closed, and **Work on this as a change** takes the chosen one forward. **Copy as ADR markdown** exports the decision.
 
+While a decision is proposed, **✎ Edit decision** changes its title, context, owner, needed-by date and Lens map link (for whoever started it, or an architect or owner), and the **Concerns** panel has a search to add the capabilities and systems it's about (any contributor). A concern can't be removed once added. Once a decision is chosen or cancelled, nothing on it can be edited.
+
 A decision that's no longer needed can be **cancelled** while it's still proposed — **Cancel decision…** on its page, by its owner or an architect or owner, giving the reason. It isn't deleted: it stays in the decision log marked cancelled, with who cancelled it, when and why, and any options still in draft are cancelled with it. A cancelled decision can't be reopened; start a new one instead. Cancelling is also how you clear a decision that's stopping its project from closing.
 
 Start a decision from **Decisions**, a project, an element page, or a finding's **Start a decision →**.

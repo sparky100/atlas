@@ -45,6 +45,14 @@ export function applyNewOption(state: DecisionPageState, link: DecisionLinkRow, 
   return { ...state, links: [...state.links, link], linkedBranchesById };
 }
 
+/** A concern added on the decision page — its link and the element it points at, appended directly; same no-op-before-ready stance as `applyNewOption`. */
+export function applyNewConcern(state: DecisionPageState, link: DecisionLinkRow, element: ElementsHeadRow): DecisionPageState {
+  if (state.status !== 'ready') return state;
+  const linkedElementsById = new Map(state.linkedElementsById);
+  linkedElementsById.set(element.element_id, element);
+  return { ...state, links: [...state.links, link], linkedElementsById };
+}
+
 /**
  * F6.2 (fast rating saves): `decision_option_ratings` is deliberately
  * *not* fetched here — `useDecisionRatings.ts` owns that data as its own
@@ -83,6 +91,8 @@ export interface UseDecisionResult {
   applyDecisionUpdate: (decision: DecisionRow) => void;
   /** Add-an-option's own link+branch patch — see `applyNewOption`'s own doc comment. */
   applyNewOption: (link: DecisionLinkRow, branch: BranchRow) => void;
+  /** A newly added concern's link and element — see `applyNewConcern`'s own doc comment. */
+  applyNewConcern: (link: DecisionLinkRow, element: ElementsHeadRow) => void;
   /**
    * Choose's own "refresh only the affected data": re-reads just the
    * branch-linked options' rows (every other draft option gets cancelled
@@ -137,6 +147,10 @@ export function useDecision(modelId: UUID, decisionId: UUID): UseDecisionResult 
     setState((prev) => applyNewOption(prev, link, branch));
   }, []);
 
+  const applyNewConcernCallback = useCallback((link: DecisionLinkRow, element: ElementsHeadRow) => {
+    setState((prev) => applyNewConcern(prev, link, element));
+  }, []);
+
   const refreshOptionsAndArguments = useCallback(async () => {
     if (state.status !== 'ready') return;
     const branchLinkIds = state.links.filter((l) => l.linked_type === 'branch').map((l) => l.linked_id);
@@ -144,5 +158,5 @@ export function useDecision(modelId: UUID, decisionId: UUID): UseDecisionResult 
     setState((prev) => (prev.status === 'ready' ? { ...prev, linkedBranchesById: new Map(branches.map((b) => [b.id, b])), args } : prev));
   }, [state, decisionId]);
 
-  return { state, reload, applyDecisionUpdate: applyDecisionUpdateCallback, applyNewOption: applyNewOptionCallback, refreshOptionsAndArguments };
+  return { state, reload, applyDecisionUpdate: applyDecisionUpdateCallback, applyNewOption: applyNewOptionCallback, applyNewConcern: applyNewConcernCallback, refreshOptionsAndArguments };
 }

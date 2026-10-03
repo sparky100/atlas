@@ -9,6 +9,7 @@ import { supabase } from '../supabaseClient';
 // Re-exported for every existing import site (`import { canEditOnMain, useMembership } from '../orgs/useMembership'`)
 // — see roleGates.ts's own comment for why the gates themselves live there now.
 export {
+  canAddDecisionConcern,
   canApproveOrMergeRequest,
   canArchiveModel,
   canBackfillCapabilityOrder,
@@ -19,6 +20,7 @@ export {
   canCreateModel,
   canDeleteModel,
   canEditBranch,
+  canEditDecision,
   canEditOnMain,
   canEditValueStreamStructure,
   canManageDuplicatesCheck,

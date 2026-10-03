@@ -146,6 +146,17 @@ export function canChooseDecisionOption(role: MemberRole | null): boolean {
   return role === 'owner' || role === 'architect';
 }
 
+/** Edit a decision's own fields: mirrors `decisions_update` (`20260921030000_decisions_update_rls_trigger_fix.sql`) — its creator or an org owner/architect, while proposed (`atlas.guard_decision_update`). */
+export function canEditDecision(role: MemberRole | null, decision: Pick<DecisionRow, 'status' | 'created_by'>, userId: UUID | null): boolean {
+  if (role === null || role === 'viewer' || decision.status !== 'proposed') return false;
+  return role === 'owner' || role === 'architect' || (userId !== null && decision.created_by === userId);
+}
+
+/** Add a concern (a capability or system the decision is about): mirrors `decision_links_insert` — owner, architect or contributor, while proposed. */
+export function canAddDecisionConcern(role: MemberRole | null, decision: Pick<DecisionRow, 'status'>): boolean {
+  return (role === 'owner' || role === 'architect' || role === 'contributor') && decision.status === 'proposed';
+}
+
 /** Cancel a decision: mirrors `atlas.cancel_decision` (`20261005010000_cancel_decision.sql`) — an org owner/architect (as for choosing) or the decision's own owner, while it's still proposed. */
 export function canCancelDecision(role: MemberRole | null, decision: Pick<DecisionRow, 'status' | 'owner_id'>, userId: UUID | null): boolean {
   if (role === null || decision.status !== 'proposed') return false;
