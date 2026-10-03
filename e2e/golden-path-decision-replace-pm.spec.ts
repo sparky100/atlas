@@ -72,6 +72,18 @@ test('retiring PM on an option, with a real replacement picked, shows the Outcom
   await expect(outcomeRow).toContainText('unchanged');
   await expect(outcomeRow).toContainText('replaced by Hana equivalent');
 
+  // The PM group-header row spans the whole table without adding phantom
+  // columns: each real header column keeps a readable width and none
+  // overlaps its neighbour (the 390px overlap bug, where `colSpan={99}`
+  // shrank every real column to ~3px).
+  const headerBoxes = await whatChangesTable.locator('thead th').evaluateAll((ths) => ths.map((th) => th.getBoundingClientRect()).map((r) => ({ left: r.left, right: r.right, width: r.width })));
+  expect(headerBoxes).toHaveLength(3);
+  for (const [i, box] of headerBoxes.entries()) {
+    expect(box.width).toBeGreaterThanOrEqual(80);
+    const next = headerBoxes[i + 1];
+    if (next) expect(box.right).toBeLessThanOrEqual(next.left + 1);
+  }
+
   const criteriaGridTable = page.locator('table').first();
   await expect(criteriaGridTable.locator('th', { hasText: optionTitle })).toContainText('Retires PM, adds Hana equivalent');
 });
