@@ -14,7 +14,7 @@ import { addCapability, addSystemFromHome, goToModelHome, signUpCreateOrgAndMode
 
 /** `HomeModeSwitch`'s own toggle occasionally doesn't register on the very first click right after a save+navigate — pre-existing, unrelated to this test's own feature; retried rather than masked, so a genuine break still fails loudly on the final assertion. */
 async function switchToDirectorView(page: Page): Promise<void> {
-  const button = page.getByRole('button', { name: 'Capability view' });
+  const button = page.getByRole('button', { name: 'Overview' });
   for (let attempt = 0; attempt < 4; attempt++) {
     await button.click();
     try {
@@ -47,7 +47,7 @@ test('rate a primary supporter a poor fit; the Director door flags the capabilit
   // confirms the write, the same signal the app itself surfaces.
   await expect(page.getByText('Fit for purpose: poor', { exact: false })).toBeVisible();
 
-  // Switch to the Director door (an owner defaults to the Application view).
+  // Switch to the Director door (an owner defaults to My work).
   await goToModelHome(page);
   await switchToDirectorView(page);
 

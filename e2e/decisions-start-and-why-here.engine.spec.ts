@@ -108,7 +108,7 @@ test('start a decision from the director door\'s own weak-capability tile', asyn
   if (!seedResult.ok) throw new Error(`startdecisiondirector fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
-  await page.getByRole('button', { name: 'Capability view' }).click();
+  await page.getByRole('button', { name: 'Overview' }).click();
   await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
 
   const tile = page.getByRole('link', { name: /Adult Social Care/ });

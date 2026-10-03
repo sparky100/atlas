@@ -71,8 +71,8 @@ test('sign-up through org and model creation to ModelHome\'s front doors', async
   // creator is its owner, so the architect door is the default —
   // UI-principles §3), the search box, and the browse-elements link.
   await expect(page.getByRole('heading', { name: modelName })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Application view' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('button', { name: 'Capability view' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('button', { name: 'My work' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Overview' })).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByPlaceholder('Search or create a capability, system, or actor…')).toBeVisible();
 
   const browseLink = page.getByRole('link', { name: 'Browse all elements →' });

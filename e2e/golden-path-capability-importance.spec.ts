@@ -27,7 +27,7 @@ async function setImportance(page: Page, level: string): Promise<void> {
 
 /** `HomeModeSwitch`'s own toggle occasionally doesn't register on the very first click — pre-existing, unrelated to this test's own feature; retried rather than masked. */
 async function switchToDirectorView(page: Page): Promise<void> {
-  const button = page.getByRole('button', { name: 'Capability view' });
+  const button = page.getByRole('button', { name: 'Overview' });
   for (let attempt = 0; attempt < 4; attempt++) {
     await button.click();
     try {
