@@ -58,7 +58,10 @@
   width: 100%;
   border-collapse: collapse;
   margin: var(--space-3) 0;
-  table-layout: fixed;
+  /* Auto layout, not `table-layout: fixed`: under a fixed layout the
+     `min-width`s below are ignored, so at phone width every column is
+     squeezed to an equal share of the card instead of `.tableWrap`
+     scrolling horizontally. */
 }
 
 .comparisonTable th,
