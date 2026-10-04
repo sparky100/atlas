@@ -124,6 +124,12 @@ export function projectProgress(changes: readonly Pick<BranchRow, 'status' | 'in
   };
 }
 
+/** A project's progress as one line of plain counts, never a percentage — the project page and Overview's "What we're doing" both read it this way. */
+export function formatProjectProgress(progress: ProjectProgress): string {
+  const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
+  return `${plural(progress.openChanges, 'open change', 'open changes')} · ${String(progress.mergedChanges)} merged · ${plural(progress.openDecisions, 'open decision', 'open decisions')} · ${String(progress.decidedDecisions)} decided`;
+}
+
 /** The originating decision (ADR-024 §5): the project's earliest decision, if any — no column, just the first entry in the log. */
 export function originatingDecision(decisions: readonly DecisionRow[]): DecisionRow | null {
   let earliest: DecisionRow | null = null;

@@ -4,12 +4,11 @@ import type { ElementsHeadRow } from '../../contracts/rows';
 import { listChangeBranches } from '../../db/branches';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
 import { listOwnsEdges } from '../../db/elementBrowse';
-import { computeSelfOwnedCapabilityIds } from '../../db/healthFindings';
+import { computeSelfOwnedCapabilityIds, listOpenProjectScopeForModel } from '../../db/healthFindings';
 import { listContainersForLandscape, listSystemsForLandscape } from '../../db/landscape';
 import {
   buildCapabilityTiles,
   commitsSincePreviousTag,
-  loadChangeTouchCounts,
   loadCommitDepths,
   loadModelCounts,
   loadPlannedReplacements,
@@ -17,18 +16,17 @@ import {
   type CapabilityTileData,
   type ModelCounts,
 } from '../../db/modelHome';
-import { listProfilesByIds } from '../../db/profiles';
+import { listDecisionsForModel, listOpenDecisionElementLinksForModel } from '../../db/decisions';
+import { listOrgMemberProfiles, listProfilesByIds } from '../../db/profiles';
+import { listProjectsForModel } from '../../db/projects';
 import { listTagsForModel } from '../../db/tags';
-import type { BranchRow, ProfileRow, TagRow } from '../../db/types';
+import type { ProfileRow, TagRow } from '../../db/types';
 import { resolveRef } from '../../db/ref';
 import { computeCapabilityMapTree } from '../capabilityMap/layout';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
-
-export interface OpenChangeRow {
-  branch: BranchRow;
-  touches: number;
-}
+import { computeTileInHand, type TileInHand } from './tileInHand';
+import { buildRecentRecords, buildWhatWeAreDoing, type RecentRecord, type WhatWeAreDoing } from './whatWeAreDoing';
 
 export interface VersionStamp {
   tag: TagRow;
@@ -43,26 +41,21 @@ export interface DirectorHomeData {
   exposedCount: number;
   unrecordedCount: number;
   counts: ModelCounts;
-  openChanges: OpenChangeRow[];
-  /** The earliest `target_date` among `openChanges` — `null` if none has one. */
-  nextTargetDate: string | null;
+  /** "What we're doing" (UI-principles §3, 2026-10-04): projects in hand and open decisions outside any project — `whatWeAreDoing.ts`. Replaces Handoff 7d's "What's changing" list of raw changes. */
+  whatWeAreDoing: WhatWeAreDoing;
+  /** Per level-1 tile (by capability id): the open projects and decisions already addressing it — `tileInHand.ts`. */
+  inHandByTile: ReadonlyMap<UUID, TileInHand>;
   versions: VersionStamp[];
+  /** Decisions made and projects ended since the newest version (all of them while there is none) — `buildRecentRecords`. */
+  recentRecords: RecentRecord[];
+  /** The newest version those are counted from, or `null` when nothing is tagged yet. */
+  recentSince: TagRow | null;
 }
 
 type DirectorHomeLoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: DirectorHomeData };
 
 /** A callable `reload` alongside the same load-state union every other door/route hook already returns — kept as an intersection (not folded into each branch by hand) so the union stays discriminable on `status`. */
 export type DirectorHomeState = DirectorHomeLoadState & { reload: () => void };
-
-/** Handoff 7d's "What's changing" scope: the same set `loadModelCounts`'s `openChanges` count already uses — everything still in motion, `draft` included (a change not yet proposed is still an open piece of work a director should see coming). */
-const OPEN_CHANGE_STATUSES: BranchRow['status'][] = ['draft', 'proposed', 'in_review', 'approved'];
-
-function compareByTargetDateAscending(a: BranchRow, b: BranchRow): number {
-  if (a.target_date === null && b.target_date === null) return 0;
-  if (a.target_date === null) return 1; // nulls last
-  if (b.target_date === null) return -1;
-  return a.target_date.localeCompare(b.target_date);
-}
 
 /**
  * The director door's data (UI-principles §3.1, built to Handoff 7d —
@@ -99,7 +92,7 @@ export function useDirectorHome(
         return;
       }
 
-      const [capabilities, supportsEdges, systems, containers, counts, changeBranches, tags, plannedReplacements, ownsEdges] = await Promise.all([
+      const [capabilities, supportsEdges, systems, containers, counts, changeBranches, tags, plannedReplacements, ownsEdges, projects, decisions, memberProfiles, projectScope, decisionElementLinks] = await Promise.all([
         listCapabilitiesForMap(supabase, commitId),
         listAllSupportsEdges(supabase, commitId),
         listSystemsForLandscape(supabase, commitId),
@@ -109,6 +102,15 @@ export function useDirectorHome(
         listTagsForModel(supabase, modelId),
         loadPlannedReplacements(supabase, modelId),
         listOwnsEdges(supabase, commitId),
+        listProjectsForModel(supabase, modelId),
+        listDecisionsForModel(supabase, modelId),
+        // Owner names for "What we're doing" — every org member's profile in
+        // one org-scoped read, never an `.in()` over owner ids (CLAUDE.md
+        // rule 8: that list grows with the model).
+        listOrgMemberProfiles(supabase, orgId),
+        // What's addressing each weak tile — both model-scoped, no id list.
+        listOpenProjectScopeForModel(supabase, modelId),
+        listOpenDecisionElementLinksForModel(supabase, modelId),
       ]);
 
       // Bug fix: a `supports` edge's own `from_element_id` can be a
@@ -133,15 +135,9 @@ export function useDirectorHome(
       const exposedCount = tiles.filter((t) => t.tone === 'warn' || t.tone === 'info').length;
       const unrecordedCount = tiles.filter((t) => t.tone === 'neutral').length;
 
-      const openChanges = changeBranches
-        .filter((b) => OPEN_CHANGE_STATUSES.includes(b.status))
-        .sort(compareByTargetDateAscending);
-      const nextTargetDate = openChanges.find((b) => b.target_date !== null)?.target_date ?? null;
-      const touchCounts = await loadChangeTouchCounts(
-        supabase,
-        openChanges.map((b) => b.id),
-      );
-      const openChangeRows: OpenChangeRow[] = openChanges.map((branch) => ({ branch, touches: touchCounts.get(branch.id) ?? 0 }));
+      const today = new Date().toISOString().slice(0, 10);
+      const whatWeAreDoing = buildWhatWeAreDoing(projects, decisions, changeBranches, new Map(memberProfiles.map((p) => [p.user_id, p])), today);
+      const inHandByTile = computeTileInHand(tiles, capabilities, projectScope, decisionElementLinks, decisions);
 
       const recentTags = [...tags].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3);
       // One older tag beyond the three shown is enough to compute the
@@ -153,6 +149,9 @@ export function useDirectorHome(
       const authorIds = [...new Set(recentTags.map((t) => t.created_by))];
       const profiles = await listProfilesByIds(supabase, authorIds);
       const profileById = new Map<UUID, ProfileRow>(profiles.map((p) => [p.user_id, p]));
+
+      const recentSince = allSortedTags[0] ?? null;
+      const recentRecords = buildRecentRecords(decisions, projects, recentSince?.created_at ?? null);
 
       const versions: VersionStamp[] = recentTags.map((tag, index) => {
         const olderTag = allSortedTags[index + 1];
@@ -167,7 +166,7 @@ export function useDirectorHome(
       if (!cancelled) {
         setState({
           status: 'ready',
-          data: { tiles, exposedCount, unrecordedCount, counts, openChanges: openChangeRows, nextTargetDate, versions },
+          data: { tiles, exposedCount, unrecordedCount, counts, whatWeAreDoing, inHandByTile, versions, recentRecords, recentSince },
         });
       }
     }

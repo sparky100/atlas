@@ -181,7 +181,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
       )}
 
       {search.results.length > 0 && (
-        <ul className={styles.results}>
+        <ul className={styles.results} aria-label="Search results">
           {search.results.map((result) => {
             const lifecycleStatus = attributesRecord(result.element.attributes).lifecycleStatus;
             const tone = typeof lifecycleStatus === 'string' ? lifecycleToneFor(lifecycleStatus) : undefined;

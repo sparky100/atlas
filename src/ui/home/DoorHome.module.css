@@ -102,6 +102,12 @@
   gap: var(--space-1);
 }
 
+/* My decisions / My projects (UI-principles §3, 2026-10-04): a title row
+   (the shared `.branchRow` shape) with a muted meta line under it. */
+.ownedRow p {
+  margin: var(--space-1) 0 0;
+}
+
 .commitRow,
 .branchRow {
   display: flex;

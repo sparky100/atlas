@@ -11,7 +11,8 @@ import { Text } from '../components/Text/Text';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { MemberRole } from '../../db/types';
 import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, PlatformFlowEndpoint, UnlabeledVerbRelationship } from '../../db/healthFindings';
-import { formatRelativeTime } from '../time';
+import { formatDate, formatRelativeTime } from '../time';
+import { formatProjectProgress, projectStatusLabel, projectStatusTone } from '../projects/projectModel';
 import { branchStatusTone } from '../changes/branchStatus';
 import {
   decisionPrefillToSearchParams,
@@ -151,6 +152,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
   // empty in that case, and the panels that show them render a muted
   // "Loading…" instead, rather than an empty/misleadingly-clear state.
   const insightsData = insights.status === 'ready' ? insights.data : null;
+  const modelHref = `/o/${orgSlug}/m/${modelSlug}`;
   const elementHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}`;
   // A commit's diff against its own parent (Sprint U4-1 B2) — main's genesis
   // commit has no parent to diff against, so it stays plain text below
@@ -597,6 +599,69 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
               </Link>
             ) : (
               <EmptyState>Nothing in review right now.</EmptyState>
+            )}
+          </Panel>
+
+          {/* UI-principles §3 (2026-10-04, step 3): what's waiting on this
+              user as an owner — their open decisions (overdue first) and
+              the projects they're accountable for. In the main column,
+              straight after the review queue, so a phone (where the side
+              column stacks last) reaches them before the health findings. */}
+          <Panel>
+            <Text as="h2" size="xl" className={styles.sectionTitle}>
+              My decisions
+            </Text>
+            {data.myOwnedWork.decisions.length === 0 ? (
+              <EmptyState>No open decisions of yours.</EmptyState>
+            ) : (
+              <ul className={styles.branchList} aria-label="My decisions">
+                {data.myOwnedWork.decisions.map(({ decision, overdue, projectTitle }) => (
+                  <li key={decision.id} className={styles.ownedRow}>
+                    <div className={styles.branchRow}>
+                      <Link to={`${modelHref}/decisions/${decision.id}`}>
+                        <Text as="span" size="sm">
+                          {decision.title}
+                        </Text>
+                      </Link>
+                      {overdue && <Chip tone="warn">overdue</Chip>}
+                    </div>
+                    {(decision.needed_by !== null || projectTitle !== null) && (
+                      <Text as="p" tone="muted" size="xs">
+                        {[decision.needed_by !== null ? `needed by ${formatDate(decision.needed_by)}` : null, projectTitle !== null ? `in ${projectTitle}` : null].filter((part): part is string => part !== null).join(' · ')}
+                      </Text>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <Panel>
+            <Text as="h2" size="xl" className={styles.sectionTitle}>
+              My projects
+            </Text>
+            {data.myOwnedWork.projects.length === 0 ? (
+              <EmptyState>No projects of yours in hand.</EmptyState>
+            ) : (
+              <ul className={styles.branchList} aria-label="My projects">
+                {data.myOwnedWork.projects.map(({ project, progress, overdueDecisions }) => (
+                  <li key={project.id} className={styles.ownedRow}>
+                    <div className={styles.branchRow}>
+                      <Link to={`${modelHref}/projects/${project.id}`}>
+                        <Text as="span" size="sm">
+                          {project.title}
+                        </Text>
+                      </Link>
+                      {project.status !== 'active' && <Chip tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status)}</Chip>}
+                      {overdueDecisions > 0 && <Chip tone="warn">{`${String(overdueDecisions)} ${overdueDecisions === 1 ? 'decision' : 'decisions'} overdue`}</Chip>}
+                    </div>
+                    <Text as="p" tone="muted" size="xs">
+                      {project.target_date !== null ? `target ${formatDate(project.target_date)} · ` : ''}
+                      {formatProjectProgress(progress)}
+                    </Text>
+                  </li>
+                ))}
+              </ul>
             )}
           </Panel>
 

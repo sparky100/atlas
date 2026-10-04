@@ -10,7 +10,7 @@
  * change from one session, exactly as a solo maintainer would today.
  */
 import { randomUUID } from 'node:crypto';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import type { CommitEnvelope, Delta } from '../src/contracts/delta';
 import { getBranch } from '../src/db/branches';
 import { commitToBranch } from '../src/db/commits';
@@ -19,6 +19,15 @@ import { addArchitectMember, bootstrapChangeBranchFixture, submitForReviewWithRe
 
 function seedSystemDelta(elementId: string, name: string, sourceId: string): Delta {
   return { kind: 'element.create', id: randomUUID(), elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId, confidence: 1 };
+}
+
+/** The Changes page's own "New change" form — the one place a change of any intent but explore is started without an element in hand. Lands on the new change's own page. */
+async function createChangeFromChangesPage(page: Page, orgSlug: string, modelSlug: string, name: string, intent: 'record' | 'propose'): Promise<void> {
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
+  const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Create change' }) });
+  await form.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(name);
+  await form.getByRole('combobox').first().selectOption(intent);
+  await form.getByRole('button', { name: 'Create change' }).click();
 }
 
 test('a record change merges in one click from its own page and never appears in /review; a propose change is unaffected', async ({ page }) => {
@@ -31,9 +40,8 @@ test('a record change merges in one click from its own page and never appears in
   // gating it, and a second, unused member doesn't affect the record half.
   await addArchitectMember(env, orgId, userId);
 
-  // The director's door only shows "What's changing" (and its "What
-  // happened" entry point) once the capability map has something on it —
-  // an empty map shows its own empty state instead.
+  // One capability on main — kept from when this test started its changes
+  // from the director door, which needs a non-empty map; harmless now.
   const capabilityResult = await commitToBranch(owner, {
     modelId,
     branchId: fixture.main.id,
@@ -51,14 +59,11 @@ test('a record change merges in one click from its own page and never appears in
   });
   if (!capabilityResult.ok) throw new Error(`seeding a capability: ${capabilityResult.message}`);
 
-  // 1. Record: "What happened" (F0's own record-default entry point).
-  await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
-  // "What happened" lives on the director's door; an owner lands on the architect's.
-  await page.getByRole('button', { name: 'Overview', exact: true }).click();
-  await page.getByRole('button', { name: 'What happened' }).click();
+  // 1. Record: the Changes page's own "New change" form, "Why" set to
+  // Record (Overview's "What happened" button left on 2026-10-04 —
+  // UI-principles §3: a briefing starts projects and decisions, not changes).
   const recordName = `deployed-ledger-${randomUUID().slice(0, 8)}`;
-  await page.getByPlaceholder('Name (e.g. retire-northgate)').fill(recordName);
-  await page.getByRole('button', { name: 'Create & continue' }).click();
+  await createChangeFromChangesPage(page, orgSlug, modelSlug, recordName, 'record');
 
   // Lands on the change's own page — the header names its own intent
   // (`intentHeaderLine`'s "Recording: {title}", PR2).
@@ -112,11 +117,8 @@ test('a record change merges in one click from its own page and never appears in
   // 2. Propose: today's ordinary flow, completely unaffected — the queue
   // still lists it, and its own page offers "Open review →" only, never
   // the one-click action.
-  await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
-  await page.getByRole('button', { name: 'Propose a change' }).click();
   const proposeName = `replace-ledger-vendor-${randomUUID().slice(0, 8)}`;
-  await page.getByPlaceholder('Name (e.g. retire-northgate)').fill(proposeName);
-  await page.getByRole('button', { name: 'Create & continue' }).click();
+  await createChangeFromChangesPage(page, orgSlug, modelSlug, proposeName, 'propose');
   await expect(page.getByRole('heading', { name: new RegExp(`Proposing: ${proposeName}`) })).toBeVisible();
   const proposeBranchIdMatch = /\/changes\/([^/?]+)/.exec(page.url());
   if (!proposeBranchIdMatch?.[1]) throw new Error(`could not read the propose branch id out of ${page.url()}`);
