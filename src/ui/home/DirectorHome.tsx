@@ -22,7 +22,7 @@ import { canStartProject } from '../orgs/roleGates';
 import { StartProjectLink } from '../projects/StartProjectLink';
 import type { CapabilityTileData } from '../../db/modelHome';
 import type { DirectorHomeData } from './useDirectorHome';
-import type { OpenDecisionSummary, ProjectSummary } from './whatWeAreDoing';
+import type { OpenDecisionSummary, ProjectSummary, RecentRecord } from './whatWeAreDoing';
 import { isNothingInHand, type TileInHand } from './tileInHand';
 import { formatProjectProgress, projectStatusLabel, projectStatusTone } from '../projects/projectModel';
 import styles from './DirectorHome.module.css';
@@ -215,6 +215,38 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
           <Text as="h2" size="xl" className={styles.sectionTitle}>
             What's recent
           </Text>
+          {/* UI-principles §3 (2026-10-04, step 4): what's moved since the
+              last version — decisions made, projects closed — before the
+              version stamps themselves. */}
+          <Text as="h3" size="lg" className={styles.subsectionTitle}>
+            {data.recentSince ? `Since ${data.recentSince.name}` : 'Decided and closed'}
+          </Text>
+          {data.recentRecords.length === 0 ? (
+            <EmptyState>{data.recentSince ? `No decisions made or projects closed since ${data.recentSince.name}.` : 'No decisions made or projects closed yet.'}</EmptyState>
+          ) : (
+            <ul className={styles.workList} aria-label="Decided and closed">
+              {data.recentRecords.slice(0, RECENT_SHOWN).map((record) => (
+                <li key={`${record.kind}-${record.id}`} className={styles.workRow}>
+                  <Link to={`${modelHref}/${record.kind === 'decision' ? 'decisions' : 'projects'}/${record.id}`}>
+                    <Text as="span">{record.title}</Text>
+                  </Link>
+                  <Text as="p" tone="muted" size="sm">
+                    {RECENT_OUTCOME_LABEL[record.outcome]} {formatDate(record.at)}
+                  </Text>
+                </li>
+              ))}
+              {data.recentRecords.length > RECENT_SHOWN && (
+                <li className={styles.workRow}>
+                  <Text as="span" tone="muted" size="sm">
+                    +{data.recentRecords.length - RECENT_SHOWN} more
+                  </Text>
+                </li>
+              )}
+            </ul>
+          )}
+          <Text as="h3" size="lg" className={styles.subsectionTitle}>
+            Versions
+          </Text>
           {data.versions.length === 0 ? (
             <EmptyState>No versions tagged yet.</EmptyState>
           ) : (
@@ -244,6 +276,15 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
     </div>
   );
 }
+
+/** How many recent records "What's recent" lists before "+N more". */
+const RECENT_SHOWN = 5;
+
+const RECENT_OUTCOME_LABEL: Record<RecentRecord['outcome'], string> = {
+  decided: 'Decision made',
+  closed: 'Project closed',
+  cancelled: 'Project cancelled',
+};
 
 function plural(count: number, one: string, many: string): string {
   return `${String(count)} ${count === 1 ? one : many}`;

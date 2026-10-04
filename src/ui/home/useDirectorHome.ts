@@ -26,7 +26,7 @@ import { computeCapabilityMapTree } from '../capabilityMap/layout';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 import { computeTileInHand, type TileInHand } from './tileInHand';
-import { buildWhatWeAreDoing, type WhatWeAreDoing } from './whatWeAreDoing';
+import { buildRecentRecords, buildWhatWeAreDoing, type RecentRecord, type WhatWeAreDoing } from './whatWeAreDoing';
 
 export interface VersionStamp {
   tag: TagRow;
@@ -46,6 +46,10 @@ export interface DirectorHomeData {
   /** Per level-1 tile (by capability id): the open projects and decisions already addressing it — `tileInHand.ts`. */
   inHandByTile: ReadonlyMap<UUID, TileInHand>;
   versions: VersionStamp[];
+  /** Decisions made and projects ended since the newest version (all of them while there is none) — `buildRecentRecords`. */
+  recentRecords: RecentRecord[];
+  /** The newest version those are counted from, or `null` when nothing is tagged yet. */
+  recentSince: TagRow | null;
 }
 
 type DirectorHomeLoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: DirectorHomeData };
@@ -146,6 +150,9 @@ export function useDirectorHome(
       const profiles = await listProfilesByIds(supabase, authorIds);
       const profileById = new Map<UUID, ProfileRow>(profiles.map((p) => [p.user_id, p]));
 
+      const recentSince = allSortedTags[0] ?? null;
+      const recentRecords = buildRecentRecords(decisions, projects, recentSince?.created_at ?? null);
+
       const versions: VersionStamp[] = recentTags.map((tag, index) => {
         const olderTag = allSortedTags[index + 1];
         const newerDepth = depths.get(tag.commit_id) ?? null;
@@ -159,7 +166,7 @@ export function useDirectorHome(
       if (!cancelled) {
         setState({
           status: 'ready',
-          data: { tiles, exposedCount, unrecordedCount, counts, whatWeAreDoing, inHandByTile, versions },
+          data: { tiles, exposedCount, unrecordedCount, counts, whatWeAreDoing, inHandByTile, versions, recentRecords, recentSince },
         });
       }
     }

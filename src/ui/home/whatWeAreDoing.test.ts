@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow, DecisionRow, ProfileRow, ProjectRow } from '../../db/types';
-import { buildMyOwnedWork, buildWhatWeAreDoing, displayNameOf } from './whatWeAreDoing';
+import { buildMyOwnedWork, buildRecentRecords, buildWhatWeAreDoing, displayNameOf } from './whatWeAreDoing';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
   return {
@@ -189,5 +189,35 @@ describe('buildMyOwnedWork', () => {
     const result = buildMyOwnedWork(projects, decisions, [], 'me', TODAY).projects;
     expect(result.map((p) => p.project.id)).toEqual(['p-mine']);
     expect(result[0]?.progress.openDecisions).toBe(1);
+  });
+});
+
+describe('buildRecentRecords', () => {
+  const SINCE = '2026-09-01T00:00:00Z';
+
+  it('lists decisions made and projects closed or cancelled after the newest version, newest first', () => {
+    const decisions = [
+      decision({ id: 'd-made', title: 'Made', status: 'accepted', decided_at: '2026-09-10T00:00:00Z' }),
+      decision({ id: 'd-before', status: 'accepted', decided_at: '2026-08-10T00:00:00Z' }),
+      decision({ id: 'd-cancelled', status: 'rejected', decided_at: null }),
+      decision({ id: 'd-open', status: 'proposed' }),
+    ];
+    const projects = [
+      project({ id: 'p-closed', title: 'Closed', status: 'closed', closed_at: '2026-09-20T00:00:00Z' }),
+      project({ id: 'p-cancelled', title: 'Cancelled', status: 'cancelled', closed_at: '2026-09-05T00:00:00Z' }),
+      project({ id: 'p-before', status: 'closed', closed_at: '2026-08-01T00:00:00Z' }),
+      project({ id: 'p-active', status: 'active' }),
+    ];
+    expect(buildRecentRecords(decisions, projects, SINCE).map((r) => [r.id, r.outcome])).toEqual([
+      ['p-closed', 'closed'],
+      ['d-made', 'decided'],
+      ['p-cancelled', 'cancelled'],
+    ]);
+  });
+
+  it('with no version tagged yet, lists every decision made and project ended', () => {
+    const decisions = [decision({ id: 'd-old', status: 'accepted', decided_at: '2025-01-01T00:00:00Z' })];
+    const projects = [project({ id: 'p-old', status: 'closed', closed_at: '2025-02-01T00:00:00Z' })];
+    expect(buildRecentRecords(decisions, projects, null).map((r) => r.id)).toEqual(['p-old', 'd-old']);
   });
 });

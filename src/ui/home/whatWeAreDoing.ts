@@ -126,3 +126,31 @@ export function buildMyOwnedWork(projects: readonly ProjectRow[], decisions: rea
   ).projects;
   return { decisions: ownedDecisions, projects: ownedProjects };
 }
+
+/** One decision made or project ended, for Overview's "What's recent" (UI-principles §3, 2026-10-04, step 4). */
+export interface RecentRecord {
+  kind: 'decision' | 'project';
+  id: UUID;
+  title: string;
+  /** What happened, in a word: a decision was made; a project was closed or cancelled. */
+  outcome: 'decided' | 'closed' | 'cancelled';
+  /** When — `decided_at` / `closed_at`, an ISO timestamp. */
+  at: string;
+}
+
+/**
+ * Decisions made (accepted — a cancelled decision is no decision made) and
+ * projects ended (closed or cancelled) after `sinceIso` — the newest
+ * version's tag time, so "what's moved since the last committee paper" —
+ * newest first. `sinceIso` null (no version tagged yet) means every one.
+ */
+export function buildRecentRecords(decisions: readonly DecisionRow[], projects: readonly ProjectRow[], sinceIso: string | null): RecentRecord[] {
+  const after = (at: string | null): at is string => at !== null && (sinceIso === null || at > sinceIso);
+  const records: RecentRecord[] = [
+    ...decisions.flatMap((d): RecentRecord[] => (d.status === 'accepted' && after(d.decided_at) ? [{ kind: 'decision', id: d.id, title: d.title, outcome: 'decided', at: d.decided_at }] : [])),
+    ...projects.flatMap((p): RecentRecord[] =>
+      (p.status === 'closed' || p.status === 'cancelled') && after(p.closed_at) ? [{ kind: 'project', id: p.id, title: p.title, outcome: p.status, at: p.closed_at }] : [],
+    ),
+  ];
+  return records.sort((a, b) => b.at.localeCompare(a.at) || a.title.localeCompare(b.title));
+}

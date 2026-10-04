@@ -100,3 +100,31 @@ test("a weak tile says what's in hand: nothing at first, then the project starte
   await card.getByRole('link', { name: 'Project: Who supports Housing Repairs' }).click();
   await expect(page.getByRole('heading', { name: 'Who supports Housing Repairs', level: 1 })).toBeVisible();
 });
+
+test("What's recent lists a project closed since the last version, and it leaves What we're doing", async ({ page }) => {
+  await signUpCreateOrgAndModel(page, 'overviewrecent');
+  await addCapability(page, 'Housing Repairs');
+
+  await showOverview(page);
+  await expect(page.getByText('No decisions made or projects closed yet.')).toBeVisible();
+
+  // A project, started and closed with nothing open in it.
+  const projectTitle = `Repairs pilot ${randomUUID().slice(0, 8)}`;
+  await page.getByRole('link', { name: 'Start a project', exact: true }).click();
+  await page.getByLabel('Project title').fill(projectTitle);
+  await page.getByLabel('Owner').selectOption({ index: 1 });
+  await page.getByRole('button', { name: 'Start project' }).click();
+  await expect(page.getByRole('heading', { name: projectTitle, level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: 'Close project' }).click();
+  await expect(page.getByText('Closed', { exact: true }).first()).toBeVisible();
+
+  await showOverview(page);
+  const recent = page.getByRole('list', { name: 'Decided and closed' });
+  const row = recent.getByRole('listitem').filter({ hasText: projectTitle });
+  await expect(row.getByRole('link', { name: projectTitle })).toBeVisible();
+  await expect(row.getByText(/^Project closed /)).toBeVisible();
+  await expect(page.getByRole('region', { name: "What we're doing" }).getByText(projectTitle)).toHaveCount(0);
+
+  await row.getByRole('link', { name: projectTitle }).click();
+  await expect(page.getByRole('heading', { name: projectTitle, level: 1 })).toBeVisible();
+});

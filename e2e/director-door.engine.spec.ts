@@ -11,7 +11,7 @@ import { expect, test } from '@playwright/test';
 import type { CommitEnvelope, Delta, LifecycleStatus } from '../src/contracts/delta';
 import { createChangeBranch, getBranch, getMainBranch } from '../src/db/branches';
 import { createDecision } from '../src/db/decisions';
-import { addProjectLink, createProject } from '../src/db/projects';
+import { addProjectLink, createProject, setProjectStatus } from '../src/db/projects';
 import { createSupabaseClient } from '../src/db/client';
 import { commitToBranch } from '../src/db/commits';
 import { createTag } from '../src/db/tags';
@@ -181,6 +181,11 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
   // in hand and stops offering to start another (UI-principles §3).
   await addProjectLink(signedIn, { projectId, linkedType: 'element', linkedId: capWarnId, createdBy: userId });
   await createDecision(signedIn, { id: randomUUID(), orgId, modelId, title: 'Replace or upgrade Northgate?', statement: 'Northgate Revenues is retiring.', ownerId: userId, neededBy: '2026-01-15', projectId, createdBy: userId });
+  // A project closed after v0.2 was tagged — "What's recent".
+  const closedProjectId = randomUUID();
+  await createProject(signedIn, { id: closedProjectId, orgId, modelId, title: 'Pilot closed early', purpose: 'A finished pilot.', ownerId: userId, createdBy: userId });
+  const closeResult = await setProjectStatus(signedIn, closedProjectId, 'closed');
+  if (closeResult.status !== 'updated') throw new Error('closing the pilot project: it still had open items');
   await createDecision(signedIn, { id: randomUUID(), orgId, modelId, title: 'Standardise on one cloud?', statement: 'Portfolio-level.', ownerId: userId, neededBy: '2099-06-30', createdBy: userId });
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
@@ -234,6 +239,12 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
   await expect(portfolioDecisions.getByText(/needed by .*2099/)).toBeVisible();
   await expect(page.getByText('Upcoming change')).toHaveCount(0);
   await expect(page.getByText('Replace or upgrade Northgate?')).toHaveCount(0);
+
+  // What's recent: what's moved since the newest version (v0.2) — the
+  // project closed after it was tagged — then the version stamps.
+  await expect(page.getByRole('heading', { name: 'Since v0.2' })).toBeVisible();
+  const recentRow = page.getByRole('list', { name: 'Decided and closed' }).getByRole('listitem').filter({ hasText: 'Pilot closed early' });
+  await expect(recentRow.getByText(/^Project closed /)).toBeVisible();
 
   // What's recent: two versions, the newer one showing a non-zero commits-
   // since-previous-tag count computed from commits.depth, no diff walk.
