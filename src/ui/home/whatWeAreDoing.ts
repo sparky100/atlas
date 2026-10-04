@@ -90,3 +90,39 @@ export function buildWhatWeAreDoing(
 
   return { projects: projectSummaries, decisionsOutsideProjects };
 }
+
+/** One open decision the viewer owns, on My work — with the project it belongs to, if any. */
+export interface OwnedDecision {
+  decision: DecisionRow;
+  overdue: boolean;
+  projectTitle: string | null;
+}
+
+export interface MyOwnedWork {
+  /** Open (`proposed`) decisions the viewer owns: overdue first, then by needed-by date (none last), then title. */
+  decisions: OwnedDecision[];
+  /** Projects in hand (active, then on hold) the viewer owns — the same summaries Overview shows. */
+  projects: ProjectSummary[];
+}
+
+/**
+ * My work's "My decisions" and "My projects" (UI-principles §3, 2026-10-04,
+ * step 3): what's waiting on the viewer as an owner — never a decision or
+ * project merely created by them. Reuses `buildWhatWeAreDoing`'s project
+ * summaries so the two views count progress the same way.
+ */
+export function buildMyOwnedWork(projects: readonly ProjectRow[], decisions: readonly DecisionRow[], changeBranches: readonly BranchRow[], userId: UUID, today: string): MyOwnedWork {
+  const projectTitles = new Map(projects.map((p) => [p.id, p.title]));
+  const ownedDecisions = decisions
+    .filter((d) => d.status === 'proposed' && d.owner_id === userId)
+    .map((decision): OwnedDecision => ({ decision, overdue: isDecisionOverdue(decision, today), projectTitle: decision.project_id !== null ? (projectTitles.get(decision.project_id) ?? null) : null }))
+    .sort((a, b) => Number(b.overdue) - Number(a.overdue) || compareDatesNullsLast(a.decision.needed_by, b.decision.needed_by) || a.decision.title.localeCompare(b.decision.title));
+  const ownedProjects = buildWhatWeAreDoing(
+    projects.filter((p) => p.owner_id === userId),
+    decisions,
+    changeBranches,
+    new Map(),
+    today,
+  ).projects;
+  return { decisions: ownedDecisions, projects: ownedProjects };
+}

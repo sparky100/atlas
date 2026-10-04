@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow, DecisionRow, ProfileRow, ProjectRow } from '../../db/types';
-import { buildWhatWeAreDoing, displayNameOf } from './whatWeAreDoing';
+import { buildMyOwnedWork, buildWhatWeAreDoing, displayNameOf } from './whatWeAreDoing';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
   return {
@@ -160,5 +160,34 @@ describe('displayNameOf', () => {
     expect(displayNameOf('u-1', profiles)).toBe('Sam Lee');
     expect(displayNameOf('u-2', profiles)).toBe('sam2');
     expect(displayNameOf('u-3', profiles)).toBe('u-3');
+  });
+});
+
+describe('buildMyOwnedWork', () => {
+  it("lists only the viewer's own open decisions — in a project or not — overdue first, then by needed-by date, naming each one's project", () => {
+    const projects = [project({ id: 'p1', title: 'CRM replacement', owner_id: 'someone-else' })];
+    const decisions = [
+      decision({ id: 'd-mine-later', owner_id: 'me', project_id: null, needed_by: '2026-12-01' }),
+      decision({ id: 'd-mine-overdue', owner_id: 'me', project_id: 'p1', needed_by: '2026-09-01' }),
+      decision({ id: 'd-mine-decided', owner_id: 'me', status: 'accepted' }),
+      decision({ id: 'd-theirs', owner_id: 'someone-else', created_by: 'me' }),
+    ];
+    const result = buildMyOwnedWork(projects, decisions, [], 'me', TODAY).decisions;
+    expect(result.map((d) => [d.decision.id, d.overdue, d.projectTitle])).toEqual([
+      ['d-mine-overdue', true, 'CRM replacement'],
+      ['d-mine-later', false, null],
+    ]);
+  });
+
+  it("lists only the viewer's own projects in hand, with the same progress Overview counts", () => {
+    const projects = [
+      project({ id: 'p-mine', owner_id: 'me' }),
+      project({ id: 'p-mine-closed', owner_id: 'me', status: 'closed' }),
+      project({ id: 'p-theirs', owner_id: 'someone-else', created_by: 'me' }),
+    ];
+    const decisions = [decision({ id: 'd1', project_id: 'p-mine', owner_id: 'someone-else' })];
+    const result = buildMyOwnedWork(projects, decisions, [], 'me', TODAY).projects;
+    expect(result.map((p) => p.project.id)).toEqual(['p-mine']);
+    expect(result[0]?.progress.openDecisions).toBe(1);
   });
 });
