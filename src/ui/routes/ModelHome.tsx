@@ -64,7 +64,7 @@ function DirectorDoor({
   useRouteTiming('model-home', directorState.status === 'ready');
   if (directorState.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (directorState.status === 'error') return <Text as="p">{directorState.message}</Text>;
-  return <DirectorHome data={directorState.data} reload={directorState.reload} modelId={modelId} orgId={orgId} userId={userId} role={role} orgSlug={orgSlug} modelSlug={modelSlug} mainCommitIdHint={mainCommitIdHint} onShowMyWork={onShowMyWork} />;
+  return <DirectorHome data={directorState.data} reload={directorState.reload} modelId={modelId} userId={userId} role={role} orgSlug={orgSlug} modelSlug={modelSlug} mainCommitIdHint={mainCommitIdHint} onShowMyWork={onShowMyWork} />;
 }
 
 function ArchitectDoor({

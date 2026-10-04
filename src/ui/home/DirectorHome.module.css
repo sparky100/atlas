@@ -9,9 +9,10 @@
 
 .sectionHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-1) var(--space-3);
   margin-bottom: var(--space-2);
   border-bottom: var(--border-width) solid var(--border);
   padding-bottom: var(--space-2);
@@ -35,6 +36,10 @@
    card body text under it rather than "too close in weight". */
 .sectionTitle {
   font-weight: 700;
+  /* The heading keeps its own line rather than shrinking to its longest
+     word; whatever sits beside it (a count, a link, the start buttons)
+     wraps underneath on a narrow screen instead. */
+  flex-shrink: 0;
 }
 
 /* Visual pass item 4: "the first thing a director should read" — a
@@ -211,29 +216,32 @@
   min-width: 0;
 }
 
-.tableWrap {
-  overflow-x: auto;
+/* "What we're doing" (UI-principles §3, 2026-10-04): one row per project
+   in hand or open decision, hairline-separated like the table it replaced. */
+.workList {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.table th,
-.table td {
-  text-align: left;
-  padding: var(--space-2);
+.workRow {
+  padding: var(--space-2) 0;
   border-bottom: var(--border-width) solid var(--border);
 }
 
-.changeColumn {
-  width: 44%;
+.workRowTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-.targetColumn {
-  text-align: right;
-  white-space: nowrap;
+.workRow p {
+  margin: var(--space-1) 0 0;
+}
+
+.subsectionTitle {
+  margin: var(--space-4) 0 0;
 }
 
 .versionsColumn {

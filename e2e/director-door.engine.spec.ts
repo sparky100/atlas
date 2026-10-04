@@ -10,6 +10,8 @@ import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import type { CommitEnvelope, Delta, LifecycleStatus } from '../src/contracts/delta';
 import { createChangeBranch, getBranch, getMainBranch } from '../src/db/branches';
+import { createDecision } from '../src/db/decisions';
+import { createProject } from '../src/db/projects';
 import { createSupabaseClient } from '../src/db/client';
 import { commitToBranch } from '../src/db/commits';
 import { createTag } from '../src/db/tags';
@@ -22,7 +24,7 @@ function createSystem(id: string, elementId: string, name: string, lifecycleStat
   return { kind: 'element.create', id, elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus, isExternal: false }, sourceId, confidence: 1 };
 }
 
-test('director door: weakness grid (warn/info/healthy/unrecorded), the changes table, and version stamps', async ({ page }) => {
+test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re doing (projects and decisions, never raw changes), and version stamps', async ({ page }) => {
   const env = loadEnv();
 
   const email = `directordoor-${randomUUID()}@example.test`;
@@ -166,9 +168,17 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
   if (!mainAfterAdvance?.head_commit_id) throw new Error('main branch not found after advance');
   await createTag(signedIn, { id: randomUUID(), orgId, modelId, name: 'v0.2', commitId: mainAfterAdvance.head_commit_id, createdBy: userId });
 
-  // An open change with a target date, for "What's changing".
-  const targetDate = '2026-12-01';
-  await createChangeBranch(signedIn, { id: randomUUID(), orgId, modelId, name: 'upcoming-change', title: 'Upcoming change', createdBy: userId, intent: 'propose', mainHeadCommitId: mainAfterAdvance.head_commit_id, targetDate });
+  // An open change in no project: never shown on Overview (UI-principles
+  // §3, 2026-10-04 — a change outside any project is My work's and the
+  // Changes page's, not a briefing's).
+  await createChangeBranch(signedIn, { id: randomUUID(), orgId, modelId, name: 'upcoming-change', title: 'Upcoming change', createdBy: userId, intent: 'propose', mainHeadCommitId: mainAfterAdvance.head_commit_id, targetDate: '2026-12-01' });
+
+  // A project in hand with an overdue decision of its own, and an open
+  // decision that belongs to no project — "What we're doing".
+  const projectId = randomUUID();
+  await createProject(signedIn, { id: projectId, orgId, modelId, title: 'Revenues replacement', purpose: 'Replace Northgate Revenues.', ownerId: userId, targetDate: '2027-03-31', createdBy: userId });
+  await createDecision(signedIn, { id: randomUUID(), orgId, modelId, title: 'Replace or upgrade Northgate?', statement: 'Northgate Revenues is retiring.', ownerId: userId, neededBy: '2026-01-15', projectId, createdBy: userId });
+  await createDecision(signedIn, { id: randomUUID(), orgId, modelId, title: 'Standardise on one cloud?', statement: 'Portfolio-level.', ownerId: userId, neededBy: '2099-06-30', createdBy: userId });
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // The org's creator is its owner, so the default door is architect —
@@ -193,15 +203,21 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
   await expect(page.getByRole('link', { name: /Waste Collection/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Electoral Services/ })).toBeVisible();
 
-  // What's changing: the open branch, its target date, right-aligned
-  // monospace, sorted to the top since it's the only row with a date.
-  await expect(page.getByRole('heading', { name: "What's changing" })).toBeVisible();
-  const changeRow = page.getByRole('row', { name: /Upcoming change/ });
-  await expect(changeRow).toBeVisible();
-  // A real target date renders (year visible, timezone/locale-formatting
-  // details aside), not the '—' placeholder an absent one would show.
-  await expect(changeRow.getByText('2026')).toBeVisible();
-  await expect(changeRow.getByText('—', { exact: true })).toHaveCount(0);
+  // What we're doing: the project (owner, target date, progress, its
+  // overdue decision flagged in words), then the decision outside any
+  // project — and no raw change at all.
+  await expect(page.getByRole('heading', { name: "What we're doing" })).toBeVisible();
+  const projects = page.getByRole('list', { name: 'Projects in hand' });
+  const projectRow = projects.getByRole('listitem').filter({ hasText: 'Revenues replacement' });
+  await expect(projectRow.getByRole('link', { name: 'Revenues replacement' })).toBeVisible();
+  await expect(projectRow.getByText('1 decision overdue')).toBeVisible();
+  await expect(projectRow.getByText(/target .*2027/)).toBeVisible();
+  await expect(projectRow.getByText('0 open changes · 0 merged · 1 open decision · 0 decided')).toBeVisible();
+  const portfolioDecisions = page.getByRole('list', { name: 'Decisions outside a project' });
+  await expect(portfolioDecisions.getByRole('link', { name: 'Standardise on one cloud?' })).toBeVisible();
+  await expect(portfolioDecisions.getByText(/needed by .*2099/)).toBeVisible();
+  await expect(page.getByText('Upcoming change')).toHaveCount(0);
+  await expect(page.getByText('Replace or upgrade Northgate?')).toHaveCount(0);
 
   // What's recent: two versions, the newer one showing a non-zero commits-
   // since-previous-tag count computed from commits.depth, no diff walk.
@@ -210,8 +226,13 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), the changes t
   await expect(page.getByText(/commits since previous tag/)).toBeVisible();
   await expect(page.getByRole('link', { name: /v0\.1/ })).toBeVisible();
 
-  // Read-only by construction: no add/edit control anywhere on this door.
+  // No add/edit control anywhere on this door; its only create controls
+  // start a project or a decision — never a change.
   await expect(page.getByRole('button', { name: /^Add/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Start a project', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Start a decision', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Propose a change' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'What happened' })).toHaveCount(0);
 
   // The branch used earlier in this test was a stand-in fixture only —
   // confirm it wasn't left mid-review by checking its final status.

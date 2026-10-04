@@ -23,6 +23,7 @@ import { canCreateChangeBranch, canEditProject, canStartDecision } from '../orgs
 import { useMembers } from '../orgs/useMembers';
 import { supabase } from '../supabaseClient';
 import {
+  formatProjectProgress,
   groupChangesByStage,
   isDecisionOverdue,
   openItemsBlockingClose,
@@ -332,7 +333,7 @@ function ProjectHeader({ project, ownerName, progress }: { project: ProjectRow; 
       </div>
       {project.purpose !== '' && <Text as="p">{project.purpose}</Text>}
       <Text as="p" tone="muted" size="sm">
-        {progress.openChanges} open {progress.openChanges === 1 ? 'change' : 'changes'} · {progress.mergedChanges} merged · {progress.openDecisions} open {progress.openDecisions === 1 ? 'decision' : 'decisions'} · {progress.decidedDecisions} decided
+        {formatProjectProgress(progress)}
       </Text>
     </div>
   );

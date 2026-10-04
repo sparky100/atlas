@@ -1,40 +1,37 @@
 import { HomeViewLink } from './HomeViewLink';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { BlueprintFrame } from '../components/BlueprintFrame/BlueprintFrame';
 import { Button } from '../components/Button/Button';
+import { LinkButton } from '../components/Button/LinkButton';
 import { Chip, type ChipTone } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
-import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { UUID } from '../../contracts/delta';
 import type { MemberRole } from '../../db/types';
 import { formatDate } from '../time';
-import { branchStatusTone } from '../changes/branchStatus';
-import { defaultIntentForEntryPoint } from '../changes/branchIntent';
-import type { BranchIntent } from '../../db/types';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { attributesRecord } from '../elements/attributesRecord';
 import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromWeakFitCapabilities, prefillFromWeakCapability } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { importanceLabel } from './capabilityImportance';
 import { compareWeakTiles, formatWeakFitPillLabel, isCapabilityTileWeak, weakFitPillTone } from './capabilityTileFit';
-import { ProposeChangePicker } from './ProposeChangePicker';
 import { ValueStreamsOutcomeView } from '../valueStreams/ValueStreamsOutcomeView';
-import { canCreateChangeBranch, canStartDecision } from '../orgs/useMembership';
+import { canStartDecision } from '../orgs/useMembership';
 import { canStartProject } from '../orgs/roleGates';
 import { StartProjectLink } from '../projects/StartProjectLink';
 import type { CapabilityTileData } from '../../db/modelHome';
 import type { DirectorHomeData } from './useDirectorHome';
+import type { OpenDecisionSummary, ProjectSummary } from './whatWeAreDoing';
+import { formatProjectProgress, projectStatusLabel, projectStatusTone } from '../projects/projectModel';
 import styles from './DirectorHome.module.css';
 
 export interface DirectorHomeProps {
   data: DirectorHomeData;
   reload: () => void;
   modelId: UUID;
-  orgId: UUID;
   userId: UUID | null;
-  /** Sprint 7i item 4's "Propose a change" entry point — the one deliberate exception to this door's own "no add control anywhere" design (see this component's own module comment); gated the same way every other propose-a-change entry point is. */
+  /** Gates the door's only create controls — "Start a project" / "Start a decision" ("What we're doing") and each weak tile's own actions — the same way every other entry point to them is gated. */
   role: MemberRole | null;
   orgSlug: string;
   modelSlug: string;
@@ -46,29 +43,26 @@ export interface DirectorHomeProps {
 
 /**
  * The director's door (UI-principles §3.1, built to Handoff 7d —
- * `docs/HANDOFF-7d-director-door.md`): one vertical read, weakness first,
- * then what's changing, then what's recent. Read-only by construction —
- * no branch selector, no inline edit, no add control anywhere on this
- * page (the search box lives in `ModelHome`'s shared title row, common to
+ * `docs/HANDOFF-7d-director-door.md`, revised by UI-principles §3 on
+ * 2026-10-04): one vertical read — weakness first, then what we're doing
+ * about it (projects in hand and open decisions, never raw changes), then
+ * what's recent. No branch selector and no inline edit; its only create
+ * controls start a project or a decision (the search box lives in
+ * `ModelHome`'s shared title row, common to
  * both doors — see this component's own module comment in the handoff
  * doc for the one place this build simplified the literal layout: the
  * title/search chrome stays the existing shared header rather than a
  * director-only redesign of it, to avoid touching the architect door).
  */
-export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSlug, modelSlug, mainCommitIdHint, onShowMyWork }: DirectorHomeProps) {
+export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, modelSlug, mainCommitIdHint, onShowMyWork }: DirectorHomeProps) {
   const capabilityMapHref = `/o/${orgSlug}/m/${modelSlug}/capability-map`;
-  // Prompt pack F0: which entry point (if either) is currently open, and
-  // therefore which intent the picker it opens should default to —
-  // `null` means neither is open. A single piece of state rather than two
-  // booleans, since only one of "Propose a change"/"What happened" can be
-  // open at a time.
-  const [changeEntryIntent, setChangeEntryIntent] = useState<BranchIntent | null>(null);
   // F6 Step 6 (ADR-023 "Views" item 2): the director door's own "By
   // capability / By outcome" toggle — plain unpersisted component state
   // (the "route via platforms" precedent), not a `user_preferences` column.
   const [weaknessView, setWeaknessView] = useState<'capability' | 'outcome'>('capability');
-  const navigate = useNavigate();
-  const canPropose = canCreateChangeBranch(role);
+  const modelHref = `/o/${orgSlug}/m/${modelSlug}`;
+  const { whatWeAreDoing } = data;
+  const openDecisionCount = whatWeAreDoing.decisionsOutsideProjects.length + whatWeAreDoing.projects.reduce((n, p) => n + p.progress.openDecisions, 0);
 
   if (data.tiles.length === 0) {
     return (
@@ -167,95 +161,52 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
       </section>
 
       <div className={styles.lowerRow}>
-        <section className={styles.changesColumn} aria-label="What's changing">
+        <section className={styles.changesColumn} aria-label="What we're doing">
           <div className={styles.sectionHeader}>
             <Text as="h2" size="xl" className={styles.sectionTitle}>
-              What's changing
+              What we're doing
             </Text>
             <Text as="span" tone="muted" size="sm">
-              {data.openChanges.length} open{data.nextTargetDate ? ` · next target ${formatDate(data.nextTargetDate)}` : ''}
+              {plural(whatWeAreDoing.projects.length, 'project', 'projects')} in hand · {plural(openDecisionCount, 'open decision', 'open decisions')}
             </Text>
-            {canPropose && (
-              <>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setChangeEntryIntent(defaultIntentForEntryPoint('directorDoor'));
-                  }}
-                >
-                  Propose a change
-                </Button>
-                {/* Prompt pack F0's own "'what happened' → record" entry point — genuinely new, no prior surface for it anywhere in this app. Same gate as "Propose a change" (a lightweight, contributor-level act like opening any other change). */}
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setChangeEntryIntent(defaultIntentForEntryPoint('whatHappened'));
-                  }}
-                >
-                  What happened
-                </Button>
-              </>
+            {/* UI-principles §3 (2026-10-04): how a director starts work —
+                a project or a decision. Starting a change is My work's and
+                the Changes page's, not a briefing's. */}
+            {canStartProject(role) && (
+              <LinkButton variant="ghost" to={`${modelHref}/projects`}>
+                Start a project
+              </LinkButton>
+            )}
+            {canStartDecision(role) && (
+              <LinkButton variant="ghost" to={`${modelHref}/decisions`}>
+                Start a decision
+              </LinkButton>
             )}
           </div>
-          {changeEntryIntent && (
-            <Panel>
-              <ProposeChangePicker
-                modelId={modelId}
-                orgId={orgId}
-                userId={userId}
-                defaultIntent={changeEntryIntent}
-                onChosen={(branch) => {
-                  setChangeEntryIntent(null);
-                  // ChangePage.tsx routes on the branch id in the path itself, not `?ref=` — there's nothing to select once you're already on that change's own page.
-                  void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`);
-                }}
-                onCancel={() => {
-                  setChangeEntryIntent(null);
-                }}
-              />
-            </Panel>
-          )}
-          {data.openChanges.length === 0 ? (
-            <EmptyState>Nothing changing right now.</EmptyState>
+          {whatWeAreDoing.projects.length === 0 && whatWeAreDoing.decisionsOutsideProjects.length === 0 ? (
+            <EmptyState>No projects or open decisions right now.</EmptyState>
           ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th className={styles.changeColumn}>Change</th>
-                    <th>Status</th>
-                    <th>Touches</th>
-                    <th className={styles.targetColumn}>Target</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.openChanges.map(({ branch, touches }) => (
-                    <tr key={branch.id}>
-                      <td>
-                        <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`}>
-                          <Text as="span">{branch.title ?? branch.name}</Text>
-                        </Link>
-                      </td>
-                      <td>
-                        <Chip tone={branchStatusTone(branch.status)} glyph={<span className={styles.dot} />}>
-                          {branch.status}
-                        </Chip>
-                      </td>
-                      <td>
-                        <Text as="span" tone="muted" size="sm">
-                          {touches}
-                        </Text>
-                      </td>
-                      <td className={styles.targetColumn}>
-                        <Text as="span" mono size="sm">
-                          {branch.target_date ? formatDate(branch.target_date) : '—'}
-                        </Text>
-                      </td>
-                    </tr>
+            <>
+              {whatWeAreDoing.projects.length > 0 && (
+                <ul className={styles.workList} aria-label="Projects in hand">
+                  {whatWeAreDoing.projects.map((summary) => (
+                    <ProjectWorkRow key={summary.project.id} summary={summary} modelHref={modelHref} />
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </ul>
+              )}
+              {whatWeAreDoing.decisionsOutsideProjects.length > 0 && (
+                <>
+                  <Text as="h3" size="lg" className={styles.subsectionTitle}>
+                    Decisions outside a project
+                  </Text>
+                  <ul className={styles.workList} aria-label="Decisions outside a project">
+                    {whatWeAreDoing.decisionsOutsideProjects.map((summary) => (
+                      <DecisionWorkRow key={summary.decision.id} summary={summary} modelHref={modelHref} />
+                    ))}
+                  </ul>
+                </>
+              )}
+            </>
           )}
         </section>
 
@@ -290,6 +241,55 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
         </section>
       </div>
     </div>
+  );
+}
+
+function plural(count: number, one: string, many: string): string {
+  return `${String(count)} ${count === 1 ? one : many}`;
+}
+
+/** One project in hand: title (to its page), status when not simply active, owner, target date, progress counts, and its decisions' timing — overdue ones flagged in words, never colour alone. */
+function ProjectWorkRow({ summary, modelHref }: { summary: ProjectSummary; modelHref: string }) {
+  const { project, ownerDisplay, progress, overdueDecisions, nextDecisionDue } = summary;
+  return (
+    <li className={styles.workRow}>
+      <div className={styles.workRowTitle}>
+        <Link to={`${modelHref}/projects/${project.id}`}>
+          <Text as="span" size="lg">
+            {project.title}
+          </Text>
+        </Link>
+        {project.status !== 'active' && <Chip tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status)}</Chip>}
+        {overdueDecisions > 0 && <Chip tone="warn">{plural(overdueDecisions, 'decision overdue', 'decisions overdue')}</Chip>}
+      </div>
+      <Text as="p" tone="muted" size="sm">
+        {ownerDisplay}
+        {project.target_date !== null ? ` · target ${formatDate(project.target_date)}` : ''}
+        {nextDecisionDue !== null ? ` · next decision due ${formatDate(nextDecisionDue)}` : ''}
+      </Text>
+      <Text as="p" tone="faint" size="xs">
+        {formatProjectProgress(progress)}
+      </Text>
+    </li>
+  );
+}
+
+/** One open decision that belongs to no project — a portfolio-level decision (ADR-024 §1). */
+function DecisionWorkRow({ summary, modelHref }: { summary: OpenDecisionSummary; modelHref: string }) {
+  const { decision, ownerDisplay, overdue } = summary;
+  return (
+    <li className={styles.workRow}>
+      <div className={styles.workRowTitle}>
+        <Link to={`${modelHref}/decisions/${decision.id}`}>
+          <Text as="span">{decision.title}</Text>
+        </Link>
+        {overdue && <Chip tone="warn">overdue</Chip>}
+      </div>
+      <Text as="p" tone="muted" size="sm">
+        {ownerDisplay}
+        {decision.needed_by !== null ? ` · needed by ${formatDate(decision.needed_by)}` : ''}
+      </Text>
+    </li>
   );
 }
 
