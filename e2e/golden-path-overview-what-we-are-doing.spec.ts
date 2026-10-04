@@ -71,3 +71,32 @@ test("Overview's \"What we're doing\" shows a project and a decision outside any
   await projectRow.getByRole('link', { name: projectTitle }).click();
   await expect(page.getByRole('heading', { name: projectTitle, level: 1 })).toBeVisible();
 });
+
+test("a weak tile says what's in hand: nothing at first, then the project started from it — and stops offering to start another", async ({ page }) => {
+  await signUpCreateOrgAndModel(page, 'overviewinhand');
+  await addCapability(page, 'Housing Repairs');
+
+  // A capability nothing supports is weak; nothing is addressing it yet.
+  await showOverview(page);
+  const tileCard = page.getByRole('link', { name: /Housing Repairs/ }).first().locator('xpath=..');
+  await expect(tileCard.getByText('Nothing in hand')).toBeVisible();
+
+  // Start a project from the tile itself — its scope is already the capability.
+  await tileCard.getByRole('link', { name: 'Start a project →' }).click();
+  await expect(page.getByLabel('Project title')).toHaveValue('Who supports Housing Repairs');
+  await page.getByLabel('Owner').selectOption({ index: 1 });
+  await page.getByRole('button', { name: 'Start project' }).click();
+  await expect(page.getByRole('heading', { name: 'Who supports Housing Repairs', level: 1 })).toBeVisible();
+
+  // Back on Overview: the tile names the project and offers nothing to start.
+  await showOverview(page);
+  const card = page.getByRole('link', { name: /Housing Repairs/ }).first().locator('xpath=..');
+  await expect(card.getByText('In hand:')).toBeVisible();
+  await expect(card.getByText('Nothing in hand')).toHaveCount(0);
+  await expect(card.getByRole('link', { name: 'Start a project →' })).toHaveCount(0);
+  await expect(card.getByRole('link', { name: 'Start a decision →' })).toHaveCount(0);
+
+  // The project link opens the project.
+  await card.getByRole('link', { name: 'Project: Who supports Housing Repairs' }).click();
+  await expect(page.getByRole('heading', { name: 'Who supports Housing Repairs', level: 1 })).toBeVisible();
+});

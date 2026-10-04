@@ -37,6 +37,7 @@ import {
   listDecisionLinksForDecision,
   listDecisionsForModel,
   listDecisionsLinkingElements,
+  listOpenDecisionElementLinksForModel,
   updateDecision,
 } from './decisions';
 import { loadEnv } from './env';
@@ -106,6 +107,36 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
 
   afterAll(async () => {
     await service.auth.admin.deleteUser(alice.id);
+  });
+
+  it("listOpenDecisionElementLinksForModel lists open decisions' element links on this model only — never a cancelled decision's, never another model's", async () => {
+    const open = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Replace SAP PM?', statement: 'Open.', ownerId: alice.id, createdBy: alice.id });
+    await createDecisionLink(alice.client, { decisionId: open.id, linkedType: 'element', linkedId: elementId, createdBy: alice.id });
+    const cancelled = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Tolerate SAP PM?', statement: 'Withdrawn.', ownerId: alice.id, createdBy: alice.id });
+    await createDecisionLink(alice.client, { decisionId: cancelled.id, linkedType: 'element', linkedId: elementId, createdBy: alice.id });
+    await cancelDecision(alice.client, cancelled.id, 'Withdrawn.');
+
+    // A second model in the same org, with its own element and open, linked decision.
+    const otherModelId = randomUUID();
+    await createModel(alice.client, { id: otherModelId, orgId, name: 'Other Model', slug: `decisions-other-${otherModelId.slice(0, 8)}`, createdBy: alice.id });
+    const otherSource = await getOrCreateManualSource(alice.client, { id: randomUUID(), orgId, modelId: otherModelId, userId: alice.id });
+    const otherMain = await getMainBranch(alice.client, otherModelId);
+    if (!otherMain?.head_commit_id) throw new Error('other main branch not found');
+    const otherElementId = randomUUID();
+    const otherSeed = await commitToBranch(alice.client, {
+      modelId: otherModelId,
+      branchId: otherMain.id,
+      expectedHeadCommitId: otherMain.head_commit_id,
+      envelope: { id: randomUUID(), branchId: otherMain.id, parentCommitId: otherMain.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title: 'seed', body: null, deltas: [makeCreateDelta(randomUUID(), otherElementId, 'Other PM', otherSource.id)] },
+    });
+    if (!otherSeed.ok) throw new Error(`other model seed: ${otherSeed.message}`);
+    const otherDecision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId: otherModelId, title: 'Elsewhere', statement: 'Other model.', ownerId: alice.id, createdBy: alice.id });
+    await createDecisionLink(alice.client, { decisionId: otherDecision.id, linkedType: 'element', linkedId: otherElementId, createdBy: alice.id });
+
+    const links = await listOpenDecisionElementLinksForModel(alice.client, modelId);
+    expect(links).toContainEqual({ decisionId: open.id, elementId });
+    expect(links.map((l) => l.decisionId)).not.toContain(cancelled.id);
+    expect(links.map((l) => l.decisionId)).not.toContain(otherDecision.id);
   });
 
   it('createDecision round-trips every field; it is listed and readable back', async () => {

@@ -4,7 +4,7 @@ import type { ElementsHeadRow } from '../../contracts/rows';
 import { listChangeBranches } from '../../db/branches';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
 import { listOwnsEdges } from '../../db/elementBrowse';
-import { computeSelfOwnedCapabilityIds } from '../../db/healthFindings';
+import { computeSelfOwnedCapabilityIds, listOpenProjectScopeForModel } from '../../db/healthFindings';
 import { listContainersForLandscape, listSystemsForLandscape } from '../../db/landscape';
 import {
   buildCapabilityTiles,
@@ -16,7 +16,7 @@ import {
   type CapabilityTileData,
   type ModelCounts,
 } from '../../db/modelHome';
-import { listDecisionsForModel } from '../../db/decisions';
+import { listDecisionsForModel, listOpenDecisionElementLinksForModel } from '../../db/decisions';
 import { listOrgMemberProfiles, listProfilesByIds } from '../../db/profiles';
 import { listProjectsForModel } from '../../db/projects';
 import { listTagsForModel } from '../../db/tags';
@@ -25,6 +25,7 @@ import { resolveRef } from '../../db/ref';
 import { computeCapabilityMapTree } from '../capabilityMap/layout';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
+import { computeTileInHand, type TileInHand } from './tileInHand';
 import { buildWhatWeAreDoing, type WhatWeAreDoing } from './whatWeAreDoing';
 
 export interface VersionStamp {
@@ -42,6 +43,8 @@ export interface DirectorHomeData {
   counts: ModelCounts;
   /** "What we're doing" (UI-principles §3, 2026-10-04): projects in hand and open decisions outside any project — `whatWeAreDoing.ts`. Replaces Handoff 7d's "What's changing" list of raw changes. */
   whatWeAreDoing: WhatWeAreDoing;
+  /** Per level-1 tile (by capability id): the open projects and decisions already addressing it — `tileInHand.ts`. */
+  inHandByTile: ReadonlyMap<UUID, TileInHand>;
   versions: VersionStamp[];
 }
 
@@ -85,7 +88,7 @@ export function useDirectorHome(
         return;
       }
 
-      const [capabilities, supportsEdges, systems, containers, counts, changeBranches, tags, plannedReplacements, ownsEdges, projects, decisions, memberProfiles] = await Promise.all([
+      const [capabilities, supportsEdges, systems, containers, counts, changeBranches, tags, plannedReplacements, ownsEdges, projects, decisions, memberProfiles, projectScope, decisionElementLinks] = await Promise.all([
         listCapabilitiesForMap(supabase, commitId),
         listAllSupportsEdges(supabase, commitId),
         listSystemsForLandscape(supabase, commitId),
@@ -101,6 +104,9 @@ export function useDirectorHome(
         // one org-scoped read, never an `.in()` over owner ids (CLAUDE.md
         // rule 8: that list grows with the model).
         listOrgMemberProfiles(supabase, orgId),
+        // What's addressing each weak tile — both model-scoped, no id list.
+        listOpenProjectScopeForModel(supabase, modelId),
+        listOpenDecisionElementLinksForModel(supabase, modelId),
       ]);
 
       // Bug fix: a `supports` edge's own `from_element_id` can be a
@@ -127,6 +133,7 @@ export function useDirectorHome(
 
       const today = new Date().toISOString().slice(0, 10);
       const whatWeAreDoing = buildWhatWeAreDoing(projects, decisions, changeBranches, new Map(memberProfiles.map((p) => [p.user_id, p])), today);
+      const inHandByTile = computeTileInHand(tiles, capabilities, projectScope, decisionElementLinks, decisions);
 
       const recentTags = [...tags].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3);
       // One older tag beyond the three shown is enough to compute the
@@ -152,7 +159,7 @@ export function useDirectorHome(
       if (!cancelled) {
         setState({
           status: 'ready',
-          data: { tiles, exposedCount, unrecordedCount, counts, whatWeAreDoing, versions },
+          data: { tiles, exposedCount, unrecordedCount, counts, whatWeAreDoing, inHandByTile, versions },
         });
       }
     }

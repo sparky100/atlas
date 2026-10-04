@@ -95,6 +95,25 @@
   margin-top: var(--space-2);
 }
 
+/* UI-principles §3 (2026-10-04): what's already addressing a weak tile —
+   the projects and decisions naming it, or "Nothing in hand". */
+.inHand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  margin: var(--space-2) 0 0;
+}
+
+.inHandList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
 /* F6.1: the poor-fit capability links — real navigable links to each
    affected capability, kept outside the tile's own primary `<Link>`
    (siblings, same reasoning `.tileWrapper` documents) but still

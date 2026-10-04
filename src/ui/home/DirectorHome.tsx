@@ -23,6 +23,7 @@ import { StartProjectLink } from '../projects/StartProjectLink';
 import type { CapabilityTileData } from '../../db/modelHome';
 import type { DirectorHomeData } from './useDirectorHome';
 import type { OpenDecisionSummary, ProjectSummary } from './whatWeAreDoing';
+import { isNothingInHand, type TileInHand } from './tileInHand';
 import { formatProjectProgress, projectStatusLabel, projectStatusTone } from '../projects/projectModel';
 import styles from './DirectorHome.module.css';
 
@@ -147,10 +148,10 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
 
             <div className={styles.tileGrid}>
               {weakTiles.map((tile) => (
-                <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised role={role} />
+                <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised role={role} inHand={data.inHandByTile.get(tile.capability.element_id) ?? NO_IN_HAND} />
               ))}
               {healthyTiles.map((tile) => (
-                <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised={false} role={role} />
+                <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised={false} role={role} inHand={data.inHandByTile.get(tile.capability.element_id) ?? NO_IN_HAND} />
               ))}
             </div>
           </>
@@ -293,6 +294,52 @@ function DecisionWorkRow({ summary, modelHref }: { summary: OpenDecisionSummary;
   );
 }
 
+const NO_IN_HAND: TileInHand = { projects: [], decisions: [] };
+/** How many in-hand items a tile names before "+N more" — a tile is a glance, the project page and the decision list hold the rest. */
+const IN_HAND_SHOWN = 2;
+
+/** A weak tile's "In hand" line: the projects and decisions already addressing it, each a link to its own page — or, plainly, "Nothing in hand". Real links, rendered as siblings after the tile's own primary link (never inside it). */
+function TileInHandLine({ inHand, modelHref }: { inHand: TileInHand; modelHref: string }) {
+  if (isNothingInHand(inHand)) {
+    return (
+      <Text as="p" tone="muted" size="xs" className={styles.inHand}>
+        Nothing in hand
+      </Text>
+    );
+  }
+  const items = [
+    ...inHand.projects.map((p) => ({ key: `p-${p.id}`, href: `${modelHref}/projects/${p.id}`, label: `Project: ${p.title}` })),
+    ...inHand.decisions.map((d) => ({ key: `d-${d.id}`, href: `${modelHref}/decisions/${d.id}`, label: `Decision: ${d.title}` })),
+  ];
+  const shown = items.slice(0, IN_HAND_SHOWN);
+  const more = items.length - shown.length;
+  return (
+    <div className={styles.inHand}>
+      <Text as="span" tone="muted" size="xs">
+        In hand:
+      </Text>
+      <ul className={styles.inHandList}>
+        {shown.map((item) => (
+          <li key={item.key}>
+            <Link to={item.href}>
+              <Text as="span" size="xs">
+                {item.label}
+              </Text>
+            </Link>
+          </li>
+        ))}
+        {more > 0 && (
+          <li>
+            <Text as="span" tone="muted" size="xs">
+              +{more} more
+            </Text>
+          </li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
 interface CapabilityTileProps {
   tile: CapabilityTileData;
   orgSlug: string;
@@ -300,6 +347,8 @@ interface CapabilityTileProps {
   emphasised: boolean;
   /** Prompt pack F3 PR6: gates the "Start a decision →" action below an emphasised (weak) tile — omitted entirely, not shown disabled, for a viewer; never rendered at all on a healthy tile. */
   role: MemberRole | null;
+  /** The open projects and decisions already addressing this tile (`tileInHand.ts`) — named on a weak tile, and when there are any, the tile's own start actions are dropped. */
+  inHand: TileInHand;
 }
 
 const TONE_LABEL: Record<CapabilityTileData['tone'], string> = {
@@ -311,7 +360,7 @@ const TONE_LABEL: Record<CapabilityTileData['tone'], string> = {
 
 const TONE_CHIP: Record<CapabilityTileData['tone'], ChipTone> = { ok: 'ok', warn: 'warn', info: 'info', neutral: 'neutral' };
 
-function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: CapabilityTileProps) {
+function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: CapabilityTileProps) {
   const href = `/o/${orgSlug}/m/${modelSlug}/e/${tile.capability.element_id}`;
   // Visual pass item 1: "no known supporters" specifically, not every weak
   // tile — `buildCapabilityTiles` (`modelHome.ts`) sets `tone: 'neutral'`
@@ -348,10 +397,13 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
     tile.weakFitCapabilities.length > 0 && !tile.weakFitAllReplacementPlanned && canStartDecision(role)
       ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefillFromWeakFitCapabilities(tile.capability.name, tile.weakFitCapabilities.map((c) => ({ id: c.element_id, name: c.name })))).toString()}`
       : null;
-  const decisionActionHrefs = [startDecisionHref, startFitDecisionHref].filter((href): href is string => href !== null);
+  // UI-principles §3 (2026-10-04): once a project or decision is already
+  // addressing this tile, it says so instead of offering to start another.
+  const nothingInHand = isNothingInHand(inHand);
+  const decisionActionHrefs = nothingInHand ? [startDecisionHref, startFitDecisionHref].filter((href): href is string => href !== null) : [];
   // F10 step 7 (ADR-024 §6.4): a weak tile can start a project instead —
   // the same prefill as its exposure decision, read by the project form.
-  const startProjectHref = startDecisionHref !== null && canStartProject(role) ? startDecisionHref.replace('/decisions?', '/projects?') : null;
+  const startProjectHref = nothingInHand && startDecisionHref !== null && canStartProject(role) ? startDecisionHref.replace('/decisions?', '/projects?') : null;
   const actionCount = decisionActionHrefs.length + (startProjectHref !== null ? 1 : 0);
   const content = (
     <>
@@ -450,6 +502,7 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
           ))}
         </ul>
       )}
+      {emphasised && <TileInHandLine inHand={inHand} modelHref={`/o/${orgSlug}/m/${modelSlug}`} />}
       {actionCount > 0 && (
         <div className={styles.tileActions}>
           {decisionActionHrefs.map((href) => (

@@ -11,7 +11,7 @@ import { expect, test } from '@playwright/test';
 import type { CommitEnvelope, Delta, LifecycleStatus } from '../src/contracts/delta';
 import { createChangeBranch, getBranch, getMainBranch } from '../src/db/branches';
 import { createDecision } from '../src/db/decisions';
-import { createProject } from '../src/db/projects';
+import { addProjectLink, createProject } from '../src/db/projects';
 import { createSupabaseClient } from '../src/db/client';
 import { commitToBranch } from '../src/db/commits';
 import { createTag } from '../src/db/tags';
@@ -177,6 +177,9 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
   // decision that belongs to no project — "What we're doing".
   const projectId = randomUUID();
   await createProject(signedIn, { id: projectId, orgId, modelId, title: 'Revenues replacement', purpose: 'Replace Northgate Revenues.', ownerId: userId, targetDate: '2027-03-31', createdBy: userId });
+  // Scoped to Revenues and Benefits — so that weak tile says the project is
+  // in hand and stops offering to start another (UI-principles §3).
+  await addProjectLink(signedIn, { projectId, linkedType: 'element', linkedId: capWarnId, createdBy: userId });
   await createDecision(signedIn, { id: randomUUID(), orgId, modelId, title: 'Replace or upgrade Northgate?', statement: 'Northgate Revenues is retiring.', ownerId: userId, neededBy: '2026-01-15', projectId, createdBy: userId });
   await createDecision(signedIn, { id: randomUUID(), orgId, modelId, title: 'Standardise on one cloud?', statement: 'Portfolio-level.', ownerId: userId, neededBy: '2099-06-30', createdBy: userId });
 
@@ -195,10 +198,23 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
   await expect(revenuesTile).toBeVisible();
   await expect(revenuesTile.getByText('lifecycle exposure')).toBeVisible();
   await expect(revenuesTile.getByText('Northgate Revenues')).toBeVisible();
+  // What's addressing it: the project scoped to it, linked — and no
+  // "Start a decision / project" on this tile any more. (The project's own
+  // decision is shown through the project, not again.)
+  const revenuesCard = revenuesTile.locator('xpath=..');
+  await expect(revenuesCard.getByText('In hand:')).toBeVisible();
+  await expect(revenuesCard.getByRole('link', { name: 'Project: Revenues replacement' })).toBeVisible();
+  await expect(revenuesCard.getByText(/Decision: /)).toHaveCount(0);
+  await expect(revenuesCard.getByRole('link', { name: 'Start a decision →' })).toHaveCount(0);
+  await expect(revenuesCard.getByRole('link', { name: 'Start a project →' })).toHaveCount(0);
 
   const socialCareTile = page.getByRole('link', { name: /Adult Social Care/ });
   await expect(socialCareTile).toBeVisible();
   await expect(socialCareTile.getByText('replacement planned')).toBeVisible();
+  // Nothing names this one: it says so, and still offers to start work.
+  const socialCareCard = socialCareTile.locator('xpath=..');
+  await expect(socialCareCard.getByText('Nothing in hand')).toBeVisible();
+  await expect(socialCareCard.getByRole('link', { name: 'Start a decision →' })).toBeVisible();
 
   await expect(page.getByRole('link', { name: /Waste Collection/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Electoral Services/ })).toBeVisible();
