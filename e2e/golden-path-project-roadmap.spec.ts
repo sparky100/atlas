@@ -47,7 +47,10 @@ test('roadmap grouped by project: the project\'s change lands under the project,
   // Inside the change: retire Legacy CRM, replaced by New CRM Platform.
   await goToModelHome(page);
   await page.getByPlaceholder('Search or create a capability, system, or actor…').fill('Legacy CRM');
-  await page.getByRole('link', { name: 'Legacy CRM' }).click();
+  // The search result is the first match: My work's Recent activity can
+  // also link "Legacy CRM" once it has loaded, which made this click
+  // ambiguous depending on timing.
+  await page.getByRole('link', { name: 'Legacy CRM' }).first().click();
   await expect(page.getByRole('heading', { name: 'Legacy CRM' })).toBeVisible();
   await retireElement(page, isoDateDaysFromNow(90), 'New CRM Platform');
   await expect(page.getByText(/Replaced by/)).toBeVisible();
