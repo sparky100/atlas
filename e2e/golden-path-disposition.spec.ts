@@ -63,7 +63,9 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
 
   await goToModelHome(page);
   await page.getByPlaceholder('Search or create a capability, system, or actor…').fill('Legacy Payroll');
-  await page.getByRole('link', { name: 'Legacy Payroll' }).click();
+  // Inside the search results: My work also links "Migrate Legacy Payroll"
+  // (My projects), which an unscoped name match would hit too.
+  await page.getByRole('list', { name: 'Search results' }).getByRole('link', { name: 'Legacy Payroll' }).click();
   await expect(page.getByRole('heading', { name: 'Legacy Payroll' })).toBeVisible();
   await retireElement(page, isoDateDaysFromNow(90));
   await expect(page.getByText('retiring', { exact: true }).first()).toBeVisible();
