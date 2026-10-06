@@ -29,6 +29,7 @@ export {
   canRestoreModel,
   canReviewMergeRequest,
   canRunCapture,
+  canDiscardCaptureJob,
   canRunDuplicateCheck,
   canStartDecision,
 } from './roleGates';

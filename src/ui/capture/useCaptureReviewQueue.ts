@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { CandidateDecision, CandidateDecisionDetail, CaptureCandidate, CaptureJob } from '../../contracts/capture';
 import { buildPromotionEnvelope, BuildPromotionEnvelopeError } from '../../capture/buildPromotionEnvelope';
@@ -9,12 +10,13 @@ import { loadTargetBranchHead, type LoadedTargetBranch } from '../../capture/loa
 import { computeNotInFile, type NotInFileElement } from '../../capture/notInFile';
 import { createChangeBranch, getMainBranch, listChangeBranches } from '../../db/branches';
 import { applyCaptureDecisions, listCaptureCandidates, stageCaptureDecisions, type CaptureDecisionInput } from '../../db/captureCandidates';
-import { getCaptureJob } from '../../db/captureJobs';
+import { discardCaptureJob, finishCaptureReview, getCaptureJob } from '../../db/captureJobs';
 import { getOrCreateManualSource } from '../../db/sources';
 import { envelopeToDeltaRows, type ElementsHeadRow, type RelationshipsHeadRow } from '../../contracts/rows';
 import { selectAll } from '../../db/selectAll';
 import type { BranchRow, MemberRole } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
+import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
 
 const ELEMENTS_HEAD_COLUMNS = 'element_id, element_type, name, parent_id, attributes, exists_delta_id';
@@ -30,7 +32,7 @@ async function loadMainNowMaps(commitId: UUID | null): Promise<{ elements: Map<U
   return { elements: new Map(elementRows.map((r) => [r.element_id, r])), relationships: new Map(relationshipRows.map((r) => [r.relationship_id, r])) };
 }
 
-export type CaptureReviewStatus = 'loading' | 'idle' | 'error' | 'applying';
+export type CaptureReviewStatus = 'loading' | 'idle' | 'error' | 'applying' | 'closing';
 
 export interface UseCaptureReviewQueueResult {
   status: CaptureReviewStatus;
@@ -64,6 +66,15 @@ export interface UseCaptureReviewQueueResult {
    * affected either way.
    */
   apply: () => Promise<{ appliedCount: number; merged: boolean; mergeSkippedReason?: string } | null>;
+  /**
+   * SPEC-capture.md §8.2 (amended): closes the review as `reviewed` via
+   * `atlas.finish_capture_review` — no target change, no commit — when
+   * `finishableWithoutApply.ts` says nothing is left to promote (e.g.
+   * every candidate rejected). `true` once closed.
+   */
+  finish: () => Promise<boolean>;
+  /** §3.2: throws the whole run away via `atlas.discard_capture_job` (status `discarded`, draft archived, every row kept). `true` once discarded. */
+  discard: () => Promise<boolean>;
   /**
    * The `m` picker's own search (SPEC §10: "picker prefilled with `similar`,
    * then search") — a case-insensitive substring match over the *target*
@@ -106,6 +117,7 @@ function tallyDecisions(candidates: readonly CaptureCandidate[]): Record<string,
  * from a real UI rather than only from `applyCaptureDecisions.integration.test.ts`).
  */
 export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, userId: UUID | null, role: MemberRole | null): UseCaptureReviewQueueResult {
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<CaptureReviewStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<CaptureJob | null>(null);
@@ -303,6 +315,30 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
     }
   }, [job, targetBranchId, userId, candidates, modelId, orgId, role, reload, mainElementById, draftElementById]);
 
+  const closeWith = useCallback(
+    async (close: () => Promise<void>, failure: string): Promise<boolean> => {
+      setStatus('closing');
+      setError(null);
+      try {
+        await close();
+        setStatus('idle');
+        // The job just left `parsed` — the Changes nav badge (`useReviewQueueCount.ts`) counts exactly those.
+        void queryClient.invalidateQueries({ queryKey: queryKeys.reviewQueueCount(modelId) });
+        reload();
+        return true;
+      } catch (e) {
+        setStatus('idle');
+        setError(e instanceof Error ? e.message : failure);
+        reportError(failure, e);
+        return false;
+      }
+    },
+    [reload, queryClient, modelId],
+  );
+
+  const finish = useCallback(() => closeWith(() => finishCaptureReview(supabase, jobId), "Couldn't finish this capture review."), [closeWith, jobId]);
+  const discard = useCallback(() => closeWith(() => discardCaptureJob(supabase, jobId), "Couldn't discard this capture draft."), [closeWith, jobId]);
+
   const searchTargetElements = useCallback(
     async (elementType: ElementType, query: string): Promise<{ elementId: UUID; name: string; parentName: string | null }[] | null> => {
       if (!targetBranchId) return null;
@@ -338,5 +374,5 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
     return computeNotInFile(systems, containers, touchedElementIds);
   }, [candidates, mainElementById]);
 
-  return { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, searchTargetElements, reload, notInFile };
+  return { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, finish, discard, searchTargetElements, reload, notInFile };
 }

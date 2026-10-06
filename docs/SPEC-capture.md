@@ -96,7 +96,7 @@ SPEC §3.7's columns stand. Added:
 | `progress` | jsonb | nullable — `{stage, done, total, startedAt, updatedAt}`; `stage ∈ parse, extract, match, write` |
 | `llm_usage` | jsonb | nullable — `{calls, inputTokens, outputTokens, cacheReadTokens, model}` accumulated per run, for per-org cost attribution (ADR-014) |
 
-`status` keeps SPEC's enum: `pending` (uploaded, not yet run or mid-run — `progress` says which), `parsed` (draft branch written, awaiting review), `reviewed` (every candidate decided and applied at least once; the draft is archived), `discarded` (the person threw the whole run away before or after review). `error` is set with a §11 code whenever a run fails; a failed job stays `pending` with `error` non-null and can be retried (a retry clears `error`, re-runs from the last persisted stage).
+`status` keeps SPEC's enum: `pending` (uploaded, not yet run or mid-run — `progress` says which), `parsed` (draft branch written, awaiting review), `reviewed` (every candidate decided, and every non-rejected one applied; the draft is archived), `discarded` (the person threw the whole run away before or after review). `error` is set with a §11 code whenever a run fails; a failed job stays `pending` with `error` non-null and can be retried (a retry clears `error`, re-runs from the last persisted stage).
 
 Transitions, and who makes them:
 
@@ -105,6 +105,7 @@ Transitions, and who makes them:
 | — | `pending` | client insert (RLS: contributor+, `created_by = auth.uid()`) |
 | `pending` | `parsed` | `capture-run` (service role) at the end of `write` |
 | `parsed` | `reviewed` | `atlas.apply_capture_decisions` when no undecided candidate remains |
+| `parsed` | `reviewed` | `atlas.finish_capture_review` (contributor+) when no candidate is undecided and every candidate not yet promoted is `rejected` — no target change, no commit (§8.2, amended 2026-10-06) |
 | `pending`/`parsed` | `discarded` | `atlas.discard_capture_job` (contributor+ who created it, or architect/owner) — archives the draft branch (`status = 'archived'`), leaves every row in place |
 
 ### 3.3 `capture_candidates` (new, K-2)
@@ -797,6 +798,8 @@ What each decision promotes:
 
 `s` at the draft level ("send selected deltas to a different change branch", UI §5.2) is simply an apply call with a different `p_target_branch_id` for a subset — the function is called once per target.
 
+**Amended 2026-10-06 — finishing a review with nothing to apply.** Apply needs a draft `change` branch as its target even when every remaining decision is `rejected`, which promotes nothing — so a reviewer who rejected everything had to create an empty change just to close the review, and until they did the draft sat in the review queue. `atlas.finish_capture_review(p_job_id)` (`20261006010000_finish_capture_review.sql`; security definer, contributor+ on the org, job must be `parsed`) closes it instead: it refuses while any candidate is undecided (`CANDIDATES_UNDECIDED`) or while any non-`rejected` candidate has no `promoted_commit_id` (`CANDIDATES_UNAPPLIED` — that still needs a real apply), then sets `status = 'reviewed'` and archives the draft branch, exactly as apply's step 5 does. It writes no commit, no deltas and no `target_branch_id`; rejections stay recorded on the candidate rows. The review page shows **Finish review** in place of **Apply decisions** whenever `src/capture/finishableWithoutApply.ts` (the client-side mirror of that gate) holds, and `⌘/Ctrl+Enter` does the same. A draft nobody means to review at all is discarded instead (§3.2), from the review page, the capture list or the review queue.
+
 ---
 
 ## 9. Re-import diff
@@ -859,7 +862,9 @@ Relationship units render as `type · from → to` with the endpoint elements' b
 
 **Amended, Sprint F2b — multi-select widened to `new` and bulk-accept added.** Before this sprint, `x` multi-select existed only for `confirm`, and its only bulk action was `r` (reject a subset). Folding F2-lite in without this would be a real regression for the common case it handled well: a clean register that resolves to all-`confirm`/all-exact-`new` candidates went from F2-lite's one-shot commit to a queue that needed one keystroke per row. `x` now also multi-selects within `new`, and `a` on a multi-selection bulk-accepts every selected candidate (same guard shape as the existing bulk-`r`, same `⌘/Ctrl+Enter` apply afterwards) — a clean import is still select-all-then-accept-then-apply, three actions regardless of row count, not `a` once per row.
 
-`⌘/Ctrl+Enter` applies §8.2. Progress and session tally are as UI §5.1.
+**Amended 2026-10-06 — bulk actions and discard without a keyboard.** `x`/`a`/`r` had no on-screen equivalent, so on a phone bulk-accept didn't exist. Each `new`/`confirm` group header now has **Select all** / **Deselect all**, and a non-empty selection shows a sticky bar with **Accept selected**, **Reject selected** and **Clear** — the same `decideMany` call `a`/`r` make. The page also offers **Discard this draft…** (two-step; `atlas.discard_capture_job`, so the creator or an owner/architect only), and a job that is no longer `parsed` renders as closed with a link back to the queue rather than as an actionable queue. The review queue's "Capture drafts" list has a Discard per row and, for a file with more than one draft waiting, one **Discard N older copies** action that keeps only the newest (`src/ui/capture/olderDuplicateDrafts.ts`).
+
+`⌘/Ctrl+Enter` applies §8.2 (or finishes the review, per §8.2's 2026-10-06 amendment). Progress and session tally are as UI §5.1.
 
 ---
 

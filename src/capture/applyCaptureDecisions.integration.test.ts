@@ -300,4 +300,96 @@ describe('stage_capture_decisions / apply_capture_decisions against a real local
     const draftBranchAfter = await getBranch(owner.client, draftBranchId);
     expect(draftBranchAfter?.status).toBe('draft'); // never archived by the failed attempt.
   });
+
+  async function stageDecision(user: TestUser, jobId: UUID, decision: 'accepted' | 'rejected' | null): Promise<void> {
+    const { data: rows } = await owner.client.from('capture_candidates').select('id').eq('job_id', jobId).order('seq');
+    const candidateId: UUID | undefined = rows?.[0]?.id;
+    const { error } = await user.client.schema('atlas').rpc('stage_capture_decisions', {
+      p_job_id: jobId,
+      p_decisions: [{ candidate_id: candidateId, decision, decision_detail: null }],
+    } satisfies Record<string, unknown>);
+    if (error) throw new Error(`stage_capture_decisions: ${error.message}`);
+  }
+
+  describe('finish_capture_review (SPEC-capture.md §8.2, amended)', () => {
+    it('RT: an all-rejected review closes as reviewed with no target change and no commit, the draft archived and the rejection kept', async () => {
+      const jobId = await insertPendingJob(contributor);
+      const { draftBranchId } = await writeDraftWithNewCandidate(jobId);
+      await stageDecision(contributor, jobId, 'rejected');
+      const draftBefore = await getBranch(owner.client, draftBranchId);
+
+      const { data, error } = await contributor.client.schema('atlas').rpc('finish_capture_review', { p_job_id: jobId });
+      if (error) throw new Error(`finish_capture_review: ${error.message}`);
+      expect(data).toMatchObject({ id: jobId, status: 'reviewed', target_branch_id: null });
+
+      const { data: job } = await owner.client.from('capture_jobs').select('status, target_branch_id').eq('id', jobId).single();
+      expect(job).toMatchObject({ status: 'reviewed', target_branch_id: null });
+
+      const draftAfter = await getBranch(owner.client, draftBranchId);
+      expect(draftAfter?.status).toBe('archived');
+      expect(draftAfter?.head_commit_id).toBe(draftBefore?.head_commit_id); // no commit written anywhere.
+
+      const { data: candidate } = await owner.client.from('capture_candidates').select('decision, promoted_commit_id').eq('job_id', jobId).single();
+      expect(candidate).toMatchObject({ decision: 'rejected', promoted_commit_id: null }); // "recorded, not deleted".
+    });
+
+    it('refuses while a candidate is undecided', async () => {
+      const jobId = await insertPendingJob(contributor);
+      await writeDraftWithNewCandidate(jobId);
+
+      const { error } = await contributor.client.schema('atlas').rpc('finish_capture_review', { p_job_id: jobId });
+      expect(error?.message).toMatch(/CANDIDATES_UNDECIDED/);
+      const { data: job } = await owner.client.from('capture_jobs').select('status').eq('id', jobId).single();
+      expect(job).toMatchObject({ status: 'parsed' });
+    });
+
+    it('refuses while an accepted candidate has not been applied to a change', async () => {
+      const jobId = await insertPendingJob(contributor);
+      await writeDraftWithNewCandidate(jobId);
+      await stageDecision(contributor, jobId, 'accepted');
+
+      const { error } = await contributor.client.schema('atlas').rpc('finish_capture_review', { p_job_id: jobId });
+      expect(error?.message).toMatch(/CANDIDATES_UNAPPLIED/);
+      const { data: job } = await owner.client.from('capture_jobs').select('status').eq('id', jobId).single();
+      expect(job).toMatchObject({ status: 'parsed' });
+    });
+
+    it('refuses a job that is no longer parsed', async () => {
+      const jobId = await insertPendingJob(contributor);
+      await writeDraftWithNewCandidate(jobId);
+      await stageDecision(contributor, jobId, 'rejected');
+      const { error: discardError } = await contributor.client.schema('atlas').rpc('discard_capture_job', { p_job_id: jobId });
+      if (discardError) throw new Error(`discard_capture_job: ${discardError.message}`);
+
+      const { error } = await contributor.client.schema('atlas').rpc('finish_capture_review', { p_job_id: jobId });
+      expect(error?.message).toMatch(/must be parsed/);
+    });
+
+    it('refuses someone with no role in the organisation', async () => {
+      const outsider = await createSignedInUser('applydecisions-outsider');
+      const jobId = await insertPendingJob(contributor);
+      await writeDraftWithNewCandidate(jobId);
+      await stageDecision(contributor, jobId, 'rejected');
+
+      const { error } = await outsider.client.schema('atlas').rpc('finish_capture_review', { p_job_id: jobId });
+      expect(error).not.toBeNull();
+      const { data: job } = await owner.client.from('capture_jobs').select('status').eq('id', jobId).single();
+      expect(job).toMatchObject({ status: 'parsed' });
+    });
+  });
+
+  it('discard_capture_job discards a parsed job that already carries review decisions, keeping the decisions', async () => {
+    const jobId = await insertPendingJob(contributor);
+    const { draftBranchId } = await writeDraftWithNewCandidate(jobId);
+    await stageDecision(contributor, jobId, 'rejected');
+
+    const { error } = await contributor.client.schema('atlas').rpc('discard_capture_job', { p_job_id: jobId });
+    if (error) throw new Error(`discard_capture_job: ${error.message}`);
+
+    const { data: job } = await owner.client.from('capture_jobs').select('status').eq('id', jobId).single();
+    expect(job).toMatchObject({ status: 'discarded' });
+    expect((await getBranch(owner.client, draftBranchId))?.status).toBe('archived');
+    const { data: candidate } = await owner.client.from('capture_candidates').select('decision').eq('job_id', jobId).single();
+    expect(candidate).toMatchObject({ decision: 'rejected' });
+  });
 });

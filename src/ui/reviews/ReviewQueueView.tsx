@@ -5,7 +5,10 @@ import { Text } from '../components/Text/Text';
 import type { UUID } from '../../contracts/delta';
 import { useAuth } from '../auth/useAuth';
 import { captureJobStatusLabel, captureJobStatusTone } from '../capture/captureJobStatus';
+import { DiscardCaptureButton } from '../capture/DiscardCaptureButton';
+import { olderDuplicateDrafts } from '../capture/olderDuplicateDrafts';
 import { useCaptureJobs } from '../capture/useCaptureJob';
+import { canDiscardCaptureJob, useMembership } from '../orgs/useMembership';
 import { cachedClassification } from './cachedClassification';
 import { mergeRequestStatusTone } from './mergeRequestStatus';
 import { useReviewQueue, type ReviewQueueRow } from './useReviewQueue';
@@ -27,12 +30,19 @@ export interface ReviewQueueViewProps {
  * padding out an empty second section). `useCaptureJobs` (PR14) already
  * gives every job on this model; this view just filters and links onward,
  * rather than adding a second, capture-specific queue hook.
+ *
+ * Each draft can be discarded from here (`atlas.discard_capture_job`), and
+ * a file run more than once gets one "Discard N older copies" action that
+ * keeps only its newest draft — without either, a draft nobody means to
+ * review had no way out of this queue short of opening it.
  */
 export function ReviewQueueView({ modelId, orgId, orgSlug, modelSlug }: ReviewQueueViewProps) {
   const state = useReviewQueue(modelId);
   const { userId } = useAuth();
-  const { jobs: captureJobs } = useCaptureJobs(modelId, orgId, userId);
+  const { role } = useMembership(orgId, userId);
+  const { jobs: captureJobs, discardJobs } = useCaptureJobs(modelId, orgId, userId);
   const captureDrafts = captureJobs.filter((j) => j.status === 'parsed');
+  const duplicateGroups = olderDuplicateDrafts(captureDrafts.filter((j) => canDiscardCaptureJob(role, j, userId)));
 
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
@@ -59,6 +69,18 @@ export function ReviewQueueView({ modelId, orgId, orgSlug, modelSlug }: ReviewQu
           <Text as="h2" size="lg">
             Capture drafts
           </Text>
+          {duplicateGroups.map((group) => (
+            <div key={group.inputName} className={styles.duplicateGroup}>
+              <Text as="p" size="sm" tone="muted">
+                {group.inputName} has {group.olderIds.length + 1} drafts waiting.
+              </Text>
+              <DiscardCaptureButton
+                label={`Discard ${String(group.olderIds.length)} older ${group.olderIds.length === 1 ? 'copy' : 'copies'}`}
+                confirmText={`Keep only the newest draft of ${group.inputName} and discard the other ${String(group.olderIds.length)}? Nothing from them reaches the model.`}
+                onConfirm={() => discardJobs(group.olderIds)}
+              />
+            </div>
+          ))}
           <ul className={styles.list}>
             {captureDrafts.map((job) => (
               <li key={job.id} className={styles.row}>
@@ -70,9 +92,14 @@ export function ReviewQueueView({ modelId, orgId, orgSlug, modelSlug }: ReviewQu
                     <Chip tone={captureJobStatusTone(job)}>{captureJobStatusLabel(job)}</Chip>
                   </div>
                 </div>
-                <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/capture/${job.id}`} variant="secondary">
-                  Review →
-                </LinkButton>
+                <div className={styles.rowActions}>
+                  <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/capture/${job.id}`} variant="secondary">
+                    Review →
+                  </LinkButton>
+                  {canDiscardCaptureJob(role, job, userId) && (
+                    <DiscardCaptureButton label="Discard" confirmText="Discard this capture draft? Nothing from it reaches the model." onConfirm={() => discardJobs([job.id])} />
+                  )}
+                </div>
               </li>
             ))}
           </ul>

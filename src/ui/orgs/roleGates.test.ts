@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
-import { canAddDecisionConcern, canApproveOrMergeRequest, canArchiveModel, canCancelDecision, canEditDecision, canDeleteModel, canEditBranch, canEditValueStreamStructure, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
+import { canAddDecisionConcern, canApproveOrMergeRequest, canArchiveModel, canCancelDecision, canDiscardCaptureJob, canEditDecision, canDeleteModel, canEditBranch, canEditValueStreamStructure, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
   return {
@@ -200,5 +200,31 @@ describe('canAddDecisionConcern (mirrors decision_links_insert)', () => {
     expect(canAddDecisionConcern('contributor', { status: 'proposed' })).toBe(true);
     expect(canAddDecisionConcern('viewer', { status: 'proposed' })).toBe(false);
     expect(canAddDecisionConcern('owner', { status: 'accepted' })).toBe(false);
+  });
+});
+
+describe('canDiscardCaptureJob', () => {
+  const parsedJob = { createdBy: 'user-1', status: 'parsed' };
+
+  it('lets the contributor who created a parsed job discard it', () => {
+    expect(canDiscardCaptureJob('contributor', parsedJob, 'user-1')).toBe(true);
+  });
+
+  it("refuses a contributor who didn't create the job", () => {
+    expect(canDiscardCaptureJob('contributor', parsedJob, 'user-2')).toBe(false);
+  });
+
+  it('lets any owner or architect discard', () => {
+    expect(canDiscardCaptureJob('owner', parsedJob, 'user-2')).toBe(true);
+    expect(canDiscardCaptureJob('architect', parsedJob, 'user-2')).toBe(true);
+  });
+
+  it('refuses a viewer even on their own job', () => {
+    expect(canDiscardCaptureJob('viewer', parsedJob, 'user-1')).toBe(false);
+  });
+
+  it('refuses once the job is reviewed or discarded', () => {
+    expect(canDiscardCaptureJob('owner', { createdBy: 'user-1', status: 'reviewed' }, 'user-1')).toBe(false);
+    expect(canDiscardCaptureJob('owner', { createdBy: 'user-1', status: 'discarded' }, 'user-1')).toBe(false);
   });
 });

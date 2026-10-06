@@ -195,3 +195,62 @@ test('upload a JSON file, bulk-accept every new candidate by keyboard, and apply
   await expect(page.getByText('Billing Platform', { exact: true })).toBeVisible();
   await expect(page.getByText('Fleet Tracker', { exact: true })).toBeVisible();
 });
+
+test('reject everything by tap, finish the review with no change, and discard a duplicate draft from the queue', async ({ page }, testInfo) => {
+  // A finished review must be able to leave the queue without inventing a
+  // change: "Select all" → "Reject selected" → "Finish review", all by tap
+  // (no keyboard at 390px), then a second run of the same file discarded
+  // straight from the review queue's "Capture drafts" list.
+  // Two real capture runs — each can take most of the 120s wait below.
+  test.setTimeout(300_000);
+  const inputPath = testInfo.outputPath('reject-me.json');
+  await fs.writeFile(
+    inputPath,
+    JSON.stringify({
+      systems: [
+        { name: 'Legacy Fax Gateway', description: 'Not in scope.', confidence: 1 },
+        { name: 'Shadow Spreadsheet', description: 'Not in scope.', confidence: 1 },
+      ],
+    }),
+  );
+
+  await signUpCreateOrgAndModel(page, 'capturefinish');
+
+  async function runCapture(): Promise<void> {
+    await goToModelHome(page);
+    await clickNavItem(page, 'Capture');
+    await page.getByRole('button', { name: 'New capture run' }).click();
+    await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toBeVisible();
+    await page.getByLabel('Choose a CSV, XLSX, JSON, or PDF file').setInputFiles(inputPath);
+    const startButton = page.getByRole('button', { name: 'Start capture run' });
+    await expect(startButton).toBeEnabled();
+    await startButton.click();
+    await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toHaveCount(0, { timeout: 30_000 });
+    await expect(page.getByText('Parsed', { exact: true }).first()).toBeVisible({ timeout: 120_000 });
+  }
+
+  await runCapture();
+  await page.getByRole('link', { name: 'Review →' }).first().click();
+  await expect(page.getByRole('heading', { name: 'New', exact: false })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Select all' }).click();
+  await expect(page.getByRole('toolbar', { name: 'Bulk actions' })).toContainText('2 selected');
+  await page.getByRole('button', { name: 'Reject selected' }).click();
+  await expect(page.getByText('rejected', { exact: true })).toHaveCount(2);
+
+  // Nothing left to promote — no target change needed.
+  await expect(page.getByRole('button', { name: 'Apply decisions' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Finish review' }).click();
+  await expect(page.getByRole('heading', { name: 'Changes' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Capture drafts' })).toHaveCount(0);
+
+  // A second run of the same file, thrown away from the queue itself.
+  await runCapture();
+  await goToModelHome(page);
+  await clickNavItem(page, 'Changes');
+  await page.getByRole('link', { name: /Review queue/ }).click();
+  await expect(page.getByRole('heading', { name: 'Capture drafts' })).toBeVisible();
+  await page.getByRole('button', { name: 'Discard', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm discard' }).click();
+  await expect(page.getByRole('heading', { name: 'Capture drafts' })).toHaveCount(0);
+});
