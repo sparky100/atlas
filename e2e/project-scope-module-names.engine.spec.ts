@@ -58,7 +58,7 @@ test('project page: a module in scope is named "Platform · Module"', async ({ p
   const moduleId = randomUUID();
   const deltas: Delta[] = [
     { kind: 'element.create', id: randomUUID(), elementId: platformId, elementType: 'system', name: 'SAP S/4HANA', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false, kind: 'platform' }, sourceId, confidence: 1 },
-    { kind: 'element.create', id: randomUUID(), elementId: moduleId, elementType: 'container', name: 'PM', parentId: platformId, attributes: {}, sourceId, confidence: 1 },
+    { kind: 'element.create', id: randomUUID(), elementId: moduleId, elementType: 'container', name: 'PM', parentId: platformId, attributes: { isExternal: false }, sourceId, confidence: 1 },
   ];
   const envelope: CommitEnvelope = {
     id: randomUUID(),
