@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ElementsHeadRow } from '../../../contracts/rows';
 import type { SourceRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
@@ -177,6 +177,24 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuShift, setMenuShift] = useState(0);
+  // The menu hangs from the "⋯" button's right edge, which is right for a
+  // desktop header but pushes it off the left of the screen on a phone,
+  // where the meta row wraps and leaves the button near the left gutter.
+  // Measured before paint and nudged sideways so it stays inside the
+  // viewport's 16px gutter either way.
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!menuOpen || !menu) return;
+    const gutter = 16;
+    const rect = menu.getBoundingClientRect();
+    const naturalLeft = rect.left - menuShift;
+    const naturalRight = rect.right - menuShift;
+    const viewportWidth = document.documentElement.clientWidth;
+    const shift = naturalLeft < gutter ? gutter - naturalLeft : naturalRight > viewportWidth - gutter ? viewportWidth - gutter - naturalRight : 0;
+    if (shift !== menuShift) setMenuShift(shift);
+  }, [menuOpen, menuShift]);
   const attrs = attributesRecord(element.attributes);
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
@@ -295,7 +313,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
           <button type="button" className={styles.menuToggle} aria-expanded={menuOpen} aria-controls={menuId} aria-label="Element actions" onClick={() => { setMenuOpen((o) => !o); }}>
             <span aria-hidden="true">⋯</span>
           </button>
-          <div id={menuId} className={[styles.menu, menuOpen ? styles.open : ''].filter(Boolean).join(' ')}>
+          <div id={menuId} ref={menuRef} className={[styles.menu, menuOpen ? styles.open : ''].filter(Boolean).join(' ')} style={menuShift !== 0 ? { transform: `translateX(${String(menuShift)}px)` } : undefined}>
             {rename && !renaming && (
               <button
                 type="button"
