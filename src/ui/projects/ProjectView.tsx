@@ -39,6 +39,7 @@ import { markdownToPdfBytes } from '../exports/markdownPdf';
 import { buildProjectPackMarkdown, projectPackFilename } from '../exports/projectPack';
 import { downloadBlob, exportDate } from '../exports/viewExport';
 import type { ProjectData } from './useProject';
+import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
 import styles from './ProjectView.module.css';
 
 export interface ProjectViewProps {
@@ -76,7 +77,10 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
     const member = members.find((m) => m.member.user_id === id);
     return member ? profileLabel(member.profile) : 'A former member';
   };
-  const elementName = (id: UUID) => elementsById.get(id)?.name ?? touched.find((t) => t.elementId === id)?.createdName ?? 'An element not on main yet';
+  const elementName = (id: UUID) => {
+    const element = elementsById.get(id);
+    return element ? moduleDisplayNameFromMap(element, elementsById) : (touched.find((t) => t.elementId === id)?.createdName ?? 'An element not on main yet');
+  };
 
   const scopeIds = links.filter((l) => l.linked_type === 'element').map((l) => l.linked_id);
   const touchedIds = touched.map((t) => t.elementId);
