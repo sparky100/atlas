@@ -347,11 +347,11 @@ export interface OverlappingChange {
  * its own deltas (`listOwnDeltas`, so nothing a refresh brought in from main).
  */
 export async function listOpenChangesSharingElements(supabase: Client, modelId: UUID, branchId: UUID, ownTouched: ReadonlySet<UUID>, parentOf: (elementId: UUID) => UUID | null): Promise<OverlappingChange[]> {
+  const deltasQuery = supabase.from('deltas').select('commit_id, subject_type, subject_id, from_element_id, to_element_id', { count: 'exact' }).eq('model_id', modelId).order('id');
+  const commitsQuery = supabase.from('commits').select('id, branch_id', { count: 'exact' }).eq('model_id', modelId).order('id');
   const [deltaRows, commitRows, branchResult] = await Promise.all([
-    selectAll<{ commit_id: UUID; subject_type: 'element' | 'relationship'; subject_id: UUID; from_element_id: UUID | null; to_element_id: UUID | null }>(
-      supabase.from('deltas').select('commit_id, subject_type, subject_id, from_element_id, to_element_id', { count: 'exact' }).eq('model_id', modelId).order('id'),
-    ),
-    selectAll<{ id: UUID; branch_id: UUID }>(supabase.from('commits').select('id, branch_id', { count: 'exact' }).eq('model_id', modelId).order('id')),
+    selectAll<{ commit_id: UUID; subject_type: 'element' | 'relationship'; subject_id: UUID; from_element_id: UUID | null; to_element_id: UUID | null }>(deltasQuery),
+    selectAll<{ id: UUID; branch_id: UUID }>(commitsQuery),
     supabase.from('branches').select('*').eq('model_id', modelId).neq('kind', 'main').in('status', ['draft', 'proposed', 'in_review', 'approved']),
   ]);
   if (branchResult.error) throw new Error(`listOpenChangesSharingElements: ${branchResult.error.message}`);

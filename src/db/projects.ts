@@ -224,9 +224,8 @@ export async function listElementsTouchedByChange(supabase: Client, modelId: UUI
     } else relationshipIdsWithoutEnds.add(row.subject_id);
   }
   if (relationshipIdsWithoutEnds.size > 0) {
-    const creates = await selectAll<{ subject_id: UUID; from_element_id: UUID; to_element_id: UUID }>(
-      supabase.from('deltas').select('subject_id, from_element_id, to_element_id', { count: 'exact' }).eq('model_id', modelId).eq('kind', 'relationship_create').order('id'),
-    );
+    const createsQuery = supabase.from('deltas').select('subject_id, from_element_id, to_element_id', { count: 'exact' }).eq('model_id', modelId).eq('kind', 'relationship_create').order('id');
+    const creates = await selectAll<{ subject_id: UUID; from_element_id: UUID; to_element_id: UUID }>(createsQuery);
     for (const create of creates) {
       if (!relationshipIdsWithoutEnds.has(create.subject_id)) continue;
       touch(create.from_element_id, null);
