@@ -16,7 +16,8 @@ import { listOwnDeltas, type BranchFork } from '../engine/branch';
 import { describeEnvelope, type NameLookup } from '../engine/describeEnvelope';
 import type { ElementRow, Head, RelationshipRow } from '../engine/deltas';
 import { foldFromGenesis } from '../engine/head';
-import { type AffectedValueStream, valueStreamsReachedFrom } from '../ui/valueStreams/impactTraversal';
+import { compareBySiblingOrder } from '../ui/elements/siblingOrder';
+import { type AffectedValueStreamStage, valueStreamsReachedFrom } from '../ui/valueStreams/impactTraversal';
 import { moduleDisplayName } from '../ui/elements/moduleDisplayName';
 import { buildCommitLoader } from './commitLoader';
 import type { Client } from './client';
@@ -61,12 +62,35 @@ export interface AffectedCapability {
   reasons: ImpactReason[];
 }
 
+/** Whether something this change names directly is new, gone, or still there but changed — read from which head has it. */
+export type ImpactChange = 'added' | 'edited' | 'removed';
+
+/** Why a stage or stream counts as affected directly (ADR-023's "Amended — change impact"), beside being reached through an affected capability (`viaCapabilities`). */
+export type ValueStreamReason =
+  | { kind: 'stage'; change: ImpactChange }
+  | { kind: 'stream'; change: ImpactChange }
+  /** A capability → stage `enables` edge added, changed or removed. */
+  | { kind: 'enables'; capabilityName: string; change: ImpactChange };
+
+export interface ChangeValueStreamStage extends AffectedValueStreamStage {
+  /** Direct reasons only — empty when the stage is reached through `viaCapabilities` alone. */
+  reasons: ValueStreamReason[];
+}
+
+/** `AffectedValueStream` with the change's own direct reasons — still assignable to it, so every reader of the plain traversal shape keeps working. */
+export interface ChangeAffectedValueStream {
+  stream: ElementsHeadRow;
+  stages: ChangeValueStreamStage[];
+  /** The stream's own record added, edited or removed by this change. */
+  reasons: ValueStreamReason[];
+}
+
 export interface ChangeSummary {
   /** Empty when the branch has made no commits of its own yet (freshly created, still equal to main). */
   subjects: ChangeSubjectSummary[];
   affectedCapabilities: AffectedCapability[];
-  /** F6 (ADR-023): the impact hop's own one more step — every value-stream stage/stream a touched capability (direct or via a touched system's `supports` edge) enables. */
-  affectedValueStreams: AffectedValueStream[];
+  /** F6 (ADR-023): every stage/stream an affected capability enables, plus (ADR-023's "Amended — change impact") any this change edits directly or reaches through its own `enables` edges. */
+  affectedValueStreams: ChangeAffectedValueStream[];
   /** Other open changes sharing an element with this one (ADR-024 §9), with the shared elements' display names ("Platform · Module" for a module). */
   otherOpenChanges: { branch: BranchRow; sharedElementNames: string[] }[];
   sourcesById: Map<UUID, SourceRow>;
@@ -95,7 +119,7 @@ function subjectTypeOf(delta: Delta): ChangeSubject {
 export interface ChangeSummaryCore {
   subjects: ChangeSubjectSummary[];
   affectedCapabilities: AffectedCapability[];
-  affectedValueStreams: AffectedValueStream[];
+  affectedValueStreams: ChangeAffectedValueStream[];
 }
 
 /**
@@ -226,11 +250,60 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
   for (const [id, row] of toBeHead.relationships) {
     if (row.relationshipType === 'enables') enablesEdges.push(relationshipRow(id, row));
   }
-  const affectedValueStreams = valueStreamsReachedFrom(
+  const reached = valueStreamsReachedFrom(
     affectedCapabilities.map((ac) => ac.capability.element_id),
     elementsById,
     enablesEdges,
   );
+
+  // ADR-023's "Amended — change impact": a stage or stream this change edits
+  // itself, or whose `enables` edge it adds, changes or removes, counts
+  // directly — not only when an affected capability reaches it. A removed
+  // stage or edge is read from the as-is head.
+  const streams = new Map<UUID, { stream: ElementsHeadRow; stages: Map<UUID, ChangeValueStreamStage>; reasons: ValueStreamReason[] }>();
+  for (const { stream, stages } of reached) {
+    streams.set(stream.element_id, { stream, reasons: [], stages: new Map(stages.map((st) => [st.stage.element_id, { ...st, reasons: [] }])) });
+  }
+  const anyRow = (id: UUID): ElementsHeadRow | null => {
+    const row = element(id);
+    return row ? elementRow(id, row) : null;
+  };
+  const changeOf = (inToBe: boolean, inAsIs: boolean): ImpactChange => (inToBe && !inAsIs ? 'added' : !inToBe && inAsIs ? 'removed' : 'edited');
+  const streamEntry = (streamId: UUID) => {
+    const existing = streams.get(streamId);
+    if (existing) return existing;
+    const stream = anyRow(streamId);
+    if (stream?.element_type !== 'value_stream') return null;
+    const created = { stream, reasons: [] as ValueStreamReason[], stages: new Map<UUID, ChangeValueStreamStage>() };
+    streams.set(streamId, created);
+    return created;
+  };
+  const addStageReason = (stageId: UUID, reason: ValueStreamReason) => {
+    const stage = anyRow(stageId);
+    if (stage?.element_type !== 'value_stream' || stage.parent_id === null) return;
+    const entry = streamEntry(stage.parent_id);
+    if (!entry) return;
+    const stageEntry = entry.stages.get(stageId) ?? { stage, viaCapabilities: [], reasons: [] };
+    stageEntry.reasons.push(reason);
+    entry.stages.set(stageId, stageEntry);
+  };
+  for (const [subjectId, entry] of deltasBySubject) {
+    if (entry.subjectType === 'element' && entry.elementType === 'value_stream') {
+      const row = element(subjectId);
+      const change = changeOf(toBeHead.elements.has(subjectId), asIsHead.elements.has(subjectId));
+      if (!row) continue;
+      if (row.parentId !== null) addStageReason(subjectId, { kind: 'stage', change });
+      else streamEntry(subjectId)?.reasons.push({ kind: 'stream', change });
+    } else if (entry.subjectType === 'relationship' && entry.relationshipType === 'enables') {
+      const rel = toBeHead.relationships.get(subjectId) ?? asIsHead.relationships.get(subjectId);
+      if (!rel) continue; // created and removed again on this change — no net effect.
+      const change = changeOf(toBeHead.relationships.has(subjectId), asIsHead.relationships.has(subjectId));
+      addStageReason(rel.toElementId, { kind: 'enables', capabilityName: elementName(toBeHead, asIsHead, rel.fromElementId), change });
+    }
+  }
+  const affectedValueStreams: ChangeAffectedValueStream[] = [...streams.values()]
+    .map(({ stream, stages, reasons }) => ({ stream, reasons, stages: [...stages.values()].sort((a, b) => compareBySiblingOrder(a.stage, b.stage)) }))
+    .sort((a, b) => a.stream.name.localeCompare(b.stream.name));
 
   return { subjects, affectedCapabilities, affectedValueStreams };
 }

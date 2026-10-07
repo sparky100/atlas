@@ -173,3 +173,60 @@ test("change page: an integration from a module counts the module's own supports
   await expect(panel.getByText('integration: ESCOMS uses ArcGIS · Enterprise')).toBeVisible();
   await expect(panel.getByRole('link', { name: 'Network mapping' })).toHaveCount(0);
 });
+
+test('change page: a change that only adds an enables edge shows its value stream stage, with why (ADR-023 amendment)', async ({ page }) => {
+  const env = loadEnv();
+  const fixture = await bootstrapChangeBranchFixture(page, env, 'changeimpactvs', 'ESCOMS');
+  const { signedIn, userId, orgId, orgSlug, modelId, modelSlug, seedSourceId, seedCommitId } = fixture;
+
+  const wayleavesId = randomUUID();
+  const streamId = randomUUID();
+  const stageId = randomUUID();
+  const mainResult = await commitToBranch(signedIn, {
+    modelId,
+    branchId: fixture.main.id,
+    expectedHeadCommitId: seedCommitId,
+    envelope: {
+      id: randomUUID(),
+      branchId: fixture.main.id,
+      parentCommitId: seedCommitId,
+      mergedBranchHeadCommitId: null,
+      kind: 'manual',
+      title: 'seed a capability and a value stream',
+      body: null,
+      deltas: [
+        { kind: 'element.create', id: randomUUID(), elementId: wayleavesId, elementType: 'capability', name: 'Wayleaves', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 },
+        { kind: 'element.create', id: randomUUID(), elementId: streamId, elementType: 'value_stream', name: 'Getting Connected', parentId: null, attributes: { order: 10 }, sourceId: seedSourceId, confidence: 1 },
+        { kind: 'element.create', id: randomUUID(), elementId: stageId, elementType: 'value_stream', name: 'Survey', parentId: streamId, attributes: { order: 10 }, sourceId: seedSourceId, confidence: 1 },
+      ],
+    },
+  });
+  if (!mainResult.ok) throw new Error(`seeding main: ${mainResult.message}`);
+  const main = await getMainBranch(signedIn, modelId);
+  if (!main?.head_commit_id) throw new Error('main has no head after seeding');
+
+  const branchId = randomUUID();
+  await createChangeBranch(signedIn, { id: branchId, orgId, modelId, name: 'wayleaves-survey', title: 'Wayleaves enables Survey', createdBy: userId, intent: 'propose', mainHeadCommitId: main.head_commit_id });
+  const changeResult = await commitToBranch(signedIn, {
+    modelId,
+    branchId,
+    expectedHeadCommitId: main.head_commit_id,
+    envelope: {
+      id: randomUUID(),
+      branchId,
+      parentCommitId: main.head_commit_id,
+      mergedBranchHeadCommitId: null,
+      kind: 'manual',
+      title: 'Wayleaves enables Survey',
+      body: null,
+      deltas: [{ kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'enables', fromElementId: wayleavesId, toElementId: stageId, attributes: {}, sourceId: seedSourceId, confidence: 1 }],
+    },
+  });
+  if (!changeResult.ok) throw new Error(`committing the enables edge: ${changeResult.message}`);
+
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
+  const panel = page.locator('section, div').filter({ has: page.getByRole('heading', { name: 'Affected value streams' }) }).last();
+  await expect(panel.getByRole('link', { name: 'Getting Connected' })).toBeVisible();
+  await expect(panel.getByRole('link', { name: 'Survey' })).toBeVisible();
+  await expect(panel.getByText('Wayleaves now enables it')).toBeVisible();
+});
