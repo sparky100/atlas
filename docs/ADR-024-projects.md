@@ -82,7 +82,7 @@ Three things need deciding that neither ADR-001 nor ADR-013/022 answers:
 
 - The project's **decision log**: `decisions where project_id = P`, plus decisions that link to it with `linked_type = 'project'` (shown separately as "constraining decisions").
 - The **originating decision**: the project's earliest decision, if any. No column — the human's model makes the first decision just the first entry in the log.
-- **What the project touches**: the union of elements changed by its changes' deltas, alongside the declared scope in `project_links`. A difference between the two (touched but not in scope, or in scope but untouched) is a useful prompt, shown, never auto-corrected.
+- **What the project touches**: the union of elements changed by its changes' deltas, alongside the declared scope in `project_links`. A difference between the two (touched but not in scope, or in scope but untouched) is a useful prompt, shown, never auto-corrected. **Amended 2026-10-07 (§9):** "changed" includes both ends of every relationship a change adds, changes or removes (`listElementsTouchedByChange`), so a project whose changes are integrations touches the systems they integrate; and a scope item one of its changes only *affects* — a capability or value stream reached through change impact (§8, ADR-023's amendment) — is covered, so it no longer reads "in scope, not touched or affected by any change yet". Affected items outside the scope are not listed as touched: impact reaches widely, and that list is for what the changes edit.
 - **Progress**: counts of its changes by status and decisions by status. No percentage — Atlas does not score (ADR-000 preface #6).
 - **Overdue decisions**: a `proposed` decision in the project whose `needed_by` is past.
 

@@ -84,7 +84,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
 
   const scopeIds = links.filter((l) => l.linked_type === 'element').map((l) => l.linked_id);
   const touchedIds = touched.map((t) => t.elementId);
-  const difference = scopeDifference(scopeIds, touchedIds);
+  const difference = scopeDifference(scopeIds, touchedIds, data.reachedIds);
   const progress = projectProgress(changes, decisions);
   const firstDecision = originatingDecision(decisions);
 
@@ -171,7 +171,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
             {difference.declaredNotTouched.length > 0 && changes.length > 0 && (
               <div>
                 <Text as="h3" size="md">
-                  In scope, not touched by any change yet
+                  In scope, not touched or affected by any change yet
                 </Text>
                 <ul className={styles.inlineList}>
                   {difference.declaredNotTouched.map((id) => (

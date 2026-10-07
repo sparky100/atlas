@@ -64,6 +64,7 @@ export async function loadProjectPack(args: { modelId: UUID; modelName: string; 
   const difference = scopeDifference(
     scopeIds,
     touched.map((t) => t.elementId),
+    data.reachedIds,
   );
 
   return {

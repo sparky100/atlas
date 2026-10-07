@@ -152,7 +152,7 @@ export function buildProjectPackMarkdown(input: ProjectPackInput): string {
   }
   if (declaredNotTouched.length > 0) {
     lines.push('');
-    lines.push(`**In the declared scope but not touched by any change yet:** ${declaredNotTouched.join(', ')}`);
+    lines.push(`**In the declared scope but not touched or affected by any change yet:** ${declaredNotTouched.join(', ')}`);
   }
 
   lines.push('');

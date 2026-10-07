@@ -189,10 +189,14 @@ export interface TouchedElement {
 
 /**
  * The elements one change's own commits touch (ADR-024 §5, "what the
- * project touches", derived, never stored). One query per change, filtered
- * by `commits.branch_id` through an inner embed — never an `.in()` over a
- * growing id list (CLAUDE.md rule 8). RLS applies: a viewer sees nothing
- * for another person's unshared draft.
+ * project touches", derived, never stored): every element it edits, and
+ * both ends of every relationship it adds, changes or removes (§9) — a
+ * change made only of integrations touches the systems it integrates. One
+ * query per change, filtered by `commits.branch_id` through an inner embed —
+ * never an `.in()` over a growing id list (CLAUDE.md rule 8). An update or
+ * retract carries only the relationship id, so when there is one the
+ * model's relationship create deltas are read too, narrowed in memory. RLS
+ * applies: a viewer sees nothing for another person's unshared draft.
  */
 export async function listElementsTouchedByChange(supabase: Client, modelId: UUID, branchId: UUID): Promise<TouchedElement[]> {
   assertRealId('listElementsTouchedByChange', 'branch_id', branchId);
@@ -200,18 +204,34 @@ export async function listElementsTouchedByChange(supabase: Client, modelId: UUI
   // delta rows than max_rows returns in one page.
   const query = supabase
     .from('deltas')
-    .select('id, subject_id, kind, name, commits!inner(branch_id)', { count: 'exact' })
+    .select('id, subject_type, subject_id, kind, name, from_element_id, to_element_id, commits!inner(branch_id)', { count: 'exact' })
     .eq('model_id', modelId)
-    .eq('subject_type', 'element')
     .eq('commits.branch_id', branchId)
     .order('id');
-  const rows = await selectAll<{ subject_id: UUID; kind: string; name: string | null }>(query);
+  const rows = await selectAll<{ subject_type: 'element' | 'relationship'; subject_id: UUID; kind: string; name: string | null; from_element_id: UUID | null; to_element_id: UUID | null }>(query);
   const byId = new Map<UUID, TouchedElement>();
-  for (const row of rows) {
-    const existing = byId.get(row.subject_id);
-    const createdName = row.kind === 'element_create' ? row.name : null;
-    if (!existing) byId.set(row.subject_id, { elementId: row.subject_id, createdName });
+  const touch = (elementId: UUID, createdName: string | null) => {
+    const existing = byId.get(elementId);
+    if (!existing) byId.set(elementId, { elementId, createdName });
     else if (createdName !== null) existing.createdName = createdName;
+  };
+  const relationshipIdsWithoutEnds = new Set<UUID>();
+  for (const row of rows) {
+    if (row.subject_type === 'element') touch(row.subject_id, row.kind === 'element_create' ? row.name : null);
+    else if (row.from_element_id !== null && row.to_element_id !== null) {
+      touch(row.from_element_id, null);
+      touch(row.to_element_id, null);
+    } else relationshipIdsWithoutEnds.add(row.subject_id);
+  }
+  if (relationshipIdsWithoutEnds.size > 0) {
+    const creates = await selectAll<{ subject_id: UUID; from_element_id: UUID; to_element_id: UUID }>(
+      supabase.from('deltas').select('subject_id, from_element_id, to_element_id', { count: 'exact' }).eq('model_id', modelId).eq('kind', 'relationship_create').order('id'),
+    );
+    for (const create of creates) {
+      if (!relationshipIdsWithoutEnds.has(create.subject_id)) continue;
+      touch(create.from_element_id, null);
+      touch(create.to_element_id, null);
+    }
   }
   return [...byId.values()];
 }

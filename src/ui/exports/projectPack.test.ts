@@ -127,7 +127,7 @@ describe('buildProjectPackMarkdown (F13 step 2)', () => {
   it('notes the gap between declared scope and what the changes touch', () => {
     const md = buildProjectPackMarkdown(input({ touchedNotDeclared: ['Billing'], declaredNotTouched: ['Customer management'] }));
     expect(md).toContain("**Touched by the project's changes but not in the declared scope:** Billing");
-    expect(md).toContain('**In the declared scope but not touched by any change yet:** Customer management');
+    expect(md).toContain('**In the declared scope but not touched or affected by any change yet:** Customer management');
   });
 
   it('nests each decision ADR under the decision log, and lists constraining decisions', () => {

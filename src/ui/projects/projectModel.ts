@@ -90,14 +90,19 @@ export function groupChangesByStage(changes: readonly BranchRow[]): { stage: Pro
 
 /**
  * ADR-024 §5: the declared scope against what the project's changes
- * actually touch — a prompt, shown, never auto-corrected.
+ * actually touch — a prompt, shown, never auto-corrected. A scope item a
+ * change only *affects* (`reached`: a capability or value stream reached
+ * through change impact, §8) is covered — it isn't "not touched" — but
+ * isn't counted as touched-out-of-scope either: impact reaches widely, and
+ * that list is for what the changes edit.
  */
-export function scopeDifference(declared: readonly UUID[], touched: readonly UUID[]): { touchedNotDeclared: UUID[]; declaredNotTouched: UUID[] } {
+export function scopeDifference(declared: readonly UUID[], touched: readonly UUID[], reached: readonly UUID[] = []): { touchedNotDeclared: UUID[]; declaredNotTouched: UUID[] } {
   const declaredSet = new Set(declared);
   const touchedSet = new Set(touched);
+  const coveredSet = new Set([...touched, ...reached]);
   return {
     touchedNotDeclared: [...touchedSet].filter((id) => !declaredSet.has(id)),
-    declaredNotTouched: [...declaredSet].filter((id) => !touchedSet.has(id)),
+    declaredNotTouched: [...declaredSet].filter((id) => !coveredSet.has(id)),
   };
 }
 

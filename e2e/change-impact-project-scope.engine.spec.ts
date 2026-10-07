@@ -56,6 +56,7 @@ test('change page: an integration-only change shows the consumer\'s in-scope cap
   const projectId = randomUUID();
   await createProject(signedIn, { id: projectId, orgId, modelId, title: 'Wayleaves', purpose: 'Test', ownerId: userId, createdBy: userId });
   await addProjectLink(signedIn, { projectId, linkedType: 'element', linkedId: wayleavesId, createdBy: userId });
+  await addProjectLink(signedIn, { projectId, linkedType: 'element', linkedId: escomsId, createdBy: userId });
 
   const branchId = randomUUID();
   await createChangeBranch(signedIn, { id: branchId, orgId, modelId, name: 'gis-integration', title: 'Gis integration', createdBy: userId, intent: 'propose', mainHeadCommitId: main.head_commit_id });
@@ -101,6 +102,15 @@ test('change page: an integration-only change shows the consumer\'s in-scope cap
   await more.click();
   await expect(panel.getByRole('link', { name: 'Asset records' })).toBeVisible();
   await expect(panel.getByRole('link', { name: 'Network mapping' })).toHaveCount(0);
+
+  // The project page agrees (ADR-024 §5/§9): the integration touches ESCOMS (in scope) and GIS (not), and Wayleaves — in
+  // scope, edited by no change — is affected, so nothing in scope reads as untouched.
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/projects/${projectId}`);
+  await expect(page.getByRole('heading', { name: 'Wayleaves', level: 1 })).toBeVisible();
+  const scopeDiff = page.locator('div').filter({ has: page.getByRole('heading', { name: "Touched by this project's changes, not in scope" }) }).last();
+  await expect(scopeDiff.getByRole('link', { name: 'GIS' })).toBeVisible();
+  await expect(scopeDiff.getByRole('link', { name: 'ESCOMS' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /In scope, not touched/ })).toHaveCount(0);
 });
 
 test("change page: an integration from a module counts the module's own supports edge (Salesforce · ESCOMS → Land, Wayleaves & Consents)", async ({ page }) => {

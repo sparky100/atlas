@@ -113,6 +113,11 @@ describe('scopeDifference', () => {
   it('lists touched-but-undeclared and declared-but-untouched separately', () => {
     expect(scopeDifference(['a', 'b'], ['b', 'c', 'c'])).toEqual({ touchedNotDeclared: ['c'], declaredNotTouched: ['a'] });
   });
+
+  it('a scope item a change only affects is covered, and an affected item outside scope is not "touched"', () => {
+    // Land, Wayleaves & Consents is affected (impact) but not edited; Network mapping is affected and out of scope.
+    expect(scopeDifference(['escoms', 'wayleaves', 'bi'], ['escoms', 'enterprise'], ['wayleaves', 'mapping'])).toEqual({ touchedNotDeclared: ['enterprise'], declaredNotTouched: ['bi'] });
+  });
 });
 
 describe('isDecisionOverdue', () => {
