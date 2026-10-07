@@ -233,6 +233,37 @@ describe('summarizeOwnDeltas', () => {
       ]);
     });
 
+    it("a module's own supports edge counts when the module is touched — ESCOMS as a module of Salesforce, supporting Wayleaves itself", () => {
+      const asIs = emptyHead();
+      const toBe = emptyHead();
+      for (const head of [asIs, toBe]) {
+        head.elements.set('salesforce', platform('Salesforce'));
+        head.elements.set('escoms', container('ESCOMS', 'salesforce'));
+        head.elements.set('arcgis', platform('ArcGIS'));
+        head.elements.set('enterprise', container('Enterprise', 'arcgis'));
+        head.elements.set('cap-wayleaves', capability('Land, Wayleaves & Consents'));
+        head.elements.set('cap-gis', capability('Network mapping'));
+        head.relationships.set('s1', supports('escoms', 'cap-wayleaves'));
+        head.relationships.set('s2', supports('enterprise', 'cap-gis'));
+      }
+      toBe.relationships.set('rel-int', edge('uses', 'escoms', 'enterprise'));
+
+      const result = summarizeOwnDeltas([edgeCreate('d1', 'rel-int', 'uses', 'escoms', 'enterprise')], asIs, toBe);
+
+      expect(result.affectedCapabilities.map((ac) => ac.capability.name)).toEqual(['Land, Wayleaves & Consents']);
+      expect(result.affectedCapabilities[0]?.reasons).toEqual([{ kind: 'integration', systemName: 'Salesforce', consumerName: 'Salesforce · ESCOMS', relationshipType: 'uses', otherName: 'ArcGIS · Enterprise' }]);
+    });
+
+    it('names a relationship created and retracted on the same change from its own create delta, not its raw id', () => {
+      const { asIs, toBe } = escomsAndGis();
+      const create = edgeCreate('d1', 'rel-gone', 'uses', 'escoms', 'gis');
+      const retract: Delta = { kind: 'relationship.retract', id: 'd2', relationshipId: 'rel-gone', relationshipType: 'uses', previousDeltaId: 'd1', sourceId: 'src', confidence: 1 };
+
+      const result = summarizeOwnDeltas([create, retract], asIs, toBe);
+
+      expect(result.subjects[0]?.name).toBe('uses ESCOMS → GIS');
+    });
+
     it('a supports edge of its own names its capability, without reaching the system\'s other capabilities', () => {
       const { asIs, toBe } = escomsAndGis();
       toBe.relationships.set('s-new', supports('gis', 'cap-wayleaves'));
