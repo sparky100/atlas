@@ -17,7 +17,9 @@ import { LinkButton } from '../components/Button/LinkButton';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import { canDiscardCaptureJob, useMembership } from '../orgs/useMembership';
 import { captureJobStatusLabel, captureJobStatusTone } from './captureJobStatus';
+import { DiscardCaptureButton } from './DiscardCaptureButton';
 import { useCaptureJobs } from './useCaptureJob';
 import { UploadCaptureDialog } from './UploadCaptureDialog';
 import styles from './CaptureJobListView.module.css';
@@ -43,7 +45,8 @@ const PAGE_SIZE = 8;
 
 export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCreate }: CaptureJobListViewProps) {
   const { userId } = useAuth();
-  const { status, jobs, error, createJob, retryJob, discardJob } = useCaptureJobs(modelId, orgId, userId);
+  const { role } = useMembership(orgId, userId);
+  const { status, jobs, error, createJob, retryJob, discardJobs } = useCaptureJobs(modelId, orgId, userId);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const visibleJobs = jobs.slice(0, visibleCount);
@@ -84,7 +87,7 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
 
       <ul className={styles.list}>
         {visibleJobs.map((job) => (
-          <CaptureJobRow key={job.id} job={job} orgSlug={orgSlug} modelSlug={modelSlug} onRetry={() => { retryJob(job.id); }} onDiscard={() => { discardJob(job.id); }} />
+          <CaptureJobRow key={job.id} job={job} orgSlug={orgSlug} modelSlug={modelSlug} canDiscard={canDiscardCaptureJob(role, job, userId)} onRetry={() => { retryJob(job.id); }} onDiscard={() => discardJobs([job.id])} />
         ))}
       </ul>
       {jobs.length > visibleCount && (
@@ -109,7 +112,7 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
   );
 }
 
-function CaptureJobRow({ job, orgSlug, modelSlug, onRetry, onDiscard }: { job: CaptureJob; orgSlug: string; modelSlug: string; onRetry: () => void; onDiscard: () => void }) {
+function CaptureJobRow({ job, orgSlug, modelSlug, canDiscard, onRetry, onDiscard }: { job: CaptureJob; orgSlug: string; modelSlug: string; canDiscard: boolean; onRetry: () => void; onDiscard: () => Promise<unknown> }) {
   const isRunning = job.status === 'pending' && job.error === null;
   const isFailed = job.status === 'pending' && job.error !== null;
   return (
@@ -142,14 +145,14 @@ function CaptureJobRow({ job, orgSlug, modelSlug, onRetry, onDiscard }: { job: C
           <Button variant="secondary" onClick={onRetry}>
             Retry
           </Button>
-          <Button variant="ghost" onClick={onDiscard}>
+          <Button variant="ghost" onClick={() => { void onDiscard(); }}>
             Discard
           </Button>
         </div>
       )}
       {isRunning && (
         <div className={styles.rowActions}>
-          <Button variant="ghost" onClick={onDiscard}>
+          <Button variant="ghost" onClick={() => { void onDiscard(); }}>
             Cancel
           </Button>
         </div>
@@ -159,6 +162,7 @@ function CaptureJobRow({ job, orgSlug, modelSlug, onRetry, onDiscard }: { job: C
           <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/capture/${job.id}`} variant="secondary">
             Review →
           </LinkButton>
+          {canDiscard && <DiscardCaptureButton label="Discard" confirmText="Discard this capture draft? Nothing from it reaches the model." onConfirm={onDiscard} />}
         </div>
       )}
     </li>

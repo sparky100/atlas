@@ -195,6 +195,13 @@ export function canRunCapture(role: MemberRole | null): boolean {
   return role === 'owner' || role === 'architect' || role === 'contributor';
 }
 
+/** Mirrors `atlas.discard_capture_job`'s own check (`20260920200022_write_capture_draft.sql`): the contributor+ who created the job, or any owner/architect — and only while the job is `pending`/`parsed`. Gates Discard on the capture list, the review queue's "Capture drafts" rows and the capture review page itself. */
+export function canDiscardCaptureJob(role: MemberRole | null, job: { createdBy: UUID; status: string }, userId: UUID | null): boolean {
+  if (job.status !== 'pending' && job.status !== 'parsed') return false;
+  if (role === 'owner' || role === 'architect') return true;
+  return role === 'contributor' && userId !== null && job.createdBy === userId;
+}
+
 /** F4 (ADR-019 "Amended (F4, ...)"): mirrors `atlas.run_duplicate_check`/`atlas.dismiss_duplicate_pair`'s own role check (`20260924020000_duplicate_check_rpcs.sql`: contributor+) — gates both "Check now" and "Not a duplicate" on the duplicates report. Same floor as `canRunCapture`, named separately since the two coincide today but aren't the same rule. */
 export function canRunDuplicateCheck(role: MemberRole | null): boolean {
   return role === 'owner' || role === 'architect' || role === 'contributor';

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { UUID } from '../../contracts/delta';
 import type { CaptureInputKind, CaptureJob } from '../../contracts/capture';
 import { computeInputSha256Hex, captureInputObjectPath, discardCaptureJob, insertCaptureJob, invokeCaptureRun, listCaptureJobs, uploadCaptureInput } from '../../db/captureJobs';
 import { reportError } from '../errors/errorBannerStore';
+import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
 
 /**
@@ -38,8 +40,8 @@ export interface UseCaptureJobsResult {
   createJob: (input: CreateCaptureJobInput) => Promise<CaptureJob | null>;
   /** Re-invokes `capture-run` for an already-created job (§3.2: "a failed job stays `pending` with `error` non-null and can be retried"). Fire-and-forget, like `createJob`'s own run — see that function's comment. */
   retryJob: (jobId: UUID) => void;
-  /** Discards a `pending`/`parsed` job (`atlas.discard_capture_job`) — the "cancel" for a run that is taking too long or has got stuck, or "discard" for a failed one. */
-  discardJob: (jobId: UUID) => void;
+  /** Discards `pending`/`parsed` jobs (`atlas.discard_capture_job`) — the "cancel" for a run that is taking too long or has got stuck, "discard" for a failed one, or a parsed draft nobody means to review; several at once for the review queue's "Discard older copies". One after another, reloading once — resolves to how many were actually discarded; the first failure stops the batch and is reported. */
+  discardJobs: (jobIds: readonly UUID[]) => Promise<number>;
   reload: () => void;
 }
 
@@ -63,6 +65,7 @@ const POLL_INTERVAL_MS = 2500;
  * interval itself being torn down and rebuilt on every reload.
  */
 export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null): UseCaptureJobsResult {
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<CaptureJobsStatus>('loading');
   const [jobs, setJobs] = useState<CaptureJob[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -182,21 +185,27 @@ export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null):
     [reload],
   );
 
-  const discardJob = useCallback(
-    (jobId: UUID) => {
+  const discardJobs = useCallback(
+    async (jobIds: readonly UUID[]): Promise<number> => {
       setError(null);
-      void discardCaptureJob(supabase, jobId)
-        .then(() => {
-          reload();
-        })
-        .catch((e: unknown) => {
-          const message = e instanceof Error ? e.message : 'Could not discard this capture run.';
-          setError(message);
-          reportError("Couldn't discard this capture run.", e);
-        });
+      let discarded = 0;
+      try {
+        for (const jobId of jobIds) {
+          await discardCaptureJob(supabase, jobId);
+          discarded += 1;
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Could not discard this capture run.';
+        setError(message);
+        reportError("Couldn't discard this capture run.", e);
+      }
+      // The Changes nav badge counts parsed drafts (`useReviewQueueCount.ts`) — re-check it rather than leave a stale number.
+      if (discarded > 0) void queryClient.invalidateQueries({ queryKey: queryKeys.reviewQueueCount(modelId) });
+      reload();
+      return discarded;
     },
-    [reload],
+    [reload, queryClient, modelId],
   );
 
-  return { status, jobs, error, createJob, retryJob, discardJob, reload };
+  return { status, jobs, error, createJob, retryJob, discardJobs, reload };
 }

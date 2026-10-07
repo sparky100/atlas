@@ -52,7 +52,7 @@ export function CaptureReviewPage() {
               Capture review
             </Text>
           </div>
-          <CaptureReviewView modelId={model.id} orgId={organisation.id} jobId={jobId ?? ''} />
+          <CaptureReviewView modelId={model.id} orgId={organisation.id} jobId={jobId ?? ''} reviewQueueHref={`/o/${orgSlug ?? ''}/m/${model.slug}/review`} />
         </main>
       </div>
     </div>
