@@ -20,7 +20,7 @@ import { type AffectedValueStream, valueStreamsReachedFrom } from '../ui/valueSt
 import { moduleDisplayName } from '../ui/elements/moduleDisplayName';
 import { buildCommitLoader } from './commitLoader';
 import type { Client } from './client';
-import { getSourcesByIds, listInFlightBranchesTouchingSubjects } from './elements';
+import { getSourcesByIds, listOpenChangesSharingElements } from './elements';
 import { listProjectLinks } from './projects';
 import type { BranchRow, SourceRow } from './types';
 
@@ -67,7 +67,8 @@ export interface ChangeSummary {
   affectedCapabilities: AffectedCapability[];
   /** F6 (ADR-023): the impact hop's own one more step — every value-stream stage/stream a touched capability (direct or via a touched system's `supports` edge) enables. */
   affectedValueStreams: AffectedValueStream[];
-  otherOpenChanges: BranchRow[];
+  /** Other open changes sharing an element with this one (ADR-024 §9), with the shared elements' display names ("Platform · Module" for a module). */
+  otherOpenChanges: { branch: BranchRow; sharedElementNames: string[] }[];
   sourcesById: Map<UUID, SourceRow>;
   /** The element ids in the change's own project's declared scope, or `null` when the change belongs to no project — what `focusImpact` narrows the shown list by. */
   projectScopeIds: ReadonlySet<UUID> | null;
@@ -256,14 +257,51 @@ export async function loadChangeSummary(supabase: Client, modelId: UUID, branch:
   const asIsHead = foldFromGenesis(branch.base_commit_id, loader);
   const { subjects, affectedCapabilities, affectedValueStreams } = summarizeOwnDeltas(ownDeltas, asIsHead, toBeHead);
 
-  const subjectIds = subjects.map((s) => s.subjectId);
-  const [otherOpenChanges, sourcesById, projectScopeIds] = await Promise.all([
-    listInFlightBranchesTouchingSubjects(supabase, modelId, subjectIds, branch.id),
+  const element = (id: UUID) => toBeHead.elements.get(id) ?? asIsHead.elements.get(id);
+  const parentOf = (id: UUID) => {
+    const el = element(id);
+    return el?.elementType === 'container' ? el.parentId : null;
+  };
+  const [overlaps, sourcesById, projectScopeIds] = await Promise.all([
+    listOpenChangesSharingElements(supabase, modelId, branch.id, touchedElementIds(ownDeltas, asIsHead, toBeHead), parentOf),
     getSourcesByIds(supabase, [...new Set(ownDeltas.map((d) => d.sourceId))]),
     loadProjectScopeIds(supabase, branch.project_id),
   ]);
 
+  const otherOpenChanges = overlaps.map(({ branch: other, sharedElementIds }) => ({
+    branch: other,
+    sharedElementNames: sharedElementIds.map((id) => {
+      const el = element(id);
+      if (!el) return 'an element not on this change';
+      const parent = el.elementType === 'container' && el.parentId !== null ? element(el.parentId) : undefined;
+      return moduleDisplayName(elementRow(id, el), parent && el.parentId !== null ? elementRow(el.parentId, parent) : null);
+    }),
+  }));
+
   return { subjects, affectedCapabilities, affectedValueStreams, otherOpenChanges, sourcesById, projectScopeIds };
+}
+
+/**
+ * Every element a change's own deltas touch (ADR-024 §9): each element it
+ * edits, and both ends of each relationship it adds, changes or removes —
+ * read from either head, or from the change's own create delta for a
+ * relationship it created and removed again.
+ */
+export function touchedElementIds(ownDeltas: readonly Delta[], asIsHead: Head, toBeHead: Head): Set<UUID> {
+  const touched = new Set<UUID>();
+  for (const delta of ownDeltas) {
+    const { subjectType, subjectId } = subjectOf(delta);
+    if (subjectType === 'element') {
+      touched.add(subjectId);
+      continue;
+    }
+    const rel = toBeHead.relationships.get(subjectId) ?? asIsHead.relationships.get(subjectId) ?? (delta.kind === 'relationship.create' ? delta : undefined);
+    if (rel) {
+      touched.add(rel.fromElementId);
+      touched.add(rel.toElementId);
+    }
+  }
+  return touched;
 }
 
 export interface ChangeListSummary extends ChangeSummaryCore {

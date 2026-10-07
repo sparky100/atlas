@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Delta } from '../contracts/delta';
 import { emptyHead, type ElementRow, type RelationshipRow } from '../engine/deltas';
-import { summarizeOwnDeltas } from './changeSummary';
+import { summarizeOwnDeltas, touchedElementIds } from './changeSummary';
 
 function elementCreate(id: string, elementId: string, name: string): Delta {
   return { kind: 'element.create', id, elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: 'src', confidence: 1 };
@@ -284,3 +284,24 @@ describe('summarizeOwnDeltas', () => {
   });
 });
 
+describe('touchedElementIds (ADR-024 §9)', () => {
+  it('counts each element edited and both ends of each relationship edit, even one created and removed again', () => {
+    const asIs = emptyHead();
+    asIs.elements.set('escoms', system('ESCOMS'));
+    asIs.elements.set('enterprise', system('Enterprise'));
+    asIs.relationships.set('rel-old', supports('escoms', 'cap'));
+    const toBe = emptyHead();
+    toBe.elements.set('escoms', system('ESCOMS'));
+    toBe.elements.set('enterprise', system('Enterprise'));
+    toBe.elements.set('tableau', system('Tableau'));
+
+    const deltas: Delta[] = [
+      elementCreate('d1', 'tableau', 'Tableau'),
+      { kind: 'relationship.create', id: 'd2', relationshipId: 'rel-gone', relationshipType: 'uses', fromElementId: 'escoms', toElementId: 'enterprise', attributes: {}, sourceId: 'src', confidence: 1 },
+      { kind: 'relationship.retract', id: 'd3', relationshipId: 'rel-gone', relationshipType: 'uses', previousDeltaId: 'd2', sourceId: 'src', confidence: 1 },
+      { kind: 'relationship.retract', id: 'd4', relationshipId: 'rel-old', relationshipType: 'supports', previousDeltaId: 'create-supports', sourceId: 'src', confidence: 1 },
+    ];
+
+    expect([...touchedElementIds(deltas, asIs, toBe)].sort()).toEqual(['cap', 'enterprise', 'escoms', 'tableau']);
+  });
+});

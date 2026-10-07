@@ -1,5 +1,7 @@
 /**
- * Round-trip coverage for the `listInFlightBranchesTouchingSubjects` fix
+ * Round-trip coverage for `listOpenChangesSharingElements` (formerly
+ * `listInFlightBranchesTouchingSubjects`, widened by ADR-024 §9) and the
+ * original fix it carries
  * (SPEC §6.7 / CLAUDE.md rule 8): a live report hit
  * `listInFlightBranchesTouchingSubjects: .in('subject_id', ...) called with
  * 89 values, over the 50-value limit` — a real change branch touching that
@@ -24,7 +26,7 @@ import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { commitToBranch } from './commits';
 import { loadEnv } from './env';
-import { listInFlightBranchesTouchingSubjects } from './elements';
+import { listOpenChangesSharingElements } from './elements';
 import { createModel } from './models';
 import { createOrganisation } from './organisations';
 import { getOrCreateManualSource } from './sources';
@@ -55,7 +57,7 @@ function makeCreateDelta(id: string, elementId: string, name: string, sourceId: 
   return { kind: 'element.create', id, elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId, confidence: 1 };
 }
 
-describe('listInFlightBranchesTouchingSubjects against a real local Supabase', () => {
+describe('listOpenChangesSharingElements against a real local Supabase', () => {
   let owner: TestUser;
   let orgId: string;
   let modelId: string;
@@ -144,7 +146,35 @@ describe('listInFlightBranchesTouchingSubjects against a real local Supabase', (
     });
     if (!branchBResult.ok) throw new Error(`commitToBranch (branch B): ${branchBResult.message}`);
 
-    const found = await listInFlightBranchesTouchingSubjects(owner.client, modelId, branchAElementIds, branchA.id);
-    expect(found.map((b) => b.id)).toEqual([branchB.id]);
+    const found = await listOpenChangesSharingElements(owner.client, modelId, branchA.id, new Set(branchAElementIds), () => null);
+    expect(found.map((f) => f.branch.id)).toEqual([branchB.id]);
+    expect(found[0]?.sharedElementIds).toEqual([sharedElementId]);
+  });
+
+  it('a change that only adds a relationship overlaps another open change touching either end', async () => {
+    const consumerId = randomUUID();
+    const providerId = randomUUID();
+    const commitOnNewBranch = async (label: string, deltas: Delta[]) => {
+      const branch = await createChangeBranch(owner.client, { id: randomUUID(), orgId, modelId, name: `${label}-${randomUUID().slice(0, 8)}`, createdBy: owner.id, intent: 'propose', mainHeadCommitId });
+      const result = await commitToBranch(owner.client, {
+        modelId,
+        branchId: branch.id,
+        expectedHeadCommitId: mainHeadCommitId,
+        envelope: { id: randomUUID(), branchId: branch.id, parentCommitId: mainHeadCommitId, mergedBranchHeadCommitId: null, kind: 'manual', title: label, body: null, deltas },
+      });
+      if (!result.ok) throw new Error(`commitToBranch (${label}): ${result.message}`);
+      return branch;
+    };
+
+    const integration = await commitOnNewBranch('integration', [
+      makeCreateDelta(randomUUID(), consumerId, 'Consumer', sourceId),
+      makeCreateDelta(randomUUID(), providerId, 'Provider', sourceId),
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'uses', fromElementId: consumerId, toElementId: providerId, attributes: {}, sourceId, confidence: 1 },
+    ]);
+    const providerEdit = await commitOnNewBranch('provider-edit', [makeCreateDelta(randomUUID(), providerId, 'Provider elsewhere', sourceId)]);
+
+    const found = await listOpenChangesSharingElements(owner.client, modelId, integration.id, new Set([consumerId, providerId]), () => null);
+    const match = found.find((f) => f.branch.id === providerEdit.id);
+    expect(match?.sharedElementIds).toEqual([providerId]);
   });
 });

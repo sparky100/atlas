@@ -124,6 +124,14 @@ A capability is affected when its own record is edited, its own `supports` edge 
 
 **Deferred:** naming which capability an integration serves (a field on the `uses`/`flows_to` relationship), which would make a system supporting several capabilities reach exactly one. It is a data-model change (migration, contract, round-trip test) and waits for a need the scope focus doesn't meet.
 
+### 9. Amended — open changes touching the same elements (2026-10-07)
+
+Agreed with the human on 2026-10-07. The change page's "Other open changes touching the same elements" compared only the subjects a change edits — element ids, and for a relationship the relationship's own id. A change made of relationships therefore never matched anything: a relationship it adds exists on no other change.
+
+**What a change touches** (`touchedElementIds`, `src/db/changeSummary.ts`; `touchedElementsByBranch`, `src/engine/changeOverlap.ts`): every element it edits, and **both** ends of every relationship it adds, changes or removes. Both ends, unlike change impact (§8): the question is "might these two changes collide?", and two changes integrating with the same system is exactly that. A relationship's ends come from either head, or from its own create delta when it was created and removed on the same change; for another change, from that relationship's create delta anywhere in the model.
+
+**Overlap** (`sharedElements`): two open changes overlap when they touch a common element, or one touches a platform directly and the other one of its modules. Two sibling modules of one platform don't overlap. Each overlapping change is listed with the elements it shares ("Both touch GIS"), named as everywhere else ("Platform · Module"). The query (`listOpenChangesSharingElements`, `src/db/elements.ts`) reads the model's deltas, commits and open branches whole and narrows in memory — CLAUDE.md rule 8, no id list in an `.in()` filter.
+
 ## Alternatives rejected
 
 - **Project as a fifth landscape element type.** Gives history and provenance for free, but makes a delivery vehicle a landscape fact — it would appear in versions, be drawable, need relationship rules, and break ADR-001's explicit exclusion for no modelling gain. The things worth versioning (what the project changes) are already versioned, as its changes.

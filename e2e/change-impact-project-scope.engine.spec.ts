@@ -73,7 +73,22 @@ test('change page: an integration-only change shows the consumer\'s in-scope cap
   const changeResult = await commitToBranch(signedIn, { modelId, branchId, expectedHeadCommitId: main.head_commit_id, envelope: changeEnvelope });
   if (!changeResult.ok) throw new Error(`committing the integration: ${changeResult.message}`);
 
+  // A second open change that only adds a relationship at GIS — it shares GIS with the integration (ADR-024 §9).
+  const otherBranchId = randomUUID();
+  await createChangeBranch(signedIn, { id: otherBranchId, orgId, modelId, name: 'gis-mapping', title: 'GIS mapping support', createdBy: userId, intent: 'propose', mainHeadCommitId: main.head_commit_id });
+  const otherResult = await commitToBranch(signedIn, {
+    modelId,
+    branchId: otherBranchId,
+    expectedHeadCommitId: main.head_commit_id,
+    envelope: { id: randomUUID(), branchId: otherBranchId, parentCommitId: main.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title: 'GIS supports wayleaves', body: null, deltas: [supports(gisId, wayleavesId)] },
+  });
+  if (!otherResult.ok) throw new Error(`committing the other change: ${otherResult.message}`);
+
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
+  const others = page.locator('section, div').filter({ has: page.getByRole('heading', { name: 'Other open changes touching the same elements' }) }).last();
+  await expect(others.getByText('GIS mapping support')).toBeVisible();
+  await expect(others.getByText('Both touch GIS')).toBeVisible();
+
   const panel = page.locator('section, div').filter({ has: page.getByRole('heading', { name: 'Affected capabilities' }) }).last();
   await expect(panel.getByRole('link', { name: 'Wayleaves' })).toBeVisible();
   await expect(panel.getByText('integration: ESCOMS uses GIS').first()).toBeVisible();

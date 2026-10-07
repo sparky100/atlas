@@ -619,9 +619,14 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         {summaryState.status === 'ready' && summaryState.summary.otherOpenChanges.length === 0 && <EmptyState>No other open change touches the same elements.</EmptyState>}
         {summaryState.status === 'ready' && summaryState.summary.otherOpenChanges.length > 0 && (
           <ul className={styles.branchList}>
-            {summaryState.summary.otherOpenChanges.map((other) => (
+            {summaryState.summary.otherOpenChanges.map(({ branch: other, sharedElementNames }) => (
               <li key={other.id} className={styles.branchRow}>
-                <Text as="span">{other.title ?? other.name}</Text>
+                <div>
+                  <Text as="span">{other.title ?? other.name}</Text>
+                  <Text as="p" tone="muted" size="sm">
+                    Both touch {sharedElementNames.join(', ')}
+                  </Text>
+                </div>
                 <div className={styles.subjectTitle}>
                   <Chip tone={branchStatusTone(other.status)}>{other.status}</Chip>
                   <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${other.id}`} variant="secondary">
