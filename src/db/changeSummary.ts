@@ -113,15 +113,17 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
   }
 
   const subjects: ChangeSubjectSummary[] = [];
-  /** systemId -> the reasons it counts as touched, in first-touched order. */
-  const reasonsBySystemId = new Map<UUID, ImpactReason[]>();
+  /** A touched system's or module's own id -> the reasons it counts as touched, in first-touched order. A touched module is recorded under both its own id and its platform's, so a `supports` edge from either reaches its capability. */
+  const reasonsByElementId = new Map<UUID, ImpactReason[]>();
   /** capabilityId -> reasons that name it directly (its own edit, or its own `supports` edge). */
   const directReasonsByCapabilityId = new Map<UUID, { reasons: ImpactReason[]; systemIds: Set<UUID> }>();
   const element = (id: UUID) => toBeHead.elements.get(id) ?? asIsHead.elements.get(id);
-  const addSystemReason = (systemId: UUID, reason: ImpactReason) => {
-    const reasons = reasonsBySystemId.get(systemId) ?? [];
-    reasons.push(reason);
-    reasonsBySystemId.set(systemId, reasons);
+  const addTouchedReason = (elementId: UUID, systemId: UUID, reason: ImpactReason) => {
+    for (const id of new Set([elementId, systemId])) {
+      const reasons = reasonsByElementId.get(id) ?? [];
+      reasons.push(reason);
+      reasonsByElementId.set(id, reasons);
+    }
   };
   const addCapabilityReason = (capabilityId: UUID, reason: ImpactReason, systemId: UUID | null) => {
     const entry = directReasonsByCapabilityId.get(capabilityId) ?? { reasons: [], systemIds: new Set<UUID>() };
@@ -145,23 +147,27 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
     if (entry.subjectType === 'element') {
       const el = element(subjectId);
       subjects.push({ subjectId, ...entry, name: el?.name ?? subjectId });
-      if (el?.elementType === 'system') addSystemReason(subjectId, { kind: 'edited', systemName: el.name });
+      if (el?.elementType === 'system') addTouchedReason(subjectId, subjectId, { kind: 'edited', systemName: el.name });
       if (el?.elementType === 'capability') addCapabilityReason(subjectId, { kind: 'direct' }, null);
       if (el?.elementType === 'container') {
         const owner = owningSystem(subjectId);
-        if (owner) addSystemReason(owner.systemId, { kind: 'module', systemName: owner.system.name, moduleName: owner.displayName });
+        if (owner) addTouchedReason(subjectId, owner.systemId, { kind: 'module', systemName: owner.system.name, moduleName: owner.displayName });
       }
     } else {
       const rel = toBeHead.relationships.get(subjectId) ?? asIsHead.relationships.get(subjectId);
-      const name = rel
-        ? `${rel.relationshipType} ${elementName(toBeHead, asIsHead, rel.fromElementId)} → ${elementName(toBeHead, asIsHead, rel.toElementId)}`
+      // A relationship created and retracted on this same change is in
+      // neither head — its own create delta still names both ends.
+      const created = entry.deltas.find((d) => d.kind === 'relationship.create');
+      const ends = rel ?? (created?.kind === 'relationship.create' ? created : null);
+      const name = ends
+        ? `${ends.relationshipType} ${elementName(toBeHead, asIsHead, ends.fromElementId)} → ${elementName(toBeHead, asIsHead, ends.toElementId)}`
         : subjectId;
       subjects.push({ subjectId, ...entry, name });
       if (rel && (rel.relationshipType === 'uses' || rel.relationshipType === 'flows_to')) {
         const consumer = owningSystem(rel.fromElementId);
         if (consumer) {
           const other = owningSystem(rel.toElementId);
-          addSystemReason(consumer.systemId, {
+          addTouchedReason(rel.fromElementId, consumer.systemId, {
             kind: 'integration',
             systemName: consumer.system.name,
             consumerName: consumer.displayName,
@@ -172,7 +178,7 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
       }
       if (rel?.relationshipType === 'supports') {
         const supporter = owningSystem(rel.fromElementId);
-        addCapabilityReason(rel.toElementId, { kind: 'supports', systemName: supporter?.system.name ?? elementName(toBeHead, asIsHead, rel.fromElementId) }, supporter?.systemId ?? null);
+        addCapabilityReason(rel.toElementId, { kind: 'supports', systemName: supporter?.displayName ?? elementName(toBeHead, asIsHead, rel.fromElementId) }, supporter ? rel.fromElementId : null);
       }
     }
   }
@@ -180,14 +186,15 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
 
   // Affected capabilities (ADR-024's "Amended — change impact"): a capability
   // named directly (its own edit or its own `supports` edge), or one a
-  // touched system supports — "touched" meaning its own record, one of its
-  // modules, or the consuming side of an integration changed. Read off the
+  // touched system or module supports — "touched" meaning its own record,
+  // one of its modules, or the consuming side of an integration changed; a
+  // module's own `supports` edges count as well as its platform's. Read off the
   // to-be head, since that's this change's own resulting state.
   const byCapabilityId = new Map<UUID, { reasons: ImpactReason[]; systemIds: Set<UUID> }>();
   for (const [capabilityId, entry] of directReasonsByCapabilityId) byCapabilityId.set(capabilityId, { reasons: [...entry.reasons], systemIds: new Set(entry.systemIds) });
   for (const rel of toBeHead.relationships.values()) {
     if (rel.relationshipType !== 'supports') continue;
-    const systemReasons = reasonsBySystemId.get(rel.fromElementId);
+    const systemReasons = reasonsByElementId.get(rel.fromElementId);
     if (!systemReasons) continue;
     const entry = byCapabilityId.get(rel.toElementId) ?? { reasons: [], systemIds: new Set<UUID>() };
     entry.reasons.push(...systemReasons);
