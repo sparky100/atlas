@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Delta } from '../contracts/delta';
 import { emptyHead, type ElementRow, type RelationshipRow } from '../engine/deltas';
-import { summarizeOwnDeltas } from './changeSummary';
+import { summarizeOwnDeltas, touchedElementIds } from './changeSummary';
 
 function elementCreate(id: string, elementId: string, name: string): Delta {
   return { kind: 'element.create', id, elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: 'src', confidence: 1 };
@@ -284,3 +284,82 @@ describe('summarizeOwnDeltas', () => {
   });
 });
 
+describe("ADR-023 amendment: value streams a change names directly", () => {
+  function enablesCreate(id: string, relationshipId: string, from: string, to: string): Delta {
+    return { kind: 'relationship.create', id, relationshipId, relationshipType: 'enables', fromElementId: from, toElementId: to, attributes: {}, sourceId: 'src', confidence: 1 };
+  }
+  function streamHeads() {
+    const asIs = emptyHead();
+    const toBe = emptyHead();
+    for (const head of [asIs, toBe]) {
+      head.elements.set('cap-w', capability('Wayleaves'));
+      head.elements.set('vs', valueStream('Connections', null));
+      head.elements.set('st-survey', valueStream('Survey', 'vs'));
+    }
+    return { asIs, toBe };
+  }
+
+  it('an enables edge added on its own names its stage, though no capability is affected', () => {
+    const { asIs, toBe } = streamHeads();
+    toBe.relationships.set('en-1', enables('cap-w', 'st-survey'));
+
+    const result = summarizeOwnDeltas([enablesCreate('d1', 'en-1', 'cap-w', 'st-survey')], asIs, toBe);
+
+    expect(result.affectedCapabilities).toEqual([]);
+    expect(result.affectedValueStreams).toMatchObject([{ stream: { name: 'Connections' }, reasons: [], stages: [{ stage: { name: 'Survey' }, viaCapabilities: [], reasons: [{ kind: 'enables', capabilityName: 'Wayleaves', change: 'added' }] }] }]);
+  });
+
+  it('a removed enables edge still names its stage — read from the as-is head', () => {
+    const { asIs, toBe } = streamHeads();
+    asIs.relationships.set('en-1', enables('cap-w', 'st-survey'));
+    const retract: Delta = { kind: 'relationship.retract', id: 'd1', relationshipId: 'en-1', relationshipType: 'enables', previousDeltaId: 'create-enables', sourceId: 'src', confidence: 1 };
+
+    const result = summarizeOwnDeltas([retract], asIs, toBe);
+
+    expect(result.affectedValueStreams[0]?.stages[0]?.reasons).toEqual([{ kind: 'enables', capabilityName: 'Wayleaves', change: 'removed' }]);
+  });
+
+  it("a stage or stream edited directly counts; a stage removed is named from the as-is head", () => {
+    const { asIs, toBe } = streamHeads();
+    toBe.elements.delete('st-survey');
+    const deltas: Delta[] = [
+      { kind: 'element.update', id: 'd1', elementId: 'vs', elementType: 'value_stream', attribute: 'name', value: 'Connections', previousDeltaId: 'create-Connections', sourceId: 'src', confidence: 1 },
+      { kind: 'element.retract', id: 'd2', elementId: 'st-survey', elementType: 'value_stream', previousDeltaId: 'create-Survey', sourceId: 'src', confidence: 1 },
+    ];
+
+    const result = summarizeOwnDeltas(deltas, asIs, toBe);
+
+    expect(result.affectedValueStreams).toMatchObject([{ stream: { name: 'Connections' }, reasons: [{ kind: 'stream', change: 'edited' }], stages: [{ stage: { name: 'Survey' }, reasons: [{ kind: 'stage', change: 'removed' }] }] }]);
+  });
+
+  it('an enables edge created and removed on the same change counts for nothing', () => {
+    const { asIs, toBe } = streamHeads();
+    const deltas: Delta[] = [
+      enablesCreate('d1', 'en-1', 'cap-w', 'st-survey'),
+      { kind: 'relationship.retract', id: 'd2', relationshipId: 'en-1', relationshipType: 'enables', previousDeltaId: 'd1', sourceId: 'src', confidence: 1 },
+    ];
+    expect(summarizeOwnDeltas(deltas, asIs, toBe).affectedValueStreams).toEqual([]);
+  });
+});
+
+describe('touchedElementIds (ADR-024 §9)', () => {
+  it('counts each element edited and both ends of each relationship edit, even one created and removed again', () => {
+    const asIs = emptyHead();
+    asIs.elements.set('escoms', system('ESCOMS'));
+    asIs.elements.set('enterprise', system('Enterprise'));
+    asIs.relationships.set('rel-old', supports('escoms', 'cap'));
+    const toBe = emptyHead();
+    toBe.elements.set('escoms', system('ESCOMS'));
+    toBe.elements.set('enterprise', system('Enterprise'));
+    toBe.elements.set('tableau', system('Tableau'));
+
+    const deltas: Delta[] = [
+      elementCreate('d1', 'tableau', 'Tableau'),
+      { kind: 'relationship.create', id: 'd2', relationshipId: 'rel-gone', relationshipType: 'uses', fromElementId: 'escoms', toElementId: 'enterprise', attributes: {}, sourceId: 'src', confidence: 1 },
+      { kind: 'relationship.retract', id: 'd3', relationshipId: 'rel-gone', relationshipType: 'uses', previousDeltaId: 'd2', sourceId: 'src', confidence: 1 },
+      { kind: 'relationship.retract', id: 'd4', relationshipId: 'rel-old', relationshipType: 'supports', previousDeltaId: 'create-supports', sourceId: 'src', confidence: 1 },
+    ];
+
+    expect([...touchedElementIds(deltas, asIs, toBe)].sort()).toEqual(['cap', 'enterprise', 'escoms', 'tableau']);
+  });
+});

@@ -12,6 +12,7 @@
  */
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow, DeltaRow } from '../contracts/rows';
 import type { Json, UUID } from '../contracts/delta';
+import { sharedElements, touchedElementsByBranch, type DeltaTouchRow } from '../engine/changeOverlap';
 import { attributesRecord } from '../ui/elements/attributesRecord';
 import type { Client } from './client';
 import { assertInFilterSize } from './inFilterLimit';
@@ -322,45 +323,57 @@ export async function listInFlightBranchesTouchingSubject(supabase: Client, mode
   return branchRows as BranchRow[];
 }
 
+/** Another open change and the elements it shares with the change being looked at (`sharedElements`, `src/engine/changeOverlap.ts`). */
+export interface OverlappingChange {
+  branch: BranchRow;
+  sharedElementIds: UUID[];
+}
+
 /**
- * Batched form of `listInFlightBranchesTouchingSubject` for the change
- * page's "other open changes touching the same elements" (Sprint C1 step
- * 6, UI-principles' change page spec) — a change branch typically touches
- * several subjects at once, and this is one round trip per table rather
- * than N. `excludeBranchId` drops the change's own branch from the
- * result — it always touches its own subjects, which isn't "another" open
- * change.
+ * The change page's "other open changes touching the same elements"
+ * (Sprint C1 step 6; widened by ADR-024 §9): every other open change that
+ * touches an element this one does — an element edit, or either end of a
+ * relationship edit — or a platform/module pair across the two
+ * (`sharedElements`).
  *
- * `subjectIds` is every subject a real change branch touches — a live
- * report hit 89 on one branch — so, per SPEC §6.7/CLAUDE.md rule 8, this
- * never puts that list in an `.in()` filter. Same rewrite as
- * `src/db/landscape.ts`'s `listLandscapeEdges`/`listSupportsEdgesForSystems`:
- * each step queries the model scope alone (`deltas`/`commits`/`branches`
- * all carry `model_id`) and narrows to the id set in memory, so the
- * request URL never grows with the caller-supplied list. `status` stays an
- * `.in()` filter — a fixed, small enum, never a growing id list.
+ * Per SPEC §6.7/CLAUDE.md rule 8 no id list ever goes into an `.in()`
+ * filter: each step reads the model scope alone (`deltas`/`commits`/
+ * `branches` all carry `model_id`) and narrows in memory, the same shape as
+ * `src/db/landscape.ts`'s `listLandscapeEdges`. `status` stays an `.in()`
+ * filter — a fixed, small enum, never a growing id list. Every relationship
+ * create delta in the model is read too, not just open changes' own: an
+ * update or retract carries only the relationship id, and the relationship
+ * may have been created on main. `ownTouched` is the change's own set, from
+ * its own deltas (`listOwnDeltas`, so nothing a refresh brought in from main).
  */
-export async function listInFlightBranchesTouchingSubjects(supabase: Client, modelId: UUID, subjectIds: readonly UUID[], excludeBranchId: UUID): Promise<BranchRow[]> {
-  if (subjectIds.length === 0) return [];
-  const subjectIdSet = new Set(subjectIds);
-
-  const deltasQuery = supabase.from('deltas').select('commit_id, subject_id', { count: 'exact' }).eq('model_id', modelId).order('id');
-  const deltaRows = await selectAll<{ commit_id: UUID; subject_id: UUID }>(deltasQuery);
-  const commitIds = new Set(deltaRows.filter((row) => subjectIdSet.has(row.subject_id)).map((row) => row.commit_id));
-  if (commitIds.size === 0) return [];
-
+export async function listOpenChangesSharingElements(supabase: Client, modelId: UUID, branchId: UUID, ownTouched: ReadonlySet<UUID>, parentOf: (elementId: UUID) => UUID | null): Promise<OverlappingChange[]> {
+  const deltasQuery = supabase.from('deltas').select('commit_id, subject_type, subject_id, from_element_id, to_element_id', { count: 'exact' }).eq('model_id', modelId).order('id');
   const commitsQuery = supabase.from('commits').select('id, branch_id', { count: 'exact' }).eq('model_id', modelId).order('id');
-  const commitRows = await selectAll<{ id: UUID; branch_id: UUID }>(commitsQuery);
-  const branchIds = new Set(commitRows.filter((row) => commitIds.has(row.id)).map((row) => row.branch_id));
-  branchIds.delete(excludeBranchId);
-  if (branchIds.size === 0) return [];
+  const [deltaRows, commitRows, branchResult] = await Promise.all([
+    selectAll<{ commit_id: UUID; subject_type: 'element' | 'relationship'; subject_id: UUID; from_element_id: UUID | null; to_element_id: UUID | null }>(deltasQuery),
+    selectAll<{ id: UUID; branch_id: UUID }>(commitsQuery),
+    supabase.from('branches').select('*').eq('model_id', modelId).neq('kind', 'main').in('status', ['draft', 'proposed', 'in_review', 'approved']),
+  ]);
+  if (branchResult.error) throw new Error(`listOpenChangesSharingElements: ${branchResult.error.message}`);
+  const openBranches = (branchResult.data as BranchRow[]).filter((b) => b.id !== branchId);
+  const wanted = new Set(openBranches.map((b) => b.id));
 
-  const { data: branchRows, error: branchError } = await supabase
-    .from('branches')
-    .select('*')
-    .eq('model_id', modelId)
-    .neq('kind', 'main')
-    .in('status', ['draft', 'proposed', 'in_review', 'approved']);
-  if (branchError) throw new Error(`listInFlightBranchesTouchingSubjects: ${branchError.message}`);
-  return (branchRows as BranchRow[]).filter((row) => branchIds.has(row.id));
+  const branchByCommitId = new Map(commitRows.map((c) => [c.id, c.branch_id]));
+  const relationshipEnds = new Map<UUID, { fromElementId: UUID; toElementId: UUID }>();
+  const rows: DeltaTouchRow[] = [];
+  for (const row of deltaRows) {
+    if (row.subject_type === 'relationship' && row.from_element_id !== null && row.to_element_id !== null) {
+      relationshipEnds.set(row.subject_id, { fromElementId: row.from_element_id, toElementId: row.to_element_id });
+    }
+    const rowBranchId = branchByCommitId.get(row.commit_id);
+    if (rowBranchId !== undefined && wanted.has(rowBranchId)) rows.push({ branchId: rowBranchId, subjectType: row.subject_type, subjectId: row.subject_id });
+  }
+
+  const touched = touchedElementsByBranch(rows, relationshipEnds);
+  const result: OverlappingChange[] = [];
+  for (const branch of openBranches) {
+    const sharedElementIds = sharedElements(ownTouched, touched.get(branch.id) ?? new Set<UUID>(), parentOf);
+    if (sharedElementIds.length > 0) result.push({ branch, sharedElementIds });
+  }
+  return result.sort((a, b) => (a.branch.title ?? a.branch.name).localeCompare(b.branch.title ?? b.branch.name));
 }

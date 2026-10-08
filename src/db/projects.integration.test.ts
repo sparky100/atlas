@@ -26,6 +26,7 @@ import {
   listChangesForProject,
   listConstrainingDecisions,
   listDecisionsForProject,
+  listElementsTouchedByChange,
   listProjectLinks,
   listProjectsForModel,
   removeProjectLink,
@@ -296,6 +297,64 @@ describe('projects (ADR-024) against a real local Supabase', () => {
       expect(split.ok).toBe(true);
       if (!split.ok) return;
       expect(split.splitBranch.project_id).toBe(p.id);
+    });
+  });
+
+  describe('what a change touches (ADR-024 §5/§9)', () => {
+    it("counts both ends of a relationship the change adds, and of one it removes that was created on main", async () => {
+      const main = await getMainBranch(owner.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch missing');
+      const [consumer, provider, oldFrom, oldTo] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+      const oldRelationshipId = randomUUID();
+      const oldCreateId = randomUUID();
+      const system = (id: string, name: string): Delta => ({ kind: 'element.create', id: randomUUID(), elementId: id, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId, confidence: 1 });
+      const seeded = await commitToBranch(owner.client, {
+        modelId,
+        branchId: main.id,
+        expectedHeadCommitId: main.head_commit_id,
+        envelope: {
+          id: randomUUID(),
+          branchId: main.id,
+          parentCommitId: main.head_commit_id,
+          mergedBranchHeadCommitId: null,
+          kind: 'manual',
+          title: 'four systems and one integration',
+          body: null,
+          deltas: [
+            system(consumer, 'Consumer'),
+            system(provider, 'Provider'),
+            system(oldFrom, 'Old from'),
+            system(oldTo, 'Old to'),
+            { kind: 'relationship.create', id: oldCreateId, relationshipId: oldRelationshipId, relationshipType: 'uses', fromElementId: oldFrom, toElementId: oldTo, attributes: {}, sourceId, confidence: 1 },
+          ],
+        },
+      });
+      if (!seeded.ok) throw new Error(`seed: ${seeded.message}`);
+
+      const change = await newChange(owner, null);
+      const committed = await commitToBranch(owner.client, {
+        modelId,
+        branchId: change.id,
+        expectedHeadCommitId: change.head_commit_id,
+        envelope: {
+          id: randomUUID(),
+          branchId: change.id,
+          parentCommitId: change.head_commit_id,
+          mergedBranchHeadCommitId: null,
+          kind: 'manual',
+          title: 'swap an integration',
+          body: null,
+          deltas: [
+            { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'uses', fromElementId: consumer, toElementId: provider, attributes: {}, sourceId, confidence: 1 },
+            { kind: 'relationship.retract', id: randomUUID(), relationshipId: oldRelationshipId, relationshipType: 'uses', previousDeltaId: oldCreateId, sourceId, confidence: 1 },
+          ],
+        },
+      });
+      if (!committed.ok) throw new Error(`commit: ${committed.message}`);
+
+      const touched = await listElementsTouchedByChange(owner.client, modelId, change.id);
+      expect(touched.map((t) => t.elementId).sort()).toEqual([consumer, provider, oldFrom, oldTo].sort());
+      expect(touched.every((t) => t.createdName === null)).toBe(true);
     });
   });
 

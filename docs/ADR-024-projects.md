@@ -82,7 +82,7 @@ Three things need deciding that neither ADR-001 nor ADR-013/022 answers:
 
 - The project's **decision log**: `decisions where project_id = P`, plus decisions that link to it with `linked_type = 'project'` (shown separately as "constraining decisions").
 - The **originating decision**: the project's earliest decision, if any. No column — the human's model makes the first decision just the first entry in the log.
-- **What the project touches**: the union of elements changed by its changes' deltas, alongside the declared scope in `project_links`. A difference between the two (touched but not in scope, or in scope but untouched) is a useful prompt, shown, never auto-corrected.
+- **What the project touches**: the union of elements changed by its changes' deltas, alongside the declared scope in `project_links`. A difference between the two (touched but not in scope, or in scope but untouched) is a useful prompt, shown, never auto-corrected. **Amended 2026-10-07 (§9):** "changed" includes both ends of every relationship a change adds, changes or removes (`listElementsTouchedByChange`), so a project whose changes are integrations touches the systems they integrate; and a scope item one of its changes only *affects* — a capability or value stream reached through change impact (§8, ADR-023's amendment) — is covered, so it no longer reads "in scope, not touched or affected by any change yet". Affected items outside the scope are not listed as touched: impact reaches widely, and that list is for what the changes edit.
 - **Progress**: counts of its changes by status and decisions by status. No percentage — Atlas does not score (ADR-000 preface #6).
 - **Overdue decisions**: a `proposed` decision in the project whose `needed_by` is past.
 
@@ -123,6 +123,14 @@ A capability is affected when its own record is edited, its own `supports` edge 
 **Reviewer routing is not narrowed.** `loadDerivedReviewers` (`src/db/deriveReviewers.ts`, ADR-000 §merge review "Derivation") still reads the full affected-capability list, collapsed ones included: collapsing is a display choice, and a capability owner whose capability the change really reaches must not drop out of the review because the project's scope didn't name it. The wider touched-system rule above does reach more capability owners than before — the intended effect. The touched-*system* owner list for routing is unchanged (systems the change edits as elements).
 
 **Deferred:** naming which capability an integration serves (a field on the `uses`/`flows_to` relationship), which would make a system supporting several capabilities reach exactly one. It is a data-model change (migration, contract, round-trip test) and waits for a need the scope focus doesn't meet.
+
+### 9. Amended — open changes touching the same elements (2026-10-07)
+
+Agreed with the human on 2026-10-07. The change page's "Other open changes touching the same elements" compared only the subjects a change edits — element ids, and for a relationship the relationship's own id. A change made of relationships therefore never matched anything: a relationship it adds exists on no other change.
+
+**What a change touches** (`touchedElementIds`, `src/db/changeSummary.ts`; `touchedElementsByBranch`, `src/engine/changeOverlap.ts`): every element it edits, and **both** ends of every relationship it adds, changes or removes. Both ends, unlike change impact (§8): the question is "might these two changes collide?", and two changes integrating with the same system is exactly that. A relationship's ends come from either head, or from its own create delta when it was created and removed on the same change; for another change, from that relationship's create delta anywhere in the model.
+
+**Overlap** (`sharedElements`): two open changes overlap when they touch a common element, or one touches a platform directly and the other one of its modules. Two sibling modules of one platform don't overlap. Each overlapping change is listed with the elements it shares ("Both touch GIS"), named as everywhere else ("Platform · Module"). The query (`listOpenChangesSharingElements`, `src/db/elements.ts`) reads the model's deltas, commits and open branches whole and narrows in memory — CLAUDE.md rule 8, no id list in an `.in()` filter.
 
 ## Alternatives rejected
 

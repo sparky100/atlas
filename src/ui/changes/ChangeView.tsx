@@ -13,9 +13,8 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { createChangeBranch, getMainBranch } from '../../db/branches';
-import type { AffectedCapability } from '../../db/changeSummary';
+import type { AffectedCapability, ChangeAffectedValueStream } from '../../db/changeSummary';
 import type { MemberRole, SourceRow } from '../../db/types';
-import type { AffectedValueStream } from '../valueStreams/impactTraversal';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { formatDateTime } from '../time';
 import { canApproveOrMergeRequest, canCancelChange } from '../orgs/useMembership';
@@ -25,7 +24,7 @@ import { dateFieldLabelForIntent, intentReviewWeight, isDateRequiredForIntent } 
 import { branchStatusTone } from './branchStatus';
 import { deriveChangeStep } from './changeStepper';
 import { describeDelta } from './changeSummaryFormat';
-import { describeImpactReasons, focusImpact } from './impactFocus';
+import { describeImpactReasons, describeValueStreamReasons, focusImpact } from './impactFocus';
 import { Stepper } from './Stepper/Stepper';
 import { useApproveAndMerge } from './useApproveAndMerge';
 import { useCancelChange } from './useCancelChange';
@@ -619,9 +618,14 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         {summaryState.status === 'ready' && summaryState.summary.otherOpenChanges.length === 0 && <EmptyState>No other open change touches the same elements.</EmptyState>}
         {summaryState.status === 'ready' && summaryState.summary.otherOpenChanges.length > 0 && (
           <ul className={styles.branchList}>
-            {summaryState.summary.otherOpenChanges.map((other) => (
+            {summaryState.summary.otherOpenChanges.map(({ branch: other, sharedElementNames }) => (
               <li key={other.id} className={styles.branchRow}>
-                <Text as="span">{other.title ?? other.name}</Text>
+                <div>
+                  <Text as="span">{other.title ?? other.name}</Text>
+                  <Text as="p" tone="muted" size="sm">
+                    Both touch {sharedElementNames.join(', ')}
+                  </Text>
+                </div>
                 <div className={styles.subjectTitle}>
                   <Chip tone={branchStatusTone(other.status)}>{other.status}</Chip>
                   <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${other.id}`} variant="secondary">
@@ -684,10 +688,10 @@ function AffectedCapabilityList({ capabilities, orgSlug, modelSlug }: { capabili
   );
 }
 
-function AffectedValueStreamList({ valueStreams, orgSlug, modelSlug }: { valueStreams: readonly AffectedValueStream[]; orgSlug: string; modelSlug: string }) {
+function AffectedValueStreamList({ valueStreams, orgSlug, modelSlug }: { valueStreams: readonly ChangeAffectedValueStream[]; orgSlug: string; modelSlug: string }) {
   return (
     <ul className={styles.capabilityList}>
-      {valueStreams.map(({ stream, stages }) => (
+      {valueStreams.map(({ stream, stages, reasons }) => (
         <li key={stream.element_id}>
           <div className={styles.subjectTitle}>
             <ElementTypeGlyph type="value_stream" />
@@ -695,17 +699,22 @@ function AffectedValueStreamList({ valueStreams, orgSlug, modelSlug }: { valueSt
               <Text as="span">{stream.name}</Text>
             </Link>
           </div>
+          {reasons.length > 0 && (
+            <Text as="p" tone="muted" size="sm">
+              {describeValueStreamReasons(reasons)}
+            </Text>
+          )}
           <ul className={styles.capabilityList}>
-            {stages.map(({ stage, viaCapabilities }) => (
+            {stages.map(({ stage, viaCapabilities, reasons: stageReasons }) => (
               <li key={stage.element_id}>
                 <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${stage.element_id}`}>
                   <Text as="span" size="sm">
                     {stage.name}
                   </Text>
                 </Link>
-                {viaCapabilities.length > 0 && (
+                {(viaCapabilities.length > 0 || stageReasons.length > 0) && (
                   <Text as="p" tone="muted" size="sm">
-                    via {viaCapabilities.map((c) => c.name).join(', ')}
+                    {[viaCapabilities.length > 0 ? `via ${viaCapabilities.map((c) => c.name).join(', ')}` : null, stageReasons.length > 0 ? describeValueStreamReasons(stageReasons) : null].filter((part): part is string => part !== null).join('; ')}
                   </Text>
                 )}
               </li>
