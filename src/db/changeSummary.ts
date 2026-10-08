@@ -93,6 +93,8 @@ export interface ChangeSummary {
   affectedValueStreams: ChangeAffectedValueStream[];
   /** Other open changes sharing an element with this one (ADR-024 §9), with the shared elements' display names ("Platform · Module" for a module). */
   otherOpenChanges: { branch: BranchRow; sharedElementNames: string[] }[];
+  /** Unreviewed capture drafts (`kind: 'capture_draft'`) sharing an element with this change — kept apart from real changes (ADR-024 §9), one entry per source document however many times it was uploaded. */
+  captureDraftOverlaps: CaptureDraftOverlap[];
   sourcesById: Map<UUID, SourceRow>;
   /** The element ids in the change's own project's declared scope, or `null` when the change belongs to no project — what `focusImpact` narrows the shown list by. */
   projectScopeIds: ReadonlySet<UUID> | null;
@@ -114,6 +116,39 @@ function elementName(head: Head, fallbackHead: Head, elementId: UUID): string {
 function subjectTypeOf(delta: Delta): ChangeSubject {
   if ('elementType' in delta) return { subjectType: 'element', elementType: delta.elementType };
   return { subjectType: 'relationship', relationshipType: delta.relationshipType };
+}
+
+/** One source document's capture drafts that overlap a change — grouped, since uploading the same document again makes another draft. */
+export interface CaptureDraftOverlap {
+  /** The drafts' shared title ("file — date"). */
+  title: string;
+  draftCount: number;
+  /** The newest draft's capture job — what "Review" opens. `null` if no job row names the draft (shouldn't happen; the row is still listed). */
+  latestJobId: UUID | null;
+  sharedElementNames: string[];
+}
+
+/**
+ * Groups overlapping capture drafts by title (ADR-024 §9): `latestJobId` is
+ * the group's newest capture job, shared element names are unioned, groups
+ * sorted by title.
+ */
+export function groupCaptureDraftOverlaps(drafts: readonly { branch: BranchRow; sharedElementNames: string[] }[], jobByBranchId: ReadonlyMap<UUID, { id: UUID; createdAt: string }>): CaptureDraftOverlap[] {
+  const groups = new Map<string, { drafts: BranchRow[]; names: Set<string> }>();
+  for (const { branch, sharedElementNames } of drafts) {
+    const title = branch.title ?? branch.name;
+    const group = groups.get(title) ?? { drafts: [], names: new Set<string>() };
+    group.drafts.push(branch);
+    for (const name of sharedElementNames) group.names.add(name);
+    groups.set(title, group);
+  }
+  return [...groups.entries()]
+    .map(([title, group]) => {
+      const jobs = group.drafts.map((d) => jobByBranchId.get(d.id)).filter((job): job is { id: UUID; createdAt: string } => job !== undefined);
+      const newest = jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id))[0];
+      return { title, draftCount: group.drafts.length, latestJobId: newest?.id ?? null, sharedElementNames: [...group.names].sort((a, b) => a.localeCompare(b)) };
+    })
+    .sort((a, b) => a.title.localeCompare(b.title));
 }
 
 export interface ChangeSummaryCore {
@@ -308,6 +343,13 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
   return { subjects, affectedCapabilities, affectedValueStreams };
 }
 
+/** Each capture draft branch's own job (`capture_jobs.resulting_branch_id`) — the model's jobs read whole and narrowed in memory (CLAUDE.md rule 8). */
+async function loadCaptureJobsByBranch(supabase: Client, modelId: UUID): Promise<Map<UUID, { id: UUID; createdAt: string }>> {
+  const { data, error } = await supabase.from('capture_jobs').select('id, resulting_branch_id, created_at').eq('model_id', modelId).not('resulting_branch_id', 'is', null);
+  if (error) throw new Error(`loadCaptureJobsByBranch: ${error.message}`);
+  return new Map((data as { id: UUID; resulting_branch_id: UUID; created_at: string }[]).map((row) => [row.resulting_branch_id, { id: row.id, createdAt: row.created_at }]));
+}
+
 /** The element ids in a project's declared scope (ADR-024 `project_links`, `linked_type: 'element'`), or `null` for a change in no project. */
 async function loadProjectScopeIds(supabase: Client, projectId: UUID | null): Promise<ReadonlySet<UUID> | null> {
   if (projectId === null) return null;
@@ -323,7 +365,7 @@ export async function loadChangeSummary(supabase: Client, modelId: UUID, branch:
   const ownDeltas = listOwnDeltas(fork, loader);
 
   if (ownDeltas.length === 0) {
-    return { subjects: [], affectedCapabilities: [], affectedValueStreams: [], otherOpenChanges: [], sourcesById: new Map(), projectScopeIds: null };
+    return { subjects: [], affectedCapabilities: [], affectedValueStreams: [], otherOpenChanges: [], captureDraftOverlaps: [], sourcesById: new Map(), projectScopeIds: null };
   }
 
   const toBeHead = foldFromGenesis(branch.head_commit_id, loader);
@@ -341,7 +383,7 @@ export async function loadChangeSummary(supabase: Client, modelId: UUID, branch:
     loadProjectScopeIds(supabase, branch.project_id),
   ]);
 
-  const otherOpenChanges = overlaps.map(({ branch: other, sharedElementIds }) => ({
+  const named = overlaps.map(({ branch: other, sharedElementIds }) => ({
     branch: other,
     sharedElementNames: sharedElementIds.map((id) => {
       const el = element(id);
@@ -350,8 +392,13 @@ export async function loadChangeSummary(supabase: Client, modelId: UUID, branch:
       return moduleDisplayName(elementRow(id, el), parent && el.parentId !== null ? elementRow(el.parentId, parent) : null);
     }),
   }));
+  // ADR-024 §9: an unreviewed capture draft isn't a change — it's listed
+  // apart, grouped by document (each re-upload makes another draft).
+  const otherOpenChanges = named.filter((o) => o.branch.kind !== 'capture_draft');
+  const drafts = named.filter((o) => o.branch.kind === 'capture_draft');
+  const captureDraftOverlaps = drafts.length === 0 ? [] : groupCaptureDraftOverlaps(drafts, await loadCaptureJobsByBranch(supabase, modelId));
 
-  return { subjects, affectedCapabilities, affectedValueStreams, otherOpenChanges, sourcesById, projectScopeIds };
+  return { subjects, affectedCapabilities, affectedValueStreams, otherOpenChanges, captureDraftOverlaps, sourcesById, projectScopeIds };
 }
 
 /**

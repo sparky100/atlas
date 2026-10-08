@@ -10,7 +10,9 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import type { CommitEnvelope, Delta } from '../src/contracts/delta';
+import { envelopeToDeltaRows } from '../src/contracts/rows';
 import { createChangeBranch, getMainBranch } from '../src/db/branches';
+import { createServiceRoleClient, type Client } from '../src/db/client';
 import { commitToBranch } from '../src/db/commits';
 import { loadEnv } from '../src/db/env';
 import { addProjectLink, createProject, setChangeProject } from '../src/db/projects';
@@ -240,3 +242,96 @@ test('change page: a change that only adds an enables edge shows its value strea
   await expect(panel.getByRole('link', { name: 'Survey' })).toBeVisible();
   await expect(panel.getByText('Wayleaves now enables it')).toBeVisible();
 });
+
+/**
+ * One capture job and its `capture_draft` branch, written through the real
+ * `write_capture_draft` RPC (service role, as `capture-run` does) with the
+ * given deltas and no candidates — the same shape
+ * `capture-finish-and-discard.engine.spec.ts` seeds, minus the review queue.
+ */
+async function seedCaptureDraft(client: Client, service: Client, ids: { orgId: string; modelId: string; userId: string; mainHeadCommitId: string; sourceId: string }, inputName: string, deltas: Delta[]): Promise<void> {
+  const { orgId, modelId, userId, mainHeadCommitId, sourceId } = ids;
+  const jobId = randomUUID();
+  const { error: jobError } = await client.from('capture_jobs').insert({
+    id: jobId,
+    org_id: orgId,
+    model_id: modelId,
+    input_kind: 'pdf',
+    input_name: inputName,
+    input_ref: `capture-inputs/${orgId}/${modelId}/${jobId}/${inputName}`,
+    input_sha256: '\\x' + '00'.repeat(32),
+    document_date: '2026-09-24',
+    created_by: userId,
+  });
+  if (jobError) throw new Error(`seed capture job: ${jobError.message}`);
+  const branchId = randomUUID();
+  const commitId = randomUUID();
+  const envelope: CommitEnvelope = { id: commitId, branchId, parentCommitId: mainHeadCommitId, mergedBranchHeadCommitId: null, kind: 'capture', title: `Capture from ${inputName}`, body: null, deltas: deltas.map((d) => ({ ...d, sourceId })) };
+  const { error } = await service.schema('atlas').rpc('write_capture_draft', {
+    p_job_id: jobId,
+    p_branch_id: branchId,
+    p_commit_id: commitId,
+    p_commit_body: 'seeded',
+    p_deltas: envelopeToDeltaRows(envelope, { orgId: '', modelId: '', createdBy: '' }),
+    p_candidates: [],
+    p_stats: { candidates: 0, byClass: {} },
+  } satisfies Record<string, unknown>);
+  if (error) throw new Error(`write_capture_draft: ${error.message}`);
+}
+
+test('change page at 390px: capture drafts are grouped apart from changes, and a long title keeps its Open button inside the card (ADR-024 §9)', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const env = loadEnv();
+  const service = createServiceRoleClient(env);
+  const fixture = await bootstrapChangeBranchFixture(page, env, 'changeimpactdrafts', 'ESCOMS');
+  const { signedIn, userId, orgId, orgSlug, modelId, modelSlug, seedSourceId, systemId: escomsId, seedCommitId } = fixture;
+
+  const gisId = randomUUID();
+  const mainResult = await commitToBranch(signedIn, {
+    modelId,
+    branchId: fixture.main.id,
+    expectedHeadCommitId: seedCommitId,
+    envelope: { id: randomUUID(), branchId: fixture.main.id, parentCommitId: seedCommitId, mergedBranchHeadCommitId: null, kind: 'manual', title: 'seed GIS', body: null, deltas: [{ kind: 'element.create', id: randomUUID(), elementId: gisId, elementType: 'system', name: 'GIS', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 }] },
+  });
+  if (!mainResult.ok) throw new Error(`seeding main: ${mainResult.message}`);
+  const main = await getMainBranch(signedIn, modelId);
+  if (!main?.head_commit_id) throw new Error('main has no head after seeding');
+  const integration = (): Delta => ({ kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'uses', fromElementId: escomsId, toElementId: gisId, attributes: {}, sourceId: seedSourceId, confidence: 1 });
+
+  const commitChange = async (title: string) => {
+    const id = randomUUID();
+    await createChangeBranch(signedIn, { id, orgId, modelId, name: `c-${id.slice(0, 8)}`, title, createdBy: userId, intent: 'propose', mainHeadCommitId: main.head_commit_id });
+    const result = await commitToBranch(signedIn, { modelId, branchId: id, expectedHeadCommitId: main.head_commit_id, envelope: { id: randomUUID(), branchId: id, parentCommitId: main.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title, body: null, deltas: [integration()] } });
+    if (!result.ok) throw new Error(`committing ${title}: ${result.message}`);
+    return id;
+  };
+  const branchId = await commitChange('Escoms gis integration');
+  const longTitle = 'SPEN_T3_Digitalisation_Strategy_2026_with_an_unbroken_name.pdf';
+  await commitChange(longTitle);
+  // The same document uploaded twice — two drafts, one entry.
+  const draftIds = { orgId, modelId, userId, mainHeadCommitId: main.head_commit_id, sourceId: seedSourceId };
+  await seedCaptureDraft(signedIn, service, draftIds, 'SPDJune2026ActionPlan.pdf', [integration()]);
+  await seedCaptureDraft(signedIn, service, draftIds, 'SPDJune2026ActionPlan.pdf', [integration()]);
+
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
+  const others = page.locator('section, div').filter({ has: page.getByRole('heading', { name: 'Other open changes touching the same elements' }) }).last();
+  const longRow = others.getByRole('listitem').filter({ hasText: longTitle });
+  await expect(longRow).toBeVisible();
+  // Only the real change is in the main list.
+  await expect(others.getByRole('listitem').filter({ hasText: 'SPDJune2026ActionPlan.pdf' })).toHaveCount(0);
+
+  const rowBox = await longRow.boundingBox();
+  const openBox = await longRow.getByRole('link', { name: 'Open →' }).boundingBox();
+  if (!rowBox || !openBox) throw new Error('row or its Open button has no box');
+  expect(openBox.x + openBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
+  expect(rowBox.x + rowBox.width).toBeLessThanOrEqual(390);
+
+  const drafts = others.getByRole('button', { name: /Unreviewed capture drafts touching these elements/ });
+  await expect(drafts).toContainText('(1)');
+  await drafts.click();
+  const draftRow = others.getByRole('listitem').filter({ hasText: 'SPDJune2026ActionPlan.pdf' });
+  await expect(draftRow).toHaveCount(1);
+  await expect(draftRow).toContainText('2 drafts');
+  await expect(draftRow.getByRole('link', { name: 'Review →' })).toBeVisible();
+});
+
