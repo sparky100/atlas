@@ -620,13 +620,13 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           <ul className={styles.branchList}>
             {summaryState.summary.otherOpenChanges.map(({ branch: other, sharedElementNames }) => (
               <li key={other.id} className={styles.branchRow}>
-                <div>
+                <div className={styles.branchText}>
                   <Text as="span">{other.title ?? other.name}</Text>
                   <Text as="p" tone="muted" size="sm">
                     Both touch {sharedElementNames.join(', ')}
                   </Text>
                 </div>
-                <div className={styles.subjectTitle}>
+                <div className={styles.branchActions}>
                   <Chip tone={branchStatusTone(other.status)}>{other.status}</Chip>
                   <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${other.id}`} variant="secondary">
                     Open →
@@ -635,6 +635,29 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
               </li>
             ))}
           </ul>
+        )}
+        {summaryState.status === 'ready' && summaryState.summary.captureDraftOverlaps.length > 0 && (
+          <CollapsibleSection title="Unreviewed capture drafts touching these elements" meta={`(${String(summaryState.summary.captureDraftOverlaps.length)})`} defaultOpen={false}>
+            <ul className={styles.branchList}>
+              {summaryState.summary.captureDraftOverlaps.map(({ title, draftCount, latestJobId, sharedElementNames }) => (
+                <li key={title} className={styles.branchRow}>
+                  <div className={styles.branchText}>
+                    <Text as="span">{title}</Text>
+                    <Text as="p" tone="muted" size="sm">
+                      {draftCount > 1 ? `${String(draftCount)} drafts · ` : ''}Both touch {sharedElementNames.join(', ')}
+                    </Text>
+                  </div>
+                  {latestJobId !== null && (
+                    <div className={styles.branchActions}>
+                      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/capture/${latestJobId}`} variant="secondary">
+                        Review →
+                      </LinkButton>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CollapsibleSection>
         )}
       </Panel>
 
@@ -651,8 +674,10 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           <ul className={styles.branchList}>
             {summaryState.lineage.splits.map((split) => (
               <li key={split.id} className={styles.branchRow}>
-                <Text as="span">{split.title ?? split.name}</Text>
-                <div className={styles.subjectTitle}>
+                <div className={styles.branchText}>
+                  <Text as="span">{split.title ?? split.name}</Text>
+                </div>
+                <div className={styles.branchActions}>
                   <Chip tone={branchStatusTone(split.status)}>{split.status === 'merged' ? 'delivered' : split.status}</Chip>
                   <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${split.id}`} variant="secondary">
                     Open →

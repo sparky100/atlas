@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Delta } from '../contracts/delta';
 import { emptyHead, type ElementRow, type RelationshipRow } from '../engine/deltas';
-import { summarizeOwnDeltas, touchedElementIds } from './changeSummary';
+import { groupCaptureDraftOverlaps, summarizeOwnDeltas, touchedElementIds } from './changeSummary';
+import type { BranchRow } from './types';
 
 function elementCreate(id: string, elementId: string, name: string): Delta {
   return { kind: 'element.create', id, elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: 'src', confidence: 1 };
@@ -363,3 +364,32 @@ describe('touchedElementIds (ADR-024 §9)', () => {
     expect([...touchedElementIds(deltas, asIs, toBe)].sort()).toEqual(['cap', 'enterprise', 'escoms', 'tableau']);
   });
 });
+
+describe('groupCaptureDraftOverlaps (ADR-024 §9)', () => {
+  const draft = (id: string, title: string) => ({ id, name: `capture/${id}`, title, kind: 'capture_draft', status: 'draft' }) as unknown as BranchRow;
+
+  it('groups re-uploads of one document, counts them, unions what they share, and links the newest job', () => {
+    const groups = groupCaptureDraftOverlaps(
+      [
+        { branch: draft('b1', 'SPDJune2026ActionPlan.pdf — 2026-09-24'), sharedElementNames: ['Salesforce · ESCOMS'] },
+        { branch: draft('b2', 'SPDJune2026ActionPlan.pdf — 2026-09-24'), sharedElementNames: ['Salesforce', 'Salesforce · ESCOMS'] },
+        { branch: draft('b3', 'Digitalisation.pdf — 2026-09-21'), sharedElementNames: ['Salesforce'] },
+      ],
+      new Map([
+        ['b1', { id: 'job-old', createdAt: '2026-09-24T10:00:00Z' }],
+        ['b2', { id: 'job-new', createdAt: '2026-09-25T10:00:00Z' }],
+        ['b3', { id: 'job-3', createdAt: '2026-09-21T10:00:00Z' }],
+      ]),
+    );
+
+    expect(groups).toEqual([
+      { title: 'Digitalisation.pdf — 2026-09-21', draftCount: 1, latestJobId: 'job-3', sharedElementNames: ['Salesforce'] },
+      { title: 'SPDJune2026ActionPlan.pdf — 2026-09-24', draftCount: 2, latestJobId: 'job-new', sharedElementNames: ['Salesforce', 'Salesforce · ESCOMS'] },
+    ]);
+  });
+
+  it('still lists a draft whose job row is missing, with no review link', () => {
+    expect(groupCaptureDraftOverlaps([{ branch: draft('b1', 'Orphan.pdf'), sharedElementNames: ['GIS'] }], new Map())).toEqual([{ title: 'Orphan.pdf', draftCount: 1, latestJobId: null, sharedElementNames: ['GIS'] }]);
+  });
+});
+
