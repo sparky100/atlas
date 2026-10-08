@@ -30,6 +30,18 @@ describe('dedupeIntraDocumentCandidates', () => {
     expect(result).toHaveLength(2);
   });
 
+  it('never merges two rows that each name a different Atlas ID, however alike the names', () => {
+    const a = elementCandidate(0, 'PowerOn', { matchHints: { atlasId: '11111111-1111-4111-8111-111111111111' } });
+    const b = elementCandidate(1, 'PowerOn Ltd', { matchHints: { atlasId: '22222222-2222-4222-8222-222222222222' } });
+    expect(dedupeIntraDocumentCandidates([a, b]).candidates).toHaveLength(2);
+  });
+
+  it('still merges alike names when only one row, or both rows with the same ID, name an Atlas ID', () => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    expect(dedupeIntraDocumentCandidates([elementCandidate(0, 'PowerOn', { matchHints: { atlasId: id } }), elementCandidate(1, 'PowerOn Ltd')]).candidates).toHaveLength(1);
+    expect(dedupeIntraDocumentCandidates([elementCandidate(0, 'PowerOn', { matchHints: { atlasId: id } }), elementCandidate(1, 'PowerOn Ltd', { matchHints: { atlasId: id } })]).candidates).toHaveLength(1);
+  });
+
   it('unions attributes the duplicate stated and the survivor did not', () => {
     const first = elementCandidate(0, 'PowerOn', { evidence: evidence('PowerOn', { attributeConfidence: { name: 0.95 } }) });
     const dup: RowCandidate = { ...elementCandidate(1, 'PowerOn Ltd'), proposal: { kind: 'element', elementType: 'system', name: 'PowerOn Ltd', parent: null, attributes: { isExternal: false, vendor: 'Enzen' } }, evidence: evidence('PowerOn Ltd', { attributeConfidence: { vendor: 0.9 } }) };

@@ -155,7 +155,7 @@ export type RunCaptureResult = RunCaptureFailure | RunCaptureSuccess;
 
 const CONTAINER_SHEET_NAME_PATTERN = /\b(modules?|components?|containers?|services?)\b/i;
 const CAPABILITY_SHEET_NAME_PATTERN = /\bcapabilit(y|ies)\b/i;
-const ACTOR_SHEET_NAME_PATTERN = /\b(teams?|owners?|contacts?)\b/i;
+const ACTOR_SHEET_NAME_PATTERN = /\b(actors?|teams?|owners?|contacts?)\b/i;
 
 /**
  * §5.2: "system by default; container when the sheet is named like
@@ -293,16 +293,32 @@ function buildRunElementIndex(candidates: readonly RowCandidate[]): RunElementIn
 function resolveTextRef(text: string, expectedTypes: readonly ElementType[], runIndex: RunElementIndex, resolvedSubjectBySeq: ReadonlyMap<number, UUID | null>, matchIndex: MatchIndex, kindFilter?: (elementType: ElementType, attributes: Record<string, unknown>) => boolean): UUID | null {
   const normalised = normaliseName(text);
   for (const type of expectedTypes) {
+    // A module is named by itself ("PM") or qualified by its platform ("SAP ·
+    // PM" — how this product's own export writes a name two modules share).
+    // Two different elements answering to one name is ambiguous: refused
+    // (the row stays `invalid`) rather than linked to whichever came first.
+    const hits = new Set<UUID>();
     for (const candidate of runIndex.byType.get(type) ?? []) {
-      if (candidate.proposal.kind !== 'element' || normaliseName(candidate.proposal.name) !== normalised) continue;
+      if (candidate.proposal.kind !== 'element') continue;
+      const parentText = candidate.proposal.parent?.kind === 'unresolved' ? candidate.proposal.parent.text : null;
+      const named = normaliseName(candidate.proposal.name) === normalised || (parentText !== null && normaliseName(`${parentText} ${candidate.proposal.name}`) === normalised);
+      if (!named) continue;
       if (kindFilter && !kindFilter(type, candidate.proposal.attributes)) continue;
       const resolved = resolvedSubjectBySeq.get(candidate.seq);
-      if (resolved !== undefined && resolved !== null) return resolved;
+      if (resolved !== undefined && resolved !== null) hits.add(resolved);
     }
+    if (hits.size > 1) return null;
+    const [only] = hits;
+    if (only !== undefined) return only;
   }
   for (const type of expectedTypes) {
     let pool = matchIndex.elementsByType.get(type) ?? [];
     if (kindFilter) pool = pool.filter((el) => kindFilter(type, el.attributes as Record<string, unknown>));
+    const qualified = pool.filter((el) => {
+      const parent = el.parent_id !== null ? matchIndex.elements.get(el.parent_id) : undefined;
+      return parent !== undefined && normaliseName(`${parent.name} ${el.name}`) === normalised;
+    });
+    if (qualified.length === 1 && qualified[0] !== undefined) return qualified[0].element_id;
     const hit = resolveByTrigram(text, pool);
     if (hit.level !== 'none' && hit.ambiguous === undefined && hit.elementId !== undefined) return hit.elementId;
   }
@@ -690,7 +706,8 @@ async function runSheetCapture(input: RunSheetCaptureInput): Promise<RunCaptureR
     // and parsed before any column mapping — its rows are relationships
     // directly, never element rows, and need no LLM call at all.
     if (isRelationshipsSheet(sheet.sheetName, sheet.headers)) {
-      const relationshipCandidates = relationshipSheetToCandidates({ sheetName: sheet.sheetName, headers: sheet.headers, headerColumnRefs: sheet.headerColumnRefs, rawSheet, headerRowIndex });
+      const { candidates: relationshipCandidates, skipped: skippedRelationshipRows } = relationshipSheetToCandidates({ sheetName: sheet.sheetName, headers: sheet.headers, headerColumnRefs: sheet.headerColumnRefs, rawSheet, headerRowIndex });
+      for (const skip of skippedRelationshipRows) bumpStat(`relationships.skipped.${skip.reason}`);
       bumpStat('sheet.type.relationships');
       usableSheetCount++;
       combined = combined.concat(relationshipCandidates.map((c) => offsetRowCandidate(c, seqOffset)));
@@ -1052,6 +1069,42 @@ async function runProseCapture(input: RunProseCaptureInput): Promise<RunCaptureR
 // restored at the very end.
 // ---------------------------------------------------------------------------
 
+/**
+ * Elements with a parent, in an order where every parent that is itself a
+ * candidate in this run resolves before its children. A capability tree is
+ * more than two levels deep, and a sheet sorted by name (this product's own
+ * export is) lists a child before its parent — resolving in `seq` order made
+ * that child `invalid` ("PARENT_UNRESOLVED") for want of an ordering. Stable:
+ * candidates at the same depth keep their `seq` order; a cycle (a bad file
+ * naming each other as parent) is cut where it is found and left to resolve
+ * as `invalid` the way it would have before.
+ */
+export function orderByParentDependency<T extends RowCandidate & { proposal: ElementProposal }>(candidates: readonly T[]): T[] {
+  const byName = new Map<string, T[]>();
+  for (const candidate of candidates) {
+    const key = normaliseName(candidate.proposal.name);
+    byName.set(key, [...(byName.get(key) ?? []), candidate]);
+  }
+  const depthMemo = new Map<T, number>();
+  const depthOf = (candidate: T, visiting: Set<T>): number => {
+    const known = depthMemo.get(candidate);
+    if (known !== undefined) return known;
+    if (visiting.has(candidate)) return 0;
+    const parent = candidate.proposal.parent;
+    let depth = 0;
+    if (parent !== null && parent.kind === 'unresolved') {
+      visiting.add(candidate);
+      for (const possibleParent of byName.get(normaliseName(parent.text)) ?? []) {
+        if (possibleParent !== candidate && possibleParent.proposal.elementType === candidate.proposal.elementType) depth = Math.max(depth, 1 + depthOf(possibleParent, visiting));
+      }
+      visiting.delete(candidate);
+    }
+    depthMemo.set(candidate, depth);
+    return depth;
+  };
+  return candidates.map((candidate, index) => ({ candidate, index, depth: depthOf(candidate, new Set()) })).sort((a, b) => a.depth - b.depth || a.index - b.index).map((entry) => entry.candidate);
+}
+
 function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: MatchIndex, targetHead: Head | undefined, mainHead: Head, documentDate: string | null, reimportPrevious: readonly PreviousCandidateForDiff[] | undefined, mintId: () => UUID, stats: Record<string, number>): RunCaptureResult {
   const runIndex = buildRunElementIndex(combined);
   const relationshipIndex = buildRelationshipIndex(mainHead);
@@ -1111,7 +1164,7 @@ function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: Match
   };
 
   for (const candidate of elementsNoParent) resolveOneElement(candidate);
-  for (const candidate of elementsWithParent) resolveOneElement(candidate);
+  for (const candidate of orderByParentDependency(elementsWithParent)) resolveOneElement(candidate);
 
   const rowKeyForElementId = (elementId: UUID): string => {
     const seq = seqByElementId.get(elementId);

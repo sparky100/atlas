@@ -247,7 +247,9 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
     let rowElementType: ElementType = sheetType;
     if (parentColIndex >= 0) {
       const raw = (row.cells[parentColIndex] ?? '').trim();
-      if (sheetType === 'container') {
+      if (sheetType === 'container' || sheetType === 'capability') {
+        // A module's parent system, or a capability's parent capability (this
+        // product's own export writes both) — optional either way.
         if (raw !== '') parentText = raw;
       } else if (sheetType === 'system' && raw !== '') {
         rowElementType = 'container';

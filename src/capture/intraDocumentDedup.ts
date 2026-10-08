@@ -158,6 +158,13 @@ export function dedupeIntraDocumentCandidates(candidates: readonly RowCandidate[
     for (const index of indices) {
       const existing = result[index];
       if (existing?.proposal.kind !== 'element') continue;
+      // Two rows that each name a different Atlas ID are two different
+      // elements whatever their names look like — this product's own export
+      // writes an ID on every row, and "Connections" next to "Connection
+      // Quotations" is two capabilities, not a typo.
+      const existingAtlasId = existing.matchHints?.atlasId;
+      const ownAtlasId = candidate.matchHints?.atlasId;
+      if (existingAtlasId !== undefined && ownAtlasId !== undefined && existingAtlasId !== ownAtlasId) continue;
       if (trigramSimilarity(normalisedName, normaliseName(existing.proposal.name)) >= IDENTITY_TRIGRAM_THRESHOLD) {
         mergeIntoIndex = index;
         break;

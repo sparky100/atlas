@@ -44,6 +44,8 @@ function downloadBlob(blob: Blob, filename: string): void {
 interface LoadedExportData {
   provenanceById: Map<UUID, ExportProvenance>;
   relationships: RelationshipExportRow[];
+  /** Every element's name by id — the parent columns look a parent up here, not in the (possibly filtered) visible set. */
+  nameById: Map<UUID, string>;
 }
 
 /**
@@ -73,6 +75,7 @@ export function useElementExport({ modelId, commitId, definitions, rows, filenam
     return {
       provenanceById: buildProvenanceById(facts, sourcesById, new Date()),
       relationships: relationshipExportRows([...supports, ...usesFlowsTo, ...owns], elementsById),
+      nameById: new Map(elements.map((e) => [e.element_id, e.name])),
     };
   }, [modelId, commitId]);
 
@@ -85,7 +88,7 @@ export function useElementExport({ modelId, commitId, definitions, rows, filenam
         setError('This model has no commits yet.');
         return;
       }
-      const csv = elementBrowseRowsToCsv(rows, definitions, data.provenanceById);
+      const csv = elementBrowseRowsToCsv(rows, definitions, data.provenanceById, data.nameById);
       // A UTF-8 BOM so Excel (which otherwise guesses the system codepage for
       // a plain .csv) reliably reads non-ASCII names/values as UTF-8.
       downloadBlob(new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8;' }), `${sanitizeForFilename(filenameBase)}-export.csv`);
@@ -106,7 +109,7 @@ export function useElementExport({ modelId, commitId, definitions, rows, filenam
         setError('This model has no commits yet.');
         return;
       }
-      const blob = browseRowsToXlsxBlob(rows, definitions, data.provenanceById, data.relationships);
+      const blob = browseRowsToXlsxBlob(rows, definitions, data.provenanceById, data.relationships, data.nameById);
       downloadBlob(blob, `${sanitizeForFilename(filenameBase)}-export.xlsx`);
     } catch (e) {
       reportError("Couldn't export.", e);

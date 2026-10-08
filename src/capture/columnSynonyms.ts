@@ -46,7 +46,8 @@ const COLUMN_SYNONYMS_RAW: Readonly<Record<ColumnRole, readonly string[]>> = {
   hostingProvider: ['Hosting provider', 'Data centre', 'Cloud provider'],
   disposition: ['TIME', 'Disposition', 'Rationalisation', 'Rationalization', 'TIME category', 'TIME disposition'],
   technology: ['Technology', 'Platform', 'Stack'],
-  parent: ['Parent system', 'Part of'],
+  // 'Parent' / 'Parent capability' are what this product's own export writes on a capability sheet; 'Parent system' on a module sheet.
+  parent: ['Parent system', 'Part of', 'Parent', 'Parent capability'],
   owner: ['Owner', 'Business owner', 'Service owner', 'Accountable', 'Team'],
   ownerEmail: ['Owner email', 'Contact'],
   technicalOwner: ['Technical owner', 'IT owner', 'Engineering contact', 'Support team'],

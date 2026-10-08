@@ -72,6 +72,21 @@ describe('rowsToCandidates — basic element extraction', () => {
   });
 });
 
+describe('rowsToCandidates — a capability sheet\'s parent column', () => {
+  it('reads each capability\'s parent capability as unresolved text, blank for a top-level one', () => {
+    const headers = ['Capability name', 'Parent capability'];
+    const { roles } = resolveColumnRoles({ headers, llmAssignments: new Map([[0, { role: 'name', confidence: 0.9 }]]) });
+    const grid = [headers, ['Connections', 'Customer'], ['Customer', '']];
+    const rawSheet: RawSheet = { sheetName: 'Capabilities', grid, cellMeta: new Map() };
+    const result = rowsToCandidates({ sheetName: 'Capabilities', sheetType: 'capability', headers, headerColumnRefs: ['A', 'B'], roles, nameColumnIndex: 0, rawSheet, headerRowIndex: 0 });
+    const parents = elementProposals(result).map((c) => [c.proposal.name, c.proposal.parent]);
+    expect(parents).toEqual([
+      ['Connections', { kind: 'unresolved', text: 'Customer' }],
+      ['Customer', null],
+    ]);
+  });
+});
+
 describe('rowsToCandidates — intra-document duplicates', () => {
   it('collapses rows whose normalised (type, name) is an exact match into one candidate with an alias per row', () => {
     const result = run(['Application', 'Supplier'], [['PowerON', 'Acme'], ['POWERON', 'Acme'], ['poweron', 'Acme']]);

@@ -104,7 +104,7 @@ What you can do depends on your role and on whether you're looking at main or a 
 
 ## The Elements page
 
-**Elements** lists everything in the model. Search by name or owner, filter by type, disposition or a custom attribute, or pick a **Finding** to see just the elements a health finding flagged. Sort by any column, and **Export CSV** or **Export XLSX**.
+**Elements** lists everything in the model. Search by name or owner, filter by type, disposition or a custom attribute, or pick a **Finding** to see just the elements a health finding flagged. Sort by any column, and **Export CSV** or **Export XLSX**. The workbook carries each element's **Atlas ID** and its parent (a module's system, a capability's parent capability) and lists every relationship, so it can be brought back in through **Capture**: modules keep their platform and systems keep their capability links.
 
 - **Edit in grid** turns the Lifecycle, Criticality and Disposition cells (and a custom attribute's column, when one is shown) into editable controls. **Save N changes** records them all as one edit — on main, or in the change you're working in. While editing, each row also has **✓ Still accurate**.
 - **Import…** (architects and owners) takes you to Capture.

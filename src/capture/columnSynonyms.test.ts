@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { lookupColumnSynonym, resolveColumnRoles } from './columnSynonyms';
 
+describe('the headers this product\'s own export writes', () => {
+  it('reads Parent system, Parent capability and Parent as the parent role, and Atlas ID as the id', () => {
+    expect(lookupColumnSynonym('Parent system')).toBe('parent');
+    expect(lookupColumnSynonym('Parent capability')).toBe('parent');
+    expect(lookupColumnSynonym('Parent')).toBe('parent');
+    expect(lookupColumnSynonym('Atlas ID')).toBe('atlasId');
+  });
+
+  it('does not read the export\'s IT/OT domain as a business-area (capability) column', () => {
+    expect(lookupColumnSynonym('IT/OT domain')).not.toBe('capability');
+    expect(lookupColumnSynonym('Domain')).toBe('capability');
+  });
+});
+
 describe('lookupColumnSynonym', () => {
   it('matches every example header from §5.2\'s own table, case/whitespace-insensitively', () => {
     expect(lookupColumnSynonym('Atlas ID')).toBe('atlasId');
