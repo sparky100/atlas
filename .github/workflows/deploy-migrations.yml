@@ -79,6 +79,25 @@ jobs:
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
+      # The `capture-run` edge function carries its own bundled copy of
+      # the capture importer (`src/capture`), so a merged importer change
+      # does not reach the live project until this step ships it: the
+      # app's own Cloudflare deploy below never touches it. Found the hard
+      # way (2026-10-08): the export/import round-trip fix (#352) was
+      # merged and live in the app, but imports kept running the old
+      # importer in the unredeployed function. Bundles then deploys, the
+      # same two steps as `pnpm functions:deploy:capture-run`; runs after
+      # the migrations (a function may call a new RPC) and before the app.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies (for the capture-run bundle)
+        run: pnpm install --frozen-lockfile
+      - name: Deploy the capture-run edge function
+        run: pnpm functions:bundle:capture-run && supabase functions deploy capture-run
+
       # Runs only once migrations have actually succeeded (the step
       # above) — this workflow's whole reason for sequencing the two
       # rather than letting Cloudflare's own push-triggered auto-build
