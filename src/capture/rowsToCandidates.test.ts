@@ -72,6 +72,67 @@ describe('rowsToCandidates — basic element extraction', () => {
   });
 });
 
+describe('rowsToCandidates — a capability sheet\'s parent column', () => {
+  it('reads each capability\'s parent capability as unresolved text, blank for a top-level one', () => {
+    const headers = ['Capability name', 'Parent capability'];
+    const { roles } = resolveColumnRoles({ headers, llmAssignments: new Map([[0, { role: 'name', confidence: 0.9 }]]) });
+    const grid = [headers, ['Connections', 'Customer'], ['Customer', '']];
+    const rawSheet: RawSheet = { sheetName: 'Capabilities', grid, cellMeta: new Map() };
+    const result = rowsToCandidates({ sheetName: 'Capabilities', sheetType: 'capability', headers, headerColumnRefs: ['A', 'B'], roles, nameColumnIndex: 0, rawSheet, headerRowIndex: 0 });
+    const parents = elementProposals(result).map((c) => [c.proposal.name, c.proposal.parent]);
+    expect(parents).toEqual([
+      ['Connections', { kind: 'unresolved', text: 'Customer' }],
+      ['Customer', null],
+    ]);
+  });
+});
+
+describe('rowsToCandidates — the attribute columns this product\'s export writes', () => {
+  const attributesOf = (headers: string[], row: string[], sheetType: ElementType = 'system') => elementProposals(run(headers, [row], sheetType))[0]?.proposal.attributes;
+
+  it('reads kind, criticality, domain, version and run cost against the system schema — a stored key, a spaced key, or a label', () => {
+    const attributes = attributesOf(['Name', 'Kind', 'Criticality', 'IT/OT domain', 'Version', 'Run cost', 'Hosting model'], ['SAP', 'platform', 'High', 'hybrid', '4.2', 'Under £50k', 'private cloud']);
+    expect(attributes).toMatchObject({ kind: 'platform', criticality: 'high', domain: 'hybrid', version: '4.2', annualRunCost: 'under_50k', hostingModel: 'private_cloud' });
+  });
+
+  it('reads the dates, including support end', () => {
+    expect(attributesOf(['Name', 'Introduced', 'Planned end', 'Vendor support ends'], ['SAP', '2019-04-01', '2031-12-31', '2030-06-30'])).toMatchObject({ introduced: '2019-04-01', plannedEnd: '2031-12-31', supportEndsAt: '2030-06-30' });
+  });
+
+  it('warns ENUM_UNPARSED, and records nothing, for a value outside the attribute\'s options', () => {
+    const result = run(['Name', 'Criticality'], [['SAP', 'mission critical']]);
+    expect(elementProposals(result)[0]?.proposal.attributes).not.toHaveProperty('criticality');
+    expect(result.candidates[0]?.evidence.warnings).toContainEqual({ code: 'ENUM_UNPARSED', cell: 'B2', raw: 'mission critical' });
+  });
+
+  it('skips, without a warning, an attribute the element type does not have (a Kind on a capability)', () => {
+    const result = run(['Name', 'Kind', 'Reference'], [['Customer', 'platform', 'CUS-1']], 'capability');
+    expect(elementProposals(result)[0]?.proposal.attributes).toEqual({ code: 'CUS-1' });
+    expect(result.candidates[0]?.evidence.warnings).toEqual([]);
+  });
+
+  it('reads a capability\'s importance and essential-function flag', () => {
+    expect(attributesOf(['Name', 'Importance', 'Essential function (NIS/CAF)'], ['Customer', 'high', 'Yes'], 'capability')).toMatchObject({ importance: 'high', essentialFunction: true });
+  });
+});
+
+describe('rowsToCandidates — an actor row', () => {
+  it('reads the actor\'s own type, email and org unit, and the person/team guess is not used for a stated type', () => {
+    const [actor] = elementProposals(run(['Name', 'Actor type', 'Email', 'Org unit', 'External'], [['Network Team', 'team', 'network.team@example.org', 'Networks', 'No']], 'actor'));
+    expect(actor?.proposal.attributes).toMatchObject({ subtype: 'team', email: 'network.team@example.org', orgUnit: 'Networks', isExternal: false });
+  });
+
+  it('warns ENUM_UNPARSED for an actor type that is not person, team or organisation', () => {
+    const result = run(['Name', 'Actor type', 'Description'], [['Network Team', 'squad', 'x']], 'actor');
+    expect(elementProposals(result)[0]?.proposal.attributes).not.toHaveProperty('subtype');
+    expect(result.candidates[0]?.evidence.warnings).toContainEqual({ code: 'ENUM_UNPARSED', cell: 'B2', raw: 'squad' });
+  });
+
+  it('an Actor type column on a system sheet is ignored — only an actor has one', () => {
+    expect(elementProposals(run(['Name', 'Actor type', 'Description'], [['Aurora', 'team', 'x']]))[0]?.proposal.attributes).not.toHaveProperty('subtype');
+  });
+});
+
 describe('rowsToCandidates — intra-document duplicates', () => {
   it('collapses rows whose normalised (type, name) is an exact match into one candidate with an alias per row', () => {
     const result = run(['Application', 'Supplier'], [['PowerON', 'Acme'], ['POWERON', 'Acme'], ['poweron', 'Acme']]);

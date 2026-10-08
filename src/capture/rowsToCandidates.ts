@@ -33,6 +33,7 @@
  *   own candidates as an extra pass is the orchestrator's job (PR10), not
  *   duplicated here.
  */
+import { attributeFieldSchema, validateAttributeValue } from '../contracts/attributeSchema';
 import type { CandidateEvidence, CandidateProposal, CaptureAliasType, ElementProposal, EvidenceWarning, RelationshipProposal } from '../contracts/capture';
 import type { ActorSubtype, ElementType, OwnsRole, UUID } from '../contracts/delta';
 import type { SourceRef } from '../contracts/sourceRef';
@@ -90,7 +91,42 @@ export interface RowsToCandidatesResult {
 
 type Role = ColumnRole;
 
-const PLAIN_ATTRIBUTES: ReadonlySet<Role> = new Set(['description', 'vendor', 'technology', 'externalOrganisation', 'hostingProvider']);
+const PLAIN_ATTRIBUTES: ReadonlySet<Role> = new Set(['description', 'vendor', 'technology', 'externalOrganisation', 'hostingProvider', 'orgUnit']);
+
+/**
+ * Column roles that are one attribute each, validated against the element's
+ * own attribute schema (`attributeSchema.ts`) rather than a hand-written
+ * parser — so an enum's legal values live in one place. A type the schema
+ * doesn't give that attribute (a `kind` on a capability) is skipped, not
+ * warned about. These are the columns this product's own export writes.
+ */
+const SCHEMA_ATTRIBUTE_ROLE_KEYS: Partial<Record<Role, string>> = {
+  kind: 'kind',
+  criticality: 'criticality',
+  domain: 'domain',
+  version: 'version',
+  annualRunCost: 'annualRunCost',
+  capabilityCode: 'code',
+  importance: 'importance',
+  essentialFunction: 'essentialFunction',
+};
+
+/** `undefined`: this element type has no such attribute. `null`: the cell isn't a legal value for it. Otherwise the value to record. An enum cell may be the stored key (`on_premises`), the key spaced or hyphenated (`on premises`), or its label ("Under £50k"). */
+function parseSchemaAttribute(elementType: ElementType, key: string, raw: string): unknown {
+  const field = attributeFieldSchema(elementType, key);
+  if (!field) return undefined;
+  let candidate: unknown = raw.trim();
+  if (field.kind === 'enum') {
+    const wanted = raw.trim().toLowerCase();
+    const options = field.options ?? [];
+    candidate = options.find((o) => o === wanted) ?? options.find((o) => o === wanted.replace(/[\s-]+/g, '_')) ?? options.find((o) => (field.optionLabels?.[o] ?? '').toLowerCase() === wanted);
+  } else if (field.kind === 'boolean') {
+    candidate = parseBool(raw) ?? undefined;
+  }
+  if (candidate === undefined) return null;
+  const validated = validateAttributeValue(elementType, key, candidate);
+  return validated.ok && validated.value !== null ? validated.value : null;
+}
 const MULTI_VALUE_SEPARATOR = / \/ /;
 const LIST_SPLIT_PATTERN = /[;,/\n]/;
 
@@ -247,7 +283,9 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
     let rowElementType: ElementType = sheetType;
     if (parentColIndex >= 0) {
       const raw = (row.cells[parentColIndex] ?? '').trim();
-      if (sheetType === 'container') {
+      if (sheetType === 'container' || sheetType === 'capability') {
+        // A module's parent system, or a capability's parent capability (this
+        // product's own export writes both) — optional either way.
         if (raw !== '') parentText = raw;
       } else if (sheetType === 'system' && raw !== '') {
         rowElementType = 'container';
@@ -351,6 +389,32 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
         recordAttribute(group, 'hostingModel', parsed.value, warnings, rowFactor, assignment.confidence, ref, isFirst);
         continue;
       }
+      const schemaKey = SCHEMA_ATTRIBUTE_ROLE_KEYS[role];
+      if (schemaKey !== undefined) {
+        if (raw === '') {
+          bailOnBlank();
+          continue;
+        }
+        const value = parseSchemaAttribute(group.elementType, schemaKey, raw);
+        if (value === undefined) continue;
+        if (value === null) {
+          group.warnings.push({ code: 'ENUM_UNPARSED', cell: refText, raw });
+          continue;
+        }
+        recordAttribute(group, schemaKey, value, baseWarnings, rowFactor, assignment.confidence, ref, isFirst);
+        continue;
+      }
+      if (role === 'actorType') {
+        // An actor row's own person / team / organisation (this product's export writes it as "Actor type"). Only an actor row has one.
+        if (raw === '' || group.elementType !== 'actor') continue;
+        const subtype = raw.toLowerCase();
+        if (subtype !== 'person' && subtype !== 'team' && subtype !== 'organisation') {
+          group.warnings.push({ code: 'ENUM_UNPARSED', cell: refText, raw });
+          continue;
+        }
+        recordAttribute(group, 'subtype', subtype, baseWarnings, rowFactor, assignment.confidence, ref, isFirst);
+        continue;
+      }
       if (role === 'disposition') {
         if (raw === '') {
           bailOnBlank();
@@ -365,7 +429,7 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
         recordAttribute(group, 'disposition', parsed.value, warnings, rowFactor, assignment.confidence, ref, isFirst);
         continue;
       }
-      if (role === 'introduced' || role === 'plannedEnd') {
+      if (role === 'introduced' || role === 'plannedEnd' || role === 'supportEndsAt') {
         if (raw === '') {
           bailOnBlank();
           continue;
@@ -417,6 +481,11 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
         if (raw === '') continue;
         const email = parseEmail(raw);
         if (!email) continue;
+        // On an actor row (this product's export writes the actor's own address as "Email") it is the actor's, not an owner's.
+        if (group.elementType === 'actor') {
+          recordAttribute(group, 'email', email, baseWarnings, rowFactor, assignment.confidence, ref, isFirst);
+          continue;
+        }
         // Attaches to whichever actor this row's own `owner` column just produced — a row with `ownerEmail` but no `owner` column has nothing to attach to.
         const ownerRaw = ownerColIndex >= 0 ? (row.cells[ownerColIndex] ?? '').trim() : '';
         if (ownerRaw === '') continue;
