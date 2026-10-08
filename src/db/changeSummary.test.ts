@@ -151,4 +151,136 @@ describe('summarizeOwnDeltas', () => {
 
     expect(result.affectedValueStreams).toHaveLength(0);
   });
+
+  describe("ADR-024 amendment: which systems a change touches, and why", () => {
+    function container(name: string, parentId: string): ElementRow {
+      return { elementType: 'container', name, parentId, attributes: {}, existsDeltaId: `create-${name}` };
+    }
+    function platform(name: string): ElementRow {
+      return { elementType: 'system', name, parentId: null, attributes: { kind: 'platform' }, existsDeltaId: `create-${name}` };
+    }
+    function edge(relationshipType: 'uses' | 'flows_to', fromElementId: string, toElementId: string): RelationshipRow {
+      return { relationshipType, fromElementId, toElementId, attributes: {}, existsDeltaId: `create-${relationshipType}` };
+    }
+    function edgeCreate(id: string, relationshipId: string, relationshipType: 'uses' | 'flows_to', fromElementId: string, toElementId: string): Delta {
+      return { kind: 'relationship.create', id, relationshipId, relationshipType, fromElementId, toElementId, attributes: {}, sourceId: 'src', confidence: 1 };
+    }
+
+    /** ESCOMS supports Wayleaves; GIS supports two other capabilities. */
+    function escomsAndGis() {
+      const asIs = emptyHead();
+      const toBe = emptyHead();
+      for (const head of [asIs, toBe]) {
+        head.elements.set('escoms', system('ESCOMS'));
+        head.elements.set('gis', system('GIS'));
+        head.elements.set('cap-wayleaves', capability('Wayleaves'));
+        head.elements.set('cap-mapping', capability('Network mapping'));
+        head.elements.set('cap-fault', capability('Fault location'));
+        head.relationships.set('s1', supports('escoms', 'cap-wayleaves'));
+        head.relationships.set('s2', supports('gis', 'cap-mapping'));
+        head.relationships.set('s3', supports('gis', 'cap-fault'));
+      }
+      return { asIs, toBe };
+    }
+
+    it("a new integration counts only its consuming side: ESCOMS uses GIS reaches Wayleaves, nothing GIS supports", () => {
+      const { asIs, toBe } = escomsAndGis();
+      toBe.relationships.set('rel-int', edge('uses', 'escoms', 'gis'));
+
+      const result = summarizeOwnDeltas([edgeCreate('d1', 'rel-int', 'uses', 'escoms', 'gis')], asIs, toBe);
+
+      expect(result.affectedCapabilities.map((ac) => ac.capability.name)).toEqual(['Wayleaves']);
+      expect(result.affectedCapabilities[0]?.reasons).toEqual([{ kind: 'integration', systemName: 'ESCOMS', consumerName: 'ESCOMS', relationshipType: 'uses', otherName: 'GIS' }]);
+      expect(result.affectedCapabilities[0]?.viaSystems.map((s) => s.element_id)).toEqual(['escoms']);
+    });
+
+    it('a flows_to edge counts its sending side', () => {
+      const { asIs, toBe } = escomsAndGis();
+      toBe.relationships.set('rel-flow', edge('flows_to', 'gis', 'escoms'));
+
+      const result = summarizeOwnDeltas([edgeCreate('d1', 'rel-flow', 'flows_to', 'gis', 'escoms')], asIs, toBe);
+
+      expect(result.affectedCapabilities.map((ac) => ac.capability.name)).toEqual(['Fault location', 'Network mapping']);
+    });
+
+    it('a removed integration still counts — read from the as-is side', () => {
+      const { asIs, toBe } = escomsAndGis();
+      asIs.relationships.set('rel-int', edge('uses', 'escoms', 'gis'));
+      const retract: Delta = { kind: 'relationship.retract', id: 'd1', relationshipId: 'rel-int', relationshipType: 'uses', previousDeltaId: 'create-uses', sourceId: 'src', confidence: 1 };
+
+      const result = summarizeOwnDeltas([retract], asIs, toBe);
+
+      expect(result.affectedCapabilities.map((ac) => ac.capability.name)).toEqual(['Wayleaves']);
+    });
+
+    it("a module's edit and a module's integration both roll up to its platform, named \"Platform · Module\"", () => {
+      const { asIs, toBe } = escomsAndGis();
+      for (const head of [asIs, toBe]) {
+        head.elements.set('sap', platform('SAP'));
+        head.elements.set('pm', container('PM', 'sap'));
+        head.elements.set('cap-maint', capability('Maintenance'));
+        head.relationships.set('s4', supports('sap', 'cap-maint'));
+      }
+      toBe.relationships.set('rel-int', edge('uses', 'pm', 'gis'));
+      const moduleEdit: Delta = { kind: 'element.update', id: 'd1', elementId: 'pm', elementType: 'container', attribute: 'description', value: 'x', previousDeltaId: 'create-PM', sourceId: 'src', confidence: 1 };
+
+      const result = summarizeOwnDeltas([moduleEdit, edgeCreate('d2', 'rel-int', 'uses', 'pm', 'gis')], asIs, toBe);
+
+      expect(result.affectedCapabilities.map((ac) => ac.capability.name)).toEqual(['Maintenance']);
+      expect(result.affectedCapabilities[0]?.reasons).toEqual([
+        { kind: 'module', systemName: 'SAP', moduleName: 'SAP · PM' },
+        { kind: 'integration', systemName: 'SAP', consumerName: 'SAP · PM', relationshipType: 'uses', otherName: 'GIS' },
+      ]);
+    });
+
+    it("a module's own supports edge counts when the module is touched — ESCOMS as a module of Salesforce, supporting Wayleaves itself", () => {
+      const asIs = emptyHead();
+      const toBe = emptyHead();
+      for (const head of [asIs, toBe]) {
+        head.elements.set('salesforce', platform('Salesforce'));
+        head.elements.set('escoms', container('ESCOMS', 'salesforce'));
+        head.elements.set('arcgis', platform('ArcGIS'));
+        head.elements.set('enterprise', container('Enterprise', 'arcgis'));
+        head.elements.set('cap-wayleaves', capability('Land, Wayleaves & Consents'));
+        head.elements.set('cap-gis', capability('Network mapping'));
+        head.relationships.set('s1', supports('escoms', 'cap-wayleaves'));
+        head.relationships.set('s2', supports('enterprise', 'cap-gis'));
+      }
+      toBe.relationships.set('rel-int', edge('uses', 'escoms', 'enterprise'));
+
+      const result = summarizeOwnDeltas([edgeCreate('d1', 'rel-int', 'uses', 'escoms', 'enterprise')], asIs, toBe);
+
+      expect(result.affectedCapabilities.map((ac) => ac.capability.name)).toEqual(['Land, Wayleaves & Consents']);
+      expect(result.affectedCapabilities[0]?.reasons).toEqual([{ kind: 'integration', systemName: 'Salesforce', consumerName: 'Salesforce · ESCOMS', relationshipType: 'uses', otherName: 'ArcGIS · Enterprise' }]);
+    });
+
+    it('names a relationship created and retracted on the same change from its own create delta, not its raw id', () => {
+      const { asIs, toBe } = escomsAndGis();
+      const create = edgeCreate('d1', 'rel-gone', 'uses', 'escoms', 'gis');
+      const retract: Delta = { kind: 'relationship.retract', id: 'd2', relationshipId: 'rel-gone', relationshipType: 'uses', previousDeltaId: 'd1', sourceId: 'src', confidence: 1 };
+
+      const result = summarizeOwnDeltas([create, retract], asIs, toBe);
+
+      expect(result.subjects[0]?.name).toBe('uses ESCOMS → GIS');
+    });
+
+    it('a supports edge of its own names its capability, without reaching the system\'s other capabilities', () => {
+      const { asIs, toBe } = escomsAndGis();
+      toBe.relationships.set('s-new', supports('gis', 'cap-wayleaves'));
+
+      const result = summarizeOwnDeltas([relationshipCreate('d1', 's-new', 'gis', 'cap-wayleaves')], asIs, toBe);
+
+      expect(result.affectedCapabilities.map((ac) => ac.capability.name)).toEqual(['Wayleaves']);
+      expect(result.affectedCapabilities[0]?.reasons).toEqual([{ kind: 'supports', systemName: 'GIS' }]);
+    });
+
+    it('a system edited directly still reaches everything it supports, with an "edited" reason', () => {
+      const { asIs, toBe } = escomsAndGis();
+      const result = summarizeOwnDeltas([elementUpdate('d1', 'gis', 'GIS', 'create-GIS')], asIs, toBe);
+
+      expect(result.affectedCapabilities.map((ac) => ac.capability.name)).toEqual(['Fault location', 'Network mapping']);
+      expect(result.affectedCapabilities.every((ac) => ac.reasons.every((r) => r.kind === 'edited'))).toBe(true);
+    });
+  });
 });
+

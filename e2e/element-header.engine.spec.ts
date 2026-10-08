@@ -120,4 +120,18 @@ test('element header: raw id is hidden behind the header menu, an alias renders 
   await appMenuToggle.click();
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   await expect(copyButton).toBeVisible();
+  await appMenuToggle.click();
+
+  // On a phone the meta row wraps and leaves "⋯" near the left gutter — the
+  // menu used to hang from the button's right edge and spill off the left
+  // of the screen. Reopened at 390px, every edge sits inside the viewport.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await menuToggle.click();
+  await expect(copyButton).not.toBeVisible();
+  await menuToggle.click();
+  await expect(copyButton).toBeVisible();
+  const menuBox = await page.locator(`[id="${(await menuToggle.getAttribute('aria-controls')) ?? ''}"]`).boundingBox();
+  if (!menuBox) throw new Error('element actions menu has no box');
+  expect(menuBox.x).toBeGreaterThanOrEqual(16);
+  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(390 - 16);
 });

@@ -18,6 +18,7 @@ import { dateFieldLabelForIntent, INTENT_LABEL, NEW_CHANGE_INTENT_OPTIONS } from
 import { groupChangesList } from './changesListGroups';
 import { useRouteTiming } from '../perf/useRouteTiming';
 import { useChangeSummaries } from './useChangeSummaries';
+import { focusImpact } from './impactFocus';
 import { useChanges } from './useChanges';
 import styles from './ChangesView.module.css';
 
@@ -302,6 +303,7 @@ function ChangeRow({
 }) {
   const intent = branch.intent ?? 'propose';
   const dateFieldLabel = dateFieldLabelForIntent(intent);
+  const impact = summary ? focusImpact(summary.affectedCapabilities, summary.affectedValueStreams, summary.projectScopeIds) : null;
   return (
     <li className={styles.row}>
       <div>
@@ -355,9 +357,9 @@ function ChangeRow({
             </Text>
           )}
         </div>
-        {summary && summary.affectedCapabilities.length > 0 && (
+        {impact && impact.shownCapabilities.length > 0 && (
           <ul className={styles.affectedCapabilities}>
-            {summary.affectedCapabilities.map(({ capability }) => (
+            {impact.shownCapabilities.map(({ capability }) => (
               <li key={capability.element_id}>
                 <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${capability.element_id}`} className={styles.affectedCapabilityLink}>
                   <ElementTypeGlyph type="capability" />
@@ -367,15 +369,22 @@ function ChangeRow({
                 </Link>
               </li>
             ))}
+            {impact.collapsedCapabilities.length > 0 && (
+              <li>
+                <Text as="span" tone="muted" size="sm">
+                  +{impact.collapsedCapabilities.length} more outside the project&apos;s scope
+                </Text>
+              </li>
+            )}
           </ul>
         )}
         {/* F6/ADR-023: same compact glyph+name+link shape as the capabilities
             list above, stream-only — this card list has no room for the
             fuller stage/capability breakdown `ChangeView.tsx`'s own panel
             gives. */}
-        {summary && summary.affectedValueStreams.length > 0 && (
+        {impact && impact.shownValueStreams.length > 0 && (
           <ul className={styles.affectedCapabilities}>
-            {summary.affectedValueStreams.map(({ stream }) => (
+            {impact.shownValueStreams.map(({ stream }) => (
               <li key={stream.element_id}>
                 <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${stream.element_id}`} className={styles.affectedCapabilityLink}>
                   <ElementTypeGlyph type="value_stream" />

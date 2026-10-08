@@ -17,9 +17,11 @@ import { describeEnvelope, type NameLookup } from '../engine/describeEnvelope';
 import type { ElementRow, Head, RelationshipRow } from '../engine/deltas';
 import { foldFromGenesis } from '../engine/head';
 import { type AffectedValueStream, valueStreamsReachedFrom } from '../ui/valueStreams/impactTraversal';
+import { moduleDisplayName } from '../ui/elements/moduleDisplayName';
 import { buildCommitLoader } from './commitLoader';
 import type { Client } from './client';
 import { getSourcesByIds, listInFlightBranchesTouchingSubjects } from './elements';
+import { listProjectLinks } from './projects';
 import type { BranchRow, SourceRow } from './types';
 
 export type ChangeSubject =
@@ -34,10 +36,29 @@ export type ChangeSubjectSummary = ChangeSubject & {
   deltas: Delta[];
 };
 
+/**
+ * Why a capability counts as affected (ADR-024's "Amended — change impact").
+ * Names are resolved here, from whichever head still has the element, so a
+ * caller only formats — `describeImpactReason` (`src/ui/changes/impactFocus.ts`).
+ */
+export type ImpactReason =
+  /** The capability's own record is edited. */
+  | { kind: 'direct' }
+  /** A system supporting it has its own record edited. */
+  | { kind: 'edited'; systemName: string }
+  /** One of a supporting system's modules is edited — a module rolls up to its platform. */
+  | { kind: 'module'; systemName: string; moduleName: string }
+  /** A `uses`/`flows_to` edge is added, changed or removed with a supporting system (or one of its modules) on the consuming `from` side. The provider (`to`) side is never counted: gaining a consumer doesn't change how it delivers its own capabilities. */
+  | { kind: 'integration'; systemName: string; consumerName: string; relationshipType: 'uses' | 'flows_to'; otherName: string }
+  /** The `supports` edge to this capability is itself added, changed or removed. */
+  | { kind: 'supports'; systemName: string };
+
 export interface AffectedCapability {
   capability: ElementsHeadRow;
   /** Which of this change's own touched systems support it — there can be more than one. */
   viaSystems: ElementsHeadRow[];
+  /** Every reason it counts, in the order this change's own subjects were first touched — never empty. */
+  reasons: ImpactReason[];
 }
 
 export interface ChangeSummary {
@@ -48,6 +69,8 @@ export interface ChangeSummary {
   affectedValueStreams: AffectedValueStream[];
   otherOpenChanges: BranchRow[];
   sourcesById: Map<UUID, SourceRow>;
+  /** The element ids in the change's own project's declared scope, or `null` when the change belongs to no project — what `focusImpact` narrows the shown list by. */
+  projectScopeIds: ReadonlySet<UUID> | null;
 }
 
 function elementRow(elementId: UUID, row: ElementRow): ElementsHeadRow {
@@ -90,46 +113,104 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
   }
 
   const subjects: ChangeSubjectSummary[] = [];
-  const touchedSystemIds: UUID[] = [];
-  const touchedCapabilityIds: UUID[] = [];
+  /** A touched system's or module's own id -> the reasons it counts as touched, in first-touched order. A touched module is recorded under both its own id and its platform's, so a `supports` edge from either reaches its capability. */
+  const reasonsByElementId = new Map<UUID, ImpactReason[]>();
+  /** capabilityId -> reasons that name it directly (its own edit, or its own `supports` edge). */
+  const directReasonsByCapabilityId = new Map<UUID, { reasons: ImpactReason[]; systemIds: Set<UUID> }>();
+  const element = (id: UUID) => toBeHead.elements.get(id) ?? asIsHead.elements.get(id);
+  const addTouchedReason = (elementId: UUID, systemId: UUID, reason: ImpactReason) => {
+    for (const id of new Set([elementId, systemId])) {
+      const reasons = reasonsByElementId.get(id) ?? [];
+      reasons.push(reason);
+      reasonsByElementId.set(id, reasons);
+    }
+  };
+  const addCapabilityReason = (capabilityId: UUID, reason: ImpactReason, systemId: UUID | null) => {
+    const entry = directReasonsByCapabilityId.get(capabilityId) ?? { reasons: [], systemIds: new Set<UUID>() };
+    entry.reasons.push(reason);
+    if (systemId !== null) entry.systemIds.add(systemId);
+    directReasonsByCapabilityId.set(capabilityId, entry);
+  };
+  /** The system an element stands for in impact terms — itself, or a module's own parent system — with the element's own display name ("Platform · Module" for a module). */
+  const owningSystem = (elementId: UUID): { systemId: UUID; system: ElementRow; displayName: string } | null => {
+    const el = element(elementId);
+    if (el?.elementType === 'system') return { systemId: elementId, system: el, displayName: el.name };
+    if (el?.elementType === 'container' && el.parentId !== null) {
+      const parent = element(el.parentId);
+      if (parent?.elementType !== 'system') return null;
+      return { systemId: el.parentId, system: parent, displayName: moduleDisplayName(elementRow(elementId, el), elementRow(el.parentId, parent)) };
+    }
+    return null;
+  };
 
   for (const [subjectId, entry] of deltasBySubject) {
     if (entry.subjectType === 'element') {
-      const el = toBeHead.elements.get(subjectId) ?? asIsHead.elements.get(subjectId);
+      const el = element(subjectId);
       subjects.push({ subjectId, ...entry, name: el?.name ?? subjectId });
-      if (el?.elementType === 'system') touchedSystemIds.push(subjectId);
-      if (el?.elementType === 'capability') touchedCapabilityIds.push(subjectId);
+      if (el?.elementType === 'system') addTouchedReason(subjectId, subjectId, { kind: 'edited', systemName: el.name });
+      if (el?.elementType === 'capability') addCapabilityReason(subjectId, { kind: 'direct' }, null);
+      if (el?.elementType === 'container') {
+        const owner = owningSystem(subjectId);
+        if (owner) addTouchedReason(subjectId, owner.systemId, { kind: 'module', systemName: owner.system.name, moduleName: owner.displayName });
+      }
     } else {
       const rel = toBeHead.relationships.get(subjectId) ?? asIsHead.relationships.get(subjectId);
-      const name = rel
-        ? `${rel.relationshipType} ${elementName(toBeHead, asIsHead, rel.fromElementId)} → ${elementName(toBeHead, asIsHead, rel.toElementId)}`
+      // A relationship created and retracted on this same change is in
+      // neither head — its own create delta still names both ends.
+      const created = entry.deltas.find((d) => d.kind === 'relationship.create');
+      const ends = rel ?? (created?.kind === 'relationship.create' ? created : null);
+      const name = ends
+        ? `${ends.relationshipType} ${elementName(toBeHead, asIsHead, ends.fromElementId)} → ${elementName(toBeHead, asIsHead, ends.toElementId)}`
         : subjectId;
       subjects.push({ subjectId, ...entry, name });
+      if (rel && (rel.relationshipType === 'uses' || rel.relationshipType === 'flows_to')) {
+        const consumer = owningSystem(rel.fromElementId);
+        if (consumer) {
+          const other = owningSystem(rel.toElementId);
+          addTouchedReason(rel.fromElementId, consumer.systemId, {
+            kind: 'integration',
+            systemName: consumer.system.name,
+            consumerName: consumer.displayName,
+            relationshipType: rel.relationshipType,
+            otherName: other?.displayName ?? elementName(toBeHead, asIsHead, rel.toElementId),
+          });
+        }
+      }
+      if (rel?.relationshipType === 'supports') {
+        const supporter = owningSystem(rel.fromElementId);
+        addCapabilityReason(rel.toElementId, { kind: 'supports', systemName: supporter?.displayName ?? elementName(toBeHead, asIsHead, rel.fromElementId) }, supporter ? rel.fromElementId : null);
+      }
     }
   }
   subjects.sort((a, b) => a.name.localeCompare(b.name));
 
-  // Affected capabilities (the brief's "via supports"): a touched
-  // capability directly, or one a touched system supports — read off the
+  // Affected capabilities (ADR-024's "Amended — change impact"): a capability
+  // named directly (its own edit or its own `supports` edge), or one a
+  // touched system or module supports — "touched" meaning its own record,
+  // one of its modules, or the consuming side of an integration changed; a
+  // module's own `supports` edges count as well as its platform's. Read off the
   // to-be head, since that's this change's own resulting state.
-  const systemsByCapabilityId = new Map<UUID, Set<UUID>>();
-  for (const capabilityId of touchedCapabilityIds) systemsByCapabilityId.set(capabilityId, new Set());
+  const byCapabilityId = new Map<UUID, { reasons: ImpactReason[]; systemIds: Set<UUID> }>();
+  for (const [capabilityId, entry] of directReasonsByCapabilityId) byCapabilityId.set(capabilityId, { reasons: [...entry.reasons], systemIds: new Set(entry.systemIds) });
   for (const rel of toBeHead.relationships.values()) {
-    if (rel.relationshipType !== 'supports' || !touchedSystemIds.includes(rel.fromElementId)) continue;
-    const systems = systemsByCapabilityId.get(rel.toElementId) ?? new Set<UUID>();
-    systems.add(rel.fromElementId);
-    systemsByCapabilityId.set(rel.toElementId, systems);
+    if (rel.relationshipType !== 'supports') continue;
+    const systemReasons = reasonsByElementId.get(rel.fromElementId);
+    if (!systemReasons) continue;
+    const entry = byCapabilityId.get(rel.toElementId) ?? { reasons: [], systemIds: new Set<UUID>() };
+    entry.reasons.push(...systemReasons);
+    entry.systemIds.add(rel.fromElementId);
+    byCapabilityId.set(rel.toElementId, entry);
   }
   const affectedCapabilities: AffectedCapability[] = [];
-  for (const [capabilityId, systemIds] of systemsByCapabilityId) {
+  for (const [capabilityId, { reasons, systemIds }] of byCapabilityId) {
     const capabilityRow = toBeHead.elements.get(capabilityId);
-    if (!capabilityRow) continue; // retracted since, or never resolved — no row to show.
+    if (capabilityRow?.elementType !== 'capability') continue; // retracted since, never resolved, or not a capability — no row to show.
     const viaSystems: ElementsHeadRow[] = [];
     for (const systemId of systemIds) {
       const systemRow = toBeHead.elements.get(systemId);
       if (systemRow) viaSystems.push(elementRow(systemId, systemRow));
     }
-    affectedCapabilities.push({ capability: elementRow(capabilityId, capabilityRow), viaSystems });
+    affectedCapabilities.push({ capability: elementRow(capabilityId, capabilityRow), viaSystems, reasons });
   }
   affectedCapabilities.sort((a, b) => a.capability.name.localeCompare(b.capability.name));
 
@@ -153,6 +234,13 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
   return { subjects, affectedCapabilities, affectedValueStreams };
 }
 
+/** The element ids in a project's declared scope (ADR-024 `project_links`, `linked_type: 'element'`), or `null` for a change in no project. */
+async function loadProjectScopeIds(supabase: Client, projectId: UUID | null): Promise<ReadonlySet<UUID> | null> {
+  if (projectId === null) return null;
+  const links = await listProjectLinks(supabase, projectId);
+  return new Set(links.filter((l) => l.linked_type === 'element').map((l) => l.linked_id));
+}
+
 export async function loadChangeSummary(supabase: Client, modelId: UUID, branch: BranchRow): Promise<ChangeSummary | null> {
   if (!branch.base_commit_id || !branch.head_commit_id) return null;
 
@@ -161,7 +249,7 @@ export async function loadChangeSummary(supabase: Client, modelId: UUID, branch:
   const ownDeltas = listOwnDeltas(fork, loader);
 
   if (ownDeltas.length === 0) {
-    return { subjects: [], affectedCapabilities: [], affectedValueStreams: [], otherOpenChanges: [], sourcesById: new Map() };
+    return { subjects: [], affectedCapabilities: [], affectedValueStreams: [], otherOpenChanges: [], sourcesById: new Map(), projectScopeIds: null };
   }
 
   const toBeHead = foldFromGenesis(branch.head_commit_id, loader);
@@ -169,12 +257,13 @@ export async function loadChangeSummary(supabase: Client, modelId: UUID, branch:
   const { subjects, affectedCapabilities, affectedValueStreams } = summarizeOwnDeltas(ownDeltas, asIsHead, toBeHead);
 
   const subjectIds = subjects.map((s) => s.subjectId);
-  const [otherOpenChanges, sourcesById] = await Promise.all([
+  const [otherOpenChanges, sourcesById, projectScopeIds] = await Promise.all([
     listInFlightBranchesTouchingSubjects(supabase, modelId, subjectIds, branch.id),
     getSourcesByIds(supabase, [...new Set(ownDeltas.map((d) => d.sourceId))]),
+    loadProjectScopeIds(supabase, branch.project_id),
   ]);
 
-  return { subjects, affectedCapabilities, affectedValueStreams, otherOpenChanges, sourcesById };
+  return { subjects, affectedCapabilities, affectedValueStreams, otherOpenChanges, sourcesById, projectScopeIds };
 }
 
 export interface ChangeListSummary extends ChangeSummaryCore {
@@ -188,6 +277,8 @@ export interface ChangeListSummary extends ChangeSummaryCore {
    * gist, not a full summary.
    */
   description: string;
+  /** Same as `ChangeSummary.projectScopeIds`. */
+  projectScopeIds: ReadonlySet<UUID> | null;
 }
 
 /**
@@ -203,8 +294,13 @@ export async function loadChangeSummariesForModel(supabase: Client, modelId: UUI
   const result = new Map<UUID, ChangeListSummary>();
   if (branches.length === 0) return result;
 
-  const loader = await buildCommitLoader(supabase, modelId);
+  // One `project_links` read per distinct project among these branches — a
+  // handful at most, never one per branch.
+  const projectIds = [...new Set(branches.map((b) => b.project_id).filter((id): id is UUID => id !== null))];
+  const [loader, scopes] = await Promise.all([buildCommitLoader(supabase, modelId), Promise.all(projectIds.map((id) => loadProjectScopeIds(supabase, id)))]);
+  const scopeByProjectId = new Map(projectIds.map((id, i) => [id, scopes[i] ?? null]));
   for (const branch of branches) {
+    const projectScopeIds = branch.project_id !== null ? (scopeByProjectId.get(branch.project_id) ?? null) : null;
     // ADR-018 guarantees both are real in practice; BranchRow's own type
     // hasn't been narrowed yet (same gap every other reader of these two
     // columns still carries, per LandscapePage.tsx's own comment) — skipped
@@ -215,7 +311,7 @@ export async function loadChangeSummariesForModel(supabase: Client, modelId: UUI
     const fork: BranchFork = { baseCommitId: branch.base_commit_id, headCommitId: branch.head_commit_id };
     const ownDeltas = listOwnDeltas(fork, loader);
     if (ownDeltas.length === 0) {
-      result.set(branch.id, { subjects: [], affectedCapabilities: [], affectedValueStreams: [], description: 'No changes yet' });
+      result.set(branch.id, { subjects: [], affectedCapabilities: [], affectedValueStreams: [], description: 'No changes yet', projectScopeIds });
       continue;
     }
 
@@ -238,7 +334,7 @@ export async function loadChangeSummariesForModel(supabase: Client, modelId: UUI
       // id falls back to "(unknown)" rather than guessing.
       const nameLookup: NameLookup = (id) => toBeHead.elements.get(id)?.name ?? asIsHead.elements.get(id)?.name;
       const description = describeEnvelope(ownDeltas, nameLookup);
-      result.set(branch.id, { subjects, affectedCapabilities, affectedValueStreams, description });
+      result.set(branch.id, { subjects, affectedCapabilities, affectedValueStreams, description, projectScopeIds });
     } catch {
       continue;
     }

@@ -70,7 +70,7 @@ Enabling capabilities may be at any level (a stage is usually enabled by level-2
 
 ### Impact — one more hop
 
-`src/db/changeSummary.ts`'s existing traversal (touched system → `supports` → affected capability) gains one hop: affected capability → `enables` → stage → parent stream, as `AffectedValueStream { stream, stages: [{ stage, viaCapabilities }] }`, computed by one shared pure function (`src/ui/valueStreams/impactTraversal.ts`) used in three places: the change page and Changes list ("Affected value streams" beside affected capabilities), the decision comparison row (`compareOptions.ts` — the streams reached from the decision's own capabilities at each option's projection, with their rollup tone there), and a new "Impact" section on the element page (a system or container: via its own `supports` edges; a capability: directly).
+`src/db/changeSummary.ts`'s existing traversal (touched system → `supports` → affected capability; which systems count as touched, and what the change page shows first, are ADR-024 §8) gains one hop: affected capability → `enables` → stage → parent stream, as `AffectedValueStream { stream, stages: [{ stage, viaCapabilities }] }`, computed by one shared pure function (`src/ui/valueStreams/impactTraversal.ts`) used in three places: the change page and Changes list ("Affected value streams" beside affected capabilities), the decision comparison row (`compareOptions.ts` — the streams reached from the decision's own capabilities at each option's projection, with their rollup tone there), and a new "Impact" section on the element page (a system or container: via its own `supports` edges; a capability: directly).
 
 ### Views
 

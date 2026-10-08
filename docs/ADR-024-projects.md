@@ -106,6 +106,24 @@ Recorded so nothing in the build is an unwritten decision:
 - **Evidence authoring** is a link (http/https only) or a document reference with an optional description, attached to the project — the first `evidence` authoring path anywhere.
 - **Found and fixed on the way:** `atlas.delete_model` never deleted `decision_option_ratings` (added after it was last rewritten), so deleting an archived model with a rated option failed on a foreign key. The F10 rewrite clears ratings, project links and projects.
 
+### 8. Amended — change impact (2026-10-06)
+
+Agreed with the human on 2026-10-06, after a change that only added an integration (ESCOMS uses GIS) listed no affected capabilities at all, though ESCOMS supports Wayleaves — the capability the change's own project is about.
+
+**Which systems a change touches** (`summarizeOwnDeltas`, `src/db/changeSummary.ts`). Before this, only a system whose own record a change edited counted, so a change made of relationships reached nothing. Now a system counts as touched when:
+
+- its own record is edited (unchanged);
+- one of its modules is edited — a module rolls up to its parent system;
+- a `uses` or `flows_to` edge is added, changed or removed with it, or one of its modules, on the **`from` (consuming / sending) side**. The `to` side is never counted: a provider gaining a consumer doesn't change how it delivers its own capabilities, and counting it made one integration with a widely used system (GIS, an integration platform) list everything that system supports.
+
+A capability is affected when its own record is edited, its own `supports` edge is added/changed/removed (that capability only — not everything the supporting system supports), or a touched system or module supports it. A touched module counts under its own id as well as its platform's, so both the module's own `supports` edges and its platform's reach their capabilities. (Corrected 2026-10-07: the first build looked up `supports` edges from the platform only, so a module that supports a capability itself — ESCOMS, a module of Salesforce, supporting Land, Wayleaves & Consents — reached nothing.) Each affected capability carries its **reasons** (`ImpactReason`), shown beside it: "integration: ESCOMS uses GIS", "module SAP · PM edited", "GIS edited", and so on. Direction matters: "GIS uses ESCOMS" would reach GIS's capabilities instead — the direction an integration is recorded in is part of the fact.
+
+**What is shown first** (`focusImpact`, `src/ui/changes/impactFocus.ts`). For a change in a project, the change page, the Changes list card and the project pack show the affected capabilities in the project's declared scope (`project_links`); everything else the change reaches is listed under a collapsed "Also reached, outside the project's scope". Affected value streams follow: a stream is shown with only the stages a shown capability reaches; a stream only collapsed capabilities reach is collapsed. With no project, or none of the affected capabilities in its scope, everything is shown — narrowing to an empty list would read as "nothing affected", which is false.
+
+**Reviewer routing is not narrowed.** `loadDerivedReviewers` (`src/db/deriveReviewers.ts`, ADR-000 §merge review "Derivation") still reads the full affected-capability list, collapsed ones included: collapsing is a display choice, and a capability owner whose capability the change really reaches must not drop out of the review because the project's scope didn't name it. The wider touched-system rule above does reach more capability owners than before — the intended effect. The touched-*system* owner list for routing is unchanged (systems the change edits as elements).
+
+**Deferred:** naming which capability an integration serves (a field on the `uses`/`flows_to` relationship), which would make a system supporting several capabilities reach exactly one. It is a data-model change (migration, contract, round-trip test) and waits for a need the scope focus doesn't meet.
+
 ## Alternatives rejected
 
 - **Project as a fifth landscape element type.** Gives history and provenance for free, but makes a delivery vehicle a landscape fact — it would appear in versions, be drawable, need relationship rules, and break ADR-001's explicit exclusion for no modelling gain. The things worth versioning (what the project changes) are already versioned, as its changes.

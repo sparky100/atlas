@@ -155,9 +155,11 @@ describe('buildProjectPackMarkdown (F13 step 2)', () => {
                 {
                   capability: { element_id: 'cap', element_type: 'capability', name: 'Customer management', parent_id: null, attributes: {}, exists_delta_id: 'dc' },
                   viaSystems: [{ element_id: 'e1', element_type: 'system', name: 'New CRM', parent_id: null, attributes: {}, exists_delta_id: 'x' }],
+                  reasons: [{ kind: 'edited', systemName: 'New CRM' }],
                 },
               ],
               affectedValueStreams: [],
+              projectScopeIds: null,
             },
           },
         ],
@@ -166,7 +168,7 @@ describe('buildProjectPackMarkdown (F13 step 2)', () => {
     expect(md).toContain('### Proposing: Bring in the new CRM');
     expect(md).toContain('**Stage:** Chosen design · **Status:** draft · **Target date:** 2027-01-31');
     expect(md).toContain('Created New CRM');
-    expect(md).toContain('- Customer management (via New CRM)');
+    expect(md).toContain('- Customer management (New CRM edited)');
     expect(md).toContain('- **New CRM** — Created — "New CRM"');
   });
 
@@ -174,7 +176,7 @@ describe('buildProjectPackMarkdown (F13 step 2)', () => {
     const md = buildProjectPackMarkdown(
       input({
         changes: [
-          { branch: branch(), summary: { description: 'No changes yet', subjects: [], affectedCapabilities: [], affectedValueStreams: [] } },
+          { branch: branch(), summary: { description: 'No changes yet', subjects: [], affectedCapabilities: [], affectedValueStreams: [], projectScopeIds: null } },
           { branch: branch({ id: 'b2', title: 'Other' }), summary: null },
         ],
       }),

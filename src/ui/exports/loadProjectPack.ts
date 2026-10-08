@@ -21,6 +21,7 @@ import { loadDecisionPageData } from '../decisions/useDecision';
 import { groupWhatChangesRows } from '../decisions/whatChangesRows';
 import { scopeDifference } from '../projects/projectModel';
 import type { ProjectData } from '../projects/useProject';
+import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
 import { supabase } from '../supabaseClient';
 import type { ProjectPackDecision, ProjectPackInput } from './projectPack';
 
@@ -55,7 +56,10 @@ export async function loadProjectPack(args: { modelId: UUID; modelName: string; 
     loadChangeSummariesForModel(supabase, modelId, changes),
   ]);
 
-  const elementName = (id: UUID) => elementsById.get(id)?.name ?? touched.find((t) => t.elementId === id)?.createdName ?? 'An element not on main yet';
+  const elementName = (id: UUID) => {
+    const element = elementsById.get(id);
+    return element ? moduleDisplayNameFromMap(element, elementsById) : (touched.find((t) => t.elementId === id)?.createdName ?? 'An element not on main yet');
+  };
   const scopeIds = links.filter((l) => l.linked_type === 'element').map((l) => l.linked_id);
   const difference = scopeDifference(
     scopeIds,
