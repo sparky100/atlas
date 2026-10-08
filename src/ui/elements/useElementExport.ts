@@ -1,14 +1,11 @@
 import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { BrowseRow } from '../../db/elementBrowse';
-import { listAllElements } from '../../db/elementBrowse';
-import { listAllOwnsEdges, listAllUsesAndFlowsToEdges, listFactsForCommit } from '../../db/healthFindings';
-import { listAllSupportsEdges } from '../../db/modelHome';
-import { listSourcesForModel } from '../../db/sources';
 import type { AttributeDefinitionRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
-import { buildProvenanceById, elementBrowseRowsToCsv, relationshipExportRows, sanitizeForFilename, type ExportProvenance, type RelationshipExportRow } from './elementExport';
+import { elementBrowseRowsToCsv, sanitizeForFilename } from './elementExport';
+import { loadExportData, type LoadedExportData } from './loadExportData';
 import { browseRowsToXlsxBlob } from './elementExportXlsx';
 
 export type ElementExportStatus = 'idle' | 'working';
@@ -41,13 +38,6 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-interface LoadedExportData {
-  provenanceById: Map<UUID, ExportProvenance>;
-  relationships: RelationshipExportRow[];
-  /** Every element's name by id — the parent columns look a parent up here, not in the (possibly filtered) visible set. */
-  nameById: Map<UUID, string>;
-}
-
 /**
  * F8's export data + download. The visible set (`rows`) is already in hand;
  * this lazily loads the one-time extras an export needs — facts (for the
@@ -62,21 +52,7 @@ export function useElementExport({ modelId, commitId, definitions, rows, filenam
 
   const load = useCallback(async (): Promise<LoadedExportData | null> => {
     if (!commitId) return null;
-    const [facts, elements, supports, usesFlowsTo, owns, sources] = await Promise.all([
-      listFactsForCommit(supabase, commitId),
-      listAllElements(supabase, commitId),
-      listAllSupportsEdges(supabase, commitId),
-      listAllUsesAndFlowsToEdges(supabase, commitId),
-      listAllOwnsEdges(supabase, commitId),
-      listSourcesForModel(supabase, modelId),
-    ]);
-    const elementsById = new Map(elements.map((e) => [e.element_id, e]));
-    const sourcesById = new Map(sources.map((s) => [s.id, s]));
-    return {
-      provenanceById: buildProvenanceById(facts, sourcesById, new Date()),
-      relationships: relationshipExportRows([...supports, ...usesFlowsTo, ...owns], elementsById),
-      nameById: new Map(elements.map((e) => [e.element_id, e.name])),
-    };
+    return loadExportData(supabase, modelId, commitId);
   }, [modelId, commitId]);
 
   const exportCsv = useCallback(async () => {

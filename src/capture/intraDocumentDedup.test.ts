@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CandidateEvidence, ElementProposal, RelationshipProposal } from '../contracts/capture';
-import { dedupeIntraDocumentCandidates } from './intraDocumentDedup';
+import { dedupeIntraDocumentCandidates, mergeSameNamedActors } from './intraDocumentDedup';
 import type { RowCandidate } from './rowsToCandidates';
 
 function evidence(passage: string, overrides: Partial<CandidateEvidence> = {}): CandidateEvidence {
@@ -89,5 +89,64 @@ describe('dedupeIntraDocumentCandidates', () => {
     const rewired = result.find((c) => c.proposal.kind === 'relationship');
     expect(rewired?.proposal.kind).toBe('relationship');
     expect((rewired?.proposal as RelationshipProposal<'owns'>).to).toEqual({ kind: 'candidate', seq: 0 });
+  });
+});
+
+describe('a value the document stated beats one it only guessed', () => {
+  const actor = (seq: number, attributes: Record<string, unknown>, attributeConfidence: Record<string, number>): RowCandidate => ({
+    seq,
+    proposal: { kind: 'element', elementType: 'actor', name: 'Network Team', parent: null, attributes },
+    evidence: evidence('Network Team', { attributeConfidence }),
+    aliasProposals: [{ type: 'name', value: 'Network Team' }],
+  });
+
+  it('a defaulted subtype (0.6) yields to a stated one; two stated values still keep the first and warn', () => {
+    const guessed = actor(0, { subtype: 'person', isExternal: false }, { subtype: 0.6, isExternal: 0.6 });
+    const stated = actor(1, { subtype: 'team', isExternal: false }, { subtype: 0.95, isExternal: 0.95 });
+    const { candidates } = dedupeIntraDocumentCandidates([guessed, stated].map((c) => ({ ...c, proposal: { ...(c.proposal as ElementProposal<'actor'>), name: c.seq === 0 ? 'Network Team' : 'Network Team Ltd' } })));
+    expect((candidates[0]?.proposal as ElementProposal<'actor'>).attributes.subtype).toBe('team');
+    expect(candidates[0]?.evidence.warnings).toEqual([]);
+
+    const firstStated = actor(0, { subtype: 'person' }, { subtype: 0.95 });
+    const secondStated = actor(1, { subtype: 'team' }, { subtype: 0.95 });
+    const merged = mergeSameNamedActors([firstStated, secondStated]).candidates;
+    expect((merged[0]?.proposal as ElementProposal<'actor'>).attributes.subtype).toBe('person');
+    expect(merged[0]?.evidence.warnings).toContainEqual({ code: 'ROWS_DISAGREE', cell: 'A2' });
+  });
+});
+
+describe('mergeSameNamedActors', () => {
+  const actorNamed = (seq: number, name: string, attributes: Record<string, unknown>, attributeConfidence: Record<string, number>): RowCandidate => ({
+    seq,
+    proposal: { kind: 'element', elementType: 'actor', name, parent: null, attributes },
+    evidence: evidence(name, { attributeConfidence }),
+    aliasProposals: [{ type: 'name', value: name }],
+  });
+  const owns = (seq: number, fromSeq: number): RowCandidate => ({
+    seq,
+    proposal: { kind: 'relationship', relationshipType: 'owns', from: { kind: 'candidate', seq: fromSeq }, to: { kind: 'candidate', seq: 0 }, attributes: { role: 'business' } },
+    evidence: evidence('owns'),
+    aliasProposals: [],
+  });
+
+  it('merges an owner-cell actor and an Actors-sheet row of the same name into one, with the stated type, and re-points the owns edge', () => {
+    const system = elementCandidate(0, 'Aurora');
+    const ownerCellActor = actorNamed(1, 'Network Team', { subtype: 'person', isExternal: false }, { subtype: 0.6, isExternal: 0.6 });
+    const edge = owns(2, 1);
+    const sheetActor = actorNamed(3, 'network  team', { subtype: 'team', isExternal: false }, { subtype: 0.95, isExternal: 0.95 });
+    const { candidates, seqRemap } = mergeSameNamedActors([system, ownerCellActor, edge, sheetActor]);
+
+    expect(candidates.filter((c) => c.proposal.kind === 'element' && c.proposal.elementType === 'actor')).toHaveLength(1);
+    expect(seqRemap.get(3)).toBe(1);
+    const survivor = candidates.find((c) => c.seq === 1);
+    expect((survivor?.proposal as ElementProposal<'actor'>).attributes.subtype).toBe('team');
+    expect(survivor?.aliasProposals.map((a) => a.value)).toEqual(['Network Team', 'network  team']);
+  });
+
+  it('leaves differently named actors, and every non-actor, alone — even two near-identical systems', () => {
+    const list = [actorNamed(0, 'Network Team', {}, {}), actorNamed(1, 'Network Teams', {}, {}), elementCandidate(2, 'CBRM'), elementCandidate(3, 'CBRM (legacy)')];
+    const { candidates, seqRemap } = mergeSameNamedActors(list);
+    expect(candidates).toHaveLength(4);
+    expect(seqRemap.size).toBe(0);
   });
 });

@@ -88,7 +88,7 @@ import { parseCsv } from './parse/csv';
 import { pageHasNoText, parsePdf, PdfParseError, PdfPasswordProtectedError } from './parse/pdf';
 import { parsePastedText } from './parse/pastedText';
 import { parseXlsxWorkbook, type ParsedSpreadsheetSheet } from './parse/spreadsheet';
-import { dedupeIntraDocumentCandidates } from './intraDocumentDedup';
+import { dedupeIntraDocumentCandidates, mergeSameNamedActors } from './intraDocumentDedup';
 import { ImportFileParseError } from './parseImportFile';
 import { parseImportJsonText } from './parseImportJson';
 import { diffAgainstPreviousImport, type PreviousCandidateForDiff } from './reimportDiff';
@@ -760,6 +760,10 @@ async function runSheetCapture(input: RunSheetCaptureInput): Promise<RunCaptureR
   if (usableSheetCount === 0) {
     return { status: 'failed', errorCode: 'NO_USABLE_SHEET', message: 'No sheet in the workbook had both a usable header row and a resolvable name column.' };
   }
+
+  // One actor per name across the workbook: an owner cell and an Actors sheet
+  // both name the same actor, and this product's own export writes both.
+  combined = mergeSameNamedActors(combined).candidates;
 
   if (capabilityRows.length > 0) {
     const { candidates: supportsCandidates } = await assignCapabilities({ rows: capabilityRows, matchIndex, llmClient, startSeq: seqOffset, mainHead });

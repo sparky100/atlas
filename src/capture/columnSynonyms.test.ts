@@ -9,6 +9,21 @@ describe('the headers this product\'s own export writes', () => {
     expect(lookupColumnSynonym('Atlas ID')).toBe('atlasId');
   });
 
+  it('recognises every header the Elements export writes — so reading it back never needs the model', () => {
+    const exportHeaders: Record<string, string> = {
+      Name: 'name', Type: 'ignore', Owner: 'owner', Description: 'description', Vendor: 'vendor', Lifecycle: 'lifecycleStatus',
+      Version: 'version', External: 'isExternal', 'External organisation': 'externalOrganisation', Introduced: 'introduced', 'Planned end': 'plannedEnd',
+      'Vendor support ends': 'supportEndsAt', Criticality: 'criticality', 'Run cost': 'annualRunCost', Disposition: 'disposition',
+      'Hosting model': 'hostingModel', 'Hosting provider': 'hostingProvider', Kind: 'kind', 'IT/OT domain': 'domain',
+      Technology: 'technology', 'Lifecycle (module override)': 'lifecycleStatus', 'Criticality (module override)': 'criticality',
+      'Hosting model (module override)': 'hostingModel', 'Hosting provider (module override)': 'hostingProvider', 'Domain (module override)': 'domain',
+      'Actor type': 'actorType', Email: 'ownerEmail', 'Org unit': 'orgUnit', Reference: 'capabilityCode', Importance: 'importance',
+      'Essential function (NIS/CAF)': 'essentialFunction', Order: 'ignore', 'Parent system': 'parent', 'Parent capability': 'parent', Parent: 'parent',
+      Source: 'ignore', Age: 'ignore', 'Atlas ID': 'atlasId',
+    };
+    for (const [header, role] of Object.entries(exportHeaders)) expect([header, lookupColumnSynonym(header)]).toEqual([header, role]);
+  });
+
   it('does not read the export\'s IT/OT domain as a business-area (capability) column', () => {
     expect(lookupColumnSynonym('IT/OT domain')).not.toBe('capability');
     expect(lookupColumnSynonym('Domain')).toBe('capability');

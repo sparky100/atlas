@@ -22,6 +22,7 @@
 import type { CandidateRef, CandidateEvidence, EvidenceWarning } from '../contracts/capture';
 import type { SourceRef } from '../contracts/sourceRef';
 import { deepEqualJson } from './classify';
+import { DEFAULTED_ATTRIBUTE_CONFIDENCE } from './confidence';
 import { IDENTITY_TRIGRAM_THRESHOLD, trigramSimilarity } from '../engine/trigram';
 import { normaliseName } from './normalise';
 import type { RowCandidate } from './rowsToCandidates';
@@ -79,7 +80,20 @@ function mergeElementCandidates(survivor: RowCandidate, dup: RowCandidate): RowC
       continue;
     }
     if (!deepEqualJson(attributes[key], value)) {
-      warnings.push({ code: 'ROWS_DISAGREE', cell: refCellText(dup.evidence, key) });
+      // A value a document never stated — §5.4's defaults, and the person/team
+      // guess for an owner cell — yields to one it did, rather than winning by
+      // being seen first. Two *stated* values that disagree still keep the
+      // first and warn.
+      const survivorConfidence = attributeConfidence[key] ?? 1;
+      const dupConfidence = dup.evidence.attributeConfidence[key] ?? 0;
+      if (survivorConfidence <= DEFAULTED_ATTRIBUTE_CONFIDENCE && dupConfidence > DEFAULTED_ATTRIBUTE_CONFIDENCE) {
+        attributes[key] = value;
+        attributeConfidence[key] = dupConfidence;
+        const dupRef = dup.evidence.attributeRefs?.[key];
+        if (dupRef !== undefined) attributeRefs[key] = dupRef;
+      } else {
+        warnings.push({ code: 'ROWS_DISAGREE', cell: refCellText(dup.evidence, key) });
+      }
     }
   }
 
@@ -182,6 +196,43 @@ export function dedupeIntraDocumentCandidates(candidates: readonly RowCandidate[
     if (survivor === undefined) throw new Error('intraDocumentDedup: internal — indexed survivor must exist.');
     seqRemap.set(candidate.seq, survivor.seq);
     result[mergeIntoIndex] = mergeElementCandidates(survivor, candidate);
+  }
+
+  return { candidates: seqRemap.size === 0 ? result : result.map((c) => remapCandidateRefs(c, seqRemap)), seqRemap };
+}
+
+/**
+ * Workbook-wide: one actor per name. An owner cell on a system sheet makes an
+ * actor candidate (`rowsToCandidates.ts`'s owner path) and an Actors sheet
+ * lists the same actor again — this product's own export writes both — so
+ * without this an import creates every owner twice. Exact normalised-name
+ * matches only, and only actors: unlike `dedupeIntraDocumentCandidates`'s
+ * fuzzy pass this runs across *sheets*, where a near-miss between two
+ * systems is more likely two systems than a typo. The first-seen candidate
+ * survives; a value the later row *stated* replaces one the first only
+ * guessed (`mergeElementCandidates`), and `owns` edges that pointed at the
+ * merged-away actor are re-pointed.
+ */
+export function mergeSameNamedActors(candidates: readonly RowCandidate[]): DedupeIntraDocumentCandidatesResult {
+  const result: RowCandidate[] = [];
+  const seqRemap = new Map<number, number>();
+  const survivorIndexByName = new Map<string, number>();
+
+  for (const candidate of candidates) {
+    if (candidate.proposal.kind !== 'element' || candidate.proposal.elementType !== 'actor') {
+      result.push(candidate);
+      continue;
+    }
+    const key = normaliseName(candidate.proposal.name);
+    const survivorIndex = survivorIndexByName.get(key);
+    const survivor = survivorIndex !== undefined ? result[survivorIndex] : undefined;
+    if (survivorIndex === undefined || survivor === undefined) {
+      survivorIndexByName.set(key, result.length);
+      result.push(candidate);
+      continue;
+    }
+    seqRemap.set(candidate.seq, survivor.seq);
+    result[survivorIndex] = mergeElementCandidates(survivor, candidate);
   }
 
   return { candidates: seqRemap.size === 0 ? result : result.map((c) => remapCandidateRefs(c, seqRemap)), seqRemap };

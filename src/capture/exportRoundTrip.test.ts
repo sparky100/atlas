@@ -7,10 +7,9 @@
  * export called "Verb", and never read `supports`), read the Actors sheet as
  * systems, and merged similarly named capabilities into one.
  *
- * Only the LLM is a stand-in (CLAUDE.md rule 7: a test double for the
- * network, nothing downstream of it): "Name" is the one header the synonym
- * table doesn't know, which the real model maps to `name`; every other
- * unmapped header is ignored, as it would be.
+ * The importer is given no model at all (CLAUDE.md rule 7: nothing here fakes
+ * one): every header the export writes is a recognised synonym, so reading
+ * the export back must never need prompt A — it throws if asked.
  */
 import * as XLSX from 'xlsx';
 import { describe, expect, it } from 'vitest';
@@ -62,13 +61,10 @@ function exportAsXlsxBytes(): ArrayBuffer {
   return XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
 }
 
+/** Importing this product's own export needs no model: every header it writes is in the synonym table, so prompt A is never asked — and nothing here supplies one. */
 const llm = {
-  complete: (request: { system: string; messages: readonly { content: string }[] }) => {
-    const message = request.messages[0]?.content ?? '';
-    const text = request.system.includes('map spreadsheet columns')
-      ? JSON.stringify({ sheetType: 'unknown', columns: [...message.matchAll(/^column ([A-Z]+): (.*)$/gm)].map((m) => ({ column: m[1], role: m[2] === 'Name' ? 'name' : 'ignore', confidence: 0.9, reason: 'stub' })) })
-      : JSON.stringify({ assignments: [] });
-    return Promise.resolve({ text, stopReason: 'end_turn', inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 });
+  complete: (): Promise<never> => {
+    throw new Error("the importer asked the model for help reading its own export — a header the export writes isn't in the synonym table");
   },
 };
 
