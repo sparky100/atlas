@@ -207,7 +207,7 @@ A **version** is a named, permanent snapshot of main at a point in time (e.g. a 
 
 - **Organisation settings** (owners): the organisation's name, **members** and their roles, **invite by email**, the **membership audit** log, **custom attributes**, and deleting the organisation.
 - **Model settings**: name and description; **archive** a model you've finished with (architects and owners), and **restore** or **delete** an archived one (owners); **share with another organisation** — read-only access to main or to one version, never edit access.
-- **Your profile** (avatar menu): your name, **notifications**, and your signed-in **sessions**.
+- **Your profile** (the **•••** menu at the top right → Profile): your name, **notifications**, and your signed-in **sessions**.
 
 ## Getting help
 
