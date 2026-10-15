@@ -586,7 +586,8 @@ function resolveRelationshipCandidate(
   if (viaHint !== undefined) {
     const viaId = resolveTextRef(viaHint, ['system'], runIndex, resolvedSubjectBySeq, matchIndex, INTEGRATION_PLATFORM_FILTER);
     if (viaId !== null) attributes = { ...attributes, via: viaId };
-    // §7.4/§5.2: an unresolved `via` is dropped, never invalidating (`via` is optional) — no warning code is defined for it in §4's own EvidenceWarning union, unlike a genuine endpoint.
+    // §7.4/§5.2: an unresolved `via` (no such system, or not an integration platform) is dropped, never invalidating (`via` is optional) — but no longer silently: the same `ENDPOINT_UNRESOLVED` warning a missing endpoint gets, with `end: 'via'` (the code's own type already named it), so the review shows the flow was imported as direct.
+    else extraWarnings.push({ code: 'ENDPOINT_UNRESOLVED', text: viaHint, end: 'via' });
   }
 
   const existingRelationshipId = relationshipIndex.get(`${proposal.relationshipType}|${from.elementId}|${to.elementId}`);

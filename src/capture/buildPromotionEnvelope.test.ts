@@ -217,6 +217,28 @@ describe('buildPromotionEnvelope — merged', () => {
     expect(deltas.find((d) => d.kind === 'relationship.create')).toMatchObject({ fromElementId: 'real-crm', toElementId: 'cap' });
     expect(() => fold(cloneHead(targetHead), deltas, ctx)).not.toThrow();
   });
+
+  it("re-points a flow's `via` onto the integration platform created in the same promotion (and leaves one already on the target alone)", () => {
+    const PLATFORM = { ...SYSTEM_ATTRS, kind: 'integration_platform' };
+    const draftHead = headFrom([
+      createElement('d-a', 'draft-a', 'system', 'A', null, SYSTEM_ATTRS, DRAFT_SOURCE_ID),
+      createElement('d-b', 'draft-b', 'system', 'B', null, SYSTEM_ATTRS, DRAFT_SOURCE_ID),
+      createElement('d-mule', 'draft-mule', 'system', 'MuleSoft', null, PLATFORM, DRAFT_SOURCE_ID),
+      createElement('d-bus', 'existing-bus', 'system', 'Existing Bus', null, PLATFORM, DRAFT_SOURCE_ID),
+      createRelationship('d-rel', 'draft-rel', 'flows_to', 'draft-a', 'draft-b', { description: 'sends to', via: 'draft-mule' }, DRAFT_SOURCE_ID),
+      createRelationship('d-rel2', 'draft-rel2', 'flows_to', 'draft-b', 'draft-a', { description: 'sends back to', via: 'existing-bus' }, DRAFT_SOURCE_ID),
+    ]);
+    const targetHead = headFrom([createElement('t-bus', 'existing-bus', 'system', 'Existing Bus', null, PLATFORM)]);
+    const system = (seq: number, id: string, name: string, attributes: Record<string, unknown>) => candidate({ seq, class: 'new', elementType: 'system', draftSubjectId: id, decision: 'accepted', proposal: { kind: 'element', elementType: 'system', name, parent: null, attributes } });
+    const flow = (seq: number, id: string, from: string, to: string, attributes: Record<string, unknown>) => candidate({ seq, kind: 'relationship', class: 'new', relationshipType: 'flows_to', draftSubjectId: id, decision: 'accepted', proposal: { kind: 'relationship', relationshipType: 'flows_to', from: { kind: 'existing', elementId: from }, to: { kind: 'existing', elementId: to }, attributes } });
+    const candidates = [system(0, 'draft-a', 'A', SYSTEM_ATTRS), system(1, 'draft-b', 'B', SYSTEM_ATTRS), system(2, 'draft-mule', 'MuleSoft', PLATFORM), flow(3, 'draft-rel', 'draft-a', 'draft-b', { description: 'sends to', via: 'draft-mule' }), flow(4, 'draft-rel2', 'draft-b', 'draft-a', { description: 'sends back to', via: 'existing-bus' })];
+
+    const { deltas, promotedSubjectIdBySeq } = buildPromotionEnvelope({ candidates, draftHead, targetHead, reviewerSourceId: REVIEWER_SOURCE_ID, mintId });
+    const flows = deltas.filter((d) => d.kind === 'relationship.create');
+    expect(flows[0]).toMatchObject({ attributes: { via: promotedSubjectIdBySeq.get(2) } });
+    expect(flows[1]).toMatchObject({ attributes: { via: 'existing-bus' } });
+    expect(() => fold(cloneHead(targetHead), deltas, ctx)).not.toThrow();
+  });
 });
 
 describe('buildPromotionEnvelope — edited', () => {
