@@ -45,12 +45,15 @@ export function AppHeader({ children, orgId = null, helpContext }: AppHeaderProp
         {children}
       </div>
       <div className={styles.right}>
+        {/* The shared simmodlr header pattern (Loop, Flow, Lens, Compass,
+            Atlas): [bell] [? Help] [avatar + name] [⚙ Settings] [•••] —
+            the last three are UserMenu's own cluster. */}
+        <NotificationTray />
         {orgId !== null && (
-          <button type="button" className={styles.helpToggle} aria-label="Help" onClick={() => { setHelpOpen(true); }}>
+          <button type="button" className={styles.helpToggle} aria-label="Help" title="Help" onClick={() => { setHelpOpen(true); }}>
             <CircleHelp size={18} aria-hidden="true" />
           </button>
         )}
-        <NotificationTray />
         <UserMenu />
       </div>
       {orgId !== null && <HelpPanel open={helpOpen} onClose={() => { setHelpOpen(false); }} orgId={orgId} context={helpContext} />}

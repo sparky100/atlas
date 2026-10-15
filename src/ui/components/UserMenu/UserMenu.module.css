@@ -1,22 +1,83 @@
+/* The shared header pattern's right-hand cluster (UserMenu.tsx's own
+   comment): avatar + name, then the Settings and account-menu toggles. */
+.cluster {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* 28px, filled with the accent (Atlas has no per-person colour of its own);
+   an uploaded avatar image fills the same circle instead. */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: var(--text-xs-size);
+  font-weight: 600;
+  object-fit: cover;
+}
+
+.name {
+  color: var(--text);
+  font-size: var(--text-sm-size);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16em;
+}
+
+/* Only the name goes on a phone — every control stays where it is. */
+@media (max-width: 640px) {
+  .name {
+    display: none;
+  }
+}
+
 .wrapper {
   position: relative;
 }
 
-/* Sprint U4-2a item 6: round, avatar-styled, and shown at every width now —
-   no `display: none` gated behind a breakpoint any more. */
+/* 40px circles, the same size as Help and the notifications bell beside
+   them (and as the matching buttons in the sibling apps) — fixed, not
+   `--row-height`, so compact density doesn't shrink the header's tap
+   targets. */
 .toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: var(--row-height);
-  width: var(--row-height);
+  height: 40px;
+  width: 40px;
   border-radius: 50%;
   border: var(--border-width) solid var(--border-strong);
   background: var(--surface);
-  color: var(--text);
-  font-size: 0.9em;
-  font-weight: 600;
+  color: var(--text-muted);
+  font-weight: 700;
   cursor: pointer;
+  padding: 0;
+}
+
+.toggle:hover,
+.toggle[aria-expanded='true'] {
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+
+.dots {
+  letter-spacing: 1px;
+  line-height: 1;
 }
 
 .srOnly {
