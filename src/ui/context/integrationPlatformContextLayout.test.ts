@@ -150,3 +150,24 @@ describe('integration platform diagram — room for connectors and labels', () =
     expect(elbowX - routed.verbLabelAnchor.x).toBeGreaterThanOrEqual(160 + 16);
   });
 });
+
+describe('integration platform diagram — telling the flows apart', () => {
+  const edge = (id: string, sourceId: string, targetId: string) => ({ id, sourceId, targetId, verbLabel: 'sends to', classificationLabel: null, crossesBoundary: false });
+
+  it('numbers every flow from 1, top to bottom by where it leaves its source, each number used once', () => {
+    // Sources s0 (top) and s1 (below); ids chosen so id order disagrees with position order.
+    const edges = [edge('z-flow', 's0', 't1'), edge('a-flow', 's1', 't0'), edge('m-flow', 's0', 't0')];
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0', 's1'], ['t0', 't1'], edges);
+    const numbers = layout.edges.map((e) => e.flowNumber).sort((a, b) => a - b);
+    expect(numbers).toEqual([1, 2, 3]);
+    // Reading the left-hand pills top to bottom gives 1, 2, 3.
+    const byLeavingY = [...layout.edges].sort((a, b) => (a.sourceSegment[0]?.y ?? 0) - (b.sourceSegment[0]?.y ?? 0));
+    expect(byLeavingY.map((e) => e.flowNumber)).toEqual([1, 2, 3]);
+  });
+
+  it('gives a flow the same number on both of its segments by carrying it on the one routed edge', () => {
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0'], ['t0'], [edge('a', 's0', 't0')]);
+    expect(layout.edges).toHaveLength(1);
+    expect(layout.edges[0]?.flowNumber).toBe(1);
+  });
+});
