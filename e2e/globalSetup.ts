@@ -24,6 +24,6 @@ export default async function globalSetup(): Promise<void> {
   for (const { sector, version } of PUBLISHED_FOR_TESTS) {
     const { data, error } = await supabase.from('capability_maps').select('status').eq('sector', sector).eq('version', version).maybeSingle();
     if (error) throw new Error(`globalSetup: reading ${sector} v${String(version)}: ${error.message}`);
-    if ((data as { status: string } | null)?.status === 'draft') await publishCapabilityMap(supabase, sector, version);
+    if (data?.status === 'draft') await publishCapabilityMap(supabase, sector, version);
   }
 }
