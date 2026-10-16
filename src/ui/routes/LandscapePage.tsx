@@ -25,7 +25,7 @@ import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBran
 import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
-import { useMainBranch } from '../branches/useMainBranch';
+import { hintedModelId, useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { CapabilityLandscapeList } from '../landscape/CapabilityLandscapeList';
@@ -141,12 +141,12 @@ export function LandscapePage() {
   // Search always scans main's real head, regardless of which ref/branch is
   // being viewed (src/db/elementSearch.ts's own module comment) — only the
   // write target (`editingBranch`) varies with the ref.
-  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, loading: mainBranchLoading, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   // S1 item 15 (A2 remainder): `mainBranch` is already resolved above —
   // hand its head commit id through as `useBreadcrumbElement`'s own dedup
   // hint (that hook's own parameter comment) rather than letting it run a
   // second, redundant `resolveRef` for the common `ref.kind === 'main'` case.
-  const capability = useBreadcrumbElement(model?.id ?? null, ref, capabilityId, mainBranch?.head_commit_id ?? null);
+  const capability = useBreadcrumbElement(hintedModelId(model?.id, ref, mainBranchLoading), ref, capabilityId, mainBranch?.head_commit_id ?? null);
   const canEdit = !viewing && editingBranch !== null && canEditBranch(role, editingBranch);
   // ADR-018 guarantees both are never null in practice (every branch always
   // has a real head, from genesis onward) — `BranchRow`'s own type hasn't

@@ -6,7 +6,7 @@ import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
-import { useMainBranch } from '../branches/useMainBranch';
+import { hintedModelId, useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { useModels } from '../models/useModels';
@@ -37,9 +37,9 @@ export function PortfolioPage() {
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
-  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, loading: mainBranchLoading } = useMainBranch(model?.id ?? null);
 
-  const { state } = usePortfolio(model?.id ?? '', ref, mainBranch?.head_commit_id ?? null);
+  const { state } = usePortfolio(hintedModelId(model?.id, ref, mainBranchLoading) ?? '', ref, mainBranch?.head_commit_id ?? null);
   const { label: branchLabel } = useBranchLabel(ref);
 
   if (orgLoading || modelsLoading || !model) {

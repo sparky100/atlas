@@ -38,7 +38,7 @@ import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBran
 import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
-import { useMainBranch } from '../branches/useMainBranch';
+import { hintedModelId, useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { parseMergePrefillFromSearchParams } from '../duplicates/mergePrefill';
@@ -155,9 +155,9 @@ export function ElementPage() {
   const { role } = useMembership(organisation?.id ?? null, userId);
 
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
-  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, loading: mainBranchLoading, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   // S1 item 15 (A2 remainder): same dedup hint as every other page here.
-  const { state, reload } = useElementPage(model?.id ?? '', elementId ?? '', ref, mainBranch?.head_commit_id ?? null);
+  const { state, reload } = useElementPage(hintedModelId(model?.id, ref, mainBranchLoading) ?? '', elementId ?? '', ref, mainBranch?.head_commit_id ?? null);
   // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment.
   useRouteTiming('element-detail', state.status === 'ready');
   // A dead end for the element at this ref (retracted, or never existed
