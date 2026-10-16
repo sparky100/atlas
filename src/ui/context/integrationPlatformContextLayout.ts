@@ -32,13 +32,15 @@ const PADDING = 32;
 /** Vertical gap between two tiles stacked in the same column. */
 const TILE_GUTTER_Y = 24;
 /**
- * Horizontal distance between a column and the platform tile. Each half is the run a label pill sits on (the verb on the source side, the data classification on the target side), so it has to hold the widest pill the canvas draws (`PILL_MAX_WIDTH` there, 160px, plus padding) *beside* its tile rather than over it — at the original 140 the pills spilled across the tile edge they were meant to label.
+ * Horizontal distance between a column and the platform tile. Each half is the run a label pill sits on (the verb on the source side, the data classification on the target side), so it holds a label pill (up to `PILL_RUN_WIDTH`) *beside* its tile rather than over it — at the original 140 the pills spilled across the tile edge they were meant to label.
  */
 const COLUMN_GAP = 340;
 /** Vertical room each edge attached to a tile gets: a label pill is 18px tall, so adjacent attach points need clearly more than that or two pills on one tile sit on top of each other. */
 const ATTACH_PITCH = 26;
 /** Gap between a tile's edge and the start of the verb pill beside it. */
 const LABEL_INSET = 10;
+/** The longest a label pill may run beside its tile, in world units: the whole half-gap's run to the platform and a little past the elbow, leaving `LABEL_INSET` clear at each end. The canvas scales it with the zoom, so a label is cut only when it would really run into the next column. */
+export const PILL_RUN_WIDTH = COLUMN_GAP - LABEL_INSET * 4;
 /** ADR-026: the platform's own name sits in this strip at the top of its tile when interface bands fill the rest. */
 const HUB_HEADER = 26;
 
