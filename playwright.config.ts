@@ -22,6 +22,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
   },
+  // Loads the real starter capability maps into the local database first (e2e/globalSetup.ts).
+  globalSetup: './e2e/globalSetup.ts',
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     // S2 (docs/prompts/atlas-prompt-pack.md): "fix until they pass at 1280

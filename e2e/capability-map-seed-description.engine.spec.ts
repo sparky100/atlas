@@ -57,7 +57,9 @@ test('seeding from a starter map carries the map item\'s own description onto th
   const service = createServiceRoleClient(env);
   const capabilityMapId = randomUUID();
   const itemId = randomUUID();
-  const sector = 'electricity_network';
+  // A sector of its own, never the real 'electricity_network': a published map
+  // there would sit beside the real starter map in every model's picker.
+  const sector = `electricity_network_${randomUUID().slice(0, 8)}`;
   const version = randomInt(1, 1_000_000);
   const description = 'Plans, builds and maintains the physical network that carries electricity to customers.';
 

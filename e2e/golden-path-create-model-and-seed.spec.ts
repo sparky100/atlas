@@ -11,7 +11,7 @@ import { seedStarterCapabilityMap, signUpCreateOrgAndModel } from './fixtures/go
 
 test('create a model and seed the electricity map', async ({ page }) => {
   await signUpCreateOrgAndModel(page, 'goldenpath1');
-  await seedStarterCapabilityMap(page, /electricity/i);
+  await seedStarterCapabilityMap(page, /^Electricity Network Operator$/);
 
   // Back on Capability map, the seeded map's own top-level capabilities
   // render — proves the import actually landed, not just that the button

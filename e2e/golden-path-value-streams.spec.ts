@@ -27,7 +27,7 @@ test('a retired capability supporter reads as weakness up the value stream', asy
   await signUpCreateOrgAndModel(page, 'goldenpath-vs');
 
   // Seed the electricity map (v4 — capabilities plus value streams).
-  await seedStarterCapabilityMap(page, /electricity/i);
+  await seedStarterCapabilityMap(page, /^Electricity Network Operator$/);
 
   // A system supporting "Connections" — one of the capabilities that enable
   // Getting Connected's "Design & Offer" and "Energise & Settle" stages.

@@ -177,16 +177,36 @@ describe('comments, mentions, notifications, and realtime against a real local S
       // a fixed sleep.
       await expect.poll(() => aliceResynced && bobResynced, { timeout: 10_000, interval: 100 }).toBe(true);
 
-      const comment = await createComment(bob.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementId, body: 'seen over the wire', authorId: bob.id });
+      // A cold realtime service (the first subscriber after `pnpm db:start`
+      // or `db:reset`) reports SUBSCRIBED before its change stream is
+      // running, and an insert made in that window is never delivered —
+      // reproduced by restarting the realtime container and running this
+      // test straight away. The live service doesn't start cold under a
+      // user, and the app refetches on every (re)subscribe. So: post until
+      // one comment reaches both clients (well under a second once warm, up
+      // to ~45s cold), then check the two directions on a warm stream.
+      const warmUpDeadline = Date.now() + 45_000;
+      for (;;) {
+        const probe = await createComment(bob.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementId, body: 'warm-up', authorId: bob.id });
+        const seen = await expect
+          .poll(() => seenByAlice.includes(probe.id) && seenByBob.includes(probe.id), { timeout: 3_000, interval: 100 })
+          .toBe(true)
+          .then(() => true, () => false);
+        if (seen) break;
+        if (Date.now() > warmUpDeadline) throw new Error('realtime: no comment was delivered within 45s of subscribing');
+      }
 
+      // Each client sees a comment the other inserts.
+      const fromBob = await createComment(bob.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementId, body: 'seen over the wire', authorId: bob.id });
+      const fromAlice = await createComment(alice.client, { id: randomUUID(), orgId, modelId, anchorType: 'element', anchorId: elementId, body: 'and back again', authorId: alice.id });
       await expect
-        .poll(() => seenByAlice.includes(comment.id) && seenByBob.includes(comment.id), { timeout: 10_000, interval: 200 })
+        .poll(() => seenByAlice.includes(fromBob.id) && seenByBob.includes(fromAlice.id), { timeout: 10_000, interval: 200 })
         .toBe(true);
     } finally {
       await aliceHandle.unsubscribe();
       await bobHandleChannel.unsubscribe();
     }
-  }, 30_000);
+  }, 75_000);
 
   // ---------------------------------------------------------------------
   // atlas.profiles
