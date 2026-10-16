@@ -30,6 +30,7 @@ interface Transform {
 }
 
 interface HoverState {
+  elementId: UUID;
   label: string;
   screenX: number;
   screenY: number;
@@ -219,10 +220,16 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
       ctx.translate(transform.tx, transform.ty);
       ctx.scale(transform.scale, transform.scale);
 
-      const drawPolyline = (points: readonly { x: number; y: number }[], warn: boolean, arrowAtEnd: boolean): void => {
+      // Hovering a source or target (not the platform, which every flow touches) picks out the flows through it and fades the rest — with several apps, the way to see which line in goes with which line out.
+      const hoveredId = hover && hover.elementId !== hub.element_id ? hover.elementId : null;
+      const flowIsEmphasised = (edge: { sourceId: UUID; targetId: UUID }): boolean => hoveredId !== null && (edge.sourceId === hoveredId || edge.targetId === hoveredId);
+      const flowIsFaded = (edge: { sourceId: UUID; targetId: UUID }): boolean => hoveredId !== null && !flowIsEmphasised(edge);
+
+      const drawPolyline = (points: readonly { x: number; y: number }[], warn: boolean, arrowAtEnd: boolean, emphasised: boolean, faded: boolean): void => {
         ctx.save();
-        ctx.strokeStyle = warn ? tokens.statusWarn : tokens.borderStrong;
-        ctx.lineWidth = warn ? 2 : 1.5;
+        ctx.globalAlpha = faded ? 0.2 : 1;
+        ctx.strokeStyle = warn ? tokens.statusWarn : emphasised ? tokens.text : tokens.borderStrong;
+        ctx.lineWidth = emphasised ? 2.5 : warn ? 2 : 1.5;
         ctx.lineJoin = 'round';
         ctx.beginPath();
         points.forEach((p, i) => {
@@ -244,7 +251,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
         ctx.lineTo(-8, -4);
         ctx.lineTo(-8, 4);
         ctx.closePath();
-        ctx.fillStyle = warn ? tokens.statusWarn : tokens.borderStrong;
+        ctx.fillStyle = warn ? tokens.statusWarn : emphasised ? tokens.text : tokens.borderStrong;
         ctx.fill();
         ctx.restore();
       };
@@ -254,8 +261,8 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
       // segments per the prompt's own "each via-flow drawn as source →
       // platform → target."
       for (const edge of layout.edges) {
-        drawPolyline(edge.sourceSegment, edge.crossesBoundary, true);
-        drawPolyline(edge.targetSegment, edge.crossesBoundary, true);
+        drawPolyline(edge.sourceSegment, edge.crossesBoundary, true, flowIsEmphasised(edge), flowIsFaded(edge));
+        drawPolyline(edge.targetSegment, edge.crossesBoundary, true, flowIsEmphasised(edge), flowIsFaded(edge));
       }
 
       const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; maxWidth: number }[] = [];
@@ -318,11 +325,12 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
         ctx.textAlign = 'center';
         for (const edge of layout.edges) {
           const [vx, vy] = toScreen(edge.verbLabelAnchor.x, edge.verbLabelAnchor.y);
-          drawPill(ctx, edge.verbLabel, vx, vy, tokens, edge.crossesBoundary, 'left');
-          if (edge.classificationLabel) {
-            const [cx, cy] = toScreen(edge.classificationLabelAnchor.x, edge.classificationLabelAnchor.y);
-            drawPill(ctx, edge.classificationLabel, cx, cy, tokens, edge.crossesBoundary, 'centre');
-          }
+          ctx.globalAlpha = flowIsFaded(edge) ? 0.25 : 1;
+          // Both pills carry the flow's number, so a line leaving the platform can be matched to the one that entered it.
+          drawPill(ctx, edge.verbLabel.trim() === '' ? String(edge.flowNumber) : `${String(edge.flowNumber)} · ${edge.verbLabel}`, vx, vy, tokens, edge.crossesBoundary, 'left');
+          const [cx, cy] = toScreen(edge.classificationLabelAnchor.x, edge.classificationLabelAnchor.y);
+          drawPill(ctx, edge.classificationLabel ? `${String(edge.flowNumber)} · ${edge.classificationLabel}` : String(edge.flowNumber), cx, cy, tokens, edge.crossesBoundary, 'centre');
+          ctx.globalAlpha = 1;
         }
         ctx.textAlign = 'left';
       }
@@ -358,7 +366,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
     }
     const tile = tileAt(screenX, screenY);
     const element = tile ? platformTileElement(tile.elementId, tile.elementId === hub.element_id, elementsById, hub) : undefined;
-    setHover(element ? { label: moduleDisplayNameFromMap(element, elementsById), screenX, screenY } : null);
+    setHover(element && tile ? { elementId: tile.elementId, label: moduleDisplayNameFromMap(element, elementsById), screenX, screenY } : null);
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>): void {

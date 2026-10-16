@@ -73,8 +73,12 @@ export interface RoutedPlatformFlowEdge extends PlatformFlowEdgeInput {
   targetSegment: Point[];
   /** Left end of the verb label pill, on the source segment's own leaving-the-source run — the pill is drawn rightwards from here. */
   verbLabelAnchor: Point;
-  /** Centre of the target segment's own arriving-at-the-target run — where the classification chip pill sits. */
+  /** Centre of the target segment's own arriving-at-the-target run — where the target-side pill sits (the flow's number, and its data classification when it has one). */
   classificationLabelAnchor: Point;
+  /**
+   * This flow's number, shown on both its source-side and target-side pill. A flow is source → platform → target, drawn as two separate lines meeting at the platform, so with more than a couple of apps nothing else says which line out the right belongs to which line in on the left. Numbered top to bottom by where the flow leaves its source (the order the left-hand pills read in), from 1.
+   */
+  flowNumber: number;
 }
 
 export interface IntegrationPlatformContextLayout {
@@ -218,10 +222,14 @@ export function computeIntegrationPlatformContextLayout(
         // The pill's left end, just clear of the source tile (the canvas draws it from here to the right), so a long verb runs along the line instead of back over the tile it labels.
         verbLabelAnchor: { x: sourceStart.x + LABEL_INSET, y: sy },
         classificationLabelAnchor: { x: (targetMidX + targetEnd.x) / 2, y: ty },
+        flowNumber: 0,
       },
     ];
   });
   routed.sort((a, b) => compareIds(a.id, b.id));
+  // Numbered in the order the left-hand pills read, top to bottom (`hubLeftOrder`: by the source's attach y, then id), so the numbers on the left run 1, 2, 3 …
+  const numberByEdgeId = new Map(hubLeftOrder.map((edge, i) => [edge.id, i + 1]));
+  for (const edge of routed) edge.flowNumber = numberByEdgeId.get(edge.id) ?? 0;
 
   return {
     hub,
