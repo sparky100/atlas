@@ -22,6 +22,7 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { ModulesSection } from '../components/ModulesSection/ModulesSection';
 import { Panel } from '../components/Panel/Panel';
+import { InterfacesSection } from '../components/PlatformFlowsSection/InterfacesSection';
 import { PlatformFlowsSection } from '../components/PlatformFlowsSection/PlatformFlowsSection';
 import { RelationshipsSection } from '../components/RelationshipGroup/RelationshipsSection';
 import { RemoveFromModelAction } from '../components/RemoveFromModelAction/RemoveFromModelAction';
@@ -57,7 +58,7 @@ import { useAttestation } from '../elements/useAttestation';
 import { useElementRename } from '../elements/useElementRename';
 import { ActorMemberPicker } from '../elements/ActorMemberPicker';
 import { attributesRecord } from '../elements/attributesRecord';
-import { isIntegrationPlatform, isPlatform } from '../elements/systemKind';
+import { isIntegrationInterface, isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { useRouteTiming } from '../perf/useRouteTiming';
 import { useValueStreamImpact } from '../valueStreams/useValueStreamImpact';
 import styles from './ElementPage.module.css';
@@ -692,10 +693,21 @@ export function ElementPage() {
                   </CollapsibleSection>
                 )}
                 {state.data.element.element_type === 'system' && isIntegrationPlatform(state.data.element) && (
-                  <CollapsibleSection title="Flows via this platform" meta={`(${String(state.data.flowsViaThisPlatform.length)})`}>
-                    <PlatformFlowsSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} flows={state.data.flowsViaThisPlatform} endpoints={state.data.flowsViaThisPlatformEndpoints} />
+                  <CollapsibleSection title="Interfaces" meta={`(${String(state.data.children.filter((c) => c.element_type === 'container').length)})`}>
+                    <InterfacesSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} interfaces={state.data.children.filter((c) => c.element_type === 'container')} flows={state.data.flowsViaThisPlatform} />
                   </CollapsibleSection>
                 )}
+                {(isIntegrationPlatform(state.data.element) && state.data.element.element_type === 'system') || isIntegrationInterface(state.data.element, state.data.parent) ? (
+                  <CollapsibleSection title={state.data.element.element_type === 'container' ? 'Flows via this interface' : 'Flows via this platform'} meta={`(${String(state.data.flowsViaThisPlatform.length)})`}>
+                    <PlatformFlowsSection
+                      orgSlug={organisation?.slug ?? ''}
+                      modelSlug={model.slug}
+                      flows={state.data.flowsViaThisPlatform}
+                      endpoints={state.data.flowsViaThisPlatformEndpoints}
+                      interfaces={new Map((state.data.element.element_type === 'container' ? [state.data.element] : state.data.children.filter((c) => c.element_type === 'container')).map((c) => [c.element_id, c]))}
+                    />
+                  </CollapsibleSection>
+                ) : null}
                 {state.data.element.element_type === 'system' && isPlatform(state.data.element) && (
                   <CollapsibleSection title="Modules" meta={`(${String(state.data.children.length)})`}>
                     <ModulesSection

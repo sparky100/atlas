@@ -955,7 +955,7 @@ describe('V6 (SPEC §5.2): no two live relationships share (type, from, to)', ()
   });
 });
 
-describe('C18 (Prompt 7k item 4): uses.via/flows_to.via must reference a live integration_platform system', () => {
+describe('C18 (Prompt 7k item 4, ADR-026): uses.via/flows_to.via must reference a live integration_platform system or an interface on one', () => {
   function elementCreate(id: UUID, elementId: UUID, elementType: ElementType, name: string, attributes: Record<string, Json> = {}): Delta {
     const base = elementType === 'system' ? { lifecycleStatus: 'active', isExternal: false } : {};
     return { kind: 'element.create', id, elementId, elementType, name, parentId: null, attributes: { ...base, ...attributes } as never, sourceId: 'src', confidence: 1 };
@@ -1026,6 +1026,31 @@ describe('C18 (Prompt 7k item 4): uses.via/flows_to.via must reference a live in
     fold(head, [flowsToCreate('rel-1', 'sys-platform')], ctx);
     const clearVia: Delta = { kind: 'relationship.update', id: 'd-clear-via', relationshipId: 'rel-1', relationshipType: 'flows_to', attribute: 'via', value: null, previousDeltaId: 'd-rel-1', sourceId: 'src', confidence: 1 };
     expect(() => fold(head, [clearVia], ctx)).not.toThrow();
+  });
+
+  // ADR-026: an *interface* — a container whose parent is a live integration platform — is accepted as `via` too.
+  function containerCreate(id: UUID, elementId: UUID, name: string, parentId: UUID, attributes: Record<string, Json> = {}): Delta {
+    return { kind: 'element.create', id, elementId, elementType: 'container', name, parentId, attributes: { isExternal: false, ...attributes } as never, sourceId: 'src', confidence: 1 };
+  }
+
+  it('ADR-026: accepts via set to an interface on an integration platform, carrying each side\'s protocol, and folds them back exactly', () => {
+    const head = fold(twoSystemsAndAPlatform(), [containerCreate('d-api', 'iface-api', 'Customer API', 'sys-platform', { interfaceType: 'api', transformation: 'Converts the nightly file into a REST API' })], ctx);
+    const create: Delta = { kind: 'relationship.create', id: 'd-rel-1', relationshipId: 'rel-1', relationshipType: 'flows_to', fromElementId: 'sys-a', toElementId: 'sys-b', attributes: { description: 'sends readings to', via: 'iface-api', protocolIn: 'file_sftp', protocolOut: 'rest_api' }, sourceId: 'src', confidence: 1 };
+    fold(head, [create], ctx);
+    expect(head.relationships.get('rel-1')?.attributes).toMatchObject({ via: 'iface-api', protocolIn: 'file_sftp', protocolOut: 'rest_api' });
+    expect(head.elements.get('iface-api')?.attributes).toMatchObject({ interfaceType: 'api', transformation: 'Converts the nightly file into a REST API' });
+  });
+
+  it('ADR-026: rejects via set to a container whose parent is not an integration platform (an ordinary module), naming C18', () => {
+    const head = fold(twoSystemsAndAPlatform(), [containerCreate('d-pm', 'mod-pm', 'PM', 'sys-b')], ctx);
+    expect(() => fold(head, [flowsToCreate('rel-1', 'mod-pm')], ctx)).toThrow(/C18/);
+  });
+
+  it('ADR-026: relationship.update can move via from the platform to one of its interfaces', () => {
+    const head = fold(twoSystemsAndAPlatform(), [containerCreate('d-api', 'iface-api', 'Customer API', 'sys-platform', { interfaceType: 'api' }), flowsToCreate('rel-1', 'sys-platform')], ctx);
+    const toInterface: Delta = { kind: 'relationship.update', id: 'd-to-iface', relationshipId: 'rel-1', relationshipType: 'flows_to', attribute: 'via', value: 'iface-api', previousDeltaId: 'd-rel-1', sourceId: 'src', confidence: 1 };
+    expect(() => fold(head, [toInterface], ctx)).not.toThrow();
+    expect(head.relationships.get('rel-1')?.attributes).toMatchObject({ via: 'iface-api' });
   });
 });
 

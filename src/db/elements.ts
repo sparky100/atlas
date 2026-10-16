@@ -94,7 +94,7 @@ export async function listRelationshipsForElement(supabase: Client, commitId: UU
  * filters to `via` client-side, the same "query the scope once" pattern
  * `listRelationshipsForElement` above already gives a real precedent for.
  */
-export async function listFlowsViaElement(supabase: Client, commitId: UUID, platformElementId: UUID): Promise<RelationshipsHeadRow[]> {
+export async function listFlowsViaElement(supabase: Client, commitId: UUID, viaIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
   const query = supabase
     .from('relationships_head')
     .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
@@ -102,7 +102,12 @@ export async function listFlowsViaElement(supabase: Client, commitId: UUID, plat
     .in('relationship_type', ['uses', 'flows_to'])
     .order('relationship_id');
   const rows = await selectAll<RelationshipsHeadRow>(query);
-  return rows.filter((row) => attributesRecord(row.attributes).via === platformElementId);
+  // ADR-026: `viaIds` is a platform plus its interfaces (a platform's own page and Context view), or one interface alone.
+  const wanted = new Set(viaIds);
+  return rows.filter((row) => {
+    const via = attributesRecord(row.attributes).via;
+    return typeof via === 'string' && wanted.has(via);
+  });
 }
 
 /**

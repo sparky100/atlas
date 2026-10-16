@@ -320,6 +320,10 @@ export interface SystemAttributes {
 export interface ContainerAttributes {
   description?: string;
   technology?: string;
+  /** ADR-026: on an *interface* (a container of an integration platform) — what kind of thing it is. See `InterfaceType`. */
+  interfaceType?: InterfaceType;
+  /** ADR-026: on an interface — what the platform does to the data passing through it (maps, enriches, combines, converts a file to an API…). `description` stays what the interface *is*. */
+  transformation?: string;
   isExternal: boolean;
   /** See `SystemAttributes.introduced`. */
   introduced?: ISODate;
@@ -430,9 +434,44 @@ export interface SupportsAttributes {
   /** Optional free-text rationale for the `fitForPurpose` rating, shown alongside it on the relationship's own expanded attributes — deliberately not the rating's *source* (that's the delta's own provenance, ADR-007); this is the "why", in the author's own words. */
   fitForPurposeNotes?: string;
 }
+/**
+ * ADR-026: what an integration platform exposes or consumes — set on an
+ * *interface*, a `container` whose parent is a system with
+ * `kind: 'integration_platform'` (meaningless, and never read, on any other
+ * container).
+ */
+export type InterfaceType = 'api' | 'file' | 'event' | 'batch' | 'database' | 'ot_gateway' | 'other';
+
+/**
+ * ADR-026: the technology one side of a flow uses — `protocolIn` (source →
+ * platform) and `protocolOut` (platform → target) on a `uses`/`flows_to`
+ * that goes `via` a platform or interface. A fixed list with an `other`
+ * escape hatch so reports can count by it.
+ */
+export type IntegrationProtocol =
+  | 'rest_api'
+  | 'soap'
+  | 'graphql'
+  | 'file_sftp'
+  | 'file_share'
+  | 'event_queue'
+  | 'database'
+  | 'email'
+  | 'iccp'
+  | 'dnp3'
+  | 'iec_61850'
+  | 'modbus'
+  | 'opc_ua'
+  | 'manual'
+  | 'other';
+
 export interface UsesAttributes {
   description?: string;
-  /** Prompt 7k item 4: an optional element ref to the `system` (of `kind: 'integration_platform'`) this flow actually goes via — an ESB/API gateway/message bus sitting between `fromElementId` and `toElementId`, not a third real endpoint of its own (C18, `src/engine/deltas.ts`'s `apply()`, validates the reference at commit time). Direct edges (no `via`) are the default; the landscape only routes an edge through its `via` node when the "route via platforms" toggle is on (unpersisted view state, `src/ui/landscape/LandscapeCanvas.tsx` — never a stored preference, keeping this item's migration footprint at zero). */
+  /** ADR-026: the source side's protocol (source → platform) on a flow with `via` — e.g. `file_sftp` for "A drops a file". */
+  protocolIn?: IntegrationProtocol;
+  /** ADR-026: the target side's protocol (platform → target) on a flow with `via` — e.g. `rest_api` for "B reads it as an API". */
+  protocolOut?: IntegrationProtocol;
+  /** Prompt 7k item 4 (ADR-026: or an *interface* on one — a `container` whose parent is such a system): an optional element ref to the `system` (of `kind: 'integration_platform'`) this flow actually goes via — an ESB/API gateway/message bus sitting between `fromElementId` and `toElementId`, not a third real endpoint of its own (C18, `src/engine/deltas.ts`'s `apply()`, validates the reference at commit time). Direct edges (no `via`) are the default; the landscape only routes an edge through its `via` node when the "route via platforms" toggle is on (unpersisted view state, `src/ui/landscape/LandscapeCanvas.tsx` — never a stored preference, keeping this item's migration footprint at zero). */
   via?: UUID;
 }
 export interface OwnsAttributes {
@@ -455,7 +494,12 @@ export interface OwnsAttributes {
 export interface FlowsToAttributes {
   description?: string;
   dataClassification?: DataClassification;
+  /** The protocol of a direct flow. On a flow with `via`, a lone `protocol` reads as both sides (ADR-026); `protocolIn`/`protocolOut` say each side apart. */
   protocol?: string;
+  /** See `UsesAttributes.protocolIn`. */
+  protocolIn?: IntegrationProtocol;
+  /** See `UsesAttributes.protocolOut`. */
+  protocolOut?: IntegrationProtocol;
   /** See `UsesAttributes.via`'s own doc comment — identical meaning and validation, `flows_to`'s own copy since each relationship type's attributes are their own interface. */
   via?: UUID;
 }
@@ -796,7 +840,7 @@ export const COMMIT_INVARIANTS = [
   },
   {
     id: 'C18',
-    text: "relationship.create/relationship.update setting uses.via or flows_to.via to a non-null value: the referenced element exists in the head as it stands at the point this delta is applied and is a system with kind === 'integration_platform' (Prompt 7k item 4). Not re-checked at relationship.restore, matching C9's own endpoint check, which restore also does not re-run — a restored edge is trusted to reconstruct exactly the state it last held, not re-validated against the current head.",
+    text: "relationship.create/relationship.update setting uses.via or flows_to.via to a non-null value: the referenced element exists in the head as it stands at the point this delta is applied and is either a system with kind === 'integration_platform' (Prompt 7k item 4) or an interface on one — a container whose parent is such a system (ADR-026). Not re-checked at relationship.restore, matching C9's own endpoint check, which restore also does not re-run — a restored edge is trusted to reconstruct exactly the state it last held, not re-validated against the current head.",
   },
   {
     id: 'C19',

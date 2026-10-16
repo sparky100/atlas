@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import { projectionContainersForLandscape, projectionElementById, projectionElementsByIds, projectionFlowsViaElement, projectionRelationshipsForElement, projectionRelationshipsTouchingAny } from '../../db/branchProjection';
-import { getElementHead, getElementsByIds, listFlowsViaElement, listRelationshipsForElement } from '../../db/elements';
+import { projectionChildrenOf, projectionContainersForLandscape, projectionElementById, projectionElementsByIds, projectionFlowsViaElement, projectionRelationshipsForElement, projectionRelationshipsTouchingAny } from '../../db/branchProjection';
+import { getElementHead, getElementsByIds, listChildrenOf, listFlowsViaElement, listRelationshipsForElement } from '../../db/elements';
 import type { HeadProjection } from '../../engine/projection';
 import { listContainersForLandscape } from '../../db/landscape';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
@@ -15,7 +15,7 @@ import type { ViewRow } from '../../db/types';
 import { computeContextGroup, computePlatformConnections, type ContextGroup, type PlatformConnection } from './contextGrouping';
 import { buildPlatformModulesById, type ContextModule } from './contextDiagramData';
 import { containerParentIds } from '../elements/moduleDisplayName';
-import { isIntegrationPlatform, isPlatform } from '../elements/systemKind';
+import { flowViaIdsFor, isIntegrationInterface, isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -72,6 +72,8 @@ export interface IntegrationPlatformContextData {
   flows: RelationshipsHeadRow[];
   /** Every flow's own `from`/`to` endpoint, by id, *plus* each container endpoint's own parent (`moduleDisplayNameFromMap`'s own requirement) — never the hub itself, which is only ever the `via`, not an endpoint, of these edges (same as `ElementPageData.flowsViaThisPlatformEndpoints`'s own doc comment). */
   endpoints: Map<UUID, ElementsHeadRow>;
+  /** ADR-026: the platform's interfaces (or, for an interface's own view, just it), by id — the diagram groups flows under the interface their `via` names. */
+  interfaces: Map<UUID, ElementsHeadRow>;
 }
 
 export type ElementContextData = PlatformStructureData | IntegrationPlatformContextData | ElementGroupData;
@@ -199,8 +201,14 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
       // `uses`/`flows_to` edge elsewhere in the model naming this element
       // as its `via`, the same query `PlatformFlowsSection`'s own element-
       // page data already runs.
-      if (hub.element_type === 'system' && isIntegrationPlatform(hub)) {
-        const flows = projection ? projectionFlowsViaElement(projection, elementId) : await listFlowsViaElement(supabase, commitId, elementId);
+      // ADR-026: an interface (a container of an integration platform) gets the same view, scoped to its own flows; a platform's view counts flows via any of its interfaces too.
+      const hubParent = hub.element_type === 'container' && hub.parent_id !== null ? (projection ? projectionElementById(projection, hub.parent_id) : await getElementHead(supabase, commitId, hub.parent_id)) : null;
+      if ((hub.element_type === 'system' && isIntegrationPlatform(hub)) || isIntegrationInterface(hub, hubParent)) {
+        const hubChildren = hub.element_type === 'system' ? (projection ? projectionChildrenOf(projection, elementId) : await listChildrenOf(supabase, commitId, elementId)) : [];
+        const viaIds = flowViaIdsFor(hub, hubParent, hubChildren);
+        const interfaces = new Map(hubChildren.filter((c) => c.element_type === 'container').map((c) => [c.element_id, c]));
+        if (hub.element_type === 'container') interfaces.set(hub.element_id, hub);
+        const flows = projection ? projectionFlowsViaElement(projection, viaIds) : await listFlowsViaElement(supabase, commitId, viaIds);
         const endpointIds = [...new Set(flows.flatMap((f) => [f.from_element_id, f.to_element_id]))];
         const rawEndpoints = projection ? projectionElementsByIds(projection, endpointIds) : await getElementsByIds(supabase, commitId, endpointIds);
         // "Platform · Module": a source or target routed via this platform
@@ -212,7 +220,7 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
         const endpointParentIds = containerParentIds(rawEndpoints.values());
         const endpointParentsById = projection ? projectionElementsByIds(projection, endpointParentIds) : await getElementsByIds(supabase, commitId, endpointParentIds);
         const endpoints = new Map([...rawEndpoints, ...endpointParentsById]);
-        if (!cancelled) setState({ status: 'ready', data: { kind: 'integration-platform', commitId, view, hub, flows, endpoints } });
+        if (!cancelled) setState({ status: 'ready', data: { kind: 'integration-platform', commitId, view, hub, flows, endpoints, interfaces } });
         return;
       }
 

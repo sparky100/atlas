@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { INTEGRATION_PROTOCOL_LABELS } from '../../../contracts/relationshipAttributeSchema';
 import type { UUID } from '../../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../../contracts/rows';
 import { Chip } from '../Chip/Chip';
@@ -14,6 +15,8 @@ export interface PlatformFlowsSectionProps {
   modelSlug: string;
   flows: readonly RelationshipsHeadRow[];
   endpoints: ReadonlyMap<UUID, ElementsHeadRow>;
+  /** ADR-026: the platform's interfaces (or the one interface whose page this is), by id — each flow says which it goes through. */
+  interfaces?: ReadonlyMap<UUID, ElementsHeadRow> | undefined;
 }
 
 /**
@@ -31,9 +34,9 @@ export interface PlatformFlowsSectionProps {
  * module of some other platform (both callers, `ElementPage.tsx` and
  * `IntegrationPlatformContextView.tsx`, already merge it in).
  */
-export function PlatformFlowsSection({ orgSlug, modelSlug, flows, endpoints }: PlatformFlowsSectionProps) {
+export function PlatformFlowsSection({ orgSlug, modelSlug, flows, endpoints, interfaces }: PlatformFlowsSectionProps) {
   if (flows.length === 0) {
-    return <EmptyState>Nothing flows via this platform yet.</EmptyState>;
+    return <EmptyState>Nothing flows via this yet.</EmptyState>;
   }
 
   return (
@@ -41,7 +44,10 @@ export function PlatformFlowsSection({ orgSlug, modelSlug, flows, endpoints }: P
       {flows.map((flow) => {
         const from = endpoints.get(flow.from_element_id);
         const to = endpoints.get(flow.to_element_id);
-        const description = attributesRecord(flow.attributes).description;
+        const attrs = attributesRecord(flow.attributes);
+        const description = attrs.description;
+        const viaInterface = typeof attrs.via === 'string' ? interfaces?.get(attrs.via) : undefined;
+        const sides = protocolSides(attrs);
         return (
           <li key={flow.relationship_id} className={styles.row}>
             <div className={styles.endpoints}>
@@ -52,6 +58,13 @@ export function PlatformFlowsSection({ orgSlug, modelSlug, flows, endpoints }: P
               <EndpointLink orgSlug={orgSlug} modelSlug={modelSlug} elementId={flow.to_element_id} element={to} endpoints={endpoints} />
               <Chip tone="neutral">{flow.relationship_type.replace('_', ' ')}</Chip>
             </div>
+            {(viaInterface !== undefined || sides !== null) && (
+              <Text as="p" tone="muted" size="sm">
+                {viaInterface !== undefined && <>via {viaInterface.name}</>}
+                {viaInterface !== undefined && sides !== null && ' · '}
+                {sides}
+              </Text>
+            )}
             {typeof description === 'string' && description.trim() !== '' && (
               <Text as="p" tone="muted" size="sm">
                 “{description}”
@@ -62,6 +75,16 @@ export function PlatformFlowsSection({ orgSlug, modelSlug, flows, endpoints }: P
       })}
     </ul>
   );
+}
+
+/** ADR-026: "File (SFTP) in → REST API out", or one side alone, or the single direct-flow protocol read as both sides; null when none is recorded. */
+function protocolSides(attrs: Record<string, unknown>): string | null {
+  const label = (value: unknown): string | null => (typeof value === 'string' && value in INTEGRATION_PROTOCOL_LABELS ? INTEGRATION_PROTOCOL_LABELS[value as keyof typeof INTEGRATION_PROTOCOL_LABELS] : typeof value === 'string' && value.trim() !== '' ? value : null);
+  const inLabel = label(attrs.protocolIn) ?? label(attrs.protocol);
+  const outLabel = label(attrs.protocolOut) ?? label(attrs.protocol);
+  if (inLabel === null && outLabel === null) return null;
+  if (inLabel !== null && outLabel !== null) return inLabel === outLabel ? inLabel : `${inLabel} in → ${outLabel} out`;
+  return inLabel !== null ? `${inLabel} in` : `${outLabel ?? ''} out`;
 }
 
 function EndpointLink({
