@@ -4,6 +4,7 @@ import type { ElementVersionDiff, VersionDiff } from '../../engine/versionDiff';
 import { Chip } from '../components/Chip/Chip';
 import { LinkButton } from '../components/Button/LinkButton';
 import { DiffBadge } from '../components/DiffBadge/DiffBadge';
+import { DiffLegend } from '../components/DiffBadge/DiffLegend';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
@@ -58,9 +59,11 @@ const MOBILE_BREAKPOINT_PX = 768;
  * below (name, glyph, external chip, diff badge, "Containers →") stays;
  * only the summary lines moved.
  *
- * No diff highlighting on the canvas/mobile body — V1 doesn't ask for it,
- * unlike the landscape, and this view's own diff support stays scoped to
- * the hub's header badge, unchanged from before this sprint.
+ * In Diff mode the canvas marks what a change adds, removes and changes —
+ * edges and tiles, with a legend (`diffCanvas.ts`, the same convention the
+ * landscape uses). The mobile list does not mark them yet. V1 shipped with
+ * the hub's header badge as the only diff cue, which left a Diff view looking
+ * identical to To-be.
  */
 export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null, focusedElementId, onFocusElement, onClearFocus }: ContextViewProps) {
   const narrow = useIsNarrowViewport(MOBILE_BREAKPOINT_PX);
@@ -103,6 +106,7 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null, 
 
       {(group.internal.length > 0 || group.external.length > 0) && (
         <div className={styles.diagram}>
+          {diff && !narrow && <DiffLegend />}
           {narrow ? (
             <ContextMobileList group={group} elementHref={elementHref} neighbourContextHref={neighbourContextHref} />
           ) : (
@@ -113,6 +117,7 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null, 
               focusedElementId={focusedElementId}
               onFocusElement={onFocusElement}
               onClearFocus={onClearFocus}
+              diff={diff}
             />
           )}
         </div>

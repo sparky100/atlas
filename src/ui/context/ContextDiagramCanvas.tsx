@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { ActorSubtype, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
+import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff } from '../../engine/versionDiff';
+import { DIFF_MARKER, diffBorderColour, edgeDiffState, polylineMidpoint } from '../components/DiffBadge/diffCanvas';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
@@ -45,6 +47,10 @@ export interface ContextDiagramCanvasProps {
   focusedElementId: UUID | null;
   onFocusElement: (elementId: UUID) => void;
   onClearFocus: () => void;
+  /**
+   * UI-principles §6.2/§6.3 — present only when a change's Diff mode is on. Added things draw in the `--diff-added` colour with a "+", removed ones dashed in `--diff-removed` with a "−", changed ones `--diff-changed` with a "~"; everything unchanged recedes. Before this the Diff view of a Context page looked identical to To-be, so an integration a change adds was impossible to pick out.
+   */
+  diff?: VersionDiff | null | undefined;
 }
 
 interface Transform {
@@ -80,6 +86,9 @@ interface CanvasTokens {
   statusDanger: string;
   statusInfo: string;
   statusNeutral: string;
+  diffAdded: string;
+  diffRemoved: string;
+  diffChanged: string;
 }
 
 function readTokens(el: HTMLElement): CanvasTokens {
@@ -96,6 +105,9 @@ function readTokens(el: HTMLElement): CanvasTokens {
     statusDanger: v('--status-danger'),
     statusInfo: v('--status-info'),
     statusNeutral: v('--status-neutral'),
+    diffAdded: v('--diff-added'),
+    diffRemoved: v('--diff-removed'),
+    diffChanged: v('--diff-changed'),
   };
 }
 
@@ -188,7 +200,9 @@ function computeFitTransform(worldWidth: number, worldHeight: number, displayWid
  * module?" marker and per-module tooltip this file used to carry are gone
  * along with `contextDiagramLayout.ts`'s own support for them.
  */
-export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextHref, elementHref, focusedElementId, onFocusElement, onClearFocus }: ContextDiagramCanvasProps) {
+export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextHref, elementHref, focusedElementId, onFocusElement, onClearFocus, diff = null }: ContextDiagramCanvasProps) {
+  const diffByElementId = useMemo(() => new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []), [diff]);
+  const diffByRelationshipId = useMemo(() => new Map<UUID, RelationshipVersionDiff>(diff?.relationships.map((r) => [r.relationshipId, r]) ?? []), [diff]);
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -309,10 +323,17 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
       }
 
       // Every edge is an axis-aligned polyline from the layout — its own lane, its own attach points. The hovered edge draws last and heavier so it reads on top of its neighbours.
+      const diffMarkers: { text: string; worldX: number; worldY: number; colour: string }[] = [];
       const drawEdge = (edge: (typeof layout.edges)[number], highlighted: boolean): void => {
+        // Diff mode: an added/removed/changed connection takes its diff colour (removed also dashed), and what has not changed recedes so the change stands out.
+        const edgeState = diff ? edgeDiffState(edge.relationshipIds, diffByRelationshipId) : 'unchanged';
+        const diffColour = diff && edgeState !== 'unchanged' ? diffBorderColour(edgeState, tokens) : null;
+        const lineColour = highlighted ? tokens.text : (diffColour ?? tokens.borderStrong);
         ctx.save();
-        ctx.strokeStyle = highlighted ? tokens.text : tokens.borderStrong;
-        ctx.lineWidth = highlighted ? 2.5 : 1.5;
+        ctx.strokeStyle = lineColour;
+        ctx.lineWidth = highlighted ? 2.5 : diffColour ? 2.5 : 1.5;
+        ctx.globalAlpha = diff && edgeState === 'unchanged' && !highlighted ? 0.6 : 1;
+        if (edgeState === 'removed') ctx.setLineDash([6, 4]);
         ctx.lineJoin = 'round';
         ctx.beginPath();
         edge.points.forEach((p, i) => {
@@ -320,7 +341,12 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
           else ctx.lineTo(p.x, p.y);
         });
         ctx.stroke();
+        ctx.setLineDash([]);
         ctx.restore();
+        if (diff && edgeState !== 'unchanged' && DIFF_MARKER[edgeState] !== '') {
+          const mid = polylineMidpoint(edge.points);
+          diffMarkers.push({ text: DIFF_MARKER[edgeState], worldX: mid.x, worldY: mid.y, colour: diffColour ?? tokens.text });
+        }
 
         // An arrowhead at whichever end(s) carry one (UI-principles §9's
         // "target only" for a normal edge; a merged bidirectional pair,
@@ -339,7 +365,8 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
           ctx.lineTo(-8, -4);
           ctx.lineTo(-8, 4);
           ctx.closePath();
-          ctx.fillStyle = highlighted ? tokens.text : tokens.borderStrong;
+          ctx.fillStyle = lineColour;
+          ctx.globalAlpha = diff && edgeState === 'unchanged' && !highlighted ? 0.6 : 1;
           ctx.fill();
           ctx.restore();
         };
@@ -371,12 +398,20 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
         const tone = toneColour(element, tokens);
         ctx.fillStyle = tone ? `color-mix(in srgb, ${tone} 16%, ${tokens.surfaceRaised})` : tokens.surfaceRaised;
         ctx.fill();
-        ctx.strokeStyle = isHub || isFocused ? tokens.text : isHovered ? tokens.borderStrong : tokens.border;
-        ctx.lineWidth = isHub || isFocused ? 2 : 1;
-        if (external) ctx.setLineDash([4, 3]);
+        const tileDiff = diff ? diffByElementId.get(tile.elementId) : undefined;
+        const tileState = tileDiff?.state ?? 'unchanged';
+        const tileDiffColour = diff && tileState !== 'unchanged' ? diffBorderColour(tileState, tokens) : null;
+        ctx.strokeStyle = tileDiffColour ?? (isHub || isFocused ? tokens.text : isHovered ? tokens.borderStrong : tokens.border);
+        ctx.lineWidth = tileDiffColour ? 3 : isHub || isFocused ? 2 : 1;
+        if (external || tileState === 'removed') ctx.setLineDash([4, 3]);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.restore();
+
+        if (diff && tileState !== 'unchanged' && DIFF_MARKER[tileState] !== '') {
+          const text = tileState === 'changed' ? `${DIFF_MARKER[tileState]}${String(tileDiff?.changedAttributes.length ?? 0)}` : DIFF_MARKER[tileState];
+          diffMarkers.push({ text, worldX: tile.x + tile.w - 14, worldY: tile.y + 12, colour: tileDiffColour ?? tokens.text });
+        }
 
         if (showLabels) {
           const glyph = element.element_type === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph(element.element_type);
@@ -408,6 +443,16 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
           ctx.fillText(line, x + 26 * transform.scale, startY + i * lineHeight);
         });
       }
+
+      // The state markers (§8.4: never colour alone) — "+" added, "−" removed, "~N" changed — on the changed edge's midpoint or the tile's top-right corner, in the same diff colour.
+      ctx.font = `bold ${(14 * textScale).toFixed(2)}px sans-serif`;
+      ctx.textAlign = 'center';
+      for (const marker of diffMarkers) {
+        const [x, y] = toScreen(marker.worldX, marker.worldY);
+        ctx.fillStyle = marker.colour;
+        ctx.fillText(marker.text, x, y);
+      }
+      ctx.textAlign = 'left';
 
       // Rework items 3–4: label pills, placed in world units by the pure layout module (widths measured at the current font and divided back to world), audited for collisions, then drawn — all of them when labels are visible, only the hovered edge's when they're hidden.
       ctx.font = `${(11 * textScale).toFixed(2)}px sans-serif`;
@@ -448,7 +493,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
     return () => {
       observer.disconnect();
     };
-  }, [layout, elementsById, displayNameById, transform, hover, hoveredEdgeId, labelMode, labelsWouldCollide, zoomShowsText, focusedElementId]);
+  }, [layout, elementsById, displayNameById, transform, hover, hoveredEdgeId, labelMode, labelsWouldCollide, zoomShowsText, focusedElementId, diff, diffByElementId, diffByRelationshipId]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);

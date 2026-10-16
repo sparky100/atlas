@@ -31,8 +31,19 @@ import { spreadAlong, type Point } from './contextDiagramLayout';
 const PADDING = 32;
 /** Vertical gap between two tiles stacked in the same column. */
 const TILE_GUTTER_Y = 24;
-/** Horizontal distance between a column and the platform tile — wide enough for a label pill on each of the two segments meeting there. */
-const COLUMN_GAP = 140;
+/**
+ * Horizontal distance between a column and the platform tile. Each half is the run a label pill sits on (the verb on the source side, the data classification on the target side), so it has to hold the widest pill the canvas draws (`PILL_MAX_WIDTH` there, 160px, plus padding) *beside* its tile rather than over it — at the original 140 the pills spilled across the tile edge they were meant to label.
+ */
+const COLUMN_GAP = 340;
+/** Vertical room each edge attached to a tile gets: a label pill is 18px tall, so adjacent attach points need clearly more than that or two pills on one tile sit on top of each other. */
+const ATTACH_PITCH = 26;
+/** Gap between a tile's edge and the start of the verb pill beside it. */
+const LABEL_INSET = 10;
+
+/** A tile's height: the standard tile, or taller once it carries enough edges that their attach points would otherwise sit closer than `ATTACH_PITCH` (the platform itself, which every flow touches, grows the most — it is the bus). */
+function tileHeightFor(edgeCount: number): number {
+  return Math.max(NODE_HEIGHT, (edgeCount + 1) * ATTACH_PITCH);
+}
 
 export interface PlatformFlowTile {
   elementId: UUID;
@@ -60,7 +71,7 @@ export interface RoutedPlatformFlowEdge extends PlatformFlowEdgeInput {
   sourceSegment: Point[];
   /** The platform's own right-edge attach point, through the elbow, to the target tile's left-edge attach point. */
   targetSegment: Point[];
-  /** Centre of the source segment's own leaving-the-source run — where the verb label pill sits. */
+  /** Left end of the verb label pill, on the source segment's own leaving-the-source run — the pill is drawn rightwards from here. */
   verbLabelAnchor: Point;
   /** Centre of the target segment's own arriving-at-the-target run — where the classification chip pill sits. */
   classificationLabelAnchor: Point;
@@ -80,13 +91,19 @@ function compareIds(a: string, b: string): number {
 }
 
 /** One column's own tiles, stacked top to bottom, sorted by id for a deterministic tie-break (CLAUDE.md rule 6 — there's no other ordering signal once every tile is the same fixed size). */
-function stackColumn(ids: readonly UUID[], x: number, top: number): PlatformFlowTile[] {
-  return [...ids].sort(compareIds).map((elementId, i) => ({ elementId, x, y: top + i * (NODE_HEIGHT + TILE_GUTTER_Y), w: NODE_WIDTH, h: NODE_HEIGHT }));
+function stackColumn(ids: readonly UUID[], x: number, top: number, heightOf: (id: UUID) => number): PlatformFlowTile[] {
+  let y = top;
+  return [...ids].sort(compareIds).map((elementId) => {
+    const h = heightOf(elementId);
+    const tile = { elementId, x, y, w: NODE_WIDTH, h };
+    y += h + TILE_GUTTER_Y;
+    return tile;
+  });
 }
 
 /** This column's own total height — every tile plus every gutter between them; 0 for an empty column. */
-function columnHeight(count: number): number {
-  return count === 0 ? 0 : count * NODE_HEIGHT + (count - 1) * TILE_GUTTER_Y;
+function columnHeight(ids: readonly UUID[], heightOf: (id: UUID) => number): number {
+  return ids.length === 0 ? 0 : [...ids].reduce((sum, id) => sum + heightOf(id), 0) + (ids.length - 1) * TILE_GUTTER_Y;
 }
 
 /**
@@ -101,15 +118,30 @@ export function computeIntegrationPlatformContextLayout(
   targetIds: readonly UUID[],
   edges: readonly PlatformFlowEdgeInput[],
 ): IntegrationPlatformContextLayout {
-  const contentHeight = Math.max(NODE_HEIGHT, columnHeight(sourceIds.length), columnHeight(targetIds.length));
+  // How many drawn edges touch each tile decides how tall it is (`tileHeightFor`): the platform carries every one, a source or target only its own.
+  const sourceIdSet = new Set(sourceIds);
+  const targetIdSet = new Set(targetIds);
+  const drawn = edges.filter((e) => sourceIdSet.has(e.sourceId) && targetIdSet.has(e.targetId));
+  const sourceEdgeCount = new Map<UUID, number>();
+  const targetEdgeCount = new Map<UUID, number>();
+  for (const edge of drawn) {
+    sourceEdgeCount.set(edge.sourceId, (sourceEdgeCount.get(edge.sourceId) ?? 0) + 1);
+    targetEdgeCount.set(edge.targetId, (targetEdgeCount.get(edge.targetId) ?? 0) + 1);
+  }
+  const sourceHeight = (id: UUID): number => tileHeightFor(sourceEdgeCount.get(id) ?? 0);
+  const targetHeight = (id: UUID): number => tileHeightFor(targetEdgeCount.get(id) ?? 0);
+  const hubHeight = tileHeightFor(drawn.length);
+  const sourcesHeight = columnHeight(sourceIds, sourceHeight);
+  const targetsHeight = columnHeight(targetIds, targetHeight);
+  const contentHeight = Math.max(hubHeight, sourcesHeight, targetsHeight);
 
   const sourcesX = PADDING;
   const hubX = sourcesX + NODE_WIDTH + COLUMN_GAP;
   const targetsX = hubX + NODE_WIDTH + COLUMN_GAP;
 
-  const sources = stackColumn(sourceIds, sourcesX, PADDING + (contentHeight - columnHeight(sourceIds.length)) / 2);
-  const targets = stackColumn(targetIds, targetsX, PADDING + (contentHeight - columnHeight(targetIds.length)) / 2);
-  const hub: PlatformFlowTile = { elementId: hubId, x: hubX, y: PADDING + (contentHeight - NODE_HEIGHT) / 2, w: NODE_WIDTH, h: NODE_HEIGHT };
+  const sources = stackColumn(sourceIds, sourcesX, PADDING + (contentHeight - sourcesHeight) / 2, sourceHeight);
+  const targets = stackColumn(targetIds, targetsX, PADDING + (contentHeight - targetsHeight) / 2, targetHeight);
+  const hub: PlatformFlowTile = { elementId: hubId, x: hubX, y: PADDING + (contentHeight - hubHeight) / 2, w: NODE_WIDTH, h: hubHeight };
 
   const sourceById = new Map(sources.map((t) => [t.elementId, t]));
   const targetById = new Map(targets.map((t) => [t.elementId, t]));
@@ -183,7 +215,8 @@ export function computeIntegrationPlatformContextLayout(
         ...edge,
         sourceSegment,
         targetSegment,
-        verbLabelAnchor: { x: (sourceStart.x + sourceMidX) / 2, y: sy },
+        // The pill's left end, just clear of the source tile (the canvas draws it from here to the right), so a long verb runs along the line instead of back over the tile it labels.
+        verbLabelAnchor: { x: sourceStart.x + LABEL_INSET, y: sy },
         classificationLabelAnchor: { x: (targetMidX + targetEnd.x) / 2, y: ty },
       },
     ];

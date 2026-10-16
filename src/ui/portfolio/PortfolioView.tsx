@@ -5,7 +5,7 @@ import { countAnnualRunCosts } from '../elements/annualRunCost';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import { PortfolioCards } from './PortfolioCards';
 import { ExportViewButtons } from '../components/ExportViewButtons/ExportViewButtons';
-import { portfolioExportPlan } from '../exports/portfolioExport';
+import { portfolioExportPlan, portfolioExportTable } from '../exports/portfolioExport';
 import type { ExportStamp } from '../exports/viewExport';
 import { DEFAULT_PORTFOLIO_FILTERS, filterPortfolioRows, type PortfolioFilters } from './portfolioFilter';
 import { DEFAULT_PORTFOLIO_SORT_DIRECTION, DEFAULT_PORTFOLIO_SORT_KEY, sortPortfolioRows, type PortfolioSortKey } from './portfolioSort';
@@ -77,6 +77,11 @@ export function PortfolioView({ data, elementHref, exportStamp }: PortfolioViewP
         <div className={styles.exportActions}>
           <ExportViewButtons
             what="portfolio"
+            formats={['xlsx', 'pdf']}
+            buildXlsx={async () => {
+              const { portfolioTableToXlsxBlob } = await import('../exports/portfolioExportXlsx');
+              return portfolioTableToXlsxBlob(portfolioExportTable(rows), { ...exportStamp, viewLabel: 'Portfolio' });
+            }}
             build={() => {
               const plan = portfolioExportPlan(rows, exportStamp);
               return { plan, stamp: { ...exportStamp, viewLabel: 'Portfolio' } };

@@ -203,10 +203,13 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
     return null;
   };
 
+  /** An element's name as the rest of the product shows it: a module reads "Platform · Module" (`moduleDisplayName`), everything else is its own name — an id only for something neither head knows. */
+  const displayNameOf = (elementId: UUID): string => owningSystem(elementId)?.displayName ?? elementName(toBeHead, asIsHead, elementId);
+
   for (const [subjectId, entry] of deltasBySubject) {
     if (entry.subjectType === 'element') {
       const el = element(subjectId);
-      subjects.push({ subjectId, ...entry, name: el?.name ?? subjectId });
+      subjects.push({ subjectId, ...entry, name: el ? displayNameOf(subjectId) : subjectId });
       if (el?.elementType === 'system') addTouchedReason(subjectId, subjectId, { kind: 'edited', systemName: el.name });
       if (el?.elementType === 'capability') addCapabilityReason(subjectId, { kind: 'direct' }, null);
       if (el?.elementType === 'container') {
@@ -220,7 +223,7 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
       const created = entry.deltas.find((d) => d.kind === 'relationship.create');
       const ends = rel ?? (created?.kind === 'relationship.create' ? created : null);
       const name = ends
-        ? `${ends.relationshipType} ${elementName(toBeHead, asIsHead, ends.fromElementId)} → ${elementName(toBeHead, asIsHead, ends.toElementId)}`
+        ? `${ends.relationshipType} ${displayNameOf(ends.fromElementId)} → ${displayNameOf(ends.toElementId)}`
         : subjectId;
       subjects.push({ subjectId, ...entry, name });
       if (rel && (rel.relationshipType === 'uses' || rel.relationshipType === 'flows_to')) {
