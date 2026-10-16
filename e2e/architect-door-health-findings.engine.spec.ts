@@ -383,11 +383,12 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // line, mirroring the old "No findings." x2 behaviour it replaces.
   // Assurance is 5, as of S1 item 11a's own two new checks (external
   // interfaces missing classification, external organisation access) —
-  // both zero on an element-less model. Health findings is 12: F11's own
+  // both zero on an element-less model. Health findings is 13: F11's own
   // `outgoing-no-retiring-change` check added one, and on 2026-10-03 the
   // architect-door layout prompt's `capability-no-supporters` and the
   // `poor-fit-no-replacement` check both left (their one home is Overview's
-  // weak-capability grid, UI-principles §3) — all zero here.
+  // weak-capability grid, UI-principles §3); ADR-026's unused-interface
+  // check makes it 13 — all zero here.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // `exact: true`: this model's own title, "Health Findings Clean Test
   // Model", contains "Health Findings" as a substring, so a non-exact
@@ -398,7 +399,7 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // match into a reliable strict-mode violation.
   await expect(page.getByRole('heading', { name: 'Health findings', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
-  const healthClear = page.getByRole('button', { name: '12 checks clear' });
+  const healthClear = page.getByRole('button', { name: '13 checks clear' });
   const assuranceClear = page.getByRole('button', { name: '5 checks clear' });
   await expect(healthClear).toBeVisible();
   await expect(assuranceClear).toBeVisible();

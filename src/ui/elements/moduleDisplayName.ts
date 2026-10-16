@@ -19,18 +19,19 @@
  */
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import { isPlatform } from './systemKind';
+import { isIntegrationPlatform, isPlatform } from './systemKind';
 
 /**
  * `element`'s own display name — "{parent} · {element}" when `element` is
- * a container whose given `parent` is a live platform system, otherwise
+ * a container whose given `parent` is a live platform or integration platform system, otherwise
  * just `element.name`. Never looks anything up itself; the caller already
  * has (or knows how to resolve) `parent`, however it's scoped — an
  * endpoints map, a batched parent lookup, or a single already-fetched row.
  */
 export function moduleDisplayName(element: ElementsHeadRow, parent: ElementsHeadRow | null): string {
   if (element.element_type !== 'container' || parent === null) return element.name;
-  return isPlatform(parent) ? `${parent.name} · ${element.name}` : element.name;
+  // ADR-026: an interface on an integration platform is named the same way ("MuleSoft · Reads API").
+  return isPlatform(parent) || (parent.element_type === 'system' && isIntegrationPlatform(parent)) ? `${parent.name} · ${element.name}` : element.name;
 }
 
 /**

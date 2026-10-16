@@ -109,7 +109,7 @@ test('ADR-026: a flow via an interface records each side\'s protocol, and the in
   await page.getByLabel('Protocol in').selectOption('file_sftp');
   await page.getByLabel('Protocol out').selectOption('rest_api');
   await page.getByPlaceholder('Search platforms and interfaces…').fill('Reads API');
-  await page.getByRole('button', { name: 'Enterprise Service Bus · Reads API' }).click();
+  await page.getByRole('button', { name: /Enterprise Service Bus · Reads API/ }).click();
   await expect(page.getByRole('link', { name: /Billing Platform/ })).toBeVisible({ timeout: 15_000 });
 
   // 2. The interface's own page lists the flow with both protocols.

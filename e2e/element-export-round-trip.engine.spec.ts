@@ -69,5 +69,5 @@ test('Export XLSX writes each module\'s platform, an Atlas ID on every sheet, an
   }
   expect(rows('Capabilities')[0]?.[3]).toBe('Parent capability');
 
-  expect(rows('Relationships')).toContainEqual(['ESCOMS', 'supports', 'Land, Wayleaves & Consents', '', 'primary', '', '']);
+  expect(rows('Relationships')).toContainEqual(['ESCOMS', 'supports', 'Land, Wayleaves & Consents', '', 'primary', '', '', '', '']);
 });
