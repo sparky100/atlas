@@ -140,6 +140,12 @@ interface PendingTarget {
  */
 export function RelationshipAdd({ slot, direction, elementId, elementName, elementType, existingRows, relationshipFacts, modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, onCreated }: RelationshipAddProps) {
   const [open, setOpen] = useState(false);
+  // Performance: the search pools (every element of the slot's types, plus
+  // aliases) load the first time this control is opened, not when the
+  // element page mounts — a page with a dozen relationship slots used to
+  // fetch a dozen pools nobody had asked for, competing with the page's own
+  // reload after every save. Latched, so closing and reopening doesn't refetch.
+  const [searchWanted, setSearchWanted] = useState(false);
   const [pendingTarget, setPendingTarget] = useState<PendingTarget | null>(null);
   const [labelDraft, setLabelDraft] = useState('');
   const [showViaStage, setShowViaStage] = useState(false);
@@ -153,7 +159,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   // element should relate to, say) is otherwise invisible to a main-only
   // search — `useRelationshipTargetSearch`'s own `branchCommitId` doc comment.
   const branchCommitId = branch.kind === 'change' ? branch.head_commit_id : null;
-  const search = useRelationshipTargetSearch(searchCommitId, modelId, slot.targetTypes, elementId, true, branchCommitId);
+  const search = useRelationshipTargetSearch(searchCommitId, modelId, slot.targetTypes, elementId, searchWanted, branchCommitId);
   // V6 (SPEC §5.2, `checkNoDuplicateRelationship` in `src/engine/deltas.ts`):
   // no two live relationships may share `(type, from, to)`. The search pool
   // itself doesn't know this element's own existing edges, so it's filtered
@@ -178,7 +184,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   // element page must not also pay for a redundant system-pool query.
   // ADR-026: containers too, so an interface on a platform (a container
   // whose parent is an integration platform) can be the via.
-  const viaSearch = useRelationshipTargetSearch(searchCommitId, modelId, ['system', 'container'], elementId, needsLabel, branchCommitId);
+  const viaSearch = useRelationshipTargetSearch(searchCommitId, modelId, ['system', 'container'], elementId, needsLabel && searchWanted, branchCommitId);
   // Set right before each `create()` call so the hook's own success callback
   // (which carries no arguments of its own) can still report which element
   // the new relationship points at (Handoff — Flow: Add a system, step 7).
@@ -287,7 +293,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
 
   if (!open) {
     return (
-      <Button variant="ghost" onClick={() => { setOpen(true); }}>
+      <Button variant="ghost" onClick={() => { setOpen(true); setSearchWanted(true); }}>
         + Add {DIRECTION_VERB[slot.relationshipType][direction]}
       </Button>
     );

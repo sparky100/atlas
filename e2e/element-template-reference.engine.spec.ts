@@ -55,7 +55,9 @@ test('element page: templateRef is hidden from Attributes, and its own "seeded f
   const service = createServiceRoleClient(env);
   const capabilityMapId = randomUUID();
   const itemId = randomUUID();
-  const sector = 'electricity_network';
+  // A sector of its own, never the real 'electricity_network': a published map
+  // there would sit beside the real starter map in every model's picker.
+  const sector = `electricity_network_${randomUUID().slice(0, 8)}`;
   const version = randomInt(1, 1_000_000);
 
   const { error: mapError } = await service.from('capability_maps').insert({ id: capabilityMapId, sector, version, status: 'draft', source_description: 'Sprint U4-1 D2 e2e fixture' });
