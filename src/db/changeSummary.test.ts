@@ -391,5 +391,34 @@ describe('groupCaptureDraftOverlaps (ADR-024 §9)', () => {
   it('still lists a draft whose job row is missing, with no review link', () => {
     expect(groupCaptureDraftOverlaps([{ branch: draft('b1', 'Orphan.pdf'), sharedElementNames: ['GIS'] }], new Map())).toEqual([{ title: 'Orphan.pdf', draftCount: 1, latestJobId: null, sharedElementNames: ['GIS'] }]);
   });
-});
 
+  describe('names a module "Platform · Module" in the edit list, as everywhere else', () => {
+    const sap: ElementRow = { elementType: 'system', name: 'SAP', parentId: null, attributes: { kind: 'platform' }, existsDeltaId: 'c-sap' };
+    const salesforce: ElementRow = { elementType: 'system', name: 'Salesforce', parentId: null, attributes: { kind: 'platform' }, existsDeltaId: 'c-sf' };
+    const pm: ElementRow = { elementType: 'container', name: 'PM', parentId: 'sap', attributes: {}, existsDeltaId: 'c-pm' };
+    const escoms: ElementRow = { elementType: 'container', name: 'ESCOMS', parentId: 'sf', attributes: {}, existsDeltaId: 'c-esc' };
+    const rel: RelationshipRow = { relationshipType: 'uses', fromElementId: 'escoms', toElementId: 'pm', attributes: {}, existsDeltaId: 'c-rel' };
+
+    it('writes both ends of a relationship, and a module element itself, with their platform', () => {
+      const asIs = emptyHead();
+      const toBe = emptyHead();
+      for (const [id, row] of [['sap', sap], ['sf', salesforce], ['pm', pm], ['escoms', escoms]] as const) toBe.elements.set(id, row);
+      toBe.relationships.set('rel-1', rel);
+      const deltas: Delta[] = [
+        { kind: 'relationship.create', id: 'd1', relationshipId: 'rel-1', relationshipType: 'uses', fromElementId: 'escoms', toElementId: 'pm', attributes: {}, sourceId: 'src', confidence: 1 },
+        elementCreate('d2', 'pm', 'PM'),
+      ];
+      const result = summarizeOwnDeltas(deltas, asIs, toBe);
+      expect(result.subjects.find((s) => s.subjectId === 'rel-1')?.name).toBe('uses Salesforce · ESCOMS → SAP · PM');
+      expect(result.subjects.find((s) => s.subjectId === 'pm')?.name).toBe('SAP · PM');
+    });
+
+    it('still writes a plain system by its own name, and an id only for an element neither head knows', () => {
+      const asIs = emptyHead();
+      const toBe = emptyHead();
+      toBe.elements.set('sap', sap);
+      const result = summarizeOwnDeltas([elementCreate('d1', 'sap', 'SAP')], asIs, toBe);
+      expect(result.subjects[0]?.name).toBe('SAP');
+    });
+  });
+});

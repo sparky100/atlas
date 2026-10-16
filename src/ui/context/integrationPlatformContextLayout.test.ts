@@ -119,3 +119,34 @@ describe('computeIntegrationPlatformContextLayout', () => {
     expect(layout.hub.h).toBe(NODE_HEIGHT);
   });
 });
+
+describe('integration platform diagram — room for connectors and labels', () => {
+  const edge = (id: string, sourceId: string, targetId: string) => ({ id, sourceId, targetId, verbLabel: 'sends something to', classificationLabel: null, crossesBoundary: false });
+
+  it('grows the platform tile so the attach points of many flows are not on top of each other', () => {
+    const edges = ['a', 'b', 'c', 'd', 'e', 'f'].map((id, i) => edge(id, `s${String(i % 3)}`, `t${String(i % 5)}`));
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0', 's1', 's2'], ['t0', 't1', 't2', 't3', 't4'], edges);
+    expect(layout.hub.h).toBeGreaterThan(NODE_HEIGHT);
+    const hubAttachYs = [...layout.edges.map((e) => e.sourceSegment[e.sourceSegment.length - 1]?.y ?? 0)].sort((x, y) => x - y);
+    for (let i = 1; i < hubAttachYs.length; i++) expect((hubAttachYs[i] ?? 0) - (hubAttachYs[i - 1] ?? 0)).toBeGreaterThanOrEqual(20);
+  });
+
+  it('lets a source with several flows grow too, and never overlaps two tiles in a column however tall', () => {
+    const edges = [edge('a', 's0', 't0'), edge('b', 's0', 't1'), edge('c', 's0', 't2'), edge('d', 's1', 't0')];
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0', 's1'], ['t0', 't1', 't2'], edges);
+    const [first, second] = layout.sources;
+    expect(first?.h).toBeGreaterThan(NODE_HEIGHT);
+    if (first && second) expect(second.y).toBeGreaterThanOrEqual(first.y + first.h);
+  });
+
+  it('starts each verb label just clear of its source tile, with the whole run to the elbow free beside it', () => {
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0'], ['t0'], [edge('a', 's0', 't0')]);
+    const source = layout.sources[0];
+    const routed = layout.edges[0];
+    if (!source || !routed) throw new Error('expected one source and one edge');
+    expect(routed.verbLabelAnchor.x).toBeGreaterThan(source.x + source.w);
+    // The widest pill (160px text + padding) fits between the tile and the elbow.
+    const elbowX = routed.sourceSegment[1]?.x ?? layout.hub.x;
+    expect(elbowX - routed.verbLabelAnchor.x).toBeGreaterThanOrEqual(160 + 16);
+  });
+});

@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import type { ReactNode } from 'react';
 import type { ActorSubtype } from '../../contracts/delta';
@@ -31,6 +31,8 @@ export interface LandscapeMobileListProps {
   threadCounts?: ReadonlyMap<UUID, { open: number; total: number }> | undefined;
   /** Required together with `threadCounts` — opens the comments panel scoped to the clicked row's own element. */
   onCommentMarkerClick?: ((elementId: UUID) => void) | undefined;
+  /** "Find on this landscape" (`LandscapeFind.tsx`): open the group holding this element, scroll its row into view and highlight it. A new object each time, so finding the same row again re-reveals it. */
+  revealElement?: { elementId: UUID } | null | undefined;
 }
 
 
@@ -48,15 +50,35 @@ const ACTORS_GROUP_KEY = '$actors';
  * for the identical UI problem (a long list of named collections, each
  * with its own members, on a narrow screen).
  */
-export function LandscapeMobileList({ groups, elementHref, contextHref, threadCounts, onCommentMarkerClick }: LandscapeMobileListProps) {
+export function LandscapeMobileList({ groups, elementHref, contextHref, threadCounts, onCommentMarkerClick, revealElement = null }: LandscapeMobileListProps) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [highlightedId, setHighlightedId] = useState<UUID | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // A find-box pick: open the accordion group that holds it (one open at a time), then mark it. State adjusted during render, keyed on the request object itself, so a data refresh alone never re-opens a group the reader has closed.
+  const [handledReveal, setHandledReveal] = useState<typeof revealElement>(null);
+  if (revealElement !== null && revealElement !== handledReveal) {
+    setHandledReveal(revealElement);
+    const id = revealElement.elementId;
+    const key = groups.actors.some((a) => a.element_id === id) ? ACTORS_GROUP_KEY : groups.groups.find((g) => g.members.some((m) => m.system.element_id === id))?.key;
+    if (key !== undefined) {
+      setExpandedKey(key);
+      setHighlightedId(id);
+    }
+  }
+
+  // Once the group is open and the row rendered, bring it into view.
+  useEffect(() => {
+    if (highlightedId === null) return;
+    listRef.current?.querySelector(`[data-element-id="${highlightedId}"]`)?.scrollIntoView({ block: 'center' });
+  }, [highlightedId, expandedKey]);
 
   function toggle(key: string): void {
     setExpandedKey((current) => (current === key ? null : key));
   }
 
   return (
-    <div className={styles.list} role="list">
+    <div className={styles.list} role="list" ref={listRef}>
       {groups.actors.length > 0 && (
         <AccordionGroup
           label="Actors"
@@ -69,7 +91,7 @@ export function LandscapeMobileList({ groups, elementHref, contextHref, threadCo
         >
           <ul className={styles.rows}>
             {groups.actors.map((actor) => (
-              <ActorRow key={actor.element_id} actor={actor} elementHref={elementHref} />
+              <ActorRow key={actor.element_id} actor={actor} elementHref={elementHref} highlighted={highlightedId === actor.element_id} />
             ))}
           </ul>
         </AccordionGroup>
@@ -96,6 +118,7 @@ export function LandscapeMobileList({ groups, elementHref, contextHref, threadCo
                 <SystemRow
                   key={member.system.element_id}
                   member={member}
+                  highlighted={highlightedId === member.system.element_id}
                   elementHref={elementHref}
                   contextHref={contextHref}
                   marker={commentMarkerFor(member.system.element_id, threadCounts)}
@@ -163,12 +186,12 @@ function AccordionGroup({ label, count, countUnit, referencedBy = [], expanded, 
   );
 }
 
-function ActorRow({ actor, elementHref }: { actor: ElementsHeadRow; elementHref: (id: UUID) => string }) {
+function ActorRow({ actor, elementHref, highlighted }: { actor: ElementsHeadRow; elementHref: (id: UUID) => string; highlighted: boolean }) {
   const attrs = attributesRecord(actor.attributes);
   const external = attrs.isExternal === true;
   const subtype = typeof attrs.subtype === 'string' ? (attrs.subtype as ActorSubtype) : undefined;
   return (
-    <li className={styles.row}>
+    <li className={highlighted ? [styles.row, styles.rowFound].filter(Boolean).join(' ') : styles.row} data-element-id={actor.element_id}>
       <Link to={elementHref(actor.element_id)} className={styles.rowMain}>
         <ElementTypeGlyph type="actor" {...(subtype !== undefined ? { actorSubtype: subtype } : {})} external={external} />
         <Text as="span" className={styles.rowName}>
@@ -185,12 +208,14 @@ function SystemRow({
   contextHref,
   marker,
   onCommentMarkerClick,
+  highlighted,
 }: {
   member: LandscapeGroupMember;
   elementHref: (id: UUID) => string;
   contextHref: (id: UUID) => string;
   marker: CommentMarkerState | undefined;
   onCommentMarkerClick: ((elementId: UUID) => void) | undefined;
+  highlighted: boolean;
 }) {
   const { system, extraLaneCount, usesCount, usedByCount, role } = member;
   const attrs = attributesRecord(system.attributes);
@@ -209,7 +234,7 @@ function SystemRow({
   const hasNoContextView = system.element_type === 'actor';
 
   return (
-    <li className={styles.row}>
+    <li className={highlighted ? [styles.row, styles.rowFound].filter(Boolean).join(' ') : styles.row} data-element-id={system.element_id}>
       <Link to={elementHref(system.element_id)} className={styles.rowMain}>
         <ElementTypeGlyph type={system.element_type} external={external} {...(actorSubtype !== undefined ? { actorSubtype } : {})} />
         <Text as="span" className={styles.rowName}>
