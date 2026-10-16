@@ -10,7 +10,7 @@ import { INTERFACE_TYPE_LABELS } from '../../contracts/attributeSchema';
 import { platformTileElement } from './platformTileElement';
 import { quantizeScale, wheelZoomFactor } from '../landscape/zoom';
 import { NODE_WIDTH } from '../landscape/layout';
-import { allPlatformFlowTilesOf, computeIntegrationPlatformContextLayout, type IntegrationPlatformContextLayout, type PlatformFlowEdgeInput, type PlatformFlowTile } from './integrationPlatformContextLayout';
+import { allPlatformFlowTilesOf, computeIntegrationPlatformContextLayout, PILL_RUN_WIDTH, type IntegrationPlatformContextLayout, type PlatformFlowEdgeInput, type PlatformFlowTile } from './integrationPlatformContextLayout';
 import styles from './IntegrationPlatformDiagramCanvas.module.css';
 
 export interface IntegrationPlatformDiagramCanvasProps {
@@ -117,14 +117,35 @@ function computeFitTransform(worldWidth: number, worldHeight: number, displayWid
   return { scale, tx, ty };
 }
 
-/** The widest a pill's text gets before it is cut with an ellipsis — and the width `COLUMN_GAP` in `integrationPlatformContextLayout.ts` is sized to hold beside a tile. The full text is on hover and in the flows list below. */
-const PILL_MAX_TEXT_WIDTH = 160;
+/**
+ * Up to two lines of `text` within `maxWidth`, breaking at a space (or a
+ * "·", so "Salesforce · Field Service" breaks between platform and module);
+ * whatever doesn't fit on the second line is cut with an ellipsis.
+ */
+function wrapTwoLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  if (ctx.measureText(text).width <= maxWidth) return [text];
+  const words = text.split(' ');
+  let first = '';
+  let i = 0;
+  for (; i < words.length; i += 1) {
+    const candidate = first === '' ? (words[i] ?? '') : `${first} ${words[i] ?? ''}`;
+    if (ctx.measureText(candidate).width > maxWidth) break;
+    first = candidate;
+  }
+  // A single word wider than the line: nothing to break on, so one cut line.
+  if (first === '') return [truncate(ctx, text, maxWidth)];
+  // Don't leave a lone "·" dangling at the end of the first line.
+  const firstLine = first.endsWith(' ·') ? first.slice(0, -2) : first;
+  const rest = words.slice(i).join(' ');
+  const secondLine = first.endsWith(' ·') ? rest : rest.replace(/^· /, '');
+  return [firstLine, truncate(ctx, secondLine, maxWidth)];
+}
 
-function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, cy: number, tokens: CanvasTokens, warn: boolean, anchor: 'centre' | 'left'): void {
+function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, cy: number, tokens: CanvasTokens, warn: boolean, anchor: 'centre' | 'left', maxTextWidth: number): void {
   if (text.trim().length === 0) return;
   const paddingX = 8;
-  const maxWidth = PILL_MAX_TEXT_WIDTH;
-  const shown = truncate(ctx, text, maxWidth);
+  // The full text is on hover and in the flows list below.
+  const shown = truncate(ctx, text, maxTextWidth);
   const textWidth = ctx.measureText(shown).width;
   const w = textWidth + paddingX * 2;
   const h = 18;
@@ -268,7 +289,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
         drawPolyline(edge.targetSegment, edge.crossesBoundary, true, flowIsEmphasised(edge), flowIsFaded(edge));
       }
 
-      const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; maxWidth: number }[] = [];
+      const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; maxWidth: number; maxLines: 1 | 2 }[] = [];
 
       const drawTile = (tile: PlatformFlowTile, isHub: boolean): void => {
         // The platform itself is never one of the flows' endpoints, so it is not in `elementsById` (which holds only those and their parents) — it is the `hub` prop. Without this the centre tile was silently never drawn, leaving every line running into empty space.
@@ -294,7 +315,8 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
           const glyph = element.element_type === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph(element.element_type);
           // With interface bands inside it, the platform's own name sits in the header strip at the top of its tile.
           const labelY = isHub && layout.hubHeaderHeight > 0 ? tile.y + layout.hubHeaderHeight / 2 + 2 : tile.y + tile.h / 2;
-          nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: labelY, maxWidth: tile.w - 30 });
+          // A tile's name may take two lines; the platform's header strip (with interface bands below it) has room for one.
+          nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: labelY, maxWidth: tile.w - 34, maxLines: isHub && layout.hubHeaderHeight > 0 ? 1 : 2 });
         }
       };
 
@@ -337,8 +359,11 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
         ctx.font = `${(14 * textScale).toFixed(2)}px sans-serif`;
         ctx.fillText(label.glyph, x + 8 * transform.scale, y);
         ctx.font = `${(12 * textScale).toFixed(2)}px sans-serif`;
-        const truncated = truncate(ctx, label.name, label.maxWidth * transform.scale);
-        ctx.fillText(truncated, x + 26 * transform.scale, y);
+        const lines = label.maxLines === 2 ? wrapTwoLines(ctx, label.name, label.maxWidth * transform.scale) : [truncate(ctx, label.name, label.maxWidth * transform.scale)];
+        const lineHeight = 14 * textScale;
+        lines.forEach((line, index) => {
+          ctx.fillText(line, x + 26 * transform.scale, y + (index - (lines.length - 1) / 2) * lineHeight);
+        });
       }
 
       ctx.font = `${(11 * textScale).toFixed(2)}px sans-serif`;
@@ -361,9 +386,10 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
           const [vx, vy] = toScreen(edge.verbLabelAnchor.x, edge.verbLabelAnchor.y);
           ctx.globalAlpha = flowIsFaded(edge) ? 0.25 : 1;
           // Both pills carry the flow's number, so a line leaving the platform can be matched to the one that entered it.
-          drawPill(ctx, edge.verbLabel.trim() === '' ? String(edge.flowNumber) : `${String(edge.flowNumber)} · ${edge.verbLabel}`, vx, vy, tokens, edge.crossesBoundary, 'left');
+          const pillMaxWidth = PILL_RUN_WIDTH * transform.scale - 16;
+          drawPill(ctx, edge.verbLabel.trim() === '' ? String(edge.flowNumber) : `${String(edge.flowNumber)} · ${edge.verbLabel}`, vx, vy, tokens, edge.crossesBoundary, 'left', pillMaxWidth);
           const [cx, cy] = toScreen(edge.classificationLabelAnchor.x, edge.classificationLabelAnchor.y);
-          drawPill(ctx, edge.classificationLabel ? `${String(edge.flowNumber)} · ${edge.classificationLabel}` : String(edge.flowNumber), cx, cy, tokens, edge.crossesBoundary, 'centre');
+          drawPill(ctx, edge.classificationLabel ? `${String(edge.flowNumber)} · ${edge.classificationLabel}` : String(edge.flowNumber), cx, cy, tokens, edge.crossesBoundary, 'centre', pillMaxWidth);
           ctx.globalAlpha = 1;
         }
         ctx.textAlign = 'left';
