@@ -68,7 +68,7 @@ export function truncate(text: string, maxChars: number): string {
 }
 
 /** The filename for an export: `{model}-{view}-{date}.{ext}`, safe on every OS. */
-export function exportFilename(stamp: ExportStamp, ext: 'png' | 'pdf'): string {
+export function exportFilename(stamp: ExportStamp, ext: 'png' | 'pdf' | 'xlsx'): string {
   const safe = (s: string) => s.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'export';
   return `${safe(stamp.modelName)}-${safe(stamp.viewLabel)}-${stamp.date}.${ext}`;
 }
