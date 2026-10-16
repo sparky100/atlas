@@ -90,61 +90,64 @@ export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange,
 
   return (
     <div className={styles.bar}>
-      <div className={styles.modeToggle} role="group" aria-label="Roadmap state">
-        <button type="button" className={mode === 'asIs' ? styles.modeActive : styles.mode} aria-pressed={mode === 'asIs'} onClick={() => { onModeChange('asIs'); }}>
-          As-is
-        </button>
-        <button type="button" className={mode === 'toBe' ? styles.modeActive : styles.mode} aria-pressed={mode === 'toBe'} onClick={() => { onModeChange('toBe'); }}>
-          To-be
-        </button>
-      </div>
-      <div className={styles.modeToggle} role="group" aria-label="Roadmap grouping">
-        <button type="button" className={groupBy === 'capability' ? styles.modeActive : styles.mode} aria-pressed={groupBy === 'capability'} onClick={() => { onGroupByChange('capability'); }}>
-          By capability
-        </button>
-        <button type="button" className={groupBy === 'valueStream' ? styles.modeActive : styles.mode} aria-pressed={groupBy === 'valueStream'} onClick={() => { onGroupByChange('valueStream'); }}>
-          By value stream
-        </button>
-        <button type="button" className={groupBy === 'project' ? styles.modeActive : styles.mode} aria-pressed={groupBy === 'project'} onClick={() => { onGroupByChange('project'); }}>
-          By project
-        </button>
-      </div>
-      <div className={styles.modeToggle} role="group" aria-label="Timeline granularity">
-        <button type="button" className={granularity === 'months' ? styles.modeActive : styles.mode} aria-pressed={granularity === 'months'} onClick={() => { onGranularityChange('months'); }}>
-          Months
-        </button>
-        <button type="button" className={granularity === 'quarters' ? styles.modeActive : styles.mode} aria-pressed={granularity === 'quarters'} onClick={() => { onGranularityChange('quarters'); }}>
-          Quarters
-        </button>
-        <button type="button" className={granularity === 'years' ? styles.modeActive : styles.mode} aria-pressed={granularity === 'years'} onClick={() => { onGranularityChange('years'); }}>
-          Years
-        </button>
-      </div>
-      <div className={styles.horizonRow}>
-        <div className={styles.modeToggle} role="group" aria-label="Timeline horizon">
-          <button type="button" className={horizon === '1y' ? styles.modeActive : styles.mode} aria-pressed={horizon === '1y'} onClick={() => { onHorizonChange('1y'); }}>
-            1 year
+      {/* Line 1: how the timeline is drawn; line 2 (below): what it is filtered to. Both wrap on a narrow screen rather than overflow. */}
+      <div className={styles.controls}>
+        <div className={styles.modeToggle} role="group" aria-label="Roadmap state">
+          <button type="button" className={mode === 'asIs' ? styles.modeActive : styles.mode} aria-pressed={mode === 'asIs'} onClick={() => { onModeChange('asIs'); }}>
+            As-is
           </button>
-          <button type="button" className={horizon === '3y' ? styles.modeActive : styles.mode} aria-pressed={horizon === '3y'} onClick={() => { onHorizonChange('3y'); }}>
-            3 years
-          </button>
-          <button type="button" className={horizon === 'all' ? styles.modeActive : styles.mode} aria-pressed={horizon === 'all'} onClick={() => { onHorizonChange('all'); }}>
-            All
+          <button type="button" className={mode === 'toBe' ? styles.modeActive : styles.mode} aria-pressed={mode === 'toBe'} onClick={() => { onModeChange('toBe'); }}>
+            To-be
           </button>
         </div>
-        {horizon !== 'all' && (
-          <div className={styles.nav} role="group" aria-label="Timeline navigation">
-            <button type="button" className={styles.navButton} onClick={() => { onNudge(-1); }} aria-label="Earlier">
-              ←
+        <div className={styles.modeToggle} role="group" aria-label="Roadmap grouping">
+          <button type="button" className={groupBy === 'capability' ? styles.modeActive : styles.mode} aria-pressed={groupBy === 'capability'} onClick={() => { onGroupByChange('capability'); }}>
+            By capability
+          </button>
+          <button type="button" className={groupBy === 'valueStream' ? styles.modeActive : styles.mode} aria-pressed={groupBy === 'valueStream'} onClick={() => { onGroupByChange('valueStream'); }}>
+            By value stream
+          </button>
+          <button type="button" className={groupBy === 'project' ? styles.modeActive : styles.mode} aria-pressed={groupBy === 'project'} onClick={() => { onGroupByChange('project'); }}>
+            By project
+          </button>
+        </div>
+        <div className={styles.modeToggle} role="group" aria-label="Timeline granularity">
+          <button type="button" className={granularity === 'months' ? styles.modeActive : styles.mode} aria-pressed={granularity === 'months'} onClick={() => { onGranularityChange('months'); }}>
+            Months
+          </button>
+          <button type="button" className={granularity === 'quarters' ? styles.modeActive : styles.mode} aria-pressed={granularity === 'quarters'} onClick={() => { onGranularityChange('quarters'); }}>
+            Quarters
+          </button>
+          <button type="button" className={granularity === 'years' ? styles.modeActive : styles.mode} aria-pressed={granularity === 'years'} onClick={() => { onGranularityChange('years'); }}>
+            Years
+          </button>
+        </div>
+        <div className={styles.horizonRow}>
+          <div className={styles.modeToggle} role="group" aria-label="Timeline horizon">
+            <button type="button" className={horizon === '1y' ? styles.modeActive : styles.mode} aria-pressed={horizon === '1y'} onClick={() => { onHorizonChange('1y'); }}>
+              1 year
             </button>
-            <button type="button" className={styles.navButton} onClick={onResetToday}>
-              Today
+            <button type="button" className={horizon === '3y' ? styles.modeActive : styles.mode} aria-pressed={horizon === '3y'} onClick={() => { onHorizonChange('3y'); }}>
+              3 years
             </button>
-            <button type="button" className={styles.navButton} onClick={() => { onNudge(1); }} aria-label="Later">
-              →
+            <button type="button" className={horizon === 'all' ? styles.modeActive : styles.mode} aria-pressed={horizon === 'all'} onClick={() => { onHorizonChange('all'); }}>
+              All
             </button>
           </div>
-        )}
+          {horizon !== 'all' && (
+            <div className={styles.nav} role="group" aria-label="Timeline navigation">
+              <button type="button" className={styles.navButton} onClick={() => { onNudge(-1); }} aria-label="Earlier">
+                ←
+              </button>
+              <button type="button" className={styles.navButton} onClick={onResetToday}>
+                Today
+              </button>
+              <button type="button" className={styles.navButton} onClick={() => { onNudge(1); }} aria-label="Later">
+                →
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       <div className={styles.facets} aria-label="Roadmap filters">
         <FacetDisclosure
