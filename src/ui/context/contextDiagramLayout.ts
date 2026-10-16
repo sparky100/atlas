@@ -25,6 +25,15 @@
  * (`bandIndexOf`) — a column's second band is a second, more distant
  * column; a row's second band is a second, more distant row.
  *
+ * **Rows beside tall columns.** A column of three or more tiles reaches
+ * past the hub's own top/bottom edge, and an actor/two-way row of three or
+ * four tiles is wider than the gap between the two columns, so it runs out
+ * beneath (or above) them. `rowClearance` pushes such a row — tiles and
+ * connector lanes together — out until it clears the outermost column tile
+ * it shares x with; a row that fits between the columns, or has none beside
+ * it, is not moved. (Found on a real SAP PM Context page: a two-way tile
+ * sat on top of the left column's last tile, hiding its connector.)
+ *
  * **Ports.** Every edge attaches to whichever hub side its group owns
  * (`spreadAlong` the hub's own edge on that side — left/right spread
  * vertically, above/below spread horizontally), and to its own neighbour
@@ -479,21 +488,33 @@ function layoutColumn(sign: -1 | 1, internalIds: readonly UUID[], externalIds: r
 }
 
 /**
+ * How far past its usual `GAP_HUB_TB` a row (above: `sign` -1, below: +1) must sit so it clears the side-column tiles it overlaps horizontally — `0` when none overlap or none reach past the hub's own edge into the row's band.
+ */
+function rowClearance(sign: -1 | 1, rowLeft: number, rowRight: number, hub: DiagramTile, sideTiles: readonly DiagramTile[]): number {
+  const overlapping = sideTiles.filter((t) => t.x < rowRight && t.x + t.w > rowLeft);
+  if (overlapping.length === 0) return 0;
+  const reach = sign === -1 ? hub.y - Math.min(...overlapping.map((t) => t.y)) : Math.max(...overlapping.map((t) => t.y + t.h)) - (hub.y + hub.h);
+  return Math.max(0, reach);
+}
+
+/**
  * An actor/two-way row: `sign` is `-1` (above, actor) or `+1` (below,
  * two-way). Tiles stack along the group's own x axis (`placeGroup`),
  * horizontally centred on the hub's own horizontal span; a tile's own band
  * decides its y, further from the hub band by band — the row's own analogue
  * of `layoutColumn`'s column, x and y swapped.
  */
-function layoutRow(sign: -1 | 1, internalIds: readonly UUID[], externalIds: readonly UUID[], edgesByNeighbour: ReadonlyMap<UUID, LayoutEdge[]>, hub: DiagramTile): GroupResult {
+function layoutRow(sign: -1 | 1, internalIds: readonly UUID[], externalIds: readonly UUID[], edgesByNeighbour: ReadonlyMap<UUID, LayoutEdge[]>, hub: DiagramTile, sideTiles: readonly DiagramTile[]): GroupResult {
   const { placed, span } = placeGroup(internalIds, externalIds, NODE_WIDTH);
   const xStart = hub.x + (hub.w - span) / 2;
+  // A row wider than the gap between the two side columns runs out beneath (or above) them, and a column of three or more reaches past the hub's own top/bottom — so the row's nearest tiles would land on the column's outermost ones, and its connectors (which drop straight from a lane to the tile) would run through them. Push the whole row, lanes included, out until it clears the lowest (or highest) column tile it shares x with, by the same gap the hub gets. A row that fits between the columns, or sits clear of them, gets no push.
+  const clearance = rowClearance(sign, xStart, xStart + span, hub, sideTiles);
   const tileAt = new Map<UUID, DiagramTile>();
   const tiles: DiagramTile[] = placed.map((p) => {
     const tile: DiagramTile = {
       elementId: p.id,
       x: xStart + p.along,
-      y: sign === -1 ? hub.y - GAP_HUB_TB - NODE_HEIGHT - p.band * (NODE_HEIGHT + BAND_GAP) : hub.y + hub.h + GAP_HUB_TB + p.band * (NODE_HEIGHT + BAND_GAP),
+      y: sign === -1 ? hub.y - clearance - GAP_HUB_TB - NODE_HEIGHT - p.band * (NODE_HEIGHT + BAND_GAP) : hub.y + hub.h + clearance + GAP_HUB_TB + p.band * (NODE_HEIGHT + BAND_GAP),
       w: NODE_WIDTH,
       h: NODE_HEIGHT,
     };
@@ -519,7 +540,8 @@ function layoutRow(sign: -1 | 1, internalIds: readonly UUID[], externalIds: read
   const edges: RoutedEdge[] = ports.map(({ edge, tile, slot, neighbourPortX, hubPortX }) => {
     if (!tile) return null;
     const k = laneIndex.get(edge.id) ?? 0;
-    const laneY = sign === -1 ? hub.y - spreadAlong(0, GAP_HUB_TB, k, laneCount) : hub.y + hub.h + spreadAlong(0, GAP_HUB_TB, k, laneCount);
+    // Lanes sit in the gap just before the row (past any clearance), so the horizontal run to the hub's port is below every column tile; the final drop to the hub is inside the hub's own x span, where no column is.
+    const laneY = sign === -1 ? hub.y - clearance - spreadAlong(0, GAP_HUB_TB, k, laneCount) : hub.y + hub.h + clearance + spreadAlong(0, GAP_HUB_TB, k, laneCount);
     const neighbourAnchor: Point = { x: neighbourPortX, y: sign === -1 ? tile.y + tile.h : tile.y };
     const hubAnchor: Point = { x: hubPortX, y: sign === -1 ? hub.y : hub.y + hub.h };
     const labelY = sign === -1 ? tile.y + tile.h + LABEL_MARGIN + LABEL_PITCH / 2 + slot * LABEL_PITCH : tile.y - LABEL_MARGIN - LABEL_PITCH / 2 - slot * LABEL_PITCH;
@@ -570,8 +592,9 @@ export function computeContextDiagramLayout(hubId: UUID, neighbours: readonly Co
   const hub: DiagramTile = { elementId: hubId, x: 0, y: 0, w: NODE_WIDTH, h: NODE_HEIGHT };
   const left = layoutColumn(-1, idsOf('source', false), idsOf('source', true), edgesByNeighbour, hub);
   const right = layoutColumn(1, idsOf('target', false), idsOf('target', true), edgesByNeighbour, hub);
-  const above = layoutRow(-1, idsOf('actor', false), idsOf('actor', true), edgesByNeighbour, hub);
-  const below = layoutRow(1, idsOf('twoWay', false), idsOf('twoWay', true), edgesByNeighbour, hub);
+  const sideTiles = [...left.tiles, ...right.tiles];
+  const above = layoutRow(-1, idsOf('actor', false), idsOf('actor', true), edgesByNeighbour, hub, sideTiles);
+  const below = layoutRow(1, idsOf('twoWay', false), idsOf('twoWay', true), edgesByNeighbour, hub, sideTiles);
 
   const allTiles = [...left.tiles, ...right.tiles, ...above.tiles, ...below.tiles];
   const allEdges = [...left.edges, ...right.edges, ...above.edges, ...below.edges].sort((a, b) => compareIds(a.id, b.id));
