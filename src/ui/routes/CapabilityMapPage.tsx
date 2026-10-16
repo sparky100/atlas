@@ -11,7 +11,7 @@ import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
-import { useMainBranch } from '../branches/useMainBranch';
+import { hintedModelId, useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { useThreadCounts } from '../comments/useThreadCounts';
@@ -106,12 +106,12 @@ export function CapabilityMapPage() {
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const canEdit = ref.kind === 'main' && canEditOnMain(role);
-  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, loading: mainBranchLoading, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
 
   // #244: no As-is/To-be/Diff selector on this page (unlike LandscapePage's
   // `?mode=` control) — always the branch's own current state, the same
   // default `parseViewMode` itself falls back to when `?mode=` is absent.
-  const { state, reload } = useCapabilityMap(model?.id ?? '', organisation?.id ?? '', userId, ref, 'toBe', mainBranch?.head_commit_id ?? null);
+  const { state, reload } = useCapabilityMap(hintedModelId(model?.id, ref, mainBranchLoading) ?? '', organisation?.id ?? '', userId, ref, 'toBe', mainBranch?.head_commit_id ?? null);
   // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment.
   useRouteTiming('capability-map', state.status === 'ready');
   // S2 flow 1 bug fix: every mutation on this page (importing a starter

@@ -14,7 +14,7 @@ import { useThreadCounts } from '../comments/useThreadCounts';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
-import { useMainBranch } from '../branches/useMainBranch';
+import { hintedModelId, useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { refLabelOf } from '../../db/ref';
 import { HomeSearch } from '../home/HomeSearch';
@@ -103,7 +103,7 @@ export function ElementsPage() {
   const { role } = useMembership(organisation?.id ?? null, userId);
   const canEdit = canEditOnMain(role);
   const navigate = useNavigate();
-  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, loading: mainBranchLoading, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   // Same search-first "type a name, find it or create it" control the front
   // doors use (`ModelHome.tsx`'s own `HomeSearch` wiring, verbatim) — a
   // browse table is exactly where "does this already exist?" matters most,
@@ -170,7 +170,7 @@ export function ElementsPage() {
     setSearchParams(params);
   };
 
-  const state = useElementBrowse(model?.id ?? '', ref, 'toBe', filter, mainBranch?.head_commit_id ?? null);
+  const state = useElementBrowse(hintedModelId(model?.id, ref, mainBranchLoading) ?? '', ref, 'toBe', filter, mainBranch?.head_commit_id ?? null);
   // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment.
   useRouteTiming('elements', state.status === 'ready');
   const onLinked = () => {

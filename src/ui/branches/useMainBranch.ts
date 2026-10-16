@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
+import type { Ref } from '../../db/ref';
 import type { BranchRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
 import { invalidateModelHead } from '../query/invalidateModelHead';
@@ -76,4 +77,18 @@ export function useMainBranch(modelId: UUID | null): UseMainBranchResult {
       if (modelId) void invalidateModelHead(queryClient, modelId);
     },
   };
+}
+
+/**
+ * Performance: the model id a page should hand its main-scoped data hook —
+ * `null` while `main` itself is still loading *and* the page is viewing
+ * `main`, so the hook's own "no model id yet" guard holds it back and it
+ * loads once, with `head_commit_id` as its hint, instead of loading once
+ * without the hint and again the moment `main` arrives (every request of
+ * the page sent twice — seen on the element page's waterfall). Any other
+ * ref never waits: it doesn't use the hint.
+ */
+export function hintedModelId(modelId: UUID | null | undefined, ref: Ref, mainLoading: boolean): UUID | null {
+  if (!modelId) return null;
+  return ref.kind === 'main' && mainLoading ? null : modelId;
 }

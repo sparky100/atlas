@@ -17,7 +17,7 @@ import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBran
 import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
-import { useMainBranch } from '../branches/useMainBranch';
+import { hintedModelId, useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { StructureView } from '../structureView/StructureView';
@@ -58,9 +58,9 @@ export function ContainerPage() {
   const { label: branchLabel } = useBranchLabel(ref);
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
-  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, loading: mainBranchLoading, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   // S1 item 15 (A2 remainder): same dedup hint as `useStructureView` below.
-  const capability = useBreadcrumbElement(model?.id ?? null, ref, capabilityId, mainBranch?.head_commit_id ?? null);
+  const capability = useBreadcrumbElement(hintedModelId(model?.id, ref, mainBranchLoading), ref, capabilityId, mainBranch?.head_commit_id ?? null);
   const canEdit = !viewing && editingBranch !== null && canEditBranch(role, editingBranch);
   // See LandscapePage.tsx's identical comment: ADR-018 guarantees both are
   // never null in practice; BranchRow's own type hasn't been narrowed yet.
@@ -68,7 +68,7 @@ export function ContainerPage() {
   const writeHeadCommitId = editingBranch?.head_commit_id ?? null;
   const canAdd = canEdit && searchCommitId !== null && writeHeadCommitId !== null;
 
-  const state = useStructureView(model?.id ?? '', organisation?.id ?? '', userId, systemId ?? '', ref, mode, mainBranch?.head_commit_id ?? null);
+  const state = useStructureView(hintedModelId(model?.id, ref, mainBranchLoading) ?? '', organisation?.id ?? '', userId, systemId ?? '', ref, mode, mainBranch?.head_commit_id ?? null);
   // See ElementPage.tsx's identical effect for why this is a real
   // navigate(-1) rather than a fallback route.
   useEffect(() => {
