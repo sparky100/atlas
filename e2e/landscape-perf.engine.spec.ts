@@ -99,6 +99,12 @@ test.describe('landscape performance (Sprint U1 step 4b, ADR-015; E3 amendment)'
       const orgId = randomUUID();
       const orgSlug = `perf-${orgId.slice(0, 8)}`;
       await createOrganisation(signedIn, { id: orgId, name: 'Perf Org', slug: orgSlug, createdBy: userId });
+      // A name, as a real user has once past their first sign-in: without it
+      // Home shows the display-name prompt as soon as the profile loads, and
+      // the "Your organisations" check below passed only when it ran in the
+      // moment before that (failing whenever the profile loaded first).
+      const { error: nameError } = await signedIn.schema('atlas').from('profiles').update({ display_name: 'Perf User' }).eq('user_id', userId);
+      if (nameError) throw new Error(`perf fixture display name: ${nameError.message}`);
 
       const modelId = randomUUID();
       const modelSlug = `perf-landscape-${modelId.slice(0, 8)}`;

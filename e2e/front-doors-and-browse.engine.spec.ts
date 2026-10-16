@@ -17,6 +17,7 @@ import { commitToBranch } from '../src/db/commits';
 import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
+import { homeSearchResult } from './fixtures/goldenPath';
 
 test('front doors and browse: both doors render for a seeded model, switching persists, search opens an element, table filters, mobile shows the collapsed menu', async ({ page }) => {
   const env = loadEnv();
@@ -141,7 +142,7 @@ test('front doors and browse: both doors render for a seeded model, switching pe
   // The search box is search-first and opens an existing element rather
   // than creating a duplicate.
   await page.getByPlaceholder('Search or create a capability, system, or actor…').fill('Payment Gateway');
-  await page.getByRole('link', { name: /Payment Gateway/ }).click();
+  await homeSearchResult(page, 'Payment Gateway').click();
   await expect(page.getByRole('heading', { name: 'Payment Gateway' })).toBeVisible();
 
   // The element browse table, reachable from both doors, filters by type.

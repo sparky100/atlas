@@ -98,6 +98,10 @@ export async function signInExistingUser(page: Page, email: string, password: st
   const displayNameHeading = page.getByRole('heading', { name: 'What should we call you?' });
   const orgsHeading = page.getByRole('heading', { name: 'Your organisations' });
   await expect(displayNameHeading.or(orgsHeading)).toBeVisible();
+  // Home renders "Your organisations" while the profile is still loading and
+  // swaps to the prompt once it arrives, so seeing the heading first isn't
+  // the answer — wait for the page's own requests to settle before deciding.
+  await page.waitForLoadState('networkidle');
   if (await displayNameHeading.isVisible()) {
     await page.getByLabel('Display name').fill(email.split('@')[0] ?? email);
     await page.getByRole('button', { name: 'Continue' }).click();

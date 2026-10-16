@@ -13,7 +13,7 @@
  * literally reading "Request changes" in the current UI.
  */
 import { expect, test } from '@playwright/test';
-import { acceptInviteViaSignUp, addCapability, addSystemFromHome, goToModelHome, inviteMemberFromHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { acceptInviteViaSignUp, addCapability, addSystemFromHome, goToModelHome, homeSearchResult, inviteMemberFromHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 test('propose a change from an element page, leave and re-enter it, submit; reviewer requests changes, proposer resubmits, reviewer approves and merges; director sees the result', async ({ page, browser }) => {
   // The longest golden path here — two real browser sessions and every
@@ -66,7 +66,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
 
   // 1. Proposer, at main: "Propose a change" instead of "✎ Edit".
   await proposerPage.getByPlaceholder('Search or create a capability, system, or actor…').fill('Ledger Service');
-  await proposerPage.getByRole('link', { name: 'Ledger Service' }).click();
+  await homeSearchResult(proposerPage, 'Ledger Service').click();
   await expect(proposerPage.getByRole('heading', { name: 'Ledger Service' })).toBeVisible();
   await expect(proposerPage.getByRole('button', { name: '✎ Edit' })).toHaveCount(0);
   await proposerPage.getByRole('button', { name: 'Propose a change' }).click();
@@ -227,7 +227,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   // The merged edit itself, confirmed on main via Home's own search door.
   await goToModelHome(page);
   await page.getByPlaceholder('Search or create a capability, system, or actor…').fill('Ledger Service');
-  await page.getByRole('link', { name: 'Ledger Service' }).click();
+  await homeSearchResult(page, 'Ledger Service').click();
   await expect(page.getByRole('heading', { name: 'Ledger Service' })).toBeVisible();
   await expect(page.getByText('Ridgeline Systems', { exact: true })).toBeVisible();
 
