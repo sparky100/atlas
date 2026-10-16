@@ -137,6 +137,11 @@ function descriptionOf(element: ElementsHeadRow): string {
   return typeof value === 'string' ? value : '';
 }
 
+/** Lowercased text with "·", "/", "-" and runs of spaces read as a single space — so "SAP · PM", "sap-pm" and "SAP  PM" all compare equal. */
+function words(text: string): string {
+  return text.toLowerCase().replace(/[·/-]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 /**
  * How well `q` (already trimmed/lowercased) matches one pool entry, lowest
  * number best — `null` for no match at all. Field priority (name, then
@@ -148,11 +153,19 @@ function descriptionOf(element: ElementsHeadRow): string {
  * the bug behind `matchElements` silently truncating a highly relevant
  * result out of a capped list while a poor one took its place.
  */
-function matchTier(element: ElementsHeadRow, aliases: readonly string[], q: string): number | null {
+function matchTier(element: ElementsHeadRow, aliases: readonly string[], q: string, parentName?: string): number | null {
   const name = element.name.toLowerCase();
   if (name === q) return 0;
   if (name.startsWith(q)) return 1;
   if (name.includes(q)) return 2;
+  // A module is shown everywhere as "Platform · Module" (`moduleDisplayName`) but stored as just "Module" — so typing what is on screen ("SAP PM", "SAP · PM") found nothing. Matched as the two words together, and only once the query has more than one word, so "sap" alone doesn't bury the platform under all of its modules.
+  if (parentName !== undefined) {
+    const queryWords = words(q);
+    if (queryWords.includes(' ')) {
+      const composite = words(`${parentName} ${name}`);
+      if (composite.startsWith(queryWords) || composite.includes(queryWords)) return 2;
+    }
+  }
   const description = descriptionOf(element).toLowerCase();
   if (description.startsWith(q)) return 3;
   if (description.includes(q)) return 4;
@@ -183,9 +196,12 @@ function rankedMatches(pool: readonly SearchPoolElement[], query: string, exclud
   const q = query.trim().toLowerCase();
   if (q === '') return [];
   const ranked: { element: ElementsHeadRow; tier: number }[] = [];
+  // A container's own parent, when the pool carries it (a pool searched across `system` and `container` does; one restricted to a single type doesn't, and then a module is found by its own name only).
+  const nameById = new Map(pool.map(({ element }) => [element.element_id, element.name]));
   for (const { element, aliases } of pool) {
     if (excludeElementId !== undefined && element.element_id === excludeElementId) continue;
-    const tier = matchTier(element, aliases, q);
+    const parentName = element.element_type === 'container' && element.parent_id !== null ? nameById.get(element.parent_id) : undefined;
+    const tier = matchTier(element, aliases, q, parentName);
     if (tier !== null) ranked.push({ element, tier });
   }
   ranked.sort((a, b) => a.tier - b.tier);

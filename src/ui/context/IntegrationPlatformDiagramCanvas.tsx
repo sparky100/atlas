@@ -6,6 +6,7 @@ import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
+import { platformTileElement } from './platformTileElement';
 import { quantizeScale, wheelZoomFactor } from '../landscape/zoom';
 import { NODE_WIDTH } from '../landscape/layout';
 import { allPlatformFlowTilesOf, computeIntegrationPlatformContextLayout, type IntegrationPlatformContextLayout, type PlatformFlowEdgeInput, type PlatformFlowTile } from './integrationPlatformContextLayout';
@@ -112,14 +113,19 @@ function computeFitTransform(worldWidth: number, worldHeight: number, displayWid
   return { scale, tx, ty };
 }
 
-function drawPill(ctx: CanvasRenderingContext2D, text: string, cx: number, cy: number, tokens: CanvasTokens, warn: boolean): void {
+/** The widest a pill's text gets before it is cut with an ellipsis — and the width `COLUMN_GAP` in `integrationPlatformContextLayout.ts` is sized to hold beside a tile. The full text is on hover and in the flows list below. */
+const PILL_MAX_TEXT_WIDTH = 160;
+
+function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, cy: number, tokens: CanvasTokens, warn: boolean, anchor: 'centre' | 'left'): void {
   if (text.trim().length === 0) return;
   const paddingX = 8;
-  const maxWidth = 160;
+  const maxWidth = PILL_MAX_TEXT_WIDTH;
   const shown = truncate(ctx, text, maxWidth);
   const textWidth = ctx.measureText(shown).width;
   const w = textWidth + paddingX * 2;
   const h = 18;
+  // `x` is the pill's centre, or its left end for a verb that starts just clear of its source tile.
+  const cx = anchor === 'left' ? x + w / 2 : x;
   roundRectPath(ctx, cx - w / 2, cy - h / 2, w, h, h / 2);
   ctx.fillStyle = tokens.surfaceRaised;
   ctx.fill();
@@ -255,7 +261,8 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
       const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; maxWidth: number }[] = [];
 
       const drawTile = (tile: PlatformFlowTile, isHub: boolean): void => {
-        const element = elementsById.get(tile.elementId);
+        // The platform itself is never one of the flows' endpoints, so it is not in `elementsById` (which holds only those and their parents) — it is the `hub` prop. Without this the centre tile was silently never drawn, leaving every line running into empty space.
+        const element = platformTileElement(tile.elementId, isHub, elementsById, hub);
         if (!element) return;
         const displayName = moduleDisplayNameFromMap(element, elementsById);
         const external = attributesRecord(element.attributes).isExternal === true;
@@ -311,10 +318,10 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
         ctx.textAlign = 'center';
         for (const edge of layout.edges) {
           const [vx, vy] = toScreen(edge.verbLabelAnchor.x, edge.verbLabelAnchor.y);
-          drawPill(ctx, edge.verbLabel, vx, vy, tokens, edge.crossesBoundary);
+          drawPill(ctx, edge.verbLabel, vx, vy, tokens, edge.crossesBoundary, 'left');
           if (edge.classificationLabel) {
             const [cx, cy] = toScreen(edge.classificationLabelAnchor.x, edge.classificationLabelAnchor.y);
-            drawPill(ctx, edge.classificationLabel, cx, cy, tokens, edge.crossesBoundary);
+            drawPill(ctx, edge.classificationLabel, cx, cy, tokens, edge.crossesBoundary, 'centre');
           }
         }
         ctx.textAlign = 'left';
@@ -327,7 +334,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
     return () => {
       observer.disconnect();
     };
-  }, [layout, elementsById, transform, hover, zoomShowsText]);
+  }, [layout, elementsById, hub, transform, hover, zoomShowsText]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -350,7 +357,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
       }
     }
     const tile = tileAt(screenX, screenY);
-    const element = tile ? elementsById.get(tile.elementId) ?? (tile.elementId === hub.element_id ? hub : undefined) : undefined;
+    const element = tile ? platformTileElement(tile.elementId, tile.elementId === hub.element_id, elementsById, hub) : undefined;
     setHover(element ? { label: moduleDisplayNameFromMap(element, elementsById), screenX, screenY } : null);
   }
 

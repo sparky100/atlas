@@ -242,3 +242,26 @@ describe('hasExactMatch (Prompt 7h bug fix: "Create..." hides only on an exact m
     expect(hasExactMatch(p, 'Payment Gateway')).toBe(false);
   });
 });
+
+describe('matchElements — a module found by what is on screen ("Platform · Module")', () => {
+  const sap = el({ element_id: 'sap', name: 'SAP' });
+  const salesforce = el({ element_id: 'sf', name: 'Salesforce' });
+  const pmSap = el({ element_id: 'pm-sap', element_type: 'container', name: 'PM', parent_id: 'sap' });
+  const pmSf = el({ element_id: 'pm-sf', element_type: 'container', name: 'PM', parent_id: 'sf' });
+  const p = pool([{ element: sap }, { element: salesforce }, { element: pmSap }, { element: pmSf }]);
+
+  it('finds the module by its platform and name together, in any of the written forms', () => {
+    for (const query of ['SAP PM', 'sap · pm', 'SAP-PM', '  sap   pm ']) expect(matchElements(p, query).map((e) => e.element_id)).toEqual(['pm-sap']);
+    expect(matchElements(p, 'salesforce pm').map((e) => e.element_id)).toEqual(['pm-sf']);
+  });
+
+  it("still finds it by its own name alone, and a platform's name alone does not drag in all its modules", () => {
+    expect(matchElements(p, 'pm').map((e) => e.element_id).sort()).toEqual(['pm-sap', 'pm-sf']);
+    expect(matchElements(p, 'sap').map((e) => e.element_id)).toEqual(['sap']);
+  });
+
+  it('finds a module by name when its parent is not in the pool (a pool restricted to one type)', () => {
+    expect(matchElements(pool([{ element: pmSap }]), 'pm').map((e) => e.element_id)).toEqual(['pm-sap']);
+    expect(matchElements(pool([{ element: pmSap }]), 'sap pm')).toEqual([]);
+  });
+});
