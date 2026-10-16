@@ -303,13 +303,45 @@ export function findExternalOrganisationAccess(edges: readonly RelationshipsHead
  * — reused here rather than a second query, since `via` presence is just
  * another attribute on the same rows.
  */
-export function findUnusedIntegrationPlatforms(systems: readonly ElementsHeadRow[], usesAndFlowsToEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
+export function findUnusedIntegrationPlatforms(systems: readonly ElementsHeadRow[], usesAndFlowsToEdges: readonly RelationshipsHeadRow[], containers: readonly ElementsHeadRow[] = []): ElementsHeadRow[] {
+  // ADR-026: a via naming one of the platform's interfaces (a container
+  // whose parent is the platform) routes through the platform too.
+  const parentIdByContainerId = new Map(containers.flatMap((c) => (c.parent_id !== null ? [[c.element_id, c.parent_id] as const] : [])));
   const platformIdsInUse = new Set<UUID>();
-  for (const edge of usesAndFlowsToEdges) {
-    const via = attributesRecord(edge.attributes).via;
-    if (typeof via === 'string') platformIdsInUse.add(via);
+  for (const via of viaIdsOf(usesAndFlowsToEdges)) {
+    platformIdsInUse.add(via);
+    const parentId = parentIdByContainerId.get(via);
+    if (parentId !== undefined) platformIdsInUse.add(parentId);
   }
-  return systems.filter((system) => attributesRecord(system.attributes).kind === 'integration_platform' && !platformIdsInUse.has(system.element_id));
+  return systems.filter((system) => isIntegrationPlatformSystem(system) && !platformIdsInUse.has(system.element_id));
+}
+
+/**
+ * ADR-026's own health finding: every interface — a container whose parent
+ * is an integration platform — that no live `uses`/`flows_to` edge names as
+ * its `via`. The interface-level twin of `findUnusedIntegrationPlatforms`:
+ * a recorded API or feed nothing is shown to use. Each row comes back
+ * named "Platform · Interface", the way every other surface names a module.
+ */
+export function findUnusedIntegrationInterfaces(systems: readonly ElementsHeadRow[], containers: readonly ElementsHeadRow[], usesAndFlowsToEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
+  const platformsById = new Map(systems.filter(isIntegrationPlatformSystem).map((s) => [s.element_id, s]));
+  const viaIds = new Set(viaIdsOf(usesAndFlowsToEdges));
+  return containers.flatMap((container) => {
+    const platform = container.parent_id !== null ? platformsById.get(container.parent_id) : undefined;
+    if (!platform || viaIds.has(container.element_id)) return [];
+    return [{ ...container, name: `${platform.name} · ${container.name}` }];
+  });
+}
+
+function isIntegrationPlatformSystem(row: ElementsHeadRow): boolean {
+  return row.element_type === 'system' && attributesRecord(row.attributes).kind === 'integration_platform';
+}
+
+function viaIdsOf(edges: readonly RelationshipsHeadRow[]): UUID[] {
+  return edges.flatMap((edge) => {
+    const via = attributesRecord(edge.attributes).via;
+    return typeof via === 'string' ? [via] : [];
+  });
 }
 
 /** Every fact at `commitId`, unfiltered by subject — callers scope to the systems they care about (health findings only reads systems' own attributes, not every subject in the model). Routed through `selectAll` (SPEC §6.7): `facts` is one of the tables `max_rows` can silently truncate. */

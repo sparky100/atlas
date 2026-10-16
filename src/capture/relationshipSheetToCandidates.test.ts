@@ -129,4 +129,18 @@ describe('relationshipSheetToCandidates (Sprint F2b, SPEC-capture.md §5.2a)', (
     expect((candidates[0]?.proposal.attributes as Record<string, unknown>).dataClassification).toBeUndefined();
     expect(candidates[0]?.evidence.warnings).toEqual([{ code: 'ENUM_UNPARSED', cell: 'E2', raw: 'top secret' }]);
   });
+  it('reads Protocol in / Protocol out by key or label on uses and flows_to (ADR-026), warning on one it cannot read', () => {
+    const { candidates } = run(
+      ['From', 'Type', 'To', 'Verb', 'Via', 'Protocol in', 'Protocol out'],
+      [
+        ['Meters', 'flows_to', 'Billing', 'sends reads to', 'MuleSoft · Reads API', 'file_sftp', 'REST API'],
+        ['Portal', 'uses', 'CRM', 'reads from', 'MuleSoft', 'carrier pigeon', 'rest api'],
+      ],
+    );
+    expect(candidates.map((c) => c.proposal.attributes)).toEqual([
+      { description: 'sends reads to', protocolIn: 'file_sftp', protocolOut: 'rest_api' },
+      { description: 'reads from', protocolOut: 'rest_api' },
+    ]);
+    expect(candidates[1]?.evidence.warnings).toEqual([{ code: 'ENUM_UNPARSED', cell: 'F3', raw: 'carrier pigeon' }]);
+  });
 });

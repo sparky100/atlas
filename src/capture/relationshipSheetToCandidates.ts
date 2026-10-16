@@ -65,13 +65,14 @@ export interface RelationshipsSheetInput {
   headerRowIndex: number;
 }
 
-function parseDataClassification(raw: string): string | undefined {
-  const field = relationshipAttributeFieldSchema('flows_to', 'dataClassification');
+/** An enum cell read by key, spaced key or label; `undefined` when it is none of them. */
+function parseRelationshipEnum(relationshipType: 'uses' | 'flows_to', key: 'dataClassification' | 'protocolIn' | 'protocolOut', raw: string): string | undefined {
+  const field = relationshipAttributeFieldSchema(relationshipType, key);
   const wanted = raw.trim().toLowerCase();
   const options = field?.options ?? [];
-  const key = options.find((o) => o === wanted) ?? options.find((o) => o === wanted.replace(/[\s-]+/g, '_')) ?? options.find((o) => (field?.optionLabels?.[o] ?? '').toLowerCase() === wanted);
-  if (key === undefined) return undefined;
-  const validated = validateRelationshipAttributeValue('flows_to', 'dataClassification', key);
+  const option = options.find((o) => o === wanted) ?? options.find((o) => o === wanted.replace(/[\s-]+/g, '_')) ?? options.find((o) => (field?.optionLabels?.[o] ?? '').toLowerCase() === wanted);
+  if (option === undefined) return undefined;
+  const validated = validateRelationshipAttributeValue(relationshipType, key, option);
   return validated.ok && typeof validated.value === 'string' ? validated.value : undefined;
 }
 
@@ -105,6 +106,9 @@ export function relationshipSheetToCandidates(input: RelationshipsSheetInput): R
   const viaCol = colIndex(headers, 'via');
   // The export's header is "Data classification"; the JSON/documented form is `data_classification`.
   const dataClassificationCol = colIndex(headers, 'data classification') >= 0 ? colIndex(headers, 'data classification') : colIndex(headers, 'data_classification');
+  // ADR-026: each side's protocol on a flow through a platform.
+  const protocolInCol = colIndex(headers, 'protocol in') >= 0 ? colIndex(headers, 'protocol in') : colIndex(headers, 'protocol_in');
+  const protocolOutCol = colIndex(headers, 'protocol out') >= 0 ? colIndex(headers, 'protocol out') : colIndex(headers, 'protocol_out');
   if (fromCol < 0 || typeCol < 0 || toCol < 0) return { candidates: [], skipped: [] };
 
   const dataRows = extractDataRows(rawSheet, headerRowIndex, fromCol);
@@ -152,19 +156,30 @@ export function relationshipSheetToCandidates(input: RelationshipsSheetInput): R
       continue;
     }
     const via = viaCol >= 0 ? (row.cells[viaCol] ?? '').trim() || undefined : undefined;
-    const dataClassificationRaw = typeRaw === 'flows_to' && dataClassificationCol >= 0 ? (row.cells[dataClassificationCol] ?? '').trim() : '';
     // Read by key, spaced key or label like every other enum cell; a value that is none of them is dropped with a warning, never guessed.
-    const dataClassification = dataClassificationRaw === '' ? undefined : parseDataClassification(dataClassificationRaw);
-    const warnings: EvidenceWarning[] = dataClassificationRaw !== '' && dataClassification === undefined ? [{ code: 'ENUM_UNPARSED', cell: `${headerColumnRefs[dataClassificationCol] ?? '?'}${String(row.rowNumber)}`, raw: dataClassificationRaw }] : [];
+    const warnings: EvidenceWarning[] = [];
+    const enumAttributes: Record<string, string> = {};
+    const readEnum = (key: 'dataClassification' | 'protocolIn' | 'protocolOut', col: number): void => {
+      const raw = col >= 0 ? (row.cells[col] ?? '').trim() : '';
+      if (raw === '') return;
+      const value = parseRelationshipEnum(typeRaw, key, raw);
+      if (value === undefined) warnings.push({ code: 'ENUM_UNPARSED', cell: `${headerColumnRefs[col] ?? '?'}${String(row.rowNumber)}`, raw });
+      else enumAttributes[key] = value;
+    };
+    // `data_classification` on a `uses` row is dropped (`UsesAttributes` has no such key).
+    if (typeRaw === 'flows_to') readEnum('dataClassification', dataClassificationCol);
+    readEnum('protocolIn', protocolInCol);
+    readEnum('protocolOut', protocolOutCol);
 
     const proposal: RelationshipProposal<'uses' | 'flows_to'> = {
       kind: 'relationship',
       relationshipType: typeRaw,
       from: { kind: 'unresolved', text: from },
       to: { kind: 'unresolved', text: to },
-      attributes: { description, ...(dataClassification !== undefined ? { dataClassification } : {}) },
+      attributes: { description, ...enumAttributes },
     };
-    candidates.push({ seq: seq++, proposal, evidence: evidence({ description: 1, ...(dataClassification !== undefined ? { dataClassification: 1 } : {}) }, warnings), ...(via !== undefined ? { viaHint: via } : {}), aliasProposals: [] });
+    const enumConfidence = Object.fromEntries(Object.keys(enumAttributes).map((key) => [key, 1]));
+    candidates.push({ seq: seq++, proposal, evidence: evidence({ description: 1, ...enumConfidence }, warnings), ...(via !== undefined ? { viaHint: via } : {}), aliasProposals: [] });
   }
 
   return { candidates, skipped };

@@ -117,7 +117,7 @@ export function IntegrationPlatformContextView({ hub, flows, endpoints, interfac
       {flows.length === 0 ? (
         <EmptyState>Nothing flows via this {noun} yet.</EmptyState>
       ) : narrow ? (
-        <IntegrationPlatformMobileList flows={flows} endpoints={endpoints} elementHref={elementHref} />
+        <IntegrationPlatformMobileList flows={flows} endpoints={endpoints} elementHref={elementHref} interfaces={interfaces} />
       ) : (
         <>
           <div className={styles.diagram}>

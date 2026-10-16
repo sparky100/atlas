@@ -21,7 +21,7 @@
  * has two columns both called "Type".
  *
  * `.xlsx` is one sheet per element type present in the set plus a
- * `Relationships` sheet (`From, Type, To, Verb, Role, Via, Data classification`) —
+ * `Relationships` sheet (`From, Type, To, Verb, Role, Via, Data classification, Protocol in, Protocol out`) —
  * `verb` from a `uses`/`flows_to` edge's `description`, `role` from a
  * `supports`/`owns` edge's `role`, `via` the integration platform a
  * `uses`/`flows_to` flow goes through, `data classification` a `flows_to`
@@ -165,6 +165,9 @@ export interface RelationshipExportRow {
   /** The integration platform a `uses`/`flows_to` flow goes via, named like an endpoint ("Parent · Name" when the name is shared). */
   via: string;
   dataClassification: string;
+  /** ADR-026: each side's protocol on a flow through a platform (stored keys, read back by key or label). */
+  protocolIn: string;
+  protocolOut: string;
 }
 
 /**
@@ -181,6 +184,13 @@ export function endpointName(element: ElementsHeadRow | undefined, elementsById:
   return parent ? `${parent.name} · ${element.name}` : element.name;
 }
 
+/** A `via` cell: the platform's name, or — ADR-026 — an interface always qualified by its platform ("MuleSoft · Reads API"), so the sheet says which platform the flow goes through even when the interface's own name is unique. */
+function viaName(element: ElementsHeadRow | undefined, elementsById: ReadonlyMap<UUID, ElementsHeadRow>): string {
+  if (!element) return '';
+  const parent = element.parent_id !== null ? elementsById.get(element.parent_id) : undefined;
+  return parent ? `${parent.name} · ${element.name}` : element.name;
+}
+
 /** `supports`/`uses`/`flows_to`/`owns` edges → the Relationships sheet's rows (`verb` = description, `role` = attributes.role). */
 export function relationshipExportRows(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): RelationshipExportRow[] {
   const nameCounts = new Map<string, number>();
@@ -193,8 +203,10 @@ export function relationshipExportRows(edges: readonly RelationshipsHeadRow[], e
       to: endpointName(elementsById.get(edge.to_element_id), elementsById, nameCounts),
       verb: typeof attrs.description === 'string' ? attrs.description : '',
       role: typeof attrs.role === 'string' ? attrs.role : '',
-      via: typeof attrs.via === 'string' ? endpointName(elementsById.get(attrs.via), elementsById, nameCounts) : '',
+      via: typeof attrs.via === 'string' ? viaName(elementsById.get(attrs.via), elementsById) : '',
       dataClassification: typeof attrs.dataClassification === 'string' ? attrs.dataClassification : '',
+      protocolIn: typeof attrs.protocolIn === 'string' ? attrs.protocolIn : '',
+      protocolOut: typeof attrs.protocolOut === 'string' ? attrs.protocolOut : '',
     };
   });
 }
@@ -265,7 +277,7 @@ export function buildExportSheets(rows: readonly BrowseRow[], definitions: reado
   }
   sheets.push({
     name: 'Relationships',
-    cells: [['From', 'Type', 'To', 'Verb', 'Role', 'Via', 'Data classification'], ...relationships.map((rel) => [rel.from, rel.type, rel.to, rel.verb, rel.role, rel.via, rel.dataClassification])],
+    cells: [['From', 'Type', 'To', 'Verb', 'Role', 'Via', 'Data classification', 'Protocol in', 'Protocol out'], ...relationships.map((rel) => [rel.from, rel.type, rel.to, rel.verb, rel.role, rel.via, rel.dataClassification, rel.protocolIn, rel.protocolOut])],
   });
   return sheets;
 }

@@ -47,7 +47,7 @@ test('A flows_to B via M: the third staged prompt records via, M\'s page lists t
   await page.getByPlaceholder('e.g. reads customer records from').fill('sends interval reads to');
   await page.getByRole('button', { name: 'Next' }).click();
   await expect(page.getByText('Does this go via an integration platform?')).toBeVisible();
-  await page.getByPlaceholder('Search platforms…').fill('Enterprise Service Bus');
+  await page.getByPlaceholder('Search platforms and interfaces…').fill('Enterprise Service Bus');
   await page.getByRole('button', { name: /Enterprise Service Bus/ }).click();
   await expect(page.getByRole('link', { name: /Billing Platform/ })).toBeVisible({ timeout: 15_000 });
 
@@ -77,4 +77,49 @@ test('A flows_to B via M: the third staged prompt records via, M\'s page lists t
   await expect(routeViaToggle).not.toBeChecked();
   await routeViaToggle.check();
   await expect(routeViaToggle).toBeChecked();
+});
+
+test('ADR-026: a flow via an interface records each side\'s protocol, and the interface and its platform both list it', async ({ page }) => {
+  const env = loadEnv();
+  const fixture = await bootstrapChangeBranchFixture(page, env, 'interfaces', 'Meter Reading Service');
+  const { signedIn: owner, orgId, orgSlug, modelId, modelSlug, systemId: meterReadingId, userId: ownerId } = fixture;
+
+  const main = await getMainBranch(owner, modelId);
+  if (!main) throw new Error('main branch missing');
+  const source = await getOrCreateManualSource(owner, { id: randomUUID(), orgId, modelId, userId: ownerId });
+  const esbId = randomUUID();
+  const interfaceId = randomUUID();
+  const deltas: Delta[] = [
+    { kind: 'element.create', id: randomUUID(), elementId: randomUUID(), elementType: 'system', name: 'Billing Platform', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: source.id, confidence: 1 },
+    { kind: 'element.create', id: randomUUID(), elementId: esbId, elementType: 'system', name: 'Enterprise Service Bus', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false, kind: 'integration_platform' }, sourceId: source.id, confidence: 1 },
+    { kind: 'element.create', id: randomUUID(), elementId: interfaceId, elementType: 'container', name: 'Reads API', parentId: esbId, attributes: { isExternal: false, interfaceType: 'api', transformation: 'Turns the nightly file into an API' }, sourceId: source.id, confidence: 1 },
+  ];
+  const envelope: CommitEnvelope = { id: randomUUID(), branchId: main.id, parentCommitId: main.head_commit_id, mergedBranchHeadCommitId: null, kind: 'manual', title: 'seed B, the platform and its interface', body: null, deltas };
+  const seedResult = await commitToBranch(owner, { modelId, branchId: main.id, expectedHeadCommitId: main.head_commit_id, envelope });
+  if (!seedResult.ok) throw new Error(`seed: ${seedResult.message}`);
+
+  // 1. A flows_to B via the interface, file in and API out.
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${meterReadingId}`);
+  await expect(page.getByRole('heading', { name: 'Meter Reading Service' })).toBeVisible();
+  await page.getByRole('button', { name: '+ Add flows to' }).click();
+  await page.getByPlaceholder('Search…').fill('Billing Platform');
+  await page.getByRole('button', { name: /Billing Platform/ }).click();
+  await page.getByPlaceholder('e.g. reads customer records from').fill('sends interval reads to');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByLabel('Protocol in').selectOption('file_sftp');
+  await page.getByLabel('Protocol out').selectOption('rest_api');
+  await page.getByPlaceholder('Search platforms and interfaces…').fill('Reads API');
+  await page.getByRole('button', { name: 'Enterprise Service Bus · Reads API' }).click();
+  await expect(page.getByRole('link', { name: /Billing Platform/ })).toBeVisible({ timeout: 15_000 });
+
+  // 2. The interface's own page lists the flow with both protocols.
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${interfaceId}`);
+  await expect(page.getByText('Flows via this interface', { exact: false })).toBeVisible();
+  await expect(page.getByText('File (SFTP) in → REST API out')).toBeVisible();
+
+  // 3. The platform's page lists the interface, and the flow via it.
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${esbId}`);
+  await expect(page.getByRole('heading', { name: 'Enterprise Service Bus' })).toBeVisible();
+  await expect(page.getByText('Flows via this platform', { exact: false })).toBeVisible();
+  await expect(page.getByText('via Reads API')).toBeVisible();
 });

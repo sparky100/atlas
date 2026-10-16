@@ -1030,7 +1030,7 @@ describe('C18 (Prompt 7k item 4, ADR-026): uses.via/flows_to.via must reference 
 
   // ADR-026: an *interface* — a container whose parent is a live integration platform — is accepted as `via` too.
   function containerCreate(id: UUID, elementId: UUID, name: string, parentId: UUID, attributes: Record<string, Json> = {}): Delta {
-    return { kind: 'element.create', id, elementId, elementType: 'container', name, parentId, attributes: { isExternal: false, ...attributes } as never, sourceId: 'src', confidence: 1 };
+    return { kind: 'element.create', id, elementId, elementType: 'container', name, parentId, attributes: { isExternal: false, ...attributes }, sourceId: 'src', confidence: 1 };
   }
 
   it('ADR-026: accepts via set to an interface on an integration platform, carrying each side\'s protocol, and folds them back exactly', () => {

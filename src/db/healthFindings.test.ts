@@ -20,6 +20,7 @@ import {
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
+  findUnusedIntegrationInterfaces,
   findUnusedIntegrationPlatforms,
   isCapabilityOwnedWithAncestry,
 } from './healthFindings';
@@ -605,6 +606,30 @@ describe('findUnusedIntegrationPlatforms (Prompt 7k item 4)', () => {
     const systems = [system('sys-esb-a', { kind: 'integration_platform' }), system('sys-esb-b', { kind: 'integration_platform' })];
     const edges = [relationship('r1', 'uses', 'sys-a', 'sys-b', { via: 'sys-esb-b' })];
     expect(findUnusedIntegrationPlatforms(systems, edges).map((s) => s.element_id)).toEqual(['sys-esb-a']);
+  });
+});
+
+describe('integration interfaces (ADR-026)', () => {
+  const esb = system('sys-esb', { kind: 'integration_platform' });
+
+  it('a via naming one of the platform\'s interfaces counts as the platform being used', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-a', 'sys-b', { via: 'if-api' })];
+    expect(findUnusedIntegrationPlatforms([esb], edges, [container('if-api', 'sys-esb')])).toEqual([]);
+  });
+
+  it('flags an interface nothing flows via, named Platform · Interface', () => {
+    const containers = [container('if-api', 'sys-esb'), container('if-file', 'sys-esb')];
+    const edges = [relationship('r1', 'flows_to', 'sys-a', 'sys-b', { via: 'if-api' })];
+    expect(findUnusedIntegrationInterfaces([{ ...esb, name: 'ESB' }], containers, edges).map((c) => [c.element_id, c.name])).toEqual([['if-file', 'ESB · Container if-file']]);
+  });
+
+  it('a flow via the platform itself does not clear its interfaces', () => {
+    const edges = [relationship('r1', 'uses', 'sys-a', 'sys-b', { via: 'sys-esb' })];
+    expect(findUnusedIntegrationInterfaces([esb], [container('if-api', 'sys-esb')], edges).map((c) => c.element_id)).toEqual(['if-api']);
+  });
+
+  it('never flags a module of an ordinary platform', () => {
+    expect(findUnusedIntegrationInterfaces([system('sap')], [container('pm', 'sap')], [])).toEqual([]);
   });
 });
 

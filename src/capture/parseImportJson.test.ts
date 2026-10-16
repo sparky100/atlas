@@ -40,7 +40,7 @@ describe('parseImportJson', () => {
     const result = await parseImportJson(file);
     expect(result.errors).toEqual([]);
     expect(result.relationshipErrors).toEqual([]);
-    expect(result.relationshipRows).toEqual([{ rowNumber: 1, from: 'Northgate', type: 'uses', to: 'Southgate', description: 'reads accounts from', via: null, dataClassification: null }]);
+    expect(result.relationshipRows).toEqual([{ rowNumber: 1, from: 'Northgate', type: 'uses', to: 'Southgate', description: 'reads accounts from', via: null, dataClassification: null, protocolIn: null, protocolOut: null }]);
     expect(result.changeErrors).toEqual([]);
     expect(result.changeRows).toEqual([{ rowNumber: 1, name: 'Legacy CRM', action: 'retire', reason: 'Decommissioned', replacedBy: null, quote: undefined, confidence: undefined }]);
   });

@@ -1,6 +1,6 @@
 # ADR-026: Integration interfaces — what an integration platform actually exposes
 
-**Status:** **Proposed 2026-10-16** — option (c), the hybrid, chosen by the human; the open points under "Decisions to confirm" need answers before the build starts.
+**Status:** **Accepted 2026-10-16** — option (c), the hybrid, chosen by the human; all four points under "Decisions confirmed" agreed as proposed ("yes to all four").
 **Depends on:** ADR-000's "Amended (Prompt 7k item 4, integration platforms)" (`SystemAttributes.kind`, `UsesAttributes.via`/`FlowsToAttributes.via`, invariant C18), ADR-001 (containers: a module of a platform is a `container` whose `parentId` is that system), ADR-024's change-impact amendment (an integration counts only its consuming side), SPEC §4 (the delta format), rule 1 of `CLAUDE.md`.
 
 ## Context
@@ -46,9 +46,19 @@ That is enough for "A talks to B through MuleSoft". It is not enough for what in
 
 Orchestration logic — sequencing, conditional routing, retries, error queues. That belongs to the platform's own tooling; an architecture model records *what* connects to *what*, through *which* interface, carrying *which* data.
 
-## Decisions to confirm
+## Decisions confirmed (2026-10-16)
 
 1. **Interface form:** a typed module of the platform (this ADR), rather than a new element type. A new type would mean a migration (element type enum, relationship rules) and new pages for little gain.
-2. **`InterfaceType` list** — proposed: `api`, `file`, `event` (topic/queue), `batch` (scheduled job), `database` (view/replication), `ot_gateway` (OT protocol bridge), `other`.
-3. **Protocol list** — proposed fixed list with an escape hatch, so reports can count by it: `rest_api`, `soap`, `graphql`, `file_sftp`, `file_share`, `event_queue`, `database`, `email`, `iccp`, `dnp3`, `iec_61850`, `modbus`, `opc_ua`, `manual`, `other`. (The OT protocols because this is a networks business; confirm which matter.)
+2. **`InterfaceType` list** — `api`, `file`, `event` (topic/queue), `batch` (scheduled job), `database` (view/replication), `ot_gateway` (OT protocol bridge), `other`.
+3. **Protocol list** — fixed list with an escape hatch, so reports can count by it: `rest_api`, `soap`, `graphql`, `file_sftp`, `file_share`, `event_queue`, `database`, `email`, `iccp`, `dnp3`, `iec_61850`, `modbus`, `opc_ua`, `manual`, `other` (the OT protocols because this is a networks business).
 4. **The existing single `protocol`** on `flows_to` stays as the direct-flow protocol (this ADR), rather than being migrated into `protocolIn`/`protocolOut`.
+
+## As built
+
+- **Contracts:** `InterfaceType`, `IntegrationProtocol`, `ContainerAttributes.interfaceType`/`transformation`, `UsesAttributes`/`FlowsToAttributes.protocolIn`/`protocolOut` (`src/contracts/delta.ts`); fields and option lists in `attributeSchema.ts` (both `hideWhenEmpty`) and `relationshipAttributeSchema.ts`.
+- **C18** (`src/engine/deltas.ts`, `checkVia`): accepts a live integration platform, or a live container whose parent is one. Property tests in `deltas.property.test.ts`.
+- **Views:** the element page of an integration platform lists its **Interfaces** and **Flows via this platform** (flows via any of its interfaces included); an interface's page lists **Flows via this interface**, each with its side protocols. The platform Context view draws an interface band per interface inside the hub (flows naming only the platform under a dashed "Via the platform" band); an interface's own Context view is the same diagram for its flows alone. The Landscape routes a flow via an interface through the interface's platform.
+- **Add relationship:** the via stage searches platforms and interfaces, and offers optional Protocol in / Protocol out.
+- **Export/import:** Relationships sheet `Protocol in`/`Protocol out`; an interface `Via` is always written "Platform · Interface"; the module sheet's `Interface type`/`Transformation` columns come from the schema and are read back (synonym roles `interfaceType`/`transformation`). The importer resolves a via to an interface by exact name, bare or qualified, never by trigram. JSON import: `interface_type`, `transformation`, `protocol_in`, `protocol_out`. Covered by `exportImportRoundTrip.integration.test.ts`.
+- **Health:** "integration interfaces with nothing flowing via them" (`findUnusedIntegrationInterfaces`); the unused-platform finding counts flows via its interfaces.
+- **Not built:** a protocol column for the direct-flow `protocol` on the Relationships sheet (unchanged from before), and editing `interfaceType`/`transformation` on the JSON import of a top-level system (refused by validation — an interface is always a module).

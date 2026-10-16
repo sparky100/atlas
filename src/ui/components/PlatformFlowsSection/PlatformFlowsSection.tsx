@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { INTEGRATION_PROTOCOL_LABELS } from '../../../contracts/relationshipAttributeSchema';
+import { protocolSides } from './protocolSides';
 import type { UUID } from '../../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../../contracts/rows';
 import { Chip } from '../Chip/Chip';
@@ -77,15 +77,6 @@ export function PlatformFlowsSection({ orgSlug, modelSlug, flows, endpoints, int
   );
 }
 
-/** ADR-026: "File (SFTP) in → REST API out", or one side alone, or the single direct-flow protocol read as both sides; null when none is recorded. */
-function protocolSides(attrs: Record<string, unknown>): string | null {
-  const label = (value: unknown): string | null => (typeof value === 'string' && value in INTEGRATION_PROTOCOL_LABELS ? INTEGRATION_PROTOCOL_LABELS[value as keyof typeof INTEGRATION_PROTOCOL_LABELS] : typeof value === 'string' && value.trim() !== '' ? value : null);
-  const inLabel = label(attrs.protocolIn) ?? label(attrs.protocol);
-  const outLabel = label(attrs.protocolOut) ?? label(attrs.protocol);
-  if (inLabel === null && outLabel === null) return null;
-  if (inLabel !== null && outLabel !== null) return inLabel === outLabel ? inLabel : `${inLabel} in → ${outLabel} out`;
-  return inLabel !== null ? `${inLabel} in` : `${outLabel ?? ''} out`;
-}
 
 function EndpointLink({
   orgSlug,

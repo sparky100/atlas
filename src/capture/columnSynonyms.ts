@@ -39,7 +39,10 @@ export type SynonymOnlyColumnRole =
   | 'orgUnit'
   | 'capabilityCode'
   | 'importance'
-  | 'essentialFunction';
+  | 'essentialFunction'
+  // ADR-026: an interface's own two attributes, on the module sheet.
+  | 'interfaceType'
+  | 'transformation';
 
 /** Every role a column can end up with: prompt A's own, plus the synonym-only ones. */
 export type ColumnRole = PromptAColumnRole | SynonymOnlyColumnRole;
@@ -84,6 +87,8 @@ const COLUMN_SYNONYMS_RAW: Readonly<Record<ColumnRole, readonly string[]>> = {
   capabilityCode: ['Reference'],
   importance: ['Importance'],
   essentialFunction: ['Essential function (NIS/CAF)'],
+  interfaceType: ['Interface type'],
+  transformation: ['Transformation'],
 };
 
 const COLUMN_SYNONYMS: ReadonlyMap<string, ColumnRole> = new Map(

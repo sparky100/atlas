@@ -21,6 +21,7 @@ import {
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
+  findUnusedIntegrationInterfaces,
   findUnusedIntegrationPlatforms,
   listAllOwnsEdges,
   listAllUsesAndFlowsToEdges,
@@ -67,6 +68,8 @@ export type ElementBrowseFilter =
   | 'critical-no-business-owner'
   | 'critical-exposed'
   | 'unused-integration-platform'
+  /** ADR-026: interfaces on an integration platform nothing flows via (`findUnusedIntegrationInterfaces`). */
+  | 'unused-integration-interface'
   | 'essential-no-technical-owner'
   | 'critical-support-end'
   /** Per-item-actions prompt: the third decision-shaped finding, `findCapabilitiesWithNoSupporters`'s own filter key (`ArchitectHome.tsx`'s `capability-no-supporters` check). */
@@ -293,7 +296,13 @@ export function useElementBrowse(
       } else if (filter === 'unused-integration-platform') {
         const systems = elements.filter((e) => e.element_type === 'system');
         const usesAndFlowsToEdges = await getUsesAndFlowsToEdges();
-        ids = new Set(findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges).map((e) => e.element_id));
+        const containers = elements.filter((e) => e.element_type === 'container');
+        ids = new Set(findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges, containers).map((e) => e.element_id));
+      } else if (filter === 'unused-integration-interface') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const containers = elements.filter((e) => e.element_type === 'container');
+        const usesAndFlowsToEdges = await getUsesAndFlowsToEdges();
+        ids = new Set(findUnusedIntegrationInterfaces(systems, containers, usesAndFlowsToEdges).map((e) => e.element_id));
       } else if (filter === 'essential-no-technical-owner') {
         const systems = elements.filter((e) => e.element_type === 'system');
         const containers = elements.filter((e) => e.element_type === 'container');
