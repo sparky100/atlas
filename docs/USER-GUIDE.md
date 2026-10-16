@@ -46,6 +46,7 @@ Atlas models these kinds of thing:
 - **Capability** — something the organisation does (a business function), independent of any system. Capabilities nest inside each other (e.g. *Customer service › Contact › Complaints*); the capability map shows three levels.
 - **System** — a named piece of software or a service. A system has a **kind**: application, integration platform, data platform, infrastructure, or **platform**.
 - **Container** — something inside a system. Inside a **platform** (a large system such as an ERP), a container is a **module** — "Finance" inside "SAP", say. A module can set its own lifecycle, criticality, hosting, domain, run cost and disposition; where it leaves one unset it reads its platform's (except disposition, which is never inherited).
+- **Interface** — a container inside an **integration platform** (MuleSoft, say) is an **interface**: an API, file drop, event topic, batch job, database feed or OT gateway the platform exposes or consumes. An interface records its **interface type** and, optionally, its **transformation** — what the platform does to the data (maps, enriches, combines, turns a file into an API).
 - **Actor** — a person, team or organisation that owns or uses things. Actors can be internal or external.
 - **Value stream** — how the organisation delivers an outcome, as a sequence of stages.
 
@@ -55,7 +56,7 @@ Elements connect through **relationships**, which you record yourself:
 
 - **supports** — a system or module supports a capability. One of a system's supports links can be **primary** (it decides which lane the system sits in on the landscape). A supports link carries a **fit** rating: excellent, good, adequate or poor.
 - **owns** — an actor owns a capability, system or module, as its **business**, **technical** or **service** owner.
-- **uses** and **flows to** — between systems and modules (and actors using systems), optionally with a verb and a data classification.
+- **uses** and **flows to** — between systems and modules (and actors using systems), optionally with a verb and a data classification. A flow can go **via** an integration platform, or via one of its interfaces, and then records the protocol on each side — **protocol in** (source → platform) and **protocol out** (platform → target), e.g. file over SFTP in, REST API out. Several flows via the same interface is how reuse and combining show: the interface's page lists every flow via it, and the platform's context diagram groups its flows by interface. Health findings flag an integration platform, or an interface, that nothing flows via.
 - **replaces** — one system or module replaces another (recorded when you retire something with a replacement).
 - **enables** — a capability enables a value-stream stage.
 

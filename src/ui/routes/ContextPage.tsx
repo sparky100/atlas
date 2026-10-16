@@ -174,6 +174,7 @@ export function ContextPage() {
             hub={state.data.hub}
             flows={state.data.flows}
             endpoints={state.data.endpoints}
+            interfaces={state.data.interfaces}
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}
             refParam={refParam}

@@ -327,6 +327,37 @@ function resolveTextRef(text: string, expectedTypes: readonly ElementType[], run
 
 const INTEGRATION_PLATFORM_FILTER = (elementType: ElementType, attributes: Record<string, unknown>): boolean => elementType === 'system' && attributes.kind === 'integration_platform';
 
+/**
+ * ADR-026: a `via` may name an interface — a container whose parent is an
+ * integration platform — by itself ("Reads API") or qualified by its
+ * platform ("MuleSoft · Reads API", how the export writes one). Exact names
+ * only, never trigram: a fuzzy hit on some other platform's module would
+ * silently reroute the flow. Tried before the platform itself, so the
+ * qualified form is never fuzzy-matched to its bare platform. Two
+ * interfaces answering to one name is ambiguous, and refused.
+ */
+function resolveInterfaceRef(text: string, runIndex: RunElementIndex, resolvedSubjectBySeq: ReadonlyMap<number, UUID | null>, matchIndex: MatchIndex): UUID | null {
+  const normalised = normaliseName(text);
+  const named = (parentName: string, name: string): boolean => normaliseName(name) === normalised || normaliseName(`${parentName} ${name}`) === normalised;
+  const hits = new Set<UUID>();
+  for (const candidate of runIndex.byType.get('container') ?? []) {
+    if (candidate.proposal.kind !== 'element' || candidate.proposal.parent?.kind !== 'unresolved') continue;
+    const parentText = candidate.proposal.parent.text;
+    if (!named(parentText, candidate.proposal.name)) continue;
+    if (resolveTextRef(parentText, ['system'], runIndex, resolvedSubjectBySeq, matchIndex, INTEGRATION_PLATFORM_FILTER) === null) continue;
+    const resolved = resolvedSubjectBySeq.get(candidate.seq);
+    if (resolved !== undefined && resolved !== null) hits.add(resolved);
+  }
+  for (const element of matchIndex.elementsByType.get('container') ?? []) {
+    const parent = element.parent_id !== null ? matchIndex.elements.get(element.parent_id) : undefined;
+    if (!parent || !INTEGRATION_PLATFORM_FILTER(parent.element_type, parent.attributes as Record<string, unknown>)) continue;
+    if (named(parent.name, element.name)) hits.add(element.element_id);
+  }
+  if (hits.size !== 1) return null;
+  const [only] = hits;
+  return only ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Row keys (§9.1) — needs each resolved subject's own identifying triple.
 // For a run-minted candidate this is the document's own name/parent text;
@@ -584,9 +615,9 @@ function resolveRelationshipCandidate(
   let attributes: Record<string, unknown> = { ...(proposal.attributes as Record<string, unknown>) };
   const viaHint = candidate.viaHint;
   if (viaHint !== undefined) {
-    const viaId = resolveTextRef(viaHint, ['system'], runIndex, resolvedSubjectBySeq, matchIndex, INTEGRATION_PLATFORM_FILTER);
+    const viaId = resolveInterfaceRef(viaHint, runIndex, resolvedSubjectBySeq, matchIndex) ?? resolveTextRef(viaHint, ['system'], runIndex, resolvedSubjectBySeq, matchIndex, INTEGRATION_PLATFORM_FILTER);
     if (viaId !== null) attributes = { ...attributes, via: viaId };
-    // §7.4/§5.2: an unresolved `via` (no such system, or not an integration platform) is dropped, never invalidating (`via` is optional) — but no longer silently: the same `ENDPOINT_UNRESOLVED` warning a missing endpoint gets, with `end: 'via'` (the code's own type already named it), so the review shows the flow was imported as direct.
+    // §7.4/§5.2: an unresolved `via` (no such system, or not an integration platform or an interface on one) is dropped, never invalidating (`via` is optional) — but no longer silently: the same `ENDPOINT_UNRESOLVED` warning a missing endpoint gets, with `end: 'via'` (the code's own type already named it), so the review shows the flow was imported as direct.
     else extraWarnings.push({ code: 'ENDPOINT_UNRESOLVED', text: viaHint, end: 'via' });
   }
 
@@ -897,7 +928,9 @@ function buildJsonRelationshipCandidates(rows: readonly ImportRelationshipRow[],
     const confidence = jsonConfidence(row.confidence);
     const attributes: Record<string, unknown> = { description: row.description };
     if (row.type === 'flows_to' && row.dataClassification !== null) attributes.dataClassification = row.dataClassification;
-    const attributeConfidence: Record<string, number> = { description: confidence, ...(attributes.dataClassification !== undefined ? { dataClassification: confidence } : {}) };
+    if (row.protocolIn !== null) attributes.protocolIn = row.protocolIn;
+    if (row.protocolOut !== null) attributes.protocolOut = row.protocolOut;
+    const attributeConfidence: Record<string, number> = Object.fromEntries(Object.keys(attributes).map((key) => [key, confidence]));
 
     const proposal: RelationshipProposal<'uses' | 'flows_to'> = { kind: 'relationship', relationshipType: row.type, from: { kind: 'unresolved', text: row.from }, to: { kind: 'unresolved', text: row.to }, attributes };
     const evidence: CandidateEvidence = { sourceRef: jsonSourceRef(index), passage: jsonPassage(row.quote, row), extractor: 'json-authored', attributeConfidence, warnings: [] };

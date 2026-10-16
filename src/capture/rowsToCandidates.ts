@@ -109,6 +109,8 @@ const SCHEMA_ATTRIBUTE_ROLE_KEYS: Partial<Record<Role, string>> = {
   capabilityCode: 'code',
   importance: 'importance',
   essentialFunction: 'essentialFunction',
+  interfaceType: 'interfaceType',
+  transformation: 'transformation',
 };
 
 /** `undefined`: this element type has no such attribute. `null`: the cell isn't a legal value for it. Otherwise the value to record. An enum cell may be the stored key (`on_premises`), the key spaced or hyphenated (`on premises`), or its label ("Under £50k"). */

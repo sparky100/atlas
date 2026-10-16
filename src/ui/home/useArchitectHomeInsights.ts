@@ -26,6 +26,7 @@ import {
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
+  findUnusedIntegrationInterfaces,
   findUnusedIntegrationPlatforms,
   listAllOwnsEdges,
   listAllUsesAndFlowsToEdges,
@@ -82,6 +83,8 @@ export interface ArchitectHomeInsightsData {
   boundaryCrossingsMissingVerb: BoundaryCrossing[];
   /** Prompt 7k item 4's own health finding: integration platforms with nothing routed via them. */
   unusedIntegrationPlatforms: ElementsHeadRow[];
+  /** ADR-026: interfaces on an integration platform that nothing flows via (`findUnusedIntegrationInterfaces`), named "Platform · Interface". */
+  unusedIntegrationInterfaces: ElementsHeadRow[];
   /** Prompt 7k item 5's first Assurance finding: systems supporting an `essentialFunction` capability with no `role: 'technical'` owner. */
   systemsSupportingEssentialFunctionWithoutTechnicalOwner: ElementsHeadRow[];
   /** Prompt 7k item 5's second Assurance finding: boundary crossings missing a data classification (the CAF A3/B4-relevant subset of item 3's own wider finding). */
@@ -225,7 +228,8 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             criticalSystemsWithoutBusinessOwner: findCriticalSystemsWithoutBusinessOwner([...systems, ...containers], ownsEdges),
             criticalExposedSystems: findCriticalExposedSystems(systems),
             boundaryCrossingsMissingVerb: findBoundaryCrossingsMissingVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
-            unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges),
+            unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges, containers),
+            unusedIntegrationInterfaces: findUnusedIntegrationInterfaces(systems, containers, usesAndFlowsToEdges),
             systemsSupportingEssentialFunctionWithoutTechnicalOwner: findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...systems, ...containers], capabilities, supportsEdges, ownsEdges),
             boundaryCrossingsMissingClassification: findBoundaryCrossingsMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             criticalSystemsPastOrNearSupportEnd: findCriticalSystemsPastOrNearSupportEnd(systems),

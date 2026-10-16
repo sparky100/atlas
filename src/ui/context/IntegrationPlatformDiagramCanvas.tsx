@@ -6,6 +6,7 @@ import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
+import { INTERFACE_TYPE_LABELS } from '../../contracts/attributeSchema';
 import { platformTileElement } from './platformTileElement';
 import { quantizeScale, wheelZoomFactor } from '../landscape/zoom';
 import { NODE_WIDTH } from '../landscape/layout';
@@ -18,6 +19,8 @@ export interface IntegrationPlatformDiagramCanvasProps {
   targetIds: readonly UUID[];
   edges: readonly PlatformFlowEdgeInput[];
   elementsById: ReadonlyMap<UUID, ElementsHeadRow>;
+  /** ADR-026: interface names for the bands drawn inside the platform tile. */
+  interfaces?: ReadonlyMap<UUID, ElementsHeadRow> | undefined;
   /** A system/container neighbour tile navigates to its own Context page; an actor (no Context view of its own, same reasoning `ContextDiagramCanvas.tsx`'s own prop comment gives) falls back to `elementHref`. */
   neighbourContextHref: (elementId: UUID) => string;
   elementHref: (elementId: UUID) => string;
@@ -161,7 +164,7 @@ function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, cy: nu
  * already carry each container's own parent for this to resolve, same
  * requirement `contextGrouping.ts`'s own `computeContextGroup` documents.
  */
-export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, edges, elementsById, neighbourContextHref, elementHref }: IntegrationPlatformDiagramCanvasProps) {
+export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, edges, elementsById, interfaces, neighbourContextHref, elementHref }: IntegrationPlatformDiagramCanvasProps) {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -289,13 +292,37 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
 
         if (zoomShowsText) {
           const glyph = element.element_type === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph(element.element_type);
-          nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: tile.y + tile.h / 2, maxWidth: tile.w - 30 });
+          // With interface bands inside it, the platform's own name sits in the header strip at the top of its tile.
+          const labelY = isHub && layout.hubHeaderHeight > 0 ? tile.y + layout.hubHeaderHeight / 2 + 2 : tile.y + tile.h / 2;
+          nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: labelY, maxWidth: tile.w - 30 });
         }
       };
 
       for (const tile of layout.sources) drawTile(tile, false);
       for (const tile of layout.targets) drawTile(tile, false);
       drawTile(layout.hub, true);
+
+      // ADR-026: one band per interface inside the platform tile, spanning the flows that go through it, labelled with the interface's name and type; flows that name only the platform sit in a last, plainer band.
+      const bandLabels: { text: string; worldX: number; worldY: number; maxWidth: number; muted: boolean }[] = [];
+      for (const band of layout.interfaceBands) {
+        const inset = 8;
+        ctx.save();
+        roundRectPath(ctx, layout.hub.x + inset, band.top + 2, layout.hub.w - inset * 2, band.bottom - band.top - 4, 6);
+        ctx.fillStyle = band.interfaceId === null ? 'transparent' : tokens.surfaceRaised;
+        ctx.fill();
+        ctx.strokeStyle = tokens.border;
+        ctx.lineWidth = 1;
+        if (band.interfaceId === null) ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        if (zoomShowsText) {
+          const iface = band.interfaceId !== null ? interfaces?.get(band.interfaceId) : undefined;
+          const type = iface ? attributesRecord(iface.attributes).interfaceType : undefined;
+          const typeLabel = typeof type === 'string' && type in INTERFACE_TYPE_LABELS ? ` · ${INTERFACE_TYPE_LABELS[type as keyof typeof INTERFACE_TYPE_LABELS]}` : '';
+          bandLabels.push({ text: iface ? `${iface.name}${typeLabel}` : 'Via the platform', worldX: layout.hub.x + inset + 8, worldY: (band.top + band.bottom) / 2, maxWidth: layout.hub.w - inset * 2 - 16, muted: iface === undefined });
+        }
+      }
 
       ctx.restore();
 
@@ -312,6 +339,13 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
         ctx.font = `${(12 * textScale).toFixed(2)}px sans-serif`;
         const truncated = truncate(ctx, label.name, label.maxWidth * transform.scale);
         ctx.fillText(truncated, x + 26 * transform.scale, y);
+      }
+
+      ctx.font = `${(11 * textScale).toFixed(2)}px sans-serif`;
+      for (const label of bandLabels) {
+        const [x, y] = toScreen(label.worldX, label.worldY);
+        ctx.fillStyle = label.muted ? tokens.textMuted : tokens.text;
+        ctx.fillText(truncate(ctx, label.text, label.maxWidth * transform.scale), x, y);
       }
 
       // Rework of `contextDiagramLayout.ts`'s own pill drawing, simplified
@@ -342,7 +376,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
     return () => {
       observer.disconnect();
     };
-  }, [layout, elementsById, hub, transform, hover, zoomShowsText]);
+  }, [layout, elementsById, interfaces, hub, transform, hover, zoomShowsText]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);

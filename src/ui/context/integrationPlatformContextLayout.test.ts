@@ -171,3 +171,31 @@ describe('integration platform diagram — telling the flows apart', () => {
     expect(layout.edges[0]?.flowNumber).toBe(1);
   });
 });
+
+describe('integration platform diagram — grouping flows by interface (ADR-026)', () => {
+  const edge = (id: string, sourceId: string, targetId: string, interfaceId: string | null) => ({ id, sourceId, targetId, verbLabel: 'sends to', classificationLabel: null, crossesBoundary: false, interfaceId });
+
+  it('draws no bands and no header when no flow names an interface', () => {
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0'], ['t0'], [edge('a', 's0', 't0', null)]);
+    expect(layout.interfaceBands).toEqual([]);
+    expect(layout.hubHeaderHeight).toBe(0);
+  });
+
+  it("gives each interface one band holding exactly its flows' attach points on both edges of the platform, with the platform's own flows last", () => {
+    const edges = [edge('a', 's0', 't0', 'api'), edge('b', 's1', 't1', null), edge('c', 's2', 't0', 'api'), edge('d', 's1', 't1', 'file')];
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0', 's1', 's2'], ['t0', 't1'], edges);
+    expect(layout.interfaceBands.map((b) => b.interfaceId)).toEqual(['api', 'file', null]);
+    expect(layout.hubHeaderHeight).toBeGreaterThan(0);
+    for (const routed of layout.edges) {
+      const band = layout.interfaceBands.find((b) => b.interfaceId === (edges.find((e) => e.id === routed.id)?.interfaceId ?? null));
+      const inY = routed.sourceSegment[routed.sourceSegment.length - 1]?.y ?? 0;
+      const outY = routed.targetSegment[0]?.y ?? 0;
+      expect(band && inY >= band.top && inY <= band.bottom).toBe(true);
+      expect(band && outY >= band.top && outY <= band.bottom).toBe(true);
+    }
+    // Bands never overlap, and sit below the platform's own header.
+    const sorted = [...layout.interfaceBands].sort((x, y) => x.top - y.top);
+    for (let i = 1; i < sorted.length; i++) expect((sorted[i]?.top ?? 0) >= (sorted[i - 1]?.bottom ?? 0) - 0.001).toBe(true);
+    expect((sorted[0]?.top ?? 0) >= layout.hub.y + layout.hubHeaderHeight - 0.001).toBe(true);
+  });
+});

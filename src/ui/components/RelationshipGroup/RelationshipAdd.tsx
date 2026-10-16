@@ -1,11 +1,12 @@
 import { useId, useRef, useState } from 'react';
-import type { ElementType, OwnsRole, RelationshipType, UUID } from '../../../contracts/delta';
+import type { ElementType, IntegrationProtocol, OwnsRole, RelationshipType, UUID } from '../../../contracts/delta';
+import { INTEGRATION_PROTOCOL_LEVELS } from '../../../contracts/relationshipAttributeSchema';
 import type { FactsRow, RelationshipsHeadRow } from '../../../contracts/rows';
 import type { RelationshipGroupSlot } from '../../../contracts/relationshipTypeRules';
 import type { BranchRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
 import { moduleDisplayName } from '../../elements/moduleDisplayName';
-import { isIntegrationPlatform } from '../../elements/systemKind';
+import { isIntegrationInterface, isIntegrationPlatform } from '../../elements/systemKind';
 import { useRelationshipCreate, type RelationshipCreateDemotion } from '../../elements/useRelationshipCreate';
 import { useRelationshipTargetSearch } from '../../elements/useRelationshipTargetSearch';
 import { Button } from '../Button/Button';
@@ -142,6 +143,11 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   const [pendingTarget, setPendingTarget] = useState<PendingTarget | null>(null);
   const [labelDraft, setLabelDraft] = useState('');
   const [showViaStage, setShowViaStage] = useState(false);
+  // ADR-026: each side's protocol, asked alongside the via pick — both optional.
+  const [protocolIn, setProtocolIn] = useState<IntegrationProtocol | ''>('');
+  const [protocolOut, setProtocolOut] = useState<IntegrationProtocol | ''>('');
+  const protocolInId = useId();
+  const protocolOutId = useId();
   const labelId = useId();
   // A target added earlier on this same change (a second new system this
   // element should relate to, say) is otherwise invisible to a main-only
@@ -170,7 +176,9 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   // Only mounted (its own fetch enabled) for uses/flows_to slots — see this
   // hook's own `enabled` doc comment for why every other slot on the same
   // element page must not also pay for a redundant system-pool query.
-  const viaSearch = useRelationshipTargetSearch(searchCommitId, modelId, ['system'], elementId, needsLabel, branchCommitId);
+  // ADR-026: containers too, so an interface on a platform (a container
+  // whose parent is an integration platform) can be the via.
+  const viaSearch = useRelationshipTargetSearch(searchCommitId, modelId, ['system', 'container'], elementId, needsLabel, branchCommitId);
   // Set right before each `create()` call so the hook's own success callback
   // (which carries no arguments of its own) can still report which element
   // the new relationship points at (Handoff — Flow: Add a system, step 7).
@@ -190,6 +198,8 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
       setPendingTarget(null);
       setLabelDraft('');
       setShowViaStage(false);
+      setProtocolIn('');
+      setProtocolOut('');
       if (targetIdRef.current) onCreated(targetIdRef.current);
     },
   });
@@ -240,7 +250,8 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
     if (!pendingTarget) return;
     targetIdRef.current = pendingTarget.elementId;
     const description = labelDraft.trim();
-    void create(pendingTarget.elementId, pendingTarget.name, via ? { description, via } : { description });
+    const protocols = { ...(protocolIn !== '' ? { protocolIn } : {}), ...(protocolOut !== '' ? { protocolOut } : {}) };
+    void create(pendingTarget.elementId, pendingTarget.name, via ? { description, via, ...protocols } : { description });
   }
 
   function answerOwnsRole(role: OwnsRole): void {
@@ -270,6 +281,8 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
     setPendingTarget(null);
     setLabelDraft('');
     setShowViaStage(false);
+    setProtocolIn('');
+    setProtocolOut('');
   };
 
   if (!open) {
@@ -354,7 +367,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   }
 
   if (pendingTarget && needsLabel && showViaStage) {
-    const platformResults = viaSearch.results.filter((el) => isIntegrationPlatform(el) && el.element_id !== pendingTarget.elementId);
+    const platformResults = viaSearch.results.filter((el) => el.element_id !== pendingTarget.elementId && (el.element_type === 'system' ? isIntegrationPlatform(el) : isIntegrationInterface(el, viaSearch.resultParents.get(el.element_id) ?? null)));
     return (
       <div className={styles.panel}>
         <Text as="p" size="sm">
@@ -365,10 +378,38 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
           autoFocus
           type="text"
           className={styles.input}
-          placeholder="Search platforms…"
+          placeholder="Search platforms and interfaces…"
           value={viaSearch.query}
           onChange={(e) => { viaSearch.setQuery(e.target.value); }}
         />
+        <div className={styles.protocolRow}>
+          <label htmlFor={protocolInId}>
+            <Text as="span" size="sm" tone="muted">
+              Protocol in
+            </Text>
+          </label>
+          <select id={protocolInId} className={styles.input} value={protocolIn} onChange={(e) => { setProtocolIn(e.target.value as IntegrationProtocol | ''); }}>
+            <option value="">Not recorded</option>
+            {INTEGRATION_PROTOCOL_LEVELS.map((level) => (
+              <option key={level.key} value={level.key}>
+                {level.label}
+              </option>
+            ))}
+          </select>
+          <label htmlFor={protocolOutId}>
+            <Text as="span" size="sm" tone="muted">
+              Protocol out
+            </Text>
+          </label>
+          <select id={protocolOutId} className={styles.input} value={protocolOut} onChange={(e) => { setProtocolOut(e.target.value as IntegrationProtocol | ''); }}>
+            <option value="">Not recorded</option>
+            {INTEGRATION_PROTOCOL_LEVELS.map((level) => (
+              <option key={level.key} value={level.key}>
+                {level.label}
+              </option>
+            ))}
+          </select>
+        </div>
         {viaSearch.status === 'loading' && (
           <Text as="p" tone="muted" size="sm">
             Loading…
@@ -376,7 +417,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
         )}
         {viaSearch.status === 'ready' && viaSearch.query.trim().length > 0 && platformResults.length === 0 && (
           <Text as="p" tone="muted" size="sm">
-            No integration platforms match.
+            No integration platforms or interfaces match.
           </Text>
         )}
         {platformResults.length > 0 && (
@@ -385,7 +426,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
               <li key={platform.element_id}>
                 <button type="button" className={styles.resultRow} disabled={status === 'creating'} onClick={() => { finalizeWithVia(platform.element_id); }}>
                   <ElementTypeGlyph type={platform.element_type} />
-                  <Text as="span">{platform.name}</Text>
+                  <Text as="span">{moduleDisplayName(platform, viaSearch.resultParents.get(platform.element_id) ?? null)}</Text>
                 </button>
               </li>
             ))}

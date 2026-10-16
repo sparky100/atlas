@@ -4,7 +4,7 @@ import { validateImportRelationshipRow } from './importRelationshipRow';
 describe('validateImportRelationshipRow', () => {
   it('accepts a minimal uses row', () => {
     const result = validateImportRelationshipRow({ from: 'Northgate', type: 'uses', to: 'Southgate', description: 'reads accounts from' }, 2);
-    expect(result).toEqual({ ok: true, row: { rowNumber: 2, from: 'Northgate', type: 'uses', to: 'Southgate', description: 'reads accounts from', via: null, dataClassification: null } });
+    expect(result).toEqual({ ok: true, row: { rowNumber: 2, from: 'Northgate', type: 'uses', to: 'Southgate', description: 'reads accounts from', via: null, dataClassification: null, protocolIn: null, protocolOut: null } });
   });
 
   it('requires from', () => {
@@ -66,5 +66,11 @@ describe('validateImportRelationshipRow', () => {
   it('rejects a confidence outside [0,1]', () => {
     const result = validateImportRelationshipRow({ from: 'A', type: 'uses', to: 'B', description: 'reads from', confidence: 2 }, 2);
     expect(result).toEqual({ ok: false, rowNumber: 2, error: '"confidence": must be a number between 0 and 1' });
+  });
+  it('reads protocol_in / protocol_out (ADR-026) and rejects one not on the list', () => {
+    const ok = validateImportRelationshipRow({ from: 'A', type: 'flows_to', to: 'B', description: 'sends to', via: 'ESB · Orders API', protocol_in: 'file_sftp', protocol_out: 'rest_api' }, 2);
+    expect(ok.ok && [ok.row.protocolIn, ok.row.protocolOut]).toEqual(['file_sftp', 'rest_api']);
+    const bad = validateImportRelationshipRow({ from: 'A', type: 'uses', to: 'B', description: 'reads from', protocol_in: 'pigeon' }, 2);
+    expect(bad.ok).toBe(false);
   });
 });

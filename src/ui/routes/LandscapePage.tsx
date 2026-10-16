@@ -760,6 +760,7 @@ export function LandscapePage() {
                   focusedElementId={focusedElementId}
                   onFocusElement={setFocusedElementId}
                   centreOn={centreRequest}
+                  platformIdByInterfaceId={state.data.platformIdByInterfaceId}
                   onClearFocus={() => {
                     setFocusedElementId(null);
                   }}

@@ -315,6 +315,16 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
       singleItemAction: (item: HealthFindingItem) => ({ href: contextHref(item.id), label: 'View context →' }),
     },
     {
+      // ADR-026: the interface-level twin of the finding above.
+      key: 'unused-integration-interface',
+      count: insightsData.unusedIntegrationInterfaces.length,
+      summary: `${String(insightsData.unusedIntegrationInterfaces.length)} integration ${plural(insightsData.unusedIntegrationInterfaces.length, 'interface', 'interfaces')} with nothing flowing via ${plural(insightsData.unusedIntegrationInterfaces.length, 'it', 'them')}`,
+      items: elementItems(insightsData.unusedIntegrationInterfaces),
+      severity: 'medium',
+      browseHref: browseHref('unused-integration-interface'),
+      singleItemAction: (item: HealthFindingItem) => ({ href: contextHref(item.id), label: 'View context →' }),
+    },
+    {
       // F11: a recorded Migrate/Eliminate with no open change retiring it.
       // Each item names the open project already scoped to it, and its one
       // action opens that project — or starts one when there is none.

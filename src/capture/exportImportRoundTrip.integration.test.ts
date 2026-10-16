@@ -97,6 +97,8 @@ const ids = {
   planned: randomUUID(),
   assetInspection: randomUUID(),
   team: randomUUID(),
+  readsApi: randomUUID(),
+  meterFeed: randomUUID(),
 };
 
 function seedDeltas(sourceId: UUID): Delta[] {
@@ -120,6 +122,9 @@ function seedDeltas(sourceId: UUID): Delta[] {
     module(ids.pmSap, 'PM', ids.sap, { description: 'Plant maintenance' }),
     module(ids.pmSalesforce, 'PM', ids.salesforce, { description: 'Programme management' }),
     module(ids.enterprise, 'Enterprise', ids.arcgis),
+    // ADR-026: two interfaces on the integration platform — a REST API and a file drop.
+    module(ids.readsApi, 'Reads API', ids.mule, { interfaceType: 'api', transformation: 'Maps work orders to the field schema' }),
+    module(ids.meterFeed, 'Meter feed', ids.mule, { interfaceType: 'file' }),
     capability(ids.customer, 'Customer', null),
     capability(ids.quotations, 'Connection Quotations', ids.customer),
     capability(ids.connections, 'Connections', ids.customer, 'Connecting new customers to the network.'),
@@ -139,6 +144,8 @@ function seedDeltas(sourceId: UUID): Delta[] {
     edge('flows_to', ids.pmSap, ids.cbrm, { description: 'sends asset condition to' }),
     edge('flows_to', ids.escoms, ids.aurora, { description: 'sends work orders to', via: ids.mule, dataClassification: 'official_sensitive' }),
     edge('uses', ids.pmSalesforce, ids.enterprise, { description: 'reads layers from', via: ids.mule }),
+    edge('flows_to', ids.pmSap, ids.aurora, { description: 'sends asset register to', via: ids.readsApi, protocolIn: 'file_sftp', protocolOut: 'rest_api' }),
+    edge('uses', ids.cbrm, ids.aurora, { description: 'reads outage history from', via: ids.mule, protocolOut: 'soap' }),
     edge('owns', ids.team, ids.aurora, { role: 'business' }),
   ];
 }
@@ -299,7 +306,7 @@ async function applyAll(user: TestUser, orgId: UUID, modelId: UUID, imported: Aw
 // ---------------------------------------------------------------------------
 
 /** Attributes the Elements export carries *and* the importer reads. */
-const COMPARED_ATTRIBUTES = ['lifecycleStatus', 'vendor', 'description', 'isExternal', 'externalOrganisation', 'hostingModel', 'introduced', 'plannedEnd', 'technology', 'disposition', 'subtype', 'kind', 'criticality', 'domain', 'version', 'annualRunCost', 'supportEndsAt', 'code', 'importance', 'essentialFunction', 'email', 'orgUnit'] as const;
+const COMPARED_ATTRIBUTES = ['lifecycleStatus', 'vendor', 'description', 'isExternal', 'externalOrganisation', 'hostingModel', 'introduced', 'plannedEnd', 'technology', 'disposition', 'subtype', 'kind', 'criticality', 'domain', 'version', 'annualRunCost', 'supportEndsAt', 'code', 'importance', 'essentialFunction', 'email', 'orgUnit', 'interfaceType', 'transformation'] as const;
 
 function describeModel(head: Head): { elements: string[]; attributes: string[]; relationships: string[] } {
   const key = (id: UUID): string => {
@@ -322,7 +329,9 @@ function describeModel(head: Head): { elements: string[]; attributes: string[]; 
     const detail = typeof attrs.role === 'string' ? attrs.role : typeof attrs.description === 'string' ? attrs.description : '';
     const via = typeof attrs.via === 'string' ? ` via ${key(attrs.via)}` : '';
     const classification = typeof attrs.dataClassification === 'string' ? ` (${attrs.dataClassification})` : '';
-    return `${r.relationshipType} ${key(r.fromElementId)} -> ${key(r.toElementId)} [${detail}]${via}${classification}`;
+    const side = (value: unknown): string => (typeof value === 'string' ? value : '');
+    const protocols = side(attrs.protocolIn) !== '' || side(attrs.protocolOut) !== '' ? ` {${side(attrs.protocolIn)} → ${side(attrs.protocolOut)}}` : '';
+    return `${r.relationshipType} ${key(r.fromElementId)} -> ${key(r.toElementId)} [${detail}]${via}${classification}${protocols}`;
   });
   return { elements: elements.sort(), attributes: attributes.sort(), relationships: relationships.sort() };
 }
@@ -369,6 +378,10 @@ describe('export → import round trip against a real local Supabase', () => {
     const imported = await runImport(owner, modelB, workbook);
     const { head } = await applyAll(owner, orgId, modelB, imported);
     const modelOfB = describeModel(head);
+
+    // ADR-026: the interface flow and its protocols are really in A, so the comparison below is not vacuous for them.
+    expect(modelOfA.relationships).toContain('flows_to container:SAP / PM -> system:Aurora [sends asset register to] via container:MuleSoft / Reads API {file_sftp → rest_api}');
+    expect(modelOfA.attributes).toContain('container:MuleSoft / Reads API interfaceType="api"');
 
     // Exact, sorted lists — so a duplicate or a missing row shows, not just a difference of sets.
     expect(modelOfB.elements).toEqual(modelOfA.elements);

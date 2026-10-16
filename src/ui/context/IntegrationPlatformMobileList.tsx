@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { Chip } from '../components/Chip/Chip';
+import { protocolSides } from '../components/PlatformFlowsSection/protocolSides';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../components/Text/Text';
 import { attributesRecord } from '../elements/attributesRecord';
@@ -12,6 +13,8 @@ export interface IntegrationPlatformMobileListProps {
   flows: readonly RelationshipsHeadRow[];
   endpoints: ReadonlyMap<UUID, ElementsHeadRow>;
   elementHref: (elementId: UUID) => string;
+  /** ADR-026: the hub's interfaces by id — a flow via one says which, as the desktop list does. */
+  interfaces?: ReadonlyMap<UUID, ElementsHeadRow>;
 }
 
 /**
@@ -25,7 +28,7 @@ export interface IntegrationPlatformMobileListProps {
  * every flow is already here, just grouped, so mobile never shows the
  * same data twice.
  */
-export function IntegrationPlatformMobileList({ flows, endpoints, elementHref }: IntegrationPlatformMobileListProps) {
+export function IntegrationPlatformMobileList({ flows, endpoints, elementHref, interfaces }: IntegrationPlatformMobileListProps) {
   const bySource = new Map<UUID, RelationshipsHeadRow[]>();
   for (const flow of flows) {
     const list = bySource.get(flow.from_element_id) ?? [];
@@ -64,6 +67,9 @@ export function IntegrationPlatformMobileList({ flows, endpoints, elementHref }:
                 const target = endpoints.get(flow.to_element_id);
                 const description = attributesRecord(flow.attributes).description;
                 const dataClassification = attributesRecord(flow.attributes).dataClassification;
+                const via = attributesRecord(flow.attributes).via;
+                const viaInterface = typeof via === 'string' ? interfaces?.get(via) : undefined;
+                const protocols = protocolSides(attributesRecord(flow.attributes));
                 return (
                   <li key={flow.relationship_id} className={styles.row}>
                     {target ? (
@@ -85,6 +91,11 @@ export function IntegrationPlatformMobileList({ flows, endpoints, elementHref }:
                     {typeof dataClassification === 'string' && dataClassification.trim() !== '' && (
                       <Text as="p" tone="muted" size="sm">
                         {dataClassification.replace('_', ' ')}
+                      </Text>
+                    )}
+                    {(viaInterface !== undefined || protocols !== null) && (
+                      <Text as="p" tone="muted" size="sm">
+                        {[viaInterface !== undefined ? `via ${viaInterface.name}` : null, protocols].filter((part) => part !== null).join(' · ')}
                       </Text>
                     )}
                   </li>

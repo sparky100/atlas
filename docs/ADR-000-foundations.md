@@ -648,4 +648,6 @@ Named explicitly so they aren't mistaken for settled: multi-branch to-be composi
 
 **ADR-025** — `docs/ADR-025-still-accurate.md`, "Still accurate": confirming an element re-asserts each of its current facts, unchanged, as a new delta under an `attestation` source (one per confirmation), so per-fact staleness resets and provenance says the value was confirmed — option (a), no separate attestations table. **Accepted 2026-10-02** with F12 step 3 (`20261004010000_source_kind_attestation.sql`, `20261004020000_attestation_sources.sql`).
 
+**ADR-026** — `docs/ADR-026-integration-interfaces.md`, integration interfaces: an interface is a typed module (`container`) of an integration platform, `via` may name it (C18 widened), and each flow records its protocol on each side (`protocolIn`/`protocolOut`); reuse and combining are read from several flows sharing an interface, never stored. **Accepted 2026-10-16** — option (c), the hybrid; interface type and protocol lists confirmed as proposed.
+
 ~~Whether Atlas shares the existing suite's identity/tenancy tables (ADR-014)~~ — **closed, Sprint H1: ADR-017 decides separate, permanently.** This was the only item in this list with a concrete follow-up ADR actually written; the rest remain open in the sense this section describes.

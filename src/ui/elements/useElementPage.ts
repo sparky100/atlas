@@ -34,7 +34,7 @@ import { loadProjectionAtCommitCached } from '../query/cachedBranchProjection';
 import { attributesRecord } from './attributesRecord';
 import { capabilityLevel } from './capabilityDepth';
 import { containerParentIds, valueStreamParentIds } from './moduleDisplayName';
-import { isIntegrationPlatform, isPlatform } from './systemKind';
+import { flowViaIdsFor, isPlatform } from './systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -145,7 +145,7 @@ interface ElementSource {
   relationships: (elementId: UUID) => Promise<RelationshipsHeadRow[]>;
   facts: (subjectId: UUID) => Promise<Map<string, FactsRow>>;
   /** Prompt 7k item 4 — see `ElementPageData.flowsViaThisPlatform`'s own doc comment. */
-  flowsViaElement: (platformElementId: UUID) => Promise<RelationshipsHeadRow[]>;
+  flowsViaElement: (viaIds: readonly UUID[]) => Promise<RelationshipsHeadRow[]>;
 }
 
 function projectionSource(commitId: UUID, projection: HeadProjection): ElementSource {
@@ -156,7 +156,7 @@ function projectionSource(commitId: UUID, projection: HeadProjection): ElementSo
     children: (parentId) => Promise.resolve(projectionChildrenOf(projection, parentId)),
     relationships: (elementId) => Promise.resolve(projectionRelationshipsForElement(projection, elementId)),
     facts: (subjectId) => Promise.resolve(projectionFactsForSubject(projection, subjectId)),
-    flowsViaElement: (platformElementId) => Promise.resolve(projectionFlowsViaElement(projection, platformElementId)),
+    flowsViaElement: (viaIds) => Promise.resolve(projectionFlowsViaElement(projection, viaIds)),
   };
 }
 
@@ -168,7 +168,7 @@ function commitSource(commitId: UUID): ElementSource {
     children: (parentId) => listChildrenOf(supabase, commitId, parentId),
     relationships: (elementId) => listRelationshipsForElement(supabase, commitId, elementId),
     facts: (subjectId) => loadFacts(commitId, subjectId),
-    flowsViaElement: (platformElementId) => listFlowsViaElement(supabase, commitId, platformElementId),
+    flowsViaElement: (viaIds) => listFlowsViaElement(supabase, commitId, viaIds),
   };
 }
 
@@ -369,8 +369,10 @@ export function useElementPage(
       // uses/flows_to scan it can never have a match in.
       let flowsViaThisPlatform: RelationshipsHeadRow[] = [];
       let flowsViaThisPlatformEndpoints = new Map<UUID, ElementsHeadRow>();
-      if (element.element_type === 'system' && isIntegrationPlatform(element)) {
-        flowsViaThisPlatform = await source.flowsViaElement(elementId);
+      // ADR-026: a platform counts flows via itself and via any of its interfaces; an interface counts only its own.
+      const viaIds = flowViaIdsFor(element, parent, children);
+      if (viaIds.length > 0) {
+        flowsViaThisPlatform = await source.flowsViaElement(viaIds);
         const endpointIds = flowsViaThisPlatform.flatMap((r) => [r.from_element_id, r.to_element_id]);
         flowsViaThisPlatformEndpoints = await source.elementsByIds(endpointIds);
         // "Platform · Module": a flow's own source/target can itself be a

@@ -16,6 +16,8 @@
  * those column lists). Pure — no I/O, no capability data; the model-specific
  * half of the prompt is `{{CAPABILITY_LIST}}`, built elsewhere.
  */
+import { INTERFACE_TYPE_OPTIONS } from '../contracts/attributeSchema';
+import { INTEGRATION_PROTOCOL_OPTIONS } from '../contracts/relationshipAttributeSchema';
 import { IMPORT_COLUMNS } from './importRowSchema';
 import { RELATIONSHIP_IMPORT_COLUMNS } from './importRelationshipRow';
 import { CHANGE_IMPORT_COLUMNS } from './importChangeRow';
@@ -41,6 +43,8 @@ Fields (only what's actually known has to be filled in): \`${IMPORT_COLUMNS.join
 - \`is_external\` is true/false.
 - \`external_organisation\` is free text (e.g. "Acme Consulting") — only meaningful for a top-level system.
 - \`capability\` names one or more capabilities from the list below, separated by \`|\` if there's more than one — the first one listed becomes the primary link, any others are secondary. Leave it out if nothing fits; never invent a capability name.
+- \`interface_type\` is one of: ${INTERFACE_TYPE_OPTIONS.join(', ')} — only for a module of an integration platform (an *interface*: an API, file drop, topic or job the platform exposes or consumes). Leave it out everywhere else.
+- \`transformation\` is free text: what the platform does to the data on this interface (maps, enriches, combines, converts a file to an API…). Only for an interface.
 - \`business_owner\`/\`technical_owner\` each name one person, team, or organisation. A plain name ("Jane Doe") creates or matches an ordinary owner. "Name (External: Org)" (e.g. "Ofgem (External: Energy regulator)") creates or matches an external organisation instead.
 
 An entry that matches an existing system or module by name updates it; a name that doesn't match anything creates a new one.
@@ -52,7 +56,8 @@ Fields: \`${RELATIONSHIP_IMPORT_COLUMNS.join(', ')}\`
 - \`from\`/\`to\` each name an existing or newly-described system or module, by its \`name\` from \`systems\`. To point at a module specifically (rather than a top-level system of the same name), write "Platform · Module" (e.g. "SAP · PM").
 - \`type\` is \`uses\` or \`flows_to\`.
 - \`description\` is the verb phrase (e.g. "sends payment confirmations to") — always required.
-- \`via\` optionally names an integration platform (a system with \`kind = integration_platform\`) this connection actually routes through. Leave it out for a direct connection.
+- \`via\` optionally names an integration platform (a system with \`kind = integration_platform\`) this connection actually routes through, or one of its interfaces as "Platform · Interface". Leave it out for a direct connection.
+- \`protocol_in\`/\`protocol_out\` are each one of: ${INTEGRATION_PROTOCOL_OPTIONS.join(', ')} — how data reaches the platform from \`from\`, and how it leaves the platform to \`to\` (e.g. file_sftp in, rest_api out). Only with \`via\`.
 - \`data_classification\` is one of: public, official, official_sensitive, special_category — only meaningful for a \`flows_to\` entry, never a \`uses\` entry.
 
 ### \`changes\` (optional) — explicit retire/restore of an existing system or module

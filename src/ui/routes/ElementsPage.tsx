@@ -43,6 +43,7 @@ const VALID_FILTERS: readonly ElementBrowseFilter[] = [
   'critical-no-business-owner',
   'critical-exposed',
   'unused-integration-platform',
+  'unused-integration-interface',
   // Bug fix (per-item-actions prompt): these two were reachable already
   // (ArchitectHome.tsx's own `browseHref('essential-no-technical-owner')`/
   // `browseHref('critical-support-end')`) but missing here, so

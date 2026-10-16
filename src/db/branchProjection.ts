@@ -120,8 +120,13 @@ export function projectionRelationshipsForElement(projection: HeadProjection, el
 }
 
 /** Mirrors src/db/elements.ts's `listFlowsViaElement` — Prompt 7k item 4's "Flows via this platform". */
-export function projectionFlowsViaElement(projection: HeadProjection, platformElementId: UUID): RelationshipsHeadRow[] {
-  return projection.relationshipsHead.filter((r) => (r.relationship_type === 'uses' || r.relationship_type === 'flows_to') && attributesRecord(r.attributes).via === platformElementId);
+export function projectionFlowsViaElement(projection: HeadProjection, viaIds: readonly UUID[]): RelationshipsHeadRow[] {
+  const wanted = new Set(viaIds);
+  return projection.relationshipsHead.filter((r) => {
+    if (r.relationship_type !== 'uses' && r.relationship_type !== 'flows_to') return false;
+    const via = attributesRecord(r.attributes).via;
+    return typeof via === 'string' && wanted.has(via);
+  });
 }
 
 /** Mirrors src/db/elements.ts's `listFactsForSubject`, keyed the same way `useElementPage.ts`'s own `loadFacts` keys its result (by attribute). */

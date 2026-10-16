@@ -16,7 +16,7 @@
  * renders `via` as its own resolved-name row instead, alongside this
  * schema-driven table, using the same `endpoints` map it already has.
  */
-import type { RelationshipType } from './delta';
+import type { IntegrationProtocol, RelationshipType } from './delta';
 import { validateByKind, type AttributeFieldMeta, type AttributeFieldSchema, type AttributeValidationResult } from './attributeSchema';
 
 function schemaOf<T extends string>(order: readonly T[], meta: Record<T, AttributeFieldMeta>): AttributeFieldSchema[] {
@@ -27,6 +27,33 @@ const SUPPORTS_ROLE_OPTIONS = ['primary', 'secondary'] as const;
 const FIT_FOR_PURPOSE_OPTIONS = ['excellent', 'good', 'adequate', 'poor'] as const;
 const OWNS_ROLE_OPTIONS = ['business', 'technical', 'service'] as const;
 const DATA_CLASSIFICATION_OPTIONS = ['public', 'official', 'official_sensitive', 'special_category'] as const;
+
+/** ADR-026: each side of a flow through an integration platform. The OT protocols are there because this is a networks business. */
+export const INTEGRATION_PROTOCOL_LEVELS = [
+  { key: 'rest_api', label: 'REST API' },
+  { key: 'soap', label: 'SOAP' },
+  { key: 'graphql', label: 'GraphQL' },
+  { key: 'file_sftp', label: 'File (SFTP)' },
+  { key: 'file_share', label: 'File (share)' },
+  { key: 'event_queue', label: 'Event / queue' },
+  { key: 'database', label: 'Database' },
+  { key: 'email', label: 'Email' },
+  { key: 'iccp', label: 'ICCP' },
+  { key: 'dnp3', label: 'DNP3' },
+  { key: 'iec_61850', label: 'IEC 61850' },
+  { key: 'modbus', label: 'Modbus' },
+  { key: 'opc_ua', label: 'OPC UA' },
+  { key: 'manual', label: 'Manual' },
+  { key: 'other', label: 'Other' },
+] as const satisfies readonly { key: IntegrationProtocol; label: string }[];
+export const INTEGRATION_PROTOCOL_OPTIONS = INTEGRATION_PROTOCOL_LEVELS.map((level) => level.key) as readonly IntegrationProtocol[];
+export const INTEGRATION_PROTOCOL_LABELS: Readonly<Record<IntegrationProtocol, string>> = Object.fromEntries(INTEGRATION_PROTOCOL_LEVELS.map((level) => [level.key, level.label])) as Readonly<Record<IntegrationProtocol, string>>;
+
+/** ADR-026: shown only once set, since a direct flow (no `via`) never has either. */
+const PROTOCOL_SIDE_META = {
+  protocolIn: { label: 'Protocol in (source → platform)', required: false, kind: 'enum', options: INTEGRATION_PROTOCOL_OPTIONS, optionLabels: INTEGRATION_PROTOCOL_LABELS },
+  protocolOut: { label: 'Protocol out (platform → target)', required: false, kind: 'enum', options: INTEGRATION_PROTOCOL_OPTIONS, optionLabels: INTEGRATION_PROTOCOL_LABELS },
+} satisfies Record<'protocolIn' | 'protocolOut', AttributeFieldMeta>;
 
 const SUPPORTS_META = {
   role: { label: 'Role', required: true, kind: 'enum', options: SUPPORTS_ROLE_OPTIONS },
@@ -42,8 +69,9 @@ const USES_META = {
   // reads that way here too, not the generic "Description" `supports`
   // uses for the same underlying field.
   description: { label: 'Verb phrase', required: true, kind: 'text', multiline: true },
-} satisfies Record<'description', AttributeFieldMeta>;
-const USES_ORDER = ['description'] as const;
+  ...PROTOCOL_SIDE_META,
+} satisfies Record<'description' | 'protocolIn' | 'protocolOut', AttributeFieldMeta>;
+const USES_ORDER = ['description', 'protocolIn', 'protocolOut'] as const;
 
 const OWNS_META = {
   role: { label: 'Role', required: true, kind: 'enum', options: OWNS_ROLE_OPTIONS },
@@ -54,8 +82,9 @@ const FLOWS_TO_META = {
   description: { label: 'Verb phrase', required: true, kind: 'text', multiline: true },
   dataClassification: { label: 'Data classification', required: false, kind: 'enum', options: DATA_CLASSIFICATION_OPTIONS },
   protocol: { label: 'Protocol', required: false, kind: 'text' },
-} satisfies Record<'description' | 'dataClassification' | 'protocol', AttributeFieldMeta>;
-const FLOWS_TO_ORDER = ['description', 'dataClassification', 'protocol'] as const;
+  ...PROTOCOL_SIDE_META,
+} satisfies Record<'description' | 'dataClassification' | 'protocol' | 'protocolIn' | 'protocolOut', AttributeFieldMeta>;
+const FLOWS_TO_ORDER = ['description', 'dataClassification', 'protocol', 'protocolIn', 'protocolOut'] as const;
 
 // ADR-001 amendment ("replaces"): no role, no via — a plain optional note,
 // same shape `supports`'s own free-text `description` field already has.

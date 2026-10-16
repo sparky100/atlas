@@ -79,6 +79,8 @@ export interface LandscapeCanvasProps {
    * "Find on this landscape" (`LandscapeFind.tsx`): bring this tile to the centre of the view, zoomed to at least 100%. A new object each time (not just a new id), so finding the same tile again after panning away re-centres it. Pure view state like the pan/zoom itself — never persisted.
    */
   centreOn?: { elementId: UUID } | null | undefined;
+  /** ADR-026: each interface mapped to its integration platform, so a flow `via` an interface routes through, and lights up with, the platform's tile. */
+  platformIdByInterfaceId?: ReadonlyMap<UUID, UUID> | undefined;
   /** A different tile was clicked while nothing (or someone else) was focused — see `handlePointerUp`'s own click-focus-vs-navigate precedence comment for exactly when this fires instead of a real navigation. */
   onFocusElement?: (elementId: UUID) => void;
   /** Escape, or a click on empty canvas background — decision 2's own "background click clears focus, same as Escape." */
@@ -320,6 +322,7 @@ export function LandscapeCanvas({
   routeViaPlatforms = false,
   focusedElementId = null,
   centreOn = null,
+  platformIdByInterfaceId,
   onFocusElement,
   onClearFocus,
   showConnections = false,
@@ -352,7 +355,9 @@ export function LandscapeCanvas({
   // never match the ordinary "touches the focused element" test below.
   const focusedSystem = focusedElementId != null ? systemsById.get(focusedElementId) : undefined;
   const focusedIsIntegrationPlatform = routeViaPlatforms && focusedSystem !== undefined && isIntegrationPlatform(focusedSystem);
-  const isViaFlowThroughFocus = useCallback((edge: RelationshipsHeadRow): boolean => focusedIsIntegrationPlatform && attributesRecord(edge.attributes).via === focusedElementId, [focusedIsIntegrationPlatform, focusedElementId]);
+  // ADR-026: a flow can name one of the platform's interfaces rather than the platform; on the landscape both read as the platform.
+  const viaPlatformOf = useCallback((via: unknown): string | undefined => (typeof via === 'string' ? (platformIdByInterfaceId?.get(via) ?? via) : undefined), [platformIdByInterfaceId]);
+  const isViaFlowThroughFocus = useCallback((edge: RelationshipsHeadRow): boolean => focusedIsIntegrationPlatform && viaPlatformOf(attributesRecord(edge.attributes).via) === focusedElementId, [focusedIsIntegrationPlatform, focusedElementId, viaPlatformOf]);
 
   // V2 "landscape focus and filters": "edges hidden by default; 'Show
   // connections' toggle" — off (and no focus active) means no edge draws
@@ -445,7 +450,7 @@ export function LandscapeCanvas({
       // to the platform-chip redirection below: routing "via" a platform
       // is the one case that's supposed to visibly enter it.
       const via = attributesRecord(edge.attributes).via;
-      const viaPosition = viaPositionFor(typeof via === 'string' ? via : undefined, positionById, routeViaPlatforms);
+      const viaPosition = viaPositionFor(viaPlatformOf(via), positionById, routeViaPlatforms);
       if (viaPosition) {
         const obstaclesToVia = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== viaPosition.elementId);
         const obstaclesFromVia = allPositions.filter((n) => n.elementId !== viaPosition.elementId && n.elementId !== edge.to_element_id);
@@ -460,7 +465,7 @@ export function LandscapeCanvas({
       segments.push({ edge, points: routeLandscapeEdge(fromChip ?? from, toChip ?? to, obstacles, channels, layout.lanes) });
     }
     return { segments, platformEdgeChips: [...platformChipsByElementId.values()] };
-  }, [layout, visibleEdges, routeViaPlatforms, focusedElementId, systemsById]);
+  }, [layout, visibleEdges, routeViaPlatforms, focusedElementId, systemsById, viaPlatformOf]);
 
   const fitToView = useCallback(() => {
     const wrapper = wrapperRef.current;
