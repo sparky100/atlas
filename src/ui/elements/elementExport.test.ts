@@ -73,8 +73,8 @@ describe('relationshipExportRows', () => {
     ];
     const elementsById = new Map<string, ElementsHeadRow>([['a', element('a', 'system')], ['b', element('b', 'system')], ['c', element('c', 'capability')]]);
     const rows = relationshipExportRows(edges, elementsById);
-    expect(rows[0]).toEqual({ from: 'a', type: 'uses', to: 'b', verb: 'reads from', role: '' });
-    expect(rows[1]).toEqual({ from: 'a', type: 'supports', to: 'c', verb: '', role: 'primary' });
+    expect(rows[0]).toEqual({ from: 'a', type: 'uses', to: 'b', verb: 'reads from', role: '', via: '', dataClassification: '' });
+    expect(rows[1]).toEqual({ from: 'a', type: 'supports', to: 'c', verb: '', role: 'primary', via: '', dataClassification: '' });
   });
 });
 
@@ -95,12 +95,12 @@ describe('elementBrowseRowsToCsv', () => {
 describe('buildExportSheets', () => {
   it('makes one sheet per element type present plus a Relationships sheet', () => {
     const rows = [row(element('s-1', 'system', { isExternal: false, lifecycleStatus: 'active' })), row(element('c-1', 'capability'))];
-    const sheets = buildExportSheets(rows, [], new Map(), [{ from: 's-1', type: 'supports', to: 'c-1', verb: '', role: 'primary' }]);
+    const sheets = buildExportSheets(rows, [], new Map(), [{ from: 's-1', type: 'supports', to: 'c-1', verb: '', role: 'primary', via: '', dataClassification: '' }]);
     expect(sheets.map((s) => s.name)).toEqual(['Capabilities', 'Systems', 'Relationships']);
     const systems = sheets.find((s) => s.name === 'Systems');
     expect(systems?.cells[0]).toContain('Lifecycle');
     const relationships = sheets.find((s) => s.name === 'Relationships');
-    expect(relationships?.cells[0]).toEqual(['From', 'Type', 'To', 'Verb', 'Role']);
+    expect(relationships?.cells[0]).toEqual(['From', 'Type', 'To', 'Verb', 'Role', 'Via', 'Data classification']);
   });
 });
 
@@ -181,5 +181,23 @@ describe('sanitizeForFilename', () => {
   it('replaces path-hostile characters and never returns empty', () => {
     expect(sanitizeForFilename('a/b\\c:d')).toBe('a-b-c-d');
     expect(sanitizeForFilename('   ')).toBe('export');
+  });
+});
+
+describe('relationshipExportRows — via and data classification', () => {
+  const mule = element('Mule', 'system', { kind: 'integration_platform', isExternal: false });
+  const a = element('A', 'system', { isExternal: false });
+  const b = element('B', 'system', { isExternal: false });
+  const edge = (attributes: Record<string, unknown>) => ({ relationship_id: 'r', relationship_type: 'flows_to', from_element_id: 'A', to_element_id: 'B', attributes, exists_delta_id: 'd' }) as RelationshipsHeadRow;
+  const byId = new Map([mule, a, b].map((e) => [e.element_id, e]));
+
+  it('writes the platform a flow goes via, and its data classification', () => {
+    const [row] = relationshipExportRows([edge({ description: 'sends orders to', via: 'Mule', dataClassification: 'official_sensitive' })], byId);
+    expect(row).toMatchObject({ from: 'A', to: 'B', verb: 'sends orders to', via: 'Mule', dataClassification: 'official_sensitive' });
+  });
+
+  it('leaves both blank for a direct flow', () => {
+    const [row] = relationshipExportRows([edge({ description: 'sends orders to' })], byId);
+    expect(row).toMatchObject({ via: '', dataClassification: '' });
   });
 });

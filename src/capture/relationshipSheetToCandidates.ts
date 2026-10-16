@@ -24,7 +24,8 @@
  * `resolveEndpointRef`) needs no change to consume them; both coexist,
  * inline columns on an ordinary element sheet are untouched.
  */
-import type { CandidateEvidence, RelationshipProposal } from '../contracts/capture';
+import type { CandidateEvidence, EvidenceWarning, RelationshipProposal } from '../contracts/capture';
+import { relationshipAttributeFieldSchema, validateRelationshipAttributeValue } from '../contracts/relationshipAttributeSchema';
 import type { SourceRef } from '../contracts/sourceRef';
 import { extractDataRows, type RawSheet } from './parse/sheetGrid';
 import { DEFAULTED_ATTRIBUTE_CONFIDENCE } from './confidence';
@@ -64,6 +65,16 @@ export interface RelationshipsSheetInput {
   headerRowIndex: number;
 }
 
+function parseDataClassification(raw: string): string | undefined {
+  const field = relationshipAttributeFieldSchema('flows_to', 'dataClassification');
+  const wanted = raw.trim().toLowerCase();
+  const options = field?.options ?? [];
+  const key = options.find((o) => o === wanted) ?? options.find((o) => o === wanted.replace(/[\s-]+/g, '_')) ?? options.find((o) => (field?.optionLabels?.[o] ?? '').toLowerCase() === wanted);
+  if (key === undefined) return undefined;
+  const validated = validateRelationshipAttributeValue('flows_to', 'dataClassification', key);
+  return validated.ok && typeof validated.value === 'string' ? validated.value : undefined;
+}
+
 function colIndex(headers: readonly string[], name: string): number {
   return headers.findIndex((h) => h.trim().toLowerCase() === name);
 }
@@ -92,7 +103,8 @@ export function relationshipSheetToCandidates(input: RelationshipsSheetInput): R
   const descriptionCol = colIndex(headers, 'description') >= 0 ? colIndex(headers, 'description') : colIndex(headers, 'verb');
   const roleCol = colIndex(headers, 'role');
   const viaCol = colIndex(headers, 'via');
-  const dataClassificationCol = colIndex(headers, 'data_classification');
+  // The export's header is "Data classification"; the JSON/documented form is `data_classification`.
+  const dataClassificationCol = colIndex(headers, 'data classification') >= 0 ? colIndex(headers, 'data classification') : colIndex(headers, 'data_classification');
   if (fromCol < 0 || typeCol < 0 || toCol < 0) return { candidates: [], skipped: [] };
 
   const dataRows = extractDataRows(rawSheet, headerRowIndex, fromCol);
@@ -115,12 +127,12 @@ export function relationshipSheetToCandidates(input: RelationshipsSheetInput): R
       continue;
     }
 
-    const evidence = (attributeConfidence: Record<string, number>): CandidateEvidence => ({
+    const evidence = (attributeConfidence: Record<string, number>, warnings: EvidenceWarning[] = []): CandidateEvidence => ({
       sourceRef: rowRangeRef(sheetName, headerColumnRefs, row.rowNumber),
       passage: [...headers, ...row.cells].join(' | '),
       extractor: 'sheet-mapping',
       attributeConfidence,
-      warnings: [],
+      warnings,
     });
 
     if (typeRaw === 'supports') {
@@ -140,7 +152,10 @@ export function relationshipSheetToCandidates(input: RelationshipsSheetInput): R
       continue;
     }
     const via = viaCol >= 0 ? (row.cells[viaCol] ?? '').trim() || undefined : undefined;
-    const dataClassification = typeRaw === 'flows_to' && dataClassificationCol >= 0 ? (row.cells[dataClassificationCol] ?? '').trim() || undefined : undefined;
+    const dataClassificationRaw = typeRaw === 'flows_to' && dataClassificationCol >= 0 ? (row.cells[dataClassificationCol] ?? '').trim() : '';
+    // Read by key, spaced key or label like every other enum cell; a value that is none of them is dropped with a warning, never guessed.
+    const dataClassification = dataClassificationRaw === '' ? undefined : parseDataClassification(dataClassificationRaw);
+    const warnings: EvidenceWarning[] = dataClassificationRaw !== '' && dataClassification === undefined ? [{ code: 'ENUM_UNPARSED', cell: `${headerColumnRefs[dataClassificationCol] ?? '?'}${String(row.rowNumber)}`, raw: dataClassificationRaw }] : [];
 
     const proposal: RelationshipProposal<'uses' | 'flows_to'> = {
       kind: 'relationship',
@@ -149,7 +164,7 @@ export function relationshipSheetToCandidates(input: RelationshipsSheetInput): R
       to: { kind: 'unresolved', text: to },
       attributes: { description, ...(dataClassification !== undefined ? { dataClassification } : {}) },
     };
-    candidates.push({ seq: seq++, proposal, evidence: evidence({ description: 1, ...(dataClassification !== undefined ? { dataClassification: 1 } : {}) }), ...(via !== undefined ? { viaHint: via } : {}), aliasProposals: [] });
+    candidates.push({ seq: seq++, proposal, evidence: evidence({ description: 1, ...(dataClassification !== undefined ? { dataClassification: 1 } : {}) }, warnings), ...(via !== undefined ? { viaHint: via } : {}), aliasProposals: [] });
   }
 
   return { candidates, skipped };

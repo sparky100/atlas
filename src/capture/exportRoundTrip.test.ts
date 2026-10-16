@@ -42,6 +42,7 @@ const ELEMENTS: ElementsHeadRow[] = [
   el('00000000-0000-4000-8000-000000000023', 'capability', 'Connections', '00000000-0000-4000-8000-000000000021'),
   el('00000000-0000-4000-8000-000000000024', 'capability', 'Quotation Pricing', '00000000-0000-4000-8000-000000000022'),
   el('00000000-0000-4000-8000-000000000025', 'capability', 'Land, Wayleaves & Consents'),
+  el('00000000-0000-4000-8000-000000000041', 'system', 'MuleSoft', null, { ...sys, kind: 'integration_platform' }),
   el('00000000-0000-4000-8000-000000000031', 'actor', 'Network Team', null, { subtype: 'team', isExternal: false }),
 ];
 const EDGES: RelationshipsHeadRow[] = [
@@ -49,6 +50,7 @@ const EDGES: RelationshipsHeadRow[] = [
   edge('r2', 'supports', '00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000023', { role: 'secondary' }),
   edge('r3', 'uses', '00000000-0000-4000-8000-000000000013', '00000000-0000-4000-8000-000000000011', { description: 'reads work orders from' }),
   edge('r4', 'flows_to', '00000000-0000-4000-8000-000000000012', '00000000-0000-4000-8000-000000000003', { description: 'sends incidents to' }),
+  edge('r6', 'flows_to', '00000000-0000-4000-8000-000000000013', '00000000-0000-4000-8000-000000000003', { description: 'sends work orders to', via: '00000000-0000-4000-8000-000000000041', dataClassification: 'official_sensitive' }),
   edge('r5', 'owns', '00000000-0000-4000-8000-000000000031', '00000000-0000-4000-8000-000000000003', { role: 'business' }),
 ];
 
@@ -89,7 +91,7 @@ describe('exporting a model and importing it into an empty one', () => {
   it('creates every element as its own type — actors are actors, not systems — and merges none of the alike-named capabilities', async () => {
     const { candidates } = await reimport();
     const byType = (type: string) => candidates.filter((c) => c.kind === 'element' && c.elementType === type).map(nameOf).sort();
-    expect(byType('system')).toEqual(['Aurora', 'SAP', 'Salesforce']);
+    expect(byType('system')).toEqual(['Aurora', 'MuleSoft', 'SAP', 'Salesforce']);
     expect(byType('container')).toEqual(['ESCOMS', 'PM', 'PM']);
     expect(byType('actor')).toEqual(['Network Team']);
     expect(byType('capability')).toEqual(['Connection Quotations', 'Connections', 'Customer', 'Land, Wayleaves & Consents', 'Quotation Pricing']);
@@ -125,7 +127,7 @@ describe('exporting a model and importing it into an empty one', () => {
   it('brings every supports, uses and flows_to row back as a resolved relationship, linked to the right elements', async () => {
     const { candidates, stats } = await reimport();
     const relationships = candidates.filter((c) => c.kind === 'relationship');
-    expect(relationships.map((c) => `${String(c.relationshipType)}/${c.class}`).sort()).toEqual(['flows_to/new', 'supports/new', 'supports/new', 'uses/new']);
+    expect(relationships.map((c) => `${String(c.relationshipType)}/${c.class}`).sort()).toEqual(['flows_to/new', 'flows_to/new', 'supports/new', 'supports/new', 'uses/new']);
     const id = (name: string, type: string, parentName?: string) => {
       const parentId = parentName ? candidates.find((c) => c.kind === 'element' && nameOf(c) === parentName && c.elementType === 'system')?.draftSubjectId : undefined;
       return candidates.find((c) => c.kind === 'element' && nameOf(c) === name && c.elementType === type && (parentName === undefined || (c.proposal.kind === 'element' && c.proposal.parent?.kind === 'existing' && c.proposal.parent.elementId === parentId)))?.draftSubjectId;
@@ -135,8 +137,16 @@ describe('exporting a model and importing it into an empty one', () => {
     expect(ends('supports')).toContainEqual([id('Aurora', 'system'), id('Connections', 'capability'), 'secondary']);
     // Both PM endpoints were written qualified ("SAP · PM", "Salesforce · PM") because two modules share the name, and each resolves to its own platform's module.
     expect(ends('uses')).toEqual([[id('ESCOMS', 'container'), id('PM', 'container', 'SAP'), 'reads work orders from']]);
-    expect(ends('flows_to')).toEqual([[id('PM', 'container', 'Salesforce'), id('Aurora', 'system'), 'sends incidents to']]);
+    expect(ends('flows_to')).toContainEqual([id('PM', 'container', 'Salesforce'), id('Aurora', 'system'), 'sends incidents to']);
     // The one `owns` row is not read from the Relationships sheet (the Owner column is the owner path) — and is counted, not silent.
     expect(stats['relationships.skipped.UNSUPPORTED_TYPE']).toBe(1);
+  });
+
+  it('keeps a flow routed through an integration platform routed through it, with its data classification', async () => {
+    const { candidates } = await reimport();
+    const flow = candidates.find((c) => c.relationshipType === 'flows_to' && c.proposal.kind === 'relationship' && (c.proposal.attributes as Record<string, unknown>).description === 'sends work orders to');
+    const mule = candidates.find((c) => c.kind === 'element' && nameOf(c) === 'MuleSoft');
+    expect(flow?.proposal.kind === 'relationship' && flow.proposal.attributes).toMatchObject({ via: mule?.draftSubjectId, dataClassification: 'official_sensitive' });
+    expect(flow?.evidence.warnings).toEqual([]);
   });
 });

@@ -108,4 +108,25 @@ describe('relationshipSheetToCandidates (Sprint F2b, SPEC-capture.md §5.2a)', (
   it('a wholly blank row is not a skip', () => {
     expect(run(['From', 'Type', 'To', 'Verb'], [['', '', '', '']])).toEqual({ candidates: [], skipped: [] });
   });
+
+  it("reads the export's Via and Data classification columns: via becomes a hint, and the classification is read by key, spaced key or label", () => {
+    const { candidates, skipped } = run(
+      ['From', 'Type', 'To', 'Verb', 'Role', 'Via', 'Data classification'],
+      [
+        ['ESCOMS', 'flows_to', 'Aurora', 'sends work to', '', 'MuleSoft', 'official_sensitive'],
+        ['ESCOMS', 'flows_to', 'CBRM', 'sends condition to', '', '', 'Official Sensitive'],
+        ['ESCOMS', 'uses', 'CBRM', 'reads from', '', 'MuleSoft', ''],
+      ],
+    );
+    expect(skipped).toEqual([]);
+    expect(candidates.map((c) => c.viaHint)).toEqual(['MuleSoft', undefined, 'MuleSoft']);
+    expect(candidates.map((c) => (c.proposal.attributes as Record<string, unknown>).dataClassification)).toEqual(['official_sensitive', 'official_sensitive', undefined]);
+  });
+
+  it('drops a data classification it cannot read, with a warning, and keeps the flow', () => {
+    const { candidates } = run(['From', 'Type', 'To', 'Verb', 'Data classification'], [['A', 'flows_to', 'B', 'sends to', 'top secret']]);
+    expect(candidates).toHaveLength(1);
+    expect((candidates[0]?.proposal.attributes as Record<string, unknown>).dataClassification).toBeUndefined();
+    expect(candidates[0]?.evidence.warnings).toEqual([{ code: 'ENUM_UNPARSED', cell: 'E2', raw: 'top secret' }]);
+  });
 });

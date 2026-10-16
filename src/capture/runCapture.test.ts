@@ -662,6 +662,30 @@ describe('runCapture — JSON input (Sprint F2b, SPEC-capture.md §5.6)', () => 
     const uses = result.candidates.find((c) => c.relationshipType === 'uses');
     expect(uses?.class).toBe('new');
     expect(uses?.proposal.kind === 'relationship' && uses.proposal.attributes).toMatchObject({ description: 'reads invoice data' });
+    // 'Enterprise Bus' is no system in this run or in main: the flow imports as direct, and the review is told why.
+    expect(uses?.proposal.kind === 'relationship' && (uses.proposal.attributes as Record<string, unknown>).via).toBeUndefined();
+    expect(uses?.evidence.warnings).toContainEqual({ code: 'ENDPOINT_UNRESOLVED', text: 'Enterprise Bus', end: 'via' });
+  });
+
+  it('links a flow to the integration platform it goes via, and warns when the named via is a system that is not one', async () => {
+    const platform = { element_id: 'bus-1', element_type: 'system' as const, name: 'Enterprise Bus', parent_id: null, attributes: { kind: 'integration_platform' }, exists_delta_id: 'd-1' };
+    const plainApp = { element_id: 'app-1', element_type: 'system' as const, name: 'Plain App', parent_id: null, attributes: { kind: 'application' }, exists_delta_id: 'd-2' };
+    const json = JSON.stringify({
+      systems: [{ name: 'CRM' }, { name: 'Billing' }],
+      relationships: [
+        { from: 'CRM', type: 'uses', to: 'Billing', description: 'reads invoice data', via: 'Enterprise Bus' },
+        { from: 'Billing', type: 'flows_to', to: 'CRM', description: 'sends payments to', via: 'Plain App' },
+      ],
+    });
+    const result = await expectSuccess(
+      runCapture({ inputName: 'import.json', source: { format: 'json', text: json }, documentDate: '2026-01-01', llmClient: NEVER_CALLED_LLM, matchIndex: buildMatchIndex([platform, plainApp], []), mainHead: emptyHead(), mintId: mintIdFrom('el') }),
+    );
+    const uses = result.candidates.find((c) => c.relationshipType === 'uses');
+    const flows = result.candidates.find((c) => c.relationshipType === 'flows_to');
+    expect(uses?.proposal.kind === 'relationship' && (uses.proposal.attributes as Record<string, unknown>).via).toBe('bus-1');
+    expect(uses?.evidence.warnings).toEqual([]);
+    expect(flows?.proposal.kind === 'relationship' && (flows.proposal.attributes as Record<string, unknown>).via).toBeUndefined();
+    expect(flows?.evidence.warnings).toContainEqual({ code: 'ENDPOINT_UNRESOLVED', text: 'Plain App', end: 'via' });
   });
 
   it('resolves a changes-section retire against an existing main element, never creating one', async () => {

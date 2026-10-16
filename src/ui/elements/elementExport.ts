@@ -21,9 +21,11 @@
  * has two columns both called "Type".
  *
  * `.xlsx` is one sheet per element type present in the set plus a
- * `Relationships` sheet (`From, Type, To, Verb, Role`) — `verb` from a
- * `uses`/`flows_to` edge's `description`, `role` from a `supports`/`owns`
- * edge's `role`. The CSV is one flat table: the union of every type's core
+ * `Relationships` sheet (`From, Type, To, Verb, Role, Via, Data classification`) —
+ * `verb` from a `uses`/`flows_to` edge's `description`, `role` from a
+ * `supports`/`owns` edge's `role`, `via` the integration platform a
+ * `uses`/`flows_to` flow goes through, `data classification` a `flows_to`
+ * edge's own. The CSV is one flat table: the union of every type's core
  * and custom columns, blank where a type doesn't carry an attribute.
  *
  * Generation is client-side (SheetJS `xlsx`); the browse table already
@@ -160,6 +162,9 @@ export interface RelationshipExportRow {
   to: string;
   verb: string;
   role: string;
+  /** The integration platform a `uses`/`flows_to` flow goes via, named like an endpoint ("Parent · Name" when the name is shared). */
+  via: string;
+  dataClassification: string;
 }
 
 /**
@@ -188,6 +193,8 @@ export function relationshipExportRows(edges: readonly RelationshipsHeadRow[], e
       to: endpointName(elementsById.get(edge.to_element_id), elementsById, nameCounts),
       verb: typeof attrs.description === 'string' ? attrs.description : '',
       role: typeof attrs.role === 'string' ? attrs.role : '',
+      via: typeof attrs.via === 'string' ? endpointName(elementsById.get(attrs.via), elementsById, nameCounts) : '',
+      dataClassification: typeof attrs.dataClassification === 'string' ? attrs.dataClassification : '',
     };
   });
 }
@@ -258,7 +265,7 @@ export function buildExportSheets(rows: readonly BrowseRow[], definitions: reado
   }
   sheets.push({
     name: 'Relationships',
-    cells: [['From', 'Type', 'To', 'Verb', 'Role'], ...relationships.map((rel) => [rel.from, rel.type, rel.to, rel.verb, rel.role])],
+    cells: [['From', 'Type', 'To', 'Verb', 'Role', 'Via', 'Data classification'], ...relationships.map((rel) => [rel.from, rel.type, rel.to, rel.verb, rel.role, rel.via, rel.dataClassification])],
   });
   return sheets;
 }

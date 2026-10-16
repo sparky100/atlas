@@ -77,6 +77,7 @@ async function createSignedInUser(label: string): Promise<TestUser> {
 // ---------------------------------------------------------------------------
 
 const ids = {
+  mule: randomUUID(),
   salesforce: randomUUID(),
   sap: randomUUID(),
   arcgis: randomUUID(),
@@ -112,6 +113,7 @@ function seedDeltas(sourceId: UUID): Delta[] {
     system(ids.sap, 'SAP', { kind: 'platform', vendor: 'SAP SE', hostingModel: 'private_cloud', criticality: 'high', plannedEnd: '2031-12-31', version: '4.2', annualRunCost: '1m_5m', supportEndsAt: '2030-06-30' }),
     system(ids.arcgis, 'ArcGIS', { kind: 'platform', vendor: 'ESRI' }),
     system(ids.aurora, 'Aurora', { lifecycleStatus: 'retiring', vendor: 'Acme', isExternal: true, externalOrganisation: 'Acme Ltd', disposition: 'eliminate', domain: 'ot' }),
+    system(ids.mule, 'MuleSoft', { kind: 'integration_platform', vendor: 'Salesforce Inc' }),
     system(ids.cbrm, 'CBRM', { description: 'Condition based risk management' }),
     system(ids.cbrmLegacy, 'CBRM (legacy)', { lifecycleStatus: 'retiring' }),
     module(ids.escoms, 'ESCOMS', ids.salesforce, { description: 'Wayleave and consent management', technology: 'Apex', criticality: 'medium' }),
@@ -135,6 +137,8 @@ function seedDeltas(sourceId: UUID): Delta[] {
     edge('uses', ids.escoms, ids.enterprise, { description: 'looks up land parcels in' }),
     edge('flows_to', ids.pmSalesforce, ids.aurora, { description: 'sends programme tasks to' }),
     edge('flows_to', ids.pmSap, ids.cbrm, { description: 'sends asset condition to' }),
+    edge('flows_to', ids.escoms, ids.aurora, { description: 'sends work orders to', via: ids.mule, dataClassification: 'official_sensitive' }),
+    edge('uses', ids.pmSalesforce, ids.enterprise, { description: 'reads layers from', via: ids.mule }),
     edge('owns', ids.team, ids.aurora, { role: 'business' }),
   ];
 }
@@ -316,7 +320,9 @@ function describeModel(head: Head): { elements: string[]; attributes: string[]; 
   const relationships = [...head.relationships.values()].map((r) => {
     const attrs = r.attributes as Record<string, unknown>;
     const detail = typeof attrs.role === 'string' ? attrs.role : typeof attrs.description === 'string' ? attrs.description : '';
-    return `${r.relationshipType} ${key(r.fromElementId)} -> ${key(r.toElementId)} [${detail}]`;
+    const via = typeof attrs.via === 'string' ? ` via ${key(attrs.via)}` : '';
+    const classification = typeof attrs.dataClassification === 'string' ? ` (${attrs.dataClassification})` : '';
+    return `${r.relationshipType} ${key(r.fromElementId)} -> ${key(r.toElementId)} [${detail}]${via}${classification}`;
   });
   return { elements: elements.sort(), attributes: attributes.sort(), relationships: relationships.sort() };
 }

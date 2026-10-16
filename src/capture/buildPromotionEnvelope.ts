@@ -193,6 +193,16 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
     return ref.elementId;
   }
 
+  /**
+   * A `uses`/`flows_to` edge's `via` is an element id inside its attributes, not one of the edge's own `from`/`to` refs — so `resolveRef` never saw it. Left as the draft id, an import that creates the integration platform and a flow through it in one go would write an edge whose `via` names an element that was never created (C18 rejects it when the commit is folded). Remapped here the same way an endpoint is; an id that isn't a draft id (a platform already in the model) passes through untouched.
+   */
+  function remapVia<T extends Record<string, unknown>>(attributes: T): T {
+    const via = attributes.via;
+    if (typeof via !== 'string') return attributes;
+    const remapped = promotedIdByDraftId.get(via);
+    return remapped === undefined ? attributes : { ...attributes, via: remapped };
+  }
+
   // Pass 1 — element candidates only: assign every promoted candidate's
   // real subject id before any delta is built, so a later reference to it
   // (this call's own order, not the candidates' own `seq`) always resolves.
@@ -392,6 +402,7 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
         provenance = provenanceFromDraftFact(draftFact(draftHead, draftSubjectId, EXISTS_ATTRIBUTE), seq, `${draftSubjectId}.$exists`);
       }
 
+      attributes = remapVia(attributes);
       const delta = { kind: 'relationship.create', id: mintId(), relationshipId, relationshipType, fromElementId, toElementId, attributes, ...provenance } as never as Delta;
       deltas.push(delta);
       if (candidate.decision === 'edited') resolvedConflicts.push({ id: mintId(), winningDeltaId: (delta as { id: UUID }).id, discardedDeltaId: draftFact(draftHead, draftSubjectId, EXISTS_ATTRIBUTE)?.deltaId ?? requireExistsDeltaId(draftHead, 'relationship', draftSubjectId, seq, `draft candidate ${draftSubjectId}`), rationale: null });
@@ -430,7 +441,7 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
     if (!targetHead.relationships.has(subjectId)) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: matched relationship ${subjectId} was not found on the target branch (TARGET_RETRACTED)`, subjectId);
     promotedSubjectIdBySeq.set(seq, subjectId);
     const existsDeltaId = requireExistsDeltaIdOnTarget(targetHead, 'relationship', subjectId, seq, `matched relationship ${subjectId}`);
-    const sourceAttributes: Record<string, unknown> = candidate.decision === 'edited' ? decisionDetailAttributes(candidate.decisionDetail, seq) : candidate.decision === 'split' ? pick(proposal.attributes as unknown as Record<string, unknown>, decisionDetailAcceptedAttributes(candidate.decisionDetail, seq)) : (proposal.attributes as unknown as Record<string, unknown>);
+    const sourceAttributes: Record<string, unknown> = remapVia(candidate.decision === 'edited' ? decisionDetailAttributes(candidate.decisionDetail, seq) : candidate.decision === 'split' ? pick(proposal.attributes as unknown as Record<string, unknown>, decisionDetailAcceptedAttributes(candidate.decisionDetail, seq)) : (proposal.attributes as unknown as Record<string, unknown>));
 
     for (const attribute of Object.keys(sourceAttributes).sort()) {
       const value = sourceAttributes[attribute] as Json;
