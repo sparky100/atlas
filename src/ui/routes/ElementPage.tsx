@@ -58,7 +58,7 @@ import { useAttestation } from '../elements/useAttestation';
 import { useElementRename } from '../elements/useElementRename';
 import { ActorMemberPicker } from '../elements/ActorMemberPicker';
 import { attributesRecord } from '../elements/attributesRecord';
-import { isIntegrationInterface, isIntegrationPlatform, isPlatform } from '../elements/systemKind';
+import { interfaceTypeLabelOf, isIntegrationInterface, isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { useRouteTiming } from '../perf/useRouteTiming';
 import { useValueStreamImpact } from '../valueStreams/useValueStreamImpact';
 import styles from './ElementPage.module.css';
@@ -343,6 +343,15 @@ export function ElementPage() {
               confirming={attestation.confirmingId === state.data.element.element_id}
               onProposeChange={canPropose ? () => { setProposingChange(true); } : undefined}
               readOnlyReason={underReview ? 'Read-only: under review' : undefined}
+              interfacePlatform={
+                state.data.parent && isIntegrationInterface(state.data.element, state.data.parent)
+                  ? {
+                      name: state.data.parent.name,
+                      href: `/o/${orgSlug ?? ''}/m/${model.slug}/e/${state.data.parent.element_id}?${refQueryParam(ref, viewing)}`,
+                      typeLabel: interfaceTypeLabelOf(state.data.element),
+                    }
+                  : undefined
+              }
               rename={canEdit ? rename : undefined}
               onRetire={canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') ? () => { setRetiring(true); } : undefined}
               onRemoveFromModel={canEdit && state.data.element.element_type !== 'value_stream' && state.data.children.length === 0 ? () => { setRemovingFromModel(true); } : undefined}
@@ -533,6 +542,7 @@ export function ElementPage() {
                 <CollapsibleSection title="Attributes">
                   {editor.status === 'idle' ? (
                     <AttributesTable
+                      isInterface={isIntegrationInterface(state.data.element, state.data.parent)}
                       element={state.data.element}
                       facts={state.data.facts}
                       sources={state.data.sources}
@@ -569,6 +579,7 @@ export function ElementPage() {
                     elementId={state.data.element.element_id}
                     elementType={state.data.element.element_type}
                     elementName={state.data.element.name}
+                    isInterface={isIntegrationInterface(state.data.element, state.data.parent)}
                     relationships={state.data.relationships}
                     endpoints={state.data.relationshipEndpoints}
                     relationshipFacts={state.data.relationshipFacts}
@@ -825,6 +836,7 @@ function AliasRows({ elementId, aliases, aliasSources }: { elementId: UUID; alia
 }
 
 function AttributesTable({
+  isInterface,
   element,
   facts,
   sources,
@@ -832,6 +844,8 @@ function AttributesTable({
   aliasSources,
   customFields,
 }: {
+  /** ADR-026: an interface always shows its Interface type and Transformation rows (an em dash when empty), so a missing one reads as "not filled in yet" rather than absent. */
+  isInterface: boolean;
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
   sources: Map<string, SourceRow>;
@@ -853,7 +867,7 @@ function AttributesTable({
         // row entirely rather than rendering AttributeRow's own bare "—"
         // — distinct from `hidden` above, which excludes it regardless of
         // whether a fact exists.
-        if (field.hideWhenEmpty === true && !fact) return null;
+        if (field.hideWhenEmpty === true && !fact && !(isInterface && (field.key === 'interfaceType' || field.key === 'transformation'))) return null;
         return <AttributeRow key={field.key} label={field.label} required={field.required} fact={fact} source={fact ? sources.get(fact.source_id) : undefined} field={field} />;
       })}
       <AliasRows elementId={element.element_id} aliases={aliases} aliasSources={aliasSources} />
