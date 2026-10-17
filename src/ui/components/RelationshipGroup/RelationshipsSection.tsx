@@ -83,6 +83,8 @@ export interface RelationshipsSectionProps {
   elementParentId?: UUID | null | undefined;
   /** Whether this element is an actor with `isExternal === true` — C20 forces its `owns` edges to `service` (`slotApplicability.ts`). */
   elementIsExternal?: boolean | undefined;
+  /** Whether this is a `platform`-kind system — its modules support capabilities, not the platform itself (`slotApplicability.ts`). */
+  elementIsPlatform?: boolean | undefined;
   /** This element's own current name — "Relationship removal"'s confirmation sentence subject (`elementName` on `addRelationship` already carries this for the create side; the remove side needs it unconditionally, even when `removeRelationship` is the only config given). */
   elementName: string;
   /** ADR-026: this element is an interface. Slots that don't fit one (supports, flows to / receives from — flows are modelled between systems *via* it) are not offered, and "uses" sits under a collapsed "More relationships" until it has a row. Existing rows always show, whatever the group. */
@@ -142,6 +144,7 @@ export function RelationshipsSection({
   elementType,
   elementParentId = null,
   elementIsExternal = false,
+  elementIsPlatform = false,
   elementName,
   isInterface = false,
   relationships,
@@ -173,8 +176,8 @@ export function RelationshipsSection({
     const outboundRows = relationships.filter((r) => r.relationship_type === type && r.from_element_id === elementId);
     const inboundRows = relationships.filter((r) => r.relationship_type === type && r.to_element_id === elementId);
     // C20/C22 (`slotApplicability.ts`): drop a slot the rules table admits but this element can't legally use — existing rows still show.
-    const outboundSlot = isSlotApplicable(type, 'outbound', elementType, elementParentId) ? outboundSlots.get(type) : undefined;
-    const inboundSlot = isSlotApplicable(type, 'inbound', elementType, elementParentId) ? inboundSlots.get(type) : undefined;
+    const outboundSlot = isSlotApplicable(type, 'outbound', elementType, elementParentId, elementIsPlatform) ? outboundSlots.get(type) : undefined;
+    const inboundSlot = isSlotApplicable(type, 'inbound', elementType, elementParentId, elementIsPlatform) ? inboundSlots.get(type) : undefined;
     // ADR-026: an interface offers no empty slot for supports or flows_to (either direction); rows already recorded still show.
     const slotFits = !(isInterface && (type === 'supports' || type === 'flows_to'));
     const showOutbound = outboundRows.length > 0 || (slotFits && groupAddRelationship !== undefined && outboundSlot !== undefined);

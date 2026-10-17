@@ -8,6 +8,12 @@ describe('isSlotApplicable (C22)', () => {
   it('keeps the inbound enables slot on a stage', () => {
     expect(isSlotApplicable('enables', 'inbound', 'value_stream', 'stream-id')).toBe(true);
   });
+  it('hides outbound supports on a platform-kind system, but not inbound or on other systems', () => {
+    expect(isSlotApplicable('supports', 'outbound', 'system', null, true)).toBe(false);
+    expect(isSlotApplicable('supports', 'outbound', 'system', null, false)).toBe(true);
+    expect(isSlotApplicable('supports', 'inbound', 'capability', null, true)).toBe(true);
+    expect(isSlotApplicable('uses', 'outbound', 'system', null, true)).toBe(true);
+  });
   it('leaves every other slot alone', () => {
     expect(isSlotApplicable('enables', 'outbound', 'capability', null)).toBe(true);
     expect(isSlotApplicable('supports', 'inbound', 'capability', null)).toBe(true);
