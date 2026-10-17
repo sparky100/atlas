@@ -8,6 +8,7 @@
  */
 import type { SystemKind, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
+import { INTERFACE_TYPE_LABELS } from '../../contracts/attributeSchema';
 import { attributesRecord } from './attributesRecord';
 
 export const SYSTEM_KIND_LABEL: Record<SystemKind, string> = {
@@ -51,4 +52,10 @@ export function isPlatform(system: ElementsHeadRow): boolean {
 /** Every kind other than the default — the landscape's platform band groups a system here the moment it's marked as anything but an ordinary application. */
 export function isNonApplicationKind(system: ElementsHeadRow): boolean {
   return kindOf(system) !== 'application';
+}
+
+/** ADR-026: an interface's own type as a display label ("API", "File"…), or `null` when none is recorded (or the stored value isn't a known type). */
+export function interfaceTypeLabelOf(element: ElementsHeadRow): string | null {
+  const value = attributesRecord(element.attributes).interfaceType;
+  return typeof value === 'string' && value in INTERFACE_TYPE_LABELS ? INTERFACE_TYPE_LABELS[value as keyof typeof INTERFACE_TYPE_LABELS] : null;
 }

@@ -80,6 +80,8 @@ export interface RelationshipsSectionProps {
   elementType: ElementType;
   /** This element's own current name — "Relationship removal"'s confirmation sentence subject (`elementName` on `addRelationship` already carries this for the create side; the remove side needs it unconditionally, even when `removeRelationship` is the only config given). */
   elementName: string;
+  /** ADR-026: this element is an interface. Slots that don't fit one (supports, flows to / receives from — flows are modelled between systems *via* it) are not offered, and "uses" sits under a collapsed "More relationships" until it has a row. Existing rows always show, whatever the group. */
+  isInterface?: boolean;
   relationships: RelationshipsHeadRow[];
   endpoints: Map<UUID, ElementsHeadRow>;
   relationshipFacts: Map<UUID, Map<string, FactsRow>>;
@@ -134,6 +136,7 @@ export function RelationshipsSection({
   elementId,
   elementType,
   elementName,
+  isInterface = false,
   relationships,
   endpoints,
   relationshipFacts,
@@ -164,9 +167,13 @@ export function RelationshipsSection({
     const inboundRows = relationships.filter((r) => r.relationship_type === type && r.to_element_id === elementId);
     const outboundSlot = outboundSlots.get(type);
     const inboundSlot = inboundSlots.get(type);
-    const showOutbound = outboundRows.length > 0 || (groupAddRelationship !== undefined && outboundSlot !== undefined);
-    const showInbound = inboundRows.length > 0 || (groupAddRelationship !== undefined && inboundSlot !== undefined);
-    return { type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound, groupAddRelationship, groupRemoveRelationship, groupEditRelationship };
+    // ADR-026: an interface offers no empty slot for supports or flows_to (either direction); rows already recorded still show.
+    const slotFits = !(isInterface && (type === 'supports' || type === 'flows_to'));
+    const showOutbound = outboundRows.length > 0 || (slotFits && groupAddRelationship !== undefined && outboundSlot !== undefined);
+    const showInbound = inboundRows.length > 0 || (slotFits && groupAddRelationship !== undefined && inboundSlot !== undefined);
+    // An interface's empty "uses" slot is tucked under "More relationships" rather than shown up front.
+    const collapsed = isInterface && type === 'uses' && outboundRows.length === 0;
+    return { type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound, collapsed, groupAddRelationship, groupRemoveRelationship, groupEditRelationship };
   }).filter((group) => group.showOutbound || group.showInbound);
 
   if (groups.length === 0) {
@@ -175,9 +182,8 @@ export function RelationshipsSection({
 
   return (
     <div>
-      {groups.map(({ type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound, groupAddRelationship, groupRemoveRelationship, groupEditRelationship }) => (
-        <div key={type} className={styles.typeGroup}>
-          {showOutbound && (
+      {groups.map(({ type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound, collapsed, groupAddRelationship, groupRemoveRelationship, groupEditRelationship }) => {
+        const outboundGroup = (
             <RelationshipDirectionGroup
               label={DIRECTION_LABEL[type].outbound}
               rows={outboundRows}
@@ -196,7 +202,15 @@ export function RelationshipsSection({
               editRelationship={groupEditRelationship}
               justAddedElementId={justAddedElementId}
             />
-          )}
+        );
+        return (
+        <div key={type} className={styles.typeGroup}>
+          {showOutbound && (collapsed ? (
+            <details>
+              <summary>More relationships</summary>
+              {outboundGroup}
+            </details>
+          ) : outboundGroup)}
           {showInbound && (
             <RelationshipDirectionGroup
               label={DIRECTION_LABEL[type].inbound}
@@ -218,7 +232,8 @@ export function RelationshipsSection({
             />
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

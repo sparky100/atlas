@@ -124,6 +124,10 @@ export interface ElementHeaderProps {
    */
   readOnlyReason?: string | undefined;
   /**
+   * ADR-026: set only when the element is an *interface* — names the integration platform that manages it (the interface's own parent) and links to that platform's page, so the header says "Interface · managed by <platform>" instead of leaving that to the "Parent:" line further down. `typeLabel` is the interface's own type ("API", "File"…), `null` when not yet recorded. Omitted for every other element.
+   */
+  interfacePlatform?: { name: string; href: string; typeLabel: string | null } | undefined;
+  /**
    * "Context →" — a system or container's own context diagram
    * (`/context/:elementId`, `ContextPage.tsx`). Omitted entirely (not
    * shown disabled) for a capability or actor, same convention as every
@@ -173,7 +177,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, contextHref, startProjectHref }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, interfacePlatform, contextHref, startProjectHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
@@ -282,6 +286,12 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
         {version !== null && (
           <Text as="span" tone="muted" size="sm">
             {version}
+          </Text>
+        )}
+        {interfacePlatform && <Chip tone="neutral">{interfacePlatform.typeLabel ? `Interface · ${interfacePlatform.typeLabel}` : 'Interface'}</Chip>}
+        {interfacePlatform && (
+          <Text as="span" tone="muted" size="sm">
+            managed by <Link to={interfacePlatform.href}>{interfacePlatform.name}</Link>
           </Text>
         )}
         {isExternal && <Chip tone="neutral">{externalOrganisation ? `external (${externalOrganisation})` : 'external'}</Chip>}
