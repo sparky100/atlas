@@ -1,0 +1,92 @@
+{
+  "format": "atlas-mulesoft-export",
+  "version": 1,
+  "exportedAt": "2026-10-17T13:26:25.478Z",
+  "organizationId": "00000000-0000-4000-8000-00000000a001",
+  "environments": [
+    {
+      "name": "Sandbox",
+      "apis": [
+        {
+          "id": 21241998,
+          "assetId": "test-2",
+          "assetVersion": "1.0.0",
+          "productVersion": "v1",
+          "instanceLabel": null,
+          "description": null,
+          "tags": [],
+          "endpointUri": null,
+          "endpointType": "http",
+          "technology": "mule4",
+          "status": "unregistered",
+          "deprecated": false,
+          "stage": "release",
+          "activeContractsCount": 1,
+          "environmentId": "00000000-0000-4000-8000-00000000e001",
+          "organizationId": "00000000-0000-4000-8000-00000000a001"
+        },
+        {
+          "id": 21241997,
+          "assetId": "test",
+          "assetVersion": "1.0.0",
+          "productVersion": "v1",
+          "instanceLabel": null,
+          "description": null,
+          "tags": [],
+          "endpointUri": "http://mprs.example.com",
+          "endpointType": "http",
+          "technology": "mule4",
+          "status": "unregistered",
+          "deprecated": false,
+          "stage": "release",
+          "activeContractsCount": 2,
+          "environmentId": "00000000-0000-4000-8000-00000000e001",
+          "organizationId": "00000000-0000-4000-8000-00000000a001"
+        }
+      ],
+      "contracts": {
+        "21241997": [
+          {
+            "id": 9531230,
+            "status": "APPROVED",
+            "apiId": 21241997,
+            "approvedDate": "2026-10-17T12:31:06.960Z",
+            "rejectedDate": null,
+            "revokedDate": null,
+            "application": {
+              "id": 188972877,
+              "name": "PM"
+            }
+          },
+          {
+            "id": 9531232,
+            "status": "APPROVED",
+            "apiId": 21241997,
+            "approvedDate": "2026-10-17T12:32:10.345Z",
+            "rejectedDate": null,
+            "revokedDate": null,
+            "application": {
+              "id": 188972879,
+              "name": "Field Service"
+            }
+          }
+        ],
+        "21241998": [
+          {
+            "id": 9531233,
+            "status": "APPROVED",
+            "apiId": 21241998,
+            "approvedDate": "2026-10-17T12:32:37.417Z",
+            "rejectedDate": null,
+            "revokedDate": null,
+            "application": {
+              "id": 188972877,
+              "name": "PM"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": []
+}
