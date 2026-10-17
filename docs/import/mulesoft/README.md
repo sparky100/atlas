@@ -30,6 +30,8 @@ An API's backend hostname (`endpointUri`) tells Atlas where the API forwards to,
 mprs.example.com = MPRS
 ```
 
+To keep a hostname for every later import, open the backend system's element page and add it under **Add an external reference** (a pasted URL is reduced to its hostname). A system can have as many references as it has hostnames, and the dialog applies all of them automatically; a line typed in the box overrides a saved one for that upload. Saved references are model-wide and, like all aliases, cannot be removed, so check the hostname before adding it. A hostname can belong to only one element.
+
 Mapped APIs produce `flows_to` the backend via the interface (shown on the platform's Context view); unmapped ones leave the consumer linked to the interface only, and the platform page shows that interface with no flows.
 
 ## Things to know

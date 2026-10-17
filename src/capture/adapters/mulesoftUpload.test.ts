@@ -46,6 +46,16 @@ describe('prepareMulesoftUpload', () => {
     expect(parsed.relationshipRows.filter((row) => row.type === 'flows_to')).toHaveLength(2);
   });
 
+  it('uses saved external references the same way, and a typed line wins over a saved one', () => {
+    const saved = prepareMulesoftUpload({ fileName: 'x.json', text: FIXTURE, aliasText: '', savedAliases: { 'mprs.example.com': 'MPRS' } });
+    if (!saved.ok) throw new Error(saved.error);
+    expect(saved.summary).toContain('(2 flows to a mapped backend)');
+    const overridden = prepareMulesoftUpload({ fileName: 'x.json', text: FIXTURE, aliasText: 'mprs.example.com = Other', savedAliases: { 'mprs.example.com': 'MPRS' } });
+    if (!overridden.ok) throw new Error(overridden.error);
+    expect(new TextDecoder().decode(overridden.bytes)).toContain('Other');
+    expect(new TextDecoder().decode(overridden.bytes)).not.toContain('"MPRS"');
+  });
+
   it('adds .json to a name without it, so the run is still read as JSON', () => {
     const result = prepareMulesoftUpload({ fileName: 'export', text: FIXTURE, aliasText: '' });
     expect(result.ok && result.inputName).toBe('export.json');

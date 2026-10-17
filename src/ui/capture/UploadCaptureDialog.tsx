@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { CaptureInputKind, CaptureJob } from '../../contracts/capture';
 import { prepareMulesoftUpload } from '../../capture/adapters/mulesoftUpload';
+import { listExternalRefMappings } from '../../db/aliases';
 import { computeInputSha256Hex, findReimportCandidate } from '../../db/captureJobs';
 import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
@@ -67,6 +68,8 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
   const [source, setSource] = useState<Source>('generic');
   const [mulesoftFile, setMulesoftFile] = useState<{ name: string; text: string } | null>(null);
   const [aliasText, setAliasText] = useState('');
+  // The model's own saved hostnames (external references on element pages); a failed load just means only typed mappings apply.
+  const [savedAliases, setSavedAliases] = useState<Record<string, string>>({});
   const [documentDate, setDocumentDate] = useState('');
   const [documentDateTouched, setDocumentDateTouched] = useState(false);
   // Keyed by `inputName` rather than reset imperatively when there's
@@ -89,6 +92,21 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
     };
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open || source !== 'mulesoft') return;
+    let cancelled = false;
+    listExternalRefMappings(supabase, modelId)
+      .then((mappings) => {
+        if (!cancelled) setSavedAliases(mappings);
+      })
+      .catch((e: unknown) => {
+        console.error('could not load saved hostname mappings', e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, source, modelId]);
+
   // §9.2: pasted text is stored as an object too. Its name is the user's own
   // (falling back to `pasted-text.txt` when left blank) so a later re-import
   // can find it by the same name. Purely derived from `pastedText`/`pasteName`
@@ -103,7 +121,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
   }, [pastedText, pasteName]);
 
   // The converted import JSON is what the run stores and re-imports — derived, never copied into state, so editing the mappings re-converts the same file.
-  const mulesoftPrepared = useMemo(() => (mulesoftFile === null ? null : prepareMulesoftUpload({ fileName: mulesoftFile.name, text: mulesoftFile.text, aliasText })), [mulesoftFile, aliasText]);
+  const mulesoftPrepared = useMemo(() => (mulesoftFile === null ? null : prepareMulesoftUpload({ fileName: mulesoftFile.name, text: mulesoftFile.text, aliasText, savedAliases })), [mulesoftFile, aliasText, savedAliases]);
   const mulesoftSelection = useMemo((): SelectedInput | null => (mulesoftPrepared?.ok === true ? { inputKind: 'spreadsheet', inputName: mulesoftPrepared.inputName, bytes: mulesoftPrepared.bytes } : null), [mulesoftPrepared]);
 
   const selected = source === 'mulesoft' ? mulesoftSelection : mode === 'file' ? fileSelection : pasteSelection.selected;
@@ -321,6 +339,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                   <div className={styles.formRow}>
                     <Text as="label" size="sm" tone="muted">
                       Backend systems (optional): one per line, hostname = Atlas system name
+                      {Object.keys(savedAliases).length > 0 ? `. ${String(Object.keys(savedAliases).length)} saved on element pages already apply; a line here overrides one.` : ''}
                     </Text>
                     <textarea
                       className={styles.textarea}

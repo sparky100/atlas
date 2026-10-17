@@ -49,16 +49,17 @@ function summaryOf(report: MulesoftConversionReport): string {
 function warningsOf(report: MulesoftConversionReport): string[] {
   const warnings = [...report.warnings];
   if (report.skippedContracts.length > 0) warnings.push(`${plural(report.skippedContracts.length, 'contract was', 'contracts were')} left out (not approved, or no client application).`);
-  if (report.unmappedHosts.length > 0) warnings.push(`Backend hostnames with no mapping, so their consumers link to the interface only: ${report.unmappedHosts.join(', ')}. Map them below to link consumers to the system behind each API.`);
+  if (report.unmappedHosts.length > 0) warnings.push(`Backend hostnames with no mapping, so their consumers link to the interface only: ${report.unmappedHosts.join(', ')}. Map them below, or save them as external references on the system's element page, to link consumers to the system behind each API.`);
   return warnings;
 }
 
-export function prepareMulesoftUpload(input: { fileName: string; text: string; aliasText: string }): PreparedMulesoftUpload {
+/** `savedAliases` are the model's own external references (`hostname -> Atlas name`); a line typed in the box wins over a saved one for the same hostname. */
+export function prepareMulesoftUpload(input: { fileName: string; text: string; aliasText: string; savedAliases?: Record<string, string> }): PreparedMulesoftUpload {
   const parsed = parseMulesoftExport(input.text);
   if (!parsed.ok) return { ok: false, error: parsed.error };
   const alias = parseAliasText(input.aliasText);
   if (alias.errors.length > 0) return { ok: false, error: alias.errors.join(' ') };
-  const { importJson, report } = convertMulesoftExport(parsed.file, { aliases: alias.aliases });
+  const { importJson, report } = convertMulesoftExport(parsed.file, { aliases: { ...input.savedAliases, ...alias.aliases } });
   const inputName = input.fileName.toLowerCase().endsWith('.json') ? input.fileName : `${input.fileName}.json`;
   return { ok: true, inputName, bytes: new TextEncoder().encode(`${JSON.stringify(importJson, null, 2)}\n`), summary: summaryOf(report), warnings: warningsOf(report) };
 }
