@@ -18,6 +18,7 @@ import { FactBadge } from '../FactBadge/FactBadge';
 import { fitNotRatedRelationshipIds } from './fitNotRatedEdges';
 import { endpointDisplayName } from './relationshipEndpointLabel';
 import { RelationshipAdd } from './RelationshipAdd';
+import { isSlotApplicable } from './slotApplicability';
 import { RelationshipRemove, type RelationshipsSectionRemoveConfig } from './RelationshipRemove';
 import { Text } from '../Text/Text';
 import styles from './RelationshipsSection.module.css';
@@ -78,6 +79,10 @@ export interface RelationshipsSectionProps {
   modelSlug: string;
   elementId: UUID;
   elementType: ElementType;
+  /** This element's own `parent_id` — C22 needs it to tell a value-stream stage from a stream (`slotApplicability.ts`). */
+  elementParentId?: UUID | null | undefined;
+  /** Whether this element is an actor with `isExternal === true` — C20 forces its `owns` edges to `service` (`slotApplicability.ts`). */
+  elementIsExternal?: boolean | undefined;
   /** This element's own current name — "Relationship removal"'s confirmation sentence subject (`elementName` on `addRelationship` already carries this for the create side; the remove side needs it unconditionally, even when `removeRelationship` is the only config given). */
   elementName: string;
   relationships: RelationshipsHeadRow[];
@@ -133,6 +138,8 @@ export function RelationshipsSection({
   modelSlug,
   elementId,
   elementType,
+  elementParentId = null,
+  elementIsExternal = false,
   elementName,
   relationships,
   endpoints,
@@ -162,8 +169,9 @@ export function RelationshipsSection({
     const groupEditRelationship = editRelationship;
     const outboundRows = relationships.filter((r) => r.relationship_type === type && r.from_element_id === elementId);
     const inboundRows = relationships.filter((r) => r.relationship_type === type && r.to_element_id === elementId);
-    const outboundSlot = outboundSlots.get(type);
-    const inboundSlot = inboundSlots.get(type);
+    // C20/C22 (`slotApplicability.ts`): drop a slot the rules table admits but this element can't legally use — existing rows still show.
+    const outboundSlot = isSlotApplicable(type, 'outbound', elementType, elementParentId) ? outboundSlots.get(type) : undefined;
+    const inboundSlot = isSlotApplicable(type, 'inbound', elementType, elementParentId) ? inboundSlots.get(type) : undefined;
     const showOutbound = outboundRows.length > 0 || (groupAddRelationship !== undefined && outboundSlot !== undefined);
     const showInbound = inboundRows.length > 0 || (groupAddRelationship !== undefined && inboundSlot !== undefined);
     return { type, outboundRows, inboundRows, outboundSlot, inboundSlot, showOutbound, showInbound, groupAddRelationship, groupRemoveRelationship, groupEditRelationship };
@@ -185,6 +193,7 @@ export function RelationshipsSection({
               slot={outboundSlot}
               elementId={elementId}
               elementType={elementType}
+              elementIsExternal={elementIsExternal}
               elementName={elementName}
               orgSlug={orgSlug}
               modelSlug={modelSlug}
@@ -205,6 +214,7 @@ export function RelationshipsSection({
               slot={inboundSlot}
               elementId={elementId}
               elementType={elementType}
+              elementIsExternal={elementIsExternal}
               elementName={elementName}
               orgSlug={orgSlug}
               modelSlug={modelSlug}
@@ -230,6 +240,7 @@ function RelationshipDirectionGroup({
   slot,
   elementId,
   elementType,
+  elementIsExternal,
   elementName,
   orgSlug,
   modelSlug,
@@ -247,6 +258,7 @@ function RelationshipDirectionGroup({
   slot: RelationshipGroupSlot | undefined;
   elementId: UUID;
   elementType: ElementType;
+  elementIsExternal: boolean;
   elementName: string;
   orgSlug: string;
   modelSlug: string;
@@ -373,6 +385,7 @@ function RelationshipDirectionGroup({
           direction={direction}
           elementId={elementId}
           elementType={elementType}
+          ownerIsExternal={elementIsExternal}
           elementName={addRelationship.elementName}
           existingRows={rows}
           relationshipFacts={relationshipFacts}

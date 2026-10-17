@@ -569,6 +569,8 @@ export function ElementPage() {
                     elementId={state.data.element.element_id}
                     elementType={state.data.element.element_type}
                     elementName={state.data.element.name}
+                    elementParentId={state.data.element.parent_id}
+                    elementIsExternal={state.data.element.element_type === 'actor' && attributesRecord(state.data.element.attributes).isExternal === true}
                     relationships={state.data.relationships}
                     endpoints={state.data.relationshipEndpoints}
                     relationshipFacts={state.data.relationshipFacts}
