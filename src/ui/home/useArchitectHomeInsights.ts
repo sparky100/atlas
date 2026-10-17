@@ -10,9 +10,7 @@ import {
   computeStaleAttributesFinding,
   findBoundaryCrossingsMissingClassification,
   findBoundaryCrossingsMissingVerb,
-  findCapabilitiesWithNoSupporters,
   findCapabilitiesWithoutOwner,
-  findCapabilitiesWithPoorFitPrimarySupporter,
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
   findOutgoingWithoutRetiringChange,
@@ -28,13 +26,13 @@ import {
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
+  findUnusedIntegrationInterfaces,
   findUnusedIntegrationPlatforms,
   listAllOwnsEdges,
   listAllUsesAndFlowsToEdges,
   listFactsForCommit,
   listUsesAndFlowsToEndpointElements,
   type BoundaryCrossing,
-  type CapabilityWithPoorFitSupporter,
   type ExternalInterfaceCrossing,
   type ExternalOrganisationAccess,
   type PlatformFlowEndpoint,
@@ -42,11 +40,10 @@ import {
   type UnlabeledVerbRelationship,
 } from '../../db/healthFindings';
 import { listActorsForLandscape, listSystemsForLandscape } from '../../db/landscape';
-import { groupPlannedReplacementsByCapability, listAllSupportsEdges, listDeltasForCommits, listRecentCommits, loadPlannedReplacements } from '../../db/modelHome';
+import { listAllSupportsEdges, listDeltasForCommits, listRecentCommits } from '../../db/modelHome';
 import { listProfilesByIds } from '../../db/profiles';
 import type { ProfileRow } from '../../db/types';
 import { envelopeSubjects } from '../../engine/describeEnvelope';
-import { computeCapabilityMapTree } from '../capabilityMap/layout';
 import { reportError } from '../errors/errorBannerStore';
 import { useAfterFirstPaint } from '../perf/useAfterFirstPaint';
 import { supabase } from '../supabaseClient';
@@ -86,6 +83,8 @@ export interface ArchitectHomeInsightsData {
   boundaryCrossingsMissingVerb: BoundaryCrossing[];
   /** Prompt 7k item 4's own health finding: integration platforms with nothing routed via them. */
   unusedIntegrationPlatforms: ElementsHeadRow[];
+  /** ADR-026: interfaces on an integration platform that nothing flows via (`findUnusedIntegrationInterfaces`), named "Platform · Interface". */
+  unusedIntegrationInterfaces: ElementsHeadRow[];
   /** Prompt 7k item 5's first Assurance finding: systems supporting an `essentialFunction` capability with no `role: 'technical'` owner. */
   systemsSupportingEssentialFunctionWithoutTechnicalOwner: ElementsHeadRow[];
   /** Prompt 7k item 5's second Assurance finding: boundary crossings missing a data classification (the CAF A3/B4-relevant subset of item 3's own wider finding). */
@@ -100,10 +99,6 @@ export interface ArchitectHomeInsightsData {
   externalInterfacesMissingClassification: ExternalInterfaceCrossing[];
   /** S1 item 11a's own second Assurance row: purely informational — every external actor `uses` edge, naming the organisation and which system it reaches. No classification requirement (see that finding's own doc comment for why). */
   externalOrganisationAccess: ExternalOrganisationAccess[];
-  /** The minimal fit-for-purpose finding: capabilities whose fit-assessment supporter is rated poor/adequate, with no planned replacement recorded (`findCapabilitiesWithPoorFitPrimarySupporter`'s own doc comment). */
-  capabilitiesWithPoorFitPrimarySupporter: CapabilityWithPoorFitSupporter[];
-  /** A third decision-shaped finding, alongside `criticalExposedSystems` and `criticalSystemsPastOrNearSupportEnd`: level-1 capabilities with zero supporting systems anywhere in their own subtree (`findCapabilitiesWithNoSupporters`'s own doc comment — the same "nothing recorded" classification the director door's weak-capability grid already flags). */
-  capabilitiesWithNoSupporters: ElementsHeadRow[];
 }
 
 export type ArchitectHomeInsightsState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeInsightsData };
@@ -137,7 +132,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         return;
       }
 
-      const [commits, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, plannedReplacements, duplicateCandidates, retiringElementIds, projectScope] = await Promise.all([
+      const [commits, capabilities, systems, supportsEdges, ownsEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, duplicateCandidates, retiringElementIds, projectScope] = await Promise.all([
         // S1 item 6: "recent activity" now groups consecutive same-subject
         // commits into one line and prefers others' activity when trimming
         // to five displayed items (groupRecentActivity.ts) — both can
@@ -160,12 +155,6 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         // resolving an actor endpoint needs this separate fetch merged in
         // below, not a widened filter on that one.
         listActorsForLandscape(supabase, main.head_commit_id),
-        // The "poor fit, no planned replacement" finding's own evidence —
-        // the same real "planned replacement" signal `useDirectorHome.ts`
-        // already loads for Lifecycle Exposure, not a second, weaker
-        // approximation of it (`findCapabilitiesWithPoorFitPrimarySupporter`'s
-        // own doc comment).
-        loadPlannedReplacements(supabase, modelId),
         // F4 (ADR-019 "Amended (F4, ...)"): the standing duplicates report's
         // own open-candidate count — real from here on. `listDuplicateCandidates`
         // itself excludes a pair whose element was merged away or retracted
@@ -239,7 +228,8 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             criticalSystemsWithoutBusinessOwner: findCriticalSystemsWithoutBusinessOwner([...systems, ...containers], ownsEdges),
             criticalExposedSystems: findCriticalExposedSystems(systems),
             boundaryCrossingsMissingVerb: findBoundaryCrossingsMissingVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
-            unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges),
+            unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges, containers),
+            unusedIntegrationInterfaces: findUnusedIntegrationInterfaces(systems, containers, usesAndFlowsToEdges),
             systemsSupportingEssentialFunctionWithoutTechnicalOwner: findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...systems, ...containers], capabilities, supportsEdges, ownsEdges),
             boundaryCrossingsMissingClassification: findBoundaryCrossingsMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             criticalSystemsPastOrNearSupportEnd: findCriticalSystemsPastOrNearSupportEnd(systems),
@@ -247,8 +237,6 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             projectByElementId: new Map(projectScope.map((scope) => [scope.elementId, scope])),
             externalInterfacesMissingClassification: findExternalInterfacesMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             externalOrganisationAccess: findExternalOrganisationAccess(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
-            capabilitiesWithPoorFitPrimarySupporter: findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supportsEdges, groupPlannedReplacementsByCapability(plannedReplacements)),
-            capabilitiesWithNoSupporters: findCapabilitiesWithNoSupporters(computeCapabilityMapTree(capabilities).l1.map((column) => column.capability), capabilities, supportsEdges, ownsEdges),
           },
         });
       }

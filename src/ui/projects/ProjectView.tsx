@@ -23,6 +23,7 @@ import { canCreateChangeBranch, canEditProject, canStartDecision } from '../orgs
 import { useMembers } from '../orgs/useMembers';
 import { supabase } from '../supabaseClient';
 import {
+  formatProjectProgress,
   groupChangesByStage,
   isDecisionOverdue,
   openItemsBlockingClose,
@@ -38,6 +39,7 @@ import { markdownToPdfBytes } from '../exports/markdownPdf';
 import { buildProjectPackMarkdown, projectPackFilename } from '../exports/projectPack';
 import { downloadBlob, exportDate } from '../exports/viewExport';
 import type { ProjectData } from './useProject';
+import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
 import styles from './ProjectView.module.css';
 
 export interface ProjectViewProps {
@@ -75,11 +77,14 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
     const member = members.find((m) => m.member.user_id === id);
     return member ? profileLabel(member.profile) : 'A former member';
   };
-  const elementName = (id: UUID) => elementsById.get(id)?.name ?? touched.find((t) => t.elementId === id)?.createdName ?? 'An element not on main yet';
+  const elementName = (id: UUID) => {
+    const element = elementsById.get(id);
+    return element ? moduleDisplayNameFromMap(element, elementsById) : (touched.find((t) => t.elementId === id)?.createdName ?? 'An element not on main yet');
+  };
 
   const scopeIds = links.filter((l) => l.linked_type === 'element').map((l) => l.linked_id);
   const touchedIds = touched.map((t) => t.elementId);
-  const difference = scopeDifference(scopeIds, touchedIds);
+  const difference = scopeDifference(scopeIds, touchedIds, data.reachedIds);
   const progress = projectProgress(changes, decisions);
   const firstDecision = originatingDecision(decisions);
 
@@ -166,7 +171,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
             {difference.declaredNotTouched.length > 0 && changes.length > 0 && (
               <div>
                 <Text as="h3" size="md">
-                  In scope, not touched by any change yet
+                  In scope, not touched or affected by any change yet
                 </Text>
                 <ul className={styles.inlineList}>
                   {difference.declaredNotTouched.map((id) => (
@@ -332,7 +337,7 @@ function ProjectHeader({ project, ownerName, progress }: { project: ProjectRow; 
       </div>
       {project.purpose !== '' && <Text as="p">{project.purpose}</Text>}
       <Text as="p" tone="muted" size="sm">
-        {progress.openChanges} open {progress.openChanges === 1 ? 'change' : 'changes'} · {progress.mergedChanges} merged · {progress.openDecisions} open {progress.openDecisions === 1 ? 'decision' : 'decisions'} · {progress.decidedDecisions} decided
+        {formatProjectProgress(progress)}
       </Text>
     </div>
   );

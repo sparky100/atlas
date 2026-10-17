@@ -88,7 +88,7 @@ import { parseCsv } from './parse/csv';
 import { pageHasNoText, parsePdf, PdfParseError, PdfPasswordProtectedError } from './parse/pdf';
 import { parsePastedText } from './parse/pastedText';
 import { parseXlsxWorkbook, type ParsedSpreadsheetSheet } from './parse/spreadsheet';
-import { dedupeIntraDocumentCandidates } from './intraDocumentDedup';
+import { dedupeIntraDocumentCandidates, mergeSameNamedActors } from './intraDocumentDedup';
 import { ImportFileParseError } from './parseImportFile';
 import { parseImportJsonText } from './parseImportJson';
 import { diffAgainstPreviousImport, type PreviousCandidateForDiff } from './reimportDiff';
@@ -155,7 +155,7 @@ export type RunCaptureResult = RunCaptureFailure | RunCaptureSuccess;
 
 const CONTAINER_SHEET_NAME_PATTERN = /\b(modules?|components?|containers?|services?)\b/i;
 const CAPABILITY_SHEET_NAME_PATTERN = /\bcapabilit(y|ies)\b/i;
-const ACTOR_SHEET_NAME_PATTERN = /\b(teams?|owners?|contacts?)\b/i;
+const ACTOR_SHEET_NAME_PATTERN = /\b(actors?|teams?|owners?|contacts?)\b/i;
 
 /**
  * §5.2: "system by default; container when the sheet is named like
@@ -293,16 +293,32 @@ function buildRunElementIndex(candidates: readonly RowCandidate[]): RunElementIn
 function resolveTextRef(text: string, expectedTypes: readonly ElementType[], runIndex: RunElementIndex, resolvedSubjectBySeq: ReadonlyMap<number, UUID | null>, matchIndex: MatchIndex, kindFilter?: (elementType: ElementType, attributes: Record<string, unknown>) => boolean): UUID | null {
   const normalised = normaliseName(text);
   for (const type of expectedTypes) {
+    // A module is named by itself ("PM") or qualified by its platform ("SAP ·
+    // PM" — how this product's own export writes a name two modules share).
+    // Two different elements answering to one name is ambiguous: refused
+    // (the row stays `invalid`) rather than linked to whichever came first.
+    const hits = new Set<UUID>();
     for (const candidate of runIndex.byType.get(type) ?? []) {
-      if (candidate.proposal.kind !== 'element' || normaliseName(candidate.proposal.name) !== normalised) continue;
+      if (candidate.proposal.kind !== 'element') continue;
+      const parentText = candidate.proposal.parent?.kind === 'unresolved' ? candidate.proposal.parent.text : null;
+      const named = normaliseName(candidate.proposal.name) === normalised || (parentText !== null && normaliseName(`${parentText} ${candidate.proposal.name}`) === normalised);
+      if (!named) continue;
       if (kindFilter && !kindFilter(type, candidate.proposal.attributes)) continue;
       const resolved = resolvedSubjectBySeq.get(candidate.seq);
-      if (resolved !== undefined && resolved !== null) return resolved;
+      if (resolved !== undefined && resolved !== null) hits.add(resolved);
     }
+    if (hits.size > 1) return null;
+    const [only] = hits;
+    if (only !== undefined) return only;
   }
   for (const type of expectedTypes) {
     let pool = matchIndex.elementsByType.get(type) ?? [];
     if (kindFilter) pool = pool.filter((el) => kindFilter(type, el.attributes as Record<string, unknown>));
+    const qualified = pool.filter((el) => {
+      const parent = el.parent_id !== null ? matchIndex.elements.get(el.parent_id) : undefined;
+      return parent !== undefined && normaliseName(`${parent.name} ${el.name}`) === normalised;
+    });
+    if (qualified.length === 1 && qualified[0] !== undefined) return qualified[0].element_id;
     const hit = resolveByTrigram(text, pool);
     if (hit.level !== 'none' && hit.ambiguous === undefined && hit.elementId !== undefined) return hit.elementId;
   }
@@ -310,6 +326,37 @@ function resolveTextRef(text: string, expectedTypes: readonly ElementType[], run
 }
 
 const INTEGRATION_PLATFORM_FILTER = (elementType: ElementType, attributes: Record<string, unknown>): boolean => elementType === 'system' && attributes.kind === 'integration_platform';
+
+/**
+ * ADR-026: a `via` may name an interface — a container whose parent is an
+ * integration platform — by itself ("Reads API") or qualified by its
+ * platform ("MuleSoft · Reads API", how the export writes one). Exact names
+ * only, never trigram: a fuzzy hit on some other platform's module would
+ * silently reroute the flow. Tried before the platform itself, so the
+ * qualified form is never fuzzy-matched to its bare platform. Two
+ * interfaces answering to one name is ambiguous, and refused.
+ */
+function resolveInterfaceRef(text: string, runIndex: RunElementIndex, resolvedSubjectBySeq: ReadonlyMap<number, UUID | null>, matchIndex: MatchIndex): UUID | null {
+  const normalised = normaliseName(text);
+  const named = (parentName: string, name: string): boolean => normaliseName(name) === normalised || normaliseName(`${parentName} ${name}`) === normalised;
+  const hits = new Set<UUID>();
+  for (const candidate of runIndex.byType.get('container') ?? []) {
+    if (candidate.proposal.kind !== 'element' || candidate.proposal.parent?.kind !== 'unresolved') continue;
+    const parentText = candidate.proposal.parent.text;
+    if (!named(parentText, candidate.proposal.name)) continue;
+    if (resolveTextRef(parentText, ['system'], runIndex, resolvedSubjectBySeq, matchIndex, INTEGRATION_PLATFORM_FILTER) === null) continue;
+    const resolved = resolvedSubjectBySeq.get(candidate.seq);
+    if (resolved !== undefined && resolved !== null) hits.add(resolved);
+  }
+  for (const element of matchIndex.elementsByType.get('container') ?? []) {
+    const parent = element.parent_id !== null ? matchIndex.elements.get(element.parent_id) : undefined;
+    if (!parent || !INTEGRATION_PLATFORM_FILTER(parent.element_type, parent.attributes as Record<string, unknown>)) continue;
+    if (named(parent.name, element.name)) hits.add(element.element_id);
+  }
+  if (hits.size !== 1) return null;
+  const [only] = hits;
+  return only ?? null;
+}
 
 // ---------------------------------------------------------------------------
 // Row keys (§9.1) — needs each resolved subject's own identifying triple.
@@ -568,9 +615,10 @@ function resolveRelationshipCandidate(
   let attributes: Record<string, unknown> = { ...(proposal.attributes as Record<string, unknown>) };
   const viaHint = candidate.viaHint;
   if (viaHint !== undefined) {
-    const viaId = resolveTextRef(viaHint, ['system'], runIndex, resolvedSubjectBySeq, matchIndex, INTEGRATION_PLATFORM_FILTER);
+    const viaId = resolveInterfaceRef(viaHint, runIndex, resolvedSubjectBySeq, matchIndex) ?? resolveTextRef(viaHint, ['system'], runIndex, resolvedSubjectBySeq, matchIndex, INTEGRATION_PLATFORM_FILTER);
     if (viaId !== null) attributes = { ...attributes, via: viaId };
-    // §7.4/§5.2: an unresolved `via` is dropped, never invalidating (`via` is optional) — no warning code is defined for it in §4's own EvidenceWarning union, unlike a genuine endpoint.
+    // §7.4/§5.2: an unresolved `via` (no such system, or not an integration platform or an interface on one) is dropped, never invalidating (`via` is optional) — but no longer silently: the same `ENDPOINT_UNRESOLVED` warning a missing endpoint gets, with `end: 'via'` (the code's own type already named it), so the review shows the flow was imported as direct.
+    else extraWarnings.push({ code: 'ENDPOINT_UNRESOLVED', text: viaHint, end: 'via' });
   }
 
   const existingRelationshipId = relationshipIndex.get(`${proposal.relationshipType}|${from.elementId}|${to.elementId}`);
@@ -690,7 +738,8 @@ async function runSheetCapture(input: RunSheetCaptureInput): Promise<RunCaptureR
     // and parsed before any column mapping — its rows are relationships
     // directly, never element rows, and need no LLM call at all.
     if (isRelationshipsSheet(sheet.sheetName, sheet.headers)) {
-      const relationshipCandidates = relationshipSheetToCandidates({ sheetName: sheet.sheetName, headers: sheet.headers, headerColumnRefs: sheet.headerColumnRefs, rawSheet, headerRowIndex });
+      const { candidates: relationshipCandidates, skipped: skippedRelationshipRows } = relationshipSheetToCandidates({ sheetName: sheet.sheetName, headers: sheet.headers, headerColumnRefs: sheet.headerColumnRefs, rawSheet, headerRowIndex });
+      for (const skip of skippedRelationshipRows) bumpStat(`relationships.skipped.${skip.reason}`);
       bumpStat('sheet.type.relationships');
       usableSheetCount++;
       combined = combined.concat(relationshipCandidates.map((c) => offsetRowCandidate(c, seqOffset)));
@@ -743,6 +792,10 @@ async function runSheetCapture(input: RunSheetCaptureInput): Promise<RunCaptureR
   if (usableSheetCount === 0) {
     return { status: 'failed', errorCode: 'NO_USABLE_SHEET', message: 'No sheet in the workbook had both a usable header row and a resolvable name column.' };
   }
+
+  // One actor per name across the workbook: an owner cell and an Actors sheet
+  // both name the same actor, and this product's own export writes both.
+  combined = mergeSameNamedActors(combined).candidates;
 
   if (capabilityRows.length > 0) {
     const { candidates: supportsCandidates } = await assignCapabilities({ rows: capabilityRows, matchIndex, llmClient, startSeq: seqOffset, mainHead });
@@ -875,7 +928,9 @@ function buildJsonRelationshipCandidates(rows: readonly ImportRelationshipRow[],
     const confidence = jsonConfidence(row.confidence);
     const attributes: Record<string, unknown> = { description: row.description };
     if (row.type === 'flows_to' && row.dataClassification !== null) attributes.dataClassification = row.dataClassification;
-    const attributeConfidence: Record<string, number> = { description: confidence, ...(attributes.dataClassification !== undefined ? { dataClassification: confidence } : {}) };
+    if (row.protocolIn !== null) attributes.protocolIn = row.protocolIn;
+    if (row.protocolOut !== null) attributes.protocolOut = row.protocolOut;
+    const attributeConfidence: Record<string, number> = Object.fromEntries(Object.keys(attributes).map((key) => [key, confidence]));
 
     const proposal: RelationshipProposal<'uses' | 'flows_to'> = { kind: 'relationship', relationshipType: row.type, from: { kind: 'unresolved', text: row.from }, to: { kind: 'unresolved', text: row.to }, attributes };
     const evidence: CandidateEvidence = { sourceRef: jsonSourceRef(index), passage: jsonPassage(row.quote, row), extractor: 'json-authored', attributeConfidence, warnings: [] };
@@ -1052,6 +1107,42 @@ async function runProseCapture(input: RunProseCaptureInput): Promise<RunCaptureR
 // restored at the very end.
 // ---------------------------------------------------------------------------
 
+/**
+ * Elements with a parent, in an order where every parent that is itself a
+ * candidate in this run resolves before its children. A capability tree is
+ * more than two levels deep, and a sheet sorted by name (this product's own
+ * export is) lists a child before its parent — resolving in `seq` order made
+ * that child `invalid` ("PARENT_UNRESOLVED") for want of an ordering. Stable:
+ * candidates at the same depth keep their `seq` order; a cycle (a bad file
+ * naming each other as parent) is cut where it is found and left to resolve
+ * as `invalid` the way it would have before.
+ */
+export function orderByParentDependency<T extends RowCandidate & { proposal: ElementProposal }>(candidates: readonly T[]): T[] {
+  const byName = new Map<string, T[]>();
+  for (const candidate of candidates) {
+    const key = normaliseName(candidate.proposal.name);
+    byName.set(key, [...(byName.get(key) ?? []), candidate]);
+  }
+  const depthMemo = new Map<T, number>();
+  const depthOf = (candidate: T, visiting: Set<T>): number => {
+    const known = depthMemo.get(candidate);
+    if (known !== undefined) return known;
+    if (visiting.has(candidate)) return 0;
+    const parent = candidate.proposal.parent;
+    let depth = 0;
+    if (parent !== null && parent.kind === 'unresolved') {
+      visiting.add(candidate);
+      for (const possibleParent of byName.get(normaliseName(parent.text)) ?? []) {
+        if (possibleParent !== candidate && possibleParent.proposal.elementType === candidate.proposal.elementType) depth = Math.max(depth, 1 + depthOf(possibleParent, visiting));
+      }
+      visiting.delete(candidate);
+    }
+    depthMemo.set(candidate, depth);
+    return depth;
+  };
+  return candidates.map((candidate, index) => ({ candidate, index, depth: depthOf(candidate, new Set()) })).sort((a, b) => a.depth - b.depth || a.index - b.index).map((entry) => entry.candidate);
+}
+
 function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: MatchIndex, targetHead: Head | undefined, mainHead: Head, documentDate: string | null, reimportPrevious: readonly PreviousCandidateForDiff[] | undefined, mintId: () => UUID, stats: Record<string, number>): RunCaptureResult {
   const runIndex = buildRunElementIndex(combined);
   const relationshipIndex = buildRelationshipIndex(mainHead);
@@ -1111,7 +1202,7 @@ function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: Match
   };
 
   for (const candidate of elementsNoParent) resolveOneElement(candidate);
-  for (const candidate of elementsWithParent) resolveOneElement(candidate);
+  for (const candidate of orderByParentDependency(elementsWithParent)) resolveOneElement(candidate);
 
   const rowKeyForElementId = (elementId: UUID): string => {
     const seq = seqByElementId.get(elementId);

@@ -601,7 +601,8 @@ function WhatChangesRowGroup({ group, optionBranchIds }: { group: WhatChangesRow
     <>
       {showGroupHeader && (
         <tr>
-          <td colSpan={99}>
+          {/* Exactly the table's own column count (Row + main + one per option): a larger colSpan adds phantom columns that the table's width is shared across, collapsing the real ones. */}
+          <td colSpan={2 + optionBranchIds.length}>
             <Text as="span" size="sm" tone="muted">
               {group.groupLabel}
             </Text>

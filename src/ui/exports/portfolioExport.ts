@@ -44,6 +44,13 @@ const COLUMNS: Column[] = [
   { label: 'Signals', width: 240, chars: 38, cell: (row) => (row.signals.length > 0 ? { text: row.signals.map((s) => PORTFOLIO_SIGNAL_LABEL[s.key]).join(', ') } : { text: '—', muted: true }) },
 ];
 
+/**
+ * The same rows and columns as a plain table of text (a header row, then one row per portfolio row) — what the Excel export writes. Unlike the picture it never truncates a cell, and an unrecorded value reads the way the table does ("Not entered", "Unrated").
+ */
+export function portfolioExportTable(rows: readonly PortfolioRow[]): string[][] {
+  return [COLUMNS.map((column) => column.label), ...rows.map((row) => COLUMNS.map((column) => column.cell(row).text))];
+}
+
 export function portfolioExportPlan(rows: readonly PortfolioRow[], stamp: Omit<ExportStamp, 'viewLabel'>): ExportPlan {
   const tableWidth = COLUMNS.reduce((sum, c) => sum + c.width, 0);
   const width = tableWidth + 2 * EXPORT_PADDING;

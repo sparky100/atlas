@@ -158,3 +158,9 @@
 .contextLink {
   white-space: nowrap;
 }
+
+/* The row a "Find on this landscape" pick revealed. */
+.rowFound {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}

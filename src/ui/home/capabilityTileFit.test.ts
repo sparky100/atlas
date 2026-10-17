@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Importance } from '../../contracts/delta';
 import type { CapabilityTileData } from '../../db/modelHome';
-import { compareWeakTiles, formatPoorFitPillLabel, isCapabilityTileWeak, poorFitPillTone } from './capabilityTileFit';
+import { compareWeakTiles, formatWeakFitPillLabel, isCapabilityTileWeak, weakFitPillTone } from './capabilityTileFit';
 import type { ElementsHeadRow } from '../../contracts/rows';
 
 function capability(id: string, name = `Capability ${id}`): ElementsHeadRow {
@@ -18,51 +18,65 @@ function tile(id: string, name: string, importance: Importance | null, tone: Cap
     totalCapabilityCount: 0,
     isOwned: false,
     fitForPurpose: null,
-    poorFitCapabilities: [],
-    poorFitAllReplacementPlanned: false,
+    weakFitCapabilities: [],
+    adequateFitCount: 0,
+    weakFitAllReplacementPlanned: false,
     importance,
   };
 }
 
 describe('isCapabilityTileWeak (F6.1: display rule only, fit stays out of tone per ADR-023)', () => {
   it('is weak when tone alone is not ok, even with no poor-fit capability', () => {
-    expect(isCapabilityTileWeak({ tone: 'warn', poorFitCapabilities: [] })).toBe(true);
+    expect(isCapabilityTileWeak({ tone: 'warn', weakFitCapabilities: [] })).toBe(true);
   });
 
   it('is weak when a capability rolls up to poor fit, even though tone is ok', () => {
-    expect(isCapabilityTileWeak({ tone: 'ok', poorFitCapabilities: [capability('cap-1')] })).toBe(true);
+    expect(isCapabilityTileWeak({ tone: 'ok', weakFitCapabilities: [capability('cap-1')] })).toBe(true);
   });
 
   it('is not weak when tone is ok and nothing is rated poor (good/adequate/unrated all read as healthy)', () => {
-    expect(isCapabilityTileWeak({ tone: 'ok', poorFitCapabilities: [] })).toBe(false);
+    expect(isCapabilityTileWeak({ tone: 'ok', weakFitCapabilities: [] })).toBe(false);
   });
 
   it('is weak when both tone and fit flag it (a mixed domain)', () => {
-    expect(isCapabilityTileWeak({ tone: 'neutral', poorFitCapabilities: [capability('cap-1')] })).toBe(true);
+    expect(isCapabilityTileWeak({ tone: 'neutral', weakFitCapabilities: [capability('cap-1')] })).toBe(true);
   });
 });
 
-describe('formatPoorFitPillLabel', () => {
+describe('formatWeakFitPillLabel', () => {
   it('singular for exactly one capability', () => {
-    expect(formatPoorFitPillLabel(1, false)).toBe('poor fit: 1 capability');
+    expect(formatWeakFitPillLabel(1, 0, false)).toBe('poor fit: 1 capability');
   });
 
   it('plural for more than one', () => {
-    expect(formatPoorFitPillLabel(2, false)).toBe('poor fit: 2 capabilities');
+    expect(formatWeakFitPillLabel(2, 0, false)).toBe('poor fit: 2 capabilities');
   });
 
-  it('appends "replacement planned" once every poor-fit edge has one', () => {
-    expect(formatPoorFitPillLabel(2, true)).toBe('poor fit: 2 capabilities · replacement planned');
+  it('names an adequate fit as adequate, never as poor', () => {
+    expect(formatWeakFitPillLabel(0, 1, false)).toBe('adequate fit: 1 capability');
+  });
+
+  it('names both ratings separately when a tile has both', () => {
+    expect(formatWeakFitPillLabel(1, 2, false)).toBe('poor fit: 1 capability · adequate fit: 2 capabilities');
+  });
+
+  it('appends "replacement planned" once every weak-fit edge has one', () => {
+    expect(formatWeakFitPillLabel(2, 1, true)).toBe('poor fit: 2 capabilities · adequate fit: 1 capability · replacement planned');
   });
 });
 
-describe('poorFitPillTone', () => {
-  it('is danger while any poor-fit edge still needs a decision', () => {
-    expect(poorFitPillTone(false)).toBe('danger');
+describe('weakFitPillTone', () => {
+  it('is danger while anything rated poor still needs a decision', () => {
+    expect(weakFitPillTone(false, 1)).toBe('danger');
   });
 
-  it('is info once every poor-fit edge already has a planned replacement', () => {
-    expect(poorFitPillTone(true)).toBe('info');
+  it('is the calmer warn when the weakest rating is only adequate', () => {
+    expect(weakFitPillTone(false, 0)).toBe('warn');
+  });
+
+  it('is info once every weak-fit edge already has a planned replacement', () => {
+    expect(weakFitPillTone(true, 1)).toBe('info');
+    expect(weakFitPillTone(true, 0)).toBe('info');
   });
 });
 

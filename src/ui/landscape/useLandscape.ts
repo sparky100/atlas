@@ -20,7 +20,7 @@ import type { ViewRow } from '../../db/types';
 import { resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
 import { l1AncestorOf, loadCapabilityAncestry } from '../elements/capabilityDepth';
 import { moduleDisplayName } from '../elements/moduleDisplayName';
-import { isPlatform } from '../elements/systemKind';
+import { isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -28,6 +28,8 @@ export interface LandscapeData {
   commitId: UUID;
   view: ViewRow;
   systemsById: Map<UUID, ElementsHeadRow>;
+  /** ADR-026: each interface (a container of an integration platform) mapped to its platform — a flow `via` an interface routes through, and highlights with, the platform's tile. */
+  platformIdByInterfaceId: Map<UUID, UUID>;
   /** Landscape canvas, structural (item 3) — every Actor at this commit, keyed for `LandscapeCanvas.tsx`'s own actor-row render, the same shape `systemsById` already has. */
   actorsById: Map<UUID, ElementsHeadRow>;
   edges: RelationshipsHeadRow[];
@@ -252,6 +254,8 @@ export function useLandscape(
         if (platform) moduleNodes.push({ ...container, name: moduleDisplayName(container, platform) });
       }
       if (moduleNodes.length > 0) allSystems = [...allSystems, ...moduleNodes];
+      const integrationPlatformIds = new Set(allSystems.filter((s) => s.element_type === 'system' && isIntegrationPlatform(s)).map((s) => s.element_id));
+      const platformIdByInterfaceId = new Map(allContainers.flatMap((c) => (c.parent_id !== null && integrationPlatformIds.has(c.parent_id) ? [[c.element_id, c.parent_id] as const] : [])));
 
       const systemIds = allSystems.map((s) => s.element_id);
       // S1 item 11a: an actor's own `uses` edge to a system needs the
@@ -275,7 +279,7 @@ export function useLandscape(
 
       const systemsById = new Map(allSystems.map((s) => [s.element_id, s]));
       const actorsById = new Map(allActors.map((a) => [a.element_id, a]));
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, actorsById, edges, supportsEdges, ownsEdges, l1AncestorByCapabilityId, diff } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, platformIdByInterfaceId, actorsById, edges, supportsEdges, ownsEdges, l1AncestorByCapabilityId, diff } });
     }
 
     load().catch((e: unknown) => {

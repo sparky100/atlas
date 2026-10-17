@@ -82,7 +82,7 @@ Three things need deciding that neither ADR-001 nor ADR-013/022 answers:
 
 - The project's **decision log**: `decisions where project_id = P`, plus decisions that link to it with `linked_type = 'project'` (shown separately as "constraining decisions").
 - The **originating decision**: the project's earliest decision, if any. No column — the human's model makes the first decision just the first entry in the log.
-- **What the project touches**: the union of elements changed by its changes' deltas, alongside the declared scope in `project_links`. A difference between the two (touched but not in scope, or in scope but untouched) is a useful prompt, shown, never auto-corrected.
+- **What the project touches**: the union of elements changed by its changes' deltas, alongside the declared scope in `project_links`. A difference between the two (touched but not in scope, or in scope but untouched) is a useful prompt, shown, never auto-corrected. **Amended 2026-10-07 (§9):** "changed" includes both ends of every relationship a change adds, changes or removes (`listElementsTouchedByChange`), so a project whose changes are integrations touches the systems they integrate; and a scope item one of its changes only *affects* — a capability or value stream reached through change impact (§8, ADR-023's amendment) — is covered, so it no longer reads "in scope, not touched or affected by any change yet". Affected items outside the scope are not listed as touched: impact reaches widely, and that list is for what the changes edit.
 - **Progress**: counts of its changes by status and decisions by status. No percentage — Atlas does not score (ADR-000 preface #6).
 - **Overdue decisions**: a `proposed` decision in the project whose `needed_by` is past.
 
@@ -105,6 +105,34 @@ Recorded so nothing in the build is an unwritten decision:
 - **Roadmap "By project"** groups each system bar under every project whose changes' roadmap events (add, retire, either end of a replacement) name it; systems no project touches sit under "No project".
 - **Evidence authoring** is a link (http/https only) or a document reference with an optional description, attached to the project — the first `evidence` authoring path anywhere.
 - **Found and fixed on the way:** `atlas.delete_model` never deleted `decision_option_ratings` (added after it was last rewritten), so deleting an archived model with a rated option failed on a foreign key. The F10 rewrite clears ratings, project links and projects.
+
+### 8. Amended — change impact (2026-10-06)
+
+Agreed with the human on 2026-10-06, after a change that only added an integration (ESCOMS uses GIS) listed no affected capabilities at all, though ESCOMS supports Wayleaves — the capability the change's own project is about.
+
+**Which systems a change touches** (`summarizeOwnDeltas`, `src/db/changeSummary.ts`). Before this, only a system whose own record a change edited counted, so a change made of relationships reached nothing. Now a system counts as touched when:
+
+- its own record is edited (unchanged);
+- one of its modules is edited — a module rolls up to its parent system;
+- a `uses` or `flows_to` edge is added, changed or removed with it, or one of its modules, on the **`from` (consuming / sending) side**. The `to` side is never counted: a provider gaining a consumer doesn't change how it delivers its own capabilities, and counting it made one integration with a widely used system (GIS, an integration platform) list everything that system supports.
+
+A capability is affected when its own record is edited, its own `supports` edge is added/changed/removed (that capability only — not everything the supporting system supports), or a touched system or module supports it. A touched module counts under its own id as well as its platform's, so both the module's own `supports` edges and its platform's reach their capabilities. (Corrected 2026-10-07: the first build looked up `supports` edges from the platform only, so a module that supports a capability itself — ESCOMS, a module of Salesforce, supporting Land, Wayleaves & Consents — reached nothing.) Each affected capability carries its **reasons** (`ImpactReason`), shown beside it: "integration: ESCOMS uses GIS", "module SAP · PM edited", "GIS edited", and so on. Direction matters: "GIS uses ESCOMS" would reach GIS's capabilities instead — the direction an integration is recorded in is part of the fact.
+
+**What is shown first** (`focusImpact`, `src/ui/changes/impactFocus.ts`). For a change in a project, the change page, the Changes list card and the project pack show the affected capabilities in the project's declared scope (`project_links`); everything else the change reaches is listed under a collapsed "Also reached, outside the project's scope". Affected value streams follow: a stream is shown with only the stages a shown capability reaches; a stream only collapsed capabilities reach is collapsed. With no project, or none of the affected capabilities in its scope, everything is shown — narrowing to an empty list would read as "nothing affected", which is false.
+
+**Reviewer routing is not narrowed.** `loadDerivedReviewers` (`src/db/deriveReviewers.ts`, ADR-000 §merge review "Derivation") still reads the full affected-capability list, collapsed ones included: collapsing is a display choice, and a capability owner whose capability the change really reaches must not drop out of the review because the project's scope didn't name it. The wider touched-system rule above does reach more capability owners than before — the intended effect. The touched-*system* owner list for routing is unchanged (systems the change edits as elements).
+
+**Deferred:** naming which capability an integration serves (a field on the `uses`/`flows_to` relationship), which would make a system supporting several capabilities reach exactly one. It is a data-model change (migration, contract, round-trip test) and waits for a need the scope focus doesn't meet.
+
+### 9. Amended — open changes touching the same elements (2026-10-07)
+
+Agreed with the human on 2026-10-07. The change page's "Other open changes touching the same elements" compared only the subjects a change edits — element ids, and for a relationship the relationship's own id. A change made of relationships therefore never matched anything: a relationship it adds exists on no other change.
+
+**What a change touches** (`touchedElementIds`, `src/db/changeSummary.ts`; `touchedElementsByBranch`, `src/engine/changeOverlap.ts`): every element it edits, and **both** ends of every relationship it adds, changes or removes. Both ends, unlike change impact (§8): the question is "might these two changes collide?", and two changes integrating with the same system is exactly that. A relationship's ends come from either head, or from its own create delta when it was created and removed on the same change; for another change, from that relationship's create delta anywhere in the model.
+
+**Overlap** (`sharedElements`): two open changes overlap when they touch a common element, or one touches a platform directly and the other one of its modules. Two sibling modules of one platform don't overlap. Each overlapping change is listed with the elements it shares ("Both touch GIS"), named as everywhere else ("Platform · Module").
+
+**Capture drafts are listed apart (2026-10-08).** An unreviewed capture draft (`branches.kind = 'capture_draft'`) is the AI extraction from one uploaded document, not a change anyone has proposed, and each re-upload of the same document makes another one — so listing them beside real changes buried the changes under rows like "SPDJune2026ActionPlan.pdf — 2026-09-24" ×5. The list now holds `kind = 'change'` only; overlapping drafts go under a collapsed "Unreviewed capture drafts touching these elements (N)", one entry per document title with its draft count, the union of what they share, and a link to the newest upload's capture review (`groupCaptureDraftOverlaps`; the job is found through `capture_jobs.resulting_branch_id`). Agreed with the human on 2026-10-08. The query (`listOpenChangesSharingElements`, `src/db/elements.ts`) reads the model's deltas, commits and open branches whole and narrows in memory — CLAUDE.md rule 8, no id list in an `.in()` filter.
 
 ## Alternatives rejected
 

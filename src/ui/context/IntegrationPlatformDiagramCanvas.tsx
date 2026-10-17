@@ -6,9 +6,11 @@ import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
+import { INTERFACE_TYPE_LABELS } from '../../contracts/attributeSchema';
+import { platformTileElement } from './platformTileElement';
 import { quantizeScale, wheelZoomFactor } from '../landscape/zoom';
 import { NODE_WIDTH } from '../landscape/layout';
-import { allPlatformFlowTilesOf, computeIntegrationPlatformContextLayout, type IntegrationPlatformContextLayout, type PlatformFlowEdgeInput, type PlatformFlowTile } from './integrationPlatformContextLayout';
+import { allPlatformFlowTilesOf, computeIntegrationPlatformContextLayout, PILL_RUN_WIDTH, type IntegrationPlatformContextLayout, type PlatformFlowEdgeInput, type PlatformFlowTile } from './integrationPlatformContextLayout';
 import styles from './IntegrationPlatformDiagramCanvas.module.css';
 
 export interface IntegrationPlatformDiagramCanvasProps {
@@ -17,6 +19,8 @@ export interface IntegrationPlatformDiagramCanvasProps {
   targetIds: readonly UUID[];
   edges: readonly PlatformFlowEdgeInput[];
   elementsById: ReadonlyMap<UUID, ElementsHeadRow>;
+  /** ADR-026: interface names for the bands drawn inside the platform tile. */
+  interfaces?: ReadonlyMap<UUID, ElementsHeadRow> | undefined;
   /** A system/container neighbour tile navigates to its own Context page; an actor (no Context view of its own, same reasoning `ContextDiagramCanvas.tsx`'s own prop comment gives) falls back to `elementHref`. */
   neighbourContextHref: (elementId: UUID) => string;
   elementHref: (elementId: UUID) => string;
@@ -29,6 +33,7 @@ interface Transform {
 }
 
 interface HoverState {
+  elementId: UUID;
   label: string;
   screenX: number;
   screenY: number;
@@ -112,14 +117,40 @@ function computeFitTransform(worldWidth: number, worldHeight: number, displayWid
   return { scale, tx, ty };
 }
 
-function drawPill(ctx: CanvasRenderingContext2D, text: string, cx: number, cy: number, tokens: CanvasTokens, warn: boolean): void {
+/**
+ * Up to two lines of `text` within `maxWidth`, breaking at a space (or a
+ * "·", so "Salesforce · Field Service" breaks between platform and module);
+ * whatever doesn't fit on the second line is cut with an ellipsis.
+ */
+function wrapTwoLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  if (ctx.measureText(text).width <= maxWidth) return [text];
+  const words = text.split(' ');
+  let first = '';
+  let i = 0;
+  for (; i < words.length; i += 1) {
+    const candidate = first === '' ? (words[i] ?? '') : `${first} ${words[i] ?? ''}`;
+    if (ctx.measureText(candidate).width > maxWidth) break;
+    first = candidate;
+  }
+  // A single word wider than the line: nothing to break on, so one cut line.
+  if (first === '') return [truncate(ctx, text, maxWidth)];
+  // Don't leave a lone "·" dangling at the end of the first line.
+  const firstLine = first.endsWith(' ·') ? first.slice(0, -2) : first;
+  const rest = words.slice(i).join(' ');
+  const secondLine = first.endsWith(' ·') ? rest : rest.replace(/^· /, '');
+  return [firstLine, truncate(ctx, secondLine, maxWidth)];
+}
+
+function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, cy: number, tokens: CanvasTokens, warn: boolean, anchor: 'centre' | 'left', maxTextWidth: number): void {
   if (text.trim().length === 0) return;
   const paddingX = 8;
-  const maxWidth = 160;
-  const shown = truncate(ctx, text, maxWidth);
+  // The full text is on hover and in the flows list below.
+  const shown = truncate(ctx, text, maxTextWidth);
   const textWidth = ctx.measureText(shown).width;
   const w = textWidth + paddingX * 2;
   const h = 18;
+  // `x` is the pill's centre, or its left end for a verb that starts just clear of its source tile.
+  const cx = anchor === 'left' ? x + w / 2 : x;
   roundRectPath(ctx, cx - w / 2, cy - h / 2, w, h, h / 2);
   ctx.fillStyle = tokens.surfaceRaised;
   ctx.fill();
@@ -154,7 +185,7 @@ function drawPill(ctx: CanvasRenderingContext2D, text: string, cx: number, cy: n
  * already carry each container's own parent for this to resolve, same
  * requirement `contextGrouping.ts`'s own `computeContextGroup` documents.
  */
-export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, edges, elementsById, neighbourContextHref, elementHref }: IntegrationPlatformDiagramCanvasProps) {
+export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, edges, elementsById, interfaces, neighbourContextHref, elementHref }: IntegrationPlatformDiagramCanvasProps) {
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -213,10 +244,16 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
       ctx.translate(transform.tx, transform.ty);
       ctx.scale(transform.scale, transform.scale);
 
-      const drawPolyline = (points: readonly { x: number; y: number }[], warn: boolean, arrowAtEnd: boolean): void => {
+      // Hovering a source or target (not the platform, which every flow touches) picks out the flows through it and fades the rest — with several apps, the way to see which line in goes with which line out.
+      const hoveredId = hover && hover.elementId !== hub.element_id ? hover.elementId : null;
+      const flowIsEmphasised = (edge: { sourceId: UUID; targetId: UUID }): boolean => hoveredId !== null && (edge.sourceId === hoveredId || edge.targetId === hoveredId);
+      const flowIsFaded = (edge: { sourceId: UUID; targetId: UUID }): boolean => hoveredId !== null && !flowIsEmphasised(edge);
+
+      const drawPolyline = (points: readonly { x: number; y: number }[], warn: boolean, arrowAtEnd: boolean, emphasised: boolean, faded: boolean): void => {
         ctx.save();
-        ctx.strokeStyle = warn ? tokens.statusWarn : tokens.borderStrong;
-        ctx.lineWidth = warn ? 2 : 1.5;
+        ctx.globalAlpha = faded ? 0.2 : 1;
+        ctx.strokeStyle = warn ? tokens.statusWarn : emphasised ? tokens.text : tokens.borderStrong;
+        ctx.lineWidth = emphasised ? 2.5 : warn ? 2 : 1.5;
         ctx.lineJoin = 'round';
         ctx.beginPath();
         points.forEach((p, i) => {
@@ -238,7 +275,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
         ctx.lineTo(-8, -4);
         ctx.lineTo(-8, 4);
         ctx.closePath();
-        ctx.fillStyle = warn ? tokens.statusWarn : tokens.borderStrong;
+        ctx.fillStyle = warn ? tokens.statusWarn : emphasised ? tokens.text : tokens.borderStrong;
         ctx.fill();
         ctx.restore();
       };
@@ -248,14 +285,15 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
       // segments per the prompt's own "each via-flow drawn as source →
       // platform → target."
       for (const edge of layout.edges) {
-        drawPolyline(edge.sourceSegment, edge.crossesBoundary, true);
-        drawPolyline(edge.targetSegment, edge.crossesBoundary, true);
+        drawPolyline(edge.sourceSegment, edge.crossesBoundary, true, flowIsEmphasised(edge), flowIsFaded(edge));
+        drawPolyline(edge.targetSegment, edge.crossesBoundary, true, flowIsEmphasised(edge), flowIsFaded(edge));
       }
 
-      const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; maxWidth: number }[] = [];
+      const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; maxWidth: number; maxLines: 1 | 2 }[] = [];
 
       const drawTile = (tile: PlatformFlowTile, isHub: boolean): void => {
-        const element = elementsById.get(tile.elementId);
+        // The platform itself is never one of the flows' endpoints, so it is not in `elementsById` (which holds only those and their parents) — it is the `hub` prop. Without this the centre tile was silently never drawn, leaving every line running into empty space.
+        const element = platformTileElement(tile.elementId, isHub, elementsById, hub);
         if (!element) return;
         const displayName = moduleDisplayNameFromMap(element, elementsById);
         const external = attributesRecord(element.attributes).isExternal === true;
@@ -275,13 +313,38 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
 
         if (zoomShowsText) {
           const glyph = element.element_type === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph(element.element_type);
-          nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: tile.y + tile.h / 2, maxWidth: tile.w - 30 });
+          // With interface bands inside it, the platform's own name sits in the header strip at the top of its tile.
+          const labelY = isHub && layout.hubHeaderHeight > 0 ? tile.y + layout.hubHeaderHeight / 2 + 2 : tile.y + tile.h / 2;
+          // A tile's name may take two lines; the platform's header strip (with interface bands below it) has room for one.
+          nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: labelY, maxWidth: tile.w - 34, maxLines: isHub && layout.hubHeaderHeight > 0 ? 1 : 2 });
         }
       };
 
       for (const tile of layout.sources) drawTile(tile, false);
       for (const tile of layout.targets) drawTile(tile, false);
       drawTile(layout.hub, true);
+
+      // ADR-026: one band per interface inside the platform tile, spanning the flows that go through it, labelled with the interface's name and type; flows that name only the platform sit in a last, plainer band.
+      const bandLabels: { text: string; worldX: number; worldY: number; maxWidth: number; muted: boolean }[] = [];
+      for (const band of layout.interfaceBands) {
+        const inset = 8;
+        ctx.save();
+        roundRectPath(ctx, layout.hub.x + inset, band.top + 2, layout.hub.w - inset * 2, band.bottom - band.top - 4, 6);
+        ctx.fillStyle = band.interfaceId === null ? 'transparent' : tokens.surfaceRaised;
+        ctx.fill();
+        ctx.strokeStyle = tokens.border;
+        ctx.lineWidth = 1;
+        if (band.interfaceId === null) ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        if (zoomShowsText) {
+          const iface = band.interfaceId !== null ? interfaces?.get(band.interfaceId) : undefined;
+          const type = iface ? attributesRecord(iface.attributes).interfaceType : undefined;
+          const typeLabel = typeof type === 'string' && type in INTERFACE_TYPE_LABELS ? ` · ${INTERFACE_TYPE_LABELS[type as keyof typeof INTERFACE_TYPE_LABELS]}` : '';
+          bandLabels.push({ text: iface ? `${iface.name}${typeLabel}` : 'Via the platform', worldX: layout.hub.x + inset + 8, worldY: (band.top + band.bottom) / 2, maxWidth: layout.hub.w - inset * 2 - 16, muted: iface === undefined });
+        }
+      }
 
       ctx.restore();
 
@@ -296,8 +359,18 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
         ctx.font = `${(14 * textScale).toFixed(2)}px sans-serif`;
         ctx.fillText(label.glyph, x + 8 * transform.scale, y);
         ctx.font = `${(12 * textScale).toFixed(2)}px sans-serif`;
-        const truncated = truncate(ctx, label.name, label.maxWidth * transform.scale);
-        ctx.fillText(truncated, x + 26 * transform.scale, y);
+        const lines = label.maxLines === 2 ? wrapTwoLines(ctx, label.name, label.maxWidth * transform.scale) : [truncate(ctx, label.name, label.maxWidth * transform.scale)];
+        const lineHeight = 14 * textScale;
+        lines.forEach((line, index) => {
+          ctx.fillText(line, x + 26 * transform.scale, y + (index - (lines.length - 1) / 2) * lineHeight);
+        });
+      }
+
+      ctx.font = `${(11 * textScale).toFixed(2)}px sans-serif`;
+      for (const label of bandLabels) {
+        const [x, y] = toScreen(label.worldX, label.worldY);
+        ctx.fillStyle = label.muted ? tokens.textMuted : tokens.text;
+        ctx.fillText(truncate(ctx, label.text, label.maxWidth * transform.scale), x, y);
       }
 
       // Rework of `contextDiagramLayout.ts`'s own pill drawing, simplified
@@ -311,11 +384,13 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
         ctx.textAlign = 'center';
         for (const edge of layout.edges) {
           const [vx, vy] = toScreen(edge.verbLabelAnchor.x, edge.verbLabelAnchor.y);
-          drawPill(ctx, edge.verbLabel, vx, vy, tokens, edge.crossesBoundary);
-          if (edge.classificationLabel) {
-            const [cx, cy] = toScreen(edge.classificationLabelAnchor.x, edge.classificationLabelAnchor.y);
-            drawPill(ctx, edge.classificationLabel, cx, cy, tokens, edge.crossesBoundary);
-          }
+          ctx.globalAlpha = flowIsFaded(edge) ? 0.25 : 1;
+          // Both pills carry the flow's number, so a line leaving the platform can be matched to the one that entered it.
+          const pillMaxWidth = PILL_RUN_WIDTH * transform.scale - 16;
+          drawPill(ctx, edge.verbLabel.trim() === '' ? String(edge.flowNumber) : `${String(edge.flowNumber)} · ${edge.verbLabel}`, vx, vy, tokens, edge.crossesBoundary, 'left', pillMaxWidth);
+          const [cx, cy] = toScreen(edge.classificationLabelAnchor.x, edge.classificationLabelAnchor.y);
+          drawPill(ctx, edge.classificationLabel ? `${String(edge.flowNumber)} · ${edge.classificationLabel}` : String(edge.flowNumber), cx, cy, tokens, edge.crossesBoundary, 'centre', pillMaxWidth);
+          ctx.globalAlpha = 1;
         }
         ctx.textAlign = 'left';
       }
@@ -327,7 +402,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
     return () => {
       observer.disconnect();
     };
-  }, [layout, elementsById, transform, hover, zoomShowsText]);
+  }, [layout, elementsById, interfaces, hub, transform, hover, zoomShowsText]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -350,8 +425,8 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
       }
     }
     const tile = tileAt(screenX, screenY);
-    const element = tile ? elementsById.get(tile.elementId) ?? (tile.elementId === hub.element_id ? hub : undefined) : undefined;
-    setHover(element ? { label: moduleDisplayNameFromMap(element, elementsById), screenX, screenY } : null);
+    const element = tile ? platformTileElement(tile.elementId, tile.elementId === hub.element_id, elementsById, hub) : undefined;
+    setHover(element && tile ? { elementId: tile.elementId, label: moduleDisplayNameFromMap(element, elementsById), screenX, screenY } : null);
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>): void {

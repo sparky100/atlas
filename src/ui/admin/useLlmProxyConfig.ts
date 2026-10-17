@@ -46,7 +46,10 @@ export const LLM_PROXY_PROVIDER_OPTIONS: LlmProxyProviderOption[] = [{ id: 'anth
  * available).
  */
 export const LLM_PROXY_MODEL_OPTIONS: LlmProxyModelOption[] = [
-  { id: 'claude-opus-5', label: 'Claude Opus 5 (flagship)' },
+  { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (flagship)' },
+  { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5' },
+  { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5' },
+  { id: 'claude-opus-5', label: 'Claude Opus 5' },
   { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
   { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
   { id: 'claude-fable-5-1', label: 'Claude Fable 5.1' },

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { getMainBranch } from '../../db/branches';
+import { loadChangeSummariesForModel } from '../../db/changeSummary';
 import { getElementsByIds } from '../../db/elements';
+import { containerParentIds } from '../elements/moduleDisplayName';
 import { listEvidenceForModel } from '../../db/evidence';
 import {
   getProject,
@@ -28,7 +30,9 @@ export interface ProjectData {
   evidence: EvidenceRow[];
   /** Every element any of the project's changes touches, with its name where known. */
   touched: TouchedElement[];
-  /** Names for scope and touched elements that exist on main. */
+  /** Every capability, value stream and stage any of the project's changes affects (change impact, ADR-024 §8 and ADR-023's amendment) — the full list, collapsed ones included. A scope item here is covered by the work even when no change edits it. */
+  reachedIds: UUID[];
+  /** Scope and touched elements that exist on main, plus each module's own platform so it can be named "Platform · Module". */
   elementsById: Map<UUID, ElementsHeadRow>;
 }
 
@@ -81,12 +85,29 @@ export function useProject(modelId: UUID, projectId: UUID): UseProjectResult {
         const scopeIds = links.filter((l) => l.linked_type === 'element').map((l) => l.linked_id);
         const evidenceIds = new Set(links.filter((l) => l.linked_type === 'evidence').map((l) => l.linked_id));
         const elementIds = [...new Set([...scopeIds, ...touchedById.keys()])];
-        const [elementsById, evidence] = await Promise.all([
+        const [elementsById, evidence, summaries] = await Promise.all([
           main?.head_commit_id ? getElementsByIds(supabase, main.head_commit_id, elementIds) : Promise.resolve(new Map<UUID, ElementsHeadRow>()),
           evidenceIds.size === 0 ? Promise.resolve([] as EvidenceRow[]) : listEvidenceForModel(supabase, modelId).then((rows) => rows.filter((r) => evidenceIds.has(r.id))),
+          loadChangeSummariesForModel(supabase, modelId, changes),
         ]);
+        const reachedIds = new Set<UUID>();
+        for (const summary of summaries.values()) {
+          for (const ac of summary.affectedCapabilities) reachedIds.add(ac.capability.element_id);
+          for (const vs of summary.affectedValueStreams) {
+            reachedIds.add(vs.stream.element_id);
+            for (const st of vs.stages) reachedIds.add(st.stage.element_id);
+          }
+        }
+        // A module reads "Platform · Module" (`moduleDisplayName.ts`), so its
+        // platform has to be in the same map — fetched only when a scope or
+        // touched element is actually a container with a platform not
+        // already loaded.
+        const missingParentIds = containerParentIds(elementsById.values()).filter((id) => !elementsById.has(id));
+        if (main?.head_commit_id && missingParentIds.length > 0) {
+          for (const [id, row] of await getElementsByIds(supabase, main.head_commit_id, missingParentIds)) elementsById.set(id, row);
+        }
         if (isCancelled()) return;
-        setState({ status: 'ready', data: { project, decisions, constrainingDecisions, changes, links, evidence, touched: [...touchedById.values()], elementsById } });
+        setState({ status: 'ready', data: { project, decisions, constrainingDecisions, changes, links, evidence, touched: [...touchedById.values()], reachedIds: [...reachedIds], elementsById } });
       } catch (e) {
         if (isCancelled()) return;
         setState({ status: 'error', message: "Couldn't load this project." });

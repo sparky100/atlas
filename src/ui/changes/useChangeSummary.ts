@@ -27,7 +27,7 @@ export function useChangeSummary(modelId: UUID, branch: BranchRow | null): Chang
     Promise.all([loadChangeSummary(supabase, modelId, branch), resolveChangeLineage(supabase, branch)])
       .then(([summary, lineage]) => {
         if (cancelled) return;
-        setState({ status: 'ready', summary: summary ?? { subjects: [], affectedCapabilities: [], affectedValueStreams: [], otherOpenChanges: [], sourcesById: new Map() }, lineage });
+        setState({ status: 'ready', summary: summary ?? { subjects: [], affectedCapabilities: [], affectedValueStreams: [], otherOpenChanges: [], captureDraftOverlaps: [], sourcesById: new Map(), projectScopeIds: null }, lineage });
       })
       .catch((e: unknown) => {
         reportError("Couldn't load this change's summary.", e);

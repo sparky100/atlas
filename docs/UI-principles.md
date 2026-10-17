@@ -81,10 +81,13 @@ It is chrome, not a per-page affordance — a page never grows its own "back to 
 | `ChevronLeft` / `ChevronRight` | Inspector panel (§6.5): collapse/expand toggle |
 | `Info` | Capability map (§6.5): each domain/card row's own small inline "Inspect" button (capability map density redesign — no longer a tile-corner overlay) — the view's only way into the Inspector, since it has no click-to-focus concept of its own (every row's primary link still navigates) |
 | `CircleHelp` | App header (`AppHeader.tsx`): the Help chat toggle — shown only when the current route has an org in scope (`AppHeader`'s own `orgId` prop comment) |
+| `Settings` | App header (`UserMenu.tsx`): the Settings toggle — theme and density |
 
 Implementation: `src/ui/components/ModelNav/ModelNav.tsx`, section membership resolved by path in `src/ui/nav/modelNavSection.ts`. (`Workflow`, `Wallet`, `Milestone` and `Upload` were already in use before F9 without being listed here; F9 step 1 adds them to the list rather than leaving the code ahead of this table. Icons marked *(F9)*/*(F10)* are listed ahead of the code that uses them.)
 
 The app header's own user menu (`src/ui/components/AppHeader/AppHeader.tsx`/`UserMenu.tsx`, Sprint U3b — email/theme/density/sign-out, the same < 768px collapse-behind-a-toggle shape as above but its own separate component, unconditional on every route) is untouched by this sprint. Sprint U4-1 E2 re-verified it specifically on the two pages that gained their own header-level disclosure this sprint (the element page's D1/D3 "⋯" menu, Landscape's E1 "+ Add"/"⋯" menus) — distinct accessible names keep the three from colliding, and opening one never disturbs another (`e2e/element-header.spec.ts`, `e2e/landscape-actions.spec.ts`).
+
+**Shared header pattern** (2026-10-15, amends the paragraph above): the app header's right-hand side is the same in all five simmodlr apps (Loop, Flow, Lens, Compass, Atlas) — `[🔔 Notifications] [? Help] [avatar + name] [⚙ Settings] [••• Account menu]`, identical at every width except that the name text is dropped at ≤ 640px. All four controls are 40px circles (fixed, not `--row-height`, so compact density doesn't shrink them). Help keeps its org-only rule (shown wherever an org is in scope, absent — not disabled — elsewhere, decided 2026-10-15). Theme and density moved out of the account menu onto the Settings gear; the "•••" account menu holds Profile, Platform admin (platform admins only) and Sign out. Atlas has no Feedback or About feature, so — unlike the sibling apps — its menu has no rows for them (CLAUDE.md rule 7, decided 2026-10-15). The avatar is the person's own `atlas.profiles` avatar image, else an accent-filled monogram; the name is their display name, else handle, else the email's local part (`UserMenu/headerIdentity.ts`). Implementation: `AppHeader.tsx`, `UserMenu.tsx`.
 
 ### 2.1 One zoom gesture, four levels
 
@@ -145,7 +148,18 @@ Same model, same data, different first screen. Which door a user gets is stored 
 
 Default: Owners and Architects get the architect door; Contributors and Viewers get the director door.
 
-### 3.1 Director's door
+**The split is by job, not by subject or by reader** (2026-10-03). The two doors are labelled **Overview** (the director's door, §3.1) and **My work** (the architect's door, §3.2):
+
+- **Overview** is a briefing on the *state of the business*: where capabilities are weak, what we're doing about it, what's recent. It states conclusions; its only create controls start a project or a decision.
+- **My work** is a worklist for the *state of the model*: what's waiting on me, what I'm part-way through, what changed under me, and what's missing or wrong in the model. It states work to do.
+
+The rule that keeps them from overlapping: a finding about business state (a capability that is weak — exposed, unsupported, poorly fitted) has its one home on Overview; a finding about model state (a missing owner, link, label, classification or stale value; assurance) has its one home on My work. Neither door repeats the other's findings; each links across to the other instead. Applied 2026-10-03: My work's "capabilities with no known supporters" finding was the same classification as Overview's "nothing recorded" tiles and was removed from My work (the Elements browse filter for it stays). The same day, "poor-fit capability" left My work too: it flagged a primary supporter rated poor *or adequate*, where Overview's tiles flagged only poor, and the decision was that an adequate fit **is** a weakness on Overview — Overview's tiles now flag poor or adequate (naming each rating separately on the tile), and the My work finding is retired (ADR-023's fit-visibility amendment, second revision). One finding that looks like a duplicate is not, and stays on My work: "critical systems exposed" reads a critical system's own `plannedEnd` (within `STALE_AFTER_MONTHS`), whatever its lifecycle and whether or not it supports a capability, whereas Overview's exposure is a `retiring`/`retired` supporter of a capability.
+
+**Overview reads work through projects and decisions** (2026-10-04). Handoff 7d's "What's changing" listed every open change — corrections, records of what already happened, drafts, and each option of each decision (an `explore` change) — so a briefing read like a work queue. Since ADR-024 the project is the container for a piece of architecture work, so Overview's middle section is **What we're doing**: projects in hand (`active`, then `on_hold`), each with owner, target date, progress counts (ADR-024 §5, never a percentage) and overdue decisions; then open decisions that belong to no project (portfolio-level, ADR-024 §1). A change appears only as part of its project's progress; a change outside any project is not shown on Overview at all — it belongs to My work and the Changes page. Overview's "Propose a change" / "What happened" buttons became **Start a project** / **Start a decision**; a record is started from the Changes page's own form. **Each weak tile says what's in hand** (step 2): the open projects whose declared scope (`project_links`) names the tile's capability, any capability beneath it, or one of the systems causing its exposure, and the open decisions whose `decision_links` name any of those — each a link, up to two then "+N more", a decision inside a named project shown through its project — or "Nothing in hand". Only a tile with nothing in hand offers "Start a decision / Start a project"; once work is started, the tile points to it instead. Supporting systems in general don't count, only exposing ones: a project scoped to a shared platform would otherwise mark every tile that platform supports as in hand. **My work lists what the viewer owns** (step 3): "My decisions" (open decisions whose owner is the viewer — in a project or not — overdue first, then by needed-by date, each naming its project) and "My projects" (projects in hand the viewer owns, with the same progress counts Overview shows), above "My changes". Ownership, not authorship: a decision or project someone merely created for another owner is that owner's. **What's recent says what's moved since the last version** (step 4): before the version stamps, "Since {newest version}" lists the decisions made (accepted — a cancelled decision is no decision made) and projects closed or cancelled after that version was tagged, newest first, up to five then "+N more", each linking to its page; with no version tagged yet, every one. That answers "what's moved since the last committee paper" without opening anything. With step 4 the redesign agreed on 2026-10-04 is complete.
+
+§3.1 and §3.2 below are the original pre-build specs, kept for their reasoning; the built doors follow `docs/HANDOFF-7d-director-door.md` and `docs/HANDOFF-7d-architect-door.md` and the job split above, and where §3.1/§3.2 disagree with that, the built doors win.
+
+### 3.1 Director's door (Overview)
 
 Opens on **the capability map at `main`**, with three overlays and nothing else:
 
@@ -161,7 +175,7 @@ Opens on **the capability map at `main`**, with three overlays and nothing else:
 
 The director's door has no sidebar, no branch selector, no editing affordance. Comments are readable via the side panel toggle.
 
-### 3.2 Architect's door
+### 3.2 Architect's door (My work)
 
 Opens on a three-column dashboard:
 
@@ -169,11 +183,11 @@ Opens on a three-column dashboard:
 2. **My branches** (centre): change branches where the user has commits, with status, head validation, "behind main by N commits" and a `Refresh` affordance when behind.
 3. **Recent activity** (right): commits, comments, decisions and merges across the model in the last 14 days, each linking to the element/branch. Mentions and replies to the user float to the top.
 
-Below the fold: the same capability map as the director sees, at `main`, with the same health chips.
+Below the fold: the same capability map as the director sees, at `main`, with the same health chips. (Never built, and superseded by the job split above: capability-level weakness is Overview's, and My work links to it rather than repeating it.)
 
 ### 3.3 The switch
 
-Top bar, right side: `Capability view` / `Application view` segmented control (labelled `Director view` / `Architect view` until 2026-10-02 — renamed because the two views are organised around capabilities and around applications, not around who reads them; "director door"/"architect door" below are the historical names for the same two views, and the stored preference still says `director`/`architect`). Switching is instant, remembered, and never changes what the user is permitted to do — a viewer who switches to the architect door sees an empty queue and no branches, with a line explaining why, not an error.
+Top bar, right side: `Overview` / `My work` segmented control — named for the job each view does (see §3's opening). Labelled `Director view` / `Architect view` until 2026-10-02, which read as a role or a permission, then briefly `Capability view` / `Application view`, which described a split by subject that the views never had (My work's findings are as often about capabilities as systems). "Director door"/"architect door" are the historical names for the same two views, and the stored preference still says `director`/`architect`. Switching is instant, remembered, and never changes what the user is permitted to do — a viewer who switches to My work sees an empty queue and no branches, with a line explaining why, not an error.
 
 ---
 

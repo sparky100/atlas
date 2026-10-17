@@ -1,71 +1,69 @@
+import { HomeViewLink } from './HomeViewLink';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { BlueprintFrame } from '../components/BlueprintFrame/BlueprintFrame';
 import { Button } from '../components/Button/Button';
+import { LinkButton } from '../components/Button/LinkButton';
 import { Chip, type ChipTone } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
-import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { UUID } from '../../contracts/delta';
 import type { MemberRole } from '../../db/types';
 import { formatDate } from '../time';
-import { branchStatusTone } from '../changes/branchStatus';
-import { defaultIntentForEntryPoint } from '../changes/branchIntent';
-import type { BranchIntent } from '../../db/types';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { attributesRecord } from '../elements/attributesRecord';
-import { decisionPrefillToSearchParams, prefillFromPoorFitCapabilities, prefillFromWeakCapability } from '../decisions/decisionPrefill';
+import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromWeakFitCapabilities, prefillFromWeakCapability } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { importanceLabel } from './capabilityImportance';
-import { compareWeakTiles, formatPoorFitPillLabel, isCapabilityTileWeak, poorFitPillTone } from './capabilityTileFit';
-import { ProposeChangePicker } from './ProposeChangePicker';
+import { compareWeakTiles, formatWeakFitPillLabel, isCapabilityTileWeak, weakFitPillTone } from './capabilityTileFit';
 import { ValueStreamsOutcomeView } from '../valueStreams/ValueStreamsOutcomeView';
-import { canCreateChangeBranch, canStartDecision } from '../orgs/useMembership';
+import { canStartDecision } from '../orgs/useMembership';
 import { canStartProject } from '../orgs/roleGates';
 import { StartProjectLink } from '../projects/StartProjectLink';
 import type { CapabilityTileData } from '../../db/modelHome';
 import type { DirectorHomeData } from './useDirectorHome';
+import type { OpenDecisionSummary, ProjectSummary, RecentRecord } from './whatWeAreDoing';
+import { isNothingInHand, type TileInHand } from './tileInHand';
+import { formatProjectProgress, projectStatusLabel, projectStatusTone } from '../projects/projectModel';
 import styles from './DirectorHome.module.css';
 
 export interface DirectorHomeProps {
   data: DirectorHomeData;
   reload: () => void;
   modelId: UUID;
-  orgId: UUID;
   userId: UUID | null;
-  /** Sprint 7i item 4's "Propose a change" entry point — the one deliberate exception to this door's own "no add control anywhere" design (see this component's own module comment); gated the same way every other propose-a-change entry point is. */
+  /** Gates the door's only create controls — "Start a project" / "Start a decision" ("What we're doing") and each weak tile's own actions — the same way every other entry point to them is gated. */
   role: MemberRole | null;
   orgSlug: string;
   modelSlug: string;
   /** The director door's own already-resolved main head commit id — passed straight to `ValueStreamsOutcomeView` (the "By outcome" reading) the same way `useDirectorHome` already uses it. */
   mainCommitIdHint: UUID | null;
+  /** Switches Home to My work — UI-principles §3's one-home-per-finding rule: model-quality findings live on My work, so this door links across to them rather than repeating them. */
+  onShowMyWork: () => void;
 }
 
 /**
  * The director's door (UI-principles §3.1, built to Handoff 7d —
- * `docs/HANDOFF-7d-director-door.md`): one vertical read, weakness first,
- * then what's changing, then what's recent. Read-only by construction —
- * no branch selector, no inline edit, no add control anywhere on this
- * page (the search box lives in `ModelHome`'s shared title row, common to
+ * `docs/HANDOFF-7d-director-door.md`, revised by UI-principles §3 on
+ * 2026-10-04): one vertical read — weakness first, then what we're doing
+ * about it (projects in hand and open decisions, never raw changes), then
+ * what's recent. No branch selector and no inline edit; its only create
+ * controls start a project or a decision (the search box lives in
+ * `ModelHome`'s shared title row, common to
  * both doors — see this component's own module comment in the handoff
  * doc for the one place this build simplified the literal layout: the
  * title/search chrome stays the existing shared header rather than a
  * director-only redesign of it, to avoid touching the architect door).
  */
-export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSlug, modelSlug, mainCommitIdHint }: DirectorHomeProps) {
+export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, modelSlug, mainCommitIdHint, onShowMyWork }: DirectorHomeProps) {
   const capabilityMapHref = `/o/${orgSlug}/m/${modelSlug}/capability-map`;
-  // Prompt pack F0: which entry point (if either) is currently open, and
-  // therefore which intent the picker it opens should default to —
-  // `null` means neither is open. A single piece of state rather than two
-  // booleans, since only one of "Propose a change"/"What happened" can be
-  // open at a time.
-  const [changeEntryIntent, setChangeEntryIntent] = useState<BranchIntent | null>(null);
   // F6 Step 6 (ADR-023 "Views" item 2): the director door's own "By
   // capability / By outcome" toggle — plain unpersisted component state
   // (the "route via platforms" precedent), not a `user_preferences` column.
   const [weaknessView, setWeaknessView] = useState<'capability' | 'outcome'>('capability');
-  const navigate = useNavigate();
-  const canPropose = canCreateChangeBranch(role);
+  const modelHref = `/o/${orgSlug}/m/${modelSlug}`;
+  const { whatWeAreDoing } = data;
+  const openDecisionCount = whatWeAreDoing.decisionsOutsideProjects.length + whatWeAreDoing.projects.reduce((n, p) => n + p.progress.openDecisions, 0);
 
   if (data.tiles.length === 0) {
     return (
@@ -112,6 +110,8 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
             </Text>
           </Link>
         </div>
+        {/* UI-principles §3: model-quality findings are My work's to show, not repeated here. */}
+        <HomeViewLink onClick={onShowMyWork}>Missing owners, links, labels and stale values are on My work →</HomeViewLink>
         <div className={styles.viewToggle} role="group" aria-label="Weakness view">
           <Button variant={weaknessView === 'capability' ? 'primary' : 'ghost'} onClick={() => { setWeaknessView('capability'); }} aria-pressed={weaknessView === 'capability'}>
             By capability
@@ -148,10 +148,10 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
 
             <div className={styles.tileGrid}>
               {weakTiles.map((tile) => (
-                <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised role={role} />
+                <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised role={role} inHand={data.inHandByTile.get(tile.capability.element_id) ?? NO_IN_HAND} />
               ))}
               {healthyTiles.map((tile) => (
-                <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised={false} role={role} />
+                <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised={false} role={role} inHand={data.inHandByTile.get(tile.capability.element_id) ?? NO_IN_HAND} />
               ))}
             </div>
           </>
@@ -162,101 +162,90 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
       </section>
 
       <div className={styles.lowerRow}>
-        <section className={styles.changesColumn} aria-label="What's changing">
+        <section className={styles.changesColumn} aria-label="What we're doing">
           <div className={styles.sectionHeader}>
             <Text as="h2" size="xl" className={styles.sectionTitle}>
-              What's changing
+              What we're doing
             </Text>
             <Text as="span" tone="muted" size="sm">
-              {data.openChanges.length} open{data.nextTargetDate ? ` · next target ${formatDate(data.nextTargetDate)}` : ''}
+              {plural(whatWeAreDoing.projects.length, 'project', 'projects')} in hand · {plural(openDecisionCount, 'open decision', 'open decisions')}
             </Text>
-            {canPropose && (
-              <>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setChangeEntryIntent(defaultIntentForEntryPoint('directorDoor'));
-                  }}
-                >
-                  Propose a change
-                </Button>
-                {/* Prompt pack F0's own "'what happened' → record" entry point — genuinely new, no prior surface for it anywhere in this app. Same gate as "Propose a change" (a lightweight, contributor-level act like opening any other change). */}
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setChangeEntryIntent(defaultIntentForEntryPoint('whatHappened'));
-                  }}
-                >
-                  What happened
-                </Button>
-              </>
+            {/* UI-principles §3 (2026-10-04): how a director starts work —
+                a project or a decision. Starting a change is My work's and
+                the Changes page's, not a briefing's. */}
+            {canStartProject(role) && (
+              <LinkButton variant="ghost" to={`${modelHref}/projects`}>
+                Start a project
+              </LinkButton>
+            )}
+            {canStartDecision(role) && (
+              <LinkButton variant="ghost" to={`${modelHref}/decisions`}>
+                Start a decision
+              </LinkButton>
             )}
           </div>
-          {changeEntryIntent && (
-            <Panel>
-              <ProposeChangePicker
-                modelId={modelId}
-                orgId={orgId}
-                userId={userId}
-                defaultIntent={changeEntryIntent}
-                onChosen={(branch) => {
-                  setChangeEntryIntent(null);
-                  // ChangePage.tsx routes on the branch id in the path itself, not `?ref=` — there's nothing to select once you're already on that change's own page.
-                  void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`);
-                }}
-                onCancel={() => {
-                  setChangeEntryIntent(null);
-                }}
-              />
-            </Panel>
-          )}
-          {data.openChanges.length === 0 ? (
-            <EmptyState>Nothing changing right now.</EmptyState>
+          {whatWeAreDoing.projects.length === 0 && whatWeAreDoing.decisionsOutsideProjects.length === 0 ? (
+            <EmptyState>No projects or open decisions right now.</EmptyState>
           ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th className={styles.changeColumn}>Change</th>
-                    <th>Status</th>
-                    <th>Touches</th>
-                    <th className={styles.targetColumn}>Target</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.openChanges.map(({ branch, touches }) => (
-                    <tr key={branch.id}>
-                      <td>
-                        <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`}>
-                          <Text as="span">{branch.title ?? branch.name}</Text>
-                        </Link>
-                      </td>
-                      <td>
-                        <Chip tone={branchStatusTone(branch.status)} glyph={<span className={styles.dot} />}>
-                          {branch.status}
-                        </Chip>
-                      </td>
-                      <td>
-                        <Text as="span" tone="muted" size="sm">
-                          {touches}
-                        </Text>
-                      </td>
-                      <td className={styles.targetColumn}>
-                        <Text as="span" mono size="sm">
-                          {branch.target_date ? formatDate(branch.target_date) : '—'}
-                        </Text>
-                      </td>
-                    </tr>
+            <>
+              {whatWeAreDoing.projects.length > 0 && (
+                <ul className={styles.workList} aria-label="Projects in hand">
+                  {whatWeAreDoing.projects.map((summary) => (
+                    <ProjectWorkRow key={summary.project.id} summary={summary} modelHref={modelHref} />
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </ul>
+              )}
+              {whatWeAreDoing.decisionsOutsideProjects.length > 0 && (
+                <>
+                  <Text as="h3" size="lg" className={styles.subsectionTitle}>
+                    Decisions outside a project
+                  </Text>
+                  <ul className={styles.workList} aria-label="Decisions outside a project">
+                    {whatWeAreDoing.decisionsOutsideProjects.map((summary) => (
+                      <DecisionWorkRow key={summary.decision.id} summary={summary} modelHref={modelHref} />
+                    ))}
+                  </ul>
+                </>
+              )}
+            </>
           )}
         </section>
 
         <section className={styles.versionsColumn} aria-label="What's recent">
           <Text as="h2" size="xl" className={styles.sectionTitle}>
             What's recent
+          </Text>
+          {/* UI-principles §3 (2026-10-04, step 4): what's moved since the
+              last version — decisions made, projects closed — before the
+              version stamps themselves. */}
+          <Text as="h3" size="lg" className={styles.subsectionTitle}>
+            {data.recentSince ? `Since ${data.recentSince.name}` : 'Decided and closed'}
+          </Text>
+          {data.recentRecords.length === 0 ? (
+            <EmptyState>{data.recentSince ? `No decisions made or projects closed since ${data.recentSince.name}.` : 'No decisions made or projects closed yet.'}</EmptyState>
+          ) : (
+            <ul className={styles.workList} aria-label="Decided and closed">
+              {data.recentRecords.slice(0, RECENT_SHOWN).map((record) => (
+                <li key={`${record.kind}-${record.id}`} className={styles.workRow}>
+                  <Link to={`${modelHref}/${record.kind === 'decision' ? 'decisions' : 'projects'}/${record.id}`}>
+                    <Text as="span">{record.title}</Text>
+                  </Link>
+                  <Text as="p" tone="muted" size="sm">
+                    {RECENT_OUTCOME_LABEL[record.outcome]} {formatDate(record.at)}
+                  </Text>
+                </li>
+              ))}
+              {data.recentRecords.length > RECENT_SHOWN && (
+                <li className={styles.workRow}>
+                  <Text as="span" tone="muted" size="sm">
+                    +{data.recentRecords.length - RECENT_SHOWN} more
+                  </Text>
+                </li>
+              )}
+            </ul>
+          )}
+          <Text as="h3" size="lg" className={styles.subsectionTitle}>
+            Versions
           </Text>
           {data.versions.length === 0 ? (
             <EmptyState>No versions tagged yet.</EmptyState>
@@ -288,6 +277,110 @@ export function DirectorHome({ data, reload, modelId, orgId, userId, role, orgSl
   );
 }
 
+/** How many recent records "What's recent" lists before "+N more". */
+const RECENT_SHOWN = 5;
+
+const RECENT_OUTCOME_LABEL: Record<RecentRecord['outcome'], string> = {
+  decided: 'Decision made',
+  closed: 'Project closed',
+  cancelled: 'Project cancelled',
+};
+
+function plural(count: number, one: string, many: string): string {
+  return `${String(count)} ${count === 1 ? one : many}`;
+}
+
+/** One project in hand: title (to its page), status when not simply active, owner, target date, progress counts, and its decisions' timing — overdue ones flagged in words, never colour alone. */
+function ProjectWorkRow({ summary, modelHref }: { summary: ProjectSummary; modelHref: string }) {
+  const { project, ownerDisplay, progress, overdueDecisions, nextDecisionDue } = summary;
+  return (
+    <li className={styles.workRow}>
+      <div className={styles.workRowTitle}>
+        <Link to={`${modelHref}/projects/${project.id}`}>
+          <Text as="span" size="lg">
+            {project.title}
+          </Text>
+        </Link>
+        {project.status !== 'active' && <Chip tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status)}</Chip>}
+        {overdueDecisions > 0 && <Chip tone="warn">{plural(overdueDecisions, 'decision overdue', 'decisions overdue')}</Chip>}
+      </div>
+      <Text as="p" tone="muted" size="sm">
+        {ownerDisplay}
+        {project.target_date !== null ? ` · target ${formatDate(project.target_date)}` : ''}
+        {nextDecisionDue !== null ? ` · next decision due ${formatDate(nextDecisionDue)}` : ''}
+      </Text>
+      <Text as="p" tone="faint" size="xs">
+        {formatProjectProgress(progress)}
+      </Text>
+    </li>
+  );
+}
+
+/** One open decision that belongs to no project — a portfolio-level decision (ADR-024 §1). */
+function DecisionWorkRow({ summary, modelHref }: { summary: OpenDecisionSummary; modelHref: string }) {
+  const { decision, ownerDisplay, overdue } = summary;
+  return (
+    <li className={styles.workRow}>
+      <div className={styles.workRowTitle}>
+        <Link to={`${modelHref}/decisions/${decision.id}`}>
+          <Text as="span">{decision.title}</Text>
+        </Link>
+        {overdue && <Chip tone="warn">overdue</Chip>}
+      </div>
+      <Text as="p" tone="muted" size="sm">
+        {ownerDisplay}
+        {decision.needed_by !== null ? ` · needed by ${formatDate(decision.needed_by)}` : ''}
+      </Text>
+    </li>
+  );
+}
+
+const NO_IN_HAND: TileInHand = { projects: [], decisions: [] };
+/** How many in-hand items a tile names before "+N more" — a tile is a glance, the project page and the decision list hold the rest. */
+const IN_HAND_SHOWN = 2;
+
+/** A weak tile's "In hand" line: the projects and decisions already addressing it, each a link to its own page — or, plainly, "Nothing in hand". Real links, rendered as siblings after the tile's own primary link (never inside it). */
+function TileInHandLine({ inHand, modelHref }: { inHand: TileInHand; modelHref: string }) {
+  if (isNothingInHand(inHand)) {
+    return (
+      <Text as="p" tone="muted" size="xs" className={styles.inHand}>
+        Nothing in hand
+      </Text>
+    );
+  }
+  const items = [
+    ...inHand.projects.map((p) => ({ key: `p-${p.id}`, href: `${modelHref}/projects/${p.id}`, label: `Project: ${p.title}` })),
+    ...inHand.decisions.map((d) => ({ key: `d-${d.id}`, href: `${modelHref}/decisions/${d.id}`, label: `Decision: ${d.title}` })),
+  ];
+  const shown = items.slice(0, IN_HAND_SHOWN);
+  const more = items.length - shown.length;
+  return (
+    <div className={styles.inHand}>
+      <Text as="span" tone="muted" size="xs">
+        In hand:
+      </Text>
+      <ul className={styles.inHandList}>
+        {shown.map((item) => (
+          <li key={item.key}>
+            <Link to={item.href}>
+              <Text as="span" size="xs">
+                {item.label}
+              </Text>
+            </Link>
+          </li>
+        ))}
+        {more > 0 && (
+          <li>
+            <Text as="span" tone="muted" size="xs">
+              +{more} more
+            </Text>
+          </li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
 interface CapabilityTileProps {
   tile: CapabilityTileData;
   orgSlug: string;
@@ -295,6 +388,8 @@ interface CapabilityTileProps {
   emphasised: boolean;
   /** Prompt pack F3 PR6: gates the "Start a decision →" action below an emphasised (weak) tile — omitted entirely, not shown disabled, for a viewer; never rendered at all on a healthy tile. */
   role: MemberRole | null;
+  /** The open projects and decisions already addressing this tile (`tileInHand.ts`) — named on a weak tile, and when there are any, the tile's own start actions are dropped. */
+  inHand: TileInHand;
 }
 
 const TONE_LABEL: Record<CapabilityTileData['tone'], string> = {
@@ -306,7 +401,7 @@ const TONE_LABEL: Record<CapabilityTileData['tone'], string> = {
 
 const TONE_CHIP: Record<CapabilityTileData['tone'], ChipTone> = { ok: 'ok', warn: 'warn', info: 'info', neutral: 'neutral' };
 
-function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: CapabilityTileProps) {
+function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: CapabilityTileProps) {
   const href = `/o/${orgSlug}/m/${modelSlug}/e/${tile.capability.element_id}`;
   // Visual pass item 1: "no known supporters" specifically, not every weak
   // tile — `buildCapabilityTiles` (`modelHome.ts`) sets `tone: 'neutral'`
@@ -321,25 +416,35 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
   // would be wrong for a tile that's only weak because of fit), and
   // rendered as a sibling *after* the tile's own primary link, not nested
   // inside it (an `<a>` cannot legally contain another `<a>`).
+  // A "nothing recorded" tile is the capability-no-supporters finding,
+  // whose one home is this grid since 2026-10-03 (UI-principles §3) — it
+  // keeps that finding's own, more specific prefill ("Who supports X?",
+  // `sourceFindingKey: 'capability-no-supporters'`) rather than the
+  // generic weak-capability one.
+  const tileCapability = { id: tile.capability.element_id, name: tile.capability.name };
+  const tilePrefill = tile.tone === 'neutral' ? prefillFromCapabilityNoSupportersFinding(tileCapability) : prefillFromWeakCapability(tileCapability, TONE_LABEL[tile.tone]);
   const startDecisionHref =
     tile.tone !== 'ok' && canStartDecision(role)
-      ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefillFromWeakCapability({ id: tile.capability.element_id, name: tile.capability.name }, TONE_LABEL[tile.tone])).toString()}`
+      ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(tilePrefill).toString()}`
       : null;
   // F6.1: a second, independent "Start a decision" for the fit reason —
   // concerns are the individual poor-fit capabilities under this tile
-  // (`prefillFromPoorFitCapabilities`), never the level-1 tile itself.
+  // (`prefillFromWeakFitCapabilities`), never the level-1 tile itself.
   // Suppressed once every poor-fit edge already has a planned
-  // replacement recorded (`poorFitAllReplacementPlanned`) — the fit pill
+  // replacement recorded (`weakFitAllReplacementPlanned`) — the fit pill
   // reads "replacement planned" instead in that case, nothing left to
   // start a decision about.
   const startFitDecisionHref =
-    tile.poorFitCapabilities.length > 0 && !tile.poorFitAllReplacementPlanned && canStartDecision(role)
-      ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefillFromPoorFitCapabilities(tile.capability.name, tile.poorFitCapabilities.map((c) => ({ id: c.element_id, name: c.name })))).toString()}`
+    tile.weakFitCapabilities.length > 0 && !tile.weakFitAllReplacementPlanned && canStartDecision(role)
+      ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefillFromWeakFitCapabilities(tile.capability.name, tile.weakFitCapabilities.map((c) => ({ id: c.element_id, name: c.name })))).toString()}`
       : null;
-  const decisionActionHrefs = [startDecisionHref, startFitDecisionHref].filter((href): href is string => href !== null);
+  // UI-principles §3 (2026-10-04): once a project or decision is already
+  // addressing this tile, it says so instead of offering to start another.
+  const nothingInHand = isNothingInHand(inHand);
+  const decisionActionHrefs = nothingInHand ? [startDecisionHref, startFitDecisionHref].filter((href): href is string => href !== null) : [];
   // F10 step 7 (ADR-024 §6.4): a weak tile can start a project instead —
   // the same prefill as its exposure decision, read by the project form.
-  const startProjectHref = startDecisionHref !== null && canStartProject(role) ? startDecisionHref.replace('/decisions?', '/projects?') : null;
+  const startProjectHref = nothingInHand && startDecisionHref !== null && canStartProject(role) ? startDecisionHref.replace('/decisions?', '/projects?') : null;
   const actionCount = decisionActionHrefs.length + (startProjectHref !== null ? 1 : 0);
   const content = (
     <>
@@ -400,31 +505,34 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
       {/* F6.1: a second, visually distinct pill — its own glyph shape (a
           triangle, not the tone chip's round dot) so the two never read as
           one combined status even before colour is considered (§6.3/§8.4's
-          "never colour alone"). Rendered off `poorFitCapabilities` directly,
+          "never colour alone"). Rendered off `weakFitCapabilities` directly,
           not `emphasised` — the instruction's own "independently of tone". */}
-      {tile.poorFitCapabilities.length > 0 && (
-        <Chip tone={poorFitPillTone(tile.poorFitAllReplacementPlanned)} glyph={<span className={styles.fitGlyph} aria-hidden="true" />}>
-          {formatPoorFitPillLabel(tile.poorFitCapabilities.length, tile.poorFitAllReplacementPlanned)}
+      {tile.weakFitCapabilities.length > 0 && (
+        <Chip tone={weakFitPillTone(tile.weakFitAllReplacementPlanned, tile.weakFitCapabilities.length - tile.adequateFitCount)} glyph={<span className={styles.fitGlyph} aria-hidden="true" />}>
+          {formatWeakFitPillLabel(tile.weakFitCapabilities.length - tile.adequateFitCount, tile.adequateFitCount, tile.weakFitAllReplacementPlanned)}
         </Chip>
       )}
     </>
   );
 
-  const linkClassName = [emphasised ? styles.tileEmphasised : styles.tile, isWeak ? styles.tileWeak : ''].filter(Boolean).join(' ');
-
-  return (
-    <div className={styles.tileWrapper}>
-      <Link to={href} className={linkClassName}>
-        {emphasised ? <BlueprintFrame>{content}</BlueprintFrame> : content}
+  // The frame (an emphasised tile's) wraps the whole tile — its primary
+  // link, the fit-capability links and the actions — so the actions sit
+  // inside the card they belong to rather than trailing below it after a
+  // gap (found at 390px: the link used to reserve room for them *outside*
+  // the frame, and a two-action tile stacked them below even that).
+  const body = (
+    <>
+      <Link to={href} className={emphasised ? styles.tileEmphasised : styles.tile}>
+        {content}
       </Link>
       {/* F6.1: "link to the capabilities concerned" — real, individually
           navigable links, rendered as DOM siblings after the tile's own
           primary link (never nested inside it, same reasoning as
           `StartDecisionLink` below — an `<a>` cannot legally contain
           another `<a>`). */}
-      {tile.poorFitCapabilities.length > 0 && (
+      {tile.weakFitCapabilities.length > 0 && (
         <ul className={styles.fitCapabilityList}>
-          {tile.poorFitCapabilities.map((capability) => (
+          {tile.weakFitCapabilities.map((capability) => (
             <li key={capability.element_id}>
               <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${capability.element_id}`}>
                 <Text as="span" size="xs">
@@ -435,20 +543,17 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role }: Capabili
           ))}
         </ul>
       )}
+      {emphasised && <TileInHandLine inHand={inHand} modelHref={`/o/${orgSlug}/m/${modelSlug}`} />}
       {actionCount > 0 && (
-        // The common case (0 or 1 action) keeps the exact corner-overlay
-        // layout every existing tile already uses (`.tileAction`); the
-        // rare case of both a tone- and a fit-triggered action on the
-        // same tile falls back to an ordinary in-flow stack
-        // (`.tileActionsStacked`) rather than risking two absolutely-
-        // positioned links overlapping in the same corner.
-        <div className={actionCount > 1 ? styles.tileActionsStacked : styles.tileAction}>
+        <div className={styles.tileActions}>
           {decisionActionHrefs.map((href) => (
             <StartDecisionLink key={href} href={href} />
           ))}
           {startProjectHref !== null && <StartProjectLink href={startProjectHref} />}
         </div>
       )}
-    </div>
+    </>
   );
+
+  return <div className={[styles.tileWrapper, isWeak ? styles.tileWeak : ''].filter(Boolean).join(' ')}>{emphasised ? <BlueprintFrame>{body}</BlueprintFrame> : body}</div>;
 }

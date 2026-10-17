@@ -29,6 +29,7 @@ import { createServiceRoleClient } from '../src/db/client';
 import { loadEnv } from '../src/db/env';
 import { parseCapabilityMapContent, type CapabilityMapContent } from '../src/contracts/capabilityMapContent';
 import type { MapStatus } from '../src/db/capabilityMapTemplates';
+import { isCliEntrypoint } from './isCliEntrypoint';
 
 const CONTENT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'content', 'capability-maps');
 
@@ -74,8 +75,13 @@ async function loadOne(supabase: ReturnType<typeof createServiceRoleClient>, fil
   // delete-then-reinsert below trip the immutability trigger. This is
   // what makes `pnpm content:load-capability-maps` safe to re-run against
   // a project that already has published maps on it.
-  if (existing.data?.status === 'published') {
-    console.log(`${label}: already published — skipping (immutable; publish a new version to change it)`);
+  // `deprecated` is the same fixed history, one step on: publishing a later
+  // version deprecates this one (scripts/publishCapabilityMap.ts), and a
+  // re-run used to treat it as a draft and fail the table's check
+  // constraint rewriting it — found when a second Playwright run's global
+  // setup re-ran this loader after the first had published electricity v4.
+  if (existing.data?.status === 'published' || existing.data?.status === 'deprecated') {
+    console.log(`${label}: already ${String(existing.data.status)} — skipping (immutable; publish a new version to change it)`);
     return;
   }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see src/db/branches.ts's module comment.
@@ -217,20 +223,26 @@ async function loadOne(supabase: ReturnType<typeof createServiceRoleClient>, fil
   console.log(`${label}: loaded ${String(itemRows.length)} item(s), ${String(valueStreamCount)} value stream(s)/stage(s), ${String(content.sources.length)} source(s) into ${content.sector} v${String(content.version)}`);
 }
 
-async function main(): Promise<void> {
-  const env = loadEnv();
-  const supabase = createServiceRoleClient(env);
+/** Every content file, loaded in turn — exported for Playwright's global setup (`e2e/globalSetup.ts`), which loads the real starter maps into a freshly reset local database. */
+export async function loadAllCapabilityMaps(supabase: ReturnType<typeof createServiceRoleClient>): Promise<number> {
   const files = await findContentFiles();
-  if (files.length === 0) {
-    console.log('No content/capability-maps/<sector>/<version>.json files found — nothing to load (see content/capability-maps/README.md).');
-    return;
-  }
   for (const file of files) {
     await loadOne(supabase, file);
   }
+  return files.length;
 }
 
-main().catch((e: unknown) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exitCode = 1;
-});
+async function main(): Promise<void> {
+  const env = loadEnv();
+  const supabase = createServiceRoleClient(env);
+  const loaded = await loadAllCapabilityMaps(supabase);
+  if (loaded === 0) console.log('No content/capability-maps/<sector>/<version>.json files found — nothing to load (see content/capability-maps/README.md).');
+}
+
+// Only run main() when this is the CLI entrypoint, not when e2e/globalSetup.ts imports loadAllCapabilityMaps.
+if (isCliEntrypoint(import.meta.url)) {
+  main().catch((e: unknown) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exitCode = 1;
+  });
+}

@@ -111,7 +111,9 @@ test('renaming a System from the header menu: new name in the Context breadcrumb
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   const searchBox = page.getByPlaceholder('Search or create a capability, system, or actor…');
   await searchBox.fill(oldName);
-  await expect(page.getByRole('link', { name: new RegExp(newName) })).toBeVisible();
+  // The search result itself (its link reads "system <name>", glyph first) —
+  // Home's recent-activity list links the same element by its bare name too.
+  await expect(page.getByRole('link', { name: new RegExp(`^system ${newName}`) })).toBeVisible();
 });
 
 test('tapping the title on the element page opens the same inline rename as the menu', async ({ page }) => {

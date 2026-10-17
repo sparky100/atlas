@@ -90,14 +90,19 @@ export function groupChangesByStage(changes: readonly BranchRow[]): { stage: Pro
 
 /**
  * ADR-024 §5: the declared scope against what the project's changes
- * actually touch — a prompt, shown, never auto-corrected.
+ * actually touch — a prompt, shown, never auto-corrected. A scope item a
+ * change only *affects* (`reached`: a capability or value stream reached
+ * through change impact, §8) is covered — it isn't "not touched" — but
+ * isn't counted as touched-out-of-scope either: impact reaches widely, and
+ * that list is for what the changes edit.
  */
-export function scopeDifference(declared: readonly UUID[], touched: readonly UUID[]): { touchedNotDeclared: UUID[]; declaredNotTouched: UUID[] } {
+export function scopeDifference(declared: readonly UUID[], touched: readonly UUID[], reached: readonly UUID[] = []): { touchedNotDeclared: UUID[]; declaredNotTouched: UUID[] } {
   const declaredSet = new Set(declared);
   const touchedSet = new Set(touched);
+  const coveredSet = new Set([...touched, ...reached]);
   return {
     touchedNotDeclared: [...touchedSet].filter((id) => !declaredSet.has(id)),
-    declaredNotTouched: [...declaredSet].filter((id) => !touchedSet.has(id)),
+    declaredNotTouched: [...declaredSet].filter((id) => !coveredSet.has(id)),
   };
 }
 
@@ -122,6 +127,12 @@ export function projectProgress(changes: readonly Pick<BranchRow, 'status' | 'in
     openDecisions: decisions.filter((d) => d.status === 'proposed').length,
     decidedDecisions: decisions.filter((d) => d.status !== 'proposed').length,
   };
+}
+
+/** A project's progress as one line of plain counts, never a percentage — the project page and Overview's "What we're doing" both read it this way. */
+export function formatProjectProgress(progress: ProjectProgress): string {
+  const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
+  return `${plural(progress.openChanges, 'open change', 'open changes')} · ${String(progress.mergedChanges)} merged · ${plural(progress.openDecisions, 'open decision', 'open decisions')} · ${String(progress.decidedDecisions)} decided`;
 }
 
 /** The originating decision (ADR-024 §5): the project's earliest decision, if any — no column, just the first entry in the log. */

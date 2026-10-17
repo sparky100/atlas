@@ -25,7 +25,7 @@ import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBran
 import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
 import { useEditingBranch } from '../branches/useEditingBranch';
-import { useMainBranch } from '../branches/useMainBranch';
+import { hintedModelId, useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { CapabilityLandscapeList } from '../landscape/CapabilityLandscapeList';
@@ -58,6 +58,7 @@ import { useBreadcrumbElement } from '../nav/useBreadcrumbElement';
 import { parseCapabilityParam, zoomQueryString } from '../nav/zoomParams';
 import { useRouteTiming } from '../perf/useRouteTiming';
 import { downloadImportPrompt } from '../import/downloadImportPrompt';
+import { LandscapeFind, type LandscapeFindOption } from '../landscape/LandscapeFind';
 import { supabase } from '../supabaseClient';
 import styles from './LandscapePage.module.css';
 
@@ -140,12 +141,12 @@ export function LandscapePage() {
   // Search always scans main's real head, regardless of which ref/branch is
   // being viewed (src/db/elementSearch.ts's own module comment) — only the
   // write target (`editingBranch`) varies with the ref.
-  const { branch: mainBranch, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, loading: mainBranchLoading, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
   // S1 item 15 (A2 remainder): `mainBranch` is already resolved above —
   // hand its head commit id through as `useBreadcrumbElement`'s own dedup
   // hint (that hook's own parameter comment) rather than letting it run a
   // second, redundant `resolveRef` for the common `ref.kind === 'main'` case.
-  const capability = useBreadcrumbElement(model?.id ?? null, ref, capabilityId, mainBranch?.head_commit_id ?? null);
+  const capability = useBreadcrumbElement(hintedModelId(model?.id, ref, mainBranchLoading), ref, capabilityId, mainBranch?.head_commit_id ?? null);
   const canEdit = !viewing && editingBranch !== null && canEditBranch(role, editingBranch);
   // ADR-018 guarantees both are never null in practice (every branch always
   // has a real head, from genesis onward) — `BranchRow`'s own type hasn't
@@ -222,6 +223,8 @@ export function LandscapePage() {
   // V2: click-to-focus — plain, unpersisted view state, the same shape
   // `routeViaPlatforms`/`commentsOnlyFilter` already use below.
   const [rawFocusedElementId, setFocusedElementId] = useState<UUID | null>(null);
+  // "Find on this landscape": a fresh object per pick, so the canvas re-centres even on the same tile.
+  const [centreRequest, setCentreRequest] = useState<{ elementId: UUID } | null>(null);
   // "Edges hidden by default; 'Show connections' toggle" — same unpersisted
   // per-session shape as `routeViaPlatforms` below; the real toggle lives
   // in the new focus panel now.
@@ -563,6 +566,18 @@ export function LandscapePage() {
             </div>
           )}
           {/* M1 close-out item 1: "the per-session 'comments on this view' filter" — desktop canvas only. Unlike the marker/panel wiring itself (which the mobile list now shares, S1 item 12), this specific *filter* (dimming every tile with no thread at all) has no equivalent on a plain list row — there's nothing to visually dim a row's own text down from. Toggled independently of `+ Add`, so it's its own `.actions` group rather than folded into `addControls`. */}
+          {state.status === 'ready' && displayState.status === 'ready' && hasContent && (
+            <div className={styles.actions}>
+              <LandscapeFind
+                options={narrow ? findOptionsFromGroups(displayState.display.groups) : findOptions(displayState.display.layout, state.data.systemsById, state.data.actorsById)}
+                onPick={(elementId) => {
+                  // The canvas focuses the tile (fading the rest, as a click does) and centres it; the mobile list has no focus, so it opens the group and highlights the row instead.
+                  if (!narrow) setFocusedElementId(elementId);
+                  setCentreRequest({ elementId });
+                }}
+              />
+            </div>
+          )}
           {state.status === 'ready' && showCanvas && (
             <div className={styles.actions}>
               <label className={styles.commentsOnlyToggle}>
@@ -701,6 +716,7 @@ export function LandscapePage() {
                   elementHref={elementHref}
                   contextHref={nodeHref}
                   threadCounts={threadCounts}
+                  revealElement={centreRequest}
                   onCommentMarkerClick={(elementId) => {
                     setCommentsPanelElementId(elementId);
                     setAutoFocusComposer(false);
@@ -743,6 +759,8 @@ export function LandscapePage() {
                   routeViaPlatforms={routeViaPlatforms}
                   focusedElementId={focusedElementId}
                   onFocusElement={setFocusedElementId}
+                  centreOn={centreRequest}
+                  platformIdByInterfaceId={state.data.platformIdByInterfaceId}
                   onClearFocus={() => {
                     setFocusedElementId(null);
                   }}
@@ -828,4 +846,26 @@ export function LandscapePage() {
       </div>
     </div>
   );
+}
+
+/** Every tile the landscape is drawing, as "Find on this landscape" options — systems and actors, alphabetical. */
+function findOptions(layout: { nodes: readonly { elementId: UUID }[]; actorNodes: readonly { elementId: UUID }[] }, systemsById: ReadonlyMap<UUID, ElementsHeadRow>, actorsById: ReadonlyMap<UUID, ElementsHeadRow>): LandscapeFindOption[] {
+  const options: LandscapeFindOption[] = [];
+  for (const node of layout.nodes) {
+    const element = systemsById.get(node.elementId);
+    if (element) options.push({ elementId: element.element_id, name: element.name, detail: element.element_type });
+  }
+  for (const node of layout.actorNodes) {
+    const element = actorsById.get(node.elementId);
+    if (element) options.push({ elementId: element.element_id, name: element.name, detail: 'actor' });
+  }
+  return options.sort((a, b) => a.name.localeCompare(b.name) || a.elementId.localeCompare(b.elementId));
+}
+
+/** The mobile list's version of `findOptions`: every actor and every system placed in a group (a system referenced in a second lane is still one row, so each id is offered once). */
+function findOptionsFromGroups(groups: { actors: readonly ElementsHeadRow[]; groups: readonly { members: readonly { system: ElementsHeadRow }[] }[] }): LandscapeFindOption[] {
+  const byId = new Map<UUID, LandscapeFindOption>();
+  for (const actor of groups.actors) byId.set(actor.element_id, { elementId: actor.element_id, name: actor.name, detail: 'actor' });
+  for (const group of groups.groups) for (const { system } of group.members) byId.set(system.element_id, { elementId: system.element_id, name: system.name, detail: system.element_type });
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name) || a.elementId.localeCompare(b.elementId));
 }

@@ -13,6 +13,7 @@ import type { ChangeListSummary } from '../../db/changeSummary';
 import type { BranchRow, DecisionRow, EvidenceRow, ProjectRow } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { describeDelta } from '../changes/changeSummaryFormat';
+import { describeImpactReasons, focusImpact } from '../changes/impactFocus';
 import { decisionStatusLabel } from '../decisions/decisionStatus';
 import { projectChangeStage, projectChangeStageLabel, projectProgress, projectStatusLabel } from '../projects/projectModel';
 
@@ -90,13 +91,15 @@ function changeLines(change: ProjectPackChange): string[] {
     return lines;
   }
   lines.push(summary.description);
-  if (summary.affectedCapabilities.length > 0) {
+  const impact = focusImpact(summary.affectedCapabilities, summary.affectedValueStreams, summary.projectScopeIds);
+  if (impact.shownCapabilities.length > 0) {
     lines.push('');
-    lines.push('**Capabilities affected:**');
+    lines.push(impact.focused ? "**Capabilities affected (in the project's scope):**" : '**Capabilities affected:**');
     lines.push('');
-    for (const ac of summary.affectedCapabilities) {
-      const via = ac.viaSystems.length > 0 ? ` (via ${ac.viaSystems.map((s) => s.name).join(', ')})` : '';
-      lines.push(`- ${ac.capability.name}${via}`);
+    for (const ac of impact.shownCapabilities) lines.push(`- ${ac.capability.name} (${describeImpactReasons(ac.reasons)})`);
+    if (impact.collapsedCapabilities.length > 0) {
+      lines.push('');
+      lines.push(`Also reached, outside the project's scope: ${impact.collapsedCapabilities.map((ac) => ac.capability.name).join(', ')}.`);
     }
   }
   lines.push('');
@@ -149,7 +152,7 @@ export function buildProjectPackMarkdown(input: ProjectPackInput): string {
   }
   if (declaredNotTouched.length > 0) {
     lines.push('');
-    lines.push(`**In the declared scope but not touched by any change yet:** ${declaredNotTouched.join(', ')}`);
+    lines.push(`**In the declared scope but not touched or affected by any change yet:** ${declaredNotTouched.join(', ')}`);
   }
 
   lines.push('');

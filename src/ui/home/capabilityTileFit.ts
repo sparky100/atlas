@@ -12,8 +12,8 @@ import { IMPORTANCE_ORDER } from './capabilityImportance';
  * one place the two signals combine for *placement* purposes, so
  * `DirectorHome.tsx` never has to re-derive the rule inline.
  */
-export function isCapabilityTileWeak(tile: Pick<CapabilityTileData, 'tone' | 'poorFitCapabilities'>): boolean {
-  return tile.tone !== 'ok' || tile.poorFitCapabilities.length > 0;
+export function isCapabilityTileWeak(tile: Pick<CapabilityTileData, 'tone' | 'weakFitCapabilities'>): boolean {
+  return tile.tone !== 'ok' || tile.weakFitCapabilities.length > 0;
 }
 
 /**
@@ -48,20 +48,23 @@ export function compareWeakTiles(a: CapabilityTileData, b: CapabilityTileData): 
 }
 
 /**
- * The director door's own "poor fit" pill text — "poor fit: N
- * capabilities", with "· replacement planned" appended once
- * `poorFitAllReplacementPlanned` is true (mirrors the exposure tone's own
- * "replacement planned" wording, `TONE_LABEL.info` in `DirectorHome.tsx`,
- * for the same underlying evidence). Never called with `poorFitCount`
- * `0` — callers only render the pill when `poorFitCapabilities` is
- * non-empty.
+ * Overview's fit pill text — each weak rating named separately, so an
+ * `adequate` fit never reads as `poor`: "poor fit: 1 capability",
+ * "adequate fit: 2 capabilities", or both joined with " · ". "· replacement
+ * planned" is appended once `weakFitAllReplacementPlanned` is true (mirrors
+ * the exposure tone's own "replacement planned" wording, `TONE_LABEL.info`
+ * in `DirectorHome.tsx`, for the same underlying evidence). Never called
+ * with both counts `0` — callers only render the pill when
+ * `weakFitCapabilities` is non-empty.
  */
-export function formatPoorFitPillLabel(poorFitCount: number, allReplacementPlanned: boolean): string {
-  const base = `poor fit: ${String(poorFitCount)} ${poorFitCount === 1 ? 'capability' : 'capabilities'}`;
+export function formatWeakFitPillLabel(poorFitCount: number, adequateFitCount: number, allReplacementPlanned: boolean): string {
+  const part = (rating: string, count: number) => `${rating} fit: ${String(count)} ${count === 1 ? 'capability' : 'capabilities'}`;
+  const base = [poorFitCount > 0 ? part('poor', poorFitCount) : null, adequateFitCount > 0 ? part('adequate', adequateFitCount) : null].filter((p): p is string => p !== null).join(' · ');
   return allReplacementPlanned ? `${base} · replacement planned` : base;
 }
 
-/** The fit pill's own tone — `info` (the same word/colour the exposure tone already uses for "replacement planned") once every poor-fit edge has one, `danger` otherwise. Deliberately its own function, not reused from `fitForPurposeTone.ts`'s `FIT_FOR_PURPOSE_TONE.poor` verbatim, since "replacement planned" is a genuinely calmer state than a still-unaddressed poor rating. */
-export function poorFitPillTone(allReplacementPlanned: boolean): ChipTone {
-  return allReplacementPlanned ? 'info' : 'danger';
+/** The fit pill's own tone — `info` (the same word/colour the exposure tone already uses for "replacement planned") once every weak-fit edge has one; otherwise `danger` while anything is rated poor, and the calmer `warn` when the weakest rating is only adequate. Deliberately its own function, not reused from `fitForPurposeTone.ts` verbatim, since "replacement planned" is a genuinely calmer state than a still-unaddressed rating. */
+export function weakFitPillTone(allReplacementPlanned: boolean, poorFitCount: number): ChipTone {
+  if (allReplacementPlanned) return 'info';
+  return poorFitCount > 0 ? 'danger' : 'warn';
 }

@@ -44,7 +44,7 @@ export function useHomeMode(userId: UUID | null, isOwnerOrArchitect: boolean): U
     getUserPreferences(supabase, userId)
       .then((row) => {
         // Never overwrite a switch the user made while this load was still
-        // in flight — clicking "Capability view" straight after landing used
+        // in flight — clicking "Overview" straight after landing used
         // to be silently undone when the (older) saved value arrived.
         if (!cancelled) setSavedHomeMode((current) => (current === undefined ? (row?.home_mode ?? null) : current));
       })

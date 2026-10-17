@@ -17,6 +17,7 @@ import { commitToBranch } from '../src/db/commits';
 import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
+import { homeSearchResult } from './fixtures/goldenPath';
 
 test('front doors and browse: both doors render for a seeded model, switching persists, search opens an element, table filters, mobile shows the collapsed menu', async ({ page }) => {
   const env = loadEnv();
@@ -125,7 +126,7 @@ test('front doors and browse: both doors render for a seeded model, switching pe
   // Switching to the director door renders the weakness grid (Handoff 7d):
   // the exposed capability's own tile, naming the retiring system that
   // exposes it, plus the "N capabilities exposed" summary chip.
-  await page.getByRole('button', { name: 'Capability view' }).click();
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Billing/ })).toBeVisible();
   await expect(page.getByText('1 capability exposed')).toBeVisible();
@@ -136,12 +137,12 @@ test('front doors and browse: both doors render for a seeded model, switching pe
   // just the in-memory toggle state.
   await page.reload();
   await expect(page.getByRole('link', { name: /Billing/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Capability view' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Overview', exact: true })).toHaveAttribute('aria-pressed', 'true');
 
   // The search box is search-first and opens an existing element rather
   // than creating a duplicate.
   await page.getByPlaceholder('Search or create a capability, system, or actor…').fill('Payment Gateway');
-  await page.getByRole('link', { name: /Payment Gateway/ }).click();
+  await homeSearchResult(page, 'Payment Gateway').click();
   await expect(page.getByRole('heading', { name: 'Payment Gateway' })).toBeVisible();
 
   // The element browse table, reachable from both doors, filters by type.

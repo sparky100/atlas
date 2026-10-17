@@ -119,3 +119,83 @@ describe('computeIntegrationPlatformContextLayout', () => {
     expect(layout.hub.h).toBe(NODE_HEIGHT);
   });
 });
+
+describe('integration platform diagram — room for connectors and labels', () => {
+  const edge = (id: string, sourceId: string, targetId: string) => ({ id, sourceId, targetId, verbLabel: 'sends something to', classificationLabel: null, crossesBoundary: false });
+
+  it('grows the platform tile so the attach points of many flows are not on top of each other', () => {
+    const edges = ['a', 'b', 'c', 'd', 'e', 'f'].map((id, i) => edge(id, `s${String(i % 3)}`, `t${String(i % 5)}`));
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0', 's1', 's2'], ['t0', 't1', 't2', 't3', 't4'], edges);
+    expect(layout.hub.h).toBeGreaterThan(NODE_HEIGHT);
+    const hubAttachYs = [...layout.edges.map((e) => e.sourceSegment[e.sourceSegment.length - 1]?.y ?? 0)].sort((x, y) => x - y);
+    for (let i = 1; i < hubAttachYs.length; i++) expect((hubAttachYs[i] ?? 0) - (hubAttachYs[i - 1] ?? 0)).toBeGreaterThanOrEqual(20);
+  });
+
+  it('lets a source with several flows grow too, and never overlaps two tiles in a column however tall', () => {
+    const edges = [edge('a', 's0', 't0'), edge('b', 's0', 't1'), edge('c', 's0', 't2'), edge('d', 's1', 't0')];
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0', 's1'], ['t0', 't1', 't2'], edges);
+    const [first, second] = layout.sources;
+    expect(first?.h).toBeGreaterThan(NODE_HEIGHT);
+    if (first && second) expect(second.y).toBeGreaterThanOrEqual(first.y + first.h);
+  });
+
+  it('starts each verb label just clear of its source tile, with the whole run to the elbow free beside it', () => {
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0'], ['t0'], [edge('a', 's0', 't0')]);
+    const source = layout.sources[0];
+    const routed = layout.edges[0];
+    if (!source || !routed) throw new Error('expected one source and one edge');
+    expect(routed.verbLabelAnchor.x).toBeGreaterThan(source.x + source.w);
+    // The widest pill (160px text + padding) fits between the tile and the elbow.
+    const elbowX = routed.sourceSegment[1]?.x ?? layout.hub.x;
+    expect(elbowX - routed.verbLabelAnchor.x).toBeGreaterThanOrEqual(160 + 16);
+  });
+});
+
+describe('integration platform diagram — telling the flows apart', () => {
+  const edge = (id: string, sourceId: string, targetId: string) => ({ id, sourceId, targetId, verbLabel: 'sends to', classificationLabel: null, crossesBoundary: false });
+
+  it('numbers every flow from 1, top to bottom by where it leaves its source, each number used once', () => {
+    // Sources s0 (top) and s1 (below); ids chosen so id order disagrees with position order.
+    const edges = [edge('z-flow', 's0', 't1'), edge('a-flow', 's1', 't0'), edge('m-flow', 's0', 't0')];
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0', 's1'], ['t0', 't1'], edges);
+    const numbers = layout.edges.map((e) => e.flowNumber).sort((a, b) => a - b);
+    expect(numbers).toEqual([1, 2, 3]);
+    // Reading the left-hand pills top to bottom gives 1, 2, 3.
+    const byLeavingY = [...layout.edges].sort((a, b) => (a.sourceSegment[0]?.y ?? 0) - (b.sourceSegment[0]?.y ?? 0));
+    expect(byLeavingY.map((e) => e.flowNumber)).toEqual([1, 2, 3]);
+  });
+
+  it('gives a flow the same number on both of its segments by carrying it on the one routed edge', () => {
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0'], ['t0'], [edge('a', 's0', 't0')]);
+    expect(layout.edges).toHaveLength(1);
+    expect(layout.edges[0]?.flowNumber).toBe(1);
+  });
+});
+
+describe('integration platform diagram — grouping flows by interface (ADR-026)', () => {
+  const edge = (id: string, sourceId: string, targetId: string, interfaceId: string | null) => ({ id, sourceId, targetId, verbLabel: 'sends to', classificationLabel: null, crossesBoundary: false, interfaceId });
+
+  it('draws no bands and no header when no flow names an interface', () => {
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0'], ['t0'], [edge('a', 's0', 't0', null)]);
+    expect(layout.interfaceBands).toEqual([]);
+    expect(layout.hubHeaderHeight).toBe(0);
+  });
+
+  it("gives each interface one band holding exactly its flows' attach points on both edges of the platform, with the platform's own flows last", () => {
+    const edges = [edge('a', 's0', 't0', 'api'), edge('b', 's1', 't1', null), edge('c', 's2', 't0', 'api'), edge('d', 's1', 't1', 'file')];
+    const layout = computeIntegrationPlatformContextLayout('hub', ['s0', 's1', 's2'], ['t0', 't1'], edges);
+    expect(layout.interfaceBands.map((b) => b.interfaceId)).toEqual(['api', 'file', null]);
+    expect(layout.hubHeaderHeight).toBeGreaterThan(0);
+    for (const routed of layout.edges) {
+      const band = layout.interfaceBands.find((b) => b.interfaceId === (edges.find((e) => e.id === routed.id)?.interfaceId ?? null));
+      const inY = routed.sourceSegment[routed.sourceSegment.length - 1]?.y ?? 0;
+      const outY = routed.targetSegment[0]?.y ?? 0;
+      expect(band && inY >= band.top && inY <= band.bottom).toBe(true);
+      expect(band && outY >= band.top && outY <= band.bottom).toBe(true);
+    }
+    // Bands never overlap, and sit below the platform's own header.
+    const sorted = [...layout.interfaceBands].sort((x, y) => x.top - y.top);
+    for (let i = 1; i < sorted.length; i++) expect((sorted[i]?.top ?? 0) >= (sorted[i - 1]?.bottom ?? 0) - 0.001).toBe(true);
+    expect((sorted[0]?.top ?? 0) >= layout.hub.y + layout.hubHeaderHeight - 0.001).toBe(true);
+  });
+});

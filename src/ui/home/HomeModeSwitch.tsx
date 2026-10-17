@@ -8,12 +8,13 @@ export interface HomeModeSwitchProps {
 }
 
 /**
- * UI-principles §3.3: "Top bar, right side: `Capability view` /
- * `Application view` segmented control" (relabelled from Director/Architect
- * view on 2026-10-02: the two views are organised around capabilities and
- * around applications, not around who reads them — the stored preference
- * keeps its `director`/`architect` values). Switching is instant, remembered, and never
- * changes what the user is permitted to do." Permission enforcement is
+ * UI-principles §3.3: "Top bar, right side: `Overview` / `My work`
+ * segmented control" — named for the job each view does (a briefing on
+ * the state of the business; a worklist for the state of the model), not
+ * for who reads it (formerly Director/Architect view, then briefly
+ * Capability/Application view — the stored preference keeps its
+ * `director`/`architect` values). "Switching is instant, remembered, and
+ * never changes what the user is permitted to do." Permission enforcement is
  * each door's own data load (an architect-door viewer with no branches
  * just sees an empty "My branches" panel, same RLS-backed emptiness every
  * other view in this product already shows a role-mismatched user) — this
@@ -23,10 +24,10 @@ export function HomeModeSwitch({ homeMode, onChange }: HomeModeSwitchProps) {
   return (
     <div className={styles.switch} role="group" aria-label="Home view">
       <Button variant={homeMode === 'director' ? 'primary' : 'ghost'} onClick={() => { onChange('director'); }} aria-pressed={homeMode === 'director'}>
-        Capability view
+        Overview
       </Button>
       <Button variant={homeMode === 'architect' ? 'primary' : 'ghost'} onClick={() => { onChange('architect'); }} aria-pressed={homeMode === 'architect'}>
-        Application view
+        My work
       </Button>
     </div>
   );

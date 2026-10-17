@@ -47,7 +47,10 @@ test('roadmap grouped by project: the project\'s change lands under the project,
   // Inside the change: retire Legacy CRM, replaced by New CRM Platform.
   await goToModelHome(page);
   await page.getByPlaceholder('Search or create a capability, system, or actor…').fill('Legacy CRM');
-  await page.getByRole('link', { name: 'Legacy CRM' }).click();
+  // Inside the search results: My work's Recent activity can also link
+  // "Legacy CRM" once it has loaded, which made an unscoped click
+  // ambiguous depending on timing.
+  await page.getByRole('list', { name: 'Search results' }).getByRole('link', { name: 'Legacy CRM' }).click();
   await expect(page.getByRole('heading', { name: 'Legacy CRM' })).toBeVisible();
   await retireElement(page, isoDateDaysFromNow(90), 'New CRM Platform');
   await expect(page.getByText(/Replaced by/)).toBeVisible();
@@ -57,7 +60,8 @@ test('roadmap grouped by project: the project\'s change lands under the project,
   await page.getByRole('link', { name: 'Open CRM replacement' }).click();
   await page.getByRole('region', { name: 'Chosen design' }).getByRole('link', { name: 'sunset-legacy-crm' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
-  await expect(page.getByText('proposed', { exact: true })).toBeVisible();
+  // The change and its review request each carry a "proposed" chip once submitted.
+  await expect(page.getByText('proposed', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Approve', exact: true }).click();
   await page.getByRole('button', { name: 'Merge', exact: true }).click();
   await expect(page.getByText('merged', { exact: true }).first()).toBeVisible();
@@ -65,7 +69,7 @@ test('roadmap grouped by project: the project\'s change lands under the project,
   // Roadmap, by project.
   await goToModelHome(page);
   await clickNavItem(page, 'Roadmap');
-  await expect(page.getByRole('heading', { name: 'Roadmap' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Roadmap', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'By project' }).click();
   await expect(page.getByRole('button', { name: 'By project' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page).toHaveURL(/groupBy=project/);

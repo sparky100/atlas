@@ -13,7 +13,7 @@
  * literally reading "Request changes" in the current UI.
  */
 import { expect, test } from '@playwright/test';
-import { acceptInviteViaSignUp, addCapability, addSystemFromHome, goToModelHome, inviteMemberFromHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { acceptInviteViaSignUp, addCapability, addSystemFromHome, goToModelHome, homeSearchResult, inviteMemberFromHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 test('propose a change from an element page, leave and re-enter it, submit; reviewer requests changes, proposer resubmits, reviewer approves and merges; director sees the result', async ({ page, browser }) => {
   // The longest golden path here — two real browser sessions and every
@@ -66,7 +66,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
 
   // 1. Proposer, at main: "Propose a change" instead of "✎ Edit".
   await proposerPage.getByPlaceholder('Search or create a capability, system, or actor…').fill('Ledger Service');
-  await proposerPage.getByRole('link', { name: 'Ledger Service' }).click();
+  await homeSearchResult(proposerPage, 'Ledger Service').click();
   await expect(proposerPage.getByRole('heading', { name: 'Ledger Service' })).toBeVisible();
   await expect(proposerPage.getByRole('button', { name: '✎ Edit' })).toHaveCount(0);
   await proposerPage.getByRole('button', { name: 'Propose a change' }).click();
@@ -192,8 +192,8 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   // Changes item's badge drops it: no count left at all.
   await goToModelHome(page);
   await expect(nav.getByRole('link', { name: 'Changes', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Capability view' }).click();
-  await expect(page.getByRole('button', { name: 'Capability view' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Overview', exact: true })).toHaveAttribute('aria-pressed', 'true');
   // The capability map tile itself never links to a system by name — just
   // its own supporting-system count and a "→ Landscape" zoom link
   // (`CapabilityMapView.tsx`'s own doc comment: "every tile's
@@ -227,7 +227,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   // The merged edit itself, confirmed on main via Home's own search door.
   await goToModelHome(page);
   await page.getByPlaceholder('Search or create a capability, system, or actor…').fill('Ledger Service');
-  await page.getByRole('link', { name: 'Ledger Service' }).click();
+  await homeSearchResult(page, 'Ledger Service').click();
   await expect(page.getByRole('heading', { name: 'Ledger Service' })).toBeVisible();
   await expect(page.getByText('Ridgeline Systems', { exact: true })).toBeVisible();
 

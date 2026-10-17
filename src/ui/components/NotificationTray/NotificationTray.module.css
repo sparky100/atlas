@@ -2,14 +2,16 @@
   position: relative;
 }
 
+/* 40px circle — the shared header pattern's button size (UserMenu.tsx). */
 .toggle {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: var(--row-height);
-  width: var(--row-height);
-  border-radius: var(--radius-sm);
+  height: 40px;
+  width: 40px;
+  padding: 0;
+  border-radius: 50%;
   border: var(--border-width) solid var(--border-strong);
   background: var(--surface);
   color: var(--text);

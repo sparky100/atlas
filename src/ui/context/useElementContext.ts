@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import { projectionContainersForLandscape, projectionElementById, projectionElementsByIds, projectionFlowsViaElement, projectionRelationshipsForElement, projectionRelationshipsTouchingAny } from '../../db/branchProjection';
-import { getElementHead, getElementsByIds, listFlowsViaElement, listRelationshipsForElement } from '../../db/elements';
+import { projectionChildrenOf, projectionContainersForLandscape, projectionElementById, projectionElementsByIds, projectionFlowsViaElement, projectionRelationshipsForElement, projectionRelationshipsTouchingAny } from '../../db/branchProjection';
+import { getElementHead, getElementsByIds, listChildrenOf, listFlowsViaElement, listRelationshipsForElement } from '../../db/elements';
 import type { HeadProjection } from '../../engine/projection';
 import { listContainersForLandscape } from '../../db/landscape';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
@@ -15,7 +15,7 @@ import type { ViewRow } from '../../db/types';
 import { computeContextGroup, computePlatformConnections, type ContextGroup, type PlatformConnection } from './contextGrouping';
 import { buildPlatformModulesById, type ContextModule } from './contextDiagramData';
 import { containerParentIds } from '../elements/moduleDisplayName';
-import { isIntegrationPlatform, isPlatform } from '../elements/systemKind';
+import { flowViaIdsFor, isIntegrationInterface, isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -72,6 +72,8 @@ export interface IntegrationPlatformContextData {
   flows: RelationshipsHeadRow[];
   /** Every flow's own `from`/`to` endpoint, by id, *plus* each container endpoint's own parent (`moduleDisplayNameFromMap`'s own requirement) — never the hub itself, which is only ever the `via`, not an endpoint, of these edges (same as `ElementPageData.flowsViaThisPlatformEndpoints`'s own doc comment). */
   endpoints: Map<UUID, ElementsHeadRow>;
+  /** ADR-026: the platform's interfaces (or, for an interface's own view, just it), by id — the diagram groups flows under the interface their `via` names. */
+  interfaces: Map<UUID, ElementsHeadRow>;
 }
 
 export type ElementContextData = PlatformStructureData | IntegrationPlatformContextData | ElementGroupData;
@@ -150,15 +152,21 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
         }
         commitId = resolvedCommitId;
         projection = null;
-        hub = await getElementHead(supabase, commitId, elementId);
+        // Performance: the hub and its relationships in one round trip, not two.
+        [hub, hubRelationships] = await Promise.all([getElementHead(supabase, commitId, elementId), listRelationshipsForElement(supabase, commitId, elementId)]);
         if (hub?.element_type !== 'system' && hub?.element_type !== 'container') {
           if (!cancelled) setState({ status: 'notPresentAtRef' });
           return;
         }
-        hubRelationships = await listRelationshipsForElement(supabase, commitId, elementId);
       }
 
-      const view = await getOrCreateScopedView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'context', name: `Context: ${hub.name}`, scopeElementId: elementId, createdBy: currentUserId, branchId });
+      // Performance: the saved view (a read, or a one-off insert the first
+      // time) runs alongside everything below rather than ahead of it; each
+      // branch awaits it only when it's ready to render.
+      const viewPromise = getOrCreateScopedView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'context', name: `Context: ${hub.name}`, scopeElementId: elementId, createdBy: currentUserId, branchId });
+      // An unawaited rejection would be reported as unhandled before the
+      // branch below gets to await it; the await itself still throws.
+      viewPromise.catch(() => undefined);
 
       // V3 item 2: a platform with at least one module takes the
       // structure-only branch instead of the ordinary neighbour diagram —
@@ -166,28 +174,33 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
       // needs `hub`'s own neighbours at all (only its own direct edges, for
       // "Platform-level connections").
       if (isPlatform(hub)) {
-        const hubContainers = projection ? projectionContainersForLandscape(projection) : await listContainersForLandscape(supabase, commitId);
+        const ownEdges = hubRelationships.filter((r) => r.relationship_type === 'uses' || r.relationship_type === 'flows_to');
+        const otherIds = [...new Set(ownEdges.flatMap((r) => [r.from_element_id, r.to_element_id]))].filter((id) => id !== elementId);
+        const [hubContainers, otherElementsById] = await Promise.all([
+          projection ? projectionContainersForLandscape(projection) : listContainersForLandscape(supabase, commitId),
+          projection ? projectionElementsByIds(projection, otherIds) : getElementsByIds(supabase, commitId, otherIds),
+        ]);
         const moduleContainers = hubContainers.filter((c) => c.parent_id === elementId);
         if (moduleContainers.length > 0) {
           const moduleIds = moduleContainers.map((c) => c.element_id);
-          const supportsEdges = projection ? projectionRelationshipsTouchingAny(projection, moduleIds, ['supports']) : await listRelationshipsTouchingAny(supabase, commitId, moduleIds, ['supports']);
+          const connectionParentIdsEarly = containerParentIds(otherElementsById.values());
+          const [supportsEdges, connectionParentsById] = await Promise.all([
+            projection ? projectionRelationshipsTouchingAny(projection, moduleIds, ['supports']) : listRelationshipsTouchingAny(supabase, commitId, moduleIds, ['supports']),
+            projection ? projectionElementsByIds(projection, connectionParentIdsEarly) : getElementsByIds(supabase, commitId, connectionParentIdsEarly),
+          ]);
           const capabilityIds = [...new Set(supportsEdges.map((e) => e.to_element_id))];
           const capabilitiesById = projection ? projectionElementsByIds(projection, capabilityIds) : await getElementsByIds(supabase, commitId, capabilityIds);
           const modules = buildPlatformModulesById([hub], hubContainers, supportsEdges, capabilitiesById).get(elementId) ?? [];
 
-          const ownEdges = hubRelationships.filter((r) => r.relationship_type === 'uses' || r.relationship_type === 'flows_to');
-          const otherIds = [...new Set(ownEdges.flatMap((r) => [r.from_element_id, r.to_element_id]))].filter((id) => id !== elementId);
-          const otherElementsById = projection ? projectionElementsByIds(projection, otherIds) : await getElementsByIds(supabase, commitId, otherIds);
           // "Platform · Module": the other end of a genuine platform-level
           // connection is rare but, per this branch's own doc comment, not
           // guaranteed to be a top-level system — it can itself be a module
           // of some *other* platform, which needs that platform's own row
           // resolved here too (`computePlatformConnections`'s own doc
           // comment on `PlatformConnection.otherName`).
-          const connectionParentIds = containerParentIds(otherElementsById.values());
-          const connectionParentsById = projection ? projectionElementsByIds(projection, connectionParentIds) : await getElementsByIds(supabase, commitId, connectionParentIds);
           const connections = computePlatformConnections(hub, ownEdges, new Map([...otherElementsById, ...connectionParentsById]));
 
+          const view = await viewPromise;
           if (!cancelled) setState({ status: 'ready', data: { kind: 'platform-structure', commitId, view, hub, modules, connections, diff } });
           return;
         }
@@ -199,8 +212,22 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
       // `uses`/`flows_to` edge elsewhere in the model naming this element
       // as its `via`, the same query `PlatformFlowsSection`'s own element-
       // page data already runs.
-      if (hub.element_type === 'system' && isIntegrationPlatform(hub)) {
-        const flows = projection ? projectionFlowsViaElement(projection, elementId) : await listFlowsViaElement(supabase, commitId, elementId);
+      // ADR-026: an interface (a container of an integration platform) gets the same view, scoped to its own flows; a platform's view counts flows via any of its interfaces too.
+      // Performance: the hub's own parent (only a container has one) comes
+      // back in the same request as its neighbours — the ordinary diagram
+      // needs both, and the integration check below needs the parent.
+      const otherIds = [...new Set(hubRelationships.flatMap((r) => [r.from_element_id, r.to_element_id]))].filter((id) => id !== elementId);
+      const hubParentId = hub.element_type === 'container' ? hub.parent_id : null;
+      const skipNeighbours = hub.element_type === 'system' && isIntegrationPlatform(hub);
+      const firstBatchIds = [...(skipNeighbours ? [] : otherIds), ...(hubParentId !== null ? [hubParentId] : [])];
+      const firstBatch = projection ? projectionElementsByIds(projection, firstBatchIds) : await getElementsByIds(supabase, commitId, firstBatchIds);
+      const hubParent = hubParentId !== null ? (firstBatch.get(hubParentId) ?? null) : null;
+      if ((hub.element_type === 'system' && isIntegrationPlatform(hub)) || isIntegrationInterface(hub, hubParent)) {
+        const hubChildren = hub.element_type === 'system' ? (projection ? projectionChildrenOf(projection, elementId) : await listChildrenOf(supabase, commitId, elementId)) : [];
+        const viaIds = flowViaIdsFor(hub, hubParent, hubChildren);
+        const interfaces = new Map(hubChildren.filter((c) => c.element_type === 'container').map((c) => [c.element_id, c]));
+        if (hub.element_type === 'container') interfaces.set(hub.element_id, hub);
+        const flows = projection ? projectionFlowsViaElement(projection, viaIds) : await listFlowsViaElement(supabase, commitId, viaIds);
         const endpointIds = [...new Set(flows.flatMap((f) => [f.from_element_id, f.to_element_id]))];
         const rawEndpoints = projection ? projectionElementsByIds(projection, endpointIds) : await getElementsByIds(supabase, commitId, endpointIds);
         // "Platform · Module": a source or target routed via this platform
@@ -212,22 +239,27 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
         const endpointParentIds = containerParentIds(rawEndpoints.values());
         const endpointParentsById = projection ? projectionElementsByIds(projection, endpointParentIds) : await getElementsByIds(supabase, commitId, endpointParentIds);
         const endpoints = new Map([...rawEndpoints, ...endpointParentsById]);
-        if (!cancelled) setState({ status: 'ready', data: { kind: 'integration-platform', commitId, view, hub, flows, endpoints } });
+        const view = await viewPromise;
+        if (!cancelled) setState({ status: 'ready', data: { kind: 'integration-platform', commitId, view, hub, flows, endpoints, interfaces } });
         return;
       }
 
       // Every relationship type (`RELATIONSHIP_TYPES`) is one `computeContextGroup` itself already classifies — no further filtering needed here.
-      const otherIds = [...new Set(hubRelationships.flatMap((r) => [r.from_element_id, r.to_element_id]))].filter((id) => id !== elementId);
-      const neighbourElementsById = projection ? projectionElementsByIds(projection, otherIds) : await getElementsByIds(supabase, commitId, otherIds);
+      const neighbourElementsById = new Map(otherIds.flatMap((id) => {
+        const row = firstBatch.get(id);
+        return row ? [[id, row] as const] : [];
+      }));
       // "Platform · Module" (moduleDisplayName): the hub itself (V3 lets a
       // container be a hub) and any neighbour can be a module of some
       // platform not otherwise loaded here — resolved once, merged into
       // the same map `computeContextGroup`'s own doc comment says it now
       // expects to also carry parents in, not only relationship endpoints.
-      const groupParentIds = containerParentIds([hub, ...neighbourElementsById.values()]);
-      const groupParentsById = projection ? projectionElementsByIds(projection, groupParentIds) : await getElementsByIds(supabase, commitId, groupParentIds);
+      const groupParentIds = containerParentIds([hub, ...neighbourElementsById.values()]).filter((id) => !firstBatch.has(id));
+      const fetchedParentsById = projection ? projectionElementsByIds(projection, groupParentIds) : await getElementsByIds(supabase, commitId, groupParentIds);
+      const groupParentsById = new Map([...fetchedParentsById, ...(hubParent ? [[hubParent.element_id, hubParent] as const] : [])]);
       const group = computeContextGroup(hub, hubRelationships, new Map([...neighbourElementsById, ...groupParentsById]));
 
+      const view = await viewPromise;
       if (!cancelled) setState({ status: 'ready', data: { kind: 'group', commitId, view, group, diff } });
     }
 

@@ -8,8 +8,8 @@
  */
 import type { BranchIntent, BranchRow } from '../../db/types';
 
-/** F0's own four entry points, each with a real default — every branch-creation call site names which one it is. */
-export type IntentEntryPoint = 'elementPage' | 'directorDoor' | 'whatHappened' | 'changesList' | 'homeSearch';
+/** The entry points that create a change, each with a real default — every branch-creation call site names which one it is. (F0's "director door → propose" and "'what happened' → record" left with Overview's change buttons on 2026-10-04 — UI-principles §3; a record is started from the Changes page's own form.) */
+export type IntentEntryPoint = 'elementPage' | 'changesList' | 'homeSearch';
 
 /**
  * F0: "set at creation (defaulting from the entry point: element page →
@@ -25,10 +25,6 @@ export function defaultIntentForEntryPoint(entryPoint: IntentEntryPoint): Branch
   switch (entryPoint) {
     case 'elementPage':
       return 'correct';
-    case 'directorDoor':
-      return 'propose';
-    case 'whatHappened':
-      return 'record';
     case 'homeSearch':
       return 'propose';
     case 'changesList':

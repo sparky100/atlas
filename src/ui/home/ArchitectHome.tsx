@@ -1,3 +1,4 @@
+import { HomeViewLink } from './HomeViewLink';
 import { Fragment } from 'react';
 import { Link } from 'react-router';
 import { Chip } from '../components/Chip/Chip';
@@ -10,15 +11,14 @@ import { Text } from '../components/Text/Text';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { MemberRole } from '../../db/types';
 import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, PlatformFlowEndpoint, UnlabeledVerbRelationship } from '../../db/healthFindings';
-import { formatRelativeTime } from '../time';
+import { formatDate, formatRelativeTime } from '../time';
+import { formatProjectProgress, projectStatusLabel, projectStatusTone } from '../projects/projectModel';
 import { branchStatusTone } from '../changes/branchStatus';
 import {
   decisionPrefillToSearchParams,
-  prefillFromCapabilityNoSupportersFinding,
   prefillFromCriticalExposedFinding,
   prefillFromCriticalSupportEndFinding,
   prefillFromOutgoingDisposition,
-  prefillFromPoorFitCapabilityFinding,
   type DecisionPrefill,
 } from '../decisions/decisionPrefill';
 import { canStartDecision } from '../orgs/useMembership';
@@ -38,6 +38,8 @@ export interface ArchitectHomeProps {
   role: MemberRole | null;
   orgSlug: string;
   modelSlug: string;
+  /** Switches Home to Overview — UI-principles §3's one-home-per-finding rule: capability weakness lives on Overview, so this door links across to it rather than repeating it. */
+  onShowOverview: () => void;
 }
 
 function plural(count: number, singular: string, pluralForm: string): string {
@@ -143,13 +145,14 @@ function resolveCardAction(check: HealthCheck): FindingCardAction | null {
  *    (`gridAssuranceChecks`/`infoAssuranceChecks` below) rather than a
  *    second, parallel layout.
  */
-export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: ArchitectHomeProps) {
+export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShowOverview }: ArchitectHomeProps) {
   const now = new Date();
   // E8 item (4): `null` while Health findings/Recent activity are still
   // loading (or failed) — every array below built from it defaults to
   // empty in that case, and the panels that show them render a muted
   // "Loading…" instead, rather than an empty/misleadingly-clear state.
   const insightsData = insights.status === 'ready' ? insights.data : null;
+  const modelHref = `/o/${orgSlug}/m/${modelSlug}`;
   const elementHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}`;
   // A commit's diff against its own parent (Sprint U4-1 B2) — main's genesis
   // commit has no parent to diff against, so it stays plain text below
@@ -312,47 +315,15 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
       singleItemAction: (item: HealthFindingItem) => ({ href: contextHref(item.id), label: 'View context →' }),
     },
     {
-      // The minimal fit-for-purpose finding: structurally close to
-      // `critical-exposed` above (a real gap, nothing lined up to replace
-      // it, the same "Start a decision" action) but not gated on
-      // `criticality: 'critical'`, so it stays medium rather than high — a
-      // judgment call, not named in the agreed severity tiers (this check
-      // didn't exist when those were agreed).
-      key: 'poor-fit-no-replacement',
-      count: insightsData.capabilitiesWithPoorFitPrimarySupporter.length,
-      summary: `${String(insightsData.capabilitiesWithPoorFitPrimarySupporter.length)} ${plural(insightsData.capabilitiesWithPoorFitPrimarySupporter.length, 'capability', 'capabilities')} whose supporter is rated a poor or adequate fit, with no planned replacement`,
-      items: elementItems(insightsData.capabilitiesWithPoorFitPrimarySupporter.map((r) => r.capability)),
-      // No `browseHref` — this filter has no browse-table home (same as
-      // before this redesign, `itemAction`'s own predecessor never had one
-      // either); a multi-item finding here gets no card action at all,
-      // only the single-item "Start a decision" case below.
+      // ADR-026: the interface-level twin of the finding above.
+      key: 'unused-integration-interface',
+      count: insightsData.unusedIntegrationInterfaces.length,
+      summary: `${String(insightsData.unusedIntegrationInterfaces.length)} integration ${plural(insightsData.unusedIntegrationInterfaces.length, 'interface', 'interfaces')} with nothing flowing via ${plural(insightsData.unusedIntegrationInterfaces.length, 'it', 'them')}`,
+      items: elementItems(insightsData.unusedIntegrationInterfaces),
       severity: 'medium',
-      ...(canStartDecision(role)
-        ? {
-            singleItemAction: (item: HealthFindingItem) =>
-              startDecisionAction(
-                prefillFromPoorFitCapabilityFinding({ id: item.id, name: item.label }, insightsData.capabilitiesWithPoorFitPrimarySupporter.find((r) => r.capability.element_id === item.id)?.usedSecondaryFallback ?? false),
-              ),
-          }
-        : {}),
+      browseHref: browseHref('unused-integration-interface'),
+      singleItemAction: (item: HealthFindingItem) => ({ href: contextHref(item.id), label: 'View context →' }),
     },
-    {
-      // The architect door's third decision-shaped finding
-      // (per-item-actions prompt): a level-1 capability with nothing
-      // recorded at all — the same classification the director door's own
-      // weak-capability grid already flags (`findCapabilitiesWithNoSupporters`'s
-      // own doc comment). Medium, not high, for the same reason
-      // `poor-fit-no-replacement` above is medium: a real gap, but not tied
-      // to an explicit `criticality: 'critical'` attribute the way
-      // `critical-exposed`/`critical-support-end` are.
-      key: 'capability-no-supporters',
-      count: insightsData.capabilitiesWithNoSupporters.length,
-      summary: `${String(insightsData.capabilitiesWithNoSupporters.length)} ${plural(insightsData.capabilitiesWithNoSupporters.length, 'capability', 'capabilities')} with no known supporters`,
-      items: elementItems(insightsData.capabilitiesWithNoSupporters),
-      severity: 'medium',
-      browseHref: browseHref('capability-no-supporters'),
-      ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromCapabilityNoSupportersFinding({ id: item.id, name: item.label })) } : {}),
-        },
     {
       // F11: a recorded Migrate/Eliminate with no open change retiring it.
       // Each item names the open project already scoped to it, and its one
@@ -641,6 +612,69 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
             )}
           </Panel>
 
+          {/* UI-principles §3 (2026-10-04, step 3): what's waiting on this
+              user as an owner — their open decisions (overdue first) and
+              the projects they're accountable for. In the main column,
+              straight after the review queue, so a phone (where the side
+              column stacks last) reaches them before the health findings. */}
+          <Panel>
+            <Text as="h2" size="xl" className={styles.sectionTitle}>
+              My decisions
+            </Text>
+            {data.myOwnedWork.decisions.length === 0 ? (
+              <EmptyState>No open decisions of yours.</EmptyState>
+            ) : (
+              <ul className={styles.branchList} aria-label="My decisions">
+                {data.myOwnedWork.decisions.map(({ decision, overdue, projectTitle }) => (
+                  <li key={decision.id} className={styles.ownedRow}>
+                    <div className={styles.branchRow}>
+                      <Link to={`${modelHref}/decisions/${decision.id}`}>
+                        <Text as="span" size="sm">
+                          {decision.title}
+                        </Text>
+                      </Link>
+                      {overdue && <Chip tone="warn">overdue</Chip>}
+                    </div>
+                    {(decision.needed_by !== null || projectTitle !== null) && (
+                      <Text as="p" tone="muted" size="xs">
+                        {[decision.needed_by !== null ? `needed by ${formatDate(decision.needed_by)}` : null, projectTitle !== null ? `in ${projectTitle}` : null].filter((part): part is string => part !== null).join(' · ')}
+                      </Text>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <Panel>
+            <Text as="h2" size="xl" className={styles.sectionTitle}>
+              My projects
+            </Text>
+            {data.myOwnedWork.projects.length === 0 ? (
+              <EmptyState>No projects of yours in hand.</EmptyState>
+            ) : (
+              <ul className={styles.branchList} aria-label="My projects">
+                {data.myOwnedWork.projects.map(({ project, progress, overdueDecisions }) => (
+                  <li key={project.id} className={styles.ownedRow}>
+                    <div className={styles.branchRow}>
+                      <Link to={`${modelHref}/projects/${project.id}`}>
+                        <Text as="span" size="sm">
+                          {project.title}
+                        </Text>
+                      </Link>
+                      {project.status !== 'active' && <Chip tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status)}</Chip>}
+                      {overdueDecisions > 0 && <Chip tone="warn">{`${String(overdueDecisions)} ${overdueDecisions === 1 ? 'decision' : 'decisions'} overdue`}</Chip>}
+                    </div>
+                    <Text as="p" tone="muted" size="xs">
+                      {project.target_date !== null ? `target ${formatDate(project.target_date)} · ` : ''}
+                      {formatProjectProgress(progress)}
+                    </Text>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
           <Panel data-testid="health-findings-panel">
             <Text as="h2" size="xl" className={styles.sectionTitle}>
               Health findings
@@ -653,6 +687,8 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug }: Arch
                 View boundary crossings →
               </Text>
             </Link>
+            {/* UI-principles §3: where capabilities are weak is Overview's to show, not repeated here. */}
+            <HomeViewLink onClick={onShowOverview}>Where capabilities are weak is on Overview →</HomeViewLink>
 
             {/* E8 item (4): Health findings load after first paint
                 (`useArchitectHomeInsights.ts`) — everything below reads

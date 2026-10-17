@@ -13,6 +13,7 @@
  */
 import { assertRealId } from './assertRealId';
 import type { Client } from './client';
+import { selectAll } from './selectAll';
 import type { DecisionArgumentRow, DecisionLinkedType, DecisionLinkRow, DecisionRow } from './types';
 import type { UUID } from '../contracts/delta';
 
@@ -98,6 +99,42 @@ export async function listDecisionArgumentsForDecision(supabase: Client, decisio
   const { data, error } = await supabase.from('decision_arguments').select('*').eq('decision_id', decisionId).order('created_at', { ascending: true });
   if (error) throw new Error(`listDecisionArgumentsForDecision: ${error.message}`);
   return data as DecisionArgumentRow[];
+}
+
+/** One element an open decision names as something it concerns (`decision_links.linked_type = 'element'`). */
+export interface OpenDecisionElementLink {
+  decisionId: UUID;
+  elementId: UUID;
+}
+
+/**
+ * Every element link of the model's still-open (`proposed`) decisions,
+ * through one inner embed on `decisions.model_id` — no id list (CLAUDE.md
+ * rule 8), the same shape as `listOpenProjectScopeForModel`
+ * (`healthFindings.ts`). Overview's weak tiles read it to say which open
+ * decision is already addressing a capability (UI-principles §3,
+ * 2026-10-04).
+ */
+export async function listOpenDecisionElementLinksForModel(supabase: Client, modelId: UUID): Promise<OpenDecisionElementLink[]> {
+  assertRealId('listOpenDecisionElementLinksForModel', 'model_id', modelId);
+  interface EmbeddedDecision { id: UUID; status: string }
+  // A many-to-one embed returns one object at runtime; postgrest-js's
+  // inference types it as an array, so accept either.
+  const rows = await selectAll<{ decision_id: UUID; linked_id: UUID; decisions: EmbeddedDecision | EmbeddedDecision[] }>(
+    supabase
+      .from('decision_links')
+      .select('decision_id, linked_id, linked_type, decisions!inner(id, status, model_id)', { count: 'exact' })
+      .eq('linked_type', 'element')
+      .eq('decisions.model_id', modelId)
+      .eq('decisions.status', 'proposed')
+      .order('decision_id')
+      .order('linked_id'),
+  );
+  return rows.flatMap((r) => {
+    const decision = Array.isArray(r.decisions) ? r.decisions[0] : r.decisions;
+    if (decision?.status !== 'proposed') return [];
+    return [{ decisionId: r.decision_id, elementId: r.linked_id }];
+  });
 }
 
 /**

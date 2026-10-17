@@ -224,3 +224,15 @@ export async function discardCaptureJob(supabase: Client, jobId: UUID): Promise<
   const { error } = await supabase.schema('atlas').rpc('discard_capture_job', { p_job_id: jobId });
   if (error) throw new Error(`discardCaptureJob: ${error.message}`);
 }
+
+/**
+ * §3.2/§8.2 (amended): closes a `parsed` job as `reviewed` without a
+ * target change or a commit, via `atlas.finish_capture_review` — legal
+ * only once every candidate is decided and every one not yet promoted is
+ * `rejected` (the state in which `apply_capture_decisions` would write no
+ * deltas at all). Archives the draft branch, same as apply's own step 5.
+ */
+export async function finishCaptureReview(supabase: Client, jobId: UUID): Promise<void> {
+  const { error } = await supabase.schema('atlas').rpc('finish_capture_review', { p_job_id: jobId });
+  if (error) throw new Error(`finishCaptureReview: ${error.message}`);
+}

@@ -29,6 +29,7 @@ import type {
   ContainerAttributes,
   ElementType,
   Importance,
+  InterfaceType,
   SystemAttributes,
   ValueStreamAttributes,
 } from './delta';
@@ -261,6 +262,19 @@ const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
   'domain',
 ];
 
+/** ADR-026: what an integration platform's interface is. */
+export const INTERFACE_TYPE_LEVELS = [
+  { key: 'api', label: 'API' },
+  { key: 'file', label: 'File' },
+  { key: 'event', label: 'Event (topic or queue)' },
+  { key: 'batch', label: 'Batch job' },
+  { key: 'database', label: 'Database (view or replication)' },
+  { key: 'ot_gateway', label: 'OT gateway' },
+  { key: 'other', label: 'Other' },
+] as const satisfies readonly { key: InterfaceType; label: string }[];
+export const INTERFACE_TYPE_OPTIONS = INTERFACE_TYPE_LEVELS.map((level) => level.key) as readonly InterfaceType[];
+export const INTERFACE_TYPE_LABELS: Readonly<Record<InterfaceType, string>> = Object.fromEntries(INTERFACE_TYPE_LEVELS.map((level) => [level.key, level.label])) as Readonly<Record<InterfaceType, string>>;
+
 const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   technology: { label: 'Technology', required: false, kind: 'text' },
   description: { label: 'Description', required: false, kind: 'text', multiline: true },
@@ -290,6 +304,9 @@ const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   // module inheritance set above (see ContainerAttributes.version's own
   // doc comment, delta.ts).
   version: { label: 'Version', required: false, kind: 'text' },
+  // ADR-026: only an interface (a container of an integration platform) uses these; hidden when empty so an ordinary module never shows them.
+  interfaceType: { label: 'Interface type', required: false, kind: 'enum', options: INTERFACE_TYPE_OPTIONS, optionLabels: INTERFACE_TYPE_LABELS, hideWhenEmpty: true },
+  transformation: { label: 'Transformation', required: false, kind: 'text', multiline: true, hideWhenEmpty: true },
 };
 const CONTAINER_ORDER: (keyof ContainerAttributes)[] = [
   'technology',
@@ -305,6 +322,8 @@ const CONTAINER_ORDER: (keyof ContainerAttributes)[] = [
   'hostingModel',
   'hostingProvider',
   'domain',
+  'interfaceType',
+  'transformation',
 ];
 
 // S1 item 11a: 'organisation' — a third-party entity (a regulator, a

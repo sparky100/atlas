@@ -127,7 +127,7 @@ describe('buildProjectPackMarkdown (F13 step 2)', () => {
   it('notes the gap between declared scope and what the changes touch', () => {
     const md = buildProjectPackMarkdown(input({ touchedNotDeclared: ['Billing'], declaredNotTouched: ['Customer management'] }));
     expect(md).toContain("**Touched by the project's changes but not in the declared scope:** Billing");
-    expect(md).toContain('**In the declared scope but not touched by any change yet:** Customer management');
+    expect(md).toContain('**In the declared scope but not touched or affected by any change yet:** Customer management');
   });
 
   it('nests each decision ADR under the decision log, and lists constraining decisions', () => {
@@ -155,9 +155,11 @@ describe('buildProjectPackMarkdown (F13 step 2)', () => {
                 {
                   capability: { element_id: 'cap', element_type: 'capability', name: 'Customer management', parent_id: null, attributes: {}, exists_delta_id: 'dc' },
                   viaSystems: [{ element_id: 'e1', element_type: 'system', name: 'New CRM', parent_id: null, attributes: {}, exists_delta_id: 'x' }],
+                  reasons: [{ kind: 'edited', systemName: 'New CRM' }],
                 },
               ],
               affectedValueStreams: [],
+              projectScopeIds: null,
             },
           },
         ],
@@ -166,7 +168,7 @@ describe('buildProjectPackMarkdown (F13 step 2)', () => {
     expect(md).toContain('### Proposing: Bring in the new CRM');
     expect(md).toContain('**Stage:** Chosen design · **Status:** draft · **Target date:** 2027-01-31');
     expect(md).toContain('Created New CRM');
-    expect(md).toContain('- Customer management (via New CRM)');
+    expect(md).toContain('- Customer management (New CRM edited)');
     expect(md).toContain('- **New CRM** — Created — "New CRM"');
   });
 
@@ -174,7 +176,7 @@ describe('buildProjectPackMarkdown (F13 step 2)', () => {
     const md = buildProjectPackMarkdown(
       input({
         changes: [
-          { branch: branch(), summary: { description: 'No changes yet', subjects: [], affectedCapabilities: [], affectedValueStreams: [] } },
+          { branch: branch(), summary: { description: 'No changes yet', subjects: [], affectedCapabilities: [], affectedValueStreams: [], projectScopeIds: null } },
           { branch: branch({ id: 'b2', title: 'Other' }), summary: null },
         ],
       }),

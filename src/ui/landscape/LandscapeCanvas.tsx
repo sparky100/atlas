@@ -5,16 +5,16 @@ import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows
 import type { UUID } from '../../contracts/delta';
 import type { LandscapeColourByMode } from '../../contracts/userPreferences';
 import type { ChipTone } from '../components/Chip/Chip';
-import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff, VersionDiffState } from '../../engine/versionDiff';
+import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff } from '../../engine/versionDiff';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { isIntegrationPlatform } from '../elements/systemKind';
 import { BOUNDARY_MARGIN, computeLandscapeChannels, laneAt, laneLabelLeftInset, NODE_HEIGHT, NODE_WIDTH, REFERENCE_CHIP_HEIGHT, REFERENCE_CHIP_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
 import { landscapeTileColourFor } from './landscapeColour';
 import { quantizeScale, wheelZoomFactor } from './zoom';
+import { DIFF_MARKER, diffBorderColour, polylineMidpoint } from '../components/DiffBadge/diffCanvas';
 import styles from './LandscapeCanvas.module.css';
 
-const DIFF_MARKER: Record<VersionDiffState, string> = { unchanged: '', added: '+', removed: '−', changed: '~', moved: '⤴' };
 
 export interface LandscapeCanvasProps {
   layout: LandscapeLayout;
@@ -75,6 +75,12 @@ export interface LandscapeCanvasProps {
    * (`visibleEdges`), regardless of `showConnections`.
    */
   focusedElementId?: UUID | null | undefined;
+  /**
+   * "Find on this landscape" (`LandscapeFind.tsx`): bring this tile to the centre of the view, zoomed to at least 100%. A new object each time (not just a new id), so finding the same tile again after panning away re-centres it. Pure view state like the pan/zoom itself — never persisted.
+   */
+  centreOn?: { elementId: UUID } | null | undefined;
+  /** ADR-026: each interface mapped to its integration platform, so a flow `via` an interface routes through, and lights up with, the platform's tile. */
+  platformIdByInterfaceId?: ReadonlyMap<UUID, UUID> | undefined;
   /** A different tile was clicked while nothing (or someone else) was focused — see `handlePointerUp`'s own click-focus-vs-navigate precedence comment for exactly when this fires instead of a real navigation. */
   onFocusElement?: (elementId: UUID) => void;
   /** Escape, or a click on empty canvas background — decision 2's own "background click clears focus, same as Escape." */
@@ -167,14 +173,6 @@ function statusColourFor(tone: ChipTone, tokens: CanvasTokens): string {
   }
 }
 
-/** The node's own diff border colour (§6.3's colour token column) — `null` for `unchanged`, which uses the same neutral border every non-diff render already draws. */
-function diffBorderColour(state: VersionDiffState, tokens: CanvasTokens): string | null {
-  if (state === 'added') return tokens.diffAdded;
-  if (state === 'removed') return tokens.diffRemoved;
-  if (state === 'changed' || state === 'moved') return tokens.diffChanged;
-  return null;
-}
-
 /** §6.3's "hatched, 50% opacity" removed-node fill — a small diagonal-stripe pattern, tiled. */
 function createHatchPattern(ctx: CanvasRenderingContext2D, colour: string): CanvasPattern | null {
   const tile = document.createElement('canvas');
@@ -234,31 +232,6 @@ function visibleWorldRect(transform: Transform, displayWidth: number, displayHei
 
 function rectIntersects(rect: WorldRect, x: number, y: number, w: number, h: number): boolean {
   return x + w >= rect.left && x <= rect.right && y + h >= rect.top && y <= rect.bottom;
-}
-
-/** The point halfway along a routed edge's own total length — item 9's routed (possibly multi-segment) paths need this instead of a plain from/to average so a diff marker sits on the line it's marking, not floating off to one side of a detour. */
-function polylineMidpoint(points: readonly { x: number; y: number }[]): { x: number; y: number } {
-  const first = points[0];
-  if (!first || points.length === 1) return first ?? { x: 0, y: 0 };
-
-  const segments: { a: { x: number; y: number }; b: { x: number; y: number }; length: number }[] = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i];
-    const b = points[i + 1];
-    if (!a || !b) continue;
-    segments.push({ a, b, length: Math.hypot(b.x - a.x, b.y - a.y) });
-  }
-
-  const total = segments.reduce((sum, s) => sum + s.length, 0);
-  let remaining = total / 2;
-  for (const [i, segment] of segments.entries()) {
-    if (remaining <= segment.length || i === segments.length - 1) {
-      const t = segment.length === 0 ? 0 : remaining / segment.length;
-      return { x: segment.a.x + (segment.b.x - segment.a.x) * t, y: segment.a.y + (segment.b.y - segment.a.y) * t };
-    }
-    remaining -= segment.length;
-  }
-  return first;
 }
 
 /** Fit-to-view (item 1): the scale/offset pair that fits the diagram's own world bounds inside a `displayWidth`×`displayHeight` viewport, centred, clamped to `[MIN_SCALE, MAX_SCALE]` — never past `1` even when the diagram is small enough to zoom in past it, since "fit" means "see the whole thing," not "fill the screen." */
@@ -348,6 +321,8 @@ export function LandscapeCanvas({
   colourBy = 'none',
   routeViaPlatforms = false,
   focusedElementId = null,
+  centreOn = null,
+  platformIdByInterfaceId,
   onFocusElement,
   onClearFocus,
   showConnections = false,
@@ -380,7 +355,9 @@ export function LandscapeCanvas({
   // never match the ordinary "touches the focused element" test below.
   const focusedSystem = focusedElementId != null ? systemsById.get(focusedElementId) : undefined;
   const focusedIsIntegrationPlatform = routeViaPlatforms && focusedSystem !== undefined && isIntegrationPlatform(focusedSystem);
-  const isViaFlowThroughFocus = useCallback((edge: RelationshipsHeadRow): boolean => focusedIsIntegrationPlatform && attributesRecord(edge.attributes).via === focusedElementId, [focusedIsIntegrationPlatform, focusedElementId]);
+  // ADR-026: a flow can name one of the platform's interfaces rather than the platform; on the landscape both read as the platform.
+  const viaPlatformOf = useCallback((via: unknown): string | undefined => (typeof via === 'string' ? (platformIdByInterfaceId?.get(via) ?? via) : undefined), [platformIdByInterfaceId]);
+  const isViaFlowThroughFocus = useCallback((edge: RelationshipsHeadRow): boolean => focusedIsIntegrationPlatform && viaPlatformOf(attributesRecord(edge.attributes).via) === focusedElementId, [focusedIsIntegrationPlatform, focusedElementId, viaPlatformOf]);
 
   // V2 "landscape focus and filters": "edges hidden by default; 'Show
   // connections' toggle" — off (and no focus active) means no edge draws
@@ -473,7 +450,7 @@ export function LandscapeCanvas({
       // to the platform-chip redirection below: routing "via" a platform
       // is the one case that's supposed to visibly enter it.
       const via = attributesRecord(edge.attributes).via;
-      const viaPosition = viaPositionFor(typeof via === 'string' ? via : undefined, positionById, routeViaPlatforms);
+      const viaPosition = viaPositionFor(viaPlatformOf(via), positionById, routeViaPlatforms);
       if (viaPosition) {
         const obstaclesToVia = allPositions.filter((n) => n.elementId !== edge.from_element_id && n.elementId !== viaPosition.elementId);
         const obstaclesFromVia = allPositions.filter((n) => n.elementId !== viaPosition.elementId && n.elementId !== edge.to_element_id);
@@ -488,7 +465,7 @@ export function LandscapeCanvas({
       segments.push({ edge, points: routeLandscapeEdge(fromChip ?? from, toChip ?? to, obstacles, channels, layout.lanes) });
     }
     return { segments, platformEdgeChips: [...platformChipsByElementId.values()] };
-  }, [layout, visibleEdges, routeViaPlatforms, focusedElementId, systemsById]);
+  }, [layout, visibleEdges, routeViaPlatforms, focusedElementId, systemsById, viaPlatformOf]);
 
   const fitToView = useCallback(() => {
     const wrapper = wrapperRef.current;
@@ -506,6 +483,19 @@ export function LandscapeCanvas({
     // only ever alongside `layout` itself changing anyway.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout]);
+
+  useEffect(() => {
+    if (centreOn === null) return;
+    const wrapper = wrapperRef.current;
+    const position = layout.nodes.find((n) => n.elementId === centreOn.elementId) ?? layout.actorNodes.find((n) => n.elementId === centreOn.elementId);
+    if (!wrapper || !position) return;
+    setTransform((current) => {
+      const scale = Math.min(MAX_SCALE, Math.max(1, current.scale));
+      return { scale, tx: wrapper.clientWidth / 2 - (position.x + NODE_WIDTH / 2) * scale, ty: wrapper.clientHeight / 2 - (position.y + NODE_HEIGHT / 2) * scale };
+    });
+    // Only a new request moves the view; a re-layout alone must not yank it back to a tile the user has since panned away from.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centreOn]);
 
   const nodeAt = useCallback(
     (screenX: number, screenY: number): { elementId: UUID; elementType: 'system' | 'actor' } | null => {

@@ -33,7 +33,7 @@ export interface DecisionPrefill {
    * F6.1 ("make capability fit-for-purpose visible to directors"):
    * widened from a single element to a non-empty array — every prefill
    * still names at least one concern, but the director door's own
-   * "poor fit" pill (`prefillFromPoorFitCapabilities` below) needs to
+   * "poor fit" pill (`prefillFromWeakFitCapabilities` below) needs to
    * link every individual poor-fit capability under a tile, not just the
    * tile's own level-1 capability. Backward compatible: every existing
    * `prefillFrom*` function still wraps a single element in a one-item
@@ -65,34 +65,12 @@ export function prefillFromWeakCapability(capability: { id: UUID; name: string }
 }
 
 /**
- * `findCapabilitiesWithPoorFitPrimarySupporter`'s own finding
- * (`ArchitectHome.tsx`'s `poor-fit-no-replacement` check) — a third "Start
- * a decision" trigger alongside `critical-support-end` above and the
- * director door's weak-capability tile.
- *
- * `usedSecondaryFallback` (that finding's own `CapabilityWithPoorFitSupporter`
- * field) says "supporter" rather than "primary supporter" — accurate for a
- * capability flagged via `fitAssessmentSupportsEdges`'s secondary-edge
- * fallback (no live primary edge at all), never assuming primary just
- * because most flagged capabilities still have one.
- */
-export function prefillFromPoorFitCapabilityFinding(capability: { id: UUID; name: string }, usedSecondaryFallback: boolean): DecisionPrefill {
-  const supporterWord = usedSecondaryFallback ? 'supporter' : 'primary supporter';
-  return {
-    title: `What replaces ${capability.name}'s ${supporterWord}?`,
-    statement: `${capability.name}'s ${supporterWord} is rated a poor or adequate fit, with no planned replacement — a decision is needed on what to do about it.`,
-    sourceFindingKey: 'poor-fit-no-replacement',
-    linkedElements: [{ id: capability.id, name: capability.name }],
-  };
-}
-
-/**
  * F6.1: the director door's own "poor fit" pill (`DirectorHome.tsx`) —
  * distinct from `prefillFromPoorFitCapabilityFinding` above (the Architect
  * door's own finding: primary supporters only, `poor` or `adequate`, one
  * capability at a time). This one names every individual capability in a
  * level-1 tile's own subtree whose `worstFitForPurpose` is `poor` across
- * *any* supports edge (`CapabilityTileData.poorFitCapabilities`,
+ * *any* supports edge (`CapabilityTileData.weakFitCapabilities`,
  * `src/db/modelHome.ts`) — never the level-1 tile itself, and never
  * folded together with the Architect finding's own, separate check.
  * `tileCapabilityName` names the level-1 tile the pill lives on, for the
@@ -100,12 +78,12 @@ export function prefillFromPoorFitCapabilityFinding(capability: { id: UUID; name
  * appears in `capabilities`. Requires at least one capability; an empty
  * list is a caller bug (nothing to start a decision about).
  */
-export function prefillFromPoorFitCapabilities(tileCapabilityName: string, capabilities: readonly { id: UUID; name: string }[]): DecisionPrefill {
+export function prefillFromWeakFitCapabilities(tileCapabilityName: string, capabilities: readonly { id: UUID; name: string }[]): DecisionPrefill {
   const names = capabilities.map((c) => c.name).join(', ');
   const isPlural = capabilities.length !== 1;
   return {
     title: `What improves fit under ${tileCapabilityName}?`,
-    statement: `${isPlural ? `${String(capabilities.length)} capabilities under ${tileCapabilityName}` : `${names}, under ${tileCapabilityName},`} rated a poor fit${isPlural ? ` (${names})` : ''} — a decision is needed on how to improve ${isPlural ? 'them' : 'it'}.`,
+    statement: `${isPlural ? `${String(capabilities.length)} capabilities under ${tileCapabilityName}` : `${names}, under ${tileCapabilityName},`} rated a poor or adequate fit${isPlural ? ` (${names})` : ''} — a decision is needed on how to improve ${isPlural ? 'them' : 'it'}.`,
     sourceFindingKey: 'poor-fit-director',
     linkedElements: capabilities.map((c) => ({ id: c.id, name: c.name })),
   };
@@ -121,7 +99,7 @@ export function prefillFromCriticalExposedFinding(system: { id: UUID; name: stri
   };
 }
 
-/** `findCapabilitiesWithNoSupporters`'s own finding (`ArchitectHome.tsx`'s `capability-no-supporters` check) — the third of the architect door's three named decision-shaped findings. */
+/** `findCapabilitiesWithNoSupporters`'s own finding — read from Overview's "nothing recorded" tile (`DirectorHome.tsx`, its one home since 2026-10-03, UI-principles §3) and the Elements browse table's `capability-no-supporters` filter. */
 export function prefillFromCapabilityNoSupportersFinding(capability: { id: UUID; name: string }): DecisionPrefill {
   return {
     title: `Who supports ${capability.name}?`,

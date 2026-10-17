@@ -12,9 +12,10 @@
  */
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow, DeltaRow } from '../contracts/rows';
 import type { Json, UUID } from '../contracts/delta';
+import { sharedElements, touchedElementsByBranch, type DeltaTouchRow } from '../engine/changeOverlap';
 import { attributesRecord } from '../ui/elements/attributesRecord';
 import type { Client } from './client';
-import { assertInFilterSize } from './inFilterLimit';
+import { assertInFilterSize, MAX_IN_FILTER_VALUES } from './inFilterLimit';
 import { selectAll } from './selectAll';
 import type { AliasRow, BranchRow, SourceRow } from './types';
 
@@ -85,51 +86,82 @@ export async function listRelationshipsForElement(supabase: Client, commitId: UU
 /**
  * Every `uses`/`flows_to` edge whose `via` names `platformElementId` —
  * Prompt 7k item 4's "Flows via this platform" element-page section.
- * `attributes ->> 'via'` can't be pushed into a `.eq()` alongside the
- * `relationship_type` filter without a raw-jsonb postgrest operator this
- * codebase has no other precedent for, so this queries the commit's whole
- * `uses`/`flows_to` scope (bounded by the model, not by how many flows
- * happen to have a `via` — CLAUDE.md rule 8's own reference shape) and
- * filters to `via` client-side, the same "query the scope once" pattern
- * `listRelationshipsForElement` above already gives a real precedent for.
+ * The `via` filter runs in Postgres (`attributes->>via`, postgrest's JSON
+ * path operator) when `viaIds` is within rule 8's ceiling — always, in
+ * practice (a platform plus its interfaces); a longer list reads the
+ * commit's whole `uses`/`flows_to` scope and filters client-side.
  */
-export async function listFlowsViaElement(supabase: Client, commitId: UUID, platformElementId: UUID): Promise<RelationshipsHeadRow[]> {
-  const query = supabase
-    .from('relationships_head')
-    .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
-    .eq('commit_id', commitId)
-    .in('relationship_type', ['uses', 'flows_to'])
-    .order('relationship_id');
-  const rows = await selectAll<RelationshipsHeadRow>(query);
-  return rows.filter((row) => attributesRecord(row.attributes).via === platformElementId);
+export async function listFlowsViaElement(supabase: Client, commitId: UUID, viaIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
+  if (viaIds.length === 0) return [];
+  // Performance: a platform plus its interfaces is a short list, so the
+  // `via` filter runs in Postgres (`attributes->>via`); only a list over
+  // rule 8's ceiling reads the whole uses/flows_to scope.
+  const rows = await selectAll<RelationshipsHeadRow>(
+    viaIds.length <= MAX_IN_FILTER_VALUES
+      ? supabase.from('relationships_head').select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).in('relationship_type', ['uses', 'flows_to']).in('attributes->>via', inFilterValues('listFlowsViaElement', 'attributes->>via', viaIds)).order('relationship_id')
+      : supabase.from('relationships_head').select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).in('relationship_type', ['uses', 'flows_to']).order('relationship_id'),
+  );
+  // ADR-026: `viaIds` is a platform plus its interfaces (a platform's own page and Context view), or one interface alone.
+  const wanted = new Set(viaIds);
+  return rows.filter((row) => {
+    const via = attributesRecord(row.attributes).via;
+    return typeof via === 'string' && wanted.has(via);
+  });
+}
+
+/** `values`, after `assertInFilterSize` has checked it — so the guard sits inside the `.in()` call it protects. */
+function inFilterValues(context: string, column: string, values: readonly UUID[]): readonly UUID[] {
+  assertInFilterSize(context, column, values);
+  return values;
 }
 
 /**
  * Batch lookup so a page with N badges makes one query, not N (§4.9's paint
- * budget). Used to put `elementIds` straight into `.in('element_id', ...)`,
- * guarded by `assertInFilterSize` — real, live 400 on dev, 2026-09-10: the
- * architect door's own health-findings/duplicates rollup calls this with
- * every capability in the model, and a starter-map-seeded model clears 50
- * on its own (an NHS import alone is 73). CLAUDE.md rule 8's own fix for
- * exactly this shape (a caller-supplied id list that grows with the model,
- * not a small fixed enum): query the commit scope alone —
- * `.eq('commit_id', commitId)`, no `.in()` at all — and filter to
- * `elementIds` client-side, the same rewrite `src/db/landscape.ts`'s
- * `listLandscapeEdges`/`listSupportsEdgesForSystems` already did for the
- * identical reason (their own comments cite the same rule). Still routed
- * through `selectAll` (SPEC §6.7, and this module's own enforcement test,
- * `headTableReads.test.ts`) since the *unfiltered* commit scope is exactly
- * the kind of read that can now genuinely page.
+ * budget). Rule 8 (CLAUDE.md): up to 50 ids go straight into
+ * `.in('element_id', ...)`; a longer list — the architect door's
+ * health-findings rollup passes every capability, 73 for an NHS import —
+ * queries the commit scope alone and filters client-side, the shape
+ * `src/db/landscape.ts`'s `listLandscapeEdges`/`listSupportsEdgesForSystems`
+ * use. Both routed through `selectAll` (SPEC §6.7, `headTableReads.test.ts`).
  */
 export async function getElementsByIds(supabase: Client, commitId: UUID, elementIds: readonly UUID[]): Promise<Map<UUID, ElementsHeadRow>> {
   if (elementIds.length === 0) return new Map();
-  const wanted = new Set(elementIds);
-  const query = supabase.from('elements_head').select(ELEMENTS_HEAD_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).order('element_id');
-  const rows = await selectAll<ElementsHeadRow>(query);
+  const wanted = [...new Set(elementIds)];
+  // Performance (element/Context page load): a short id list — the usual
+  // case, a page's own neighbours or parents — asks for just those rows,
+  // under rule 8's 50-value ceiling. Only a longer list falls back to the
+  // whole commit scope filtered client-side, which on a 2,000-element
+  // model is two full pages of `elements_head` per call.
+  const rows = await selectAll<ElementsHeadRow>(
+    wanted.length <= MAX_IN_FILTER_VALUES
+      ? supabase.from('elements_head').select(ELEMENTS_HEAD_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).in('element_id', inFilterValues('getElementsByIds', 'element_id', wanted)).order('element_id')
+      : supabase.from('elements_head').select(ELEMENTS_HEAD_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).order('element_id'),
+  );
+  const wantedSet = new Set(wanted);
   const result = new Map<UUID, ElementsHeadRow>();
   for (const row of rows) {
-    if (wanted.has(row.element_id)) result.set(row.element_id, row);
+    if (wantedSet.has(row.element_id)) result.set(row.element_id, row);
   }
+  return result;
+}
+
+/**
+ * Every fact for each of `subjectIds` at `commitId`, keyed by subject then
+ * attribute — the element page's relationship facts in one request instead
+ * of one per relationship. Same split as `getElementsByIds`: up to 50 ids
+ * go in an `.in()`, more read the commit's whole `facts` scope and filter
+ * client-side (rule 8). A subject with no facts maps to an empty map.
+ */
+export async function listFactsForSubjects(supabase: Client, commitId: UUID, subjectIds: readonly UUID[]): Promise<Map<UUID, Map<string, FactsRow>>> {
+  const wanted = [...new Set(subjectIds)];
+  const result = new Map<UUID, Map<string, FactsRow>>(wanted.map((id) => [id, new Map<string, FactsRow>()]));
+  if (wanted.length === 0) return result;
+  const rows = await selectAll<FactsRow>(
+    wanted.length <= MAX_IN_FILTER_VALUES
+      ? supabase.from('facts').select(FACTS_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).in('subject_id', inFilterValues('listFactsForSubjects', 'subject_id', wanted)).order('subject_id').order('attribute')
+      : supabase.from('facts').select(FACTS_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).order('subject_id').order('attribute'),
+  );
+  for (const row of rows) result.get(row.subject_id)?.set(row.attribute, row);
   return result;
 }
 
@@ -322,45 +354,57 @@ export async function listInFlightBranchesTouchingSubject(supabase: Client, mode
   return branchRows as BranchRow[];
 }
 
+/** Another open change and the elements it shares with the change being looked at (`sharedElements`, `src/engine/changeOverlap.ts`). */
+export interface OverlappingChange {
+  branch: BranchRow;
+  sharedElementIds: UUID[];
+}
+
 /**
- * Batched form of `listInFlightBranchesTouchingSubject` for the change
- * page's "other open changes touching the same elements" (Sprint C1 step
- * 6, UI-principles' change page spec) — a change branch typically touches
- * several subjects at once, and this is one round trip per table rather
- * than N. `excludeBranchId` drops the change's own branch from the
- * result — it always touches its own subjects, which isn't "another" open
- * change.
+ * The change page's "other open changes touching the same elements"
+ * (Sprint C1 step 6; widened by ADR-024 §9): every other open change that
+ * touches an element this one does — an element edit, or either end of a
+ * relationship edit — or a platform/module pair across the two
+ * (`sharedElements`).
  *
- * `subjectIds` is every subject a real change branch touches — a live
- * report hit 89 on one branch — so, per SPEC §6.7/CLAUDE.md rule 8, this
- * never puts that list in an `.in()` filter. Same rewrite as
- * `src/db/landscape.ts`'s `listLandscapeEdges`/`listSupportsEdgesForSystems`:
- * each step queries the model scope alone (`deltas`/`commits`/`branches`
- * all carry `model_id`) and narrows to the id set in memory, so the
- * request URL never grows with the caller-supplied list. `status` stays an
- * `.in()` filter — a fixed, small enum, never a growing id list.
+ * Per SPEC §6.7/CLAUDE.md rule 8 no id list ever goes into an `.in()`
+ * filter: each step reads the model scope alone (`deltas`/`commits`/
+ * `branches` all carry `model_id`) and narrows in memory, the same shape as
+ * `src/db/landscape.ts`'s `listLandscapeEdges`. `status` stays an `.in()`
+ * filter — a fixed, small enum, never a growing id list. Every relationship
+ * create delta in the model is read too, not just open changes' own: an
+ * update or retract carries only the relationship id, and the relationship
+ * may have been created on main. `ownTouched` is the change's own set, from
+ * its own deltas (`listOwnDeltas`, so nothing a refresh brought in from main).
  */
-export async function listInFlightBranchesTouchingSubjects(supabase: Client, modelId: UUID, subjectIds: readonly UUID[], excludeBranchId: UUID): Promise<BranchRow[]> {
-  if (subjectIds.length === 0) return [];
-  const subjectIdSet = new Set(subjectIds);
-
-  const deltasQuery = supabase.from('deltas').select('commit_id, subject_id', { count: 'exact' }).eq('model_id', modelId).order('id');
-  const deltaRows = await selectAll<{ commit_id: UUID; subject_id: UUID }>(deltasQuery);
-  const commitIds = new Set(deltaRows.filter((row) => subjectIdSet.has(row.subject_id)).map((row) => row.commit_id));
-  if (commitIds.size === 0) return [];
-
+export async function listOpenChangesSharingElements(supabase: Client, modelId: UUID, branchId: UUID, ownTouched: ReadonlySet<UUID>, parentOf: (elementId: UUID) => UUID | null): Promise<OverlappingChange[]> {
+  const deltasQuery = supabase.from('deltas').select('commit_id, subject_type, subject_id, from_element_id, to_element_id', { count: 'exact' }).eq('model_id', modelId).order('id');
   const commitsQuery = supabase.from('commits').select('id, branch_id', { count: 'exact' }).eq('model_id', modelId).order('id');
-  const commitRows = await selectAll<{ id: UUID; branch_id: UUID }>(commitsQuery);
-  const branchIds = new Set(commitRows.filter((row) => commitIds.has(row.id)).map((row) => row.branch_id));
-  branchIds.delete(excludeBranchId);
-  if (branchIds.size === 0) return [];
+  const [deltaRows, commitRows, branchResult] = await Promise.all([
+    selectAll<{ commit_id: UUID; subject_type: 'element' | 'relationship'; subject_id: UUID; from_element_id: UUID | null; to_element_id: UUID | null }>(deltasQuery),
+    selectAll<{ id: UUID; branch_id: UUID }>(commitsQuery),
+    supabase.from('branches').select('*').eq('model_id', modelId).neq('kind', 'main').in('status', ['draft', 'proposed', 'in_review', 'approved']),
+  ]);
+  if (branchResult.error) throw new Error(`listOpenChangesSharingElements: ${branchResult.error.message}`);
+  const openBranches = (branchResult.data as BranchRow[]).filter((b) => b.id !== branchId);
+  const wanted = new Set(openBranches.map((b) => b.id));
 
-  const { data: branchRows, error: branchError } = await supabase
-    .from('branches')
-    .select('*')
-    .eq('model_id', modelId)
-    .neq('kind', 'main')
-    .in('status', ['draft', 'proposed', 'in_review', 'approved']);
-  if (branchError) throw new Error(`listInFlightBranchesTouchingSubjects: ${branchError.message}`);
-  return (branchRows as BranchRow[]).filter((row) => branchIds.has(row.id));
+  const branchByCommitId = new Map(commitRows.map((c) => [c.id, c.branch_id]));
+  const relationshipEnds = new Map<UUID, { fromElementId: UUID; toElementId: UUID }>();
+  const rows: DeltaTouchRow[] = [];
+  for (const row of deltaRows) {
+    if (row.subject_type === 'relationship' && row.from_element_id !== null && row.to_element_id !== null) {
+      relationshipEnds.set(row.subject_id, { fromElementId: row.from_element_id, toElementId: row.to_element_id });
+    }
+    const rowBranchId = branchByCommitId.get(row.commit_id);
+    if (rowBranchId !== undefined && wanted.has(rowBranchId)) rows.push({ branchId: rowBranchId, subjectType: row.subject_type, subjectId: row.subject_id });
+  }
+
+  const touched = touchedElementsByBranch(rows, relationshipEnds);
+  const result: OverlappingChange[] = [];
+  for (const branch of openBranches) {
+    const sharedElementIds = sharedElements(ownTouched, touched.get(branch.id) ?? new Set<UUID>(), parentOf);
+    if (sharedElementIds.length > 0) result.push({ branch, sharedElementIds });
+  }
+  return result.sort((a, b) => (a.branch.title ?? a.branch.name).localeCompare(b.branch.title ?? b.branch.name));
 }

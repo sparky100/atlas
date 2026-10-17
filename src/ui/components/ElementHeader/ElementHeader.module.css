@@ -92,6 +92,9 @@
   background: var(--surface);
   box-shadow: var(--surface-raised-shadow);
   min-width: 220px;
+  /* Never wider than the screen less its 16px gutters — ElementHeader.tsx
+     shifts it sideways to fit, which only works if it can fit at all. */
+  max-width: calc(100vw - 32px);
   z-index: 10;
 }
 

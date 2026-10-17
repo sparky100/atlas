@@ -249,19 +249,26 @@ describe('atlas.run_duplicate_check / atlas.dismiss_duplicate_pair (F4 step 3) a
     expect(secondDismissError).toBeNull();
   });
 
-  it('refuses a second concurrent run on the same model (the partial unique index, not a check-then-insert race)', async () => {
-    const [first, second] = await Promise.all([
-      owner.client.schema('atlas').rpc('run_duplicate_check', { p_model_id: modelId }),
-      contributor.client.schema('atlas').rpc('run_duplicate_check', { p_model_id: modelId }),
-    ]);
-    const errors = [first.error, second.error].filter((e) => e !== null);
-    const successes = [first.error, second.error].filter((e) => e === null);
-    // Exactly one of the two truly concurrent calls wins the unique-index
-    // race on duplicate_check_runs(model_id) where status = 'running'; the
-    // other gets this function's own "already running" exception. Both
-    // succeeding, or both failing, would mean the guard isn't atomic.
-    expect(successes).toHaveLength(1);
-    expect(errors).toHaveLength(1);
+  it('refuses a run while another is still running on the same model (the partial unique index, not a check-then-insert race)', async () => {
+    // Two overlapping calls can't show this deterministically: the second
+    // one's INSERT waits on the first's uncommitted 'running' row, and by
+    // the time the first commits that row reads 'succeeded', so the second
+    // goes ahead — serialised, never simultaneous, but not refused. A run
+    // genuinely still in progress is what the guard refuses, so one is held
+    // open here as a committed 'running' row.
+    const heldRunId = randomUUID();
+    const { error: holdError } = await service.from('duplicate_check_runs').insert({ id: heldRunId, org_id: orgId, model_id: modelId, triggered_by: owner.id, status: 'running' });
+    expect(holdError).toBeNull();
+    try {
+      const { data, error } = await contributor.client.schema('atlas').rpc('run_duplicate_check', { p_model_id: modelId });
+      expect(data).toBeNull();
+      expect(error?.message).toMatch(/already running/);
+    } finally {
+      await service.from('duplicate_check_runs').update({ status: 'failed', error: 'test hold released', finished_at: new Date().toISOString() }).eq('id', heldRunId);
+    }
+    // Released, the next run goes ahead.
+    const { error: afterError } = await contributor.client.schema('atlas').rpc('run_duplicate_check', { p_model_id: modelId });
+    expect(afterError).toBeNull();
   });
 });
 

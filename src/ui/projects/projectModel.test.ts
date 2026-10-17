@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow, DecisionRow, ProjectRow } from '../../db/types';
 import {
+  formatProjectProgress,
   groupChangesByStage,
   groupProjectsByStatus,
   isDecisionOverdue,
@@ -112,6 +113,11 @@ describe('scopeDifference', () => {
   it('lists touched-but-undeclared and declared-but-untouched separately', () => {
     expect(scopeDifference(['a', 'b'], ['b', 'c', 'c'])).toEqual({ touchedNotDeclared: ['c'], declaredNotTouched: ['a'] });
   });
+
+  it('a scope item a change only affects is covered, and an affected item outside scope is not "touched"', () => {
+    // Land, Wayleaves & Consents is affected (impact) but not edited; Network mapping is affected and out of scope.
+    expect(scopeDifference(['escoms', 'wayleaves', 'bi'], ['escoms', 'enterprise'], ['wayleaves', 'mapping'])).toEqual({ touchedNotDeclared: ['enterprise'], declaredNotTouched: ['bi'] });
+  });
 });
 
 describe('isDecisionOverdue', () => {
@@ -149,5 +155,12 @@ describe('openItemsBlockingClose', () => {
     );
     expect(items.changes.map((c) => c.id)).toEqual(['open']);
     expect(items.decisions.map((d) => d.id)).toEqual(['pending']);
+  });
+});
+
+describe('formatProjectProgress', () => {
+  it('reads as plain counts, never a percentage, singular where one', () => {
+    expect(formatProjectProgress({ openChanges: 1, mergedChanges: 2, openDecisions: 1, decidedDecisions: 0 })).toBe('1 open change · 2 merged · 1 open decision · 0 decided');
+    expect(formatProjectProgress({ openChanges: 0, mergedChanges: 0, openDecisions: 3, decidedDecisions: 1 })).toBe('0 open changes · 0 merged · 3 open decisions · 1 decided');
   });
 });

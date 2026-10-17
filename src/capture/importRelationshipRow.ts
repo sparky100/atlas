@@ -12,7 +12,7 @@
  */
 import { validateRelationshipAttributeValue } from '../contracts/relationshipAttributeSchema';
 
-export const RELATIONSHIP_IMPORT_COLUMNS = ['from', 'type', 'to', 'description', 'via', 'data_classification'] as const;
+export const RELATIONSHIP_IMPORT_COLUMNS = ['from', 'type', 'to', 'description', 'via', 'data_classification', 'protocol_in', 'protocol_out'] as const;
 export type RelationshipImportColumn = (typeof RELATIONSHIP_IMPORT_COLUMNS)[number];
 
 export type ImportRelationshipType = 'uses' | 'flows_to';
@@ -28,6 +28,9 @@ export interface ImportRelationshipRow {
   via: string | null;
   /** `flows_to` only — `uses` has no such attribute (`UsesAttributes`), so a `uses` row setting this fails validation the same way a module row setting `vendor` does. */
   dataClassification: string | null;
+  /** ADR-026: each side's protocol on a flow through a platform — `null` when not given. */
+  protocolIn: string | null;
+  protocolOut: string | null;
   /** JSON import follow-up: a supporting quote from whatever the file's author is working from — free text, never validated beyond non-blank. Carried onto every delta this row produces, appended to `sourceRef`. */
   quote?: string | undefined;
   /** JSON import follow-up: a confidence in [0,1] for this row as a whole — overrides the otherwise-hardcoded `1` on every delta this row produces. */
@@ -74,8 +77,17 @@ export function validateImportRelationshipRow(raw: Record<string, unknown>, rowN
     if (typeof result.value === 'string') dataClassification = result.value;
   }
 
+  const protocols: { protocolIn: string | null; protocolOut: string | null } = { protocolIn: null, protocolOut: null };
+  for (const [column, key] of [['protocol_in', 'protocolIn'], ['protocol_out', 'protocolOut']] as const) {
+    const cell = cellToString(raw[column]);
+    if (cell === undefined) continue;
+    const result = validateRelationshipAttributeValue(type, key, cell);
+    if (!result.ok) return { ok: false, rowNumber, error: `"${column}": ${result.error}` };
+    if (typeof result.value === 'string') protocols[key] = result.value;
+  }
+
   const confidenceResult = parseConfidence(raw.confidence);
   if (!confidenceResult.ok) return { ok: false, rowNumber, error: `"confidence": ${confidenceResult.error}` };
 
-  return { ok: true, row: { rowNumber, from, type, to, description: descriptionResult.value, via: cellToString(raw.via) ?? null, dataClassification, quote: cellToString(raw.quote), confidence: confidenceResult.value } };
+  return { ok: true, row: { rowNumber, from, type, to, description: descriptionResult.value, via: cellToString(raw.via) ?? null, dataClassification, ...protocols, quote: cellToString(raw.quote), confidence: confidenceResult.value } };
 }

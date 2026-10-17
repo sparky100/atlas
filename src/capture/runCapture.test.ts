@@ -5,7 +5,9 @@ import { emptyHead } from '../engine/deltas';
 import { hashLlmRequest, RecordedLlmClient, type LlmClient, type LlmRequest, type LlmResponse } from './llm/client';
 import { buildMatchIndex } from './matchIndex';
 import { buildPromptBUserMessage, PROMPT_B_SCHEMA, PROMPT_B_SYSTEM, type PromptBChunkLocation } from './prompts/b';
-import { inferSheetType, runCapture, type RunCaptureSuccess } from './runCapture';
+import type { ElementProposal } from '../contracts/capture';
+import { inferSheetType, orderByParentDependency, runCapture, type RunCaptureSuccess } from './runCapture';
+import type { RowCandidate } from './rowsToCandidates';
 
 const NEVER_CALLED_LLM: LlmClient = {
   complete(): Promise<LlmResponse> {
@@ -33,6 +35,7 @@ describe('inferSheetType', () => {
   });
   it('reads a Teams-like sheet name as actor', () => {
     expect(inferSheetType('Teams', null)).toBe('actor');
+    expect(inferSheetType('Actors', null)).toBe('actor');
   });
   it('falls back to the LLM sheetType only when heuristics are undecided', () => {
     expect(inferSheetType('Sheet1', 'capability')).toBe('capability');
@@ -659,6 +662,30 @@ describe('runCapture — JSON input (Sprint F2b, SPEC-capture.md §5.6)', () => 
     const uses = result.candidates.find((c) => c.relationshipType === 'uses');
     expect(uses?.class).toBe('new');
     expect(uses?.proposal.kind === 'relationship' && uses.proposal.attributes).toMatchObject({ description: 'reads invoice data' });
+    // 'Enterprise Bus' is no system in this run or in main: the flow imports as direct, and the review is told why.
+    expect(uses?.proposal.kind === 'relationship' && (uses.proposal.attributes as Record<string, unknown>).via).toBeUndefined();
+    expect(uses?.evidence.warnings).toContainEqual({ code: 'ENDPOINT_UNRESOLVED', text: 'Enterprise Bus', end: 'via' });
+  });
+
+  it('links a flow to the integration platform it goes via, and warns when the named via is a system that is not one', async () => {
+    const platform = { element_id: 'bus-1', element_type: 'system' as const, name: 'Enterprise Bus', parent_id: null, attributes: { kind: 'integration_platform' }, exists_delta_id: 'd-1' };
+    const plainApp = { element_id: 'app-1', element_type: 'system' as const, name: 'Plain App', parent_id: null, attributes: { kind: 'application' }, exists_delta_id: 'd-2' };
+    const json = JSON.stringify({
+      systems: [{ name: 'CRM' }, { name: 'Billing' }],
+      relationships: [
+        { from: 'CRM', type: 'uses', to: 'Billing', description: 'reads invoice data', via: 'Enterprise Bus' },
+        { from: 'Billing', type: 'flows_to', to: 'CRM', description: 'sends payments to', via: 'Plain App' },
+      ],
+    });
+    const result = await expectSuccess(
+      runCapture({ inputName: 'import.json', source: { format: 'json', text: json }, documentDate: '2026-01-01', llmClient: NEVER_CALLED_LLM, matchIndex: buildMatchIndex([platform, plainApp], []), mainHead: emptyHead(), mintId: mintIdFrom('el') }),
+    );
+    const uses = result.candidates.find((c) => c.relationshipType === 'uses');
+    const flows = result.candidates.find((c) => c.relationshipType === 'flows_to');
+    expect(uses?.proposal.kind === 'relationship' && (uses.proposal.attributes as Record<string, unknown>).via).toBe('bus-1');
+    expect(uses?.evidence.warnings).toEqual([]);
+    expect(flows?.proposal.kind === 'relationship' && (flows.proposal.attributes as Record<string, unknown>).via).toBeUndefined();
+    expect(flows?.evidence.warnings).toContainEqual({ code: 'ENDPOINT_UNRESOLVED', text: 'Plain App', end: 'via' });
   });
 
   it('resolves a changes-section retire against an existing main element, never creating one', async () => {
@@ -774,3 +801,50 @@ describe('runCapture — JSON input (Sprint F2b, SPEC-capture.md §5.6)', () => 
     if (result.status === 'failed') expect(result.errorCode).toBe('INPUT_UNREADABLE');
   });
 });
+
+describe('orderByParentDependency', () => {
+  const capability = (seq: number, name: string, parent: string | null): RowCandidate & { proposal: ElementProposal } => ({
+    seq,
+    proposal: { kind: 'element', elementType: 'capability', name, parent: parent === null ? null : { kind: 'unresolved', text: parent }, attributes: {} },
+    evidence: { sourceRef: { kind: 'sheet', sheet: 'Capabilities', range: `A${String(seq + 2)}` }, passage: name, extractor: 'sheet-mapping', attributeConfidence: {}, warnings: [] },
+    aliasProposals: [],
+  });
+  const names = (list: readonly { proposal: ElementProposal }[]) => list.map((c) => c.proposal.name);
+
+  it('puts a parent that is itself a candidate before its children, keeping file order otherwise', () => {
+    // A sheet sorted by name lists "Quotation Pricing" (a grandchild) before "Connection Quotations" (its parent).
+    const ordered = orderByParentDependency([capability(0, 'Quotation Pricing', 'Connection Quotations'), capability(1, 'Connection Quotations', 'Customer'), capability(2, 'Connections', 'Customer')]);
+    expect(names(ordered)).toEqual(['Connection Quotations', 'Connections', 'Quotation Pricing']);
+  });
+
+  it('leaves an already-ordered list alone', () => {
+    const list = [capability(0, 'Connection Quotations', 'Customer'), capability(1, 'Quotation Pricing', 'Connection Quotations')];
+    expect(names(orderByParentDependency(list))).toEqual(['Connection Quotations', 'Quotation Pricing']);
+  });
+
+  it('does not loop on two rows that name each other as parent', () => {
+    expect(orderByParentDependency([capability(0, 'A', 'B'), capability(1, 'B', 'A')])).toHaveLength(2);
+  });
+});
+
+describe('runCapture — naming a module that more than one platform has', () => {
+  const workbook = buildWorkbookBuffer({
+    Applications: [['System', 'Supplier', 'Status'], ['SAP', 'SAP SE', 'Live'], ['Salesforce', 'Salesforce Inc', 'Live']],
+    Modules: [['Module', 'Parent system', 'Description'], ['PM', 'SAP', 'Plant maintenance'], ['PM', 'Salesforce', 'Programme management'], ['ESCOMS', 'Salesforce', 'Wayleaves']],
+    Relationships: [
+      ['From', 'Type', 'To', 'Description'],
+      ['ESCOMS', 'uses', 'PM', 'reads work orders from'],
+      ['ESCOMS', 'uses', 'SAP · PM', 'reads work orders from'],
+    ],
+  });
+
+  it('will not guess between two same-named modules, and resolves the one written with its platform', async () => {
+    const result = await expectSuccess(
+      runCapture({ inputName: 'model.xlsx', source: { format: 'xlsx', bytes: workbook }, documentDate: null, llmClient: NEVER_CALLED_LLM, matchIndex: buildMatchIndex([], []), mainHead: emptyHead(), mintId: mintIdFrom('el') }),
+    );
+    const relationships = result.candidates.filter((c) => c.kind === 'relationship');
+    expect(relationships.map((c) => c.class)).toEqual(['invalid', 'new']);
+    expect(relationships[0]?.evidence.warnings).toContainEqual({ code: 'ENDPOINT_UNRESOLVED', text: 'PM', end: 'to' });
+  });
+});
+

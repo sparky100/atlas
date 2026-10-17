@@ -45,9 +45,8 @@ describe('elementExport columns', () => {
   it('flat columns are fixed, then union core, then union custom, then provenance', () => {
     const columns = flatColumns([definition('flag', 'Flag', ['system'])]);
     const keys = columns.map((c) => c.key);
-    expect(keys.slice(0, 3)).toEqual(['name', 'type', 'owner']);
-    expect(keys[keys.length - 2]).toBe('source');
-    expect(keys[keys.length - 1]).toBe('age');
+    expect(keys.slice(0, 4)).toEqual(['name', 'type', 'owner', 'parent']);
+    expect(keys.slice(-3)).toEqual(['source', 'age', 'atlasId']);
     expect(keys).toContain('flag');
     expect(keys).toContain('lifecycleStatus');
   });
@@ -74,8 +73,8 @@ describe('relationshipExportRows', () => {
     ];
     const elementsById = new Map<string, ElementsHeadRow>([['a', element('a', 'system')], ['b', element('b', 'system')], ['c', element('c', 'capability')]]);
     const rows = relationshipExportRows(edges, elementsById);
-    expect(rows[0]).toEqual({ from: 'a', type: 'uses', to: 'b', verb: 'reads from', role: '' });
-    expect(rows[1]).toEqual({ from: 'a', type: 'supports', to: 'c', verb: '', role: 'primary' });
+    expect(rows[0]).toEqual({ from: 'a', type: 'uses', to: 'b', verb: 'reads from', role: '', via: '', dataClassification: '', protocolIn: '', protocolOut: '' });
+    expect(rows[1]).toEqual({ from: 'a', type: 'supports', to: 'c', verb: '', role: 'primary', via: '', dataClassification: '', protocolIn: '', protocolOut: '' });
   });
 });
 
@@ -96,12 +95,85 @@ describe('elementBrowseRowsToCsv', () => {
 describe('buildExportSheets', () => {
   it('makes one sheet per element type present plus a Relationships sheet', () => {
     const rows = [row(element('s-1', 'system', { isExternal: false, lifecycleStatus: 'active' })), row(element('c-1', 'capability'))];
-    const sheets = buildExportSheets(rows, [], new Map(), [{ from: 's-1', type: 'supports', to: 'c-1', verb: '', role: 'primary' }]);
+    const sheets = buildExportSheets(rows, [], new Map(), [{ from: 's-1', type: 'supports', to: 'c-1', verb: '', role: 'primary', via: '', dataClassification: '', protocolIn: '', protocolOut: '' }]);
     expect(sheets.map((s) => s.name)).toEqual(['Capabilities', 'Systems', 'Relationships']);
     const systems = sheets.find((s) => s.name === 'Systems');
     expect(systems?.cells[0]).toContain('Lifecycle');
     const relationships = sheets.find((s) => s.name === 'Relationships');
-    expect(relationships?.cells[0]).toEqual(['From', 'Type', 'To', 'Verb', 'Role']);
+    expect(relationships?.cells[0]).toEqual(['From', 'Type', 'To', 'Verb', 'Role', 'Via', 'Data classification', 'Protocol in', 'Protocol out']);
+  });
+});
+
+describe('the round-trip columns (parent, Atlas ID, Actor type)', () => {
+  const platform = element('SAP', 'system', { kind: 'platform', isExternal: false });
+  const mod = { ...element('PM', 'container', { isExternal: false }), parent_id: 'SAP' };
+  const topCap = element('Customer', 'capability');
+  const subCap = { ...element('Connections', 'capability'), parent_id: 'Customer' };
+  const actor = element('Network Team', 'actor', { subtype: 'team', isExternal: false });
+  const names = new Map([['SAP', 'SAP'], ['Customer', 'Customer']]);
+  const rows = [row(platform), row(mod), row(topCap), row(subCap), row(actor)];
+
+  it('a module sheet carries "Parent system", a capability sheet "Parent capability", each after Owner, with the parent\'s name and a blank for a top-level element', () => {
+    const sheets = buildExportSheets(rows, [], new Map(), [], names);
+    const containers = sheets.find((s) => s.name === 'Containers');
+    expect(containers?.cells[0]?.slice(0, 4)).toEqual(['Name', 'Type', 'Owner', 'Parent system']);
+    expect(containers?.cells[1]?.slice(0, 4)).toEqual(['PM', 'container', '', 'SAP']);
+    const capabilities = sheets.find((s) => s.name === 'Capabilities');
+    expect(capabilities?.cells[0]?.slice(0, 4)).toEqual(['Name', 'Type', 'Owner', 'Parent capability']);
+    expect(capabilities?.cells.slice(1).map((r) => [r[0], r[3]])).toEqual([['Customer', ''], ['Connections', 'Customer']]);
+    // A system has no parent column at all.
+    expect(sheets.find((s) => s.name === 'Systems')?.cells[0]).not.toContain('Parent system');
+  });
+
+  it('every sheet ends with an Atlas ID column holding the element id', () => {
+    const sheets = buildExportSheets(rows, [], new Map(), [], names);
+    for (const sheet of sheets.filter((s) => s.name !== 'Relationships')) {
+      expect(sheet.cells[0]?.[sheet.cells[0].length - 1]).toBe('Atlas ID');
+    }
+    expect(sheets.find((s) => s.name === 'Containers')?.cells[1]?.slice(-1)).toEqual(['PM']);
+  });
+
+  it("an actor's person/team column is \"Actor type\", so the sheet has one column called Type", () => {
+    const actors = buildExportSheets(rows, [], new Map(), [], names).find((s) => s.name === 'Actors');
+    const header = actors?.cells[0] ?? [];
+    expect(header.filter((h) => h === 'Type')).toHaveLength(1);
+    expect(header).toContain('Actor type');
+  });
+
+  it('a system\'s domain is "IT/OT domain" — the importer would read a "Domain" header as a capability list', () => {
+    const systems = buildExportSheets([row(platform)], [], new Map(), [], names).find((s) => s.name === 'Systems');
+    expect(systems?.cells[0]).toContain('IT/OT domain');
+    expect(systems?.cells[0]).not.toContain('Domain');
+  });
+
+  it('the flat CSV has a single "Parent" column and an Atlas ID last', () => {
+    const csv = elementBrowseRowsToCsv(rows, [], new Map(), names);
+    const [header, ...lines] = csv.split('\r\n');
+    const columns = (header ?? '').split(',');
+    expect(columns[3]).toBe('Parent');
+    expect(columns[columns.length - 1]).toBe('Atlas ID');
+    expect(lines.find((l) => l.startsWith('PM,'))?.split(',')[3]).toBe('SAP');
+  });
+
+  it('a parent that is not among the exported rows is still named — the lookup is every element, not the visible set', () => {
+    const csv = elementBrowseRowsToCsv([row(mod)], [], new Map(), names);
+    expect(csv.split('\r\n')[1]?.split(',')[3]).toBe('SAP');
+  });
+});
+
+describe('relationshipExportRows endpoint names', () => {
+  it('names an endpoint plainly, but qualifies two same-named modules by their platform', () => {
+    const sap = element('SAP', 'system');
+    const other = element('Other', 'system');
+    const sapPm = { ...element('PM', 'container'), element_id: 'sap-pm', parent_id: 'SAP' };
+    const otherPm = { ...element('PM', 'container'), element_id: 'other-pm', parent_id: 'Other' };
+    const escoms = element('ESCOMS', 'container');
+    const elementsById = new Map<string, ElementsHeadRow>([sap, other, sapPm, otherPm, escoms].map((e) => [e.element_id, e]));
+    const edges = [
+      { relationship_id: 'r1', relationship_type: 'uses', from_element_id: 'ESCOMS', to_element_id: 'sap-pm', attributes: { description: 'reads' }, exists_delta_id: 'd' },
+      { relationship_id: 'r2', relationship_type: 'uses', from_element_id: 'ESCOMS', to_element_id: 'other-pm', attributes: { description: 'reads' }, exists_delta_id: 'd' },
+    ] as RelationshipsHeadRow[];
+    expect(relationshipExportRows(edges, elementsById).map((r) => [r.from, r.to])).toEqual([['ESCOMS', 'SAP · PM'], ['ESCOMS', 'Other · PM']]);
   });
 });
 
@@ -109,5 +181,30 @@ describe('sanitizeForFilename', () => {
   it('replaces path-hostile characters and never returns empty', () => {
     expect(sanitizeForFilename('a/b\\c:d')).toBe('a-b-c-d');
     expect(sanitizeForFilename('   ')).toBe('export');
+  });
+});
+
+describe('relationshipExportRows — via and data classification', () => {
+  const mule = element('Mule', 'system', { kind: 'integration_platform', isExternal: false });
+  const a = element('A', 'system', { isExternal: false });
+  const b = element('B', 'system', { isExternal: false });
+  const edge = (attributes: Record<string, unknown>) => ({ relationship_id: 'r', relationship_type: 'flows_to', from_element_id: 'A', to_element_id: 'B', attributes, exists_delta_id: 'd' }) as RelationshipsHeadRow;
+  const byId = new Map([mule, a, b].map((e) => [e.element_id, e]));
+
+  it('writes the platform a flow goes via, and its data classification', () => {
+    const [row] = relationshipExportRows([edge({ description: 'sends orders to', via: 'Mule', dataClassification: 'official_sensitive' })], byId);
+    expect(row).toMatchObject({ from: 'A', to: 'B', verb: 'sends orders to', via: 'Mule', dataClassification: 'official_sensitive' });
+  });
+
+  it('writes each side\'s protocol on a flow via a platform (ADR-026)', () => {
+    const ordersApi = { ...element('Orders API', 'container', { isExternal: false }), parent_id: 'Mule' };
+    const withInterface = new Map([...byId, [ordersApi.element_id, ordersApi]]);
+    const [row] = relationshipExportRows([edge({ description: 'sends orders to', via: 'Orders API', protocolIn: 'file_sftp', protocolOut: 'rest_api' })], withInterface);
+    expect(row).toMatchObject({ via: 'Mule · Orders API', protocolIn: 'file_sftp', protocolOut: 'rest_api' });
+  });
+
+  it('leaves both blank for a direct flow', () => {
+    const [row] = relationshipExportRows([edge({ description: 'sends orders to' })], byId);
+    expect(row).toMatchObject({ via: '', dataClassification: '', protocolIn: '', protocolOut: '' });
   });
 });

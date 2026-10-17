@@ -7,8 +7,6 @@ const ALL_INTENTS: readonly BranchIntent[] = ['record', 'propose', 'correct', 'e
 describe('defaultIntentForEntryPoint', () => {
   it("F0's own named defaults per entry point", () => {
     expect(defaultIntentForEntryPoint('elementPage')).toBe('correct');
-    expect(defaultIntentForEntryPoint('directorDoor')).toBe('propose');
-    expect(defaultIntentForEntryPoint('whatHappened')).toBe('record');
   });
 
   it('homeSearch/changesList fall back to the generic propose default', () => {

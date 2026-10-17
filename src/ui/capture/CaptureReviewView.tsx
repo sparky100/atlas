@@ -26,18 +26,24 @@
  * it fires regardless of which row `j`/`k` last landed on.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import type { CandidateClass, CaptureCandidate } from '../../contracts/capture';
 import { findBlockedCandidates } from '../../capture/findBlockedCandidates';
+import { finishableWithoutApply } from '../../capture/finishableWithoutApply';
 import { applyResultMessage } from './applyResultMessage';
 import { Button } from '../components/Button/Button';
+import { LinkButton } from '../components/Button/LinkButton';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
-import { canRunCapture, useMembership } from '../orgs/useMembership';
+import { canDiscardCaptureJob, canRunCapture, useMembership } from '../orgs/useMembership';
+import { reportToast } from '../toasts/toastStore';
+import { captureJobStatusLabel } from './captureJobStatus';
 import { CaptureCandidateRow, type PendingAmbiguousTarget } from './CaptureCandidateRow';
+import { DiscardCaptureButton } from './DiscardCaptureButton';
 import { useCaptureReviewQueue } from './useCaptureReviewQueue';
 import styles from './CaptureReviewView.module.css';
 
@@ -45,7 +51,12 @@ export interface CaptureReviewViewProps {
   modelId: UUID;
   orgId: UUID;
   jobId: UUID;
+  /** Where Finish review / Discard land the reviewer once the job leaves `parsed` — the model's review queue. */
+  reviewQueueHref: string;
 }
+
+/** Classes `x` multi-select (and so the bulk bar and a group's "Select all") covers — SPEC-capture.md §10, Sprint F2b. */
+const MULTI_SELECT_CLASSES: ReadonlySet<CandidateClass> = new Set(['confirm', 'new']);
 
 /** SPEC §10's own queue order: needs-decision-first, bulk-accepted confirmations last. `duplicate_in_target` (issue #285) sits beside `invalid`/`unsourced` — no delta, needs the reviewer's attention before anything else. */
 const CLASS_ORDER: readonly CandidateClass[] = ['unsourced', 'invalid', 'duplicate_in_target', 'ambiguous', 'conflict', 'new', 'update', 'gone', 'confirm'];
@@ -67,12 +78,13 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable;
 }
 
-export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewProps) {
+export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: CaptureReviewViewProps) {
+  const navigate = useNavigate();
   const { userId } = useAuth();
   const { role } = useMembership(orgId, userId);
   const canReview = canRunCapture(role);
   const queue = useCaptureReviewQueue(modelId, orgId, jobId, userId, role);
-  const { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, searchTargetElements, notInFile } = queue;
+  const { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, finish, discard, searchTargetElements, notInFile } = queue;
 
   const [selectedId, setSelectedId] = useState<UUID | null>(null);
   const [openPanel, setOpenPanel] = useState<{ candidateId: UUID; type: 'edit' | 'split' | 'merge' } | null>(null);
@@ -122,6 +134,35 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
   const effectiveSelectedId = selectedId ?? flat[0]?.id ?? null;
   const selectedCandidate = flat.find((c) => c.id === effectiveSelectedId) ?? null;
 
+  /** §8.2 (amended): nothing left to promote — the primary action becomes "Finish review", which needs no target change. */
+  const finishable = useMemo(() => finishableWithoutApply(candidates), [candidates]);
+
+  const runFinish = useCallback(() => {
+    void finish().then((done) => {
+      if (!done) return;
+      reportToast('Capture review finished — nothing was applied.');
+      void navigate(reviewQueueHref);
+    });
+  }, [finish, navigate, reviewQueueHref]);
+
+  const runDiscard = useCallback(
+    () =>
+      discard().then((done) => {
+        if (!done) return;
+        reportToast('Capture draft discarded.');
+        void navigate(reviewQueueHref);
+      }),
+    [discard, navigate, reviewQueueHref],
+  );
+
+  const bulkDecide = useCallback(
+    (decision: 'accepted' | 'rejected') => {
+      decideMany([...multiSelected].map((id) => ({ candidateId: id, decision })));
+      setMultiSelected(new Set());
+    },
+    [decideMany, multiSelected],
+  );
+
   const setDecisionFor = useCallback(
     (candidate: CaptureCandidate, decision: Parameters<typeof decide>[1], decisionDetail?: Parameters<typeof decide>[2]) => {
       decide(candidate.id, decision, decisionDetail ?? null);
@@ -135,6 +176,10 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
       if (isTypingTarget(e.target)) return;
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
+        if (finishable) {
+          runFinish();
+          return;
+        }
         void apply().then((result) => {
           if (result) setApplyMessage(applyResultMessage(result));
         });
@@ -156,8 +201,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
       switch (e.key) {
         case 'a': {
           if (multiSelected.size > 0) {
-            decideMany([...multiSelected].map((id) => ({ candidateId: id, decision: 'accepted' as const })));
-            setMultiSelected(new Set());
+            bulkDecide('accepted');
           } else if (candidate.class === 'ambiguous') {
             const pending = pendingAmbiguousTargets.get(candidate.id) ?? null;
             if (pending) setDecisionFor(candidate, 'accepted', pending === 'new' ? null : { intoElementId: pending.elementId });
@@ -168,8 +212,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
         }
         case 'r': {
           if (multiSelected.size > 0) {
-            decideMany([...multiSelected].map((id) => ({ candidateId: id, decision: 'rejected' as const })));
-            setMultiSelected(new Set());
+            bulkDecide('rejected');
           } else {
             setDecisionFor(candidate, 'rejected');
           }
@@ -199,7 +242,7 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
           if (candidate.class === 'ambiguous') setPendingAmbiguousTargets((prev) => new Map(prev).set(candidate.id, 'new'));
           break;
         case 'x':
-          if (candidate.class === 'confirm' || candidate.class === 'new') {
+          if (MULTI_SELECT_CLASSES.has(candidate.class)) {
             setMultiSelected((prev) => {
               const next = new Set(prev);
               if (next.has(candidate.id)) next.delete(candidate.id);
@@ -227,7 +270,19 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
     return () => {
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [canReview, selectedCandidate, effectiveSelectedId, flat, multiSelected, pendingAmbiguousTargets, targetBranchId, decideMany, setDecisionFor, apply]);
+  }, [canReview, selectedCandidate, effectiveSelectedId, flat, multiSelected, pendingAmbiguousTargets, targetBranchId, bulkDecide, setDecisionFor, apply, finishable, runFinish]);
+
+  const toggleSelectAll = useCallback((items: readonly CaptureCandidate[]) => {
+    setMultiSelected((prev) => {
+      const next = new Set(prev);
+      const allSelected = items.every((c) => next.has(c.id));
+      for (const c of items) {
+        if (allSelected) next.delete(c.id);
+        else next.add(c.id);
+      }
+      return next;
+    });
+  }, []);
 
   const toggleGroup = useCallback((cls: CandidateClass) => {
     setCollapsedGroups((prev) => {
@@ -241,7 +296,23 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
   if (status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (status === 'error' || !job) return <Text as="p">{error ?? "Couldn't load this capture review."}</Text>;
 
-  const applyDisabledReason = !targetBranchId ? 'Choose a target change first.' : status === 'applying' ? 'Applying…' : null;
+  // A reviewed or discarded job is closed: its decisions are history, not a queue to act on.
+  if (job.status !== 'parsed') {
+    return (
+      <Panel>
+        <Text as="p">
+          This capture review is closed ({captureJobStatusLabel(job).toLowerCase()}).
+        </Text>
+        <LinkButton to={reviewQueueHref} variant="secondary">
+          Back to review queue
+        </LinkButton>
+      </Panel>
+    );
+  }
+
+  const busy = status === 'applying' || status === 'closing';
+  const applyDisabledReason = finishable ? (busy ? 'Working…' : null) : !targetBranchId ? 'Choose a target change first.' : busy ? 'Applying…' : null;
+  const canDiscard = canDiscardCaptureJob(role, job, userId);
 
   return (
     <div>
@@ -304,10 +375,21 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
             >
               Create
             </Button>
-            <Button variant="primary" disabled={!!applyDisabledReason} title={applyDisabledReason ?? undefined} onClick={() => { void apply().then((result) => { if (result) setApplyMessage(applyResultMessage(result)); }); }}>
-              {status === 'applying' ? 'Applying…' : 'Apply decisions'}
-            </Button>
+            {finishable ? (
+              <Button variant="primary" disabled={!!applyDisabledReason} onClick={runFinish}>
+                {status === 'closing' ? 'Finishing…' : 'Finish review'}
+              </Button>
+            ) : (
+              <Button variant="primary" disabled={!!applyDisabledReason} title={applyDisabledReason ?? undefined} onClick={() => { void apply().then((result) => { if (result) setApplyMessage(applyResultMessage(result)); }); }}>
+                {status === 'applying' ? 'Applying…' : 'Apply decisions'}
+              </Button>
+            )}
           </div>
+          {finishable && (
+            <Text as="p" tone="muted" size="xs">
+              Nothing left to apply — every remaining candidate is rejected. Finish review closes it without creating a change.
+            </Text>
+          )}
           {applyDisabledReason && (
             <Text as="p" tone="muted" size="xs">
               {applyDisabledReason}
@@ -323,13 +405,31 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
               {error}
             </Text>
           )}
+          {canDiscard && <DiscardCaptureButton label="Discard this draft…" confirmText="Discard the whole capture? Nothing from it reaches the model; decisions so far stay on record." onConfirm={runDiscard} />}
           {canReview && (
             <Text as="p" tone="faint" size="xs" className={styles.shortcuts}>
-              j/k select · a accept · r reject · u undo · e edit · s split · m merge into… · 1-5/n pick (ambiguous) · x select (confirm/new, then a/r bulk-acts) · t target · ⌘/Ctrl+Enter apply
+              j/k select · a accept · r reject · u undo · e edit · s split · m merge into… · 1-5/n pick (ambiguous) · x select (confirm/new, then a/r bulk-acts) · t target · ⌘/Ctrl+Enter apply / finish
             </Text>
           )}
         </Panel>
       </div>
+
+      {canReview && multiSelected.size > 0 && (
+        <div className={styles.bulkBar} role="toolbar" aria-label="Bulk actions">
+          <Text as="span" size="sm">
+            {multiSelected.size} selected
+          </Text>
+          <Button variant="primary" onClick={() => { bulkDecide('accepted'); }}>
+            Accept selected
+          </Button>
+          <Button variant="secondary" onClick={() => { bulkDecide('rejected'); }}>
+            Reject selected
+          </Button>
+          <Button variant="ghost" onClick={() => { setMultiSelected(new Set()); }}>
+            Clear
+          </Button>
+        </div>
+      )}
 
       {notInFile.length > 0 && (
         <div className={styles.header}>
@@ -360,14 +460,21 @@ export function CaptureReviewView({ modelId, orgId, jobId }: CaptureReviewViewPr
       ) : (
         grouped.map(({ cls, items }) => (
           <div key={cls} className={styles.group}>
-            <button type="button" className={styles.groupHeader} aria-expanded={!collapsedGroups.has(cls)} onClick={() => { toggleGroup(cls); }}>
-              <Text as="h2" size="lg">
-                {CLASS_LABEL[cls]} ({items.length})
-              </Text>
-              <Text as="span" tone="muted" size="sm">
-                {collapsedGroups.has(cls) ? 'Show ▸' : 'Hide ▾'}
-              </Text>
-            </button>
+            <div className={styles.groupHeaderRow}>
+              <button type="button" className={styles.groupHeader} aria-expanded={!collapsedGroups.has(cls)} onClick={() => { toggleGroup(cls); }}>
+                <Text as="h2" size="lg">
+                  {CLASS_LABEL[cls]} ({items.length})
+                </Text>
+                <Text as="span" tone="muted" size="sm">
+                  {collapsedGroups.has(cls) ? 'Show ▸' : 'Hide ▾'}
+                </Text>
+              </button>
+              {canReview && MULTI_SELECT_CLASSES.has(cls) && (
+                <Button variant="ghost" onClick={() => { toggleSelectAll(items); }}>
+                  {items.every((c) => multiSelected.has(c.id)) ? 'Deselect all' : 'Select all'}
+                </Button>
+              )}
+            </div>
             {!collapsedGroups.has(cls) && (
               <ul className={styles.list} role="listbox">
                 {items.map((candidate) => (

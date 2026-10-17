@@ -46,13 +46,14 @@ export function GapsPage() {
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
-  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, loading: mainBranchLoading } = useMainBranch(model?.id ?? null);
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
   const { label: branchLabel } = useBranchLabel(ref);
   const writeBranch = editingBranch ?? (ref.kind === 'main' ? mainBranch : null);
   const canFill = !viewing && writeBranch !== null && canEditBranch(role, writeBranch);
 
-  const { state, reload } = usePortfolio(model?.id ?? '', ref, mainBranch?.head_commit_id ?? null);
+  // Waits for main when viewing it, as `hintedModelId` does (inlined: the React Compiler can't preserve this page's memoization across a call taking `model`).
+  const { state, reload } = usePortfolio(ref.kind === 'main' && mainBranchLoading ? '' : (model?.id ?? ''), ref, mainBranch?.head_commit_id ?? null);
 
   const kindParam = searchParams.get('kind');
   const kind: GapKind | null = isGapKind(kindParam) ? kindParam : null;

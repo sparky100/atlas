@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { CommentsSection } from '../components/CommentsSection/CommentsSection';
 import { ConfidenceDots } from '../components/ConfidenceDots/ConfidenceDots';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
@@ -12,6 +13,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { createChangeBranch, getMainBranch } from '../../db/branches';
+import type { AffectedCapability, ChangeAffectedValueStream } from '../../db/changeSummary';
 import type { MemberRole, SourceRow } from '../../db/types';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { formatDateTime } from '../time';
@@ -22,6 +24,7 @@ import { dateFieldLabelForIntent, intentReviewWeight, isDateRequiredForIntent } 
 import { branchStatusTone } from './branchStatus';
 import { deriveChangeStep } from './changeStepper';
 import { describeDelta } from './changeSummaryFormat';
+import { describeImpactReasons, describeValueStreamReasons, focusImpact } from './impactFocus';
 import { Stepper } from './Stepper/Stepper';
 import { useApproveAndMerge } from './useApproveAndMerge';
 import { useCancelChange } from './useCancelChange';
@@ -92,6 +95,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   const { userId } = useAuth();
   const { status, branch, error, updateMetadata, reload } = useChange(branchId);
   const summaryState = useChangeSummary(modelId, branch);
+  const impact = summaryState.status === 'ready' ? focusImpact(summaryState.summary.affectedCapabilities, summaryState.summary.affectedValueStreams, summaryState.summary.projectScopeIds) : null;
   const importSourcesById = summaryState.status === 'ready' ? summaryState.summary.sourcesById : EMPTY_SOURCES_BY_ID;
   const importSummary = useImportSummary(orgId, modelId, branch, importSourcesById, userId, reload);
   const [editing, setEditing] = useState(false);
@@ -580,25 +584,17 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         <Text as="h2" size="lg">
           Affected capabilities
         </Text>
-        {summaryState.status === 'ready' && summaryState.summary.affectedCapabilities.length === 0 && <EmptyState>No capabilities are affected by this change yet.</EmptyState>}
-        {summaryState.status === 'ready' && summaryState.summary.affectedCapabilities.length > 0 && (
-          <ul className={styles.capabilityList}>
-            {summaryState.summary.affectedCapabilities.map(({ capability, viaSystems }) => (
-              <li key={capability.element_id}>
-                <div className={styles.subjectTitle}>
-                  <ElementTypeGlyph type="capability" />
-                  <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${capability.element_id}`}>
-                    <Text as="span">{capability.name}</Text>
-                  </Link>
-                </div>
-                {viaSystems.length > 0 && (
-                  <Text as="p" tone="muted" size="sm">
-                    via {viaSystems.map((s) => s.name).join(', ')}
-                  </Text>
-                )}
-              </li>
-            ))}
-          </ul>
+        {impact?.shownCapabilities.length === 0 && <EmptyState>No capabilities are affected by this change yet.</EmptyState>}
+        {impact?.focused && (
+          <Text as="p" tone="muted" size="sm">
+            In this project&apos;s declared scope.
+          </Text>
+        )}
+        {impact && impact.shownCapabilities.length > 0 && <AffectedCapabilityList capabilities={impact.shownCapabilities} orgSlug={orgSlug} modelSlug={modelSlug} />}
+        {impact && impact.collapsedCapabilities.length > 0 && (
+          <CollapsibleSection title="Also reached, outside the project's scope" meta={`(${String(impact.collapsedCapabilities.length)})`} defaultOpen={false}>
+            <AffectedCapabilityList capabilities={impact.collapsedCapabilities} orgSlug={orgSlug} modelSlug={modelSlug} />
+          </CollapsibleSection>
         )}
       </Panel>
 
@@ -606,36 +602,12 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         <Text as="h2" size="lg">
           Affected value streams
         </Text>
-        {summaryState.status === 'ready' && summaryState.summary.affectedValueStreams.length === 0 && <EmptyState>No value stream is affected by this change yet.</EmptyState>}
-        {summaryState.status === 'ready' && summaryState.summary.affectedValueStreams.length > 0 && (
-          <ul className={styles.capabilityList}>
-            {summaryState.summary.affectedValueStreams.map(({ stream, stages }) => (
-              <li key={stream.element_id}>
-                <div className={styles.subjectTitle}>
-                  <ElementTypeGlyph type="value_stream" />
-                  <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${stream.element_id}`}>
-                    <Text as="span">{stream.name}</Text>
-                  </Link>
-                </div>
-                <ul className={styles.capabilityList}>
-                  {stages.map(({ stage, viaCapabilities }) => (
-                    <li key={stage.element_id}>
-                      <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${stage.element_id}`}>
-                        <Text as="span" size="sm">
-                          {stage.name}
-                        </Text>
-                      </Link>
-                      {viaCapabilities.length > 0 && (
-                        <Text as="p" tone="muted" size="sm">
-                          via {viaCapabilities.map((c) => c.name).join(', ')}
-                        </Text>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
+        {impact?.shownValueStreams.length === 0 && <EmptyState>No value stream is affected by this change yet.</EmptyState>}
+        {impact && impact.shownValueStreams.length > 0 && <AffectedValueStreamList valueStreams={impact.shownValueStreams} orgSlug={orgSlug} modelSlug={modelSlug} />}
+        {impact && impact.collapsedValueStreams.length > 0 && (
+          <CollapsibleSection title="Also reached, outside the project's scope" meta={`(${String(impact.collapsedValueStreams.length)})`} defaultOpen={false}>
+            <AffectedValueStreamList valueStreams={impact.collapsedValueStreams} orgSlug={orgSlug} modelSlug={modelSlug} />
+          </CollapsibleSection>
         )}
       </Panel>
 
@@ -646,10 +618,15 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         {summaryState.status === 'ready' && summaryState.summary.otherOpenChanges.length === 0 && <EmptyState>No other open change touches the same elements.</EmptyState>}
         {summaryState.status === 'ready' && summaryState.summary.otherOpenChanges.length > 0 && (
           <ul className={styles.branchList}>
-            {summaryState.summary.otherOpenChanges.map((other) => (
+            {summaryState.summary.otherOpenChanges.map(({ branch: other, sharedElementNames }) => (
               <li key={other.id} className={styles.branchRow}>
-                <Text as="span">{other.title ?? other.name}</Text>
-                <div className={styles.subjectTitle}>
+                <div className={styles.branchText}>
+                  <Text as="span">{other.title ?? other.name}</Text>
+                  <Text as="p" tone="muted" size="sm">
+                    Both touch {sharedElementNames.join(', ')}
+                  </Text>
+                </div>
+                <div className={styles.branchActions}>
                   <Chip tone={branchStatusTone(other.status)}>{other.status}</Chip>
                   <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${other.id}`} variant="secondary">
                     Open →
@@ -658,6 +635,29 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
               </li>
             ))}
           </ul>
+        )}
+        {summaryState.status === 'ready' && summaryState.summary.captureDraftOverlaps.length > 0 && (
+          <CollapsibleSection title="Unreviewed capture drafts touching these elements" meta={`(${String(summaryState.summary.captureDraftOverlaps.length)})`} defaultOpen={false}>
+            <ul className={styles.branchList}>
+              {summaryState.summary.captureDraftOverlaps.map(({ title, draftCount, latestJobId, sharedElementNames }) => (
+                <li key={title} className={styles.branchRow}>
+                  <div className={styles.branchText}>
+                    <Text as="span">{title}</Text>
+                    <Text as="p" tone="muted" size="sm">
+                      {draftCount > 1 ? `${String(draftCount)} drafts · ` : ''}Both touch {sharedElementNames.join(', ')}
+                    </Text>
+                  </div>
+                  {latestJobId !== null && (
+                    <div className={styles.branchActions}>
+                      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/capture/${latestJobId}`} variant="secondary">
+                        Review →
+                      </LinkButton>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CollapsibleSection>
         )}
       </Panel>
 
@@ -674,8 +674,10 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           <ul className={styles.branchList}>
             {summaryState.lineage.splits.map((split) => (
               <li key={split.id} className={styles.branchRow}>
-                <Text as="span">{split.title ?? split.name}</Text>
-                <div className={styles.subjectTitle}>
+                <div className={styles.branchText}>
+                  <Text as="span">{split.title ?? split.name}</Text>
+                </div>
+                <div className={styles.branchActions}>
                   <Chip tone={branchStatusTone(split.status)}>{split.status === 'merged' ? 'delivered' : split.status}</Chip>
                   <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${split.id}`} variant="secondary">
                     Open →
@@ -687,5 +689,64 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         )}
       </Panel>
     </div>
+  );
+}
+
+/** One affected capability per row, with why it counts (`describeImpactReasons`) — shared by the shown list and the collapsed remainder. */
+function AffectedCapabilityList({ capabilities, orgSlug, modelSlug }: { capabilities: readonly AffectedCapability[]; orgSlug: string; modelSlug: string }) {
+  return (
+    <ul className={styles.capabilityList}>
+      {capabilities.map(({ capability, reasons }) => (
+        <li key={capability.element_id}>
+          <div className={styles.subjectTitle}>
+            <ElementTypeGlyph type="capability" />
+            <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${capability.element_id}`}>
+              <Text as="span">{capability.name}</Text>
+            </Link>
+          </div>
+          <Text as="p" tone="muted" size="sm">
+            {describeImpactReasons(reasons)}
+          </Text>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function AffectedValueStreamList({ valueStreams, orgSlug, modelSlug }: { valueStreams: readonly ChangeAffectedValueStream[]; orgSlug: string; modelSlug: string }) {
+  return (
+    <ul className={styles.capabilityList}>
+      {valueStreams.map(({ stream, stages, reasons }) => (
+        <li key={stream.element_id}>
+          <div className={styles.subjectTitle}>
+            <ElementTypeGlyph type="value_stream" />
+            <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${stream.element_id}`}>
+              <Text as="span">{stream.name}</Text>
+            </Link>
+          </div>
+          {reasons.length > 0 && (
+            <Text as="p" tone="muted" size="sm">
+              {describeValueStreamReasons(reasons)}
+            </Text>
+          )}
+          <ul className={styles.capabilityList}>
+            {stages.map(({ stage, viaCapabilities, reasons: stageReasons }) => (
+              <li key={stage.element_id}>
+                <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${stage.element_id}`}>
+                  <Text as="span" size="sm">
+                    {stage.name}
+                  </Text>
+                </Link>
+                {(viaCapabilities.length > 0 || stageReasons.length > 0) && (
+                  <Text as="p" tone="muted" size="sm">
+                    {[viaCapabilities.length > 0 ? `via ${viaCapabilities.map((c) => c.name).join(', ')}` : null, stageReasons.length > 0 ? describeValueStreamReasons(stageReasons) : null].filter((part): part is string => part !== null).join('; ')}
+                  </Text>
+                )}
+              </li>
+            ))}
+          </ul>
+        </li>
+      ))}
+    </ul>
   );
 }

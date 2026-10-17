@@ -9,7 +9,6 @@ import {
   findBoundaryCrossingsMissingVerb,
   findCapabilitiesWithNoSupporters,
   findCapabilitiesWithoutOwner,
-  findCapabilitiesWithPoorFitPrimarySupporter,
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
@@ -21,6 +20,7 @@ import {
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
+  findUnusedIntegrationInterfaces,
   findUnusedIntegrationPlatforms,
   isCapabilityOwnedWithAncestry,
 } from './healthFindings';
@@ -609,6 +609,30 @@ describe('findUnusedIntegrationPlatforms (Prompt 7k item 4)', () => {
   });
 });
 
+describe('integration interfaces (ADR-026)', () => {
+  const esb = system('sys-esb', { kind: 'integration_platform' });
+
+  it('a via naming one of the platform\'s interfaces counts as the platform being used', () => {
+    const edges = [relationship('r1', 'flows_to', 'sys-a', 'sys-b', { via: 'if-api' })];
+    expect(findUnusedIntegrationPlatforms([esb], edges, [container('if-api', 'sys-esb')])).toEqual([]);
+  });
+
+  it('flags an interface nothing flows via, named Platform · Interface', () => {
+    const containers = [container('if-api', 'sys-esb'), container('if-file', 'sys-esb')];
+    const edges = [relationship('r1', 'flows_to', 'sys-a', 'sys-b', { via: 'if-api' })];
+    expect(findUnusedIntegrationInterfaces([{ ...esb, name: 'ESB' }], containers, edges).map((c) => [c.element_id, c.name])).toEqual([['if-file', 'ESB · Container if-file']]);
+  });
+
+  it('a flow via the platform itself does not clear its interfaces', () => {
+    const edges = [relationship('r1', 'uses', 'sys-a', 'sys-b', { via: 'sys-esb' })];
+    expect(findUnusedIntegrationInterfaces([esb], [container('if-api', 'sys-esb')], edges).map((c) => c.element_id)).toEqual(['if-api']);
+  });
+
+  it('never flags a module of an ordinary platform', () => {
+    expect(findUnusedIntegrationInterfaces([system('sap')], [container('pm', 'sap')], [])).toEqual([]);
+  });
+});
+
 describe('findSystemsSupportingEssentialFunctionWithoutTechnicalOwner (Prompt 7k item 5)', () => {
   it('flags a system supporting an essentialFunction capability with no technical owner', () => {
     const systems = [system('sys-1')];
@@ -832,108 +856,6 @@ describe('findExternalOrganisationAccess (S1 item 11a)', () => {
       { relationshipId: 'r1', actorId: 'act-1', organisation: 'Ofgem', systemId: 'sys-1', systemName: 'System sys-1' },
       { relationshipId: 'r2', actorId: 'act-1', organisation: 'Ofgem', systemId: 'sys-2', systemName: 'System sys-2' },
     ]);
-  });
-});
-
-describe('findCapabilitiesWithPoorFitPrimarySupporter', () => {
-  it('flags a capability whose primary supporter is rated poor, with no planned replacement', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'primary', fitForPurpose: 'poor' })];
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, new Map())).toEqual([{ capability: capability('cap-1'), usedSecondaryFallback: false }]);
-  });
-
-  it('flags adequate the same as poor', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'primary', fitForPurpose: 'adequate' })];
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, new Map())).toEqual([{ capability: capability('cap-1'), usedSecondaryFallback: false }]);
-  });
-
-  it('does not flag good or excellent', () => {
-    const capabilities = [capability('cap-1'), capability('cap-2')];
-    const supports = [
-      relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'primary', fitForPurpose: 'good' }),
-      relationship('r2', 'supports', 'sys-2', 'cap-2', { role: 'primary', fitForPurpose: 'excellent' }),
-    ];
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, new Map())).toEqual([]);
-  });
-
-  it('flags a poor rating on a secondary supporter when the capability has no primary supporter at all (the fallback)', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'secondary', fitForPurpose: 'poor' })];
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, new Map())).toEqual([{ capability: capability('cap-1'), usedSecondaryFallback: true }]);
-  });
-
-  it('does not flag a secondary-only capability whose secondary supporter is a good fit', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'secondary', fitForPurpose: 'good' })];
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, new Map())).toEqual([]);
-  });
-
-  it('does not flag a poor secondary edge when the capability also has a good-fit primary edge — primary edges alone are judged once any exist', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [
-      relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'primary', fitForPurpose: 'good' }),
-      relationship('r2', 'supports', 'sys-2', 'cap-1', { role: 'secondary', fitForPurpose: 'poor' }),
-    ];
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, new Map())).toEqual([]);
-  });
-
-  it('does not flag a primary supporter with no fitForPurpose recorded at all', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'primary' })];
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, new Map())).toEqual([]);
-  });
-
-  it('ignores an unrecognised fitForPurpose value rather than treating it as poor', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'primary', fitForPurpose: 'terrible' })];
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, new Map())).toEqual([]);
-  });
-
-  it('does not flag it once a planned replacement is recorded for that exact supporter', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'primary', fitForPurpose: 'poor' })];
-    const replacements = new Map([['cap-1', new Set(['sys-1'])]]);
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, replacements)).toEqual([]);
-  });
-
-  it('planned-replacement suppression also applies to a capability flagged via the secondary fallback', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'secondary', fitForPurpose: 'poor' })];
-    const replacements = new Map([['cap-1', new Set(['sys-1'])]]);
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, replacements)).toEqual([]);
-  });
-
-  it('a planned replacement recorded for a different system does not clear this one', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'primary', fitForPurpose: 'poor' })];
-    const replacements = new Map([['cap-1', new Set(['sys-other'])]]);
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, replacements).map((r) => r.capability.element_id)).toEqual(['cap-1']);
-  });
-
-  it('a planned replacement recorded for a different capability does not clear this one', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'primary', fitForPurpose: 'poor' })];
-    const replacements = new Map([['cap-other', new Set(['sys-1'])]]);
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, replacements).map((r) => r.capability.element_id)).toEqual(['cap-1']);
-  });
-
-  it('checks every primary edge into the same capability, not just the first found', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [
-      relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'primary', fitForPurpose: 'excellent' }),
-      relationship('r2', 'supports', 'sys-2', 'cap-1', { role: 'primary', fitForPurpose: 'poor' }),
-    ];
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, new Map())).toEqual([{ capability: capability('cap-1'), usedSecondaryFallback: false }]);
-  });
-
-  it('does not double-list a capability flagged by two different primary edges', () => {
-    const capabilities = [capability('cap-1')];
-    const supports = [
-      relationship('r1', 'supports', 'sys-1', 'cap-1', { role: 'primary', fitForPurpose: 'poor' }),
-      relationship('r2', 'supports', 'sys-2', 'cap-1', { role: 'primary', fitForPurpose: 'adequate' }),
-    ];
-    expect(findCapabilitiesWithPoorFitPrimarySupporter(capabilities, supports, new Map())).toEqual([{ capability: capability('cap-1'), usedSecondaryFallback: false }]);
   });
 });
 

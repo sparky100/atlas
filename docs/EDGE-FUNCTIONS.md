@@ -298,6 +298,8 @@ pnpm functions:deploy:capture-run
 (equivalent to `pnpm functions:bundle:capture-run && supabase functions deploy capture-run`
 — see above for why the bundle step is required, not optional).
 
+**CI deploys it too (2026-10-08).** `.github/workflows/deploy-migrations.yml` bundles and deploys `capture-run` on every push to `main`, after the migrations and before the app. Before this, a merged importer change (`src/capture`) reached the app but not the function: the round-trip fix (#352) was live in the UI while imports still ran the old importer. `llm-proxy` and `send-invite-email` are still deployed by hand.
+
 `SUPABASE_URL`/`SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` are provided
 automatically, as with every edge function above.
 

@@ -10,6 +10,7 @@ import {
   listChildrenOf,
   listDeltaHistoryForSubject,
   listFactsForSubject,
+  listFactsForSubjects,
   listFlowsViaElement,
   listInFlightBranchesTouchingSubject,
   listRelationshipHistoryForElement,
@@ -34,7 +35,7 @@ import { loadProjectionAtCommitCached } from '../query/cachedBranchProjection';
 import { attributesRecord } from './attributesRecord';
 import { capabilityLevel } from './capabilityDepth';
 import { containerParentIds, valueStreamParentIds } from './moduleDisplayName';
-import { isIntegrationPlatform, isPlatform } from './systemKind';
+import { flowViaIdsFor, isPlatform } from './systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -144,8 +145,10 @@ interface ElementSource {
   children: (parentId: UUID) => Promise<ElementsHeadRow[]>;
   relationships: (elementId: UUID) => Promise<RelationshipsHeadRow[]>;
   facts: (subjectId: UUID) => Promise<Map<string, FactsRow>>;
+  /** Every subject's facts in one go — the element page's relationship facts (`listFactsForSubjects`). */
+  factsForSubjects: (subjectIds: readonly UUID[]) => Promise<Map<UUID, Map<string, FactsRow>>>;
   /** Prompt 7k item 4 — see `ElementPageData.flowsViaThisPlatform`'s own doc comment. */
-  flowsViaElement: (platformElementId: UUID) => Promise<RelationshipsHeadRow[]>;
+  flowsViaElement: (viaIds: readonly UUID[]) => Promise<RelationshipsHeadRow[]>;
 }
 
 function projectionSource(commitId: UUID, projection: HeadProjection): ElementSource {
@@ -156,7 +159,8 @@ function projectionSource(commitId: UUID, projection: HeadProjection): ElementSo
     children: (parentId) => Promise.resolve(projectionChildrenOf(projection, parentId)),
     relationships: (elementId) => Promise.resolve(projectionRelationshipsForElement(projection, elementId)),
     facts: (subjectId) => Promise.resolve(projectionFactsForSubject(projection, subjectId)),
-    flowsViaElement: (platformElementId) => Promise.resolve(projectionFlowsViaElement(projection, platformElementId)),
+    factsForSubjects: (subjectIds) => Promise.resolve(new Map(subjectIds.map((id) => [id, projectionFactsForSubject(projection, id)]))),
+    flowsViaElement: (viaIds) => Promise.resolve(projectionFlowsViaElement(projection, viaIds)),
   };
 }
 
@@ -168,7 +172,8 @@ function commitSource(commitId: UUID): ElementSource {
     children: (parentId) => listChildrenOf(supabase, commitId, parentId),
     relationships: (elementId) => listRelationshipsForElement(supabase, commitId, elementId),
     facts: (subjectId) => loadFacts(commitId, subjectId),
-    flowsViaElement: (platformElementId) => listFlowsViaElement(supabase, commitId, platformElementId),
+    factsForSubjects: (subjectIds) => listFactsForSubjects(supabase, commitId, subjectIds),
+    flowsViaElement: (viaIds) => listFlowsViaElement(supabase, commitId, viaIds),
   };
 }
 
@@ -237,27 +242,30 @@ export function useElementPage(
       }
       const { commitId } = source;
 
-      const element = await source.element(elementId);
+      // Performance: every request that needs only `elementId` goes out
+      // together with the element itself — the page used to wait for the
+      // element row before asking for anything else, then for the parent
+      // before the children, and so on, one round trip at a time.
+      // History and in-flight changes are each a chain of two or three
+      // requests, so they start now and are awaited only where needed —
+      // never ahead of the rest of the page.
+      // Merge, then re-sort — `listDeltaHistoryForSubject`'s own newest-first,
+      // `id`-tiebreak order (see that function's doc comment) applied across
+      // both sources together, not just within each.
+      const historyPromise = Promise.all([listDeltaHistoryForSubject(supabase, modelId, elementId), listRelationshipHistoryForElement(supabase, modelId, elementId)]).then(([ownHistory, relationshipHistory]) =>
+        [...ownHistory, ...relationshipHistory].sort((a, b) => (a.created_at === b.created_at ? a.id.localeCompare(b.id) : b.created_at.localeCompare(a.created_at))),
+      );
+      const inFlightPromise = listInFlightBranchesTouchingSubject(supabase, modelId, elementId);
+      // Rejections are surfaced by the awaits below; these stop them being reported as unhandled first.
+      historyPromise.catch(() => undefined);
+      inFlightPromise.catch(() => undefined);
+      const [element, facts, relationships, aliases, children] = await Promise.all([source.element(elementId), source.facts(elementId), source.relationships(elementId), listAliasesForElement(supabase, modelId, elementId), source.children(elementId)]);
       if (!element) {
         if (!cancelled) setState({ status: 'notPresentAtRef', commitId, elementId });
         return;
       }
 
-      const [facts, relationships, aliases, ownHistory, relationshipHistory, inFlightBranches] = await Promise.all([
-        source.facts(elementId),
-        source.relationships(elementId),
-        listAliasesForElement(supabase, modelId, elementId),
-        listDeltaHistoryForSubject(supabase, modelId, elementId),
-        listRelationshipHistoryForElement(supabase, modelId, elementId),
-        listInFlightBranchesTouchingSubject(supabase, modelId, elementId),
-      ]);
-      // Merge, then re-sort — `listDeltaHistoryForSubject`'s own newest-first,
-      // `id`-tiebreak order (see that function's doc comment) applied across
-      // both sources together, not just within each.
-      const history = [...ownHistory, ...relationshipHistory].sort((a, b) => (a.created_at === b.created_at ? a.id.localeCompare(b.id) : b.created_at.localeCompare(a.created_at)));
-
       const parent = element.parent_id ? await source.element(element.parent_id) : null;
-      const children = await source.children(elementId);
 
       // Capability only, and only as deep as the level computation needs
       // (at most a grandparent — nesting is capped at 3 levels): a plain
@@ -280,124 +288,108 @@ export function useElementPage(
         if (parent) decisionElementIds.push(parent.element_id);
         if (grandparent) decisionElementIds.push(grandparent.element_id);
       }
-      const decisionLinks = await listDecisionsLinkingElements(supabase, decisionElementIds);
-      const decisionsById = new Map<UUID, DecisionRow>();
-      for (const link of decisionLinks) decisionsById.set(link.decision.id, link.decision);
-      const elementDecisions: ElementPageDecisionEntry[] = await Promise.all(
-        [...decisionsById.values()]
-          .sort((a, b) => (a.created_at === b.created_at ? 0 : a.created_at < b.created_at ? 1 : -1))
-          .map(async (decision) => {
-            const allLinks = await listDecisionLinksForDecision(supabase, decision.id);
-            const branchIds = allLinks.filter((l) => l.linked_type === 'branch').map((l) => l.linked_id);
-            const options = branchIds.length > 0 ? await listBranchesByIds(supabase, branchIds) : [];
-            return { decision, options };
-          }),
-      );
+      const loadDecisions = async (): Promise<ElementPageDecisionEntry[]> => {
+        const decisionLinks = await listDecisionsLinkingElements(supabase, decisionElementIds);
+        const decisionsById = new Map<UUID, DecisionRow>();
+        for (const link of decisionLinks) decisionsById.set(link.decision.id, link.decision);
+        return Promise.all(
+          [...decisionsById.values()]
+            .sort((a, b) => (a.created_at === b.created_at ? 0 : a.created_at < b.created_at ? 1 : -1))
+            .map(async (decision) => {
+              const allLinks = await listDecisionLinksForDecision(supabase, decision.id);
+              const branchIds = allLinks.filter((l) => l.linked_type === 'branch').map((l) => l.linked_id);
+              const options = branchIds.length > 0 ? await listBranchesByIds(supabase, branchIds) : [];
+              return { decision, options };
+            }),
+        );
+      };
 
       // Relationship attribute editing, general: the expanded attributes
-      // panel shows `uses`/`flows_to`'s own `via` (an integration-platform
-      // element reference, Prompt 7k item 4) resolved to a name and linked,
-      // the same as any other endpoint — so `via` ids are folded into the
-      // same batch lookup as the ordinary from/to endpoints, not a second
-      // round trip. Harmless when a relationship has no `via` (nothing
-      // added) or when it's already one of this element's own endpoints
-      // elsewhere (`elementsByIds`/the `Map` it returns dedupe on id).
-      //
-      // History's own need is folded in here too, not a second lookup:
-      // `HistoryTimeline.tsx`'s history entries name the *other* side of a
-      // relationship, live or since retracted — `relationships` above only
-      // ever covers today's live ones, so a retracted relationship's own
-      // endpoint (its capability/system is often still live, just no
-      // longer connected) needs resolving from `history` itself.
-      // `buildRelationshipParticipantsById` recovers both endpoints of
-      // every relationship in `history` from its own `relationship_create`
-      // row (that function's own doc comment explains why that row is
-      // always present) — this dedupes against `relationships`' own ids
-      // via the same `elementsByIds` Map, same as `via` above.
-      const historyEndpointIds = [...buildRelationshipParticipantsById(history).values()].flatMap((p) => [p.fromElementId, p.toElementId]);
-      const otherEndpointIds = relationships
-        .flatMap((rel) => {
-          const attrs = attributesRecord(rel.attributes);
-          const viaId = typeof attrs.via === 'string' ? [attrs.via] : [];
-          return [rel.from_element_id === elementId ? rel.to_element_id : rel.from_element_id, ...viaId];
-        })
-        .concat(historyEndpointIds);
-      const [relationshipEndpoints, relationshipFactsList] = await Promise.all([
-        source.elementsByIds(otherEndpointIds),
-        Promise.all(relationships.map((rel) => source.facts(rel.relationship_id))),
-      ]);
-      const relationshipFacts = new Map(relationships.map((rel, i) => [rel.relationship_id, relationshipFactsList[i] ?? new Map<string, FactsRow>()]));
+      // panel shows `uses`/`flows_to`'s own `via` resolved to a name and
+      // linked, the same as any other endpoint — so `via` ids are folded into
+      // the same batch lookup as the ordinary from/to endpoints. History's
+      // own need is folded in too: `HistoryTimeline.tsx` names the *other*
+      // side of a relationship, live or since retracted, recovered from each
+      // relationship's own `relationship_create` row
+      // (`buildRelationshipParticipantsById`).
+      const liveEndpointIds = relationships.flatMap((rel) => {
+        const attrs = attributesRecord(rel.attributes);
+        const viaId = typeof attrs.via === 'string' ? [attrs.via] : [];
+        return [rel.from_element_id === elementId ? rel.to_element_id : rel.from_element_id, ...viaId];
+      });
 
-      // History's own remaining gap: a `historyEndpointIds` id that isn't in
-      // `relationshipEndpoints` is one thing only — an element `source`
-      // (live-commit or projection alike) has no *current* row for, i.e.
-      // one that has itself since been retracted. `elements_head`/a
-      // projection only ever reflects live elements, so no `source` variant
-      // can ever answer this; `getElementNamesByIds` reads `deltas`
-      // directly instead (that function's own doc comment), the one place
-      // a retracted element's name is still guaranteed to exist.
-      const missingHistoryElementIds = [...new Set(historyEndpointIds)].filter((id) => !relationshipEndpoints.has(id));
-      const retractedElementNames = await getElementNamesByIds(supabase, modelId, missingHistoryElementIds);
-
-      // A container endpoint's own parent platform — never itself a
-      // relationship endpoint, so the from/to/via batch above never
-      // includes it. `RelationshipsSection.tsx` wants "Platform · Module"
-      // for a container row (the same convention `landscapeModules.ts`'s
-      // own `withModuleLabels` already uses), which needs the parent's
-      // name; folded into this same map (never a second one — the section
-      // only ever does one `endpoints.get(id)` lookup regardless of why a
-      // row is in there) once fetched. F6 Step 6 adds the same fold for a
-      // value_stream stage's own parent stream ("Stream · Stage").
-      const relationshipEndpointParentIds = [
-        ...containerParentIds(relationshipEndpoints.values()),
-        ...valueStreamParentIds(relationshipEndpoints.values()),
-      ];
-      if (relationshipEndpointParentIds.length > 0) {
-        const parents = await source.elementsByIds(relationshipEndpointParentIds);
+      const loadEndpoints = async (): Promise<{ relationshipEndpoints: Map<UUID, ElementsHeadRow>; retractedElementNames: Map<UUID, string> }> => {
+        // Live endpoints don't wait for history; history's own extra endpoints (relationships since retracted) follow once it arrives.
+        const [liveEndpoints, history] = await Promise.all([source.elementsByIds(liveEndpointIds), historyPromise]);
+        const historyEndpointIds = [...buildRelationshipParticipantsById(history).values()].flatMap((p) => [p.fromElementId, p.toElementId]);
+        const extraHistoryIds = [...new Set(historyEndpointIds)].filter((id) => !liveEndpoints.has(id));
+        const relationshipEndpoints = new Map([...liveEndpoints, ...(extraHistoryIds.length > 0 ? await source.elementsByIds(extraHistoryIds) : [])]);
+        // History's own remaining gap: a history endpoint `source` has no
+        // current row for has itself since been retracted — `deltas` still
+        // has its name (`getElementNamesByIds`). A container endpoint's own
+        // parent platform (and a stage's own stream) is never itself an
+        // endpoint, so it's fetched alongside and folded into the same map
+        // for "Platform · Module" / "Stream · Stage".
+        const missingHistoryElementIds = [...new Set(historyEndpointIds)].filter((id) => !relationshipEndpoints.has(id));
+        const relationshipEndpointParentIds = [...containerParentIds(relationshipEndpoints.values()), ...valueStreamParentIds(relationshipEndpoints.values())];
+        const [retractedElementNames, parents] = await Promise.all([
+          getElementNamesByIds(supabase, modelId, missingHistoryElementIds),
+          relationshipEndpointParentIds.length > 0 ? source.elementsByIds(relationshipEndpointParentIds) : Promise.resolve(new Map<UUID, ElementsHeadRow>()),
+        ]);
         for (const [id, row] of parents) relationshipEndpoints.set(id, row);
-      }
+        return { relationshipEndpoints, retractedElementNames };
+      };
 
-      const allSourceIds = [
-        ...new Set([...facts.values()].map((f) => f.source_id).concat([...relationshipFactsList.flatMap((m) => [...m.values()].map((f) => f.source_id))])),
-      ];
-      const aliasSourceIds = [...new Set(aliases.map((a) => a.source_id))];
-      const [sources, aliasSources] = await Promise.all([getSourcesByIds(supabase, allSourceIds), getSourcesByIds(supabase, aliasSourceIds)]);
+      const loadFactsAndSources = async (): Promise<{ relationshipFacts: Map<UUID, Map<string, FactsRow>>; sources: Map<UUID, SourceRow>; aliasSources: Map<UUID, SourceRow> }> => {
+        // One request for every relationship's facts, not one each.
+        const relationshipFacts = await source.factsForSubjects(relationships.map((rel) => rel.relationship_id));
+        const allSourceIds = [...new Set([...facts.values()].map((f) => f.source_id).concat([...relationshipFacts.values()].flatMap((m) => [...m.values()].map((f) => f.source_id))))];
+        const aliasSourceIds = [...new Set(aliases.map((a) => a.source_id))];
+        const [sources, aliasSources] = await Promise.all([getSourcesByIds(supabase, allSourceIds), getSourcesByIds(supabase, aliasSourceIds)]);
+        return { relationshipFacts, sources, aliasSources };
+      };
 
-      // Prompt 7k item 4: only a system with `kind: 'integration_platform'`
-      // can ever be named as anyone's `via` — every other element type
-      // skips this fetch entirely rather than paying for a commit-scoped
-      // uses/flows_to scan it can never have a match in.
-      let flowsViaThisPlatform: RelationshipsHeadRow[] = [];
-      let flowsViaThisPlatformEndpoints = new Map<UUID, ElementsHeadRow>();
-      if (element.element_type === 'system' && isIntegrationPlatform(element)) {
-        flowsViaThisPlatform = await source.flowsViaElement(elementId);
-        const endpointIds = flowsViaThisPlatform.flatMap((r) => [r.from_element_id, r.to_element_id]);
-        flowsViaThisPlatformEndpoints = await source.elementsByIds(endpointIds);
-        // "Platform · Module": a flow's own source/target can itself be a
-        // module of some other platform — same "fold its own parent into
-        // the same map" pattern `relationshipEndpointParentIds` above
-        // already establishes for `PlatformFlowsSection.tsx`'s identical
-        // need.
-        const flowEndpointParentIds = containerParentIds(flowsViaThisPlatformEndpoints.values());
+      // Prompt 7k item 4: only an integration platform (or, ADR-026, one of
+      // its interfaces) can ever be named as anyone's `via` — every other
+      // element skips this fetch entirely. A flow's own source/target can be
+      // a module of some other platform, so its parent is folded in too.
+      const loadFlowsVia = async (): Promise<{ flows: RelationshipsHeadRow[]; endpoints: Map<UUID, ElementsHeadRow> }> => {
+        const viaIds = flowViaIdsFor(element, parent, children);
+        if (viaIds.length === 0) return { flows: [], endpoints: new Map() };
+        const flows = await source.flowsViaElement(viaIds);
+        const endpoints = await source.elementsByIds(flows.flatMap((r) => [r.from_element_id, r.to_element_id]));
+        const flowEndpointParentIds = containerParentIds(endpoints.values());
         if (flowEndpointParentIds.length > 0) {
           const parents = await source.elementsByIds(flowEndpointParentIds);
-          for (const [id, row] of parents) flowsViaThisPlatformEndpoints.set(id, row);
+          for (const [id, row] of parents) endpoints.set(id, row);
         }
-      }
+        return { flows, endpoints };
+      };
 
-      // "Platforms and modules": a platform's own children (already loaded
-      // above as `children`, no new round trip for that half) are its
-      // modules — reuse the same `ElementSource.relationships` primitive
-      // `PlatformFlowsSection`'s own data uses, once per module, to find
-      // which capabilities they support.
-      let moduleSupportsEdges: RelationshipsHeadRow[] = [];
-      let moduleSupportsCapabilities = new Map<UUID, ElementsHeadRow>();
-      if (element.element_type === 'system' && isPlatform(element) && children.length > 0) {
+      // "Platforms and modules": a platform's own children are its modules —
+      // which capabilities they support, once per module.
+      const loadModuleSupports = async (): Promise<{ edges: RelationshipsHeadRow[]; capabilities: Map<UUID, ElementsHeadRow> }> => {
+        if (element.element_type !== 'system' || !isPlatform(element) || children.length === 0) return { edges: [], capabilities: new Map() };
         const perModuleRelationships = await Promise.all(children.map((module) => source.relationships(module.element_id)));
-        moduleSupportsEdges = perModuleRelationships.flat().filter((rel) => rel.relationship_type === 'supports');
-        const capabilityIds = [...new Set(moduleSupportsEdges.map((rel) => rel.to_element_id))];
-        moduleSupportsCapabilities = await source.elementsByIds(capabilityIds);
-      }
+        const edges = perModuleRelationships.flat().filter((rel) => rel.relationship_type === 'supports');
+        const capabilities = await source.elementsByIds([...new Set(edges.map((rel) => rel.to_element_id))]);
+        return { edges, capabilities };
+      };
+
+      // Performance: these five are independent of each other, so they run together.
+      const [elementDecisions, { relationshipEndpoints, retractedElementNames }, { relationshipFacts, sources, aliasSources }, flowsVia, moduleSupports, history, inFlightBranches] = await Promise.all([
+        loadDecisions(),
+        loadEndpoints(),
+        loadFactsAndSources(),
+        loadFlowsVia(),
+        loadModuleSupports(),
+        historyPromise,
+        inFlightPromise,
+      ]);
+      const flowsViaThisPlatform = flowsVia.flows;
+      const flowsViaThisPlatformEndpoints = flowsVia.endpoints;
+      const moduleSupportsEdges = moduleSupports.edges;
+      const moduleSupportsCapabilities = moduleSupports.capabilities;
 
       if (!cancelled) {
         setState({

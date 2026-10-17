@@ -20,13 +20,29 @@ import type { EvidenceWarning } from '../contracts/capture';
 
 /**
  * F11: column roles reachable through this synonym table only, never
- * offered to prompt A. Prompt A's text is frozen and its replay cassettes
+ * offered to prompt A (`actorType`, 2026-10-08: the export's own "Actor type"). Prompt A's text is frozen and its replay cassettes
  * are keyed on the exact request, so a new LLM role waits until they can be
  * re-recorded live; until then an exact synonym header ("TIME",
  * "Disposition", …) maps deterministically and any other header can't
  * reach the role at all.
  */
-export type SynonymOnlyColumnRole = 'disposition';
+export type SynonymOnlyColumnRole =
+  | 'disposition'
+  | 'actorType'
+  // The rest are attributes validated against the element's own attribute schema (`rowsToCandidates.ts`'s `SCHEMA_ATTRIBUTE_ROLE_KEYS`) — columns this product's own export writes.
+  | 'kind'
+  | 'criticality'
+  | 'domain'
+  | 'version'
+  | 'annualRunCost'
+  | 'supportEndsAt'
+  | 'orgUnit'
+  | 'capabilityCode'
+  | 'importance'
+  | 'essentialFunction'
+  // ADR-026: an interface's own two attributes, on the module sheet.
+  | 'interfaceType'
+  | 'transformation';
 
 /** Every role a column can end up with: prompt A's own, plus the synonym-only ones. */
 export type ColumnRole = PromptAColumnRole | SynonymOnlyColumnRole;
@@ -34,28 +50,45 @@ export type ColumnRole = PromptAColumnRole | SynonymOnlyColumnRole;
 const COLUMN_SYNONYMS_RAW: Readonly<Record<ColumnRole, readonly string[]>> = {
   atlasId: ['atlas_id', 'Atlas ID'],
   sourceKey: ['Asset ID', 'App ID', 'Ref', 'CMDB ID', 'Application number'],
-  name: ['Application', 'System', 'Application name', 'Product', 'Solution', 'Module'],
+  // 'Name' is the header this product's own export writes on every sheet.
+  name: ['Application', 'System', 'Application name', 'Product', 'Solution', 'Module', 'Name'],
   description: ['Description', 'Purpose', 'What it does'],
   vendor: ['Supplier', 'Vendor', 'Provider', 'Manufacturer'],
-  lifecycleStatus: ['Status', 'Lifecycle', 'State', 'Live?'],
-  introduced: ['Go-live', 'Implemented', 'Start date', 'In service since'],
-  plannedEnd: ['End of life', 'Contract end', 'Decommission date', 'Retire by'],
+  lifecycleStatus: ['Status', 'Lifecycle', 'State', 'Live?', 'Lifecycle (module override)'],
+  introduced: ['Go-live', 'Implemented', 'Start date', 'In service since', 'Introduced'],
+  plannedEnd: ['End of life', 'Contract end', 'Decommission date', 'Retire by', 'Planned end'],
   isExternal: ['Hosted', 'SaaS?', 'External', 'Internal/External'],
-  externalOrganisation: ['Operated by', 'Third party'],
-  hostingModel: ['Hosting model', 'Deployment model', 'On-prem/cloud'],
-  hostingProvider: ['Hosting provider', 'Data centre', 'Cloud provider'],
+  externalOrganisation: ['Operated by', 'Third party', 'External organisation'],
+  hostingModel: ['Hosting model', 'Deployment model', 'On-prem/cloud', 'Hosting model (module override)'],
+  hostingProvider: ['Hosting provider', 'Data centre', 'Cloud provider', 'Hosting provider (module override)'],
   disposition: ['TIME', 'Disposition', 'Rationalisation', 'Rationalization', 'TIME category', 'TIME disposition'],
+  // What this product's own export writes an actor's person/team/organisation column as (its "Type" is the element type).
+  actorType: ['Actor type'],
   technology: ['Technology', 'Platform', 'Stack'],
-  parent: ['Parent system', 'Part of'],
+  // 'Parent' / 'Parent capability' are what this product's own export writes on a capability sheet; 'Parent system' on a module sheet.
+  parent: ['Parent system', 'Part of', 'Parent', 'Parent capability'],
   owner: ['Owner', 'Business owner', 'Service owner', 'Accountable', 'Team'],
-  ownerEmail: ['Owner email', 'Contact'],
+  ownerEmail: ['Owner email', 'Contact', 'Email'],
   technicalOwner: ['Technical owner', 'IT owner', 'Engineering contact', 'Support team'],
   capability: ['Business area', 'Service', 'Function', 'Capability', 'Directorate', 'Domain'],
   usesSystems: ['Depends on', 'Integrations', 'Interfaces with', 'Upstream'],
   flowsTo: ['Sends data to', 'Feeds', 'Downstream'],
   integrationPlatform: ['Via', 'Integration platform', 'Routed through', 'Middleware'],
   notes: ['Notes', 'Comments'],
-  ignore: [],
+  // Provenance (`Source`, `Age`) and the element type (`Type`) the export writes — never data about the element — and a capability's sibling `Order`, which the app maintains.
+  ignore: ['Type', 'Source', 'Age', 'Order'],
+  kind: ['Kind'],
+  criticality: ['Criticality', 'Criticality (module override)'],
+  domain: ['IT/OT domain', 'Domain (module override)'],
+  version: ['Version'],
+  annualRunCost: ['Run cost'],
+  supportEndsAt: ['Vendor support ends'],
+  orgUnit: ['Org unit'],
+  capabilityCode: ['Reference'],
+  importance: ['Importance'],
+  essentialFunction: ['Essential function (NIS/CAF)'],
+  interfaceType: ['Interface type'],
+  transformation: ['Transformation'],
 };
 
 const COLUMN_SYNONYMS: ReadonlyMap<string, ColumnRole> = new Map(

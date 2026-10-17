@@ -31,8 +31,23 @@ import { spreadAlong, type Point } from './contextDiagramLayout';
 const PADDING = 32;
 /** Vertical gap between two tiles stacked in the same column. */
 const TILE_GUTTER_Y = 24;
-/** Horizontal distance between a column and the platform tile — wide enough for a label pill on each of the two segments meeting there. */
-const COLUMN_GAP = 140;
+/**
+ * Horizontal distance between a column and the platform tile. Each half is the run a label pill sits on (the verb on the source side, the data classification on the target side), so it holds a label pill (up to `PILL_RUN_WIDTH`) *beside* its tile rather than over it — at the original 140 the pills spilled across the tile edge they were meant to label.
+ */
+const COLUMN_GAP = 340;
+/** Vertical room each edge attached to a tile gets: a label pill is 18px tall, so adjacent attach points need clearly more than that or two pills on one tile sit on top of each other. */
+const ATTACH_PITCH = 26;
+/** Gap between a tile's edge and the start of the verb pill beside it. */
+const LABEL_INSET = 10;
+/** The longest a label pill may run beside its tile, in world units: the whole half-gap's run to the platform and a little past the elbow, leaving `LABEL_INSET` clear at each end. The canvas scales it with the zoom, so a label is cut only when it would really run into the next column. */
+export const PILL_RUN_WIDTH = COLUMN_GAP - LABEL_INSET * 4;
+/** ADR-026: the platform's own name sits in this strip at the top of its tile when interface bands fill the rest. */
+const HUB_HEADER = 26;
+
+/** A tile's height: the standard tile, or taller once it carries enough edges that their attach points would otherwise sit closer than `ATTACH_PITCH` (the platform itself, which every flow touches, grows the most — it is the bus). */
+function tileHeightFor(edgeCount: number): number {
+  return Math.max(NODE_HEIGHT, (edgeCount + 1) * ATTACH_PITCH);
+}
 
 export interface PlatformFlowTile {
   elementId: UUID;
@@ -51,6 +66,8 @@ export interface PlatformFlowEdgeInput {
   verbLabel: string;
   /** The relationship's own `dataClassification`, already formatted for display — `null` when unset (`flows_to` only ever carries one; `uses` never does, `relationshipAttributeSchema.ts`'s own schema). Shown on the platform→target segment. */
   classificationLabel: string | null;
+  /** ADR-026: the interface this flow's `via` names, when it names one rather than the platform itself — flows are grouped inside the platform tile by it. */
+  interfaceId?: UUID | null | undefined;
   /** Prompt's own "IT/OT boundary crossings highlighted" — true when the source and target resolve to opposite sides of the IT/OT boundary (`isBoundaryCrossingPair`/`resolveElementDomain`, `src/db/healthFindings.ts`/`systemDomain.ts`). */
   crossesBoundary: boolean;
 }
@@ -60,14 +77,29 @@ export interface RoutedPlatformFlowEdge extends PlatformFlowEdgeInput {
   sourceSegment: Point[];
   /** The platform's own right-edge attach point, through the elbow, to the target tile's left-edge attach point. */
   targetSegment: Point[];
-  /** Centre of the source segment's own leaving-the-source run — where the verb label pill sits. */
+  /** Left end of the verb label pill, on the source segment's own leaving-the-source run — the pill is drawn rightwards from here. */
   verbLabelAnchor: Point;
-  /** Centre of the target segment's own arriving-at-the-target run — where the classification chip pill sits. */
+  /** Centre of the target segment's own arriving-at-the-target run — where the target-side pill sits (the flow's number, and its data classification when it has one). */
   classificationLabelAnchor: Point;
+  /**
+   * This flow's number, shown on both its source-side and target-side pill. A flow is source → platform → target, drawn as two separate lines meeting at the platform, so with more than a couple of apps nothing else says which line out the right belongs to which line in on the left. Numbered top to bottom by where the flow leaves its source (the order the left-hand pills read in), from 1.
+   */
+  flowNumber: number;
+}
+
+/** ADR-026: one interface's band inside the platform tile — the vertical span its flows attach across. `interfaceId` null is the "via the platform itself" group, drawn only when interfaces exist too. */
+export interface InterfaceBand {
+  interfaceId: UUID | null;
+  top: number;
+  bottom: number;
 }
 
 export interface IntegrationPlatformContextLayout {
   hub: PlatformFlowTile;
+  /** Empty unless at least one flow names an interface. */
+  interfaceBands: InterfaceBand[];
+  /** Room at the top of the platform tile for its own name when bands are drawn inside it. */
+  hubHeaderHeight: number;
   sources: PlatformFlowTile[];
   targets: PlatformFlowTile[];
   edges: RoutedPlatformFlowEdge[];
@@ -80,13 +112,19 @@ function compareIds(a: string, b: string): number {
 }
 
 /** One column's own tiles, stacked top to bottom, sorted by id for a deterministic tie-break (CLAUDE.md rule 6 — there's no other ordering signal once every tile is the same fixed size). */
-function stackColumn(ids: readonly UUID[], x: number, top: number): PlatformFlowTile[] {
-  return [...ids].sort(compareIds).map((elementId, i) => ({ elementId, x, y: top + i * (NODE_HEIGHT + TILE_GUTTER_Y), w: NODE_WIDTH, h: NODE_HEIGHT }));
+function stackColumn(ids: readonly UUID[], x: number, top: number, heightOf: (id: UUID) => number): PlatformFlowTile[] {
+  let y = top;
+  return [...ids].sort(compareIds).map((elementId) => {
+    const h = heightOf(elementId);
+    const tile = { elementId, x, y, w: NODE_WIDTH, h };
+    y += h + TILE_GUTTER_Y;
+    return tile;
+  });
 }
 
 /** This column's own total height — every tile plus every gutter between them; 0 for an empty column. */
-function columnHeight(count: number): number {
-  return count === 0 ? 0 : count * NODE_HEIGHT + (count - 1) * TILE_GUTTER_Y;
+function columnHeight(ids: readonly UUID[], heightOf: (id: UUID) => number): number {
+  return ids.length === 0 ? 0 : [...ids].reduce((sum, id) => sum + heightOf(id), 0) + (ids.length - 1) * TILE_GUTTER_Y;
 }
 
 /**
@@ -101,15 +139,32 @@ export function computeIntegrationPlatformContextLayout(
   targetIds: readonly UUID[],
   edges: readonly PlatformFlowEdgeInput[],
 ): IntegrationPlatformContextLayout {
-  const contentHeight = Math.max(NODE_HEIGHT, columnHeight(sourceIds.length), columnHeight(targetIds.length));
+  // How many drawn edges touch each tile decides how tall it is (`tileHeightFor`): the platform carries every one, a source or target only its own.
+  const sourceIdSet = new Set(sourceIds);
+  const targetIdSet = new Set(targetIds);
+  const drawn = edges.filter((e) => sourceIdSet.has(e.sourceId) && targetIdSet.has(e.targetId));
+  const sourceEdgeCount = new Map<UUID, number>();
+  const targetEdgeCount = new Map<UUID, number>();
+  for (const edge of drawn) {
+    sourceEdgeCount.set(edge.sourceId, (sourceEdgeCount.get(edge.sourceId) ?? 0) + 1);
+    targetEdgeCount.set(edge.targetId, (targetEdgeCount.get(edge.targetId) ?? 0) + 1);
+  }
+  const sourceHeight = (id: UUID): number => tileHeightFor(sourceEdgeCount.get(id) ?? 0);
+  const targetHeight = (id: UUID): number => tileHeightFor(targetEdgeCount.get(id) ?? 0);
+  const grouped = drawn.some((e) => e.interfaceId != null);
+  const hubHeaderHeight = grouped ? HUB_HEADER : 0;
+  const hubHeight = tileHeightFor(drawn.length) + hubHeaderHeight;
+  const sourcesHeight = columnHeight(sourceIds, sourceHeight);
+  const targetsHeight = columnHeight(targetIds, targetHeight);
+  const contentHeight = Math.max(hubHeight, sourcesHeight, targetsHeight);
 
   const sourcesX = PADDING;
   const hubX = sourcesX + NODE_WIDTH + COLUMN_GAP;
   const targetsX = hubX + NODE_WIDTH + COLUMN_GAP;
 
-  const sources = stackColumn(sourceIds, sourcesX, PADDING + (contentHeight - columnHeight(sourceIds.length)) / 2);
-  const targets = stackColumn(targetIds, targetsX, PADDING + (contentHeight - columnHeight(targetIds.length)) / 2);
-  const hub: PlatformFlowTile = { elementId: hubId, x: hubX, y: PADDING + (contentHeight - NODE_HEIGHT) / 2, w: NODE_WIDTH, h: NODE_HEIGHT };
+  const sources = stackColumn(sourceIds, sourcesX, PADDING + (contentHeight - sourcesHeight) / 2, sourceHeight);
+  const targets = stackColumn(targetIds, targetsX, PADDING + (contentHeight - targetsHeight) / 2, targetHeight);
+  const hub: PlatformFlowTile = { elementId: hubId, x: hubX, y: PADDING + (contentHeight - hubHeight) / 2, w: NODE_WIDTH, h: hubHeight };
 
   const sourceById = new Map(sources.map((t) => [t.elementId, t]));
   const targetById = new Map(targets.map((t) => [t.elementId, t]));
@@ -149,10 +204,30 @@ export function computeIntegrationPlatformContextLayout(
   // incoming edge, ordered by the source's own attach y so lines never
   // needlessly cross), the right edge symmetrically for outgoing edges.
   const routableEdges = edges.filter((e) => sourceById.has(e.sourceId) && targetById.has(e.targetId));
-  const hubLeftOrder = [...routableEdges].sort((a, b) => (sourceAttachY.get(a.id) ?? 0) - (sourceAttachY.get(b.id) ?? 0) || compareIds(a.id, b.id));
-  const hubLeftY = new Map<UUID, number>(hubLeftOrder.map((edge, i) => [edge.id, spreadAlong(hub.y, hub.h, i, hubLeftOrder.length)]));
-  const hubRightOrder = [...routableEdges].sort((a, b) => (targetAttachY.get(a.id) ?? 0) - (targetAttachY.get(b.id) ?? 0) || compareIds(a.id, b.id));
-  const hubRightY = new Map<UUID, number>(hubRightOrder.map((edge, i) => [edge.id, spreadAlong(hub.y, hub.h, i, hubRightOrder.length)]));
+  // ADR-026: when flows name interfaces, both of the platform's edges list them group by group (interfaces in order of their first flow down the left, "via the platform itself" last), so each group's flows enter and leave across the same band of the tile.
+  const groupRank = new Map<UUID | null, number>();
+  if (grouped) {
+    const bySourceY = [...routableEdges].sort((a, b) => (sourceAttachY.get(a.id) ?? 0) - (sourceAttachY.get(b.id) ?? 0) || compareIds(a.id, b.id));
+    for (const edge of bySourceY) if (edge.interfaceId != null && !groupRank.has(edge.interfaceId)) groupRank.set(edge.interfaceId, groupRank.size);
+    groupRank.set(null, groupRank.size);
+  }
+  const rankOf = (edge: PlatformFlowEdgeInput): number => (grouped ? (groupRank.get(edge.interfaceId ?? null) ?? 0) : 0);
+  const attachTop = hub.y + hubHeaderHeight;
+  const attachHeight = hub.h - hubHeaderHeight;
+  const hubLeftOrder = [...routableEdges].sort((a, b) => rankOf(a) - rankOf(b) || (sourceAttachY.get(a.id) ?? 0) - (sourceAttachY.get(b.id) ?? 0) || compareIds(a.id, b.id));
+  const hubLeftY = new Map<UUID, number>(hubLeftOrder.map((edge, i) => [edge.id, spreadAlong(attachTop, attachHeight, i, hubLeftOrder.length)]));
+  const hubRightOrder = [...routableEdges].sort((a, b) => rankOf(a) - rankOf(b) || (targetAttachY.get(a.id) ?? 0) - (targetAttachY.get(b.id) ?? 0) || compareIds(a.id, b.id));
+  const hubRightY = new Map<UUID, number>(hubRightOrder.map((edge, i) => [edge.id, spreadAlong(attachTop, attachHeight, i, hubRightOrder.length)]));
+  // One band per group: from half a pitch above its first attach point to half a pitch below its last (left and right lists hold each group at the same positions, so one span serves both edges of the tile).
+  const pitch = attachHeight / (hubLeftOrder.length + 1);
+  const interfaceBands: InterfaceBand[] = [];
+  if (grouped) {
+    for (const [interfaceId] of [...groupRank.entries()].sort((a, b) => a[1] - b[1])) {
+      const ys = hubLeftOrder.filter((e) => (e.interfaceId ?? null) === interfaceId).map((e) => hubLeftY.get(e.id) ?? 0);
+      if (ys.length === 0) continue;
+      interfaceBands.push({ interfaceId, top: Math.min(...ys) - pitch / 2, bottom: Math.max(...ys) + pitch / 2 });
+    }
+  }
 
   const sourceMidX = sourcesX + NODE_WIDTH + COLUMN_GAP / 2;
   const targetMidX = hubX + NODE_WIDTH + COLUMN_GAP / 2;
@@ -183,15 +258,23 @@ export function computeIntegrationPlatformContextLayout(
         ...edge,
         sourceSegment,
         targetSegment,
-        verbLabelAnchor: { x: (sourceStart.x + sourceMidX) / 2, y: sy },
+        // The pill's left end, just clear of the source tile (the canvas draws it from here to the right), so a long verb runs along the line instead of back over the tile it labels.
+        verbLabelAnchor: { x: sourceStart.x + LABEL_INSET, y: sy },
         classificationLabelAnchor: { x: (targetMidX + targetEnd.x) / 2, y: ty },
+        flowNumber: 0,
       },
     ];
   });
   routed.sort((a, b) => compareIds(a.id, b.id));
+  // Numbered in the order the left-hand pills read, top to bottom (by the source's attach y, then id) — not the platform's grouped order — so the numbers on the left run 1, 2, 3 …
+  const readingOrder = [...routableEdges].sort((a, b) => (sourceAttachY.get(a.id) ?? 0) - (sourceAttachY.get(b.id) ?? 0) || compareIds(a.id, b.id));
+  const numberByEdgeId = new Map(readingOrder.map((edge, i) => [edge.id, i + 1]));
+  for (const edge of routed) edge.flowNumber = numberByEdgeId.get(edge.id) ?? 0;
 
   return {
     hub,
+    interfaceBands,
+    hubHeaderHeight,
     sources,
     targets,
     edges: routed,

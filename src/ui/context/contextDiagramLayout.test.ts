@@ -472,3 +472,39 @@ describe('edgeNear (hover/tap-to-reveal)', () => {
     expect(edgeNear(layout.edges, { x: -500, y: -500 }, 6)).toBeNull();
   });
 });
+
+describe('a wide row below (or above) the hub beside tall side columns', () => {
+  // The SAP PM case from a real model: three systems feeding the hub down the left, one it feeds on the right, and four two-way neighbours in the row below. Four tiles are wider than the gap between the columns, so the row used to start under the left column and its first tile sat on top of the column's last (hiding that tile's connector behind it).
+  const sources = ['crm', 'poweron', 'rhythm'].map((id) => neighbour(id));
+  const target = neighbour('informatica');
+  const twoWay = ['gdt', 'arcgis', 'narms', 'field'].map((id) => neighbour(id));
+  const actors = ['team-a', 'team-b', 'team-c', 'team-d'].map((id) => neighbour(id, { isActor: true }));
+  const edges: ContextEdgeInput[] = [
+    ...sources.map((n) => ({ id: `${n.id}-e`, neighbourId: n.id, arrowAtHub: true, label: 'sends to' })),
+    { id: 'informatica-e', neighbourId: 'informatica', arrowAtHub: false, label: 'sends to' },
+    ...twoWay.flatMap((n) => [
+      { id: `${n.id}-in`, neighbourId: n.id, arrowAtHub: true, label: 'sends to' },
+      { id: `${n.id}-out`, neighbourId: n.id, arrowAtHub: false, label: 'reads from' },
+    ]),
+    ...actors.map((n) => ({ id: `${n.id}-e`, neighbourId: n.id, arrowAtHub: true, label: 'uses' })),
+  ];
+  const layout = computeContextDiagramLayout('hub', [...sources, target, ...twoWay, ...actors], 1280, edges);
+
+  it('places no two tiles on top of each other', () => {
+    const tiles = [layout.hub, ...layout.neighbours];
+    for (let i = 0; i < tiles.length; i++) for (let j = i + 1; j < tiles.length; j++) expect(tilesOverlap(tiles[i], tiles[j])).toBe(false);
+  });
+
+  it('routes no edge through any tile, and no two edges across each other', () => {
+    const rects = allRects(layout);
+    for (const edge of layout.edges) for (const [a, b] of segmentsOf(edge)) for (const rect of rects) expect(segmentCrossesInterior(a, b, rect)).toBe(false);
+    for (let i = 0; i < layout.edges.length; i++) {
+      for (let j = i + 1; j < layout.edges.length; j++) {
+        const edgeA = layout.edges[i];
+        const edgeB = layout.edges[j];
+        if (!edgeA || !edgeB) continue;
+        for (const [a1, a2] of segmentsOf(edgeA)) for (const [b1, b2] of segmentsOf(edgeB)) expect(segmentsIntersect(a1, a2, b1, b2)).toBe(false);
+      }
+    }
+  });
+});

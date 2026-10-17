@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getMainBranch, listChangeBranches } from '../../db/branches';
+import { listDecisionsForModel } from '../../db/decisions';
 import { listOpenMergeRequestsForModel } from '../../db/mergeRequests';
+import { listProjectsForModel } from '../../db/projects';
 import type { BranchRow, MergeRequestRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
+import { buildMyOwnedWork, type MyOwnedWork } from './whatWeAreDoing';
 
 export interface ArchitectHomeData {
   reviewQueueCount: number;
   oldestReviewItem: MergeRequestRow | null;
   myOpenBranches: BranchRow[];
+  /** The open decisions and in-hand projects this user owns (UI-principles §3, 2026-10-04) — `buildMyOwnedWork`. */
+  myOwnedWork: MyOwnedWork;
 }
 
 export type ArchitectHomeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: ArchitectHomeData };
@@ -33,7 +38,7 @@ const MY_OPEN_STATUSES: BranchRow['status'][] = ['draft', 'proposed', 'in_review
  * including panels that have nothing to do with either, waited on a dozen
  * queries and a batch of finding computations before painting anything at
  * all. This hook is now just main's id, the review queue, and this user's
- * own open branches — three small queries, not the model's entire
+ * own open branches, decisions and projects — five small queries, not the model's entire
  * capability/system/relationship graph.
  */
 export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectHomeState {
@@ -41,6 +46,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
 
   useEffect(() => {
     if (!modelId || !userId) return undefined;
+    const viewerId = userId;
     let cancelled = false;
     setState({ status: 'loading' });
 
@@ -51,13 +57,19 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
         return;
       }
 
-      const [reviewQueue, changeBranches] = await Promise.all([listOpenMergeRequestsForModel(supabase, modelId), listChangeBranches(supabase, modelId)]);
-      const myOpenBranches = changeBranches.filter((b) => b.created_by === userId && MY_OPEN_STATUSES.includes(b.status));
+      const [reviewQueue, changeBranches, decisions, projects] = await Promise.all([
+        listOpenMergeRequestsForModel(supabase, modelId),
+        listChangeBranches(supabase, modelId),
+        listDecisionsForModel(supabase, modelId),
+        listProjectsForModel(supabase, modelId),
+      ]);
+      const myOpenBranches = changeBranches.filter((b) => b.created_by === viewerId && MY_OPEN_STATUSES.includes(b.status));
+      const myOwnedWork = buildMyOwnedWork(projects, decisions, changeBranches, viewerId, new Date().toISOString().slice(0, 10));
 
       if (!cancelled) {
         setState({
           status: 'ready',
-          data: { reviewQueueCount: reviewQueue.length, oldestReviewItem: reviewQueue[0] ?? null, myOpenBranches },
+          data: { reviewQueueCount: reviewQueue.length, oldestReviewItem: reviewQueue[0] ?? null, myOpenBranches, myOwnedWork },
         });
       }
     }

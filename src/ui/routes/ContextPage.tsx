@@ -17,7 +17,7 @@ import { BranchViewModeControl } from '../branches/BranchViewModeControl';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
-import { useMainBranch } from '../branches/useMainBranch';
+import { hintedModelId, useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { ContextInspectorContent } from '../context/ContextInspectorContent';
@@ -66,7 +66,7 @@ export function ContextPage() {
   const model = models.find((m) => m.slug === modelSlug);
   const capability = useBreadcrumbElement(model?.id ?? null, ref, capabilityId);
   const { label: branchLabel } = useBranchLabel(ref);
-  const { branch: mainBranch } = useMainBranch(model?.id ?? null);
+  const { branch: mainBranch, loading: mainBranchLoading } = useMainBranch(model?.id ?? null);
 
   const state = useElementContext(model?.id ?? '', organisation?.id ?? '', userId, elementId ?? '', ref, mode);
   // See ElementPage.tsx's identical effect for why this is a real
@@ -82,7 +82,7 @@ export function ContextPage() {
   // works — `hub.parent_id` is `null` for a standalone solution container,
   // which simply means no extra segment, not an error.
   const platformParentId = hub?.element_type === 'container' ? hub.parent_id : null;
-  const platformParent = useBreadcrumbElement(model?.id ?? null, ref, platformParentId, mainBranch?.head_commit_id ?? null);
+  const platformParent = useBreadcrumbElement(hintedModelId(model?.id, ref, mainBranchLoading), ref, platformParentId, mainBranch?.head_commit_id ?? null);
 
   // V2b's Inspector, Context rollout: click-to-focus on the diagram's own
   // desktop canvas (`ContextDiagramCanvas.tsx`'s own doc comment) — the
@@ -174,6 +174,7 @@ export function ContextPage() {
             hub={state.data.hub}
             flows={state.data.flows}
             endpoints={state.data.endpoints}
+            interfaces={state.data.interfaces}
             orgSlug={organisation?.slug ?? ''}
             modelSlug={model.slug}
             refParam={refParam}
