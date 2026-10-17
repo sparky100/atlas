@@ -28,14 +28,37 @@ export interface SapContextFixture extends ChangeBranchFixture {
   scenario: ContainerContextScenario;
 }
 
+/**
+ * Fresh ids every run (they must be unique across runs against the same
+ * database), handed out in a fixed ascending order. The Context layout
+ * orders tiles and edges by id (`contextDiagramLayout.ts`'s `compareIds`),
+ * so plain random ids gave a different arrangement on every run — and in
+ * about one run in five, an arrangement where two labels collide and the
+ * canvas hides them (its designed fallback), failing the specs that check
+ * this fixture's labels are all visible. Ascending ids in creation order
+ * give the same arrangement every time.
+ */
+function ascendingIds(count: number): () => string {
+  const ids = Array.from({ length: count }, () => randomUUID()).sort();
+  let next = 0;
+  return () => {
+    const id = ids[next];
+    if (id === undefined) throw new Error('sapContextFixture: ran out of pre-minted ids');
+    next += 1;
+    return id;
+  };
+}
+
 export async function seedSapContextFixture(page: Page, env: Env, prefix: string, scenario: ContainerContextScenario = PM_CONTEXT_SCENARIO): Promise<SapContextFixture> {
   const fixture = await bootstrapChangeBranchFixture(page, env, prefix, SAP_HUB_NAME);
   const { signedIn: owner, orgId, modelId, systemId: sapId, userId: ownerId, main } = fixture;
   const source = await getOrCreateManualSource(owner, { id: randomUUID(), orgId, modelId, userId: ownerId });
 
-  const moduleIdByCode = new Map(SAP_MODULES.map((m) => [m.code, randomUUID()]));
-  const capabilityIdByCode = new Map(SAP_MODULES.map((m) => [m.code, randomUUID()]));
-  const neighbourIdByKey = new Map(scenario.neighbours.map((n) => [n.key, randomUUID()]));
+  const nextElementId = ascendingIds(SAP_MODULES.length * 2 + scenario.neighbours.length);
+  const nextRelationshipId = ascendingIds(SAP_MODULES.length + scenario.neighbours.reduce((total, n) => total + n.flows.length, 0));
+  const moduleIdByCode = new Map(SAP_MODULES.map((m) => [m.code, nextElementId()]));
+  const capabilityIdByCode = new Map(SAP_MODULES.map((m) => [m.code, nextElementId()]));
+  const neighbourIdByKey = new Map(scenario.neighbours.map((n) => [n.key, nextElementId()]));
   const hubModuleId = moduleIdByCode.get(scenario.hubModuleCode) ?? '';
 
   const deltas: Delta[] = [
@@ -48,7 +71,7 @@ export async function seedSapContextFixture(page: Page, env: Env, prefix: string
     deltas.push(
       { kind: 'element.create', id: randomUUID(), elementId: capabilityId, elementType: 'capability', name: module.capability, parentId: null, attributes: {}, sourceId: source.id, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: moduleId, elementType: 'container', name: module.name, parentId: sapId, attributes: { isExternal: false }, sourceId: source.id, confidence: 1 },
-      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: moduleId, toElementId: capabilityId, attributes: { role: 'primary' }, sourceId: source.id, confidence: 1 },
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: nextRelationshipId(), relationshipType: 'supports', fromElementId: moduleId, toElementId: capabilityId, attributes: { role: 'primary' }, sourceId: source.id, confidence: 1 },
     );
   }
   for (const neighbour of scenario.neighbours) {
@@ -84,7 +107,7 @@ export async function seedSapContextFixture(page: Page, env: Env, prefix: string
     for (const flow of neighbour.flows) {
       const fromElementId = flow.direction === 'in' ? neighbourId : hubModuleId;
       const toElementId = flow.direction === 'in' ? hubModuleId : neighbourId;
-      deltas.push({ kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: flow.relationshipType, fromElementId, toElementId, attributes: { description: flow.verb }, sourceId: source.id, confidence: 1 });
+      deltas.push({ kind: 'relationship.create', id: randomUUID(), relationshipId: nextRelationshipId(), relationshipType: flow.relationshipType, fromElementId, toElementId, attributes: { description: flow.verb }, sourceId: source.id, confidence: 1 });
     }
   }
 

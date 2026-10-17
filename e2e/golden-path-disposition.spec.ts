@@ -80,7 +80,8 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
   await page.getByRole('link', { name: 'Open Migrate Legacy Payroll' }).click();
   await page.getByRole('region', { name: 'Chosen design' }).getByRole('link', { name: 'retire-legacy-payroll' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
-  await expect(page.getByText('proposed', { exact: true })).toBeVisible();
+  // The change and its review request each carry a "proposed" chip once submitted.
+  await expect(page.getByText('proposed', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Approve', exact: true }).click();
   await page.getByRole('button', { name: 'Merge', exact: true }).click();
   await expect(page.getByText('merged', { exact: true }).first()).toBeVisible();

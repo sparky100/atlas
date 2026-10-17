@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * S2's own shared click-only helpers (docs/prompts/atlas-prompt-pack.md):
@@ -194,12 +194,31 @@ export async function addSystemFromHome(page: Page, options: AddSystemOptions): 
  * platform (system) — `HomeSearch.tsx`'s own `showPlatformPicker` sheet.
  * Lands on the new module's own page.
  */
+/**
+ * A row in Home's own search results (`HomeSearch.tsx`'s "Search results"
+ * list), by the element's name. Scoped to that list because the same
+ * element is often linked elsewhere on Home too — recent activity, a
+ * change's subjects — and an unscoped `getByRole('link', { name })` matched
+ * whichever of those had rendered, a strict-mode failure whenever more than
+ * one had.
+ */
+export function homeSearchResult(page: Page, name: string): Locator {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return page.getByRole('list', { name: 'Search results' }).getByRole('link', { name: new RegExp(`(^|\\s)${escaped}(\\s|$)`) }).first();
+}
+
 export async function addContainerFromHome(page: Page, name: string, platformNameMatch: string): Promise<void> {
   const searchBox = page.getByPlaceholder('Search or create a capability, system, or actor…');
   await expect(searchBox).toBeVisible();
   await searchBox.fill(name);
-  // The type select beside Home's search box (Home now has other selects too).
-  await searchBox.locator('xpath=following::select[1]').selectOption('container');
+  // The type select in the create row itself, beside its own "Create …"
+  // button — the row renders only once the search has settled, and until
+  // then "the first select after the search box" was some other select on
+  // the page (on the Elements page, one of its own filters), so picking
+  // "container" there left the create row on "system".
+  const createButton = page.getByRole('button', { name: new RegExp(`^Create \\w+ "${name}"$`) });
+  await expect(createButton).toBeVisible();
+  await createButton.locator('xpath=preceding-sibling::select[1]').selectOption('container');
   await page.getByRole('button', { name: `Create container "${name}"` }).click();
 
   await expect(page.getByText('Which platform is this a module of? (required)')).toBeVisible();

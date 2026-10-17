@@ -16,7 +16,7 @@
  * replacement marker.
  */
 import { expect, test } from '@playwright/test';
-import { addCapability, addSystemFromHome, goToModelHome, retireElement, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
+import { addCapability, addSystemFromHome, goToModelHome, homeSearchResult, retireElement, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
 function isoDateDaysFromNow(days: number): string {
   const d = new Date();
@@ -57,7 +57,7 @@ test('a retire-and-replace change, once merged, appears as an arrow on the roadm
   // Retire Legacy CRM, replaced by New CRM Platform, inside this change.
   await goToModelHome(page);
   await page.getByPlaceholder('Search or create a capability, system, or actor…').fill('Legacy CRM');
-  await page.getByRole('link', { name: 'Legacy CRM' }).click();
+  await homeSearchResult(page, 'Legacy CRM').click();
   await expect(page.getByRole('heading', { name: 'Legacy CRM' })).toBeVisible();
   await retireElement(page, isoDateDaysFromNow(90), 'New CRM Platform');
   await expect(page.getByText(/Replaced by/)).toBeVisible();
@@ -71,7 +71,8 @@ test('a retire-and-replace change, once merged, appears as an arrow on the roadm
   await page.getByRole('link', { name: 'Changes' }).click();
   await page.locator('li', { hasText: 'sunset-legacy-crm' }).getByRole('link', { name: 'Open →' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
-  await expect(page.getByText('proposed', { exact: true })).toBeVisible();
+  // The change and its review request each carry a "proposed" chip once submitted.
+  await expect(page.getByText('proposed', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Approve', exact: true }).click();
   await page.getByRole('button', { name: 'Merge', exact: true }).click();
   await expect(page.getByText('merged', { exact: true }).first()).toBeVisible();
@@ -85,7 +86,7 @@ test('a retire-and-replace change, once merged, appears as an arrow on the roadm
   // where the breadcrumb renders (collapsed at 390, where this spec also
   // runs — S2's own "fix until they pass at 1280 and 390").
   await clickNavItem(page, 'Roadmap');
-  await expect(page.getByRole('heading', { name: 'Roadmap' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Roadmap', exact: true })).toBeVisible();
   await expect(page.getByText(quarterLabelDaysFromNow(120))).toBeVisible();
   await expect(page.locator('[data-kind="replace"]').first()).toBeVisible();
   // No capability parenthetical: this event comes from the real `replaces`

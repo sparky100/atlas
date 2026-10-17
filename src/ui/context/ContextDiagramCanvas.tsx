@@ -455,16 +455,25 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
       ctx.textAlign = 'left';
 
       // Rework items 3–4: label pills, placed in world units by the pure layout module (widths measured at the current font and divided back to world), audited for collisions, then drawn — all of them when labels are visible, only the hovered edge's when they're hidden.
-      ctx.font = `${(11 * textScale).toFixed(2)}px sans-serif`;
+      // Measured once at the reference size (11px in world units), so the
+      // collision audit below gives the same answer at every zoom. It used
+      // to measure at the zoom-stepped screen font and divide by the exact
+      // zoom: within one zoom step the font is rounded up or down, so the
+      // same diagram's labels "collided" at one window width and not at a
+      // slightly different one (a page scrollbar was enough to flip it).
+      ctx.font = '11px sans-serif';
       ctx.textAlign = 'center';
-      const measureWorld = (text: string): number => ctx.measureText(text).width / transform.scale;
+      const measureWorld = (text: string): number => ctx.measureText(text).width;
       const pills = placeEdgeLabels(layout.edges, measureWorld);
+      // Drawn no larger than the exact zoom, so text never outgrows the pill it was measured for.
+      const pillTextScale = Math.min(textScale, transform.scale);
+      ctx.font = `${(11 * pillTextScale).toFixed(2)}px sans-serif`;
       const collide = edgeLabelsCollide(pills, allTilesOf(layout));
       if (collide !== labelsWouldCollide) setLabelsWouldCollide(collide);
       const labelsShown = showLabels && (labelMode === 'show' || (labelMode === 'auto' && !collide));
       const pillsToDraw: EdgeLabelPill[] = labelsShown ? pills : pills.filter((p) => p.edgeId === hoveredEdgeId);
       const hoveredLast = [...pillsToDraw.filter((p) => p.edgeId !== hoveredEdgeId), ...pillsToDraw.filter((p) => p.edgeId === hoveredEdgeId)];
-      const edgeLabelLineHeight = 12 * textScale;
+      const edgeLabelLineHeight = 12 * pillTextScale;
       for (const pill of hoveredLast) {
         const highlighted = pill.edgeId === hoveredEdgeId;
         const [left, top] = toScreen(pill.x - pill.width / 2, pill.y - pill.height / 2);
