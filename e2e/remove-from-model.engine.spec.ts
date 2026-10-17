@@ -51,6 +51,10 @@ test('removing a system from the model retracts every one of its relationships a
   // element page with nothing to show sends you back rather than leaving
   // a dead end (#313, ElementPage.tsx's own `notPresentAtRef` effect).
   await expect(page.getByRole('heading', { name: 'Field Devices Gateway', level: 1 })).toHaveCount(0, { timeout: 15_000 });
+  // Let that step back finish before navigating on: it is a history
+  // traversal, and when it landed after the `goto` below it took the page
+  // back to Home instead.
+  await page.waitForURL((url) => !url.pathname.includes(systemId));
 
   // Its relationships went with it, in the same commit — Metering no
   // longer lists Field Devices Gateway as a supporter.
