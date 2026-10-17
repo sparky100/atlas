@@ -18,6 +18,7 @@ import { FactBadge } from '../FactBadge/FactBadge';
 import { fitNotRatedRelationshipIds } from './fitNotRatedEdges';
 import { endpointDisplayName } from './relationshipEndpointLabel';
 import { RelationshipAdd } from './RelationshipAdd';
+import { isSlotApplicable } from './slotApplicability';
 import { RelationshipRemove, type RelationshipsSectionRemoveConfig } from './RelationshipRemove';
 import { Text } from '../Text/Text';
 import styles from './RelationshipsSection.module.css';
@@ -78,6 +79,12 @@ export interface RelationshipsSectionProps {
   modelSlug: string;
   elementId: UUID;
   elementType: ElementType;
+  /** This element's own `parent_id` — C22 needs it to tell a value-stream stage from a stream (`slotApplicability.ts`). */
+  elementParentId?: UUID | null | undefined;
+  /** Whether this element is an actor with `isExternal === true` — C20 forces its `owns` edges to `service` (`slotApplicability.ts`). */
+  elementIsExternal?: boolean | undefined;
+  /** Whether this is a `platform`-kind system — its modules support capabilities, not the platform itself (`slotApplicability.ts`). */
+  elementIsPlatform?: boolean | undefined;
   /** This element's own current name — "Relationship removal"'s confirmation sentence subject (`elementName` on `addRelationship` already carries this for the create side; the remove side needs it unconditionally, even when `removeRelationship` is the only config given). */
   elementName: string;
   /** ADR-026: this element is an interface. Slots that don't fit one (supports, flows to / receives from — flows are modelled between systems *via* it) are not offered, and "uses" sits under a collapsed "More relationships" until it has a row. Existing rows always show, whatever the group. */
@@ -135,6 +142,9 @@ export function RelationshipsSection({
   modelSlug,
   elementId,
   elementType,
+  elementParentId = null,
+  elementIsExternal = false,
+  elementIsPlatform = false,
   elementName,
   isInterface = false,
   relationships,
@@ -165,8 +175,9 @@ export function RelationshipsSection({
     const groupEditRelationship = editRelationship;
     const outboundRows = relationships.filter((r) => r.relationship_type === type && r.from_element_id === elementId);
     const inboundRows = relationships.filter((r) => r.relationship_type === type && r.to_element_id === elementId);
-    const outboundSlot = outboundSlots.get(type);
-    const inboundSlot = inboundSlots.get(type);
+    // C20/C22 (`slotApplicability.ts`): drop a slot the rules table admits but this element can't legally use — existing rows still show.
+    const outboundSlot = isSlotApplicable(type, 'outbound', elementType, elementParentId, elementIsPlatform) ? outboundSlots.get(type) : undefined;
+    const inboundSlot = isSlotApplicable(type, 'inbound', elementType, elementParentId, elementIsPlatform) ? inboundSlots.get(type) : undefined;
     // ADR-026: an interface offers no empty slot for supports or flows_to (either direction); rows already recorded still show.
     const slotFits = !(isInterface && (type === 'supports' || type === 'flows_to'));
     const showOutbound = outboundRows.length > 0 || (slotFits && groupAddRelationship !== undefined && outboundSlot !== undefined);
@@ -191,6 +202,7 @@ export function RelationshipsSection({
               slot={outboundSlot}
               elementId={elementId}
               elementType={elementType}
+              elementIsExternal={elementIsExternal}
               elementName={elementName}
               orgSlug={orgSlug}
               modelSlug={modelSlug}
@@ -219,6 +231,7 @@ export function RelationshipsSection({
               slot={inboundSlot}
               elementId={elementId}
               elementType={elementType}
+              elementIsExternal={elementIsExternal}
               elementName={elementName}
               orgSlug={orgSlug}
               modelSlug={modelSlug}
@@ -245,6 +258,7 @@ function RelationshipDirectionGroup({
   slot,
   elementId,
   elementType,
+  elementIsExternal,
   elementName,
   orgSlug,
   modelSlug,
@@ -262,6 +276,7 @@ function RelationshipDirectionGroup({
   slot: RelationshipGroupSlot | undefined;
   elementId: UUID;
   elementType: ElementType;
+  elementIsExternal: boolean;
   elementName: string;
   orgSlug: string;
   modelSlug: string;
@@ -388,6 +403,7 @@ function RelationshipDirectionGroup({
           direction={direction}
           elementId={elementId}
           elementType={elementType}
+          ownerIsExternal={elementIsExternal}
           elementName={addRelationship.elementName}
           existingRows={rows}
           relationshipFacts={relationshipFacts}

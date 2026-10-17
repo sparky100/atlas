@@ -609,6 +609,9 @@ export function ElementPage() {
                     elementId={state.data.element.element_id}
                     elementType={state.data.element.element_type}
                     elementName={state.data.element.name}
+                    elementParentId={state.data.element.parent_id}
+                    elementIsPlatform={state.data.element.element_type === 'system' && isPlatform(state.data.element)}
+                    elementIsExternal={state.data.element.element_type === 'actor' && attributesRecord(state.data.element.attributes).isExternal === true}
                     isInterface={isIntegrationInterface(state.data.element, state.data.parent)}
                     relationships={state.data.relationships}
                     endpoints={state.data.relationshipEndpoints}

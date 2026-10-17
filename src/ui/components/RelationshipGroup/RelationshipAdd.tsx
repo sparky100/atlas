@@ -13,6 +13,7 @@ import { Button } from '../Button/Button';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
 import { defaultAttributesForPlainPick } from './relationshipAddDefaults';
+import { forcedOwnsAttributes } from './slotApplicability';
 import styles from './RelationshipAdd.module.css';
 
 export interface RelationshipAddProps {
@@ -23,6 +24,8 @@ export interface RelationshipAddProps {
   elementName: string;
   /** This element's own type — Prompt 7k item 2's `owns` staged role prompt needs it for the `inbound` direction (elementId is the *owned* side then, so its type, not the picked target's, decides capability-default-vs-system-prompt; `outbound` instead reads the picked target's own type, `PendingTarget.elementType` below). */
   elementType: ElementType;
+  /** C20: this element is an external actor, so any `owns` edge it creates is `service` outright (`slotApplicability.ts`) — no role question. */
+  ownerIsExternal?: boolean | undefined;
   /** This exact type+direction's own existing rows (`RelationshipsSection.tsx`'s already-computed `outboundRows`/`inboundRows`) — only read for `supports`/outbound, B4's "asks 'primary?' only when the system already has a supports link". */
   existingRows: readonly RelationshipsHeadRow[];
   /** Needed alongside `existingRows` for the same B4 flow: demoting the system's current primary supports edge (if the new one is answered "yes, primary") is a `relationship.update` on that *other* relationship, and C6 needs the delta currently asserting its `role` as `previousDeltaId`. */
@@ -138,7 +141,7 @@ interface PendingTarget {
  * stage's own boolean branch mutually exclusive without a fully
  * generalised stage enum across the whole component.
  */
-export function RelationshipAdd({ slot, direction, elementId, elementName, elementType, existingRows, relationshipFacts, modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, onCreated }: RelationshipAddProps) {
+export function RelationshipAdd({ slot, direction, elementId, elementName, elementType, ownerIsExternal = false, existingRows, relationshipFacts, modelId, orgId, userId, searchCommitId, branch, expectedHeadCommitId, onCreated }: RelationshipAddProps) {
   const [open, setOpen] = useState(false);
   // Performance: the search pools (every element of the slot's types, plus
   // aliases) load the first time this control is opened, not when the
@@ -217,7 +220,8 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   function ownedElementTypeFor(target: PendingTarget): ElementType {
     return direction === 'outbound' ? target.elementType : elementType;
   }
-  const asksOwnsRole = slot.relationshipType === 'owns' && pendingTarget !== null && (ownedElementTypeFor(pendingTarget) === 'system' || ownedElementTypeFor(pendingTarget) === 'container');
+  const forcedOwns = forcedOwnsAttributes(slot.relationshipType, direction, ownerIsExternal);
+  const asksOwnsRole = forcedOwns === undefined && slot.relationshipType === 'owns' && pendingTarget !== null && (ownedElementTypeFor(pendingTarget) === 'system' || ownedElementTypeFor(pendingTarget) === 'container');
 
   function currentPrimaryDemotion(): RelationshipCreateDemotion | null {
     const currentPrimary = existingRows.find((row) => attributesRecord(row.attributes).role === 'primary');
@@ -227,13 +231,13 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   }
 
   function pickResult(target: PendingTarget): void {
-    const willAskOwnsRole = slot.relationshipType === 'owns' && (ownedElementTypeFor(target) === 'system' || ownedElementTypeFor(target) === 'container');
+    const willAskOwnsRole = forcedOwns === undefined && slot.relationshipType === 'owns' && (ownedElementTypeFor(target) === 'system' || ownedElementTypeFor(target) === 'container');
     if (asksPrimary || needsLabel || willAskOwnsRole) {
       setPendingTarget(target);
       return;
     }
     targetIdRef.current = target.elementId;
-    void create(target.elementId, target.name, defaultAttributesForPlainPick(slot.relationshipType, ownedElementTypeFor(target)));
+    void create(target.elementId, target.name, forcedOwns ?? defaultAttributesForPlainPick(slot.relationshipType, ownedElementTypeFor(target)));
   }
 
   function answerPrimary(primary: boolean): void {
