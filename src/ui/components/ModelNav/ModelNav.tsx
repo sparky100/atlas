@@ -1,4 +1,4 @@
-import { ClipboardList, Ellipsis, FolderKanban, GitBranch, History, Home, List, Search, Map, Milestone, Scale, Upload, Wallet, Workflow, Grid as GridIcon, type LucideIcon } from 'lucide-react';
+import { ClipboardList, Ellipsis, FolderKanban, GitBranch, History, Home, List, Search, Map, Milestone, Plug, Scale, Upload, Wallet, Workflow, Grid as GridIcon, type LucideIcon } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { Chip } from '../Chip/Chip';
@@ -25,7 +25,7 @@ type RealSection = Exclude<ModelNavSection, null>;
 /** F9 step 2: four named groups (UI-principles §2.0's own table, amended by F9 step 1) — a caption + 1px divider between each on the rail, dividers alone (no caption — no room) on the mobile bottom bar until F9 step 4 replaces it. Order here is display order, both grouped and flattened. Reports joined with its hub page (F9 step 3); Projects joined Work with its page (F10 step 2, ADR-024 §6.1). */
 const NAV_GROUPS: { caption: string; sections: RealSection[] }[] = [
   { caption: 'Model', sections: ['home', 'capability-map', 'landscape', 'value-streams', 'elements'] },
-  { caption: 'Analyse', sections: ['portfolio', 'roadmap', 'reports'] },
+  { caption: 'Analyse', sections: ['portfolio', 'integrations', 'roadmap', 'reports'] },
   { caption: 'Work', sections: ['projects', 'changes', 'decisions', 'capture'] },
   { caption: 'Record', sections: ['versions'] },
 ];
@@ -39,6 +39,7 @@ const SECTION_LABELS: Record<RealSection, string> = {
   'value-streams': 'Value streams',
   elements: 'Elements',
   portfolio: 'Portfolio',
+  integrations: 'Integrations',
   changes: 'Changes',
   capture: 'Capture',
   projects: 'Projects',
@@ -69,6 +70,7 @@ const SECTION_ICONS: Record<RealSection, LucideIcon> = {
   'value-streams': Workflow,
   elements: List,
   portfolio: Wallet,
+  integrations: Plug,
   changes: GitBranch,
   capture: Upload,
   projects: FolderKanban,
@@ -145,7 +147,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
 
   const hrefFor = (section: RealSection): string => {
     const path = sectionPath(section);
-    const carriesViewing = section === 'landscape' || section === 'capability-map' || section === 'roadmap' || section === 'value-streams' || section === 'portfolio';
+    const carriesViewing = section === 'landscape' || section === 'capability-map' || section === 'roadmap' || section === 'value-streams' || section === 'portfolio' || section === 'integrations';
     const query = carriesViewing ? refParamViewing : refParam;
     return `${base}${path ? `/${path}` : ''}${ref.kind !== 'main' ? `?${query}` : ''}`;
   };
@@ -373,6 +375,8 @@ function sectionPath(section: RealSection): string {
       return 'elements';
     case 'portfolio':
       return 'portfolio';
+    case 'integrations':
+      return 'integrations';
     case 'reports':
       return 'reports';
     case 'changes':

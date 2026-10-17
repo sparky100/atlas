@@ -26,6 +26,7 @@ import { OrganisationSettingsPage } from './routes/OrganisationSettingsPage';
 import { OrgHome } from './routes/OrgHome';
 import { PlatformAdminPage } from './routes/PlatformAdminPage';
 import { PortfolioPage } from './routes/PortfolioPage';
+import { IntegrationsPage } from './routes/IntegrationsPage';
 import { GapsPage } from './routes/GapsPage';
 import { ProfilePage } from './routes/ProfilePage';
 import { RequireAuth } from './routes/RequireAuth';
@@ -75,6 +76,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/roadmap" element={<RoadmapPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/value-streams" element={<ValueStreamsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/portfolio" element={<PortfolioPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/integrations" element={<IntegrationsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/gaps" element={<GapsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/context/:elementId" element={<ContextPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/container/:systemId" element={<ContainerPage />} />
