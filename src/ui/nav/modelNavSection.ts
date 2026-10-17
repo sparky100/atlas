@@ -9,7 +9,7 @@
  * highlighting the right rail item there is the honest answer, not
  * something a path-prefix match alone would produce.
  */
-export type ModelNavSection = 'home' | 'capability-map' | 'landscape' | 'value-streams' | 'elements' | 'portfolio' | 'roadmap' | 'reports' | 'changes' | 'projects' | 'decisions' | 'capture' | 'versions' | null;
+export type ModelNavSection = 'home' | 'capability-map' | 'landscape' | 'value-streams' | 'elements' | 'portfolio' | 'integrations' | 'roadmap' | 'reports' | 'changes' | 'projects' | 'decisions' | 'capture' | 'versions' | null;
 
 /** `pathname` is everything after the model slug, e.g. `/landscape`, `/context/abc`, `` (home) — matches `App.tsx`'s own route suffixes exactly. */
 export function modelNavSectionFor(modelRelativePath: string): ModelNavSection {
@@ -21,6 +21,7 @@ export function modelNavSectionFor(modelRelativePath: string): ModelNavSection {
   if (path.startsWith('/value-streams')) return 'value-streams';
   if (path === '/elements' || path.startsWith('/elements/')) return 'elements';
   if (path.startsWith('/portfolio')) return 'portfolio';
+  if (path.startsWith('/integrations')) return 'integrations';
   // F9 step 3: the Reports hub and the reports it lists (F12: plus the gaps queue).
   if (path.startsWith('/reports') || path.startsWith('/boundary-crossings') || path.startsWith('/external-interfaces') || path.startsWith('/duplicates') || path.startsWith('/gaps')) return 'reports';
   // F9 step 2 (UI-principles §2.0): the review queue is a tab of Changes, not
