@@ -22,6 +22,7 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { ModulesSection } from '../components/ModulesSection/ModulesSection';
 import { Panel } from '../components/Panel/Panel';
+import { AddInterfaceForm } from '../components/PlatformFlowsSection/AddInterfaceForm';
 import { InterfacesSection } from '../components/PlatformFlowsSection/InterfacesSection';
 import { PlatformFlowsSection } from '../components/PlatformFlowsSection/PlatformFlowsSection';
 import { RelationshipsSection } from '../components/RelationshipGroup/RelationshipsSection';
@@ -695,6 +696,18 @@ export function ElementPage() {
                 {state.data.element.element_type === 'system' && isIntegrationPlatform(state.data.element) && (
                   <CollapsibleSection title="Interfaces" meta={`(${String(state.data.children.filter((c) => c.element_type === 'container').length)})`}>
                     <InterfacesSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} interfaces={state.data.children.filter((c) => c.element_type === 'container')} flows={state.data.flowsViaThisPlatform} />
+                    {canAddRelationship && (
+                      <AddInterfaceForm
+                        platformId={state.data.element.element_id}
+                        platformName={state.data.element.name}
+                        modelId={model.id}
+                        orgId={organisation?.id ?? ''}
+                        userId={userId}
+                        branch={editingBranch}
+                        expectedHeadCommitId={state.data.commitId}
+                        onCreated={reloadAfterCommit}
+                      />
+                    )}
                   </CollapsibleSection>
                 )}
                 {(isIntegrationPlatform(state.data.element) && state.data.element.element_type === 'system') || isIntegrationInterface(state.data.element, state.data.parent) ? (
