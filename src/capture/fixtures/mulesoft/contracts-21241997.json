@@ -1,0 +1,100 @@
+[
+  {
+    "audit": {
+      "created": {
+        "date": "2026-10-17T12:31:06.792Z"
+      },
+      "updated": {}
+    },
+    "masterOrganizationId": "00000000-0000-4000-8000-00000000a001",
+    "organizationId": "00000000-0000-4000-8000-00000000a001",
+    "id": 9531230,
+    "status": "APPROVED",
+    "approvedDate": "2026-10-17T12:31:06.960Z",
+    "rejectedDate": null,
+    "revokedDate": null,
+    "applicationId": 188972877,
+    "application": {
+      "audit": {
+        "created": {
+          "date": "2026-10-17T12:31:02.310Z"
+        },
+        "updated": {}
+      },
+      "id": 188972877,
+      "name": "PM",
+      "description": null,
+      "clientProvider": {},
+      "coreServicesId": "coreservices-pm",
+      "url": null
+    },
+    "tierId": null,
+    "tier": null,
+    "requestedTierId": null,
+    "requestedTier": null,
+    "terms": null,
+    "groupInstanceId": null,
+    "groupInstance": null,
+    "partyId": null,
+    "partyName": null,
+    "condition": "APPLIED",
+    "apiId": 21241997,
+    "api": {
+      "audit": {
+        "created": {},
+        "updated": {}
+      },
+      "organizationId": "00000000-0000-4000-8000-00000000a001",
+      "id": 21241997
+    }
+  },
+  {
+    "audit": {
+      "created": {
+        "date": "2026-10-17T12:32:10.031Z"
+      },
+      "updated": {}
+    },
+    "masterOrganizationId": "00000000-0000-4000-8000-00000000a001",
+    "organizationId": "00000000-0000-4000-8000-00000000a001",
+    "id": 9531232,
+    "status": "APPROVED",
+    "approvedDate": "2026-10-17T12:32:10.345Z",
+    "rejectedDate": null,
+    "revokedDate": null,
+    "applicationId": 188972879,
+    "application": {
+      "audit": {
+        "created": {
+          "date": "2026-10-17T12:32:07.514Z"
+        },
+        "updated": {}
+      },
+      "id": 188972879,
+      "name": "Field Service",
+      "description": null,
+      "clientProvider": {},
+      "coreServicesId": "coreservices-fs",
+      "url": null
+    },
+    "tierId": null,
+    "tier": null,
+    "requestedTierId": null,
+    "requestedTier": null,
+    "terms": null,
+    "groupInstanceId": null,
+    "groupInstance": null,
+    "partyId": null,
+    "partyName": null,
+    "condition": "APPLIED",
+    "apiId": 21241997,
+    "api": {
+      "audit": {
+        "created": {},
+        "updated": {}
+      },
+      "organizationId": "00000000-0000-4000-8000-00000000a001",
+      "id": 21241997
+    }
+  }
+]

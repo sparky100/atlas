@@ -12,7 +12,7 @@ export default defineConfig(
     // send-invite-email is the first) — a different runtime with its own
     // globals (`Deno`) and remote `https://esm.sh/...` imports this repo's
     // Node-based tsconfig/eslint project can't and shouldn't resolve.
-    ignores: ['dist/**', 'node_modules/**', 'supabase/.temp/**', 'supabase/functions/**', 'coverage/**', 'storybook-static/**', 'playwright-report/**', 'test-results/**'],
+    ignores: ['dist/**', 'node_modules/**', 'supabase/.temp/**', 'supabase/functions/**', 'docs/import/**/*.mjs', 'coverage/**', 'storybook-static/**', 'playwright-report/**', 'test-results/**'],
   },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
