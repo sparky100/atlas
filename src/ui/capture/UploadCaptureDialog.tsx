@@ -14,10 +14,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { CaptureInputKind, CaptureJob } from '../../contracts/capture';
+import { prepareMulesoftUpload } from '../../capture/adapters/mulesoftUpload';
 import { computeInputSha256Hex, findReimportCandidate } from '../../db/captureJobs';
 import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { downloadMulesoftExportScript } from '../import/downloadMulesoftExportScript';
 import { supabase } from '../supabaseClient';
 import { isCreatingJob, type CreateCaptureJobInput, type CaptureJobsStatus } from './useCaptureJob';
 import styles from './UploadCaptureDialog.module.css';
@@ -36,6 +38,8 @@ const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 const MAX_PASTED_TEXT_CHARS = 200_000;
 
 type Mode = 'file' | 'paste';
+/** Where the input comes from: a file or text as-is, or a MuleSoft Anypoint export converted by `mulesoftUpload.ts` before the run starts. */
+type Source = 'generic' | 'mulesoft';
 
 interface SelectedInput {
   inputKind: CaptureInputKind;
@@ -60,6 +64,9 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
   const [pasteName, setPasteName] = useState('');
   const [fileSelection, setFileSelection] = useState<SelectedInput | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [source, setSource] = useState<Source>('generic');
+  const [mulesoftFile, setMulesoftFile] = useState<{ name: string; text: string } | null>(null);
+  const [aliasText, setAliasText] = useState('');
   const [documentDate, setDocumentDate] = useState('');
   const [documentDateTouched, setDocumentDateTouched] = useState(false);
   // Keyed by `inputName` rather than reset imperatively when there's
@@ -95,8 +102,12 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
     return { selected: { inputKind: 'text', inputName: pasteName.trim() !== '' ? pasteName.trim() : 'pasted-text.txt', bytes: new TextEncoder().encode(pastedText) }, error: null };
   }, [pastedText, pasteName]);
 
-  const selected = mode === 'file' ? fileSelection : pasteSelection.selected;
-  const localError = mode === 'file' ? fileError : pasteSelection.error;
+  // The converted import JSON is what the run stores and re-imports — derived, never copied into state, so editing the mappings re-converts the same file.
+  const mulesoftPrepared = useMemo(() => (mulesoftFile === null ? null : prepareMulesoftUpload({ fileName: mulesoftFile.name, text: mulesoftFile.text, aliasText })), [mulesoftFile, aliasText]);
+  const mulesoftSelection = useMemo((): SelectedInput | null => (mulesoftPrepared?.ok === true ? { inputKind: 'spreadsheet', inputName: mulesoftPrepared.inputName, bytes: mulesoftPrepared.bytes } : null), [mulesoftPrepared]);
+
+  const selected = source === 'mulesoft' ? mulesoftSelection : mode === 'file' ? fileSelection : pasteSelection.selected;
+  const localError = source === 'mulesoft' ? (fileError ?? (mulesoftPrepared?.ok === false ? mulesoftPrepared.error : null)) : mode === 'file' ? fileError : pasteSelection.error;
 
   useEffect(() => {
     const inputName = selected?.inputName ?? null;
@@ -153,6 +164,9 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
     setPasteName('');
     setFileSelection(null);
     setFileError(null);
+    setSource('generic');
+    setMulesoftFile(null);
+    setAliasText('');
     setDocumentDate('');
     setDocumentDateTouched(false);
     setReimportLookup(null);
@@ -185,6 +199,29 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
         setDocumentDate(new Date(file.lastModified).toISOString().slice(0, 10));
       }
     });
+  };
+
+  const onMulesoftFileChange = (file: File) => {
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setMulesoftFile(null);
+      setFileError(`"${file.name}" is ${formatMegabytes(file.size)} — the limit is ${formatMegabytes(MAX_UPLOAD_BYTES)}.`);
+      return;
+    }
+    void file.text().then((text) => {
+      setFileError(null);
+      setMulesoftFile({ name: file.name, text });
+      if (!documentDateTouched && file.lastModified) {
+        setDocumentDate(new Date(file.lastModified).toISOString().slice(0, 10));
+      }
+    });
+  };
+
+  const switchSource = (next: Source) => {
+    setSource(next);
+    setFileSelection(null);
+    setFileError(null);
+    setMulesoftFile(null);
+    setPastedText('');
   };
 
   const canSubmit = selected !== null && localError === null && !isCreatingJob(status);
@@ -229,6 +266,16 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
               Upload a spreadsheet, JSON file, or PDF, or paste in meeting notes — an AI extraction reads it, matches what it finds against this model, and produces a draft you review before anything changes.
             </Text>
 
+            <div className={styles.modeToggle} role="group" aria-label="Source">
+              <Button variant={source === 'generic' ? 'secondary' : 'ghost'} aria-pressed={source === 'generic'} onClick={() => { switchSource('generic'); }}>
+                File or text
+              </Button>
+              <Button variant={source === 'mulesoft' ? 'secondary' : 'ghost'} aria-pressed={source === 'mulesoft'} onClick={() => { switchSource('mulesoft'); }}>
+                MuleSoft Anypoint
+              </Button>
+            </div>
+
+            {source === 'generic' && (
             <div className={styles.modeToggle}>
               <Button variant={mode === 'file' ? 'secondary' : 'ghost'} aria-pressed={mode === 'file'} onClick={() => { setMode('file'); setPastedText(''); }}>
                 Upload a file
@@ -237,9 +284,76 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                 Paste text
               </Button>
             </div>
+            )}
 
             <div className={styles.form}>
-              {mode === 'file' ? (
+              {source === 'mulesoft' && (
+                <>
+                  <ol className={styles.guide}>
+                    <li>
+                      <Text as="span" size="sm">Download the export script and run it on your own machine: it asks the Anypoint CLI for your APIs and their contracts, and reads no secrets.</Text>
+                    </li>
+                    <li>
+                      <Text as="span" size="sm">
+                        In a terminal with the Anypoint CLI logged in, run <code>node mulesoft-export.mjs --env Production</code> (repeat <code>--env</code> for more environments). It writes <code>mulesoft-export.json</code>.
+                      </Text>
+                    </li>
+                    <li>
+                      <Text as="span" size="sm">Check the file for anything confidential, then choose it below.</Text>
+                    </li>
+                  </ol>
+                  <div className={styles.actions}>
+                    <Button variant="secondary" onClick={downloadMulesoftExportScript}>
+                      Download the export script
+                    </Button>
+                  </div>
+                  <input
+                    className={styles.input}
+                    type="file"
+                    accept=".json"
+                    aria-label="Choose the MuleSoft export file"
+                    disabled={isCreatingJob(status)}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) onMulesoftFileChange(file);
+                    }}
+                  />
+                  <div className={styles.formRow}>
+                    <Text as="label" size="sm" tone="muted">
+                      Backend systems (optional): one per line, hostname = Atlas system name
+                    </Text>
+                    <textarea
+                      className={styles.textarea}
+                      placeholder="mprs.example.com = MPRS"
+                      aria-label="Backend hostname mappings"
+                      value={aliasText}
+                      disabled={isCreatingJob(status)}
+                      onChange={(e) => {
+                        setAliasText(e.target.value);
+                      }}
+                    />
+                  </div>
+                  {mulesoftPrepared?.ok === true && (
+                    <div className={styles.formRow} aria-label="What this export contains">
+                      <Text as="p" size="sm">
+                        {mulesoftPrepared.summary}
+                      </Text>
+                      {mulesoftPrepared.warnings.length > 0 && (
+                        <ul className={styles.warnings}>
+                          {mulesoftPrepared.warnings.map((warning) => (
+                            <li key={warning}>
+                              <Text as="span" size="sm" tone="muted">
+                                {warning}
+                              </Text>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+              {source === 'generic' && mode === 'file' ? (
                 <input
                   className={styles.input}
                   type="file"
@@ -252,12 +366,12 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                   }}
                 />
               ) : null}
-              {mode === 'file' && hashing && (
+              {(source === 'mulesoft' || mode === 'file') && hashing && (
                 <Text as="p" tone="muted" size="sm">
                   Reading {selected.inputName}…
                 </Text>
               )}
-              {mode === 'paste' ? (
+              {source === 'generic' && mode === 'paste' ? (
                 <textarea
                   className={styles.textarea}
                   placeholder="Paste meeting notes, an email, or any other free text describing systems, owners, or relationships…"
@@ -270,7 +384,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                 />
               ) : null}
 
-              {mode === 'paste' && (
+              {source === 'generic' && mode === 'paste' && (
                 <div className={styles.formRow}>
                   <Text as="label" size="sm" tone="muted">
                     Name (optional)
