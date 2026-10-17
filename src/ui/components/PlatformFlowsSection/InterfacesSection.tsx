@@ -25,7 +25,7 @@ export interface InterfacesSectionProps {
  */
 export function InterfacesSection({ orgSlug, modelSlug, interfaces, flows }: InterfacesSectionProps) {
   if (interfaces.length === 0) {
-    return <EmptyState>No interfaces recorded. Add one as a module of this platform, then give it an interface type.</EmptyState>;
+    return <EmptyState>No interfaces recorded yet — the APIs, files, topics or jobs this platform exposes or consumes.</EmptyState>;
   }
   const countByInterface = new Map<UUID, number>();
   for (const flow of flows) {

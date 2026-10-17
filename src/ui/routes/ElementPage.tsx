@@ -22,6 +22,7 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { ModulesSection } from '../components/ModulesSection/ModulesSection';
 import { Panel } from '../components/Panel/Panel';
+import { AddInterfaceForm } from '../components/PlatformFlowsSection/AddInterfaceForm';
 import { InterfacesSection } from '../components/PlatformFlowsSection/InterfacesSection';
 import { PlatformFlowsSection } from '../components/PlatformFlowsSection/PlatformFlowsSection';
 import { RelationshipsSection } from '../components/RelationshipGroup/RelationshipsSection';
@@ -58,7 +59,7 @@ import { useAttestation } from '../elements/useAttestation';
 import { useElementRename } from '../elements/useElementRename';
 import { ActorMemberPicker } from '../elements/ActorMemberPicker';
 import { attributesRecord } from '../elements/attributesRecord';
-import { isIntegrationInterface, isIntegrationPlatform, isPlatform } from '../elements/systemKind';
+import { interfaceTypeLabelOf, isIntegrationInterface, isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { useRouteTiming } from '../perf/useRouteTiming';
 import { useValueStreamImpact } from '../valueStreams/useValueStreamImpact';
 import styles from './ElementPage.module.css';
@@ -343,6 +344,15 @@ export function ElementPage() {
               confirming={attestation.confirmingId === state.data.element.element_id}
               onProposeChange={canPropose ? () => { setProposingChange(true); } : undefined}
               readOnlyReason={underReview ? 'Read-only: under review' : undefined}
+              interfacePlatform={
+                state.data.parent && isIntegrationInterface(state.data.element, state.data.parent)
+                  ? {
+                      name: state.data.parent.name,
+                      href: `/o/${orgSlug ?? ''}/m/${model.slug}/e/${state.data.parent.element_id}?${refQueryParam(ref, viewing)}`,
+                      typeLabel: interfaceTypeLabelOf(state.data.element),
+                    }
+                  : undefined
+              }
               rename={canEdit ? rename : undefined}
               onRetire={canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') ? () => { setRetiring(true); } : undefined}
               onRemoveFromModel={canEdit && state.data.element.element_type !== 'value_stream' && state.data.children.length === 0 ? () => { setRemovingFromModel(true); } : undefined}
@@ -533,6 +543,7 @@ export function ElementPage() {
                 <CollapsibleSection title="Attributes">
                   {editor.status === 'idle' ? (
                     <AttributesTable
+                      isInterface={isIntegrationInterface(state.data.element, state.data.parent)}
                       element={state.data.element}
                       facts={state.data.facts}
                       sources={state.data.sources}
@@ -562,6 +573,35 @@ export function ElementPage() {
                     />
                   )}
                 </CollapsibleSection>
+                {/* An integration platform's own interfaces and flows come first after its attributes — what it exposes, and what goes through it, is what the page is for (ADR-026). */}
+                {state.data.element.element_type === 'system' && isIntegrationPlatform(state.data.element) && (
+                  <CollapsibleSection title="Interfaces" meta={`(${String(state.data.children.filter((c) => c.element_type === 'container').length)})`}>
+                    <InterfacesSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} interfaces={state.data.children.filter((c) => c.element_type === 'container')} flows={state.data.flowsViaThisPlatform} />
+                    {canAddRelationship && (
+                      <AddInterfaceForm
+                        platformId={state.data.element.element_id}
+                        platformName={state.data.element.name}
+                        modelId={model.id}
+                        orgId={organisation?.id ?? ''}
+                        userId={userId}
+                        branch={editingBranch}
+                        expectedHeadCommitId={state.data.commitId}
+                        onCreated={reloadAfterCommit}
+                      />
+                    )}
+                  </CollapsibleSection>
+                )}
+                {(isIntegrationPlatform(state.data.element) && state.data.element.element_type === 'system') || isIntegrationInterface(state.data.element, state.data.parent) ? (
+                  <CollapsibleSection title={state.data.element.element_type === 'container' ? 'Flows via this interface' : 'Flows via this platform'} meta={`(${String(state.data.flowsViaThisPlatform.length)})`}>
+                    <PlatformFlowsSection
+                      orgSlug={organisation?.slug ?? ''}
+                      modelSlug={model.slug}
+                      flows={state.data.flowsViaThisPlatform}
+                      endpoints={state.data.flowsViaThisPlatformEndpoints}
+                      interfaces={new Map((state.data.element.element_type === 'container' ? [state.data.element] : state.data.children.filter((c) => c.element_type === 'container')).map((c) => [c.element_id, c]))}
+                    />
+                  </CollapsibleSection>
+                ) : null}
                 <CollapsibleSection title="Relationships" meta={`(${String(state.data.relationships.length)})`}>
                   <RelationshipsSection
                     orgSlug={organisation?.slug ?? ''}
@@ -571,6 +611,7 @@ export function ElementPage() {
                     elementName={state.data.element.name}
                     elementParentId={state.data.element.parent_id}
                     elementIsExternal={state.data.element.element_type === 'actor' && attributesRecord(state.data.element.attributes).isExternal === true}
+                    isInterface={isIntegrationInterface(state.data.element, state.data.parent)}
                     relationships={state.data.relationships}
                     endpoints={state.data.relationshipEndpoints}
                     relationshipFacts={state.data.relationshipFacts}
@@ -694,22 +735,6 @@ export function ElementPage() {
                     {valueStreamImpact.status === 'ready' && <ValueStreamImpactSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} affected={valueStreamImpact.affected} />}
                   </CollapsibleSection>
                 )}
-                {state.data.element.element_type === 'system' && isIntegrationPlatform(state.data.element) && (
-                  <CollapsibleSection title="Interfaces" meta={`(${String(state.data.children.filter((c) => c.element_type === 'container').length)})`}>
-                    <InterfacesSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} interfaces={state.data.children.filter((c) => c.element_type === 'container')} flows={state.data.flowsViaThisPlatform} />
-                  </CollapsibleSection>
-                )}
-                {(isIntegrationPlatform(state.data.element) && state.data.element.element_type === 'system') || isIntegrationInterface(state.data.element, state.data.parent) ? (
-                  <CollapsibleSection title={state.data.element.element_type === 'container' ? 'Flows via this interface' : 'Flows via this platform'} meta={`(${String(state.data.flowsViaThisPlatform.length)})`}>
-                    <PlatformFlowsSection
-                      orgSlug={organisation?.slug ?? ''}
-                      modelSlug={model.slug}
-                      flows={state.data.flowsViaThisPlatform}
-                      endpoints={state.data.flowsViaThisPlatformEndpoints}
-                      interfaces={new Map((state.data.element.element_type === 'container' ? [state.data.element] : state.data.children.filter((c) => c.element_type === 'container')).map((c) => [c.element_id, c]))}
-                    />
-                  </CollapsibleSection>
-                ) : null}
                 {state.data.element.element_type === 'system' && isPlatform(state.data.element) && (
                   <CollapsibleSection title="Modules" meta={`(${String(state.data.children.length)})`}>
                     <ModulesSection
@@ -827,6 +852,7 @@ function AliasRows({ elementId, aliases, aliasSources }: { elementId: UUID; alia
 }
 
 function AttributesTable({
+  isInterface,
   element,
   facts,
   sources,
@@ -834,6 +860,8 @@ function AttributesTable({
   aliasSources,
   customFields,
 }: {
+  /** ADR-026: an interface always shows its Interface type and Transformation rows (an em dash when empty), so a missing one reads as "not filled in yet" rather than absent. */
+  isInterface: boolean;
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
   sources: Map<string, SourceRow>;
@@ -855,7 +883,7 @@ function AttributesTable({
         // row entirely rather than rendering AttributeRow's own bare "—"
         // — distinct from `hidden` above, which excludes it regardless of
         // whether a fact exists.
-        if (field.hideWhenEmpty === true && !fact) return null;
+        if (field.hideWhenEmpty === true && !fact && !(isInterface && (field.key === 'interfaceType' || field.key === 'transformation'))) return null;
         return <AttributeRow key={field.key} label={field.label} required={field.required} fact={fact} source={fact ? sources.get(fact.source_id) : undefined} field={field} />;
       })}
       <AliasRows elementId={element.element_id} aliases={aliases} aliasSources={aliasSources} />
