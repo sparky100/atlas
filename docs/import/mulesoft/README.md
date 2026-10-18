@@ -34,6 +34,15 @@ To keep a hostname for every later import, open the backend system's element pag
 
 Mapped APIs produce `flows_to` the backend via the interface (shown on the platform's Context view); unmapped ones leave the consumer linked to the interface only, and the platform page shows that interface with no flows.
 
+## Importing again later
+
+Export again and upload the new file through the same dialog; when it has the same file name, the dialog offers it as a replacement for the earlier run. The converter gives the same rows for the same export whatever order the CLI lists things in, so:
+
+- APIs and client applications that have not changed show as unchanged, and as confirmations in review.
+- A new API, client application or approved contract shows as new.
+- An API that is no longer in the export shows as **gone** for its interface, for a person to decide. It is never retired automatically.
+- A contract that is no longer approved (revoked, or removed) is **not** reported: Atlas only reports missing elements, not missing relationships (SPEC-capture §4.4). The flow stays in the model until someone retracts it by hand. Check the platform's Context view after an import if contracts were revoked.
+
 ## Things to know
 
 - **Matching is by name.** Client application names ("PM") are matched against your model's elements; check the review queue's confirmations. Naming Anypoint client applications after the Atlas element helps.
