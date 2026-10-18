@@ -58,6 +58,7 @@ import { useElementEditor, type DraftValue } from '../elements/useElementEditor'
 import { useAttestation } from '../elements/useAttestation';
 import { useElementRename } from '../elements/useElementRename';
 import { ActorMemberPicker } from '../elements/ActorMemberPicker';
+import { ExternalReferenceAdder } from '../elements/ExternalReferenceAdder';
 import { attributesRecord } from '../elements/attributesRecord';
 import { interfaceTypeLabelOf, isIntegrationInterface, isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { useRouteTiming } from '../perf/useRouteTiming';
@@ -559,6 +560,9 @@ export function ElementPage() {
                       aliasSources={state.data.aliasSources}
                       customFields={customFieldsForEditing}
                     />
+                  )}
+                  {canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') && userId && (
+                    <ExternalReferenceAdder modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} elementId={state.data.element.element_id} onAdded={reload} />
                   )}
                   {canEdit && state.data.element.element_type === 'actor' && userId && (
                     <ActorMemberPicker

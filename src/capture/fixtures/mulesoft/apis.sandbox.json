@@ -1,0 +1,78 @@
+[
+  {
+    "audit": {
+      "created": {
+        "date": "2026-10-17T12:29:25.001Z"
+      },
+      "updated": {}
+    },
+    "masterOrganizationId": "00000000-0000-4000-8000-00000000a001",
+    "organizationId": "00000000-0000-4000-8000-00000000a001",
+    "id": 21241998,
+    "instanceLabel": null,
+    "environmentInstanceId": "instance_21241998",
+    "groupId": "00000000-0000-4000-8000-00000000a001",
+    "assetId": "test-2",
+    "assetVersion": "1.0.0",
+    "productVersion": "v1",
+    "description": null,
+    "tags": [],
+    "order": 1,
+    "providerId": null,
+    "deprecated": false,
+    "lastActiveDate": null,
+    "endpointUri": null,
+    "environmentId": "00000000-0000-4000-8000-00000000e001",
+    "isPublic": false,
+    "stage": "release",
+    "technology": "mule4",
+    "status": "unregistered",
+    "approvalMethod": null,
+    "deployment": null,
+    "metadata": null,
+    "semanticServiceConfigId": null,
+    "pinned": false,
+    "activeContractsCount": 1,
+    "endpointType": "http",
+    "autodiscoveryInstanceName": "v1:21241998"
+  },
+  {
+    "audit": {
+      "created": {
+        "date": "2026-10-17T12:28:03.244Z"
+      },
+      "updated": {
+        "date": "2026-10-17T12:49:57.734Z"
+      }
+    },
+    "masterOrganizationId": "00000000-0000-4000-8000-00000000a001",
+    "organizationId": "00000000-0000-4000-8000-00000000a001",
+    "id": 21241997,
+    "instanceLabel": null,
+    "environmentInstanceId": "instance_21241997",
+    "groupId": "00000000-0000-4000-8000-00000000a001",
+    "assetId": "test",
+    "assetVersion": "1.0.0",
+    "productVersion": "v1",
+    "description": null,
+    "tags": [],
+    "order": 1,
+    "providerId": null,
+    "deprecated": false,
+    "lastActiveDate": null,
+    "endpointUri": "http://mprs.example.com",
+    "environmentId": "00000000-0000-4000-8000-00000000e001",
+    "isPublic": false,
+    "stage": "release",
+    "technology": "mule4",
+    "status": "unregistered",
+    "approvalMethod": null,
+    "deployment": null,
+    "metadata": null,
+    "semanticServiceConfigId": null,
+    "pinned": false,
+    "activeContractsCount": 2,
+    "endpointType": "http",
+    "autodiscoveryInstanceName": "v1:21241997"
+  }
+]

@@ -13,6 +13,7 @@
  */
 import type { UUID } from '../contracts/delta';
 import type { Client } from './client';
+import { getElementNamesByIds } from './elements';
 import type { AliasRow } from './types';
 
 /**
@@ -34,6 +35,33 @@ export async function listAliasesForModel(supabase: Client, modelId: UUID): Prom
   }
   return byElementId;
 }
+
+/**
+ * Every `external_ref` alias in the model as `lower-cased value -> element
+ * name`, the shape the MuleSoft converter's hostname map takes
+ * (src/capture/adapters/mulesoftUpload.ts). Aliases are model-scoped, so the
+ * alias read needs no `.in()`; the names then come in chunks of at most 50
+ * ids (`assertInFilterSize`'s ceiling) — a model has few external refs, so
+ * that is a handful of requests, not one per element.
+ */
+export async function listExternalRefMappings(supabase: Client, modelId: UUID): Promise<Record<string, string>> {
+  const { data, error } = await supabase.from('aliases').select('element_id, alias_value').eq('model_id', modelId).eq('alias_type', 'external_ref');
+  if (error) throw new Error(`listExternalRefMappings: ${error.message}`);
+  const rows = data as { element_id: UUID; alias_value: string }[];
+  const elementIds = [...new Set(rows.map((row) => row.element_id))];
+  const names = new Map<UUID, string>();
+  for (let i = 0; i < elementIds.length; i += NAME_LOOKUP_CHUNK) {
+    for (const [id, name] of await getElementNamesByIds(supabase, modelId, elementIds.slice(i, i + NAME_LOOKUP_CHUNK))) names.set(id, name);
+  }
+  const mappings: Record<string, string> = {};
+  for (const row of rows) {
+    const name = names.get(row.element_id);
+    if (name !== undefined) mappings[row.alias_value.toLowerCase()] = name;
+  }
+  return mappings;
+}
+
+const NAME_LOOKUP_CHUNK = 50;
 
 export type DirectlyInsertableAliasType = 'name' | 'code' | 'external_ref' | 'source_system_key';
 
