@@ -173,7 +173,8 @@ export function convertMulesoftExport(file: MulesoftExportFile, options: Mulesof
       systems.push(row);
       report.counts.interfaces += 1;
 
-      const contracts = environment.contracts[String(api.id)] ?? [];
+      // Sorted like the APIs: the CLI's listing order must not change the converted file between two exports of the same thing.
+      const contracts = [...(environment.contracts[String(api.id)] ?? [])].sort((a, b) => Number(a.id) - Number(b.id));
       const approved = contracts.filter((contract) => contract.status.toUpperCase() === 'APPROVED');
       for (const contract of contracts) {
         if (contract.status.toUpperCase() !== 'APPROVED') report.skippedContracts.push({ contractId: String(contract.id), apiId: String(api.id), reason: `status ${contract.status}, not approved` });
