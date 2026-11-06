@@ -202,7 +202,7 @@ A report that uses a health-finding filter cannot be saved yet; the page says so
 **Analyse → Ask Atlas** (or press Ctrl-K and type "ask") lets you ask a question about the model in plain words, such as "Which systems are critical?".
 
 - It is **off until an organisation owner switches it on**, in organisation settings under Ask Atlas. While it is on, your questions and the names, descriptions, attributes and relationships of the elements needed to answer them are sent to our AI provider. Comments and unreviewed imports are not sent.
-- It can only read. It cannot change anything.
+- It can only read. It cannot change anything. It can answer about elements and how they connect, saved reports, data-quality findings, portfolio signals, and the changes, decisions and projects recorded for the model (summaries only; comments and unreviewed imports are not read).
 - Every element it names is a link to that element's page. An answer that names no element is marked **Ungrounded**, and a reference it could not verify is removed and flagged. Open **What was looked up** under an answer to see each lookup and how many results it found.
 - Answers come from the live estate (main) only. Long lists are cut short, and the answer says so.
 - Nothing is saved: reload the page, or press Clear, and the conversation is gone.

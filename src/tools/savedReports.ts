@@ -6,13 +6,13 @@ import { defineTool, failure, okResult, uuidInput } from './toolKit';
 
 export const listSavedReports = defineTool({
   name: 'list_saved_reports',
-  description: 'The saved reports this person can see (their own and the ones shared with the organisation): id, name, description and what each is about. Use run_saved_report to run one.',
+  description: 'The saved reports this person can see (their own and the ones shared with the organisation): reportId, name, description and what each is about. Use run_saved_report to run one.',
   schema: z.strictObject({}),
   run: async (ctx) => {
     const reports = await ctx.savedReports();
     const shown = reports.slice(0, MAX_TOOL_ROWS).map((r) => {
       const parsed = parseReportSpec(r.spec);
-      return { id: r.id, name: clip(r.name, 200), description: clip(r.description, 300), about: parsed.ok ? parsed.spec.source : 'unreadable' };
+      return { reportId: r.id, name: clip(r.name, 200), description: clip(r.description, 300), about: parsed.ok ? parsed.spec.source : 'unreadable' };
     });
     return okResult(ctx, { reports: shown }, reports.length, reports.length > shown.length);
   },
@@ -35,7 +35,7 @@ export const runSavedReport = defineTool({
     return okResult(
       ctx,
       {
-        report: { id: report.id, name: clip(report.name, 200) },
+        report: { reportId: report.id, name: clip(report.name, 200) },
         columns: result.columns,
         rows: rowObjects(result),
         groups: result.groups.slice(0, MAX_TOOL_ROWS).map((g) => ({ value: typeof g.value === 'string' ? clip(g.value, 200) : g.value, count: g.count })),

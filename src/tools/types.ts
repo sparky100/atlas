@@ -6,7 +6,9 @@
  */
 import type { UUID } from '../contracts/delta';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
-import type { SavedReportRow } from '../db/types';
+import type { ChangeSummary } from '../db/changeSummary';
+import type { OpenDecisionElementLink } from '../db/decisions';
+import type { BranchRow, DecisionRow, ProjectRow, SavedReportRow } from '../db/types';
 
 /** Everything the tools need from the model, read once per question. Plain arrays, so a test can build one by hand. */
 export interface ModelSnapshot {
@@ -34,6 +36,14 @@ export interface ToolContext {
   allFacts: () => Promise<readonly FactsRow[]>;
   /** Elements an open change is retiring (for the "marked Migrate or Eliminate, nothing retiring it" finding). */
   retiredByOpenChanges: () => Promise<ReadonlySet<UUID>>;
+  /** Open and finished changes of this model (never main or capture drafts). */
+  changes: () => Promise<readonly BranchRow[]>;
+  decisions: () => Promise<readonly DecisionRow[]>;
+  /** The elements each still-open decision concerns. */
+  openDecisionLinks: () => Promise<readonly OpenDecisionElementLink[]>;
+  projects: () => Promise<readonly ProjectRow[]>;
+  /** What one change touches and who it affects, read from its own work against main; `null` when it has made no work yet or does not exist. */
+  changeImpact: (change: BranchRow) => Promise<ChangeSummary | null>;
   /** The clock, passed in so findings that depend on today's date are testable (rule 6). */
   now: () => Date;
 }

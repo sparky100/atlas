@@ -55,4 +55,8 @@ export const EVAL_SET: EvalQuestion[] = [
   { id: 'legacy-portal-supports', question: 'Which capabilities does the Legacy Portal support?', tools: [EDGES], mustCite: [E.customerOnboarding] },
   { id: 'past-end-of-support', question: 'Which systems are already past their end of support date?', tools: [['find_elements']], mustCite: [E.mainframeLedger], mustNotCite: [E.crm, E.paymentsGateway] },
   { id: 'grace-systems-and-capability', question: 'Which system does Grace Hopper own, and which capability does it support?', tools: [EDGES], mustCite: [E.billingEngine, E.billing] },
+  { id: 'open-changes', question: 'What changes are in progress?', tools: [['list_changes']], mustCite: [], answerMatches: [/retire legacy portal/i] },
+  { id: 'change-impact', question: 'What would the Retire Legacy Portal change affect?', tools: [['list_changes'], ['change_impact']], mustCite: [E.legacyPortal, E.customerOnboarding] },
+  { id: 'open-decisions', question: 'Which decisions are still open, and what do they concern?', tools: [['list_decisions']], mustCite: [E.billingEngine], answerMatches: [/billing platform/i] },
+  { id: 'active-projects', question: 'What projects are active?', tools: [['list_projects']], mustCite: [], answerMatches: [/legacy retirement/i] },
 ];

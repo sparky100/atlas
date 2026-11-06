@@ -88,6 +88,26 @@ function collectNames(value: unknown, into: Map<string, string>, depth = 0): voi
   for (const child of Object.values(record)) collectNames(child, into, depth + 1);
 }
 
+/** Keys whose ids are not elements (a change, decision, project or saved report): never citable as an element. */
+const NON_ELEMENT_ID_KEYS = new Set(['changeId', 'decisionId', 'projectId', 'reportId']);
+
+/** Every id in a tool's data that an element citation may point to: all ids except those under a non-element key. */
+function collectIds(value: unknown, into: Set<string>, depth = 0): void {
+  if (depth > 10) return;
+  if (typeof value === 'string') {
+    for (const id of value.match(UUID) ?? []) into.add(id);
+    return;
+  }
+  if (typeof value !== 'object' || value === null) return;
+  if (Array.isArray(value)) {
+    for (const item of value) collectIds(item, into, depth + 1);
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (!NON_ELEMENT_ID_KEYS.has(key)) collectIds(child, into, depth + 1);
+  }
+}
+
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 const CITATION = /\[\[element:([^\]\s]*)\]\]/g;
 
@@ -219,7 +239,7 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
         } else {
           budgetLeft -= json.length;
           if (result.ok) {
-            for (const id of json.match(UUID) ?? []) returnedIds.add(id);
+            collectIds(result.data, returnedIds);
             collectNames(result.data, namesById);
           }
           content = wrapToolData(call.name, json);
