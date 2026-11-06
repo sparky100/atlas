@@ -48,6 +48,10 @@ export interface AskToolUse {
   name: string;
   input: Record<string, unknown>;
   ok: boolean;
+  /** What came back, for the person checking an answer: how many matched in all, whether the list was cut, or why it failed. */
+  total: number | null;
+  truncated: boolean;
+  error?: string;
 }
 
 export type AskStatus = 'answered' | 'incomplete' | 'refused';
@@ -58,6 +62,8 @@ export interface AskResult {
   answer: string;
   /** Element ids cited in the answer that a tool actually returned in this question, in first-cited order. */
   citations: string[];
+  /** Display names for the cited ids, as the tools reported them, so a page can label a link without another lookup. */
+  citationNames: Record<string, string>;
   /** True when at least one citation survived. False is shown as "ungrounded". */
   grounded: boolean;
   /** How many cited ids no tool returned (removed from the answer). */
@@ -68,6 +74,18 @@ export interface AskResult {
   limit?: 'rounds' | 'budget';
   inputTokens: number;
   outputTokens: number;
+}
+
+/** Every `{ id, name }` pair anywhere in a tool's data: the label a citation to that id should show. */
+function collectNames(value: unknown, into: Map<string, string>, depth = 0): void {
+  if (depth > 8 || typeof value !== 'object' || value === null) return;
+  if (Array.isArray(value)) {
+    for (const item of value) collectNames(item, into, depth + 1);
+    return;
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.id === 'string' && typeof record.name === 'string' && !into.has(record.id)) into.set(record.id, record.name);
+  for (const child of Object.values(record)) collectNames(child, into, depth + 1);
 }
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
@@ -125,6 +143,7 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
 
   const messages: LlmProxyMessage[] = [...trimHistory(input.history).map((t) => ({ role: t.role, content: t.text })), { role: 'user' as const, content: question }];
   const returnedIds = new Set<string>();
+  const namesById = new Map<string, string>();
   const toolUses: AskToolUse[] = [];
   let budgetLeft = ASK_MAX_TOOL_CHARS;
   let rounds = 0;
@@ -140,6 +159,10 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
       status,
       answer: checked.answer,
       citations: checked.citations,
+      citationNames: Object.fromEntries(checked.citations.flatMap((id) => {
+          const name = namesById.get(id);
+          return name === undefined ? [] : [[id, name]];
+        })),
       grounded: checked.citations.length > 0,
       unverifiedRemoved: checked.unverifiedRemoved,
       toolUses,
@@ -171,6 +194,9 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
     for (const [index, call] of calls.entries()) {
       onEvent?.({ type: 'tool_call', name: call.name });
       let ok = false;
+      let total: number | null = null;
+      let truncated = false;
+      let error: string | undefined;
       let content: string;
       if (index >= ASK_MAX_CALLS_PER_ROUND) {
         content = wrapToolData(call.name, JSON.stringify({ error: `Only ${String(ASK_MAX_CALLS_PER_ROUND)} lookups are run per round. Ask again in the next round if still needed.` }));
@@ -180,18 +206,26 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
       } else {
         const result = await callTool(ctx, call.name, call.input);
         ok = result.ok;
+        if (result.ok) {
+          total = result.total;
+          truncated = result.truncated;
+        } else error = result.error;
         const json = JSON.stringify(result.ok ? { stamp: result.stamp, total: result.total, truncated: result.truncated, data: result.data } : { error: result.error });
         if (json.length > budgetLeft) {
           limit = 'budget';
           ok = false;
+          error = 'Too large to show; narrow the lookup.';
           content = wrapToolData(call.name, JSON.stringify({ error: 'This result would exceed the size budget for this question, so it was not shown. Narrow the lookup.' }));
         } else {
           budgetLeft -= json.length;
-          if (result.ok) for (const id of json.match(UUID) ?? []) returnedIds.add(id);
+          if (result.ok) {
+            for (const id of json.match(UUID) ?? []) returnedIds.add(id);
+            collectNames(result.data, namesById);
+          }
           content = wrapToolData(call.name, json);
         }
       }
-      toolUses.push({ name: call.name, input: asRecord(call.input), ok });
+      toolUses.push({ name: call.name, input: asRecord(call.input), ok, total, truncated, ...(error !== undefined ? { error } : {}) });
       onEvent?.({ type: 'tool_done', name: call.name, ok });
       resultBlocks.push({ type: 'tool_result', toolUseId: call.id, content, ...(ok ? {} : { isError: true }) });
     }

@@ -197,6 +197,16 @@ On **Elements** and **Portfolio**, **Save as report…** keeps the page's curren
 
 A report that uses a health-finding filter cannot be saved yet; the page says so.
 
+## Ask Atlas
+
+**Analyse → Ask Atlas** (or press Ctrl-K and type "ask") lets you ask a question about the model in plain words, such as "Which systems are critical?".
+
+- It is **off until an organisation owner switches it on**, in organisation settings under Ask Atlas. While it is on, your questions and the names, descriptions, attributes and relationships of the elements needed to answer them are sent to our AI provider. Comments and unreviewed imports are not sent.
+- It can only read. It cannot change anything.
+- Every element it names is a link to that element's page. An answer that names no element is marked **Ungrounded**, and a reference it could not verify is removed and flagged. Open **What was looked up** under an answer to see each lookup and how many results it found.
+- Answers come from the live estate (main) only. Long lists are cut short, and the answer says so.
+- Nothing is saved: reload the page, or press Clear, and the conversation is gone.
+
 ## Disposition (TIME)
 
 Each system can be marked **Tolerate**, **Invest**, **Migrate** or **Eliminate**; a module can set its own, but never takes its platform's. Unset reads **Not assessed**, never Tolerate. Elements and Portfolio show, sort and filter by it; the capability map can be coloured by it; spreadsheet capture reads a "TIME" or "Disposition" column. A system marked Migrate or Eliminate that nothing is retiring — no open change retires it, and it isn't already retiring — is a health finding on Home, linking to its project or offering to start one.

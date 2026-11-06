@@ -33,9 +33,10 @@ describe('runAsk', () => {
     const result = await runAsk({ client, ctx: estateContext(), history: [], question: 'What is the CRM?', onEvent: (e) => events.push(e) });
     expect(result.status).toBe('answered');
     expect(result.citations).toEqual([crm]);
+    expect(result.citationNames).toEqual({ [crm]: 'CRM Platform' });
     expect(result.grounded).toBe(true);
     expect(result.unverifiedRemoved).toBe(0);
-    expect(result.toolUses).toEqual([{ name: 'search_elements', input: { query: 'CRM' }, ok: true }]);
+    expect(result.toolUses).toMatchObject([{ name: 'search_elements', input: { query: 'CRM' }, ok: true, truncated: false }]);
     expect(events).toEqual([{ type: 'tool_call', name: 'search_elements' }, { type: 'tool_done', name: 'search_elements', ok: true }]);
     expect(result.rounds).toBe(2);
     expect(result.inputTokens).toBe(20);

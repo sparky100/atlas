@@ -28,7 +28,7 @@ export interface SearchDialogProps {
 
 interface Option {
   id: string;
-  group: 'Elements' | 'Changes' | 'Decisions';
+  group: 'Elements' | 'Changes' | 'Decisions' | 'Pages';
   label: string;
   detail: string;
   href: string;
@@ -150,7 +150,9 @@ function SearchBody({
       (decisions ?? []).map((decision) => ({ decision, texts: [decision.title] })),
       query,
     ).map(({ decision }) => ({ id: `d-${decision.id}`, group: 'Decisions', label: decision.title, detail: `decision · ${decisionStatusLabel(decision.status)}`, href: `${base}/decisions/${decision.id}` }));
-    return [...elementOptions, ...changeOptions, ...decisionOptions];
+    // F15: the one place to jump straight to Ask Atlas — shown when the query matches "ask", "atlas" or "question".
+    const pageOptions: Option[] = matchTitled([{ texts: ['Ask Atlas', 'ask a question', 'ai assistant'] }], query).length > 0 ? [{ id: 'p-ask', group: 'Pages', label: 'Ask Atlas', detail: 'page · ask a question about this model', href: `${base}/ask` }] : [];
+    return [...elementOptions, ...changeOptions, ...decisionOptions, ...pageOptions];
   }, [search.results, changes, decisions, query, base, activeRef]);
 
   const activeIndex = highlight.query === query ? highlight.index : 0;
@@ -167,7 +169,7 @@ function SearchBody({
 
   const loading = query.trim() !== '' && (search.status === 'loading' || changes === null || decisions === null);
   const activeOption = options.at(Math.min(activeIndex, options.length - 1));
-  const groups = (['Elements', 'Changes', 'Decisions'] as const).map((group) => ({ group, items: options.filter((o) => o.group === group) })).filter((g) => g.items.length > 0);
+  const groups = (['Elements', 'Changes', 'Decisions', 'Pages'] as const).map((group) => ({ group, items: options.filter((o) => o.group === group) })).filter((g) => g.items.length > 0);
 
   return (
     <div className={styles.body}>
