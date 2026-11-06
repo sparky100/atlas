@@ -2,7 +2,7 @@
 
 **Status:** **Proposed 2026-11-06.** Moves to Accepted when the first code step (the tools layer) merges.
 **Depends on:** ADR-014 (the shared LLM proxy), ADR-017 (tenancy), ADR-009 (RLS is the tenancy check), ADR-027 (the report evaluator the tools reuse), rules 4, 7 and 8 of `CLAUDE.md`, `docs/PLAN-2026-11-reports-ai-mcp.md` (F15).
-**Plan:** F15 in that file. F16 (the local MCP server, ADR-029) reuses the tools layer this ADR defines.
+**Plan:** F15 in that file. F16 (the local MCP server, [ADR-029](ADR-029-local-mcp-server.md)) reuses the tools layer this ADR defines.
 
 ## Context
 

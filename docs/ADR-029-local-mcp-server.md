@@ -1,0 +1,79 @@
+# ADR-029: A local MCP server for Claude Desktop, Claude Code and other MCP apps
+
+**Status:** **Proposed 2026-11-06.** Moves to Accepted when the server skeleton (step 2) merges.
+**Depends on:** ADR-028 (the read-only tools layer in `src/tools/` this server reuses), ADR-017 (tenancy), ADR-009 (RLS is the tenancy check), rules 4, 7 and 8 of `CLAUDE.md`, `docs/PLAN-2026-11-reports-ai-mcp.md` (F16).
+
+## Context
+
+An architect who already works in Claude Desktop or Claude Code should be able to ask it about their Atlas model and get answers read from the real data, without copying anything out of Atlas. F15 built the read-only tools; this ADR decides how to expose the same tools to an MCP app running on the user's own machine.
+
+Two facts shape it:
+
+1. **Atlas's model lives behind sign-in.** The sibling products (Loop, Flow) read plain files in a folder, so their local servers need no login. Atlas's rows are protected by row-level security, so the server must sign the user in and read over the network as that user.
+2. **The tools already take a context, not a client.** `createToolContext(supabase, model, commitId)` builds everything from a Supabase client and a commit id. A server that holds a signed-in client reuses every tool unchanged.
+
+## Decision
+
+### 1. Local, over stdio, read-only
+
+The server is started by the MCP app on the user's machine and talks over stdio. There is no hosted endpoint and no new public surface. Every tool is the F15 tool (the eleven in `MODEL_TOOLS`), so it is read-only, capped (50 rows, text cut at 500 characters, `truncated` and the true `total`) and stamps the model, ref and commit it read. Names carry the prefix `atlas_` (`atlas_search_elements`, and so on), as the sibling products do, so they do not collide with other servers' tools.
+
+Added for this server only:
+
+- **`atlas_list_models`**: the models the signed-in user can see, with organisation and slug. Every other tool takes an optional `model` (id or slug) and uses the only model when there is exactly one; if there are several and none is named it answers with the list rather than guessing.
+- **`atlas_get_guide`**: a short bundled text: how the model is organised (capabilities, systems, actors, relationships), which tool answers which kind of question, and how to cite (name the element and give its link). No model data.
+- **An optional `change` argument on each tool** (a change's id from `atlas_list_changes`) to read that change's work-in-progress instead of live main. The tools take a commit, so this is a different commit id and a ref in the stamp (`ToolStamp.ref` widens from `'main'` to `'main' | { change: id }`). Reading a change is allowed only if the change is visible to the user under the same row-level security the app uses. Default is main.
+
+No tool writes. A later, separately approved step could add tools that only ever create capture drafts for review.
+
+### 2. Sign-in: the user's own session, no service key
+
+The server talks to Supabase with the public URL and anon key plus the user's own session, so row-level security is the only authorisation. It never holds a service-role key, and no new token table or server function is added.
+
+The session must be the user's *own, separate* one. It must not reuse the browser's refresh token: Supabase refresh tokens rotate and are single-use, so two clients sharing one would sign each other out. So the server signs in itself, with the same methods the app already offers (email and password, or an emailed one-time code).
+
+Recommended mechanism (open point 1 has the alternatives):
+
+- **Email and password, everywhere.** One command, `atlas-mcp login`, for Claude Code and any app with a terminal: it asks for email and password once, signs in, and stores **only the refresh token** (never the password) in a file readable only by the user (mode 0600) in their config folder. The server refreshes from it and rotates the stored token. In the Claude Desktop extension, the manifest declares email and password as `sensitive` user settings, which Claude Desktop keeps in the operating system's keychain; the server signs in from them at start-up.
+- Accounts that signed up by emailed link and have no password set one first, through the app's normal "forgot password" flow.
+- Clear, plain errors when signed out, when the session cannot be refreshed, and when the user belongs to no organisation.
+
+Why not a browser sign-in return page: it can only hand the browser's own session to the local program, which causes the sign-out problem above, unless a server function mints a second session with the service role. That is new server code, a new secret-holding function and a new attack surface for no gain over a password the user already has.
+
+### 3. What leaves the machine
+
+The tool results go to whichever AI app the user connected (their own choice of Claude Desktop, Claude Code, Cursor and so on), not to Atlas's AI provider. ADR-028's owner switch is about Atlas sending content to *our* provider, so it does not strictly cover this. Recommended: **the server honours the same owner switch** (`organisations.ai_assistant_enabled`, one column the user can already read) and answers "Your organisation has not turned on AI access" while it is off, and the switch's wording in settings is extended to say it covers AI apps members connect. This is conservative and consistent ("nothing is sent while it is off"); it cannot stop a member copying text by hand, and the user guide says so plainly. Open point 2.
+
+### 4. Package and install
+
+`mcp/` in this repository, a small package built on the official MCP TypeScript SDK (`@modelcontextprotocol/sdk`), with its own pnpm scripts (the repository's only package manager is pnpm). It imports `src/tools/` and `src/contracts/` directly and is bundled with esbuild into one file, the same technique the edge functions use.
+
+- `pnpm mcp:bundle` produces `mcp.mjs` plus a Claude Desktop extension (`.mcpb`) with a manifest, and a `version.json`, into `public/downloads/`. The outputs are git-ignored and built in the app's `prebuild` step, so every deploy serves a bundle from the same commit (Flow's approach; no binaries in git, nothing to keep in step by hand).
+- A **"Connect Claude Desktop" card on Home** offers the download, shows the bundle version, and gives three install steps and a copy-paste config snippet for other apps. It contains only the public Supabase URL and anon key, which every browser already receives.
+- An update check compares the installed version with `version.json` and says when a newer one exists (optional, off by a setting).
+
+**Dependency:** `@modelcontextprotocol/sdk` (and `zod`, already present). Approved by Simon on 2026-11-06 (he answered yes to the question in the thread; record here if this was read wrongly).
+
+### 5. Limits that follow from "local"
+
+- One question at a time per tool call; the same per-result caps as F15. There is no model call in this server (the user's AI app does the reasoning), so there is no cost to Atlas and the `llm-proxy` limits do not apply.
+- The user's JWT is the only credential in memory. Logs never print tokens, passwords, or model content.
+- The server makes requests only to the configured Supabase URL.
+
+## Out of scope
+
+A hosted or remote MCP server with OAuth (what some competitors ship); write tools; reading comment bodies and capture drafts (as in ADR-028); more than one signed-in account at a time; a separate organisation-wide kill switch beyond the existing owner switch.
+
+## Consequences
+
+- A small widening of the tools layer: the stamp's ref, and the optional `change` argument. The in-app Ask Atlas page keeps asking about main only.
+- Home gains a download card; the app gains no sign-in return page (the plan's earlier sketch is dropped, see Decision 2).
+- No migration and no new server function.
+- Verification the sandbox cannot do: the install in Claude Desktop, and an integration test that a viewer through this server sees only what row-level security allows (Simon runs both).
+
+## Open points (recommended answers in brackets)
+
+1. **Sign-in method.** (a) Email and password, with `atlas-mcp login` for terminals and keychain-held settings for Claude Desktop [recommended: works today, no server change]; (b) emailed one-time code through two tools in the chat, which needs the email template changed to include the code and is more steps for the user; (c) a browser return page with a minted second session, which needs new server code holding a privileged key [not recommended].
+2. **Owner switch covers the MCP server.** [yes, with the settings wording extended]
+3. **Tool prefix `atlas_`.** [yes]
+4. **Include `atlas_get_guide` and the update check.** [guide yes; update check yes, off by default]
