@@ -186,6 +186,17 @@ A project is part of how your team works, not part of the model itself: it never
 - **Duplicates** — elements that look like the same thing recorded twice. **Check now** runs a fresh check; merge a pair, or dismiss it as not a duplicate.
 - **Gaps** — the systems missing a fit rating, an owner, a run cost, a criticality or a disposition. **Fill in** walks them one at a time: press a number to pick an answer and move on, **j** to skip, **k** to go back. Each answer is saved as you go.
 
+### Saved reports, copies and dashboards
+
+On **Elements** and **Portfolio**, **Save as report…** keeps the page's current search, filters and sort under a name. Tick **Share with the organisation** (owners and architects) to let everyone see it; otherwise it is private to you. Pick a saved report from **Saved reports** on either page to bring that view back. A report is live: it always shows main as it is now.
+
+- **Reports → your report** shows the result, with **Download CSV**, **Download Excel**, **Export PNG** and **Export PDF** (the picture is stamped with the model, the state and the date).
+- **Save a copy now** keeps a frozen record of the result as at that moment. It never changes, even when the report or the model does, and opens under **Saved copies**. The person who made a copy can delete it (an owner or architect can delete a shared one) after a confirmation; deleting cannot be undone.
+- **New dashboard…** (on the Reports page) shows several saved reports together, live. **Edit dashboard** adds a tile from a saved report (as a number, bar chart, split bar chart, ring or table; one column, two or full width), reorders, resizes and removes tiles. A dashboard shared with the organisation can only use shared reports.
+- **Present** fills the screen with the dashboard and no editing controls; **Esc** or **Exit presenting** goes back. **Export PNG** and **Export PDF** download the dashboard as a picture.
+
+A report that uses a health-finding filter cannot be saved yet; the page says so.
+
 ## Disposition (TIME)
 
 Each system can be marked **Tolerate**, **Invest**, **Migrate** or **Eliminate**; a module can set its own, but never takes its platform's. Unset reads **Not assessed**, never Tolerate. Elements and Portfolio show, sort and filter by it; the capability map can be coloured by it; spreadsheet capture reads a "TIME" or "Disposition" column. A system marked Migrate or Eliminate that nothing is retiring — no open change retires it, and it isn't already retiring — is a health finding on Home, linking to its project or offering to start one.
