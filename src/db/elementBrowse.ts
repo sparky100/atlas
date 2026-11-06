@@ -9,7 +9,7 @@
 import type { Disposition } from '../contracts/delta';
 import type { ElementType, UUID } from '../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
-import { attributesRecord } from '../ui/elements/attributesRecord';
+import { attributesRecord } from '../engine/elementRead/attributesRecord';
 import type { Client } from './client';
 import { selectAll } from './selectAll';
 

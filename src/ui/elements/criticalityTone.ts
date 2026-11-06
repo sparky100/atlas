@@ -18,7 +18,7 @@ export const CRITICALITY_TONE: Record<Criticality, ChipTone> = { critical: 'dang
  * supporting systems, the same "oldest lifecycle stage" shape
  * `lifecycleTone.ts`'s own `LIFECYCLE_ORDER` already gives `oldestLifecycleStage`.
  */
-export const CRITICALITY_ORDER: Record<Criticality, number> = { low: 0, medium: 1, high: 2, critical: 3 };
+export { CRITICALITY_ORDER } from '../../engine/elementRead/criticality';
 
 export function criticalityToneFor(value: string): ChipTone | undefined {
   return value in CRITICALITY_TONE ? CRITICALITY_TONE[value as Criticality] : undefined;
