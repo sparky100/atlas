@@ -6,7 +6,7 @@ const REQUEST = { system: 'sys', messages: [{ role: 'user' as const, content: 'h
 function client(respond: (init: RequestInit) => Response) {
   const seen: { url: string; init: RequestInit }[] = [];
   const fetchFn: typeof fetch = (url, init) => {
-    seen.push({ url: String(url), init: init ?? {} });
+    seen.push({ url: typeof url === 'string' ? url : 'other', init: init ?? {} });
     return Promise.resolve(respond(init ?? {}));
   };
   return { seen, client: createProxyAskClient({ proxyUrl: 'https://x.test/functions/v1/llm-proxy', authorization: 'Bearer user-jwt', anonKey: 'anon', orgId: 'org-1', fetchFn }) };
@@ -20,7 +20,7 @@ describe('createProxyAskClient', () => {
     expect(out.stopReason).toBe('tool_use');
     const sent = seen[0];
     expect((sent?.init.headers as Record<string, string>).authorization).toBe('Bearer user-jwt');
-    const body = JSON.parse(String(sent?.init.body)) as Record<string, unknown>;
+    const body = JSON.parse(sent?.init.body as string) as Record<string, unknown>;
     expect(body.orgId).toBe('org-1');
     expect(body.tools).toHaveLength(1);
     expect((body.messages as { role: string }[])[0]?.role).toBe('system');

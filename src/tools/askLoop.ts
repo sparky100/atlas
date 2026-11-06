@@ -114,7 +114,7 @@ export interface RunAskInput {
   ctx: ToolContext;
   history: readonly AskTurn[];
   question: string;
-  onEvent?: (event: AskEvent) => void;
+  onEvent?: ((event: AskEvent) => void) | undefined;
 }
 
 export async function runAsk(input: RunAskInput): Promise<AskResult> {
