@@ -1,6 +1,6 @@
 # ADR-029: A local MCP server for Claude Desktop, Claude Code and other MCP apps
 
-**Status:** **Proposed 2026-11-06.** Moves to Accepted when the server skeleton (step 2) merges.
+**Status:** **Proposed 2026-11-06.** Sign-in method decided by Simon 2026-11-06: email and password (open point 1, option a). Moves to Accepted when the server skeleton (step 2) merges.
 **Depends on:** ADR-028 (the read-only tools layer in `src/tools/` this server reuses), ADR-017 (tenancy), ADR-009 (RLS is the tenancy check), rules 4, 7 and 8 of `CLAUDE.md`, `docs/PLAN-2026-11-reports-ai-mcp.md` (F16).
 
 ## Context
@@ -73,7 +73,11 @@ A hosted or remote MCP server with OAuth (what some competitors ship); write too
 
 ## Open points (recommended answers in brackets)
 
-1. **Sign-in method.** (a) Email and password, with `atlas-mcp login` for terminals and keychain-held settings for Claude Desktop [recommended: works today, no server change]; (b) emailed one-time code through two tools in the chat, which needs the email template changed to include the code and is more steps for the user; (c) a browser return page with a minted second session, which needs new server code holding a privileged key [not recommended].
+1. **Sign-in method.** **Decided: (a).** (a) Email and password, with `atlas-mcp login` for terminals and keychain-held settings for Claude Desktop [recommended: works today, no server change]; (b) emailed one-time code through two tools in the chat, which needs the email template changed to include the code and is more steps for the user; (c) a browser return page with a minted second session, which needs new server code holding a privileged key [not recommended].
 2. **Owner switch covers the MCP server.** [yes, with the settings wording extended]
 3. **Tool prefix `atlas_`.** [yes]
 4. **Include `atlas_get_guide` and the update check.** [guide yes; update check yes, off by default]
+
+## Built in step 2
+
+`mcp/src/`: `main.ts` (commands `login`, `logout`, `status`, or no command to serve on stdio), `serverCore.ts` (the server, with its dependencies passed in so a test drives it over an in-memory transport), `auth.ts`, `sessionStore.ts` (the 0600 session file, behind Supabase's own `storage` interface, so a rotated refresh token is saved by the library), `config.ts`, `client.ts`, `models.ts`, `loginCli.ts`, `stdioGuard.ts` (console output goes to stderr, because stdout is the protocol). The SDK is a root `devDependency` (it is bundled, as the edge functions' libraries are). Only `atlas_list_models` is registered so far; step 3 wires the F15 tools, `atlas_get_guide` and the `change` argument. `pnpm mcp`, `pnpm mcp:login` and `pnpm mcp:status` run it from source. The tests under `mcp/` run in `pnpm test`.

@@ -1,0 +1,62 @@
+/**
+ * ADR-029: the MCP server itself, with everything it needs passed in so it
+ * can be driven in a test over an in-memory transport. `main.ts` is the only
+ * place that touches the real process, files and network.
+ */
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { Client } from '../../src/db/client';
+import { ensureSignedIn } from './auth';
+import { listVisibleModels } from './models';
+
+export const SERVER_NAME = 'atlas';
+export const SERVER_VERSION = '0.1.0';
+
+export interface ServerDeps {
+  supabase: Client;
+  email: string | null;
+  password: string | null;
+}
+
+type ToolReply = CallToolResult;
+
+const text = (t: string): ToolReply => ({ content: [{ type: 'text', text: t }] });
+const problem = (t: string): ToolReply => ({ content: [{ type: 'text', text: t }], isError: true });
+
+/** Signs in (or refreshes) before every tool runs and turns any failure into a plain message for the assistant, never a crash. */
+export function guarded(deps: ServerDeps, run: () => Promise<ToolReply>): Promise<ToolReply> {
+  return (async () => {
+    try {
+      const signedIn = await ensureSignedIn(deps.supabase.auth, { email: deps.email, password: deps.password });
+      if (!signedIn.ok) return problem(signedIn.message);
+      return await run();
+    } catch (e) {
+      return problem(`Atlas could not answer that: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  })();
+}
+
+const INSTRUCTIONS = [
+  'Tools for Atlas, an enterprise-architecture model of an organisation (capabilities, systems, actors and how they relate).',
+  'Everything here is read-only and shows only what the signed-in person can already see in Atlas.',
+  'Call atlas_list_models first to see which models there are.',
+].join('\n');
+
+export function createAtlasServer(deps: ServerDeps): McpServer {
+  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: INSTRUCTIONS });
+
+  server.registerTool(
+    'atlas_list_models',
+    {
+      description: 'List the Atlas models you can see: model id, name, organisation, and whether it is archived. Read-only.',
+    },
+    () =>
+      guarded(deps, async () => {
+        const models = await listVisibleModels(deps.supabase);
+        if (models.length === 0) return text('You can sign in, but you do not belong to any organisation with a model yet.');
+        return text(JSON.stringify({ models }, null, 2));
+      }),
+  );
+
+  return server;
+}

@@ -28,6 +28,7 @@
     "src/**/*.tsx",
     "e2e/**/*.ts",
     "scripts/**/*.ts",
+    "mcp/**/*.ts",
     "vite.config.ts",
     "vitest.config.ts",
     "vitest.integration.config.ts",
