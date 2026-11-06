@@ -1,0 +1,100 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.headerRow,
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.headerRow {
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Three columns on desktop, two on a tablet, one on a phone. A tile asks for 1, 2 or all columns and never more than the grid has. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.contents {
+  display: contents;
+}
+
+.tile {
+  grid-column: span var(--span, 1);
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--panel-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+@media (max-width: 1000px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tile {
+    grid-column: span min(var(--span, 1), 2);
+  }
+}
+
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tile {
+    grid-column: 1;
+  }
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cardLink {
+  font-size: var(--text-sm-size);
+}
+
+.tileControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  border-top: var(--border-width) solid var(--border);
+  padding-top: var(--space-2);
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border-top: var(--border-width) solid var(--border);
+  padding-top: var(--space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.select,
+.input {
+  min-height: 2rem;
+  padding: 0 var(--space-2);
+}

@@ -286,11 +286,11 @@ describe('saved reports, saved copies and dashboards (ADR-027) against a real lo
     it('a creator builds a private dashboard; nobody else sees it or its tiles or can add to it', async () => {
       const report = await newReport(contributor);
       const dashboard = await createDashboard(contributor.client, { id: randomUUID(), orgId, modelId, name: 'Mine', createdBy: contributor.id });
-      const tile = await addDashboardTile(contributor.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 0, kind: 'count' });
+      const tile = await addDashboardTile(contributor.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 0, kind: 'kpi' });
       expect(await listDashboardTiles(contributor.client, dashboard.id)).toHaveLength(1);
       expect((await listDashboards(otherContributor.client, modelId)).some((d) => d.id === dashboard.id)).toBe(false);
       expect(await listDashboardTiles(otherContributor.client, dashboard.id)).toEqual([]);
-      await expect(addDashboardTile(otherContributor.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 1, kind: 'count' })).rejects.toThrow();
+      await expect(addDashboardTile(otherContributor.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 1, kind: 'kpi' })).rejects.toThrow();
       await updateDashboardTile(contributor.client, tile.id, { size: 'two', kind: 'table', rowLimit: 10 });
       expect((await listDashboardTiles(contributor.client, dashboard.id))[0]).toMatchObject({ size: 'two', kind: 'table', row_limit: 10 });
       await removeDashboardTile(contributor.client, tile.id);
@@ -300,8 +300,8 @@ describe('saved reports, saved copies and dashboards (ADR-027) against a real lo
     it('refuses two tiles at one position', async () => {
       const report = await newReport(contributor);
       const dashboard = await createDashboard(contributor.client, { id: randomUUID(), orgId, modelId, name: 'Dup', createdBy: contributor.id });
-      await addDashboardTile(contributor.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 0, kind: 'count' });
-      await expect(addDashboardTile(contributor.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 0, kind: 'count' })).rejects.toThrow(/position/);
+      await addDashboardTile(contributor.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 0, kind: 'kpi' });
+      await expect(addDashboardTile(contributor.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 0, kind: 'kpi' })).rejects.toThrow(/position/);
     });
 
     it('only an architect shares a dashboard, and a shared one can only show shared reports', async () => {
@@ -311,8 +311,8 @@ describe('saved reports, saved copies and dashboards (ADR-027) against a real lo
       await expect(updateDashboard(contributor.client, mine.id, { visibility: 'organisation' })).rejects.toThrow(/owner or architect/);
 
       const shared = await createDashboard(architect.client, { id: randomUUID(), orgId, modelId, name: 'Org view', visibility: 'organisation', createdBy: architect.id });
-      await expect(addDashboardTile(architect.client, { id: randomUUID(), dashboardId: shared.id, reportId: privateReport.id, position: 0, kind: 'count' })).rejects.toThrow(/shared with the organisation/);
-      await addDashboardTile(architect.client, { id: randomUUID(), dashboardId: shared.id, reportId: sharedReport.id, position: 0, kind: 'barByField' });
+      await expect(addDashboardTile(architect.client, { id: randomUUID(), dashboardId: shared.id, reportId: privateReport.id, position: 0, kind: 'kpi' })).rejects.toThrow(/shared with the organisation/);
+      await addDashboardTile(architect.client, { id: randomUUID(), dashboardId: shared.id, reportId: sharedReport.id, position: 0, kind: 'bar' });
       expect(await listDashboardTiles(viewer.client, shared.id)).toHaveLength(1);
       await expect(updateSavedReport(architect.client, sharedReport.id, { visibility: 'private' })).rejects.toThrow(/remove it from there first/);
     });
@@ -320,7 +320,7 @@ describe('saved reports, saved copies and dashboards (ADR-027) against a real lo
     it("deleting a report removes its tiles but not the dashboard", async () => {
       const report = await newReport(contributor);
       const dashboard = await createDashboard(contributor.client, { id: randomUUID(), orgId, modelId, name: 'Loses a tile', createdBy: contributor.id });
-      await addDashboardTile(contributor.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 0, kind: 'count' });
+      await addDashboardTile(contributor.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 0, kind: 'kpi' });
       await deleteSavedReport(contributor.client, report.id);
       expect(await listDashboardTiles(contributor.client, dashboard.id)).toEqual([]);
       expect((await listDashboards(contributor.client, modelId)).some((d) => d.id === dashboard.id)).toBe(true);
@@ -347,7 +347,7 @@ describe('saved reports, saved copies and dashboards (ADR-027) against a real lo
         generatedBy: owner.id,
       });
       const dashboard = await createDashboard(owner.client, { id: randomUUID(), orgId, modelId: doomedModelId, name: 'D', createdBy: owner.id });
-      await addDashboardTile(owner.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 0, kind: 'count' });
+      await addDashboardTile(owner.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 0, kind: 'kpi' });
 
       await archiveModel(owner.client, doomedModelId);
       await deleteModel(owner.client, doomedModelId);

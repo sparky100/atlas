@@ -886,8 +886,8 @@ Same RLS as `saved_reports` (update column grant: `name, visibility`). A dashboa
 | `dashboard_id` | uuid | → `dashboards(id)` on delete cascade |
 | `report_id` | uuid | → `saved_reports(id)` on delete cascade |
 | `position` | int | not null, ≥ 0; unique per dashboard (deferrable, so a reorder can swap in one statement) |
-| `kind` | text | `count` \| `barByField` \| `table` \| `findingCount` |
-| `size` | text | `one` (default) \| `two` |
+| `kind` | text | `kpi` \| `bar` \| `stackedBar` \| `donut` \| `table` |
+| `size` | text | `one` (default) \| `two` \| `full` |
 | `row_limit` | int | nullable, 1 to 50 |
 
 A tile is visible exactly when its dashboard is, and editable by whoever may edit the dashboard. The report must be in the dashboard's model, visible to the person adding it, and (on an `organisation` dashboard) itself `organisation`. `position` and `size` are display hints (rule 3). `atlas.delete_model` deletes all four tables' rows before the rest.

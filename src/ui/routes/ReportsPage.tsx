@@ -10,6 +10,7 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import { useModels } from '../models/useModels';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { ReportsView } from '../reports/ReportsView';
+import { DashboardsList } from '../reports/DashboardsList';
 import { SavedReportsLibrary } from '../reports/SavedReportsLibrary';
 import { useAuth } from '../auth/useAuth';
 import { useMembership } from '../orgs/useMembership';
@@ -58,6 +59,7 @@ export function ReportsPage() {
             </Text>
           </div>
           <ReportsView modelId={model.id} mainHeadCommitId={mainBranch.head_commit_id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
+          {organisation && <DashboardsList modelId={model.id} orgId={organisation.id} userId={userId} role={role} basePath={`/o/${orgSlug ?? ''}/m/${model.slug}`} />}
           {organisation && <SavedReportsLibrary modelId={model.id} orgId={organisation.id} userId={userId} role={role} basePath={`/o/${orgSlug ?? ''}/m/${model.slug}`} />}
         </main>
       </div>

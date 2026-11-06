@@ -628,8 +628,8 @@ export interface ProjectLinkRow {
 /** `private` is the creator's alone; `organisation` is every member's. Only an org owner/architect can set `organisation` (ADR-027 §5). */
 export type ReportVisibility = 'private' | 'organisation';
 
-export type DashboardTileKind = 'count' | 'barByField' | 'table' | 'findingCount';
-export type DashboardTileSize = 'one' | 'two';
+export type DashboardTileKind = 'kpi' | 'bar' | 'stackedBar' | 'donut' | 'table';
+export type DashboardTileSize = 'one' | 'two' | 'full';
 
 /** The literal shape of a row in `saved_reports`: a stored question (a `ReportSpec`), never data about the architecture. `spec` is `Json` here; read it back through `parseReportSpec`. */
 export interface SavedReportRow {

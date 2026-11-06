@@ -103,9 +103,9 @@ create table dashboard_tiles (
   dashboard_id uuid not null references dashboards (id) on delete cascade,
   report_id uuid not null references saved_reports (id) on delete cascade,
   position int not null check (position >= 0),
-  kind text not null check (kind in ('count', 'barByField', 'table', 'findingCount')),
-  -- Columns wide: a small fixed set, never a coordinate.
-  size text not null default 'one' check (size in ('one', 'two')),
+  kind text not null check (kind in ('kpi', 'bar', 'stackedBar', 'donut', 'table')),
+  -- How wide: a small fixed set (one column, two, or the full row), never a coordinate.
+  size text not null default 'one' check (size in ('one', 'two', 'full')),
   -- Top N rows for a table tile.
   row_limit int check (row_limit is null or row_limit between 1 and 50),
   constraint dashboard_tiles_position_unique unique (dashboard_id, position) deferrable initially deferred
