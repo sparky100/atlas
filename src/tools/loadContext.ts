@@ -17,7 +17,7 @@ import { listFactsForSubject } from '../db/elements';
 import { listProjectsForModel } from '../db/projects';
 import { listSavedReports } from '../db/reports';
 import { selectAll } from '../db/selectAll';
-import type { ModelSnapshot, ToolContext } from './types';
+import type { ModelSnapshot, ToolContext, ToolStamp } from './types';
 
 const RELATIONSHIPS_HEAD_COLUMNS = 'relationship_id, relationship_type, from_element_id, to_element_id, attributes, exists_delta_id';
 
@@ -38,7 +38,7 @@ async function loadSnapshot(supabase: Client, modelId: UUID, commitId: UUID): Pr
   return { elements, relationships, aliases };
 }
 
-export function createToolContext(supabase: Client, model: { id: UUID; name: string }, commitId: UUID): ToolContext {
+export function createToolContext(supabase: Client, model: { id: UUID; name: string }, commitId: UUID, ref: ToolStamp['ref'] = 'main'): ToolContext {
   let snapshot: Promise<ModelSnapshot> | null = null;
   let reports: ReturnType<typeof listSavedReports> | null = null;
   let facts: ReturnType<typeof listFactsForCommit> | null = null;
@@ -48,7 +48,7 @@ export function createToolContext(supabase: Client, model: { id: UUID; name: str
   let decisionLinks: ReturnType<typeof listOpenDecisionElementLinksForModel> | null = null;
   let projects: ReturnType<typeof listProjectsForModel> | null = null;
   return {
-    stamp: { modelId: model.id, modelName: model.name, ref: 'main', commitId },
+    stamp: { modelId: model.id, modelName: model.name, ref, commitId },
     snapshot: () => (snapshot ??= loadSnapshot(supabase, model.id, commitId)),
     factsFor: (elementId) => listFactsForSubject(supabase, commitId, elementId),
     savedReports: () => (reports ??= listSavedReports(supabase, model.id)),

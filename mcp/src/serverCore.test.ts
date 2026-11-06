@@ -3,6 +3,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';
 import type { Client } from '../../src/db/client';
 import { NOT_SIGNED_IN } from './auth';
+import { MODEL_TOOLS } from '../../src/tools';
 import { createAtlasServer } from './serverCore';
 
 const MODELS = [
@@ -42,7 +43,11 @@ describe('the Atlas MCP server', () => {
   it('offers atlas_list_models and says it is read-only', async () => {
     const client = await connect(fakeSupabase({ signedIn: true }));
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name)).toEqual(['atlas_list_models']);
+    expect(tools.map((t) => t.name)).toEqual([
+      'atlas_list_models',
+      'atlas_get_guide',
+      ...MODEL_TOOLS.map((t) => `atlas_${t.name}`),
+    ]);
     expect(client.getInstructions()).toMatch(/read-only/);
   });
 
@@ -66,5 +71,38 @@ describe('the Atlas MCP server', () => {
     const result = await client.callTool({ name: 'atlas_list_models', arguments: {} });
     expect(result.isError).toBe(true);
     expect(textOf(result)).toMatch(/could not answer that/);
+  });
+
+  it('gives every model tool optional model and change arguments, and keeps its own inputs', async () => {
+    const client = await connect(fakeSupabase({ signedIn: true }));
+    const { tools } = await client.listTools();
+    const search = tools.find((t) => t.name === 'atlas_search_elements');
+    const props = Object.keys((search?.inputSchema.properties ?? {}));
+    expect(props).toEqual(expect.arrayContaining(['query', 'model', 'change']));
+    for (const t of tools.filter((x) => x.name.startsWith('atlas_') && !['atlas_list_models', 'atlas_get_guide'].includes(x.name))) {
+      expect(t.inputSchema.required ?? []).not.toContain('model');
+      expect(t.inputSchema.required ?? []).not.toContain('change');
+    }
+  });
+
+  it('returns the guide without needing a sign-in', async () => {
+    const client = await connect(fakeSupabase({ signedIn: false }));
+    const result = await client.callTool({ name: 'atlas_get_guide', arguments: {} });
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toMatch(/atlas_search_elements/);
+  });
+
+  it('says so when the named model is not one the user can see', async () => {
+    const client = await connect(fakeSupabase({ signedIn: true }));
+    const result = await client.callTool({ name: 'atlas_search_elements', arguments: { query: 'CRM', model: 'Nowhere' } });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toMatch(/No model called/);
+  });
+
+  it('reports an unknown tool plainly', async () => {
+    const client = await connect(fakeSupabase({ signedIn: true }));
+    const result = await client.callTool({ name: 'atlas_nope', arguments: {} });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toMatch(/no tool called/);
   });
 });

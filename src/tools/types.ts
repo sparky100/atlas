@@ -22,7 +22,8 @@ export interface ModelSnapshot {
 export interface ToolStamp {
   modelId: UUID;
   modelName: string;
-  ref: 'main';
+  /** `'main'` (live), or the change whose work-in-progress was read (ADR-029: only the local MCP server asks for this). */
+  ref: 'main' | { change: UUID };
   commitId: UUID;
 }
 
