@@ -16,6 +16,8 @@ import { PortfolioView } from '../portfolio/PortfolioView';
 import { usePortfolio } from '../portfolio/usePortfolio';
 import { useBranchLabel } from '../branches/useBranchLabel';
 import { exportDate, stampRefLabel } from '../exports/viewExport';
+import { useAuth } from '../auth/useAuth';
+import { useMembership } from '../orgs/useMembership';
 import styles from './PortfolioPage.module.css';
 
 /**
@@ -38,6 +40,8 @@ export function PortfolioPage() {
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
   const { branch: mainBranch, loading: mainBranchLoading } = useMainBranch(model?.id ?? null);
+  const { userId } = useAuth();
+  const { role } = useMembership(organisation?.id ?? null, userId);
 
   const { state } = usePortfolio(hintedModelId(model?.id, ref, mainBranchLoading) ?? '', ref, mainBranch?.head_commit_id ?? null);
   const { label: branchLabel } = useBranchLabel(ref);
@@ -76,7 +80,7 @@ export function PortfolioPage() {
           {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
           {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
-          {state.status === 'ready' && <PortfolioView data={state.data} elementHref={elementHref} exportStamp={{ modelName: model.name, refLabel: stampRefLabel(ref, branchLabel), date: exportDate() }} />}
+          {state.status === 'ready' && <PortfolioView data={state.data} elementHref={elementHref} savedReports={organisation ? { modelId: model.id, orgId: organisation.id, userId, role } : undefined} exportStamp={{ modelName: model.name, refLabel: stampRefLabel(ref, branchLabel), date: exportDate() }} />}
         </main>
       </div>
     </div>

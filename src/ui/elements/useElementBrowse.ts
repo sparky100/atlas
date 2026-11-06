@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Criticality, ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 import { CRITICALITY_ORDER } from './criticalityTone';
-import { DISPOSITION_ORDER, dispositionOf } from './disposition';
+import { DISPOSITION_ORDER } from './disposition';
 import type { Disposition } from '../../contracts/delta';
-import { listAllElements, loadOwnersByElementId, ownersByElementIdFromOwnsEdges, lifecycleStatusOf, criticalityOf, type BrowseRow } from '../../db/elementBrowse';
+import { listAllElements, loadOwnersByElementId, ownersByElementIdFromOwnsEdges, type BrowseRow } from '../../db/elementBrowse';
 import { attributesRecord } from './attributesRecord';
+import { buildBrowseRows } from './buildBrowseRows';
 import { compareCustomAttributeValues, sortKeyEquals, type ElementBrowseSortKey } from './elementBrowseSort';
 import { moduleDisplayName } from './moduleDisplayName';
 import {
@@ -108,6 +109,8 @@ export type ElementBrowseState =
       setSort: (key: ElementBrowseSortKey) => void;
       /** The commit every row was read at — `RelationshipAdd`'s own search needs this, for the inline supports picker on an unlinked-systems row. */
       commitId: UUID;
+      /** F14: puts the page's own sort/filter controls into a saved report's state in one go. */
+      restore: (next: { typeFilter: ElementType | 'all'; dispositionFilter: DispositionFilter; query: string; sortKey: ElementBrowseSortKey; sortDirection: 'asc' | 'desc' }) => void;
       /** Re-fetches everything (same `reload`-by-token shape `useMainBranch.ts` uses) — the inline supports picker's own `onCreated` calls this, so a just-linked system drops out of the `unlinked-systems` filter immediately rather than staying visible (and re-addable) until the next full page load. */
       reload: () => void;
     };
@@ -326,20 +329,7 @@ export function useElementBrowse(
         ids = new Set(elements.filter((e) => attributesRecord(e.attributes)[filter.custom] === filter.value).map((e) => e.element_id));
       }
 
-      const rows: BrowseRow[] = elements.map((element) => {
-        const parent = element.parent_id !== null ? (elementsById.get(element.parent_id) ?? null) : null;
-        return {
-          element,
-          owner: ownersByElementId.get(element.element_id) ?? null,
-          // `parent` threaded through so a module whose own lifecycle/
-          // criticality is unset reads as its platform's, rather than
-          // blank — `lifecycleStatusOf`/`criticalityOf`'s own doc comment.
-          lifecycleStatus: lifecycleStatusOf(element, parent),
-          criticality: criticalityOf(element, parent),
-          disposition: element.element_type === 'system' || element.element_type === 'container' ? dispositionOf(element) : null,
-          parent,
-        };
-      });
+      const rows = buildBrowseRows(elements, ownersByElementId);
 
       if (!cancelled) {
         setLoaded({ allRows: rows, commitId: resolvedCommitId, filteredIds: ids });
@@ -402,6 +392,13 @@ export function useElementBrowse(
     sortDirection,
     setSort,
     commitId: loaded.commitId,
+    restore: (next) => {
+      setTypeFilter(next.typeFilter);
+      setDispositionFilter(next.dispositionFilter);
+      setQuery(next.query);
+      setSortKey(next.sortKey);
+      setSortDirection(next.sortDirection);
+    },
     reload: () => { setReloadToken((t) => t + 1); },
   };
 }

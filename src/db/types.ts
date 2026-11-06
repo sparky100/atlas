@@ -7,7 +7,7 @@
  */
 import type { AttributeDefinitionKind } from '../contracts/attributeSchema';
 export type { CaptureJobRowShape as CaptureJobRow, CaptureCandidateRowShape as CaptureCandidateRow } from '../contracts/capture';
-import type { ElementType, UUID } from '../contracts/delta';
+import type { ElementType, Json, UUID } from '../contracts/delta';
 import type { SourceKind } from '../contracts/sources';
 export type { AnchorType, CommentStatus, NotificationKind } from '../contracts/comments';
 import type { AnchorType, CommentStatus, NotificationKind } from '../contracts/comments';
@@ -616,4 +616,84 @@ export interface ProjectLinkRow {
   linked_id: UUID;
   created_by: UUID;
   created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Saved reports, saved copies and dashboards (ADR-027, F14 —
+// docs/ADR-027-saved-reports.md and
+// supabase/migrations/20261106010000_saved_reports.sql). Workflow rows, not
+// model facts: never in deltas, heads or versions.
+// ---------------------------------------------------------------------------
+
+/** `private` is the creator's alone; `organisation` is every member's. Only an org owner/architect can set `organisation` (ADR-027 §5). */
+export type ReportVisibility = 'private' | 'organisation';
+
+export type DashboardTileKind = 'kpi' | 'bar' | 'stackedBar' | 'donut' | 'table';
+export type DashboardTileSize = 'one' | 'two' | 'full';
+
+/** The literal shape of a row in `saved_reports`: a stored question (a `ReportSpec`), never data about the architecture. `spec` is `Json` here; read it back through `parseReportSpec`. */
+export interface SavedReportRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  name: string;
+  description: string;
+  spec: Json;
+  spec_version: number;
+  visibility: ReportVisibility;
+  created_by: UUID;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * The literal shape of a row in `report_snapshots`: a frozen result, kept as
+ * a record. Insert-only — no update grant. `report_id` is null once its
+ * report has been deleted. `rows`/`columns`/`groups`/`unknown_fields` are the
+ * stored `ReportResult`; `spec` is a copy of the definition as it was.
+ */
+export interface ReportSnapshotRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  report_id: UUID | null;
+  name: string;
+  spec: Json;
+  spec_version: number;
+  /** Always the model's main branch (ADR-027 §3). */
+  branch_id: UUID;
+  /** The commit on that branch the copy was read at. */
+  commit_id: UUID;
+  columns: Json;
+  rows: Json;
+  groups: Json;
+  unknown_fields: Json;
+  row_count: number;
+  truncated: boolean;
+  visibility: ReportVisibility;
+  generated_by: UUID;
+  generated_at: string;
+}
+
+/** The literal shape of a row in `dashboards`. */
+export interface DashboardRow {
+  id: UUID;
+  org_id: UUID;
+  model_id: UUID;
+  name: string;
+  visibility: ReportVisibility;
+  created_by: UUID;
+  created_at: string;
+  updated_at: string;
+}
+
+/** The literal shape of a row in `dashboard_tiles`. `position` and `size` are display hints (rule 3), not data. */
+export interface DashboardTileRow {
+  id: UUID;
+  dashboard_id: UUID;
+  report_id: UUID;
+  position: number;
+  kind: DashboardTileKind;
+  size: DashboardTileSize;
+  row_limit: number | null;
 }

@@ -32,6 +32,8 @@ import { useAttestation } from '../elements/useAttestation';
 import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromCriticalExposedFinding, prefillFromCriticalSupportEndFinding, prefillFromOutgoingDisposition } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { useRouteTiming } from '../perf/useRouteTiming';
+import { SavedReportBar } from '../reports/SavedReportBar';
+import { elementsStateToSpec, specToElementsState } from '../reports/elementsReport';
 import styles from './ElementsPage.module.css';
 
 const VALID_FILTERS: readonly ElementBrowseFilter[] = [
@@ -279,6 +281,43 @@ export function ElementsPage() {
                 modelSlug={model.slug}
               />
             </Panel>
+          )}
+          {state.status === 'ready' && organisation && (
+            <SavedReportBar
+              source="elements"
+              modelId={model.id}
+              orgId={organisation.id}
+              userId={userId}
+              role={role}
+              current={elementsStateToSpec(
+                {
+                  typeFilter: state.typeFilter,
+                  dispositionFilter: state.dispositionFilter,
+                  query: state.query,
+                  sortKey: state.sortKey,
+                  sortDirection: state.sortDirection,
+                  custom: filter !== null && typeof filter === 'object' ? { key: filter.custom, value: filter.value } : null,
+                },
+                customAttrKey === null ? searchParams.get('filter') : null,
+              )}
+              onOpen={(spec) => {
+                const restored = specToElementsState(spec);
+                if (!restored.ok) return restored.reason;
+                const next = restored.state;
+                state.restore(next);
+                // The custom-attribute filter lives in the URL; a saved report replaces it (and any finding filter) outright.
+                const params = new URLSearchParams(searchParams);
+                params.delete('filter');
+                params.delete('customAttr');
+                params.delete('customValue');
+                if (next.custom !== null) {
+                  params.set('customAttr', next.custom.key);
+                  params.set('customValue', typeof next.custom.value === 'string' ? next.custom.value : JSON.stringify(next.custom.value));
+                }
+                setSearchParams(params);
+                return null;
+              }}
+            />
           )}
           <ElementBrowseTable
             state={state}

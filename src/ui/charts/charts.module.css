@@ -1,0 +1,219 @@
+/* ADR-027 (F14 step 6a): chart styles. Colours come only from chartTokens.css; text wears text tokens, never a series colour. */
+.figure {
+  container: chart / inline-size;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.caption {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-lh);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 11rem) 1fr 6.5rem;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+}
+
+button.row {
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+button.row:hover,
+button.row:focus-visible {
+  background: var(--bg-subtle);
+}
+
+button.row:focus-visible {
+  outline: var(--border-width-emphasis) solid var(--focus);
+  outline-offset: 2px;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track {
+  display: flex;
+  height: 14px;
+  background: var(--bg-subtle);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.segment {
+  display: block;
+  height: 100%;
+  /* A 2px surface gap between fills, so neighbours never rely on hue alone. */
+  border-right: 2px solid var(--surface);
+  min-width: 2px;
+}
+
+.segment:last-child {
+  border-right: 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fill,
+  .segment {
+    transition: width 200ms ease-out;
+  }
+}
+
+.value {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.valueMuted {
+  color: var(--text-muted);
+  margin-left: var(--space-1);
+}
+
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-sm-size);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.donutWrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.donut {
+  width: 160px;
+  height: 160px;
+  flex: none;
+}
+
+.donutSlice {
+  stroke: var(--surface);
+  stroke-width: 1;
+}
+
+button.donutSlice {
+  cursor: pointer;
+}
+
+.donutFigure {
+  font-size: 18px;
+  font-weight: 600;
+  fill: var(--text);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.donutUnit {
+  font-size: 7px;
+  fill: var(--text-muted);
+  text-anchor: middle;
+}
+
+.empty {
+  color: var(--text-muted);
+}
+
+.big {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.bigLabel {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.bigValue {
+  font-size: var(--text-3xl-size);
+  line-height: var(--text-3xl-lh);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.bigNote {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+/* Narrow charts (a phone, or a small dashboard tile): the label and figure share a line and the bar gets the full width beneath. */
+@container chart (max-width: 440px) {
+  .row {
+    grid-template-columns: 1fr auto;
+    row-gap: var(--space-1);
+  }
+
+  .row > .label {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .row > .value {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .row > .track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

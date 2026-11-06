@@ -826,6 +826,72 @@ superseding `listPublishedCapabilityMaps`) lists both statuses, flagged
 "Draft" in the UI — never indistinguishable from a reviewed, published
 map.
 
+### 3.11 Saved reports, saved copies and dashboards
+
+Workflow records on the same tier as `projects` and `decisions` (ADR-027, `supabase/migrations/20261106010000_saved_reports.sql`): never a delta, never folded into a head, never in a version. Deleting every row of all four tables loses no model information (ADR-011's litmus test for the definitions; see `report_snapshots` for the one table that is a record rather than a hint). Contract: `src/contracts/reportSpec.ts` (`ReportSpec`, `parseReportSpec`); evaluator: `src/engine/reportQuery.ts`; rows and queries: `src/db/types.ts`, `src/db/reports.ts`.
+
+Two visibility levels everywhere: `private` (the creator) and `organisation` (every member). Only an org owner/architect can set `organisation` (`atlas.guard_saved_report`, `atlas.guard_dashboard`).
+
+#### `saved_reports`
+A stored question, not data. Mutable.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | uuid | primary key (caller-minted) |
+| `org_id`, `model_id` | uuid | → `organisations`, `models`; fixed after insert |
+| `name` | text | not null, non-blank |
+| `description` | text | not null, default `''` |
+| `spec` | jsonb | not null; an object whose `specVersion` equals `spec_version` |
+| `spec_version` | int | not null, ≥ 1 |
+| `visibility` | text | `private` (default) \| `organisation` |
+| `created_by` | uuid | → `auth.users(id)`; fixed after insert |
+| `created_at`, `updated_at` | timestamptz | `updated_at` set by trigger |
+
+RLS: select for a member when `organisation` or own; insert owner/architect/contributor with `created_by = auth.uid()`; update (column grant: `name, description, spec, spec_version, visibility`) and delete by the creator, or by an owner/architect for an `organisation` report. A private report is its creator's alone. A report cannot return to private while a tile of an organisation-visible dashboard shows it.
+
+#### `report_snapshots`
+A frozen result, kept as a record. **Insert-only**: no update grant, and `atlas.report_snapshot_immutable` refuses any update except the FK's own `on delete set null` clearing `report_id`.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `org_id`, `model_id` | uuid | → `organisations`, `models` |
+| `report_id` | uuid | → `saved_reports(id)` **on delete set null** |
+| `name`, `spec`, `spec_version` | text, jsonb, int | copy of the report's name and definition when the copy was taken |
+| `branch_id` | uuid | → `branches(id)`; must be the model's `main` branch (`atlas.guard_report_snapshot`) |
+| `commit_id` | uuid | → `commits(id)`; must be on that branch |
+| `columns`, `rows`, `groups`, `unknown_fields` | jsonb | the stored `ReportResult`; `rows` has at most 5,000 entries |
+| `row_count` | int | not null, ≥ `jsonb_array_length(rows)` |
+| `truncated` | boolean | not null |
+| `visibility` | text | `private` \| `organisation`; `organisation` only if the generator is an owner/architect or the report is itself `organisation` |
+| `generated_by`, `generated_at` | uuid, timestamptz | |
+
+RLS: select for a member when `organisation` or own; insert owner/architect/contributor with `generated_by = auth.uid()`; delete by the generator, or by an owner/architect for an `organisation` copy. Reading a copy reads only these columns, never the live model.
+
+#### `dashboards`
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `org_id`, `model_id` | uuid | fixed after insert |
+| `name` | text | not null, non-blank |
+| `visibility` | text | `private` (default) \| `organisation` |
+| `created_by`, `created_at`, `updated_at` | | as `saved_reports` |
+
+Same RLS as `saved_reports` (update column grant: `name, visibility`). A dashboard cannot become `organisation` while a tile shows a private report.
+
+#### `dashboard_tiles`
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `dashboard_id` | uuid | → `dashboards(id)` on delete cascade |
+| `report_id` | uuid | → `saved_reports(id)` on delete cascade |
+| `position` | int | not null, ≥ 0; unique per dashboard (deferrable, so a reorder can swap in one statement) |
+| `kind` | text | `kpi` \| `bar` \| `stackedBar` \| `donut` \| `table` |
+| `size` | text | `one` (default) \| `two` \| `full` |
+| `row_limit` | int | nullable, 1 to 50 |
+
+A tile is visible exactly when its dashboard is, and editable by whoever may edit the dashboard. The report must be in the dashboard's model, visible to the person adding it, and (on an `organisation` dashboard) itself `organisation`. `position` and `size` are display hints (rule 3). `atlas.delete_model` deletes all four tables' rows before the rest.
+
 ---
 
 ## 4. The delta format

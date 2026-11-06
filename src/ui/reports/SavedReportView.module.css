@@ -1,0 +1,16 @@
+.view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.copies {
+  margin: 0;
+  padding-left: var(--space-4);
+}
