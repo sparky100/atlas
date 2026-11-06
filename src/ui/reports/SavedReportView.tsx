@@ -16,6 +16,7 @@ import { Text } from '../components/Text/Text';
 import { reportError } from '../errors/errorBannerStore';
 import { canCreateChangeBranch } from '../orgs/roleGates';
 import { supabase } from '../supabaseClient';
+import { reportExportPlan } from '../exports/dashboardExport';
 import { ReportDownloadButtons } from './ReportDownloadButtons';
 import { ReportResultView } from './ReportResultView';
 import { ReportRunner } from './ReportRunner';
@@ -119,7 +120,15 @@ function Loaded({ report, spec, rows, knownFields, modelName, orgId, modelId, us
   return (
     <>
       <div className={styles.actions}>
-        <ReportDownloadButtons table={table} fileBase={`${modelName}-${report.name}-${today}`} about={{ report: report.name, model: modelName, state: `main · live, ${today}` }} />
+        <ReportDownloadButtons
+          table={table}
+          fileBase={`${modelName}-${report.name}-${today}`}
+          about={{ report: report.name, model: modelName, state: `main · live, ${today}` }}
+          picture={() => {
+            const stamp = { modelName, viewLabel: report.name, refLabel: `Main, live ${today}`, date: today };
+            return { plan: reportExportPlan(report.name, spec, result, stamp), stamp };
+          }}
+        />
         {canCopy && (
           <Button variant="primary" disabled={busy || !fits} onClick={() => void saveCopy()}>
             Save a copy now

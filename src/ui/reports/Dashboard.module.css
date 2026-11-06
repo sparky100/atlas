@@ -98,3 +98,24 @@
   min-height: 2rem;
   padding: 0 var(--space-2);
 }
+
+/* Present mode: the dashboard fills the screen with no editing controls, for a meeting. */
+.present {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: auto;
+  background: var(--bg, var(--surface));
+  padding: var(--space-6);
+}
+
+.presentBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}

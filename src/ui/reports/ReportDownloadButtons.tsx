@@ -1,6 +1,7 @@
 /** ADR-027 (F14 step 5): CSV and Excel downloads for a report table (live or a saved copy). */
 import { useState } from 'react';
-import { downloadBlob } from '../exports/viewExport';
+import { ExportViewButtons } from '../components/ExportViewButtons/ExportViewButtons';
+import { downloadBlob, type ExportPlan, type ExportStamp } from '../exports/viewExport';
 import type { ReportXlsxAbout } from '../exports/reportTableXlsx';
 import { Button } from '../components/Button/Button';
 import { reportError } from '../errors/errorBannerStore';
@@ -15,9 +16,11 @@ export interface ReportDownloadButtonsProps {
   /** Used for the file name, e.g. `acme-systems-past-support-2026-11-06.csv`. */
   fileBase: string;
   about: ReportXlsxAbout;
+  /** Builds the stamped picture for the PNG and PDF downloads. */
+  picture?: () => { plan: ExportPlan; stamp: ExportStamp };
 }
 
-export function ReportDownloadButtons({ table, fileBase, about }: ReportDownloadButtonsProps) {
+export function ReportDownloadButtons({ table, fileBase, about, picture }: ReportDownloadButtonsProps) {
   const [busy, setBusy] = useState(false);
   return (
     <>
@@ -47,6 +50,7 @@ export function ReportDownloadButtons({ table, fileBase, about }: ReportDownload
       >
         Download Excel
       </Button>
+      {picture !== undefined && <ExportViewButtons what="report" build={picture} />}
     </>
   );
 }

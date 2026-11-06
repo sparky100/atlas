@@ -75,6 +75,7 @@ export function DashboardPage() {
       dashboard={state.dashboard}
       orgId={organisation.id}
       modelId={model.id}
+      modelName={model.name}
       userId={userId}
       role={role}
       main={{ headCommitId: mainBranch.head_commit_id }}

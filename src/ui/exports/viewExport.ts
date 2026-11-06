@@ -31,7 +31,9 @@ export const TONE_COLOURS: Readonly<Record<ChipTone, { fill: string; edge: strin
 
 export type ExportShape =
   | { kind: 'rect'; x: number; y: number; w: number; h: number; fill: string; stroke?: string; radius?: number }
-  | { kind: 'text'; x: number; y: number; text: string; size: number; bold?: boolean; color: string; maxWidth?: number };
+  | { kind: 'text'; x: number; y: number; text: string; size: number; bold?: boolean; color: string; maxWidth?: number }
+  /** A ring segment (donut slice). Angles are in radians clockwise from 12 o'clock. */
+  | { kind: 'arc'; cx: number; cy: number; outer: number; inner: number; from: number; to: number; fill: string };
 
 export interface ExportPlan {
   width: number;
@@ -99,6 +101,16 @@ export function drawExportPlan(ctx: CanvasRenderingContext2D, plan: ExportPlan):
         ctx.lineWidth = 1;
         ctx.stroke();
       }
+    } else if (shape.kind === 'arc') {
+      // Canvas angles start at 3 o'clock; ours start at 12.
+      const start = shape.from - Math.PI / 2;
+      const end = shape.to - Math.PI / 2;
+      ctx.beginPath();
+      ctx.arc(shape.cx, shape.cy, shape.outer, start, end);
+      ctx.arc(shape.cx, shape.cy, shape.inner, end, start, true);
+      ctx.closePath();
+      ctx.fillStyle = shape.fill;
+      ctx.fill();
     } else {
       ctx.font = `${shape.bold ? 'bold ' : ''}${String(shape.size)}px sans-serif`;
       ctx.fillStyle = shape.color;

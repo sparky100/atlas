@@ -4,7 +4,7 @@
  * uses it) and shows it the way the tile says. The title links to the full
  * report; clicking a bar opens it too.
  */
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { parseReportSpec, type ReportRow } from '../../contracts/reportSpec';
 import { runReport } from '../../engine/reportQuery';
@@ -14,6 +14,7 @@ import { BigNumber } from '../charts/BigNumber';
 import { DonutChart } from '../charts/DonutChart';
 import { StackedBarChart } from '../charts/StackedBarChart';
 import { Text } from '../components/Text/Text';
+import type { ExportTileItem } from '../exports/dashboardExport';
 import { specForTile } from './dashboardTiles';
 import { ResultTable } from './ReportResultView';
 import { reportFieldLabel } from './reportTable';
@@ -26,13 +27,23 @@ export interface DashboardTileCardProps {
   knownFields: readonly string[];
   /** `/o/:org/m/:model` */
   basePath: string;
+  /** Reports the tile's result (or `null` when it can't run) so the dashboard can export what is on screen. */
+  onResult?: (tileId: string, item: ExportTileItem | null) => void;
 }
 
-export function DashboardTileCard({ tile, report, rows, knownFields, basePath }: DashboardTileCardProps) {
+export function DashboardTileCard({ tile, report, rows, knownFields, basePath, onResult }: DashboardTileCardProps) {
   const navigate = useNavigate();
   const parsed = useMemo(() => parseReportSpec(report.spec), [report.spec]);
   const reportHref = `${basePath}/reports/saved/${report.id}`;
   const result = useMemo(() => (parsed.ok ? runReport(rows, specForTile(parsed.spec, tile.kind, tile.row_limit), { knownFields }) : null), [parsed, rows, knownFields, tile.kind, tile.row_limit]);
+
+  useEffect(() => {
+    if (!onResult) return undefined;
+    onResult(tile.id, parsed.ok && result !== null ? { title: report.name, kind: tile.kind, size: tile.size, spec: specForTile(parsed.spec, tile.kind, tile.row_limit), result } : null);
+    return () => {
+      onResult(tile.id, null);
+    };
+  }, [onResult, tile.id, tile.kind, tile.size, tile.row_limit, report.name, parsed, result]);
 
   if (!parsed.ok || result === null) {
     return <Text as="p">“{report.name}” can't be shown: {parsed.ok ? 'it could not be run' : parsed.error}</Text>;

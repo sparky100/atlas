@@ -6,13 +6,16 @@
  * tiles. No coordinates are stored: order and a size from a fixed set only
  * (rule 3).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { parseReportSpec, type ReportSource } from '../../contracts/reportSpec';
 import { addDashboardTile, deleteDashboard, listDashboardTiles, listSavedReports, removeDashboardTile, updateDashboard, updateDashboardTile } from '../../db/reports';
 import type { DashboardRow, DashboardTileKind, DashboardTileRow, DashboardTileSize, MemberRole, SavedReportRow } from '../../db/types';
 import { Button } from '../components/Button/Button';
+import { ExportViewButtons } from '../components/ExportViewButtons/ExportViewButtons';
+import { dashboardExportPlan, type ExportTileItem } from '../exports/dashboardExport';
+import { exportDate } from '../exports/viewExport';
 import { Text } from '../components/Text/Text';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -25,6 +28,7 @@ export interface DashboardViewProps {
   dashboard: DashboardRow;
   orgId: UUID;
   modelId: UUID;
+  modelName: string;
   userId: UUID | null;
   role: MemberRole | null;
   main: { headCommitId: UUID };
@@ -34,7 +38,7 @@ export interface DashboardViewProps {
 
 const SIZE_LABEL: Record<DashboardTileSize, string> = { one: 'One column', two: 'Two columns', full: 'Full width' };
 
-export function DashboardView({ dashboard, orgId, modelId, userId, role, main, basePath, onChanged }: DashboardViewProps) {
+export function DashboardView({ dashboard, orgId, modelId, modelName, userId, role, main, basePath, onChanged }: DashboardViewProps) {
   const navigate = useNavigate();
   const [tiles, setTiles] = useState<DashboardTileRow[]>([]);
   const [reports, setReports] = useState<SavedReportRow[]>([]);
@@ -44,7 +48,13 @@ export function DashboardView({ dashboard, orgId, modelId, userId, role, main, b
   const [name, setName] = useState(dashboard.name);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [add, setAdd] = useState<{ reportId: string; kind: DashboardTileKind | ''; size: DashboardTileSize }>({ reportId: '', kind: '', size: 'one' });
-  const canEdit = canEditDashboard(dashboard, userId, role);
+  const [presenting, setPresenting] = useState(false);
+  const results = useRef(new Map<string, ExportTileItem>());
+  const onResult = useCallback((tileId: string, item: ExportTileItem | null) => {
+    if (item === null) results.current.delete(tileId);
+    else results.current.set(tileId, item);
+  }, []);
+  const canEdit = canEditDashboard(dashboard, userId, role) && !presenting;
   const canShare = role === 'owner' || role === 'architect';
 
   useEffect(() => {
@@ -74,6 +84,25 @@ export function DashboardView({ dashboard, orgId, modelId, userId, role, main, b
     }
   }
 
+  // Present mode: fill the screen where the browser allows it; Esc (or leaving full screen) ends it.
+  useEffect(() => {
+    if (!presenting) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPresenting(false);
+    };
+    const onFullscreen = () => {
+      if (document.fullscreenElement === null) setPresenting(false);
+    };
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('fullscreenchange', onFullscreen);
+    void document.documentElement.requestFullscreen().catch(() => undefined);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('fullscreenchange', onFullscreen);
+      if (document.fullscreenElement !== null) void document.exitFullscreen().catch(() => undefined);
+    };
+  }, [presenting]);
+
   const reportsById = useMemo(() => new Map(reports.map((r) => [r.id, r])), [reports]);
   const specs = useMemo(() => new Map(reports.map((r) => [r.id, parseReportSpec(r.spec)])), [reports]);
   const shown = [...tiles]
@@ -91,11 +120,49 @@ export function DashboardView({ dashboard, orgId, modelId, userId, role, main, b
   const addKinds = addSpec?.ok ? tileKindsFor(addSpec.spec) : [];
 
   return (
-    <div className={styles.dashboard}>
-      <div className={styles.headerRow}>
+    <div className={presenting ? styles.present : styles.dashboard}>
+      {presenting && (
+        <div className={styles.presentBar}>
+          <Text as="h1" size="2xl">
+            {dashboard.name}
+          </Text>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setPresenting(false);
+            }}
+          >
+            Exit presenting
+          </Button>
+        </div>
+      )}
+      <div className={styles.headerRow} hidden={presenting}>
         <Text as="p" size="sm" tone="muted">
           {dashboard.visibility === 'organisation' ? 'Shared with the organisation' : 'Private to you'} · live from main
         </Text>
+        <div className={styles.row}>
+          <Button
+            variant="secondary"
+            disabled={shown.length === 0}
+            onClick={() => {
+              setEditing(false);
+              setPresenting(true);
+            }}
+          >
+            Present
+          </Button>
+          <ExportViewButtons
+            what="dashboard"
+            build={() => {
+              const items = shown.flatMap(({ tile }) => {
+                const item = results.current.get(tile.id);
+                return item ? [item] : [];
+              });
+              if (items.length === 0) return null;
+              const stamp = { modelName, viewLabel: dashboard.name, refLabel: 'Main', date: exportDate() };
+              return { plan: dashboardExportPlan(items, stamp), stamp };
+            }}
+          />
         {canEdit && (
           <Button
             variant="ghost"
@@ -107,6 +174,7 @@ export function DashboardView({ dashboard, orgId, modelId, userId, role, main, b
             {editing ? 'Done editing' : 'Edit dashboard'}
           </Button>
         )}
+        </div>
       </div>
       {message !== null && (
         <Text as="p" size="sm">
@@ -133,7 +201,7 @@ export function DashboardView({ dashboard, orgId, modelId, userId, role, main, b
                   .map(({ tile, report }) => {
                     return (
                       <section key={tile.id} className={styles.tile} style={{ '--span': tileColumnSpan(tile.size), order: tile.position } as React.CSSProperties}>
-                        <DashboardTileCard tile={tile} report={report} rows={rows} knownFields={knownFields} basePath={basePath} />
+                        <DashboardTileCard tile={tile} report={report} rows={rows} knownFields={knownFields} basePath={basePath} onResult={onResult} />
                         {editing && (
                           <div className={styles.tileControls}>
                             <select
