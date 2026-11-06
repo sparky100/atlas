@@ -78,7 +78,7 @@ A separate **Ask Atlas** page under Analyse, plus a Ctrl-K entry; the Help panel
 
 ### 9. Evaluation
 
-A fixed fixture model and **25 to 40 questions** with the element ids a correct answer must cite and the tools it should use (`pnpm ai:eval`, run on demand against the real provider by whoever holds the key). It checks the right tools were called and the right elements cited, not exact wording, and is reported in the sprint summary. It is not part of `pnpm test`: it costs money and depends on a provider.
+A fixed fixture model and **25 to 40 questions** with the element ids a correct answer must cite and the tools it should use (`pnpm ai:eval`, run on demand against the real provider by whoever holds the key). It checks the right tools were called and the right elements cited, not exact wording, and is reported in the sprint summary. It is not part of `pnpm test`: it costs money and depends on a provider. *Built in step 5:* 30 questions in `src/tools/eval/evalSet.ts` over the fixture model in `src/tools/fixtures/evalEstate.ts`, scored by `src/tools/eval/scoreEval.ts`. A unit test checks the set itself (size, real tool names, real ids, and that the expected ids for the filter questions match what `find_elements` returns), so the expectations cannot drift from the data. The questions include unanswerable ones, a planted instruction inside a record, and a request to delete something. `pnpm ai:eval [--id <question>] [--model <id>] [--json]` needs `ANTHROPIC_API_KEY`, calls the provider directly with the real loop and tools, and exits 1 on any failure. No score has been recorded yet: it has not been run against a real provider.
 
 ## Out of scope
 

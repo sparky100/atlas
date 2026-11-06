@@ -36,6 +36,7 @@
     "sync:descriptions": "tsx scripts/syncDescriptionsFromMap.ts",
     "strip:seed-codes": "tsx scripts/stripSeedCodes.ts",
     "capture:score": "tsx scripts/scoreCapture.ts",
+    "ai:eval": "tsx scripts/askEval.ts",
     "functions:bundle:capture-run": "tsx scripts/bundleCaptureRunFunction.ts",
     "functions:deploy:capture-run": "pnpm functions:bundle:capture-run && supabase functions deploy capture-run",
     "functions:bundle:ask-model": "tsx scripts/bundleAskModelFunction.ts",
