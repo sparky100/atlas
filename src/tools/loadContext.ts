@@ -9,6 +9,7 @@ import type { UUID } from '../contracts/delta';
 import type { RelationshipsHeadRow } from '../contracts/rows';
 import type { Client } from '../db/client';
 import { listAllElements } from '../db/elementBrowse';
+import { listFactsForCommit, loadElementsRetiredByOpenChanges } from '../db/healthFindings';
 import { listFactsForSubject } from '../db/elements';
 import { listSavedReports } from '../db/reports';
 import { selectAll } from '../db/selectAll';
@@ -36,10 +37,15 @@ async function loadSnapshot(supabase: Client, modelId: UUID, commitId: UUID): Pr
 export function createToolContext(supabase: Client, model: { id: UUID; name: string }, commitId: UUID): ToolContext {
   let snapshot: Promise<ModelSnapshot> | null = null;
   let reports: ReturnType<typeof listSavedReports> | null = null;
+  let facts: ReturnType<typeof listFactsForCommit> | null = null;
+  let retired: ReturnType<typeof loadElementsRetiredByOpenChanges> | null = null;
   return {
     stamp: { modelId: model.id, modelName: model.name, ref: 'main', commitId },
     snapshot: () => (snapshot ??= loadSnapshot(supabase, model.id, commitId)),
     factsFor: (elementId) => listFactsForSubject(supabase, commitId, elementId),
     savedReports: () => (reports ??= listSavedReports(supabase, model.id)),
+    allFacts: () => (facts ??= listFactsForCommit(supabase, commitId)),
+    retiredByOpenChanges: () => (retired ??= loadElementsRetiredByOpenChanges(supabase, model.id)),
+    now: () => new Date(),
   };
 }

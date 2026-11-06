@@ -5,12 +5,14 @@
  */
 import { findElements } from './findElements';
 import { getElement } from './getElement';
+import { listHealthFindings } from './healthFindings';
 import { listRelationships } from './listRelationships';
+import { portfolioSignals } from './portfolioSignals';
 import { listSavedReports, runSavedReport } from './savedReports';
 import { searchElements } from './searchElements';
 import type { ModelTool, ToolContext, ToolResult } from './types';
 
-export const MODEL_TOOLS: readonly ModelTool[] = [searchElements, getElement, listRelationships, findElements, listSavedReports, runSavedReport];
+export const MODEL_TOOLS: readonly ModelTool[] = [searchElements, getElement, listRelationships, findElements, listSavedReports, runSavedReport, listHealthFindings, portfolioSignals];
 
 export function callTool(ctx: ToolContext, name: string, input: unknown): Promise<ToolResult> {
   const tool = MODEL_TOOLS.find((t) => t.name === name);

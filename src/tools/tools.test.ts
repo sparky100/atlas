@@ -23,6 +23,7 @@ describe('every tool', () => {
     for (const file of readdirSync(new URL('.', import.meta.url)).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))) {
       const source = readFileSync(new URL(file, import.meta.url), 'utf8');
       expect(source, file).not.toMatch(/[\w)]\.in\(/);
+      expect(source, file).not.toMatch(/from '\.\.\/ui\//); // ADR-028: the tools layer does not import from src/ui
       expect(source, file).not.toMatch(/[\w)]\.(insert|update|upsert|delete|rpc)\(/);
     }
   });
@@ -183,5 +184,56 @@ describe('saved reports', () => {
     const ctx = estateContext({ reports });
     expect(failed(await callTool(ctx, 'run_saved_report', { reportId: uid(302) }))).toMatch(/portfolio.*can't run yet/);
     expect(failed(await callTool(ctx, 'run_saved_report', { reportId: uid(777) }))).toMatch(/No saved report with that id/);
+  });
+});
+
+describe('list_health_findings', () => {
+  it('counts every check, and lists the elements one flagged, by the product\'s own definitions', async () => {
+    const ctx = estateContext();
+    const all = data(await callTool(ctx, 'list_health_findings', {})) as { findings: { finding: string; label: string; count: number }[] };
+    expect(all.findings).toHaveLength(13);
+    const count = (key: string) => all.findings.find((f) => f.finding === key)?.count;
+    expect(count('unlinked-systems')).toBe(1); // Data Warehouse supports nothing
+    expect(count('no-technical-owner')).toBeGreaterThan(0);
+
+    const unlinked = ok(await callTool(ctx, 'list_health_findings', { finding: 'unlinked-systems' }));
+    expect((unlinked.data as { elements: { id: string; name: string }[] }).elements).toEqual([expect.objectContaining({ id: uid(13), name: 'Data Warehouse' })]);
+    expect(unlinked.total).toBe(1);
+  });
+
+  it('uses the injected clock for date-based findings', async () => {
+    const result = data(await callTool(estateContext(), 'list_health_findings', { finding: 'critical-support-end' })) as { elements: { name: string }[] };
+    // Billing Engine is critical and its support ended 2026-12-31, within the stale window of the fixture's "today" (2026-11-06).
+    expect(result.elements.map((e) => e.name)).toContain('Billing Engine');
+  });
+
+  it('refuses an unknown finding key', async () => {
+    expect(failed(await callTool(estateContext(), 'list_health_findings', { finding: 'everything' }))).toMatch(/Invalid input/);
+  });
+});
+
+describe('portfolio_signals', () => {
+  const costly = (n: number, name: string, attrs: Record<string, string>) => element(n, 'system', name, { annualRunCost: '1m_5m', ...attrs });
+
+  it('counts each signal, and lists the rows one fires on', async () => {
+    const snapshot = estateSnapshot({
+      elements: [costly(60, 'Pricey Poor', { criticality: 'low' }), costly(61, 'Pricey Fine', { criticality: 'critical' })],
+      relationships: [edge(3000, 'supports', 60, 1, { fitForPurpose: 'poor' }), edge(3001, 'supports', 61, 2, { fitForPurpose: 'excellent' })],
+    });
+    const ctx = estateContext({ snapshot });
+    const counts = data(await callTool(ctx, 'portfolio_signals', {})) as { rows: number; signals: { signal: string; count: number }[] };
+    expect(counts.rows).toBeGreaterThan(4);
+    expect(counts.signals.find((s) => s.signal === 'costly_poor_fit')?.count).toBe(1);
+    expect(counts.signals.find((s) => s.signal === 'justified')?.count).toBe(1);
+
+    const poor = ok(await callTool(ctx, 'portfolio_signals', { signal: 'costly_poor_fit' }));
+    const rows = (poor.data as { rows: Rec[] }).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: uid(60), name: 'Pricey Poor', fit: 'poor', cost: '1m_5m' });
+    expect(poor.total).toBe(1);
+  });
+
+  it('refuses an unknown signal', async () => {
+    expect(failed(await callTool(estateContext(), 'portfolio_signals', { signal: 'bad' }))).toMatch(/Invalid input/);
   });
 });

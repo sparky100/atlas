@@ -58,12 +58,17 @@ export function savedReport(n: number, name: string, spec: unknown): SavedReport
   return { id: uid(n), org_id: uid(900), model_id: uid(901), name, description: `${name} (test)`, spec: spec as SavedReportRow['spec'], spec_version: 1, visibility: 'private', created_by: uid(902), created_at: '', updated_at: '' };
 }
 
-export function estateContext(over: { snapshot?: ModelSnapshot; facts?: FactsRow[]; reports?: SavedReportRow[] } = {}): ToolContext {
+export const FIXTURE_NOW = new Date('2026-11-06T12:00:00Z');
+
+export function estateContext(over: { snapshot?: ModelSnapshot; facts?: FactsRow[]; reports?: SavedReportRow[]; retired?: UUID[] } = {}): ToolContext {
   const snapshot = over.snapshot ?? estateSnapshot();
   return {
     stamp: { modelId: uid(901), modelName: 'Test estate', ref: 'main', commitId: uid(903) },
     snapshot: () => Promise.resolve(snapshot),
     factsFor: (elementId) => Promise.resolve((over.facts ?? []).filter((f) => f.subject_id === elementId)),
     savedReports: () => Promise.resolve(over.reports ?? []),
+    allFacts: () => Promise.resolve(over.facts ?? []),
+    retiredByOpenChanges: () => Promise.resolve(new Set(over.retired ?? [])),
+    now: () => FIXTURE_NOW,
   };
 }

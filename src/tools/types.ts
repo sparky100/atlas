@@ -30,6 +30,12 @@ export interface ToolContext {
   snapshot: () => Promise<ModelSnapshot>;
   factsFor: (elementId: UUID) => Promise<readonly FactsRow[]>;
   savedReports: () => Promise<readonly SavedReportRow[]>;
+  /** Every fact at the commit (for the stale-attributes finding). */
+  allFacts: () => Promise<readonly FactsRow[]>;
+  /** Elements an open change is retiring (for the "marked Migrate or Eliminate, nothing retiring it" finding). */
+  retiredByOpenChanges: () => Promise<ReadonlySet<UUID>>;
+  /** The clock, passed in so findings that depend on today's date are testable (rule 6). */
+  now: () => Date;
 }
 
 export type ToolResult = { ok: true; stamp: ToolStamp; data: unknown; total: number | null; truncated: boolean } | { ok: false; error: string };
