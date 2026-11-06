@@ -66,6 +66,8 @@ export interface UpdateOrganisationInput {
   slug?: string;
   /** F3a: owner-editable review policy — the minimum number of architect members the required reviewer set must include. */
   reviewMinRequiredArchitects?: number;
+  /** F15 (ADR-028 §7): owner-only switch for Ask Atlas. */
+  aiAssistantEnabled?: boolean;
 }
 
 /** Sprint 7j item 2: rename/slug — gated by `organisations_update`'s RLS (owner) and the column-restricted grant `20260911050000_organisation_settings.sql` adds (name/slug only). F3a adds `review_min_required_architects` to that grant (20260914060000). */
@@ -74,6 +76,7 @@ export async function updateOrganisation(supabase: Client, id: UUID, input: Upda
   if (input.name !== undefined) patch.name = input.name;
   if (input.slug !== undefined) patch.slug = input.slug;
   if (input.reviewMinRequiredArchitects !== undefined) patch.review_min_required_architects = input.reviewMinRequiredArchitects;
+  if (input.aiAssistantEnabled !== undefined) patch.ai_assistant_enabled = input.aiAssistantEnabled;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('organisations').update(patch).eq('id', id).select('*').single();
   if (error) throw new Error(`updateOrganisation: ${error.message}`);

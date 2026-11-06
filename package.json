@@ -37,7 +37,9 @@
     "strip:seed-codes": "tsx scripts/stripSeedCodes.ts",
     "capture:score": "tsx scripts/scoreCapture.ts",
     "functions:bundle:capture-run": "tsx scripts/bundleCaptureRunFunction.ts",
-    "functions:deploy:capture-run": "pnpm functions:bundle:capture-run && supabase functions deploy capture-run"
+    "functions:deploy:capture-run": "pnpm functions:bundle:capture-run && supabase functions deploy capture-run",
+    "functions:bundle:ask-model": "tsx scripts/bundleAskModelFunction.ts",
+    "functions:deploy:ask-model": "pnpm functions:bundle:ask-model && supabase functions deploy ask-model"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

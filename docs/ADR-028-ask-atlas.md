@@ -35,7 +35,7 @@ First set (all read-only): `search_elements`, `get_element`, `list_relationships
 
 `ask-model` receives the conversation, runs the question-and-lookup loop, and streams progress back. It uses the **caller's own forwarded JWT** for every database read, so RLS is the authorisation check. It never holds or uses the service-role key. A viewer cannot read what a viewer cannot read, and one organisation cannot reach another's model; an integration test proves both (rule 1's counterpart for access).
 
-It is bundled for Deno the way `capture-run` is (one flat file, generated and git-ignored, built in the deploy workflow). The tools layer is pure TypeScript and imports only what the bundle can include.
+It is bundled for Deno the way `capture-run` is (one flat file, generated and git-ignored, built by `pnpm functions:bundle:ask-model` before each deploy; the deploy workflow only pushes migrations). The tools layer is pure TypeScript and imports only what the bundle can include.
 
 ### 3. Model calls go through `llm-proxy`, which gains tool support
 
@@ -44,7 +44,7 @@ The proxy is where provider auth, per-organisation rate limits and cost logging 
 - optional `tools` (definitions), and message content that may be text, a tool call or a tool result;
 - a response that returns the provider's tool calls and stop reason.
 
-`ask-model` calls the proxy once per round. Each round is therefore logged and rate-limited by the proxy with no new accounting. Tool rounds are buffered; the **final** round (the written answer) is streamed through the proxy's existing passthrough so the person sees it appear. `ask-model` interleaves its own small events with that stream: "calling `get_element`…", "done", then the answer tokens, then the citations.
+`ask-model` calls the proxy once per round. Each round is therefore logged and rate-limited by the proxy with no new accounting. Tool rounds are buffered. *Built in step 3:* the final round is buffered too and the answer arrives whole, with the lookups streamed as progress events; streaming the answer text through the proxy passthrough (which now accepts `toolChoice: 'none'` for this) is a later refinement. `ask-model` interleaves its own small events with that stream: "calling `get_element`…", "done", then the answer tokens, then the citations.
 
 The alternative, having `ask-model` call the provider directly and duplicate the key lookup, rate limit and logging, was rejected: it creates a second place that holds the provider key and a second audit trail.
 
@@ -68,7 +68,7 @@ Sending model content to the AI provider is **off by default**. An organisation 
 
 > When Ask Atlas is on, the questions members ask, and the names, descriptions, attributes and relationships of the elements needed to answer them, are sent to our AI provider to produce each answer. Comments and unreviewed imports are not sent. Nothing is sent while it is off.
 
-Data: a single column `ai_assistant_enabled boolean not null default false` on `organisations`, with update granted on that column only; the existing owner-only update policy is the permission. `ask-model` reads it with the caller's JWT and refuses when it is false. (Migration, contract type and round-trip test ship together in step 4, per rule 1.)
+Data: a single column `ai_assistant_enabled boolean not null default false` on `organisations`, with update granted on that column only; the existing owner-only update policy is the permission. `ask-model` reads it with the caller's JWT and refuses when it is false. (Migration, contract type and round-trip test shipped in step 3, because the function reads the column. The switch is checked on the model's **owning** organisation. Ask Atlas is for members: a reader of a model shared from another organisation is not a member of the owner and is refused by the proxy.)
 
 **No conversations are stored on the server** in this version. The page keeps the conversation in memory for the session; reloading clears it. The proxy log keeps counts and timing only, as today. This avoids a new table and a retention question; saved conversations are a possible later addition with their own decision.
 

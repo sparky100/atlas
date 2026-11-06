@@ -25,6 +25,8 @@ export interface OrganisationRow {
   is_personal: boolean;
   /** F3a: the minimum number of architect members the required reviewer set must include (org review policy), default 1. */
   review_min_required_architects: number;
+  /** F15 (ADR-028 §7): an owner has allowed Ask Atlas to send model content to the AI provider. Off by default. */
+  ai_assistant_enabled: boolean;
 }
 
 /** The literal shape of a row in `members`. */
