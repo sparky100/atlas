@@ -20,7 +20,7 @@
  *   lower-cased code units, so a result is identical on every machine.
  * - `null` always sorts last, in either direction.
  */
-import type { ReportFilter, ReportRow, ReportSort, ReportSpec, ReportValue } from '../contracts/reportSpec';
+import { REPORT_SNAPSHOT_ROW_CAP, type ReportFilter, type ReportRow, type ReportSort, type ReportSpec, type ReportValue } from '../contracts/reportSpec';
 
 export interface ReportGroup {
   value: ReportValue;
@@ -209,4 +209,13 @@ export function runReport(rows: readonly ReportRow[], spec: ReportSpec, options:
     groups: spec.groupBy === undefined ? [] : groupRows(ordered, spec.groupBy),
     unknownFields: unknownFieldsOf(spec, rows, options.knownFields),
   };
+}
+
+/**
+ * ADR-027 §3: can this result be kept as a saved copy? A copy holds at most
+ * `REPORT_SNAPSHOT_ROW_CAP` rows and is refused (never truncated) beyond
+ * that; a count or bar presentation stores no rows at all, so always fits.
+ */
+export function reportFitsSnapshot(result: ReportResult): boolean {
+  return result.rows.length <= REPORT_SNAPSHOT_ROW_CAP;
 }

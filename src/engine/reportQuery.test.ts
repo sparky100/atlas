@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { REPORT_SPEC_VERSION, type ReportFilter, type ReportRow, type ReportSpec } from '../contracts/reportSpec';
-import { compareReportValues, runReport } from './reportQuery';
+import { compareReportValues, reportFitsSnapshot, runReport } from './reportQuery';
 
 const rows: ReportRow[] = [
   { id: 'a', name: 'Billing', lifecycle: 'active', cost: 100, owner: 'Ann', supportEnds: '2027-06-30' },
@@ -179,5 +179,25 @@ describe('purity', () => {
   it('handles no rows', () => {
     const result = runReport([], spec());
     expect(result).toMatchObject({ rows: [], rowCount: 0, truncated: false, groups: [] });
+  });
+});
+
+describe('reportFitsSnapshot', () => {
+  const base = spec();
+  it('accepts a result at the cap and refuses one over it', () => {
+    const big = (n: number): ReportRow[] => Array.from({ length: n }, (_, i) => ({ id: `r${String(i).padStart(5, '0')}`, name: 'x' }));
+    expect(reportFitsSnapshot(runReport(big(5000), base))).toBe(true);
+    expect(reportFitsSnapshot(runReport(big(5001), base))).toBe(false);
+  });
+
+  it('always fits a count or bar presentation, however many rows matched', () => {
+    const many: ReportRow[] = Array.from({ length: 6000 }, (_, i) => ({ id: `r${String(i)}`, name: 'x' }));
+    expect(reportFitsSnapshot(runReport(many, spec({ presentation: { kind: 'count' } })))).toBe(true);
+    expect(reportFitsSnapshot(runReport(many, spec({ groupBy: 'name', presentation: { kind: 'barByField' } })))).toBe(true);
+  });
+
+  it('a table limit under the cap fits even when more rows matched', () => {
+    const many: ReportRow[] = Array.from({ length: 6000 }, (_, i) => ({ id: `r${String(i)}`, name: 'x' }));
+    expect(reportFitsSnapshot(runReport(many, spec({ presentation: { kind: 'table', limit: 100 } })))).toBe(true);
   });
 });
