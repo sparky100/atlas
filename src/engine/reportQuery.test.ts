@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { REPORT_SPEC_VERSION, type ReportFilter, type ReportRow, type ReportSpec } from '../contracts/reportSpec';
+import { REPORT_SPEC_VERSION, type ReportFilter, type ReportRow, type ReportSpec, type ReportValue } from '../contracts/reportSpec';
 import { compareReportValues, reportFitsSnapshot, runReport } from './reportQuery';
 
 const rows: ReportRow[] = [
@@ -199,5 +199,50 @@ describe('reportFitsSnapshot', () => {
   it('a table limit under the cap fits even when more rows matched', () => {
     const many: ReportRow[] = Array.from({ length: 6000 }, (_, i) => ({ id: `r${String(i)}`, name: 'x' }));
     expect(reportFitsSnapshot(runReport(many, spec({ presentation: { kind: 'table', limit: 100 } })))).toBe(true);
+  });
+});
+
+describe('splitBy', () => {
+  const split = (over: Partial<ReportSpec> = {}) => runReport(rows, spec({ groupBy: 'lifecycle', splitBy: 'owner', presentation: { kind: 'barByField' }, ...over }));
+
+  it('splits every group, parts add up to the group, and parts share one order', () => {
+    const result = split();
+    for (const group of result.groups) {
+      expect(group.parts?.reduce((sum, p) => sum + p.count, 0)).toBe(group.count);
+    }
+    const active = result.groups.find((g) => g.value === 'active');
+    // owners among the two active rows: 'Ann' and ''
+    expect(active?.parts?.map((p) => p.value)).toEqual(expect.arrayContaining(['Ann', '']));
+    for (const g of result.groups) {
+      const values = (g.parts ?? []).map((p) => p.value);
+      for (let i = 0; i < values.length; i++) {
+        for (let j = i + 1; j < values.length; j++) {
+          const a = values[i] as ReportValue;
+          const b = values[j] as ReportValue;
+          // If two values appear together in a group, their order matches every other group's.
+          const key = `${String(a)}|${String(b)}`;
+          expect(result.groups.every((o) => {
+            const ov = (o.parts ?? []).map((p) => p.value);
+            return !ov.includes(a) || !ov.includes(b) || ov.indexOf(a) < ov.indexOf(b);
+          }), key).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('is absent without splitBy', () => {
+    const result = runReport(rows, spec({ groupBy: 'lifecycle', presentation: { kind: 'barByField' } }));
+    expect(result.groups.every((g) => g.parts === undefined)).toBe(true);
+  });
+
+  it('names a splitBy field the rows do not carry as unknown', () => {
+    expect(split({ splitBy: 'gone' }).unknownFields).toEqual(['gone']);
+  });
+});
+
+describe('reportFitsSnapshot and groups', () => {
+  it('refuses a grouping with more groups than the cap', () => {
+    const many: ReportRow[] = Array.from({ length: 5001 }, (_, i) => ({ id: `r${String(i)}`, k: `v${String(i)}` }));
+    expect(reportFitsSnapshot(runReport(many, spec({ groupBy: 'k', presentation: { kind: 'barByField' } })))).toBe(false);
   });
 });

@@ -20,8 +20,8 @@ The definition (`spec`) is JSON with its own `specVersion`:
 
 - `source`: `elements`, `portfolio`, `relationships`, or `findings`. A fixed list. A new source needs a code change, not a new table.
 - `filters`: a list of `{ field, operator, value }` over the source's known fields, including custom attributes by definition key.
-- `columns`, `sort`, and an optional `groupBy` (one field).
-- `presentation`: `table`, `count`, or `barByField`.
+- `columns`, `sort`, an optional `groupBy` (one field) and an optional `splitBy` (a second, different field, which needs `groupBy`; it makes a stacked bar).
+- `presentation`: `table`, `count`, `barByField` or `donut` (the last two need `groupBy`).
 
 A report that names a custom attribute since removed still runs; that column shows "attribute removed". An unknown `specVersion` is refused with a plain message, never guessed at.
 
@@ -54,7 +54,7 @@ The stored commit id is for a later feature ("re-run this report as of then and 
 
 A **dashboard** is an ordered list of **tiles**. A tile points at a saved report and says how to show it: `count`, `barByField`, `table` (top N rows), or `findingCount`. Tiles have an order and a size from a small fixed set (one or two columns wide). Tiles are always **live**: they re-run their report when opened. A tile's position is a display hint in the sense of rule 3: delete every tile order and the reports still exist. Snapshotting a whole dashboard is possible later and is not part of this decision.
 
-There is no free-form canvas, no drag-anywhere layout and no stored coordinates. Charts are small inline SVG drawn from the result; no charting library is added.
+There is no free-form canvas, no drag-anywhere layout and no stored coordinates. Charts (ranked bar, stacked bar, donut, big number) are small components of our own in `src/ui/charts/`, drawn from the result with the colour tokens in `src/ui/styles/chartTokens.css`; no charting library is added (the human chose this on 2026-11-06, to be revisited only if more exotic chart types are wanted). The categorical colours were validated for colour-blind separation and contrast against the app's own surfaces; every chart also carries text labels or a legend with values and a data table for screen readers, so colour is never the only signal.
 
 ### 5. Visibility and roles
 

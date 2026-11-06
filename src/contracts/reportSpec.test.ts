@@ -61,3 +61,23 @@ describe('parseReportSpec', () => {
     expect(REPORT_SNAPSHOT_ROW_CAP).toBe(5000);
   });
 });
+
+describe('splitBy and donut', () => {
+  it('accepts splitBy with a different groupBy and round-trips it', () => {
+    const spec: ReportSpec = { ...valid, splitBy: 'owner', presentation: { kind: 'barByField' } };
+    expect(parseReportSpec(JSON.parse(JSON.stringify(spec)) as unknown)).toEqual({ ok: true, spec });
+  });
+  it('refuses splitBy without groupBy, or equal to it', () => {
+    const noGroup: Record<string, unknown> = { ...valid, splitBy: 'owner' };
+    delete noGroup.groupBy;
+    expect(parseReportSpec(noGroup).ok).toBe(false);
+    expect(parseReportSpec({ ...valid, splitBy: 'lifecycle' }).ok).toBe(false);
+    expect(parseReportSpec({ ...valid, splitBy: '' }).ok).toBe(false);
+  });
+  it('accepts a donut only with a groupBy', () => {
+    expect(parseReportSpec({ ...valid, presentation: { kind: 'donut' } }).ok).toBe(true);
+    const noGroup: Record<string, unknown> = { ...valid, presentation: { kind: 'donut' } };
+    delete noGroup.groupBy;
+    expect(parseReportSpec(noGroup).ok).toBe(false);
+  });
+});

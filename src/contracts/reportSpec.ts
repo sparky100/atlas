@@ -45,8 +45,10 @@ export interface ReportSort {
 export type ReportPresentation =
   | { kind: 'table'; /** Top N rows; omitted = all. */ limit?: number }
   | { kind: 'count' }
-  /** Requires `groupBy`: one bar per distinct value. */
-  | { kind: 'barByField' };
+  /** Requires `groupBy`: one bar per distinct value (stacked by `splitBy` when given). */
+  | { kind: 'barByField' }
+  /** Requires `groupBy`: one slice per distinct value, drawn as a donut. */
+  | { kind: 'donut' };
 
 export interface ReportSpec {
   specVersion: typeof REPORT_SPEC_VERSION;
@@ -55,6 +57,8 @@ export interface ReportSpec {
   columns: readonly string[];
   sort: readonly ReportSort[];
   groupBy?: string;
+  /** Splits each `groupBy` group by a second field (a stacked bar). Needs `groupBy`; must be a different field. */
+  splitBy?: string;
   presentation: ReportPresentation;
 }
 
@@ -103,7 +107,7 @@ export function parseReportSpec(raw: unknown): ReportSpecParse {
   if (raw.specVersion !== REPORT_SPEC_VERSION) {
     return { ok: false, error: `This report definition has version ${String(raw.specVersion)}, but only version ${String(REPORT_SPEC_VERSION)} is understood.` };
   }
-  const { source, filters, columns, sort, groupBy, presentation } = raw;
+  const { source, filters, columns, sort, groupBy, splitBy, presentation } = raw;
   if (typeof source !== 'string' || !(REPORT_SOURCES as readonly string[]).includes(source)) {
     return { ok: false, error: `source "${String(source)}" is not one of ${REPORT_SOURCES.join(', ')}.` };
   }
@@ -127,6 +131,11 @@ export function parseReportSpec(raw: unknown): ReportSpecParse {
     parsedSort.push({ field: entry.field, direction: entry.direction });
   }
   if (groupBy !== undefined && !isNonEmptyString(groupBy)) return { ok: false, error: 'groupBy must be a non-empty field name when given.' };
+  if (splitBy !== undefined) {
+    if (!isNonEmptyString(splitBy)) return { ok: false, error: 'splitBy must be a non-empty field name when given.' };
+    if (groupBy === undefined) return { ok: false, error: 'splitBy needs a groupBy field.' };
+    if (splitBy === groupBy) return { ok: false, error: 'splitBy must be a different field from groupBy.' };
+  }
   if (!isRecord(presentation)) return { ok: false, error: 'presentation must be an object.' };
   let parsedPresentation: ReportPresentation;
   if (presentation.kind === 'table') {
@@ -140,8 +149,11 @@ export function parseReportSpec(raw: unknown): ReportSpecParse {
   } else if (presentation.kind === 'barByField') {
     if (groupBy === undefined) return { ok: false, error: 'A bar presentation needs a groupBy field.' };
     parsedPresentation = { kind: 'barByField' };
+  } else if (presentation.kind === 'donut') {
+    if (groupBy === undefined) return { ok: false, error: 'A donut presentation needs a groupBy field.' };
+    parsedPresentation = { kind: 'donut' };
   } else {
-    return { ok: false, error: `presentation.kind "${String(presentation.kind)}" is not one of table, count, barByField.` };
+    return { ok: false, error: `presentation.kind "${String(presentation.kind)}" is not one of table, count, barByField, donut.` };
   }
   const spec: ReportSpec = {
     specVersion: REPORT_SPEC_VERSION,
@@ -150,6 +162,7 @@ export function parseReportSpec(raw: unknown): ReportSpecParse {
     columns,
     sort: parsedSort,
     ...(groupBy === undefined ? {} : { groupBy }),
+    ...(splitBy === undefined ? {} : { splitBy }),
     presentation: parsedPresentation,
   };
   return { ok: true, spec };

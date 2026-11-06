@@ -1,73 +1,79 @@
 /**
- * ADR-027 (F14 step 5): a report result on screen — a table, a count, or a
- * grouped list with plain proportional bars (proper charts arrive with the
- * dashboards, step 6). Reads only a `ReportResult`, so a saved copy renders
- * through the same component from its stored rows.
+ * ADR-027 (F14 step 5, charts in step 6a): a report result on screen — a
+ * headline figure, a chart where the report groups (ranked bars, stacked bars
+ * or a donut), and the table when the report lists rows. Reads only a
+ * `ReportResult`, so a saved copy renders through the same component from its
+ * stored rows.
  */
 import type { ReportSpec } from '../../contracts/reportSpec';
 import type { ReportResult } from '../../engine/reportQuery';
+import { BarChart } from '../charts/BarChart';
+import { BigNumber } from '../charts/BigNumber';
+import { DonutChart } from '../charts/DonutChart';
+import { StackedBarChart } from '../charts/StackedBarChart';
 import { Text } from '../components/Text/Text';
 import { reportCellText, reportFieldLabel } from './reportTable';
 import styles from './ReportResultView.module.css';
 
+function Chart({ result, spec }: { result: ReportResult; spec: ReportSpec }) {
+  if (spec.groupBy === undefined || result.groups.length === 0) return null;
+  const by = reportFieldLabel(spec.groupBy).toLowerCase();
+  const title = spec.splitBy === undefined ? `Rows by ${by}` : `Rows by ${by}, split by ${reportFieldLabel(spec.splitBy).toLowerCase()}`;
+  if (spec.presentation.kind === 'donut') return <DonutChart groups={result.groups} title={title} unit="rows" />;
+  return spec.splitBy === undefined ? <BarChart groups={result.groups} title={title} /> : <StackedBarChart groups={result.groups} title={title} />;
+}
+
 export function ReportResultView({ result, spec }: { result: ReportResult; spec: ReportSpec }) {
   const removed = new Set(result.unknownFields);
-  if (spec.presentation.kind === 'count') {
+  const kind = spec.presentation.kind;
+  const summary = <BigNumber label={result.rowCount === 1 ? 'Row matches' : 'Rows match'} value={result.rowCount} />;
+
+  if (kind === 'count') return summary;
+  if (kind === 'barByField' || kind === 'donut') {
     return (
-      <Text as="p" size="3xl">
-        {result.rowCount}
-      </Text>
-    );
-  }
-  if (spec.presentation.kind === 'barByField') {
-    const max = Math.max(1, ...result.groups.map((g) => g.count));
-    return (
-      <ul className={styles.bars}>
-        {result.groups.map((g) => (
-          <li key={String(g.value)} className={styles.bar}>
-            <span className={styles.barLabel}>{g.value === null || g.value === '' ? 'Not set' : reportCellText(g.value)}</span>
-            <span className={styles.barTrack}>
-              <span className={styles.barFill} style={{ width: `${String((g.count / max) * 100)}%` }} />
-            </span>
-            <span className={styles.barCount}>{g.count}</span>
-          </li>
-        ))}
-      </ul>
+      <div className={styles.stack}>
+        {summary}
+        <Chart result={result} spec={spec} />
+      </div>
     );
   }
   return (
-    <div className={styles.scroll}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            {result.columns.map((c) => (
-              <th key={c} scope="col">
-                {reportFieldLabel(c)}
-                {removed.has(c) ? ' (attribute removed)' : ''}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {result.rows.map((row, i) => (
-            <tr key={i}>
-              {row.map((cell, j) => (
-                <td key={j}>{reportCellText(cell)}</td>
+    <div className={styles.stack}>
+      {summary}
+      <Chart result={result} spec={spec} />
+      <div className={styles.scroll}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              {result.columns.map((c) => (
+                <th key={c} scope="col">
+                  {reportFieldLabel(c)}
+                  {removed.has(c) ? ' (attribute removed)' : ''}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {result.rows.length === 0 && (
-        <Text as="p" tone="muted">
-          No rows match.
-        </Text>
-      )}
-      {result.truncated && (
-        <Text as="p" size="sm" tone="muted">
-          Showing {result.rows.length} of {result.rowCount} rows.
-        </Text>
-      )}
+          </thead>
+          <tbody>
+            {result.rows.map((row, i) => (
+              <tr key={i}>
+                {row.map((cell, j) => (
+                  <td key={j}>{reportCellText(cell)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {result.rows.length === 0 && (
+          <Text as="p" tone="muted">
+            No rows match.
+          </Text>
+        )}
+        {result.truncated && (
+          <Text as="p" size="sm" tone="muted">
+            Showing {result.rows.length} of {result.rowCount} rows.
+          </Text>
+        )}
+      </div>
     </div>
   );
 }

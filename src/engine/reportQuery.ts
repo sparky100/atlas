@@ -25,6 +25,8 @@ import { REPORT_SNAPSHOT_ROW_CAP, type ReportFilter, type ReportRow, type Report
 export interface ReportGroup {
   value: ReportValue;
   count: number;
+  /** With a `splitBy`: this group's rows split by the second field, in the same value order for every group. Stored with a saved copy inside its `groups`, so a stacked bar reopens from the copy alone. */
+  parts?: readonly ReportGroup[];
 }
 
 export interface ReportResult {
@@ -154,6 +156,7 @@ function referencedFields(spec: ReportSpec): string[] {
   for (const filter of spec.filters) names.add(filter.field);
   for (const key of spec.sort) names.add(key.field);
   if (spec.groupBy !== undefined) names.add(spec.groupBy);
+  if (spec.splitBy !== undefined) names.add(spec.splitBy);
   return [...names];
 }
 
@@ -184,6 +187,17 @@ function groupRows(rows: readonly ReportRow[], field: string): ReportGroup[] {
     .sort((a, b) => b.count - a.count || compareReportValues(a.value, b.value));
 }
 
+/** Groups by `field`, each group split by `splitField`. Every group lists its parts in one shared order (largest overall first, ties by value) and omits parts with no rows. */
+function groupAndSplitRows(rows: readonly ReportRow[], field: string, splitField: string): ReportGroup[] {
+  const overall = groupRows(rows, splitField);
+  const rank = new Map<ReportValue, number>(overall.map((g, i) => [g.value, i]));
+  return groupRows(rows, field).map((group) => {
+    const members = rows.filter((row) => read(row, field) === group.value);
+    const parts = groupRows(members, splitField).sort((a, b) => (rank.get(a.value) ?? 0) - (rank.get(b.value) ?? 0));
+    return { value: group.value, count: group.count, parts };
+  });
+}
+
 /** Runs a report. Never mutates `rows`. */
 export function runReport(rows: readonly ReportRow[], spec: ReportSpec, options: RunReportOptions = {}): ReportResult {
   const matched = rows.filter((row) => spec.filters.every((filter) => matches(row, filter)));
@@ -206,7 +220,7 @@ export function runReport(rows: readonly ReportRow[], spec: ReportSpec, options:
     rows: shown.map((row) => spec.columns.map((column) => read(row, column))),
     rowCount: ordered.length,
     truncated: presentation.kind === 'table' && shown.length < ordered.length,
-    groups: spec.groupBy === undefined ? [] : groupRows(ordered, spec.groupBy),
+    groups: spec.groupBy === undefined ? [] : spec.splitBy === undefined ? groupRows(ordered, spec.groupBy) : groupAndSplitRows(ordered, spec.groupBy, spec.splitBy),
     unknownFields: unknownFieldsOf(spec, rows, options.knownFields),
   };
 }
@@ -214,8 +228,10 @@ export function runReport(rows: readonly ReportRow[], spec: ReportSpec, options:
 /**
  * ADR-027 §3: can this result be kept as a saved copy? A copy holds at most
  * `REPORT_SNAPSHOT_ROW_CAP` rows and is refused (never truncated) beyond
- * that; a count or bar presentation stores no rows at all, so always fits.
+ * that, and so is a grouping with more than that many groups and parts in
+ * all; a count or bar presentation stores no rows, so otherwise always fits.
  */
 export function reportFitsSnapshot(result: ReportResult): boolean {
-  return result.rows.length <= REPORT_SNAPSHOT_ROW_CAP;
+  const groupEntries = result.groups.reduce((sum, g) => sum + 1 + (g.parts?.length ?? 0), 0);
+  return result.rows.length <= REPORT_SNAPSHOT_ROW_CAP && groupEntries <= REPORT_SNAPSHOT_ROW_CAP;
 }
