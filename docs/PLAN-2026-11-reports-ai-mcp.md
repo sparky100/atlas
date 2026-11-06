@@ -43,13 +43,28 @@ Every sprint follows CLAUDE.md as it stands. Schema changes ship migration, cont
 2. **Report spec and evaluator:** `src/contracts/reportSpec.ts` (types and validation) and `src/engine/reportQuery.ts`, a pure function from head rows plus a spec to a result. Property tests for determinism and for "spec round-trips through JSON".
 3. **Migration, types, RLS:** the three tables, `src/db/reports.ts` typed queries, integration tests for RLS per role and the round trip.
 4. **Save from Elements and Portfolio:** "Save as report" captures the current filter, sort and columns; a saved report opens back into the same page state. This is the cheap win and ships on its own.
-5. **Reports library:** under Analyse, a list of saved reports (mine and organisation), run, rename, duplicate, delete, export CSV and XLSX (reusing the existing export code). Each report has a **Save a copy now** button that creates a snapshot, and a **Saved copies** list per report (date, who, row count) that opens the frozen output and exports it. Round-trip and integration tests prove a snapshot is unchanged after the report is edited, after the report is deleted, and after the underlying elements change.
-6. **Dashboards:** a Dashboards page with tiles: **count**, **bar by attribute** (simple inline SVG, no new chart library), **table (top N)**, **health finding count**. Tiles link through to the full report. Responsive grid that stacks at 390. Optionally pin one dashboard to Home.
+5. **Reports library:** under Analyse, a list of saved reports (mine and organisation), run, rename, duplicate, delete, export CSV and XLSX (reusing the existing export code). Each report has a **Save a copy now** button that creates a snapshot, and a **Saved copies** list per report (date, who, row count) that opens the frozen output and exports it. Round-trip and integration tests prove a snapshot is unchanged after the report is edited, after the report is deleted, and after the underlying elements change. The report page uses the finished layout described under "Visual quality": header with as-at stamp, summary strip, chart where the report has a grouping, then the table.
+6. **Dashboards and charts (revised 2026-11-06, see "Visual quality" below):** split into three parts, each its own PR and stop.
+   - **6a. Chart language.** Chart colour tokens (a categorical set of eight and a sequential ramp, light and dark, checked for contrast and for colour-blind safety), and a small set of chart components in `src/ui/charts/`: ranked bar, stacked bar, donut with a centre figure, and a big-number tile with a comparison. Direct labels, legends, hover and keyboard focus, click-through to the report behind a bar, empty and loading states, reduced-motion respected.
+   - **6b. Dashboard page.** Tile kinds `kpi`, `bar`, `stackedBar`, `donut`, `table`, `findingCount`; a responsive grid (one, two or full-width tiles, stacking at 390); a proper page header (title, as-at stamp, share state).
+   - **6c. Polish.** Present mode (full screen, no chrome), dashboard export to PDF and PNG with the standard stamp (model, state, date), and a visual review pass: I render real fixture data in the browser, look at it, and refine spacing, type and colour before the PR.
 7. **Golden paths:** `golden-path-save-report` (filter Elements, save, find it in the library, run, save a copy, edit an element and the report, reopen the copy and see it unchanged), `golden-path-dashboard` (build a dashboard from two reports, open a tile through to its report). User guide section.
 
 **Size:** medium to large. The evaluator and the dashboard page are the bulk. **Migration:** yes (step 3).
 
 ---
+
+### Visual quality (added 2026-11-06 at Simon's request)
+
+Simon's view is that what sets Ardoq apart is visually attractive dashboards and reports. That raises the bar for this sprint; it does not change the data design (ADR-027's report spec, copies and visibility are unaffected). What changes:
+
+- **More than the original four tiles.** The original plan had count, bar, table and finding count, all drawn as plain inline SVG. That is now a floor. Added: stacked bar, donut and big-number tiles with a comparison. A stacked bar needs a second grouping field, so the report definition gains an optional `splitBy` field (added before anything is released, so no version bump).
+- **A designed chart language, not default charts.** One set of colour tokens for charts, in both themes, checked against the existing rule that colour is never the only signal (UI-principles §6.3, §8.4): direct labels and patterns as well as colour. Consistent type, spacing and corner treatment taken from the existing tokens.
+- **Reports look finished too, not only dashboards.** A report page gets a header with its name, an "as at" stamp and the commit it was read at, a summary strip of big numbers, a chart where the report has a grouping, then the table. Saved copies open in the same layout, and PDF export uses it (the standard export stamp from F13 is reused).
+- **Interactivity that feels alive.** Hover detail, click a bar to open the matching rows, keyboard access, and short transitions that stop for people who ask for reduced motion.
+- **Built and checked visually.** I can render pages with realistic data in the cloud sandbox's browser and look at screenshots at 1280 and 390 before each UI PR, then refine. I cannot see them on your machine in Claude Desktop, so a final visual check by you is still needed.
+- **Library or not.** Recommended: build the five or six chart types ourselves as small SVG components. They are simple, they follow the theme tokens exactly, and they add no dependency. A charting library would give more chart types faster (treemaps, maps, flows) but adds a dependency and fights the theme. Revisit only if you want the more exotic types. This is a decision for Simon (below).
+- **Effect on timing.** F14 step 6 grows from one step into three (6a to 6c). Steps 4 and 5 (save a report, the report library and report page layout) are unchanged in order, with the report page layout added to step 5. F15 and F16 are untouched.
 
 ## F15: AI over the live model (ADR-028)
 

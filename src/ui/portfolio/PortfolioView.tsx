@@ -13,6 +13,9 @@ import { visiblePortfolioRows } from './portfolioVisibility';
 import { PortfolioTable } from './PortfolioTable';
 import { PortfolioToolbar } from './PortfolioToolbar';
 import type { PortfolioData } from './usePortfolio';
+import { SavedReportBar } from '../reports/SavedReportBar';
+import { portfolioStateToSpec, specToPortfolioState } from '../reports/portfolioReport';
+import type { MemberRole } from '../../db/types';
 import styles from './PortfolioView.module.css';
 
 export interface PortfolioViewProps {
@@ -20,6 +23,8 @@ export interface PortfolioViewProps {
   elementHref: (elementId: UUID) => string;
   /** F13 step 1: the export stamp's model and state; the export is offered only when given. */
   exportStamp?: Omit<ExportStamp, 'viewLabel'> | undefined;
+  /** F14: who is looking, so the saved-reports strip can offer Save. Omitted = no strip. */
+  savedReports?: { modelId: UUID; orgId: UUID; userId: UUID | null; role: MemberRole | null } | undefined;
 }
 
 /** Same breakpoint every other table/canvas → mobile-card swap in this app uses (`ElementBrowseTable.tsx`, `ValueStreamsPage.tsx`). */
@@ -37,7 +42,7 @@ const MOBILE_BREAKPOINT_PX = 768;
  * loaded rows, the same shape `useElementBrowse.ts`'s own table owns its
  * sort/filter state.
  */
-export function PortfolioView({ data, elementHref, exportStamp }: PortfolioViewProps) {
+export function PortfolioView({ data, elementHref, exportStamp, savedReports }: PortfolioViewProps) {
   const [includeContainers, setIncludeContainers] = useState(false);
   const [sortKey, setSortKey] = useState<PortfolioSortKey>(DEFAULT_PORTFOLIO_SORT_KEY);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(DEFAULT_PORTFOLIO_SORT_DIRECTION);
@@ -64,6 +69,22 @@ export function PortfolioView({ data, elementHref, exportStamp }: PortfolioViewP
 
   return (
     <div>
+      {savedReports && (
+        <SavedReportBar
+          source="portfolio"
+          {...savedReports}
+          current={portfolioStateToSpec({ includeContainers, filters, sortKey, sortDirection })}
+          onOpen={(spec) => {
+            const restored = specToPortfolioState(spec);
+            if (!restored.ok) return restored.reason;
+            setIncludeContainers(restored.state.includeContainers);
+            setFilters(restored.state.filters);
+            setSortKey(restored.state.sortKey);
+            setSortDirection(restored.state.sortDirection);
+            return null;
+          }}
+        />
+      )}
       <PortfolioToolbar
         sortKey={sortKey}
         sortDirection={sortDirection}

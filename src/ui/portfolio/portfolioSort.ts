@@ -41,24 +41,24 @@ export const PORTFOLIO_SORT_COLUMNS: { key: PortfolioSortKey; label: string }[] 
 export const DEFAULT_PORTFOLIO_SORT_KEY: PortfolioSortKey = 'cost';
 export const DEFAULT_PORTFOLIO_SORT_DIRECTION: 'asc' | 'desc' = 'desc';
 
-function costRank(cost: AnnualRunCost | null): number {
+export function costRank(cost: AnnualRunCost | null): number {
   return cost === null ? -1 : annualRunCostRank(cost);
 }
 
-function fitRank(fit: FitForPurpose | null): number {
+export function fitRank(fit: FitForPurpose | null): number {
   // Ascending = best-first (excellent before poor) — `FIT_FOR_PURPOSE_ORDER` itself runs excellent=0..poor=3, already the right direction.
   return fit === null ? -1 : FIT_FOR_PURPOSE_ORDER[fit];
 }
 
-function dispositionRank(disposition: Disposition | null): number {
+export function dispositionRank(disposition: Disposition | null): number {
   return disposition === null ? -1 : DISPOSITION_ORDER.indexOf(disposition);
 }
 
-function criticalityRank(criticality: Criticality | null): number {
+export function criticalityRank(criticality: Criticality | null): number {
   return criticality === null ? -1 : CRITICALITY_ORDER[criticality];
 }
 
-function lifecycleRank(status: string | null): number {
+export function lifecycleRank(status: string | null): number {
   return status !== null && status in LIFECYCLE_ORDER ? LIFECYCLE_ORDER[status as keyof typeof LIFECYCLE_ORDER] : -1;
 }
 

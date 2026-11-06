@@ -108,6 +108,8 @@ export type ElementBrowseState =
       setSort: (key: ElementBrowseSortKey) => void;
       /** The commit every row was read at — `RelationshipAdd`'s own search needs this, for the inline supports picker on an unlinked-systems row. */
       commitId: UUID;
+      /** F14: puts the page's own sort/filter controls into a saved report's state in one go. */
+      restore: (next: { typeFilter: ElementType | 'all'; dispositionFilter: DispositionFilter; query: string; sortKey: ElementBrowseSortKey; sortDirection: 'asc' | 'desc' }) => void;
       /** Re-fetches everything (same `reload`-by-token shape `useMainBranch.ts` uses) — the inline supports picker's own `onCreated` calls this, so a just-linked system drops out of the `unlinked-systems` filter immediately rather than staying visible (and re-addable) until the next full page load. */
       reload: () => void;
     };
@@ -402,6 +404,13 @@ export function useElementBrowse(
     sortDirection,
     setSort,
     commitId: loaded.commitId,
+    restore: (next) => {
+      setTypeFilter(next.typeFilter);
+      setDispositionFilter(next.dispositionFilter);
+      setQuery(next.query);
+      setSortKey(next.sortKey);
+      setSortDirection(next.sortDirection);
+    },
     reload: () => { setReloadToken((t) => t + 1); },
   };
 }
