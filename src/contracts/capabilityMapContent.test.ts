@@ -144,7 +144,7 @@ describe('parseCapabilityMapContent', () => {
     });
 
     it('lists exactly the eight sectors the starter content covers', () => {
-      expect([...SECTORS]).toEqual(['local_government_scotland', 'local_government_england', 'nhs', 'housing', 'hei', 'public_body', 'utility', 'electricity_network']);
+      expect([...SECTORS]).toEqual(['local_government_scotland', 'local_government_england', 'nhs', 'housing', 'hei', 'public_body', 'utility', 'electricity_network', 'retail_energy']);
     });
   });
 });
