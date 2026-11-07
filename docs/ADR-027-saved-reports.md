@@ -101,6 +101,8 @@ Found in review: nothing let a user set `groupBy`, `splitBy`, a non-table presen
 - **Click-through:** a chart mark opens the report narrowed to the matching rows. The narrowing lives in the URL (`?f=field&v=json`), is never saved, and adds `eq`/`isEmpty` filters on top of the report's own (`src/ui/reports/reportDrill.ts`). Saving a copy is not offered while narrowed.
 - Dashboard edit mode can change a tile's kind and a table tile's row count (both already columns on `dashboard_tiles`).
 
+**Standard dashboards** (Simon, 2026-11-07, chose 'Application portfolio overview' and 'Rationalisation (TIME)' from five proposed, delivered as a button that creates ordinary editable items rather than read-only built-ins). `src/ui/reports/standardDashboards.ts` holds their report definitions and tiles; "Add standard dashboards…" creates them for the model only when someone chooses to. They are questions, not facts, and nothing reads them in place of a query, so rule 7 (no seed data on a production path) is not engaged. Values in charts, tables and exports now show as words ("£50k–£250k", "Retiring") and scale fields (lifecycle, criticality, cost, fit) chart in their own order.
+
 Still not reachable, and said so in the app: reports over `relationships` and `findings` (no source adapter yet), and so the finding-count tile.
 
 ## Still open

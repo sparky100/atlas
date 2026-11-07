@@ -5,6 +5,7 @@ import type { DashboardTileKind, DashboardTileRow, DashboardTileSize, SavedRepor
 import { runReport } from '../../engine/reportQuery';
 import { DashboardTileCard } from './DashboardTileCard';
 import { ReportResultView } from './ReportResultView';
+import { STANDARD_DASHBOARDS } from './standardDashboards';
 import { tileColumnSpan } from './dashboardTiles';
 import styles from './Dashboard.module.css';
 
@@ -97,3 +98,58 @@ function ReportPage() {
 }
 
 export const GroupedReportPage: StoryObj<typeof ReportPage> = { render: () => <ReportPage /> };
+
+// The standard dashboards over a realistic portfolio (Portfolio source rows).
+const COSTS = ['under_50k', '50k_250k', '250k_1m', '1m_5m', 'over_5m', '50k_250k', 'none_included', null];
+const FITS = ['good', 'adequate', 'poor', 'excellent', 'adequate', null];
+const COST_RANK: Record<string, number> = { none_included: 0, under_50k: 1, '50k_250k': 2, '250k_1m': 3, '1m_5m': 4, over_5m: 5 };
+const portfolioRows: ReportRow[] = NAMES.map((name, i) => {
+  const cost = COSTS[(i * 3 + 1) % COSTS.length] ?? null;
+  const fit = FITS[(i * 5 + 2) % FITS.length] ?? null;
+  const costly = cost !== null && (COST_RANK[cost] ?? 0) >= 3;
+  const signalKeys = costly && fit === 'poor' ? '|costly_poor_fit|' : '||';
+  return {
+    id: `p${String(i)}`,
+    name,
+    kind: i % 9 === 0 ? 'module' : i % 7 === 0 ? 'platform' : 'system',
+    elementType: i % 9 === 0 ? 'container' : 'system',
+    cost,
+    fit,
+    criticality: CRITICALITY[(i * 3) % CRITICALITY.length] ?? null,
+    disposition: DISPOSITION[(i * 5 + Math.floor(i / 6)) % DISPOSITION.length] ?? null,
+    lifecycle: LIFECYCLES[i % LIFECYCLES.length] ?? null,
+    capabilities: i % 4,
+    owner: OWNERS[i % OWNERS.length] ?? null,
+    signals: signalKeys === '||' ? 0 : 1,
+    signalKeys,
+    costRank: cost === null ? -1 : (COST_RANK[cost] ?? -1),
+    ownerSort: OWNERS[i % OWNERS.length] ?? '',
+  };
+});
+const portfolioKnown = Object.keys(portfolioRows[0] ?? {});
+
+function Standard({ index }: { index: number }) {
+  const d = STANDARD_DASHBOARDS[index];
+  if (d === undefined) return null;
+  return (
+    <MemoryRouter>
+      <div style={{ padding: 'var(--space-6)', background: 'var(--bg)', minHeight: '100vh' }}>
+        <h1 style={{ margin: '0 0 var(--space-4)' }}>{d.name}</h1>
+        <div className={styles.grid}>
+          {d.tiles.map((t, i) => {
+            const r = report(`s${String(i)}`, t.name, t.spec);
+            const tl = tile(`s${String(i)}`, t.kind, t.size, i, t.rowLimit ?? null);
+            return (
+              <section key={tl.id} className={styles.tile} style={{ '--span': tileColumnSpan(tl.size), order: tl.position } as React.CSSProperties}>
+                <DashboardTileCard tile={tl} report={r} rows={portfolioRows} knownFields={portfolioKnown} basePath="/o/x/m/y" />
+              </section>
+            );
+          })}
+        </div>
+      </div>
+    </MemoryRouter>
+  );
+}
+
+export const StandardPortfolioOverview: StoryObj<typeof Standard> = { render: () => <Standard index={0} /> };
+export const StandardRationalisation: StoryObj<typeof Standard> = { render: () => <Standard index={1} /> };

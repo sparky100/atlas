@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import type { ReportValue } from '../../contracts/reportSpec';
 import type { ReportGroup } from '../../engine/reportQuery';
-import { categoryColour, chartDonut, isDrillable } from './chartData';
+import { categoryColour, chartDonut, isDrillable, type ValueScale } from './chartData';
 import { ChartTable } from './chartParts';
 import styles from './charts.module.css';
 
@@ -17,10 +17,11 @@ export interface DonutChartProps {
   title: string;
   unit?: string;
   onSelect?: ((value: ReportValue) => void) | undefined;
+  scale?: ValueScale | undefined;
 }
 
-export function DonutChart({ groups, title, unit = 'total', onSelect }: DonutChartProps) {
-  const slices = chartDonut(groups);
+export function DonutChart({ groups, title, unit = 'total', onSelect, scale }: DonutChartProps) {
+  const slices = chartDonut(groups, 50, 32, scale);
   const [active, setActive] = useState<string | null>(null);
   if (slices.length === 0) return <p className={styles.empty}>Nothing to chart.</p>;
   const total = slices.reduce((sum, s) => sum + s.category.count, 0);

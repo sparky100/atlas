@@ -5,7 +5,8 @@
  * filters always apply. Position and size are display hints (rule 3).
  */
 import type { UUID } from '../../contracts/delta';
-import type { ReportSpec } from '../../contracts/reportSpec';
+import type { ReportRow, ReportSpec } from '../../contracts/reportSpec';
+import { runReport } from '../../engine/reportQuery';
 import type { DashboardRow, DashboardTileKind, DashboardTileRow, MemberRole, ReportVisibility } from '../../db/types';
 
 export const TILE_KIND_LABEL: Record<DashboardTileKind, string> = {
@@ -99,4 +100,22 @@ export function canEditDashboard(dashboard: Pick<DashboardRow, 'created_by' | 'v
   if (userId === null) return false;
   if (dashboard.created_by === userId) return true;
   return dashboard.visibility === 'organisation' && (role === 'owner' || role === 'architect');
+}
+
+/** The fields that say *what kind of thing* a report counts (systems, applications), as opposed to which of them. */
+const SCOPE_FIELDS: ReadonlySet<string> = new Set(['elementType', 'type']);
+
+/**
+ * What a big number is a share of: the same kind of thing the report counts,
+ * before its other filters ("6 of 34 applications", not "of 39 portfolio
+ * rows including modules"). Pure.
+ */
+export function kpiBaseline(spec: ReportSpec, rows: readonly ReportRow[]): { total: number; noun: string } {
+  const scope = spec.filters.filter((f) => SCOPE_FIELDS.has(f.field));
+  const total = runReport(rows, { ...spec, filters: scope, presentation: { kind: 'count' } }).rowCount;
+  const typeEq = scope.find((f) => f.field === 'type' && f.operator === 'eq' && typeof f.value === 'string');
+  let noun = spec.source === 'portfolio' ? 'portfolio items' : 'elements';
+  if (spec.source === 'portfolio' && scope.some((f) => f.field === 'elementType' && f.operator === 'neq' && f.value === 'container')) noun = 'applications';
+  else if (typeEq !== undefined) noun = `${String(typeEq.value).replace(/_/g, ' ')}s`;
+  return { total, noun };
 }

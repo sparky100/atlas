@@ -9,6 +9,7 @@ import { Text } from '../components/Text/Text';
 import { reportError } from '../errors/errorBannerStore';
 import { canCreateChangeBranch } from '../orgs/roleGates';
 import { supabase } from '../supabaseClient';
+import { StandardDashboardsOffer } from './StandardDashboardsOffer';
 import styles from './SavedReportsLibrary.module.css';
 
 export interface DashboardsListProps {
@@ -50,7 +51,7 @@ export function DashboardsList({ modelId, orgId, userId, role, basePath }: Dashb
       </Text>
       {dashboards.length === 0 && (
         <Text as="p" tone="muted">
-          No dashboards yet. A dashboard shows several saved reports together, live.
+          No dashboards yet. A dashboard shows several saved reports together, live. Start from a standard one below, or build your own.
         </Text>
       )}
       <ul className={styles.list}>
@@ -64,7 +65,7 @@ export function DashboardsList({ modelId, orgId, userId, role, basePath }: Dashb
         ))}
       </ul>
       {canCreate && !creating && (
-        <div>
+        <div className={styles.row}>
           <Button
             onClick={() => {
               setCreating(true);
@@ -73,6 +74,18 @@ export function DashboardsList({ modelId, orgId, userId, role, basePath }: Dashb
             New dashboard…
           </Button>
         </div>
+      )}
+      {canCreate && (
+        <StandardDashboardsOffer
+          modelId={modelId}
+          orgId={orgId}
+          userId={userId}
+          role={role}
+          existing={dashboards}
+          onAdded={(id) => {
+            void navigate(`${basePath}/reports/dashboards/${id}`);
+          }}
+        />
       )}
       {canCreate && creating && (
         <form

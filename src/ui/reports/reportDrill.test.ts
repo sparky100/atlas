@@ -48,6 +48,6 @@ describe('report drill', () => {
   });
 
   it('describes the drill in plain words', () => {
-    expect(drillLabel([{ field: 'lifecycle', value: 'active' }, { field: 'criticality', value: null }])).toBe('Lifecycle is active and Criticality is not set');
+    expect(drillLabel([{ field: 'lifecycle', value: 'active' }, { field: 'criticality', value: null }])).toBe('Lifecycle is Active and Criticality is not set');
   });
 });

@@ -6,7 +6,7 @@
  * in the URL, so the stored report is never changed by looking at it. Pure.
  */
 import type { ReportFilter, ReportSpec, ReportValue } from '../../contracts/reportSpec';
-import { reportCellText, reportFieldLabel } from './reportTable';
+import { reportFieldLabel, reportValueLabel } from './reportTable';
 
 export interface ReportDrill {
   field: string;
@@ -59,5 +59,5 @@ export function drilledSpec(spec: ReportSpec, drills: readonly ReportDrill[]): R
 
 /** "Lifecycle is active and Criticality is not set" */
 export function drillLabel(drills: readonly ReportDrill[]): string {
-  return drills.map((d) => `${reportFieldLabel(d.field)} is ${d.value === null || d.value === '' ? 'not set' : reportCellText(d.value)}`).join(' and ');
+  return drills.map((d) => `${reportFieldLabel(d.field)} is ${d.value === null || d.value === '' ? 'not set' : reportValueLabel(d.field, d.value)}`).join(' and ');
 }

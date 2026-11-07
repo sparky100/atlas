@@ -7,7 +7,7 @@
  */
 import type { ReportValue } from '../../contracts/reportSpec';
 import type { ReportGroup } from '../../engine/reportQuery';
-import { chartBars, isDrillable, type ChartCategory } from './chartData';
+import { chartBars, isDrillable, type ChartCategory, type ValueScale } from './chartData';
 import { ChartTable } from './chartParts';
 import styles from './charts.module.css';
 
@@ -16,6 +16,7 @@ export interface BarChartProps {
   /** What is being counted, for the caption and the screen-reader table, e.g. "Systems by lifecycle". */
   title: string;
   onSelect?: ((value: ReportValue) => void) | undefined;
+  scale?: ValueScale | undefined;
 }
 
 function singleSeriesColour(category: Pick<ChartCategory, 'kind'>): string {
@@ -23,8 +24,8 @@ function singleSeriesColour(category: Pick<ChartCategory, 'kind'>): string {
   return category.kind === 'other' ? 'var(--chart-other)' : 'var(--chart-unset)';
 }
 
-export function BarChart({ groups, title, onSelect }: BarChartProps) {
-  const bars = chartBars(groups);
+export function BarChart({ groups, title, onSelect, scale }: BarChartProps) {
+  const bars = chartBars(groups, scale);
   if (bars.length === 0) return <p className={styles.empty}>Nothing to chart.</p>;
   return (
     <figure className={styles.figure} aria-label={title}>

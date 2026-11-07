@@ -16,10 +16,10 @@ import { DonutChart } from '../charts/DonutChart';
 import { StackedBarChart } from '../charts/StackedBarChart';
 import { Text } from '../components/Text/Text';
 import type { ExportTileItem } from '../exports/dashboardExport';
-import { specForTile } from './dashboardTiles';
+import { kpiBaseline, specForTile } from './dashboardTiles';
 import { ResultTable } from './ReportResultView';
 import { drillSearch, type ReportDrill } from './reportDrill';
-import { reportFieldLabel } from './reportTable';
+import { reportFieldLabel, reportValueScale } from './reportTable';
 import styles from './Dashboard.module.css';
 
 export interface DashboardTileCardProps {
@@ -52,28 +52,33 @@ export function DashboardTileCard({ tile, report, rows, knownFields, basePath, o
   }
   const spec = parsed.spec;
   const by = spec.groupBy === undefined ? '' : reportFieldLabel(spec.groupBy).toLowerCase();
-  const noun = spec.source === 'portfolio' ? 'portfolio items' : 'elements';
   // Clicking a mark opens the report narrowed to those rows (the drill lives in the URL; nothing is saved).
   const drill = (drills: ReportDrill[]) => {
     void navigate(`${reportHref}?${drillSearch(drills)}`);
   };
+  const groupScale = reportValueScale(spec.groupBy ?? '');
   const byGroup = (value: ReportValue) => {
     if (spec.groupBy !== undefined) drill([{ field: spec.groupBy, value }]);
   };
 
   let body;
   switch (tile.kind) {
-    case 'kpi':
-      body = <BigNumber label={report.name} value={result.rowCount} of={{ total: rows.length, noun }} />;
+    case 'kpi': {
+      // A count of the whole scope ("Applications") is not a share of anything, so it gets no meter.
+      const narrowed = spec.filters.some((f) => f.field !== 'elementType' && f.field !== 'type');
+      body = <BigNumber label={report.name} value={result.rowCount} of={narrowed ? kpiBaseline(spec, rows) : undefined} />;
       break;
+    }
     case 'bar':
-      body = <BarChart groups={result.groups} title={`By ${by}`} onSelect={byGroup} />;
+      body = <BarChart groups={result.groups} title={`By ${by}`} onSelect={byGroup} scale={groupScale} />;
       break;
     case 'stackedBar':
       body = (
         <StackedBarChart
           groups={result.groups}
           title={`By ${by}, split by ${reportFieldLabel(spec.splitBy ?? '').toLowerCase()}`}
+          groupScale={groupScale}
+          splitScale={reportValueScale(spec.splitBy ?? '')}
           onSelect={(group, split) => {
             if (spec.groupBy === undefined) return;
             const drills: ReportDrill[] = [{ field: spec.groupBy, value: group }];
@@ -84,7 +89,7 @@ export function DashboardTileCard({ tile, report, rows, knownFields, basePath, o
       );
       break;
     case 'donut':
-      body = <DonutChart groups={result.groups} title={`By ${by}`} unit={noun === 'elements' ? 'rows' : 'items'} onSelect={byGroup} />;
+      body = <DonutChart groups={result.groups} title={`By ${by}`} unit={spec.source === 'portfolio' ? 'items' : 'rows'} onSelect={byGroup} scale={groupScale} />;
       break;
     case 'table':
       body = <ResultTable result={result} compact />;

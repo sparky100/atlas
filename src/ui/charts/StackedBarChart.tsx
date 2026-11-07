@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import type { ReportValue } from '../../contracts/reportSpec';
 import type { ReportGroup } from '../../engine/reportQuery';
-import { categoryColour, chartStacked, isDrillable } from './chartData';
+import { categoryColour, chartStacked, isDrillable, type ValueScale } from './chartData';
 import { ChartTable } from './chartParts';
 import styles from './charts.module.css';
 
@@ -18,10 +18,12 @@ export interface StackedBarChartProps {
   title: string;
   /** `split` is undefined when the whole bar (its label) was chosen. */
   onSelect?: ((group: ReportValue, split?: ReportValue) => void) | undefined;
+  groupScale?: ValueScale | undefined;
+  splitScale?: ValueScale | undefined;
 }
 
-export function StackedBarChart({ groups, title, onSelect }: StackedBarChartProps) {
-  const chart = chartStacked(groups);
+export function StackedBarChart({ groups, title, onSelect, groupScale, splitScale }: StackedBarChartProps) {
+  const chart = chartStacked(groups, groupScale, splitScale);
   const [active, setActive] = useState<string | null>(null);
   if (chart.bars.length === 0) return <p className={styles.empty}>Nothing to chart.</p>;
   const legendTotals = chart.legend.map((c) => ({ ...c, count: chart.bars.reduce((sum, b) => sum + (b.segments.find((s) => s.category.key === c.key)?.count ?? 0), 0) }));

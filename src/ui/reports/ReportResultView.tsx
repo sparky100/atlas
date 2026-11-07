@@ -13,7 +13,7 @@ import { DonutChart } from '../charts/DonutChart';
 import { StackedBarChart } from '../charts/StackedBarChart';
 import { Text } from '../components/Text/Text';
 import type { ReportDrill } from './reportDrill';
-import { reportCellText, reportFieldLabel } from './reportTable';
+import { reportFieldLabel, reportValueLabel, reportValueScale } from './reportTable';
 import styles from './ReportResultView.module.css';
 
 /** Called when a chart mark is clicked, with the value(s) it stands for; the page narrows to those rows. */
@@ -27,12 +27,15 @@ export function ReportChart({ result, spec, onDrill }: { result: ReportResult; s
   const byGroup = onDrill === undefined ? undefined : (value: ReportValue) => {
     onDrill([{ field: groupBy, value }]);
   };
-  if (spec.presentation.kind === 'donut') return <DonutChart groups={result.groups} title={title} unit="rows" onSelect={byGroup} />;
-  if (splitBy === undefined) return <BarChart groups={result.groups} title={title} onSelect={byGroup} />;
+  const groupScale = reportValueScale(groupBy);
+  if (spec.presentation.kind === 'donut') return <DonutChart groups={result.groups} title={title} unit="rows" onSelect={byGroup} scale={groupScale} />;
+  if (splitBy === undefined) return <BarChart groups={result.groups} title={title} onSelect={byGroup} scale={groupScale} />;
   return (
     <StackedBarChart
       groups={result.groups}
       title={title}
+      groupScale={groupScale}
+      splitScale={reportValueScale(splitBy)}
       onSelect={
         onDrill === undefined
           ? undefined
@@ -64,7 +67,7 @@ export function ResultTable({ result, compact = false }: { result: ReportResult;
           {result.rows.map((row, i) => (
             <tr key={i}>
               {row.map((cell, j) => (
-                <td key={j}>{reportCellText(cell)}</td>
+                <td key={j}>{reportValueLabel(result.columns[j] ?? '', cell)}</td>
               ))}
             </tr>
           ))}

@@ -13,8 +13,8 @@
 import type { ReportSpec } from '../../contracts/reportSpec';
 import type { ReportResult } from '../../engine/reportQuery';
 import type { DashboardTileKind, DashboardTileSize } from '../../db/types';
-import { chartBars, chartCategories, chartStacked, type ChartCategory } from '../charts/chartData';
-import { reportCellText, reportFieldLabel } from '../reports/reportTable';
+import { CHART_SLOT_COUNT, chartBars, chartCategories, chartStacked, type ChartCategory, type ValueScale } from '../charts/chartData';
+import { reportFieldLabel, reportValueLabel, reportValueScale } from '../reports/reportTable';
 import { EXPORT_PADDING, EXPORT_PALETTE, STAMP_HEIGHT, stampShapes, truncate, type ExportPlan, type ExportShape, type ExportStamp } from './viewExport';
 
 /** Light-mode values of `--chart-1` to `--chart-8`, `--chart-other`, `--chart-unset`. */
@@ -97,6 +97,11 @@ function visibleTableRows(result: ReportResult): number {
   return Math.min(result.rows.length, MAX_TABLE_ROWS);
 }
 
+/** The picture uses the same labels and scale order as the screen ("£50k–£250k", lifecycle in its own order). */
+function groupScaleOf(item: ExportTileItem): ValueScale {
+  return reportValueScale(item.spec.groupBy ?? '');
+}
+
 /** Height of a tile's card for its width. */
 function tileHeight(item: ExportTileItem, width: number): number {
   const inner = width - 2 * CARD_PAD;
@@ -104,14 +109,14 @@ function tileHeight(item: ExportTileItem, width: number): number {
     case 'kpi':
       return CARD_PAD + 16 + 46 + 18 + CARD_PAD;
     case 'bar':
-      return CARD_PAD + TITLE_HEIGHT + Math.max(1, Math.min(MAX_BARS, chartBars(item.result.groups).length)) * BAR_ROW + CARD_PAD;
+      return CARD_PAD + TITLE_HEIGHT + Math.max(1, Math.min(MAX_BARS, chartBars(item.result.groups, groupScaleOf(item)).length)) * BAR_ROW + CARD_PAD;
     case 'stackedBar': {
-      const chart = chartStacked(item.result.groups);
+      const chart = chartStacked(item.result.groups, groupScaleOf(item), reportValueScale(item.spec.splitBy ?? ''));
       const legend = legendShapes(chart.legend.map((c) => ({ category: c, note: '' })), 0, 0, inner);
       return CARD_PAD + TITLE_HEIGHT + legend.height + 6 + Math.max(1, Math.min(MAX_BARS, chart.bars.length)) * BAR_ROW + CARD_PAD;
     }
     case 'donut': {
-      const categories = chartCategories(item.result.groups);
+      const categories = chartCategories(item.result.groups, CHART_SLOT_COUNT, groupScaleOf(item));
       return CARD_PAD + TITLE_HEIGHT + Math.max(140, categories.length * 18 + 8) + CARD_PAD;
     }
     case 'table': {
@@ -137,7 +142,7 @@ function tileShapes(item: ExportTileItem, x: number, y: number, width: number, h
       break;
     case 'bar': {
       shapes.push(title());
-      const bars = chartBars(item.result.groups).slice(0, MAX_BARS);
+      const bars = chartBars(item.result.groups, groupScaleOf(item)).slice(0, MAX_BARS);
       const labelW = Math.min(110, inner * 0.35);
       const valueW = 78;
       const trackX = left + labelW + 8;
@@ -154,7 +159,7 @@ function tileShapes(item: ExportTileItem, x: number, y: number, width: number, h
     }
     case 'stackedBar': {
       shapes.push(title());
-      const chart = chartStacked(item.result.groups);
+      const chart = chartStacked(item.result.groups, groupScaleOf(item), reportValueScale(item.spec.splitBy ?? ''));
       const totals = chart.legend.map((c) => ({ category: c, note: String(chart.bars.reduce((sum, b) => sum + (b.segments.find((s) => s.category.key === c.key)?.count ?? 0), 0)) }));
       const legend = legendShapes(totals, left, top + 4, inner);
       shapes.push(...legend.shapes);
@@ -176,7 +181,7 @@ function tileShapes(item: ExportTileItem, x: number, y: number, width: number, h
     }
     case 'donut': {
       shapes.push(title());
-      const categories = chartCategories(item.result.groups);
+      const categories = chartCategories(item.result.groups, CHART_SLOT_COUNT, groupScaleOf(item));
       const total = categories.reduce((sum, c) => sum + c.count, 0);
       const outer = 60;
       const cx = left + outer;
@@ -212,7 +217,7 @@ function tileShapes(item: ExportTileItem, x: number, y: number, width: number, h
         const ry = top + TABLE_ROW + i * TABLE_ROW;
         shapes.push(rect(left, ry + TABLE_ROW - 1, inner, 1, EXPORT_PALETTE.border));
         cols.forEach((col, j) => {
-          shapes.push(text(left + col.x + 4, ry + TABLE_ROW / 2, truncate(reportCellText(row[j] ?? null), col.chars), 11, EXPORT_PALETTE.text, false, inner / Math.max(1, cols.length) - 8));
+          shapes.push(text(left + col.x + 4, ry + TABLE_ROW / 2, truncate(reportValueLabel(item.result.columns[j] ?? '', row[j] ?? null), col.chars), 11, EXPORT_PALETTE.text, false, inner / Math.max(1, cols.length) - 8));
         });
       });
       if (rows.length === 0) shapes.push(text(left + 4, top + TABLE_ROW + TABLE_ROW / 2, 'No rows match.', 11, EXPORT_PALETTE.textMuted));
