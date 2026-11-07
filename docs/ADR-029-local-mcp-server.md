@@ -1,6 +1,6 @@
 # ADR-029: A local MCP server for Claude Desktop, Claude Code and other MCP apps
 
-**Status:** **Proposed 2026-11-06.** Sign-in method decided by Simon 2026-11-06: email and password (open point 1, option a). Moves to Accepted when the server skeleton (step 2) merges.
+**Status:** **Proposed 2026-11-06.** Sign-in method decided by Simon 2026-11-06: email and password (open point 1, option a). Built in steps 2 to 6 on PR #375; moves to Accepted when that merges.
 **Depends on:** ADR-028 (the read-only tools layer in `src/tools/` this server reuses), ADR-017 (tenancy), ADR-009 (RLS is the tenancy check), rules 4, 7 and 8 of `CLAUDE.md`, `docs/PLAN-2026-11-reports-ai-mcp.md` (F16).
 
 ## Context
@@ -97,4 +97,8 @@ A hosted or remote MCP server with OAuth (what some competitors ship); write too
 **No packaging dependency was added.** A `.mcpb` is a plain zip, so `scripts/zipFiles.ts` writes it with `node:zlib` (deterministic, tested with `unzip -t` where available). Only the MCP SDK was approved as a new dependency. The trade-off: the official `mcpb validate` is not run; the manifest is checked by `scripts/bundleMcp.test.ts` instead, and the first real install in Claude Desktop is the true check.
 
 Home shows a "Connect Claude Desktop" card only when `/downloads/mcp-version.json` exists and parses; otherwise nothing is rendered. Playwright: `e2e/golden-path-connect-claude-desktop.spec.ts`.
+
+## Built in step 6
+
+`docs/USER-GUIDE.md` has a "Connect Claude Desktop" section (install, sign-in, read-only, the owner switch covering connected apps, where the content goes, the optional update check). It says plainly that content read by a connected app goes to that app's provider, not Atlas's. Still open for a person to do: install the real `.mcpb` in Claude Desktop once (the manifest is checked by a test, not by Claude Desktop), and run the integration and Playwright specs named in the earlier sections.
 
