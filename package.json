@@ -40,6 +40,8 @@
     "mcp": "tsx mcp/src/main.ts",
     "mcp:login": "tsx mcp/src/main.ts login",
     "mcp:status": "tsx mcp/src/main.ts status",
+    "mcp:bundle": "tsx scripts/bundleMcp.ts",
+    "prebuild": "pnpm mcp:bundle",
     "functions:bundle:capture-run": "tsx scripts/bundleCaptureRunFunction.ts",
     "functions:deploy:capture-run": "pnpm functions:bundle:capture-run && supabase functions deploy capture-run",
     "functions:bundle:ask-model": "tsx scripts/bundleAskModelFunction.ts",

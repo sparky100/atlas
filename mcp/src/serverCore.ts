@@ -13,12 +13,16 @@ import { ATLAS_GUIDE } from './guide';
 import { listVisibleModels } from './models';
 
 export const SERVER_NAME = 'atlas';
-export const SERVER_VERSION = '0.1.0';
+import { SERVER_VERSION } from './version';
+
+export { SERVER_VERSION };
 
 export interface ServerDeps {
   supabase: Client;
   email: string | null;
   password: string | null;
+  /** From the optional update check; shown to the assistant so it can tell the person. */
+  updateNotice?: string | null;
 }
 
 type ToolReply = CallToolResult;
@@ -53,7 +57,7 @@ const NO_INPUT = { type: 'object', properties: {} } as const;
  * already carry their own JSON Schema, and `McpServer.registerTool` wants Zod.
  */
 export function createAtlasServer(deps: ServerDeps): Server {
-  const server = new Server({ name: SERVER_NAME, version: SERVER_VERSION }, { capabilities: { tools: {} }, instructions: INSTRUCTIONS });
+  const server = new Server({ name: SERVER_NAME, version: SERVER_VERSION }, { capabilities: { tools: {} }, instructions: deps.updateNotice ? `${INSTRUCTIONS}\n${deps.updateNotice}` : INSTRUCTIONS });
 
   const listModels = {
     name: 'atlas_list_models',

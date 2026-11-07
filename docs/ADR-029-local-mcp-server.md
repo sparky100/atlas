@@ -90,3 +90,11 @@ A hosted or remote MCP server with OAuth (what some competitors ship); write too
 
 `mcp/src/stdio.smoke.test.ts` starts the real `main.ts` over stdio with the SDK's client, with no network, and checks the tool list, the guide and the signed-out message (so nothing but protocol reaches stdout). `mcp/src/mcpAccess.integration.test.ts` runs the tools as real users against local Supabase: an outsider sees no models and cannot read one by id, the owner switch refuses until it is on, and an unknown change id is refused. The integration config now also picks up `mcp/**/*.integration.test.ts`; the unit config excludes it. The integration file has been written but not run here (no Docker); run `pnpm db:start` then `pnpm test:integration`.
 
+## Built in step 5
+
+`pnpm mcp:bundle` (`scripts/bundleMcp.ts`, run by `prebuild`) bundles `mcp/src/main.ts` with esbuild into `public/downloads/atlas-mcp.mjs` (plain `node`, nothing to install), packs `atlas.mcpb` (manifest plus that file) and writes `mcp-version.json`. All three are git-ignored build output. The public Supabase URL and anon key are baked in from `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` (or `SUPABASE_URL` / `SUPABASE_ANON_KEY`); with neither set the script warns and the download will say it does not know which Atlas to use. The manifest template is `mcp/bundle/manifest.json`; its tool list and version are filled in from the code so they cannot drift. The sign-in is the extension's `email` and (sensitive) `password` settings; `check_for_updates` is off by default and only works when `ATLAS_APP_URL` was set at build time.
+
+**No packaging dependency was added.** A `.mcpb` is a plain zip, so `scripts/zipFiles.ts` writes it with `node:zlib` (deterministic, tested with `unzip -t` where available). Only the MCP SDK was approved as a new dependency. The trade-off: the official `mcpb validate` is not run; the manifest is checked by `scripts/bundleMcp.test.ts` instead, and the first real install in Claude Desktop is the true check.
+
+Home shows a "Connect Claude Desktop" card only when `/downloads/mcp-version.json` exists and parses; otherwise nothing is rendered. Playwright: `e2e/golden-path-connect-claude-desktop.spec.ts`.
+

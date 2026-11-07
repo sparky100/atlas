@@ -31,3 +31,6 @@ supabase/functions/ask-model/index.ts
 *.log
 .vscode/*
 !.vscode/extensions.json
+
+# F16 / ADR-029: built by `pnpm mcp:bundle` (prebuild), never committed.
+public/downloads/

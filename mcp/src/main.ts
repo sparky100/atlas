@@ -14,9 +14,12 @@ import { createAtlasClient } from './client';
 import { resolveSettings } from './config';
 import { runLogin, runLogout, runStatus } from './loginCli';
 import { createAtlasServer } from './serverCore';
+import { checkForUpdate } from './updateCheck';
+import { SERVER_VERSION } from './version';
 
 declare const __ATLAS_URL__: string | undefined;
 declare const __ATLAS_ANON_KEY__: string | undefined;
+declare const __ATLAS_APP_URL__: string | undefined;
 
 async function main(): Promise<void> {
   const command = process.argv[2];
@@ -55,7 +58,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  const server = createAtlasServer({ supabase, email: settings.email, password: settings.password });
+  // Off unless the person turned it on (the extension's "Check for updates" setting); needs the app's address baked in at build time.
+  const appUrl = typeof __ATLAS_APP_URL__ === 'string' && __ATLAS_APP_URL__ !== '' ? __ATLAS_APP_URL__ : null;
+  const updateNotice =
+    process.env.ATLAS_MCP_UPDATE_CHECK === 'true' && appUrl !== null
+      ? await checkForUpdate({ fetchFn: fetch, versionUrl: `${appUrl.replace(/\/$/, '')}/downloads/mcp-version.json`, current: SERVER_VERSION })
+      : null;
+  const server = createAtlasServer({ supabase, email: settings.email, password: settings.password, updateNotice });
   await server.connect(new StdioServerTransport());
   console.error('Atlas MCP server ready.');
 }
