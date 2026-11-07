@@ -69,6 +69,21 @@ describe('organisation settings against a real local Supabase', () => {
     await expect(updateOrganisation(architect.client, orgId, { name: 'Should Not Land' })).rejects.toThrow();
   });
 
+  it('Ask Atlas is off by default; an owner can switch it on and off; an architect cannot (ADR-028 §7)', async () => {
+    const before = await owner.client.from('organisations').select('ai_assistant_enabled').eq('id', orgId).single();
+    expect((before.data as { ai_assistant_enabled: boolean }).ai_assistant_enabled).toBe(false);
+
+    const on = await updateOrganisation(owner.client, orgId, { aiAssistantEnabled: true });
+    expect(on.ai_assistant_enabled).toBe(true);
+
+    await expect(updateOrganisation(architect.client, orgId, { aiAssistantEnabled: false })).rejects.toThrow();
+    const stillOn = await owner.client.from('organisations').select('ai_assistant_enabled').eq('id', orgId).single();
+    expect((stillOn.data as { ai_assistant_enabled: boolean }).ai_assistant_enabled).toBe(true);
+
+    const off = await updateOrganisation(owner.client, orgId, { aiAssistantEnabled: false });
+    expect(off.ai_assistant_enabled).toBe(false);
+  });
+
   it('listMembers returns every member with their profile, role and joined date', async () => {
     const members = await listMembers(owner.client, orgId);
     expect(members).toHaveLength(2);

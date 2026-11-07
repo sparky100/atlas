@@ -66,6 +66,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
   const minArchitectsId = useId();
   const inviteEmailId = useId();
   const inviteRoleId = useId();
+  const askHeadingId = useId();
 
   return (
     <div>
@@ -137,6 +138,32 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
             </Button>
           )}
         </form>
+        <section aria-labelledby={askHeadingId}>
+          <Text as="h3" size="md" id={askHeadingId}>
+            Ask Atlas
+          </Text>
+          <Text as="p" tone="muted" size="sm">
+            When Ask Atlas is on, the questions members ask, and the names, descriptions, attributes and relationships of the elements needed to answer them, are sent to our AI provider to produce each answer. Comments and unreviewed imports are not sent. It also covers AI apps that members connect to Atlas on their own computer (such as Claude Desktop): while it is off, those apps get no model content. Nothing is sent while it is off.
+          </Text>
+          <label className={styles.checkRow}>
+            <input
+              type="checkbox"
+              checked={organisation.ai_assistant_enabled}
+              disabled={!canManage || status === 'saving'}
+              onChange={(e) => {
+                void update({ aiAssistantEnabled: e.target.checked });
+              }}
+            />
+            <Text as="span" size="sm">
+              Allow Ask Atlas for this organisation
+            </Text>
+          </label>
+          {!canManage && (
+            <Text as="p" tone="muted" size="sm">
+              Only an owner can change this.
+            </Text>
+          )}
+        </section>
         {error !== null && <Text as="p">{error}</Text>}
       </Panel>
 

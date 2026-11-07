@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
 // tests stay fast and dependency-free.
 export default defineConfig({
   test: {
-    include: ['src/**/*.integration.test.ts'],
+    include: ['src/**/*.integration.test.ts', 'mcp/**/*.integration.test.ts'],
     environment: 'node',
     globals: false,
     passWithNoTests: true,

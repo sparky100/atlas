@@ -36,8 +36,16 @@
     "sync:descriptions": "tsx scripts/syncDescriptionsFromMap.ts",
     "strip:seed-codes": "tsx scripts/stripSeedCodes.ts",
     "capture:score": "tsx scripts/scoreCapture.ts",
+    "ai:eval": "tsx scripts/askEval.ts",
+    "mcp": "tsx mcp/src/main.ts",
+    "mcp:login": "tsx mcp/src/main.ts login",
+    "mcp:status": "tsx mcp/src/main.ts status",
+    "mcp:bundle": "tsx scripts/bundleMcp.ts",
+    "prebuild": "pnpm mcp:bundle",
     "functions:bundle:capture-run": "tsx scripts/bundleCaptureRunFunction.ts",
-    "functions:deploy:capture-run": "pnpm functions:bundle:capture-run && supabase functions deploy capture-run"
+    "functions:deploy:capture-run": "pnpm functions:bundle:capture-run && supabase functions deploy capture-run",
+    "functions:bundle:ask-model": "tsx scripts/bundleAskModelFunction.ts",
+    "functions:deploy:ask-model": "pnpm functions:bundle:ask-model && supabase functions deploy ask-model"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -46,6 +54,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@playwright/test": "1.63.0",
     "@storybook/addon-a11y": "10.6.0",
     "@storybook/react-vite": "10.6.0",

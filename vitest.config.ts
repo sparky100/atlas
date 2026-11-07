@@ -6,8 +6,8 @@ import { defineConfig } from 'vitest/config';
 // — they need a running database and are a separate CI job.
 export default defineConfig({
   test: {
-    include: ['src/**/*.test.ts', 'src/**/*.property.test.ts'],
-    exclude: ['src/**/*.integration.test.ts', 'node_modules/**'],
+    include: ['src/**/*.test.ts', 'src/**/*.property.test.ts', 'mcp/**/*.test.ts', 'scripts/**/*.test.ts'],
+    exclude: ['src/**/*.integration.test.ts', 'mcp/**/*.integration.test.ts', 'node_modules/**'],
     environment: 'node',
     globals: false,
     passWithNoTests: true,

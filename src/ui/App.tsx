@@ -3,6 +3,7 @@ import { SelectedRefProvider } from './branches/SelectedRefProvider';
 import { BoundaryCrossingsPage } from './routes/BoundaryCrossingsPage';
 import { ReportsPage } from './routes/ReportsPage';
 import { SavedReportPage } from './routes/SavedReportPage';
+import { AskAtlasPage } from './routes/AskAtlasPage';
 import { DashboardPage } from './routes/DashboardPage';
 import { CapabilityMapPage } from './routes/CapabilityMapPage';
 import { CaptureJobListPage } from './routes/CaptureJobListPage';
@@ -99,6 +100,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/reports/saved/:id" element={<SavedReportPage kind="report" />} />
             <Route path="/o/:orgSlug/m/:modelSlug/reports/copies/:id" element={<SavedReportPage kind="copy" />} />
             <Route path="/o/:orgSlug/m/:modelSlug/reports/dashboards/:id" element={<DashboardPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/ask" element={<AskAtlasPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/boundary-crossings" element={<BoundaryCrossingsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/external-interfaces" element={<ExternalInterfacesPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/duplicates" element={<DuplicatesReportPage />} />

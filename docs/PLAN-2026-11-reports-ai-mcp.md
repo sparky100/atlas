@@ -88,7 +88,7 @@ Simon's view is that what sets Ardoq apart is visually attractive dashboards and
 - **UI (Simon, 2026-11-06):** a **separate "Ask Atlas" page** under Analyse, plus a Ctrl-K entry. The existing Help panel stays about how to use the app; this is about the model, so the two are kept apart. Streams the answer (reusing the Help panel's streaming client code), shows which tools were called, expandable, so answers can be checked.
 
 **Steps**
-1. **ADR-028, docs only,** including the "propose a change" follow-on sketched below.
+1. **ADR-028, docs only** (`docs/ADR-028-ask-atlas.md`, proposed 2026-11-06). The "propose a change" follow-on stays out of scope. Finding while writing it: `llm-proxy` is text-only, so step 3 also extends the proxy contract (additively) with tool calls; `ask-model` still goes through the proxy, one call per round.
 2. **Tools layer:** `src/tools/*` with unit tests per tool against fixture models, including result caps and no `.in()` over growing lists.
 3. **Edge function `ask-model`:** tool-use loop, streaming, per-org opt-in check, step and token limits, logging through the proxy. Unit tests with a fake `LlmClient`; integration test for RLS (a viewer cannot read what a viewer cannot read, and one org cannot reach another's model).
 4. **UI:** the Ask Atlas page, citations as links, tool-call disclosure, ungrounded warning, owner toggle in organisation settings (migration for the org setting).

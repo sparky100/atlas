@@ -8,6 +8,7 @@ import { Button } from '../components/Button/Button';
 import { DisplayNamePrompt } from '../components/DisplayNamePrompt/DisplayNamePrompt';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { ConnectClaudeDesktop } from '../mcp/ConnectClaudeDesktop';
 import { useOrganisations } from '../orgs/useOrganisations';
 import styles from './Home.module.css';
 
@@ -207,6 +208,7 @@ export function Home() {
             )}
           </div>
         )}
+        {organisations.length > 0 && <ConnectClaudeDesktop />}
       </main>
     </div>
   );

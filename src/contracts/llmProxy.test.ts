@@ -145,3 +145,47 @@ describe('isValidLlmProxyRequest', () => {
     expect(isValidLlmProxyRequest('not a request')).toBe(false);
   });
 });
+
+describe('tool support (ADR-028 §3)', () => {
+  const tool = { name: 'search_elements', description: 'Find elements', inputSchema: { type: 'object', properties: {} } };
+  const conversation = [
+    { role: 'user', content: 'Which systems support payments?' },
+    { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'search_elements', input: { query: 'payments' } }] },
+    { role: 'user', content: [{ type: 'tool_result', toolUseId: 't1', content: '{"rows":[]}' }] },
+  ];
+
+  it('round-trips a tool conversation through build and validate', () => {
+    const request = buildLlmProxyRequest({ messages: conversation, tools: [tool] });
+    expect(request.tools).toEqual([tool]);
+    expect(request.messages).toHaveLength(3);
+    expect(isValidLlmProxyRequest(request)).toBe(true);
+  });
+
+  it('accepts toolChoice "none" only alongside tools', () => {
+    expect(isValidLlmProxyRequest(buildLlmProxyRequest({ messages: conversation, tools: [tool], toolChoice: 'none' }))).toBe(true);
+    const noTools = { ...buildLlmProxyRequest({ messages: conversation }), toolChoice: 'none' };
+    expect(isValidLlmProxyRequest(noTools)).toBe(false);
+  });
+
+  it('drops malformed blocks and tool definitions instead of sending them on', () => {
+    const request = buildLlmProxyRequest({
+      messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }, { type: 'image', data: 'x' }, { type: 'tool_result', toolUseId: 1, content: 'x' }] }],
+      tools: [tool, { name: '', description: 'x', inputSchema: {} }],
+    });
+    expect(request.messages[0]?.content).toEqual([{ type: 'text', text: 'hi' }]);
+    expect(request.tools).toEqual([tool]);
+  });
+
+  it('leaves a request with no tools exactly as before (no tools key)', () => {
+    expect('tools' in buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }] })).toBe(false);
+  });
+
+  it('refuses tools with a structured-output request, and a streamed passthrough that could call tools', () => {
+    const base = buildLlmProxyRequest({ messages: conversation, tools: [tool] });
+    const schema = { effort: 'low', format: { type: 'json_schema', schema: {} } };
+    expect(isValidLlmProxyRequest({ ...base, outputConfig: schema })).toBe(false);
+    const streamed = { ...base, stream: true, streamToClient: true };
+    expect(isValidLlmProxyRequest(streamed)).toBe(false);
+    expect(isValidLlmProxyRequest({ ...streamed, toolChoice: 'none' })).toBe(true);
+  });
+});

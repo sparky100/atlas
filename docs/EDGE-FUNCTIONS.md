@@ -221,6 +221,41 @@ first place. Confirm a real call once, against your own Anthropic key,
 before relying on this in production — and before F2 (capture) is built
 to depend on it.
 
+**Tool support (F15, ADR-028 §3).** Contract version `2026-11-06` adds, all
+optional: message `content` may be a list of `text` / `tool_use` /
+`tool_result` blocks; `tools` (name, description, JSON Schema); `toolChoice`
+(`'none'` forbids calling a tool, for the closing round); and the response
+may carry `toolCalls`. A request without these behaves exactly as before.
+`tools` cannot be combined with `outputConfig`, and a streamed passthrough
+may carry tools only with `toolChoice: 'none'`. The shape is checked in both
+`src/contracts/llmProxy.ts` and this function, by hand.
+
+## `ask-model`
+
+F15, ADR-028: answers one Ask Atlas question. Invoked with
+`{modelId, question, history?}` by the signed-in user. **It never holds the
+service-role key**: every read uses the caller's forwarded session, so
+row-level security decides what is visible, and model calls go through
+`llm-proxy` with that same token (provider auth, the hourly cap and cost
+logging stay there). It checks, in order, that the model is readable by the
+caller, that the model's owning organisation has `ai_assistant_enabled`
+(off by default, owner-only), and that the main line has a commit; only then
+is anything sent to the provider.
+
+The response is `application/x-ndjson`: `{"type":"event",...}` lines as
+lookups start and finish, then one `{"type":"result",...}` (status `done`,
+`not_found`, `disabled`, `empty_model` or `invalid`) or
+`{"type":"error","code":"rate_limited"|"provider"|"failed",...}`. The final
+written answer is returned whole in the result in this version; streaming the
+answer text itself through the proxy passthrough is a later refinement.
+
+Logic lives in `src/tools/askHandler.ts` and `askLoop.ts` (Vitest, no Deno);
+`supabase/functions/ask-model/_source/index.ts` is only wiring. Bundled like
+`capture-run`: **run `pnpm functions:bundle:ask-model` (or
+`pnpm functions:deploy:ask-model`) before every deploy**; the generated
+`index.ts` is git-ignored. Deploy it after `llm-proxy` (it needs the
+tool-support version) and after the `20261107010000` migration.
+
 ## `capture-run`
 
 F2 (full K1) PR12, SPEC-capture.md §3.5: runs the capture pipeline for one

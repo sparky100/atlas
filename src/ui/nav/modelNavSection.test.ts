@@ -21,6 +21,10 @@ describe('modelNavSectionFor', () => {
     expect(modelNavSectionFor('/integrations')).toBe('integrations');
   });
 
+  it('matches Ask Atlas', () => {
+    expect(modelNavSectionFor('/ask')).toBe('ask');
+  });
+
   it('matches the roadmap', () => {
     expect(modelNavSectionFor('/roadmap')).toBe('roadmap');
   });

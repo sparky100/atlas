@@ -1,0 +1,50 @@
+{
+  "manifest_version": "0.3",
+  "name": "atlas-mcp",
+  "display_name": "Atlas",
+  "description": "Ask your AI assistant about your organisation's Atlas model: capabilities, systems, owners, changes and decisions. Read-only.",
+  "long_description": "Lets your assistant read your Atlas models: search and open elements, follow relationships, run saved reports, see health findings and the application portfolio, and look at proposed changes, decisions and projects. It is read-only, shows only what you can already see in Atlas, and signs in as you with your own Atlas email and password. Your organisation's owner must have turned on Ask Atlas.",
+  "author": {
+    "name": "Atlas"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "server/atlas-mcp.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/atlas-mcp.mjs"],
+      "env": {
+        "ATLAS_EMAIL": "${user_config.email}",
+        "ATLAS_PASSWORD": "${user_config.password}",
+        "ATLAS_MCP_UPDATE_CHECK": "${user_config.check_for_updates}"
+      }
+    }
+  },
+  "user_config": {
+    "email": {
+      "type": "string",
+      "title": "Atlas email",
+      "description": "The email you sign in to Atlas with.",
+      "required": true
+    },
+    "password": {
+      "type": "string",
+      "title": "Atlas password",
+      "description": "Your Atlas password. Claude Desktop keeps it in your computer's secure storage.",
+      "sensitive": true,
+      "required": true
+    },
+    "check_for_updates": {
+      "type": "boolean",
+      "title": "Check for updates",
+      "description": "Once each time it starts, fetch a small version file from Atlas to tell you when a newer version is available. Sends nothing about you or your models.",
+      "default": false,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": { "node": ">=20.0.0" }
+  },
+  "keywords": ["architecture", "enterprise-architecture", "atlas"]
+}

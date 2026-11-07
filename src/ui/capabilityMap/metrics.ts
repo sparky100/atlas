@@ -79,13 +79,15 @@ import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows
 import type { Criticality, Disposition, FitForPurpose, LifecycleStatus, UUID } from '../../contracts/delta';
 import type { HomeMode } from '../../contracts/userPreferences';
 import type { ChipTone } from '../components/Chip/Chip';
-import { monthsUntil, STALE_AFTER_MONTHS } from '../../contracts/thresholds';
 import { attributesRecord } from '../elements/attributesRecord';
 import { CRITICALITY_ORDER, CRITICALITY_TONE } from '../elements/criticalityTone';
 import { FIT_FOR_PURPOSE_ORDER, FIT_FOR_PURPOSE_TONE } from '../elements/fitForPurposeTone';
 import { LIFECYCLE_ORDER, LIFECYCLE_TONE } from '../elements/lifecycleTone';
 import { dispositionLabel, dispositionOf, dispositionTone, worstDisposition } from '../elements/disposition';
 import { domainOf } from '../elements/systemDomain';
+import { fitForPurposeOf, hasLifecycleExposureData, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../../engine/elementRead/fitAndExposure';
+
+export { fitForPurposeOf, hasLifecycleExposureData, systemsExposedByLifecycle, worstFitForPurposeOfSupporter };
 
 // The mode identifiers themselves are canonical in src/contracts/userPreferences.ts
 // (Sprint U4-1 C4: they're now persisted, `user_preferences.capability_map_colour_by`)
@@ -148,12 +150,6 @@ export function worstCriticality(capabilityId: UUID, supportsEdges: readonly Rel
   return worst;
 }
 
-/** A `supports` edge's own `fitForPurpose` rating, or `null` if unset/unrecognised. Exported for the Portfolio view's own system-side worst-fit read (`worstFitForPurposeOfSupporter` below) — the identical leaf-level read `worstFitForPurpose` already makes capability-side. */
-export function fitForPurposeOf(edge: RelationshipsHeadRow): FitForPurpose | null {
-  const value = attributesRecord(edge.attributes).fitForPurpose;
-  return typeof value === 'string' && value in FIT_FOR_PURPOSE_ORDER ? (value as FitForPurpose) : null;
-}
-
 /**
  * The worst `fitForPurpose` rating recorded on a capability's own direct
  * `supports` edges, or `null` if none is rated — `poor` the worst, the same
@@ -172,24 +168,6 @@ export function worstFitForPurpose(capabilityId: UUID, supportsEdges: readonly R
   return worst;
 }
 
-/**
- * The mirror of `worstFitForPurpose`, keyed on the *supporting* element
- * (a system or a module container, `edge.from_element_id`) rather than the
- * capability it supports — the Portfolio view's own "fit (worst across
- * its supports edges)" column, since nothing before it needed a system's
- * own worst fit rather than a capability's. Same worst-of/unrated
- * semantics: an edge with no rating is skipped, and a supporter with
- * zero rated edges reads `null`, never a recorded value.
- */
-export function worstFitForPurposeOfSupporter(supporterId: UUID, supportsEdges: readonly RelationshipsHeadRow[]): FitForPurpose | null {
-  let worst: FitForPurpose | null = null;
-  for (const edge of supportsEdges) {
-    if (edge.from_element_id !== supporterId) continue;
-    const fit = fitForPurposeOf(edge);
-    if (fit !== null && (worst === null || FIT_FOR_PURPOSE_ORDER[fit] > FIT_FOR_PURPOSE_ORDER[worst])) worst = fit;
-  }
-  return worst;
-}
 
 /**
  * This capability's own direct `supports` edges rated `poor` or `adequate`
@@ -288,35 +266,6 @@ export function otShareOf(capabilityId: UUID, supportsEdges: readonly Relationsh
     if (system && domainOf(system) === 'ot') ot += 1;
   }
   return { ot, total: ids.length };
-}
-
-function plannedEndOf(system: ElementsHeadRow): Date | null {
-  const value = attributesRecord(system.attributes).plannedEnd;
-  if (typeof value !== 'string') return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-/**
- * `true` when any of `systems` has a `plannedEnd` falling within
- * `STALE_AFTER_MONTHS` of `now` — including one already overdue, which is
- * more exposed still, not less. The reusable core `lifecycleExposure`
- * delegates to (and that the decision page's "Trigger resolved" row,
- * `whatChangesRows.ts`, also calls directly against a system/container
- * concern's own singleton system list) — see the module comment for why
- * "no planned replacement" isn't (yet) a separate check.
- */
-export function systemsExposedByLifecycle(systems: readonly ElementsHeadRow[], now: Date = new Date()): boolean {
-  for (const system of systems) {
-    const plannedEnd = plannedEndOf(system);
-    if (plannedEnd !== null && monthsUntil(plannedEnd, now) <= STALE_AFTER_MONTHS) return true;
-  }
-  return false;
-}
-
-/** `true` when at least one of `systems` has a recorded `plannedEnd` — `false` means exposure can't be determined either way (no signal), as distinct from a genuine "not exposed" read. */
-export function hasLifecycleExposureData(systems: readonly ElementsHeadRow[]): boolean {
-  return systems.some((system) => plannedEndOf(system) !== null);
 }
 
 export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): boolean {

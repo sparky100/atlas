@@ -197,6 +197,31 @@ On **Elements** and **Portfolio**, **Save as report…** keeps the page's curren
 
 A report that uses a health-finding filter cannot be saved yet; the page says so.
 
+## Ask Atlas
+
+**Analyse → Ask Atlas** (or press Ctrl-K and type "ask") lets you ask a question about the model in plain words, such as "Which systems are critical?".
+
+- It is **off until an organisation owner switches it on**, in organisation settings under Ask Atlas. While it is on, your questions and the names, descriptions, attributes and relationships of the elements needed to answer them are sent to our AI provider. Comments and unreviewed imports are not sent.
+- It can only read. It cannot change anything. It can answer about elements and how they connect, saved reports, data-quality findings, portfolio signals, and the changes, decisions and projects recorded for the model (summaries only; comments and unreviewed imports are not read).
+- Every element it names is a link to that element's page. An answer that names no element is marked **Ungrounded**, and a reference it could not verify is removed and flagged. Open **What was looked up** under an answer to see each lookup and how many results it found.
+- Answers come from the live estate (main) only. Long lists are cut short, and the answer says so.
+- Nothing is saved: reload the page, or press Clear, and the conversation is gone.
+
+## Connect Claude Desktop
+
+If you use Claude Desktop, you can ask it about your models directly. **Home → Connect Claude Desktop** has the download (the card only appears when your Atlas has one published).
+
+1. Download the Atlas extension and open the file. Claude Desktop asks you to install it.
+2. Enter the email and password you use for Atlas when it asks. The password is kept in your computer's secure storage.
+3. Ask a question in Claude Desktop, for example "Which of our systems support our most important capabilities?".
+
+- It is **read-only** and shows only what you can already see in Atlas, because it signs in as you.
+- It is **off until an organisation owner switches on Ask Atlas** (organisation settings). That switch covers connected apps too: while it is off, Claude Desktop is told your organisation has not turned on AI access and gets no model content.
+- Claude Desktop is your own choice of AI app, so what it reads goes to it and to its provider, not through Atlas's AI provider. Anything you copy out of a reply is yours to handle as you would any other Atlas data.
+- If you have more than one model, say which: "in the Council model, ...". Ask for a change by name to see a model as that change would leave it.
+- It needs Node.js 20 or later on your computer. If it says you are not signed in, check the email and password in the extension's settings.
+- **Check for updates** (off by default) makes it fetch one small version file when it starts, so it can tell you a newer download exists. It sends nothing about you or your models.
+
 ## Disposition (TIME)
 
 Each system can be marked **Tolerate**, **Invest**, **Migrate** or **Eliminate**; a module can set its own, but never takes its platform's. Unset reads **Not assessed**, never Tolerate. Elements and Portfolio show, sort and filter by it; the capability map can be coloured by it; spreadsheet capture reads a "TIME" or "Disposition" column. A system marked Migrate or Eliminate that nothing is retiring — no open change retires it, and it isn't already retiring — is a health finding on Home, linking to its project or offering to start one.

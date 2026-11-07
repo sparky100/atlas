@@ -22,7 +22,7 @@ export const FIT_FOR_PURPOSE_TONE: Record<FitForPurpose, ChipTone> = { excellent
  * reverse of the enum declaration order (`'poor' | 'adequate' | 'good' |
  * 'excellent'`), which is not itself a meaningful ordering.
  */
-export const FIT_FOR_PURPOSE_ORDER: Record<FitForPurpose, number> = { excellent: 0, good: 1, adequate: 2, poor: 3 };
+export { FIT_FOR_PURPOSE_ORDER } from '../../engine/elementRead/fitForPurpose';
 
 /** Whether an arbitrary string (e.g. from a `supports` edge's jsonb attributes) is a real `FitForPurpose` rating. */
 export function isFitForPurpose(value: string): value is FitForPurpose {

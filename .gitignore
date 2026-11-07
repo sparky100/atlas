@@ -19,6 +19,7 @@ supabase/.branches/
 # `pnpm functions:bundle:capture-run` right before a deploy, never
 # hand-edited, so never worth reviewing as a diff.
 supabase/functions/capture-run/index.ts
+supabase/functions/ask-model/index.ts
 
 # scoreCapture.ts --live's own raw cassette scratch output (SPEC-capture.md
 # §12.6) — reviewed by hand, then promoted into a fixture's own committed
@@ -30,3 +31,6 @@ supabase/functions/capture-run/index.ts
 *.log
 .vscode/*
 !.vscode/extensions.json
+
+# F16 / ADR-029: built by `pnpm mcp:bundle` (prebuild), never committed.
+public/downloads/

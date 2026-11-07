@@ -71,9 +71,24 @@ const DEFAULT_MAX_TOKENS = 1024;
 const VALID_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
 type Role = 'system' | 'user' | 'assistant';
+/** ADR-028 §3 (Ask Atlas), mirrors `src/contracts/llmProxy.ts` by hand: content is a string or a list of text / tool-call / tool-result blocks. */
+type ProxyBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  | { type: 'tool_result'; toolUseId: string; content: string; isError?: boolean };
 interface ProxyMessage {
   role: Role;
-  content: string;
+  content: string | ProxyBlock[];
+}
+interface ProxyTool {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+interface ProxyToolCall {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
 }
 interface ProxyOutputConfig {
   effort: string;
@@ -89,6 +104,53 @@ interface ProxyRequestBody {
   stream?: boolean;
   /** See this file's own module comment — the in-app help chat's own passthrough-streaming opt-in. */
   streamToClient?: boolean;
+  tools?: ProxyTool[];
+  toolChoice?: 'auto' | 'none';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeBlock(raw: unknown): ProxyBlock | null {
+  if (!isRecord(raw)) return null;
+  if (raw.type === 'text' && typeof raw.text === 'string') return raw.text.trim() === '' ? null : { type: 'text', text: raw.text };
+  if (raw.type === 'tool_use' && typeof raw.id === 'string' && typeof raw.name === 'string' && isRecord(raw.input)) return { type: 'tool_use', id: raw.id, name: raw.name, input: raw.input };
+  if (raw.type === 'tool_result' && typeof raw.toolUseId === 'string' && typeof raw.content === 'string') {
+    return { type: 'tool_result', toolUseId: raw.toolUseId, content: raw.content, ...(raw.isError === true ? { isError: true } : {}) };
+  }
+  return null;
+}
+
+function normalizeContent(content: unknown): string | ProxyBlock[] {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  const blocks: ProxyBlock[] = [];
+  for (const raw of content) {
+    const block = normalizeBlock(raw);
+    if (block) blocks.push(block);
+  }
+  return blocks;
+}
+
+function normalizeTools(raw: unknown): ProxyTool[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const tools: ProxyTool[] = [];
+  for (const t of raw) {
+    if (isRecord(t) && typeof t.name === 'string' && t.name !== '' && typeof t.description === 'string' && isRecord(t.inputSchema)) {
+      tools.push({ name: t.name, description: t.description, inputSchema: t.inputSchema });
+    }
+  }
+  return tools.length > 0 ? tools : undefined;
+}
+
+/** The provider wants snake_case block keys; the proxy contract uses camelCase. */
+function toProviderContent(content: string | ProxyBlock[]): string | Record<string, unknown>[] {
+  if (typeof content === 'string') return content;
+  return content.map((b) => {
+    if (b.type === 'tool_result') return { type: 'tool_result', tool_use_id: b.toolUseId, content: b.content, ...(b.isError ? { is_error: true } : {}) };
+    return b;
+  });
 }
 
 /** Same three-role collapse `src/contracts/llmProxy.ts`'s own `normalizeRole` uses — kept in sync by hand across the runtime boundary (see that file's own module comment). */
@@ -118,8 +180,8 @@ function normalizeRequest(raw: unknown): ProxyRequestBody | Response {
   const rawMessages = Array.isArray(r.messages) ? r.messages : [];
   const messages: ProxyMessage[] = rawMessages
     .filter((m): m is Record<string, unknown> => typeof m === 'object' && m !== null)
-    .map((m) => ({ role: normalizeRole(m.role), content: typeof m.content === 'string' ? m.content : '' }))
-    .filter((m) => m.content.trim() !== '');
+    .map((m) => ({ role: normalizeRole(m.role), content: normalizeContent(m.content) }))
+    .filter((m) => (typeof m.content === 'string' ? m.content.trim() !== '' : m.content.length > 0));
   if (messages.length === 0) {
     return jsonResponse({ status: 'error', message: 'At least one non-empty message is required.' }, 400);
   }
@@ -138,7 +200,15 @@ function normalizeRequest(raw: unknown): ProxyRequestBody | Response {
   if (streamToClient && (!stream || responseFormat !== 'text' || outputConfig !== undefined)) {
     return jsonResponse({ status: 'error', message: 'streamToClient requires stream: true, responseFormat: "text", and no outputConfig.' }, 400);
   }
-  return { messages, maxTokens, responseFormat, ...(outputConfig ? { outputConfig } : {}), cacheControl, stream, ...(streamToClient ? { streamToClient: true } : {}) };
+  const tools = normalizeTools(r.tools);
+  const toolChoice = tools && r.toolChoice === 'none' ? 'none' : undefined;
+  if (tools && outputConfig !== undefined) {
+    return jsonResponse({ status: 'error', message: 'tools cannot be combined with outputConfig.' }, 400);
+  }
+  if (streamToClient && tools && toolChoice !== 'none') {
+    return jsonResponse({ status: 'error', message: 'A streamed passthrough cannot carry tool calls; set toolChoice: "none".' }, 400);
+  }
+  return { messages, maxTokens, responseFormat, ...(outputConfig ? { outputConfig } : {}), cacheControl, stream, ...(streamToClient ? { streamToClient: true } : {}), ...(tools ? { tools } : {}), ...(toolChoice ? { toolChoice } : {}) };
 }
 
 interface AnthropicCallResult {
@@ -149,15 +219,16 @@ interface AnthropicCallResult {
   outputTokens: number;
   stopReason?: string;
   cacheReadTokens?: number;
+  toolCalls?: ProxyToolCall[];
 }
 
 /** Builds the upstream Messages API body — shared by the buffered and streaming paths so the two never drift on `system`/`output_config` shaping. */
 function buildAnthropicBody(request: ProxyRequestBody, model: string, stream: boolean): Record<string, unknown> {
   const systemText = request.messages
     .filter((m) => m.role === 'system')
-    .map((m) => m.content)
+    .map((m) => (typeof m.content === 'string' ? m.content : m.content.map((b) => (b.type === 'text' ? b.text : '')).join('')))
     .join('\n\n');
-  const userMessages = request.messages.filter((m) => m.role !== 'system').map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }));
+  const userMessages = request.messages.filter((m) => m.role !== 'system').map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: toProviderContent(m.content) }));
 
   // §6.4: "no timestamps, job ids or user names inside the system block" — this
   // proxy never adds any; a cache-controlled prefix here is only ever exactly
@@ -168,6 +239,10 @@ function buildAnthropicBody(request: ProxyRequestBody, model: string, stream: bo
       : systemText || undefined;
 
   const body: Record<string, unknown> = { model, system, messages: userMessages, max_tokens: request.maxTokens, stream };
+  if (request.tools) {
+    body.tools = request.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
+    if (request.toolChoice === 'none') body.tool_choice = { type: 'none' };
+  }
   if (request.outputConfig) {
     // `effort` is only honoured by a subset of models (Sonnet/Opus 4.6+,
     // Haiku 5.5+, Fable/Mythos); claude-haiku-4-5 rejects it with a 400
@@ -196,7 +271,10 @@ async function callAnthropicBuffered(request: ProxyRequestBody, apiKey: string, 
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Deno runtime, no shared type-checking with src/.
   const data = await upstream.json();
-  const contentBlocks: { type?: string; text?: string }[] = Array.isArray(data.content) ? data.content : [];
+  const contentBlocks: { type?: string; text?: string; id?: string; name?: string; input?: unknown }[] = Array.isArray(data.content) ? data.content : [];
+  const toolCalls: ProxyToolCall[] = contentBlocks
+    .filter((b) => b.type === 'tool_use' && typeof b.id === 'string' && typeof b.name === 'string')
+    .map((b) => ({ id: b.id as string, name: b.name as string, input: isRecord(b.input) ? b.input : {} }));
   const text = contentBlocks
     .filter((b) => b.type === 'text')
     .map((b) => b.text ?? '')
@@ -205,7 +283,7 @@ async function callAnthropicBuffered(request: ProxyRequestBody, apiKey: string, 
   const outputTokens = typeof data.usage?.output_tokens === 'number' ? data.usage.output_tokens : 0;
   const cacheReadTokens = typeof data.usage?.cache_read_input_tokens === 'number' ? data.usage.cache_read_input_tokens : undefined;
   const stopReason = typeof data.stop_reason === 'string' ? data.stop_reason : undefined;
-  return { ok: true, status: upstream.status, text, inputTokens, outputTokens, stopReason, cacheReadTokens };
+  return { ok: true, status: upstream.status, text, inputTokens, outputTokens, stopReason, cacheReadTokens, ...(toolCalls.length > 0 ? { toolCalls } : {}) };
 }
 
 /**
@@ -533,6 +611,7 @@ Deno.serve(async (req: Request) => {
         outputTokens: result.outputTokens,
         ...(result.stopReason !== undefined ? { stopReason: result.stopReason } : {}),
         ...(result.cacheReadTokens !== undefined ? { cacheReadTokens: result.cacheReadTokens } : {}),
+        ...(result.toolCalls ? { toolCalls: result.toolCalls } : {}),
       },
       200,
     );
