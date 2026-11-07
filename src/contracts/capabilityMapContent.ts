@@ -16,7 +16,7 @@
  */
 import { z } from 'zod';
 
-export const SECTORS = ['local_government_scotland', 'local_government_england', 'nhs', 'housing', 'hei', 'public_body', 'utility', 'electricity_network'] as const;
+export const SECTORS = ['local_government_scotland', 'local_government_england', 'nhs', 'housing', 'hei', 'public_body', 'utility', 'electricity_network', 'retail_energy'] as const;
 
 export type Sector = (typeof SECTORS)[number];
 
