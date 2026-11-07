@@ -363,7 +363,7 @@
       "confidence": 0.9
     },
     {
-      "name": "MHHS Data Integration Platform Adapter",
+      "name": "MHHS Settlement Gateway",
       "capability": "Smart Metering Data",
       "kind": "application",
       "lifecycle": "planned",
@@ -784,7 +784,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "Elexon (External: MHHS programme)",
       "description": "Central DIP for market-wide half-hourly settlement.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -798,7 +797,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "DCC (External: Smart Data Communications Company)",
       "description": "Smart metering communications network and data service.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -812,7 +810,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "Electralink (External: DTN operator)",
       "description": "Industry data flows (D-flows) between network operators and suppliers.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -826,7 +823,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "Gemserv (External: Electricity Central Online Enquiry Service)",
       "description": "Industry registration look-up service.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -840,7 +836,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "Ofgem (External: Energy regulator)",
       "description": "Regulatory data submissions and licence reporting.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -854,7 +849,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "NESO (External: National Energy System Operator)",
       "description": "Transmission-distribution coordination and outage planning data.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -1174,7 +1168,7 @@
       "confidence": 0.85
     },
     {
-      "from": "MHHS Data Integration Platform Adapter",
+      "from": "MHHS Settlement Gateway",
       "type": "flows_to",
       "to": "MHHS Data Integration Platform",
       "description": "publishes metering and network data to",
@@ -1185,7 +1179,7 @@
     {
       "from": "Meter Data Management",
       "type": "flows_to",
-      "to": "MHHS Data Integration Platform Adapter",
+      "to": "MHHS Settlement Gateway",
       "description": "provides half-hourly data to",
       "data_classification": "official_sensitive",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",

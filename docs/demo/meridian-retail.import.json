@@ -691,7 +691,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "MHHS programme (External: MHHS programme)",
       "description": "Central DIP for market-wide half-hourly settlement.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -705,7 +704,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "Smart Data Communications Company (External: Smart Data Communications Company)",
       "description": "Smart metering communications network and data service.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -719,7 +717,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "Electralink (External: Electralink)",
       "description": "Industry data flows (D-flows) between suppliers and networks.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -733,7 +730,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "Gemserv (External: Gemserv)",
       "description": "Industry registration look-up service.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -747,7 +743,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "Elexon (External: Elexon)",
       "description": "Settlement and Balancing and Settlement Code central systems.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -761,7 +756,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "Ofgem (External: Ofgem)",
       "description": "Regulatory data submissions and price cap reporting.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -775,7 +769,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "Xoserve (External: Xoserve)",
       "description": "Central data service for gas metering and switching.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -789,7 +782,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "Distribution network operators (External: Distribution network operators)",
       "description": "DNO registration and metering point data services.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
@@ -803,7 +795,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "business_owner": "Comparison websites (External: Comparison websites)",
       "description": "Uswitch, MoneySuperMarket and other comparison channels.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9

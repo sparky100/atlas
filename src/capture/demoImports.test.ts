@@ -54,6 +54,11 @@ describe.each(DEMOS)('demo import $file', ({ file, map }) => {
     expect(bad).toEqual([]);
   });
 
+  it('never names an external organisation as an owner (an external actor can only own with the service role, C20)', () => {
+    const external = raw.systems.flatMap((sys) => Object.entries(sys as unknown as Record<string, unknown>).filter(([k, v]) => k.endsWith('_owner') && typeof v === 'string' && v.includes('(External:')).map(([k]) => `${sys.name}.${k}`));
+    expect(external).toEqual([]);
+  });
+
   it('carries provenance on every entry', () => {
     for (const e of [...raw.systems, ...raw.relationships, ...raw.changes]) {
       expect(e.quote).toBeTruthy();
