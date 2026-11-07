@@ -7,7 +7,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts', 'src/**/*.property.test.ts', 'mcp/**/*.test.ts'],
-    exclude: ['src/**/*.integration.test.ts', 'node_modules/**'],
+    exclude: ['src/**/*.integration.test.ts', 'mcp/**/*.integration.test.ts', 'node_modules/**'],
     environment: 'node',
     globals: false,
     passWithNoTests: true,
