@@ -17,6 +17,7 @@ import { reportError } from '../errors/errorBannerStore';
 import { canCreateChangeBranch } from '../orgs/roleGates';
 import { supabase } from '../supabaseClient';
 import { copyLabel } from './copyLabel';
+import { canEditReport } from './reportAccess';
 import styles from './SavedReportsLibrary.module.css';
 
 export interface SavedReportsLibraryProps {
@@ -27,11 +28,7 @@ export interface SavedReportsLibraryProps {
   basePath: string;
 }
 
-function canEdit(report: SavedReportRow, userId: UUID | null, role: MemberRole | null): boolean {
-  if (userId === null) return false;
-  if (report.created_by === userId) return true;
-  return report.visibility === 'organisation' && (role === 'owner' || role === 'architect');
-}
+const canEdit = canEditReport;
 
 export function SavedReportsLibrary({ modelId, orgId, userId, role, basePath }: SavedReportsLibraryProps) {
   const [reports, setReports] = useState<SavedReportRow[]>([]);

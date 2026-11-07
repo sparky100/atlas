@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ReportResult } from '../../engine/reportQuery';
-import { reportCellText, reportFieldLabel, resultToTable, tableToCsv } from './reportTable';
+import { reportCellText, reportFieldLabel, resultToTable, tableToCsv, reportValueLabel } from './reportTable';
 
 const base: ReportResult = { columns: ['name', 'costCentre'], rows: [['Billing', 'A1'], ['CRM', null]], rowCount: 2, truncated: false, groups: [], unknownFields: [] };
 
@@ -13,7 +13,15 @@ describe('resultToTable', () => {
   });
   it('writes groups as value and count', () => {
     const grouped: ReportResult = { columns: ['name'], rows: [], rowCount: 3, truncated: false, groups: [{ value: 'active', count: 2 }, { value: null, count: 1 }], unknownFields: [] };
-    expect(resultToTable(grouped, { field: 'lifecycle' })).toEqual([['Lifecycle', 'Count'], ['active', '2'], ['', '1']]);
+    expect(resultToTable(grouped, { field: 'lifecycle' })).toEqual([['Lifecycle', 'Count'], ['Active', '2'], ['', '1']]);
+  });
+  it('shows stored keys as words a reader would use', () => {
+    expect(reportValueLabel('cost', '50k_250k')).toBe('£50k–£250k');
+    expect(reportValueLabel('disposition', 'eliminate')).toBe('Eliminate');
+    expect(reportValueLabel('kind', 'module')).toBe('Module');
+    expect(reportValueLabel('lifecycle', 'retiring')).toBe('Retiring');
+    expect(reportValueLabel('costCentre', 'a_1')).toBe('a_1');
+    expect(reportValueLabel('cost', null)).toBe('');
   });
   it('writes a count result as one number', () => {
     expect(resultToTable({ columns: ['name'], rows: [], rowCount: 7, truncated: false, groups: [], unknownFields: [] })).toEqual([['Rows'], ['7']]);

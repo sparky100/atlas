@@ -5,30 +5,54 @@
  * `ReportResult`, so a saved copy renders through the same component from its
  * stored rows.
  */
-import type { ReportSpec } from '../../contracts/reportSpec';
+import type { ReportSpec, ReportValue } from '../../contracts/reportSpec';
 import type { ReportResult } from '../../engine/reportQuery';
 import { BarChart } from '../charts/BarChart';
 import { BigNumber } from '../charts/BigNumber';
 import { DonutChart } from '../charts/DonutChart';
 import { StackedBarChart } from '../charts/StackedBarChart';
 import { Text } from '../components/Text/Text';
-import { reportCellText, reportFieldLabel } from './reportTable';
+import type { ReportDrill } from './reportDrill';
+import { reportFieldLabel, reportValueLabel, reportValueScale } from './reportTable';
 import styles from './ReportResultView.module.css';
 
-export function ReportChart({ result, spec }: { result: ReportResult; spec: ReportSpec }) {
-  if (spec.groupBy === undefined || result.groups.length === 0) return null;
-  const by = reportFieldLabel(spec.groupBy).toLowerCase();
-  const title = spec.splitBy === undefined ? `Rows by ${by}` : `Rows by ${by}, split by ${reportFieldLabel(spec.splitBy).toLowerCase()}`;
-  if (spec.presentation.kind === 'donut') return <DonutChart groups={result.groups} title={title} unit="rows" />;
-  return spec.splitBy === undefined ? <BarChart groups={result.groups} title={title} /> : <StackedBarChart groups={result.groups} title={title} />;
+/** Called when a chart mark is clicked, with the value(s) it stands for; the page narrows to those rows. */
+export type OnDrill = (drills: ReportDrill[]) => void;
+
+export function ReportChart({ result, spec, onDrill }: { result: ReportResult; spec: ReportSpec; onDrill?: OnDrill | undefined }) {
+  const { groupBy, splitBy } = spec;
+  if (groupBy === undefined || result.groups.length === 0) return null;
+  const by = reportFieldLabel(groupBy).toLowerCase();
+  const title = splitBy === undefined ? `Rows by ${by}` : `Rows by ${by}, split by ${reportFieldLabel(splitBy).toLowerCase()}`;
+  const byGroup = onDrill === undefined ? undefined : (value: ReportValue) => {
+    onDrill([{ field: groupBy, value }]);
+  };
+  const groupScale = reportValueScale(groupBy);
+  if (spec.presentation.kind === 'donut') return <DonutChart groups={result.groups} title={title} unit="rows" onSelect={byGroup} scale={groupScale} />;
+  if (splitBy === undefined) return <BarChart groups={result.groups} title={title} onSelect={byGroup} scale={groupScale} />;
+  return (
+    <StackedBarChart
+      groups={result.groups}
+      title={title}
+      groupScale={groupScale}
+      splitScale={reportValueScale(splitBy)}
+      onSelect={
+        onDrill === undefined
+          ? undefined
+          : (group, split) => {
+              onDrill(split === undefined ? [{ field: groupBy, value: group }] : [{ field: groupBy, value: group }, { field: splitBy, value: split }]);
+            }
+      }
+    />
+  );
 }
 
 /** The rows of a result as a table, with the "attribute removed" and "showing N of M" notes. */
-export function ResultTable({ result }: { result: ReportResult }) {
+export function ResultTable({ result, compact = false }: { result: ReportResult; compact?: boolean }) {
   const removed = new Set(result.unknownFields);
   return (
     <div className={styles.scroll}>
-      <table className={styles.table}>
+      <table className={compact ? [styles.table, styles.compact].join(' ') : styles.table}>
         <thead>
           <tr>
             {result.columns.map((c) => (
@@ -43,7 +67,7 @@ export function ResultTable({ result }: { result: ReportResult }) {
           {result.rows.map((row, i) => (
             <tr key={i}>
               {row.map((cell, j) => (
-                <td key={j}>{reportCellText(cell)}</td>
+                <td key={j}>{reportValueLabel(result.columns[j] ?? '', cell)}</td>
               ))}
             </tr>
           ))}
@@ -63,7 +87,7 @@ export function ResultTable({ result }: { result: ReportResult }) {
   );
 }
 
-export function ReportResultView({ result, spec }: { result: ReportResult; spec: ReportSpec }) {
+export function ReportResultView({ result, spec, onDrill }: { result: ReportResult; spec: ReportSpec; onDrill?: OnDrill | undefined }) {
   const kind = spec.presentation.kind;
   const summary = <BigNumber label={result.rowCount === 1 ? 'Row matches' : 'Rows match'} value={result.rowCount} />;
 
@@ -72,14 +96,14 @@ export function ReportResultView({ result, spec }: { result: ReportResult; spec:
     return (
       <div className={styles.stack}>
         {summary}
-        <ReportChart result={result} spec={spec} />
+        <ReportChart result={result} spec={spec} onDrill={onDrill} />
       </div>
     );
   }
   return (
     <div className={styles.stack}>
       {summary}
-      <ReportChart result={result} spec={spec} />
+      <ReportChart result={result} spec={spec} onDrill={onDrill} />
       <ResultTable result={result} />
     </div>
   );

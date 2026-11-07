@@ -1,6 +1,7 @@
 import type { Preview } from '@storybook/react-vite';
 import { useEffect } from 'react';
 import '../src/ui/styles/tokens.css';
+import '../src/ui/styles/chartTokens.css';
 import '../src/ui/styles/global.css';
 
 // Every story reviews against the real design tokens, not Storybook's own

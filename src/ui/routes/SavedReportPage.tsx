@@ -91,7 +91,7 @@ export function SavedReportPage({ kind }: { kind: 'report' | 'copy' }) {
     if (report.status === 'missing') return chrome('Report', <Text as="p">This report doesn't exist, or you can't see it.</Text>);
     return chrome(
       report.value.name,
-      <SavedReportView report={report.value} modelName={model.name} orgId={organisation.id} modelId={model.id} userId={userId} role={role} main={{ branchId: mainBranch.id, headCommitId: mainBranch.head_commit_id }} basePath={basePath} />,
+      <SavedReportView report={report.value} modelName={model.name} orgId={organisation.id} modelId={model.id} userId={userId} role={role} main={{ branchId: mainBranch.id, headCommitId: mainBranch.head_commit_id }} basePath={basePath} onReportChanged={(next) => { setReport({ status: 'ready', value: next }); }} />,
     );
   }
   if (copy.status === 'loading') return chrome('Saved copy', <Text tone="muted">Loading…</Text>);

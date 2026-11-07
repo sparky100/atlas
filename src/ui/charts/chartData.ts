@@ -37,6 +37,15 @@ function isUnset(value: ReportValue): boolean {
   return value === null || value === '';
 }
 
+/** Turns a stored value into its display label (e.g. `50k_250k` → "£50k–£250k"). Defaults to the value as text. */
+export type ValueFormat = (value: ReportValue) => string;
+
+/** How a field's values read and line up: a display label, and for an ordered scale (lifecycle, criticality, cost bands, fit) the order to show them in instead of largest first. */
+export interface ValueScale {
+  format?: ValueFormat | undefined;
+  order?: readonly ReportValue[] | undefined;
+}
+
 function labelOf(value: ReportValue): string {
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   return String(value);
@@ -47,21 +56,33 @@ function labelOf(value: ReportValue): string {
  * first (ties by value), "Other" then "Not set" last. `maxSlots` caps the
  * coloured categories (default eight).
  */
-export function chartCategories(items: readonly { value: ReportValue; count: number }[], maxSlots: number = CHART_SLOT_COUNT): ChartCategory[] {
-  const named = items.filter((i) => !isUnset(i.value)).sort((a, b) => b.count - a.count || compareReportValues(a.value, b.value));
+export function chartCategories(items: readonly { value: ReportValue; count: number }[], maxSlots: number = CHART_SLOT_COUNT, scale: ValueScale = {}): ChartCategory[] {
+  const format = scale.format ?? labelOf;
+  const order = scale.order;
+  const rank = (v: ReportValue) => {
+    const i = order === undefined ? -1 : order.indexOf(v);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  // An ordered scale reads in its own order (values off the scale follow, largest first); anything else, largest first.
+  const named = items.filter((i) => !isUnset(i.value)).sort((a, b) => (order === undefined ? 0 : rank(a.value) - rank(b.value)) || b.count - a.count || compareReportValues(a.value, b.value));
   const unsetCount = items.filter((i) => isUnset(i.value)).reduce((sum, i) => sum + i.count, 0);
   const folds = named.length > maxSlots;
   const kept = folds ? named.slice(0, maxSlots - 1) : named;
   const otherCount = folds ? named.slice(maxSlots - 1).reduce((sum, i) => sum + i.count, 0) : 0;
 
-  // Slots by alphabetical order of what is kept, so a colour belongs to the category.
-  const alphabetical = [...kept].sort((a, b) => compareReportValues(a.value, b.value));
+  // Slots by alphabetical order of what is kept (scale order for a scale), so a colour belongs to the category.
+  const alphabetical = order === undefined ? [...kept].sort((a, b) => compareReportValues(a.value, b.value)) : kept;
   const slotOf = new Map<ReportValue, number>(alphabetical.map((item, index) => [item.value, index + 1]));
 
-  const categories: ChartCategory[] = kept.map((item) => ({ key: `v:${typeof item.value}:${String(item.value)}`, label: labelOf(item.value), count: item.count, kind: 'slot', slot: slotOf.get(item.value) ?? null, value: item.value }));
+  const categories: ChartCategory[] = kept.map((item) => ({ key: `v:${typeof item.value}:${String(item.value)}`, label: format(item.value), count: item.count, kind: 'slot', slot: slotOf.get(item.value) ?? null, value: item.value }));
   if (otherCount > 0) categories.push({ key: OTHER_KEY, label: 'Other', count: otherCount, kind: 'other', slot: null, value: null });
   if (unsetCount > 0) categories.push({ key: UNSET_KEY, label: 'Not set', count: unsetCount, kind: 'unset', slot: null, value: null });
   return categories;
+}
+
+/** Whether a click on this category can be narrowed to its rows: a real value or "Not set", never the folded "Other". */
+export function isDrillable(category: Pick<ChartCategory, 'kind'>): boolean {
+  return category.kind !== 'other';
 }
 
 /** The CSS colour for a category: a categorical token, or a neutral. */
@@ -87,8 +108,8 @@ function round(value: number, places: number): number {
 }
 
 /** Ranked bars for a one-level grouping. */
-export function chartBars(groups: readonly ReportGroup[]): ChartBar[] {
-  const categories = chartCategories(groups);
+export function chartBars(groups: readonly ReportGroup[], scale?: ValueScale): ChartBar[] {
+  const categories = chartCategories(groups, CHART_SLOT_COUNT, scale);
   const total = categories.reduce((sum, c) => sum + c.count, 0);
   const max = Math.max(1, ...categories.map((c) => c.count));
   return categories.map((c) => ({ key: c.key, label: c.label, count: c.count, percent: total === 0 ? 0 : round((c.count / total) * 100, 1), fraction: round(c.count / max, 4), category: c }));
@@ -105,6 +126,8 @@ export interface StackedSegment {
 export interface StackedBar {
   key: string;
   label: string;
+  /** The grouping category this bar stands for (its value, for click-through). */
+  category: ChartCategory;
   total: number;
   segments: StackedSegment[];
 }
@@ -116,16 +139,16 @@ export interface StackedChart {
 }
 
 /** Stacked bars for a grouping with `parts`. The split categories (and so colours) are decided over the whole chart, then each bar's parts are mapped onto them. */
-export function chartStacked(groups: readonly ReportGroup[]): StackedChart {
+export function chartStacked(groups: readonly ReportGroup[], groupScale?: ValueScale, splitScale?: ValueScale): StackedChart {
   const overall = new Map<ReportValue, number>();
   for (const g of groups) for (const p of g.parts ?? []) overall.set(p.value, (overall.get(p.value) ?? 0) + p.count);
-  const legend = chartCategories([...overall.entries()].map(([value, count]) => ({ value, count })));
+  const legend = chartCategories([...overall.entries()].map(([value, count]) => ({ value, count })), CHART_SLOT_COUNT, splitScale);
   const keptSlots = new Map<ReportValue, ChartCategory>();
   for (const c of legend) if (c.kind === 'slot') keptSlots.set(c.value, c);
   const other = legend.find((c) => c.kind === 'other');
   const unset = legend.find((c) => c.kind === 'unset');
 
-  const barCategories = chartCategories(groups);
+  const barCategories = chartCategories(groups, CHART_SLOT_COUNT, groupScale);
   const max = Math.max(1, ...barCategories.map((c) => c.count));
   const bars: StackedBar[] = barCategories.map((barCat) => {
     // "Other" and "Not set" bars aggregate their members' parts.
@@ -150,7 +173,7 @@ export function chartStacked(groups: readonly ReportGroup[]): StackedChart {
       segments.push({ category: cat, count, start: round(start, 4), width });
       start += width;
     }
-    return { key: barCat.key, label: barCat.label, total: barCat.count, segments };
+    return { key: barCat.key, label: barCat.label, category: barCat, total: barCat.count, segments };
   });
   return { legend, bars };
 }
@@ -181,8 +204,8 @@ function ringPath(outer: number, inner: number, from: number, to: number): strin
 }
 
 /** Donut slices for a one-level grouping, with a small gap between neighbours. */
-export function chartDonut(groups: readonly ReportGroup[], outer = 50, inner = 32): DonutSlice[] {
-  const categories = chartCategories(groups);
+export function chartDonut(groups: readonly ReportGroup[], outer = 50, inner = 32, scale?: ValueScale): DonutSlice[] {
+  const categories = chartCategories(groups, CHART_SLOT_COUNT, scale);
   const total = categories.reduce((sum, c) => sum + c.count, 0);
   if (total === 0) return [];
   const gap = categories.length > 1 ? 0.02 : 0;

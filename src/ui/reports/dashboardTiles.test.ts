@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { REPORT_SPEC_VERSION, type ReportSpec } from '../../contracts/reportSpec';
-import { canEditDashboard, nextTilePosition, reportsOfferableTo, specForTile, suggestedTileKind, swapTilePositions, tileColumnSpan, tileKindsFor } from './dashboardTiles';
+import { canEditDashboard, kpiBaseline, nextTilePosition, reportsOfferableTo, specForTile, suggestedTileKind, swapTilePositions, tileColumnSpan, tileKindsFor } from './dashboardTiles';
 
 const base: ReportSpec = { specVersion: REPORT_SPEC_VERSION, source: 'elements', filters: [{ field: 'type', operator: 'eq', value: 'system' }], columns: ['name'], sort: [{ field: 'name', direction: 'asc' }], presentation: { kind: 'table' } };
 const grouped: ReportSpec = { ...base, groupBy: 'lifecycle', presentation: { kind: 'barByField' } };
@@ -96,5 +96,19 @@ describe('canEditDashboard', () => {
     expect(canEditDashboard(d('u1', 'organisation'), 'u2', 'architect')).toBe(true);
     expect(canEditDashboard(d('u1', 'organisation'), 'u2', 'contributor')).toBe(false);
     expect(canEditDashboard(d('u1', 'organisation'), null, 'owner')).toBe(false);
+  });
+});
+
+describe('kpiBaseline', () => {
+  it('measures a big number against the same kind of thing, before the other filters', () => {
+    const rows = [
+      { id: '1', elementType: 'system', owner: null },
+      { id: '2', elementType: 'system', owner: 'IT' },
+      { id: '3', elementType: 'container', owner: null },
+    ];
+    const spec = { specVersion: 1 as const, source: 'portfolio' as const, filters: [{ field: 'elementType', operator: 'neq' as const, value: 'container' }, { field: 'owner', operator: 'isEmpty' as const, value: null }], columns: ['id'], sort: [], presentation: { kind: 'count' as const } };
+    expect(kpiBaseline(spec, rows)).toEqual({ total: 2, noun: 'applications' });
+    expect(kpiBaseline({ ...spec, filters: [] }, rows)).toEqual({ total: 3, noun: 'portfolio items' });
+    expect(kpiBaseline({ ...spec, source: 'elements', filters: [{ field: 'type', operator: 'eq', value: 'system' }] }, [{ id: 'a', type: 'system' }, { id: 'b', type: 'capability' }])).toEqual({ total: 1, noun: 'systems' });
   });
 });
