@@ -92,6 +92,17 @@ Two levels only: **private** (the creator) and **organisation** (every member of
 
 4. **Deleting a saved copy** is allowed, as proposed: the person who took it, or an organisation owner or architect for an organisation-visible copy, after a confirmation that says it cannot be undone (the human, 2026-11-06: "yes" to going ahead on this basis).
 
+## Follow-up (2026-11-07): every capability reachable from the UI
+
+Found in review: nothing let a user set `groupBy`, `splitBy`, a non-table presentation or a table `limit`, so bar, donut and stacked-bar tiles could not be reached. Added, with no change to the spec format, the tables or `specVersion`:
+
+- **Report settings** on a saved report's page edit its presentation, grouping, split, row limit, description and (owner/architect) visibility, through the existing `updateSavedReport`. The contract's own `parseReportSpec` validates the result before it is stored.
+- The Elements and Portfolio pages still show only flat tables. Opening a charted report there opens its question (filters, columns, sort) and sets the chart settings aside; **Save changes** writes the page's question back with the stored settings re-applied (`src/ui/reports/reportShape.ts`).
+- **Click-through:** a chart mark opens the report narrowed to the matching rows. The narrowing lives in the URL (`?f=field&v=json`), is never saved, and adds `eq`/`isEmpty` filters on top of the report's own (`src/ui/reports/reportDrill.ts`). Saving a copy is not offered while narrowed.
+- Dashboard edit mode can change a tile's kind and a table tile's row count (both already columns on `dashboard_tiles`).
+
+Still not reachable, and said so in the app: reports over `relationships` and `findings` (no source adapter yet), and so the finding-count tile.
+
 ## Still open
 
 Nothing.

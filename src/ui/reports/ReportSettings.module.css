@@ -1,0 +1,43 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.select,
+.input {
+  min-height: 2rem;
+  padding: 0 var(--space-2);
+}
+
+.input {
+  width: 6rem;
+}
+
+.textarea {
+  max-width: 40rem;
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}

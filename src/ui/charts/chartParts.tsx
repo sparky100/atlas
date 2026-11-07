@@ -1,5 +1,4 @@
-/** Shared pieces of the chart components: the data table every chart carries for screen readers, and the legend. */
-import { categoryColour, type ChartCategory } from './chartData';
+/** Shared pieces of the chart components: the data table every chart carries for screen readers. */
 import styles from './charts.module.css';
 
 export function ChartTable({ caption, rows }: { caption: string; rows: readonly { label: string; count: number }[] }) {
@@ -21,19 +20,5 @@ export function ChartTable({ caption, rows }: { caption: string; rows: readonly 
         ))}
       </tbody>
     </table>
-  );
-}
-
-export function ChartLegend({ items }: { items: readonly (ChartCategory & { note?: string })[] }) {
-  return (
-    <ul className={styles.legend}>
-      {items.map((c) => (
-        <li key={c.key} className={styles.legendItem}>
-          <span className={styles.swatch} style={{ background: categoryColour(c) }} aria-hidden="true" />
-          <span>{c.label}</span>
-          <span className={styles.valueMuted}>{c.note ?? String(c.count)}</span>
-        </li>
-      ))}
-    </ul>
   );
 }

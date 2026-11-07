@@ -7,7 +7,7 @@
  * (rule 3).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { parseReportSpec, type ReportSource } from '../../contracts/reportSpec';
 import { addDashboardTile, deleteDashboard, listDashboardTiles, listSavedReports, removeDashboardTile, updateDashboard, updateDashboardTile } from '../../db/reports';
@@ -20,7 +20,7 @@ import { Text } from '../components/Text/Text';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 import { DashboardTileCard } from './DashboardTileCard';
-import { canEditDashboard, nextTilePosition, reportsOfferableTo, suggestedTileKind, swapTilePositions, tileColumnSpan, tileKindsFor, TILE_KIND_LABEL } from './dashboardTiles';
+import { canEditDashboard, DEFAULT_TABLE_TILE_ROWS, nextTilePosition, reportsOfferableTo, suggestedTileKind, swapTilePositions, tileColumnSpan, tileKindsFor, TILE_KIND_LABEL } from './dashboardTiles';
 import { ReportRunner } from './ReportRunner';
 import styles from './Dashboard.module.css';
 
@@ -37,6 +37,8 @@ export interface DashboardViewProps {
 }
 
 const SIZE_LABEL: Record<DashboardTileSize, string> = { one: 'One column', two: 'Two columns', full: 'Full width' };
+/** ADR-027: a table tile shows 1 to 50 rows. */
+const TABLE_TILE_ROW_CHOICES = [3, 5, 10, 15, 25, 50] as const;
 
 export function DashboardView({ dashboard, orgId, modelId, modelName, userId, role, main, basePath, onChanged }: DashboardViewProps) {
   const navigate = useNavigate();
@@ -205,6 +207,39 @@ export function DashboardView({ dashboard, orgId, modelId, modelName, userId, ro
                         {editing && (
                           <div className={styles.tileControls}>
                             <select
+                              aria-label="Show as"
+                              className={styles.select}
+                              value={tile.kind}
+                              onChange={(e) => {
+                                void attempt(() => updateDashboardTile(supabase, tile.id, { kind: e.target.value as DashboardTileKind }), "Couldn't change the tile.");
+                              }}
+                            >
+                              {(() => {
+                                const p = specs.get(tile.report_id);
+                                return (p?.ok ? tileKindsFor(p.spec) : [tile.kind]).map((k) => (
+                                  <option key={k} value={k}>
+                                    {TILE_KIND_LABEL[k]}
+                                  </option>
+                                ));
+                              })()}
+                            </select>
+                            {tile.kind === 'table' && (
+                              <select
+                                aria-label="Rows shown"
+                                className={styles.select}
+                                value={tile.row_limit ?? DEFAULT_TABLE_TILE_ROWS}
+                                onChange={(e) => {
+                                  void attempt(() => updateDashboardTile(supabase, tile.id, { rowLimit: Number(e.target.value) }), "Couldn't change the tile.");
+                                }}
+                              >
+                                {TABLE_TILE_ROW_CHOICES.map((n) => (
+                                  <option key={n} value={n}>
+                                    {n} rows
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            <select
                               aria-label="Tile size"
                               className={styles.select}
                               value={tile.size}
@@ -262,11 +297,12 @@ export function DashboardView({ dashboard, orgId, modelId, modelName, userId, ro
           <Text as="h2" size="lg">
             Add a tile
           </Text>
-          {offerable.length === 0 ? (
+          {offerable.length === 0 && (
             <Text as="p" tone="muted">
               {dashboard.visibility === 'organisation' ? 'A dashboard shared with the organisation can only show reports shared with the organisation. Share a report first.' : 'Save a report from the Elements or Portfolio page first.'}
             </Text>
-          ) : (
+          )}
+          {offerable.length > 0 && (
             <form
               className={styles.row}
               onSubmit={(e) => {
@@ -334,6 +370,12 @@ export function DashboardView({ dashboard, orgId, modelId, modelName, userId, ro
                 Add tile
               </Button>
             </form>
+          )}
+          {addSpec?.ok && addSpec.spec.groupBy === undefined && (
+            <Text as="p" size="sm" tone="muted">
+              This report has no grouping, so it can only be a big number or a table. To show it as a bar chart, donut or stacked bar,{' '}
+              <Link to={`${basePath}/reports/saved/${add.reportId}`}>open the report</Link> and choose "Edit report settings…" to group it by a field.
+            </Text>
           )}
 
           <Text as="h2" size="lg">

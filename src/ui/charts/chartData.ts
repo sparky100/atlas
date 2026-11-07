@@ -64,6 +64,11 @@ export function chartCategories(items: readonly { value: ReportValue; count: num
   return categories;
 }
 
+/** Whether a click on this category can be narrowed to its rows: a real value or "Not set", never the folded "Other". */
+export function isDrillable(category: Pick<ChartCategory, 'kind'>): boolean {
+  return category.kind !== 'other';
+}
+
 /** The CSS colour for a category: a categorical token, or a neutral. */
 export function categoryColour(category: Pick<ChartCategory, 'kind' | 'slot'>): string {
   if (category.kind === 'slot' && category.slot !== null) return `var(--chart-${String(category.slot)})`;
@@ -105,6 +110,8 @@ export interface StackedSegment {
 export interface StackedBar {
   key: string;
   label: string;
+  /** The grouping category this bar stands for (its value, for click-through). */
+  category: ChartCategory;
   total: number;
   segments: StackedSegment[];
 }
@@ -150,7 +157,7 @@ export function chartStacked(groups: readonly ReportGroup[]): StackedChart {
       segments.push({ category: cat, count, start: round(start, 4), width });
       start += width;
     }
-    return { key: barCat.key, label: barCat.label, total: barCat.count, segments };
+    return { key: barCat.key, label: barCat.label, category: barCat, total: barCat.count, segments };
   });
   return { legend, bars };
 }

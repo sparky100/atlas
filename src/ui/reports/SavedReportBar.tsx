@@ -12,13 +12,15 @@
 import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { parseReportSpec, type ReportSource, type ReportSpec } from '../../contracts/reportSpec';
-import { createSavedReport, listSavedReports } from '../../db/reports';
+import { createSavedReport, listSavedReports, updateSavedReport } from '../../db/reports';
 import type { MemberRole, SavedReportRow } from '../../db/types';
 import { Button } from '../components/Button/Button';
 import { Text } from '../components/Text/Text';
 import { reportError } from '../errors/errorBannerStore';
 import { canCreateChangeBranch } from '../orgs/roleGates';
 import { supabase } from '../supabaseClient';
+import { canEditReport } from './reportAccess';
+import { applyShape, shapeOfSpec, withoutShape } from './reportShape';
 import styles from './SavedReportBar.module.css';
 
 export type CurrentSpec = { ok: true; spec: ReportSpec } | { ok: false; reason: string };
@@ -44,6 +46,8 @@ export function SavedReportBar({ source, modelId, orgId, userId, role, current, 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  /** The report last opened into the page, so its filters can be saved back to it (keeping its chart settings). */
+  const [openedId, setOpenedId] = useState<UUID | null>(null);
 
   const canSave = userId !== null && canCreateChangeBranch(role);
   const canShare = role === 'owner' || role === 'architect';
@@ -76,7 +80,35 @@ export function SavedReportBar({ source, modelId, orgId, userId, role, current, 
       setMessage(parsed.error);
       return;
     }
-    setMessage(onOpen(parsed.spec));
+    // The page shows only the question (filters, columns, sort); a chart or row limit is set aside here and kept on "Save changes".
+    const refused = onOpen(withoutShape(parsed.spec));
+    setMessage(refused);
+    setOpenedId(refused === null ? report.id : null);
+  }
+
+  const opened = reports.find((r) => r.id === openedId) ?? null;
+  const openedSpec = opened === null ? null : parseReportSpec(opened.spec);
+  const canUpdateOpened = opened !== null && openedSpec !== null && openedSpec.ok && canEditReport(opened, userId, role);
+
+  async function saveChanges(): Promise<void> {
+    if (!current.ok || opened === null || !openedSpec?.ok) return;
+    const merged = applyShape(current.spec, shapeOfSpec(openedSpec.spec));
+    if (!merged.ok) {
+      setMessage(merged.reason);
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      await updateSavedReport(supabase, opened.id, { spec: merged.spec });
+      setMessage(`Saved changes to “${opened.name}”.`);
+      setReloadToken((t) => t + 1);
+    } catch (e: unknown) {
+      reportError("Couldn't save changes to the report.", e);
+      setMessage(e instanceof Error ? e.message : "Couldn't save changes to the report.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function save(): Promise<void> {
@@ -135,6 +167,11 @@ export function SavedReportBar({ source, modelId, orgId, userId, role, current, 
           <Button disabled={selectedId === ''} onClick={open}>
             Open
           </Button>
+          {canUpdateOpened && (
+            <Button variant="primary" disabled={busy || !current.ok} onClick={() => void saveChanges()}>
+              Save changes to “{opened.name}”
+            </Button>
+          )}
         </div>
       )}
       {canSave && !saving && (

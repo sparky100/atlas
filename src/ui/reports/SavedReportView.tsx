@@ -5,7 +5,7 @@
  * `REPORT_SNAPSHOT_ROW_CAP` rows and refused (never truncated) beyond it.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { parseReportSpec, type ReportRow, type ReportSpec } from '../../contracts/reportSpec';
 import { reportFitsSnapshot, runReport } from '../../engine/reportQuery';
@@ -20,6 +20,9 @@ import { reportExportPlan } from '../exports/dashboardExport';
 import { ReportDownloadButtons } from './ReportDownloadButtons';
 import { ReportResultView } from './ReportResultView';
 import { ReportRunner } from './ReportRunner';
+import { ReportSettings } from './ReportSettings';
+import { drilledSpec, drillLabel, drillSearch, parseDrill } from './reportDrill';
+import { canEditReport, canShareReport } from './reportAccess';
 import { resultToTable } from './reportTable';
 import { formatCopyDate, shortCommit } from './copyLabel';
 import styles from './SavedReportView.module.css';
@@ -34,9 +37,11 @@ export interface SavedReportViewProps {
   main: { branchId: UUID; headCommitId: UUID };
   /** `/o/:org/m/:model` */
   basePath: string;
+  /** Called with the report as stored after its settings are edited here. */
+  onReportChanged?: ((report: SavedReportRow) => void) | undefined;
 }
 
-export function SavedReportView({ report, modelName, orgId, modelId, userId, role, main, basePath }: SavedReportViewProps) {
+export function SavedReportView({ report, modelName, orgId, modelId, userId, role, main, basePath, onReportChanged }: SavedReportViewProps) {
   const parsed = useMemo(() => parseReportSpec(report.spec), [report.spec]);
   if (!parsed.ok) {
     return (
@@ -57,14 +62,19 @@ export function SavedReportView({ report, modelName, orgId, modelId, userId, rol
       </Text>
       <ReportRunner key={main.headCommitId} source={parsed.spec.source} modelId={modelId} orgId={orgId} commitId={main.headCommitId}>
         {(rows, knownFields) => (
-          <Loaded report={report} spec={parsed.spec} rows={rows} knownFields={knownFields} modelName={modelName} orgId={orgId} modelId={modelId} userId={userId} role={role} main={main} basePath={basePath} />
+          <Loaded report={report} spec={parsed.spec} rows={rows} knownFields={knownFields} modelName={modelName} orgId={orgId} modelId={modelId} userId={userId} role={role} main={main} basePath={basePath} onReportChanged={onReportChanged} />
         )}
       </ReportRunner>
     </div>
   );
 }
 
-function Loaded({ report, spec, rows, knownFields, modelName, orgId, modelId, userId, role, main, basePath }: SavedReportViewProps & { spec: ReportSpec; rows: readonly ReportRow[]; knownFields: readonly string[] }) {
+function Loaded({ report, spec: savedSpec, rows, knownFields, modelName, orgId, modelId, userId, role, main, basePath, onReportChanged }: SavedReportViewProps & { spec: ReportSpec; rows: readonly ReportRow[]; knownFields: readonly string[] }) {
+  // A click-through from a chart (here or on a dashboard) narrows the report to those rows; it lives in the URL only.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const drills = useMemo(() => parseDrill(searchParams), [searchParams]);
+  const drilled = drills.length > 0;
+  const spec = useMemo(() => (drilled ? drilledSpec(savedSpec, drills) : savedSpec), [drilled, savedSpec, drills]);
   const result = useMemo(() => runReport(rows, spec, { knownFields }), [rows, spec, knownFields]);
   const table = useMemo(() => resultToTable(result, spec.groupBy === undefined ? undefined : { field: spec.groupBy }), [result, spec.groupBy]);
   const [copies, setCopies] = useState<ReportSnapshotRow[]>([]);
@@ -129,13 +139,31 @@ function Loaded({ report, spec, rows, knownFields, modelName, orgId, modelId, us
             return { plan: reportExportPlan(report.name, spec, result, stamp), stamp };
           }}
         />
-        {canCopy && (
+        {canCopy && !drilled && (
           <Button variant="primary" disabled={busy || !fits} onClick={() => void saveCopy()}>
             Save a copy now
           </Button>
         )}
       </div>
-      {!fits && (
+      {drilled && (
+        <div className={styles.drill} role="status">
+          <Text size="sm">
+            Showing only rows where {drillLabel(drills)}.
+          </Text>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setSearchParams(new URLSearchParams());
+            }}
+          >
+            Show the whole report
+          </Button>
+        </div>
+      )}
+      {!drilled && canEditReport(report, userId, role) && onReportChanged !== undefined && (
+        <ReportSettings key={`${report.id}:${JSON.stringify(report.spec)}`} report={report} spec={savedSpec} knownFields={knownFields} canShare={canShareReport(role)} onSaved={onReportChanged} />
+      )}
+      {!fits && !drilled && (
         <Text as="p" size="sm" tone="muted">
           This result has more than 5,000 rows, which is too many to keep as a copy. Narrow the report's filter to save one.
         </Text>
@@ -145,7 +173,13 @@ function Loaded({ report, spec, rows, knownFields, modelName, orgId, modelId, us
           {message}
         </Text>
       )}
-      <ReportResultView result={result} spec={spec} />
+      <ReportResultView
+        result={result}
+        spec={spec}
+        onDrill={(next) => {
+          setSearchParams(new URLSearchParams(drillSearch(next)));
+        }}
+      />
       <Text as="h2" size="lg">
         Saved copies
       </Text>

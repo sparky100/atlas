@@ -217,3 +217,155 @@ button.donutSlice {
     grid-row: 2;
   }
 }
+
+/* Interaction (F14 follow-up): hover/focus highlight one category and dim the rest; clickable marks open the rows behind them. */
+.clickable {
+  cursor: pointer;
+}
+
+.dimmed {
+  opacity: 0.35;
+}
+
+.raised {
+  filter: brightness(1.06);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dimmed,
+  .donutSlice,
+  .legendRow,
+  .legendItem {
+    transition: opacity 150ms ease-out;
+  }
+
+  .fill {
+    animation: chart-grow 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    transform-origin: left center;
+  }
+
+  .donut {
+    animation: chart-fade 360ms ease-out both;
+  }
+}
+
+@keyframes chart-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes chart-fade {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.donutSlice:focus-visible,
+button.segment:focus-visible,
+.legendRow:focus-visible,
+.labelButton:focus-visible {
+  outline: var(--border-width-emphasis) solid var(--focus);
+  outline-offset: 2px;
+}
+
+button.segment {
+  padding: 0;
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+}
+
+button.segment:hover {
+  filter: brightness(1.08);
+}
+
+.labelButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.labelButton:hover {
+  text-decoration: underline;
+}
+
+.legendList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: var(--text-sm-size);
+}
+
+.legendRow {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto 3.5rem;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+}
+
+button.legendRow {
+  cursor: pointer;
+}
+
+button.legendRow:hover {
+  background: var(--bg-subtle);
+}
+
+.legendLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legendValue {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: right;
+}
+
+.legendRow .valueMuted {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.meter {
+  display: block;
+  height: 6px;
+  margin-top: var(--space-1);
+  border-radius: 3px;
+  background: var(--bg-subtle);
+  overflow: hidden;
+}
+
+.meterFill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--chart-1);
+}
