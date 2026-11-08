@@ -55,14 +55,24 @@ export async function listCapabilitiesForMap(supabase: Client, commitId: UUID): 
 export async function listSupportsEdgesForCapabilities(supabase: Client, commitId: UUID, capabilityIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
   if (capabilityIds.length === 0) return [];
   const ids = new Set(capabilityIds);
+  const rows = await listSupportsEdgesForAllCapabilities(supabase, commitId);
+  return rows.filter((r) => ids.has(r.to_element_id));
+}
+
+/**
+ * Every `supports` edge at this commit, unfiltered — for a caller that
+ * fetches it in parallel with the capability list (so it can't know the
+ * capability ids yet) and narrows in memory afterwards, the same
+ * fetch-the-commit-scope-and-filter shape rule 8 already prescribes.
+ */
+export async function listSupportsEdgesForAllCapabilities(supabase: Client, commitId: UUID): Promise<RelationshipsHeadRow[]> {
   const query = supabase
     .from('relationships_head')
     .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
     .eq('commit_id', commitId)
     .eq('relationship_type', 'supports')
     .order('relationship_id');
-  const rows = await selectAll<RelationshipsHeadRow>(query);
-  return rows.filter((r) => ids.has(r.to_element_id));
+  return selectAll<RelationshipsHeadRow>(query);
 }
 
 /**
