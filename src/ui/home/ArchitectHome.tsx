@@ -232,7 +232,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
       // edge's likely home is one level down.
       key: 'platform-supports-move-to-module',
       count: insightsData.platformSupportsThatShouldMoveToModule.length,
-      summary: `${String(insightsData.platformSupportsThatShouldMoveToModule.length)} platform supports edge${insightsData.platformSupportsThatShouldMoveToModule.length === 1 ? '' : 's'} that could move to a module`,
+      summary: `${String(insightsData.platformSupportsThatShouldMoveToModule.length)} platform ${insightsData.platformSupportsThatShouldMoveToModule.length === 1 ? 'link' : 'links'} that could move to a module`,
       items: elementItems(insightsData.platformSupportsThatShouldMoveToModule),
       severity: 'medium',
       browseHref: browseHref('platform-supports-move-to-module'),
@@ -693,7 +693,11 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
                         </Text>
                       </Link>
                       {project.status !== 'active' && <Chip tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status)}</Chip>}
-                      {overdueDecisions > 0 && <Chip tone="warn">{`${String(overdueDecisions)} ${overdueDecisions === 1 ? 'decision' : 'decisions'} overdue`}</Chip>}
+                      {overdueDecisions > 0 && (
+                        <Link to={`${modelHref}/projects/${project.id}`}>
+                          <Chip tone="warn">{`${String(overdueDecisions)} ${overdueDecisions === 1 ? 'decision' : 'decisions'} overdue`}</Chip>
+                        </Link>
+                      )}
                     </div>
                     <Text as="p" tone="muted" size="xs">
                       {project.target_date !== null ? `target ${formatDate(project.target_date)} · ` : ''}

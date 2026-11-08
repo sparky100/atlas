@@ -56,7 +56,7 @@ test('an external organisation actor using a system renders outside the boundary
   await page.getByRole('button', { name: /Reporting System/ }).click();
   await page.getByPlaceholder('e.g. reads customer records from').fill('submits RIIO returns to');
   await page.getByRole('button', { name: 'Next' }).click();
-  await page.getByRole('button', { name: 'Skip — direct edge' }).click();
+  await page.getByRole('button', { name: 'Skip — link directly' }).click();
   await expect(page.getByRole('link', { name: /Reporting System/ })).toBeVisible();
 
   // Landscape mobile list (narrow viewport, real DOM group unlike the

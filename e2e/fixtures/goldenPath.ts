@@ -242,12 +242,12 @@ export async function addUsesRelationship(page: Page, targetNameMatch: string, v
   await page.getByPlaceholder('e.g. reads customer records from').fill(verbPhrase);
   // `RelationshipAdd.tsx`'s own "Next" always leads to a "Does this go via
   // an integration platform?" stage before the edge is actually created —
-  // "Skip — direct edge" is the finalize action once no via platform is
+  // "Skip — link directly" is the finalize action once no via platform is
   // wanted, not "Add" (which only exists on the create-sheet's own
   // simpler picker, a different control).
   await page.getByRole('button', { name: 'Next' }).click();
   await expect(page.getByText('Does this go via an integration platform?')).toBeVisible();
-  await page.getByRole('button', { name: 'Skip — direct edge' }).click();
+  await page.getByRole('button', { name: 'Skip — link directly' }).click();
   // Saved once its row shows the quoted verb phrase — returning before then
   // let a caller's next click land mid-refresh (an opened menu reset, a
   // report counting before the link was on main).

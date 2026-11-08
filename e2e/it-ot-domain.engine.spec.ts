@@ -46,7 +46,7 @@ test('a flow between an IT and an OT system is listed as a boundary crossing, an
   // Since Prompt 7k: after the verb phrase, a second stage asks whether the
   // link goes via an integration platform — a direct edge here.
   await page.getByRole('button', { name: 'Next' }).click();
-  await page.getByRole('button', { name: 'Skip — direct edge' }).click();
+  await page.getByRole('button', { name: 'Skip — link directly' }).click();
   await expect(page.getByRole('link', { name: /PLC Controller/ })).toBeVisible();
 
   // 2. "Boundary crossings" — reachable from the architect door (S1 item 6:

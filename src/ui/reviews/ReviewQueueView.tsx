@@ -51,7 +51,7 @@ export function ReviewQueueView({ modelId, orgId, orgSlug, modelSlug }: ReviewQu
     <div>
       {state.rows.length === 0 ? (
         <div>
-          <EmptyState>No open merge requests. A change reaches this queue once its author submits it for review.</EmptyState>
+          <EmptyState>Nothing is waiting for review. A change reaches this queue once its author submits it for review.</EmptyState>
           <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes`} variant="secondary">
             Changes →
           </LinkButton>

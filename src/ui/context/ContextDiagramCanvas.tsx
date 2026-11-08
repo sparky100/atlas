@@ -664,7 +664,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
         <button
           type="button"
           className={styles.toolbarButton}
-          aria-label="Show edge labels"
+          aria-label="Show line labels"
           aria-pressed={edgeLabelsVisible}
           title={labelMode === 'auto' && labelsWouldCollide ? 'Labels hidden automatically: they would overlap at this density. Hover or tap an edge to see its label, or switch them on.' : 'Show or hide the verb label on every edge'}
           onClick={() => {

@@ -61,13 +61,13 @@ export function summariseHistoryEntry(delta: DeltaHistoryRow, ctx: HistorySummar
       return `${label}: ${formatAttributeValue(delta.value)}`;
     }
     case 'element_retract':
-      return 'retracted';
+      return 'retired';
     case 'element_restore':
       return 'restored';
     case 'relationship_create':
       return `created — ${relationshipVerbPhrase(delta.subject_id, delta.relationship_type, ctx)}`;
     case 'relationship_retract':
-      return `retracted — ${relationshipVerbPhrase(delta.subject_id, delta.relationship_type, ctx)}`;
+      return `removed — ${relationshipVerbPhrase(delta.subject_id, delta.relationship_type, ctx)}`;
     case 'relationship_restore':
       return `restored — ${relationshipVerbPhrase(delta.subject_id, delta.relationship_type, ctx)}`;
     case 'relationship_update':

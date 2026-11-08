@@ -84,7 +84,7 @@ test('from an empty model, add two systems and a uses relationship between them,
   await page.getByPlaceholder('e.g. reads customer records from').fill('calls for payment authorisation');
   await expect(addLabelButton).toBeEnabled();
   await addLabelButton.click();
-  await page.getByRole('button', { name: 'Skip — direct edge' }).click();
+  await page.getByRole('button', { name: 'Skip — link directly' }).click();
 
   // The relationship now shows on Payment Gateway's own element page — a
   // link to Billing Service, in the Relationships section. Following it

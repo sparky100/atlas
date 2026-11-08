@@ -147,7 +147,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
   if (approveError) throw new Error(`approve_merge_request: ${approveError.message}`);
 
   // Advance main (so the second tag differs from the first, and shows a
-  // non-zero "commits since previous tag"), then tag it.
+  // non-zero "changes since previous version"), then tag it.
   const mainAdvance = await commitToBranch(signedIn, {
     modelId,
     branchId: mainAfterSeed.id,
@@ -227,7 +227,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
   // What we're doing: the project (owner, target date, progress, its
   // overdue decision flagged in words), then the decision outside any
   // project — and no raw change at all.
-  await expect(page.getByRole('heading', { name: "What we're doing" })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Work in progress' })).toBeVisible();
   const projects = page.getByRole('list', { name: 'Projects in hand' });
   const projectRow = projects.getByRole('listitem').filter({ hasText: 'Revenues replacement' });
   await expect(projectRow.getByRole('link', { name: 'Revenues replacement' })).toBeVisible();
@@ -250,7 +250,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
   // since-previous-tag count computed from commits.depth, no diff walk.
   await expect(page.getByRole('heading', { name: "What's recent" })).toBeVisible();
   await expect(page.getByRole('link', { name: /v0\.2/ })).toBeVisible();
-  await expect(page.getByText(/commits since previous tag/)).toBeVisible();
+  await expect(page.getByText(/changes since previous version/)).toBeVisible();
   await expect(page.getByRole('link', { name: /v0\.1/ })).toBeVisible();
 
   // No add/edit control anywhere on this door; its only create controls

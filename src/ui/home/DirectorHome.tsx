@@ -162,10 +162,10 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
       </section>
 
       <div className={styles.lowerRow}>
-        <section className={styles.changesColumn} aria-label="What we're doing">
+        <section className={styles.changesColumn} aria-label="Work in progress">
           <div className={styles.sectionHeader}>
             <Text as="h2" size="xl" className={styles.sectionTitle}>
-              What we're doing
+              Work in progress
             </Text>
             <Text as="span" tone="muted" size="sm">
               {plural(whatWeAreDoing.projects.length, 'project', 'projects')} in hand · {plural(openDecisionCount, 'open decision', 'open decisions')}
@@ -259,7 +259,7 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
                     </Text>
                     <Text as="p" tone="muted" size="sm">
                       tagged {formatDate(version.tag.created_at)} by {version.authorDisplay}
-                      {version.commitsSincePrevious !== null ? ` · ${version.commitsSincePrevious.toString()} commits since previous tag` : ''}
+                      {version.commitsSincePrevious !== null ? ` · ${version.commitsSincePrevious.toString()} changes since previous version` : ''}
                     </Text>
                   </>
                 );
@@ -302,7 +302,11 @@ function ProjectWorkRow({ summary, modelHref }: { summary: ProjectSummary; model
           </Text>
         </Link>
         {project.status !== 'active' && <Chip tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status)}</Chip>}
-        {overdueDecisions > 0 && <Chip tone="warn">{plural(overdueDecisions, 'decision overdue', 'decisions overdue')}</Chip>}
+        {overdueDecisions > 0 && (
+          <Link to={`${modelHref}/projects/${project.id}`}>
+            <Chip tone="warn">{plural(overdueDecisions, 'decision overdue', 'decisions overdue')}</Chip>
+          </Link>
+        )}
       </div>
       <Text as="p" tone="muted" size="sm">
         {ownerDisplay}

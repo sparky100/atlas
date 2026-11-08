@@ -27,7 +27,7 @@ export function BoundaryCrossingsView({ modelId, orgSlug, modelSlug }: BoundaryC
   if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
   if (state.crossings.length === 0) {
-    return <EmptyState>No IT/OT boundary crossings — no `uses`/`flows_to` edge connects a system on one side to a system on the other.</EmptyState>;
+    return <EmptyState>No IT/OT boundary crossings — no system on one side is connected to a system on the other.</EmptyState>;
   }
 
   return (

@@ -1,3 +1,4 @@
+import { ModelEmptyState } from '../components/EmptyState/ModelEmptyState';
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
@@ -79,7 +80,7 @@ export function PortfolioPage() {
 
           {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
-          {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
+          {state.status === 'refNotFound' && <ModelEmptyState orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />}
           {state.status === 'ready' && <PortfolioView data={state.data} elementHref={elementHref} savedReports={organisation ? { modelId: model.id, orgId: organisation.id, userId, role } : undefined} exportStamp={{ modelName: model.name, refLabel: stampRefLabel(ref, branchLabel), date: exportDate() }} />}
         </main>
       </div>

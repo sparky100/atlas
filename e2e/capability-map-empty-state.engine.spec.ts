@@ -66,7 +66,7 @@ test('capability map empty state: add one capability by hand, without touching a
   // heading each affordance owns exclusively, not the shared phrase.
   await expect(page.getByRole('heading', { name: 'Start from a capability map' })).toBeVisible();
   await expect(page.getByText('A capability map has nothing to show until at least one Capability element exists.', { exact: false })).toBeVisible();
-  await expect(page.getByText('Nothing here yet.')).toHaveCount(0);
+  await expect(page.getByText('This model has nothing in it yet.', { exact: false })).toHaveCount(0);
 
   // "Add a capability" — CapabilityMapAddForm's closed-state button —
   // never the import panel's "Import" button next to a starter map row.

@@ -1,3 +1,4 @@
+import { ModelEmptyState } from '../components/EmptyState/ModelEmptyState';
 import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
@@ -127,7 +128,7 @@ export function ValueStreamsPage() {
 
           {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
-          {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
+          {state.status === 'refNotFound' && <ModelEmptyState orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />}
           {state.status === 'ready' && !narrow && (
             <div className={styles.row}>
               <ValueStreamsView rows={state.data.rows} selectedStageId={selectedStageId} onInspectStage={setSelectedStageId} />

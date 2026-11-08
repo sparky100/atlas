@@ -61,7 +61,7 @@ describe('summariseHistoryEntry', () => {
   });
 
   it('reports element_retract/restore plainly — no ambiguity, this is the page\'s own element', () => {
-    expect(summariseHistoryEntry(delta({ kind: 'element_retract', subject_id: HUB, subject_type: 'element' }), context())).toBe('retracted');
+    expect(summariseHistoryEntry(delta({ kind: 'element_retract', subject_id: HUB, subject_type: 'element' }), context())).toBe('retired');
     expect(summariseHistoryEntry(delta({ kind: 'element_restore', subject_id: HUB, subject_type: 'element' }), context())).toBe('restored');
   });
 
@@ -82,7 +82,7 @@ describe('summariseHistoryEntry', () => {
     const retracted = delta({ kind: 'relationship_retract', subject_id: 'rel-1', relationship_type: 'supports' });
     const restored = delta({ kind: 'relationship_restore', subject_id: 'rel-1', relationship_type: 'supports' });
     const participants = buildRelationshipParticipantsById([created, retracted, restored]);
-    expect(summariseHistoryEntry(retracted, context({ participants }))).toBe('retracted — supports Smart Metering Data');
+    expect(summariseHistoryEntry(retracted, context({ participants }))).toBe('removed — supports Smart Metering Data');
     expect(summariseHistoryEntry(restored, context({ participants }))).toBe('restored — supports Smart Metering Data');
   });
 
@@ -95,7 +95,7 @@ describe('summariseHistoryEntry', () => {
 
   it('falls back to a bare verb when the sibling relationship_create row is missing (defensive)', () => {
     const retracted = delta({ kind: 'relationship_retract', subject_id: 'rel-missing', relationship_type: 'supports' });
-    expect(summariseHistoryEntry(retracted, context())).toBe('retracted — supports');
+    expect(summariseHistoryEntry(retracted, context())).toBe('removed — supports');
   });
 
   it('falls back to the raw element id when the other endpoint has itself since been retracted', () => {
