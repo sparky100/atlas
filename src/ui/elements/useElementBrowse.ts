@@ -4,7 +4,7 @@ import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../.
 import { CRITICALITY_ORDER } from './criticalityTone';
 import { DISPOSITION_ORDER } from './disposition';
 import type { Disposition } from '../../contracts/delta';
-import { listAllElements, loadOwnersByElementId, ownersByElementIdFromOwnsEdges, type BrowseRow } from '../../db/elementBrowse';
+import { listAllElements, ownersByElementIdFromOwnsEdges, type BrowseRow } from '../../db/elementBrowse';
 import { attributesRecord } from './attributesRecord';
 import { buildBrowseRows } from './buildBrowseRows';
 import { compareCustomAttributeValues, sortKeyEquals, type ElementBrowseSortKey } from './elementBrowseSort';
@@ -263,7 +263,8 @@ export function useElementBrowse(
         supportsEdges = loadedSupportsEdges;
         ownsEdges = loadedOwnsEdges;
         const elementsByIdForOwners = new Map<UUID, ElementsHeadRow>(elements.map((e) => [e.element_id, e]));
-        ownersByElementId = await loadOwnersByElementId(supabase, commitId, elementsByIdForOwners);
+        // Reuses the `owns` edges fetched above (the same query `loadOwnersByElementId` would run again, one round trip later).
+        ownersByElementId = ownersByElementIdFromOwnsEdges(ownsEdges, elementsByIdForOwners);
         getFacts = () => listFactsForCommit(supabase, commitId);
         getUsesAndFlowsToEdges = () => listAllUsesAndFlowsToEdges(supabase, commitId);
       }
