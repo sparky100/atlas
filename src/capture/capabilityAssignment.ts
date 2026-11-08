@@ -287,7 +287,7 @@ export async function assignCapabilities(input: AssignCapabilitiesInput): Promis
         attributeConfidence: { role: target.confidence },
         warnings: [],
       };
-      candidates.push({ seq: nextSeq++, proposal, evidence, aliasProposals: [] });
+      candidates.push({ seq: nextSeq++, proposal, evidence, aliasProposals: [], ...(eligibleForPrimary ? { primaryEligible: true } : {}) });
     }
   }
 
