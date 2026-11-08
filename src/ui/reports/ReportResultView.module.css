@@ -51,3 +51,24 @@
   font-weight: 500;
 }
 
+
+/* A dashboard tile never clips a column silently: long values end in an ellipsis (the full value is the cell's tooltip) and the table keeps its columns on one line, scrolling sideways with a soft edge when it still doesn't fit. */
+.compact td {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact th:first-child,
+.compact td:first-child {
+  max-width: 18rem;
+}
+
+.scroll:has(.compact) {
+  background:
+    linear-gradient(to right, var(--surface) 30%, transparent) left / 2rem 100% no-repeat local,
+    linear-gradient(to left, var(--surface) 30%, transparent) right / 2rem 100% no-repeat local,
+    linear-gradient(to right, rgb(16 24 40 / 12%), transparent) left / 0.75rem 100% no-repeat scroll,
+    linear-gradient(to left, rgb(16 24 40 / 12%), transparent) right / 0.75rem 100% no-repeat scroll;
+}
