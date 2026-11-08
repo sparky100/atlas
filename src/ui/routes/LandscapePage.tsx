@@ -1,3 +1,4 @@
+import { ModelEmptyState } from '../components/EmptyState/ModelEmptyState';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
@@ -444,7 +445,7 @@ export function LandscapePage() {
         onCreated={reloadMainBranch}
       />
       <Button variant="secondary" onClick={() => { void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/capture`); }}>
-        Import model updates…
+        Import…
       </Button>
     </>
   );
@@ -642,7 +643,7 @@ export function LandscapePage() {
           <>
             {capabilityLandscapeState.status === 'loading' && <Text tone="muted">Loading…</Text>}
             {capabilityLandscapeState.status === 'error' && <Text as="p">{capabilityLandscapeState.message}</Text>}
-            {capabilityLandscapeState.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
+            {capabilityLandscapeState.status === 'refNotFound' && <ModelEmptyState orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />}
             {capabilityLandscapeState.status === 'ready' && (
               <>
                 <CapabilityLandscapeList
@@ -680,7 +681,7 @@ export function LandscapePage() {
           <>
             {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
             {state.status === 'error' && <Text as="p">{state.message}</Text>}
-            {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
+            {state.status === 'refNotFound' && <ModelEmptyState orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />}
             {/* V2: the raw fetch (`state`) can be ready while layout/grouping is still computing in the worker (`useLandscapeDisplay`) — a brief gap this hook's own split introduces that the old single-effect version never had. */}
             {state.status === 'ready' && displayState.status === 'loading' && <Text tone="muted">Loading…</Text>}
             {displayState.status === 'error' && <Text as="p">{displayState.message}</Text>}
@@ -705,10 +706,10 @@ export function LandscapePage() {
                       onCreated={reloadMainBranch}
                     />
                     <Button variant="secondary" onClick={() => { void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/capture`); }}>
-                      Import model updates…
+                      Import…
                     </Button>
                     <Button variant="ghost" onClick={() => void downloadImportPrompt(supabase, model.id, model.slug)}>
-                      Download AI import prompt
+                      AI prompt for preparing an import file
                     </Button>
                   </div>
                 )}

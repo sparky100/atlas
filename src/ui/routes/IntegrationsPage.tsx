@@ -1,3 +1,4 @@
+import { ModelEmptyState } from '../components/EmptyState/ModelEmptyState';
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
@@ -68,7 +69,7 @@ export function IntegrationsPage() {
 
           {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
-          {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
+          {state.status === 'refNotFound' && <ModelEmptyState orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />}
           {state.status === 'ready' && <IntegrationsView data={state.data} elementHref={elementHref} />}
         </main>
       </div>

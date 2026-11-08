@@ -1,3 +1,4 @@
+import { ModelEmptyState } from '../components/EmptyState/ModelEmptyState';
 import { useId, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
@@ -322,16 +323,16 @@ export function CapabilityMapPage() {
           <>
             <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reloadAll} />
             <Button variant="ghost" onClick={() => void downloadImportPrompt(supabase, model.id, model.slug)}>
-              Download AI import prompt
+              AI prompt for preparing an import file
             </Button>
           </>
         )}
-        {state.status === 'refNotFound' && !canEdit && <Text as="p">Nothing here yet.</Text>}
+        {state.status === 'refNotFound' && !canEdit && <ModelEmptyState orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />}
         {state.status === 'ready' && state.data.tree.l1.length === 0 && state.data.tree.orphans.length === 0 && canEdit && (
           <>
             <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reloadAll} />
             <Button variant="ghost" onClick={() => void downloadImportPrompt(supabase, model.id, model.slug)}>
-              Download AI import prompt
+              AI prompt for preparing an import file
             </Button>
           </>
         )}
