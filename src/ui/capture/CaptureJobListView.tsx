@@ -18,7 +18,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { canDiscardCaptureJob, useMembership } from '../orgs/useMembership';
-import { captureJobStatusLabel, captureJobStatusTone } from './captureJobStatus';
+import { captureInputFormatLabel, captureJobStatusLabel, captureJobStatusTone } from './captureJobStatus';
 import { DiscardCaptureButton } from './DiscardCaptureButton';
 import { useCaptureJobs } from './useCaptureJob';
 import { UploadCaptureDialog } from './UploadCaptureDialog';
@@ -123,7 +123,7 @@ function CaptureJobRow({ job, orgSlug, modelSlug, canDiscard, onRetry, onDiscard
         </Text>
         <div className={styles.rowMeta}>
           <Chip tone={captureJobStatusTone(job)}>{captureJobStatusLabel(job)}</Chip>
-          <Chip tone="neutral">{job.inputKind}</Chip>
+          <Chip tone="neutral">{captureInputFormatLabel(job)}</Chip>
           {job.reimportOfJobId !== null && <Chip tone="neutral">Re-import</Chip>}
           <Text as="span" tone="faint" size="xs">
             {job.createdAt.slice(0, 10)}

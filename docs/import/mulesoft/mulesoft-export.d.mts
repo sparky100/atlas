@@ -20,3 +20,5 @@ export interface MulesoftExport {
   warnings: string[];
 }
 export function exportEnvironments(options: { envs: readonly string[]; run: (args: string[], environmentName: string) => Promise<string>; now: string }): Promise<MulesoftExport>;
+export function withRetry<T>(call: () => Promise<T>, options?: { attempts?: number; delayMs?: number; sleep?: (ms: number) => Promise<void> }): Promise<T>;
+export function explainCliFailure(error: unknown): string | null;

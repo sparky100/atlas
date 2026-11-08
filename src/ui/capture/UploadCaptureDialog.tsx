@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { CaptureInputKind, CaptureJob } from '../../contracts/capture';
 import { prepareMulesoftUpload } from '../../capture/adapters/mulesoftUpload';
+import { DEFAULT_IMPORT_SOURCE, IMPORT_SOURCE_GROUP_LABELS, IMPORT_SOURCES, importSourceById, type ImportSourceId } from '../../capture/importSources';
 import { listExternalRefMappings } from '../../db/aliases';
 import { computeInputSha256Hex, findReimportCandidate } from '../../db/captureJobs';
 import { Button } from '../components/Button/Button';
@@ -39,8 +40,14 @@ const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 const MAX_PASTED_TEXT_CHARS = 200_000;
 
 type Mode = 'file' | 'paste';
-/** Where the input comes from: a file or text as-is, or a MuleSoft Anypoint export converted by `mulesoftUpload.ts` before the run starts. */
-type Source = 'generic' | 'mulesoft';
+/** Renders a guide step, turning `backticked` text into <code>. */
+function GuideStep({ text }: { text: string }) {
+  return (
+    <>
+      {text.split('`').map((part, index) => (index % 2 === 1 ? <code key={index}>{part}</code> : part))}
+    </>
+  );
+}
 
 interface SelectedInput {
   inputKind: CaptureInputKind;
@@ -65,7 +72,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
   const [pasteName, setPasteName] = useState('');
   const [fileSelection, setFileSelection] = useState<SelectedInput | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [source, setSource] = useState<Source>('generic');
+  const [source, setSource] = useState<ImportSourceId>(DEFAULT_IMPORT_SOURCE);
   const [mulesoftFile, setMulesoftFile] = useState<{ name: string; text: string } | null>(null);
   const [aliasText, setAliasText] = useState('');
   // The model's own saved hostnames (external references on element pages); a failed load just means only typed mappings apply.
@@ -182,7 +189,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
     setPasteName('');
     setFileSelection(null);
     setFileError(null);
-    setSource('generic');
+    setSource(DEFAULT_IMPORT_SOURCE);
     setMulesoftFile(null);
     setAliasText('');
     setDocumentDate('');
@@ -234,7 +241,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
     });
   };
 
-  const switchSource = (next: Source) => {
+  const switchSource = (next: ImportSourceId) => {
     setSource(next);
     setFileSelection(null);
     setFileError(null);
@@ -281,19 +288,42 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
               </Button>
             </div>
             <Text as="p" tone="muted" size="sm">
-              Upload a spreadsheet, JSON file, or PDF, or paste in meeting notes — an AI extraction reads it, matches what it finds against this model, and produces a draft you review before anything changes.
+              {importSourceById(source).intro}
             </Text>
 
-            <div className={styles.modeToggle} role="group" aria-label="Source">
-              <Button variant={source === 'generic' ? 'secondary' : 'ghost'} aria-pressed={source === 'generic'} onClick={() => { switchSource('generic'); }}>
-                File or text
-              </Button>
-              <Button variant={source === 'mulesoft' ? 'secondary' : 'ghost'} aria-pressed={source === 'mulesoft'} onClick={() => { switchSource('mulesoft'); }}>
-                MuleSoft Anypoint
-              </Button>
+            <div className={styles.sources} role="radiogroup" aria-label="What are you importing?">
+              {(['documents', 'tool-export'] as const).map((group) => (
+                <div key={group} className={styles.sourceGroup}>
+                  <Text as="span" size="sm" tone="muted">
+                    {IMPORT_SOURCE_GROUP_LABELS[group]}
+                  </Text>
+                  <div className={styles.sourceCards}>
+                    {IMPORT_SOURCES.filter((candidate) => candidate.group === group).map((candidate) => (
+                      <button
+                        key={candidate.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={source === candidate.id}
+                        className={[styles.sourceCard, source === candidate.id ? styles.sourceCardSelected : ''].filter(Boolean).join(' ')}
+                        disabled={isCreatingJob(status)}
+                        onClick={() => {
+                          switchSource(candidate.id);
+                        }}
+                      >
+                        <Text as="span" size="sm">
+                          {candidate.title}
+                        </Text>
+                        <Text as="span" size="sm" tone="muted">
+                          {candidate.summary}
+                        </Text>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {source === 'generic' && (
+            {source === 'documents' && (
             <div className={styles.modeToggle}>
               <Button variant={mode === 'file' ? 'secondary' : 'ghost'} aria-pressed={mode === 'file'} onClick={() => { setMode('file'); setPastedText(''); }}>
                 Upload a file
@@ -308,17 +338,13 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
               {source === 'mulesoft' && (
                 <>
                   <ol className={styles.guide}>
-                    <li>
-                      <Text as="span" size="sm">Download the export script and run it on your own machine: it asks the Anypoint CLI for your APIs and their contracts, and reads no secrets.</Text>
-                    </li>
-                    <li>
-                      <Text as="span" size="sm">
-                        In a terminal with the Anypoint CLI logged in, run <code>node mulesoft-export.mjs --env Production</code> (repeat <code>--env</code> for more environments). It writes <code>mulesoft-export.json</code>.
-                      </Text>
-                    </li>
-                    <li>
-                      <Text as="span" size="sm">Check the file for anything confidential, then choose it below.</Text>
-                    </li>
+                    {importSourceById('mulesoft').exportSteps.map((step) => (
+                      <li key={step}>
+                        <Text as="span" size="sm">
+                          <GuideStep text={step} />
+                        </Text>
+                      </li>
+                    ))}
                   </ol>
                   <div className={styles.actions}>
                     <Button variant="secondary" onClick={downloadMulesoftExportScript}>
@@ -372,7 +398,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                   )}
                 </>
               )}
-              {source === 'generic' && mode === 'file' ? (
+              {source === 'documents' && mode === 'file' ? (
                 <input
                   className={styles.input}
                   type="file"
@@ -390,7 +416,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                   Reading {selected.inputName}…
                 </Text>
               )}
-              {source === 'generic' && mode === 'paste' ? (
+              {source === 'documents' && mode === 'paste' ? (
                 <textarea
                   className={styles.textarea}
                   placeholder="Paste meeting notes, an email, or any other free text describing systems, owners, or relationships…"
@@ -403,7 +429,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                 />
               ) : null}
 
-              {source === 'generic' && mode === 'paste' && (
+              {source === 'documents' && mode === 'paste' && (
                 <div className={styles.formRow}>
                   <Text as="label" size="sm" tone="muted">
                     Name (optional)

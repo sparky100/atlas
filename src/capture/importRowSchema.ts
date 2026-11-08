@@ -29,12 +29,12 @@ import { validateAttributeValue } from '../contracts/attributeSchema';
 import { normalizeName } from '../engine/merge';
 
 /** The exact header names a row must use — order doesn't matter, extra columns are ignored, case-sensitive (matching every other attribute key in this product). Snake_case, this session's own plan's spelling — distinct from the camelCase attribute keys they map onto below. */
-export const IMPORT_COLUMNS = ['name', 'description', 'kind', 'lifecycle', 'criticality', 'annual_run_cost', 'disposition', 'domain', 'hosting_model', 'vendor', 'is_external', 'external_organisation', 'platform', 'capability', 'business_owner', 'technical_owner', 'interface_type', 'transformation'] as const;
+export const IMPORT_COLUMNS = ['name', 'description', 'kind', 'lifecycle', 'criticality', 'annual_run_cost', 'disposition', 'domain', 'hosting_model', 'vendor', 'is_external', 'external_organisation', 'platform', 'capability', 'business_owner', 'technical_owner', 'interface_type', 'transformation', 'introduced', 'planned_end', 'support_ends_at'] as const;
 export type ImportColumn = (typeof IMPORT_COLUMNS)[number];
 
 export type ImportRowElementType = 'system' | 'container';
 
-export type ImportRowAttributeKey = 'description' | 'kind' | 'lifecycleStatus' | 'criticality' | 'annualRunCost' | 'disposition' | 'domain' | 'hostingModel' | 'vendor' | 'externalOrganisation' | 'interfaceType' | 'transformation';
+export type ImportRowAttributeKey = 'description' | 'kind' | 'lifecycleStatus' | 'criticality' | 'annualRunCost' | 'disposition' | 'domain' | 'hostingModel' | 'vendor' | 'externalOrganisation' | 'interfaceType' | 'transformation' | 'introduced' | 'plannedEnd' | 'supportEndsAt';
 
 /** An owner column's own cell — either a plain name, or "Name (External: Org)" (import close-out), which creates the owner as an external organisation actor (`subtype: 'organisation'`, `isExternal: true`, `externalOrganisation: Org`) if no existing actor named `name` already resolves it. */
 export interface OwnerReference {
@@ -97,6 +97,10 @@ const ATTRIBUTE_COLUMNS: readonly (readonly [ImportColumn, ImportRowAttributeKey
   // ADR-026: an interface on an integration platform — container-only, so a system row setting either fails validation.
   ['interface_type', 'interfaceType'],
   ['transformation', 'transformation'],
+  // Roadmap dates (ISO YYYY-MM-DD). `support_ends_at` is system-only (vendor support end), so a module row setting it fails validation.
+  ['introduced', 'introduced'],
+  ['planned_end', 'plannedEnd'],
+  ['support_ends_at', 'supportEndsAt'],
 ];
 
 const TRUE_WORDS = new Set(['true', 'yes', 'y', '1']);

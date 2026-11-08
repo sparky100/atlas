@@ -41,12 +41,25 @@ export interface CapabilityMapImportPanelProps {
  * "No starter maps are available yet."
  */
 export function CapabilityMapImportPanel({ modelId, userId, onImported }: CapabilityMapImportPanelProps) {
-  const { status, maps, error, importMap } = useCapabilityImport({ modelId, userId, onImported });
+  const { status, modelHasContent, maps, error, importMap } = useCapabilityImport({ modelId, userId, onImported });
   const [query, setQuery] = useState('');
   const [importingId, setImportingId] = useState<UUID | null>(null);
   const searchId = useId();
 
   const filteredMaps = filterCapabilityMaps(maps, query);
+
+  if (modelHasContent) {
+    return (
+      <Panel>
+        <Text as="h2" size="lg">
+          Capability maps can't be imported here
+        </Text>
+        <Text as="p" tone="muted">
+          This model already has content, and a starter map can only seed an empty model. Add capabilities by hand on the map, or import a map into a new model.
+        </Text>
+      </Panel>
+    );
+  }
 
   return (
     <Panel>
@@ -56,6 +69,13 @@ export function CapabilityMapImportPanel({ modelId, userId, onImported }: Capabi
       <Text as="p" tone="muted">
         This model has no capabilities yet. Seed it from a starter map, or add capabilities by hand once you're on the map.
       </Text>
+      {error !== null && (
+        <div role="alert">
+          <Text as="p" tone="default">
+            {error}
+          </Text>
+        </div>
+      )}
       {status === 'loadingMaps' && <Text tone="muted">Loading starter maps…</Text>}
       {status !== 'loadingMaps' && maps.length === 0 && (
         <Text as="p" tone="muted">
@@ -95,11 +115,6 @@ export function CapabilityMapImportPanel({ modelId, userId, onImported }: Capabi
             />
           ))}
         </ul>
-      )}
-      {error !== null && (
-        <Text as="p" tone="default">
-          {error}
-        </Text>
       )}
     </Panel>
   );
