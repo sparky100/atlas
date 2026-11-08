@@ -14,7 +14,8 @@
       "technical_owner": "Customer Platforms Team",
       "description": "CRM, case management and workflow for domestic and SME customers.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2009-11-01"
     },
     {
       "name": "Sales Cloud",
@@ -74,7 +75,8 @@
       "technical_owner": "Billing Platform Team",
       "description": "Core billing and customer account platform, replacing Junifer.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2012-03-01"
     },
     {
       "name": "Account & Contract Management",
@@ -146,7 +148,9 @@
       "technical_owner": "Billing Platform Team",
       "description": "Legacy SME billing platform being migrated to Kraken. Migration of business customers is not complete.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2010-11-01",
+      "planned_end": "2027-03-28"
     },
     {
       "name": "Legacy Prepayment Billing",
@@ -161,7 +165,9 @@
       "business_owner": "Finance Director",
       "technical_owner": "Billing Platform Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2009-01-01",
+      "planned_end": "2025-01-28"
     },
     {
       "name": "Itron Meter Data Management",
@@ -178,7 +184,8 @@
       "technical_owner": "Metering Systems Team",
       "description": "MDM: validates and stores smart meter reads, estimates missing data and serves billing and settlement.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2011-08-01"
     },
     {
       "name": "DCC Adapter",
@@ -195,7 +202,8 @@
       "technical_owner": "Metering Systems Team",
       "description": "DCC User Gateway integration: commands, alerts and SMETS2 scheduled reads.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2017-02-01"
     },
     {
       "name": "Meter Asset Register",
@@ -210,7 +218,8 @@
       "business_owner": "Head of Metering",
       "description": "Meter asset inventory and installation history. No technical owner is recorded.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2014-09-01"
     },
     {
       "name": "Meter Read Portal",
@@ -226,7 +235,8 @@
       "technical_owner": "Digital Team",
       "description": "Customer self-service meter reading for traditional meters.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2009-12-01"
     },
     {
       "name": "Smart Install Scheduler",
@@ -242,7 +252,8 @@
       "business_owner": "Head of Metering",
       "technical_owner": "Metering Systems Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2013-09-01"
     },
     {
       "name": "HH Data Aggregator",
@@ -259,7 +270,9 @@
       "technical_owner": "Metering Systems Team",
       "description": "Legacy half-hourly aggregation, to be replaced by MHHS data services.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2021-01-01",
+      "support_ends_at": "2031-06-30"
     },
     {
       "name": "ETRM Platform",
@@ -276,7 +289,8 @@
       "technical_owner": "Trading Systems Team",
       "description": "Energy trading and risk management: hedging, positions and mark-to-market.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2012-06-01"
     },
     {
       "name": "Demand Forecasting Engine",
@@ -291,7 +305,8 @@
       "business_owner": "Head of Trading",
       "technical_owner": "Data Science Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2011-09-01"
     },
     {
       "name": "Settlement Engine",
@@ -308,7 +323,8 @@
       "technical_owner": "Trading Systems Team",
       "description": "Current BSC settlement and imbalance engine; being adapted for MHHS.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2013-12-01"
     },
     {
       "name": "MHHS Settlement Engine",
@@ -324,7 +340,8 @@
       "technical_owner": "Trading Systems Team",
       "description": "Planned market-wide half-hourly settlement capability.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2027-12-01"
     },
     {
       "name": "Position & Imbalance Monitor",
@@ -339,7 +356,8 @@
       "business_owner": "Head of Trading",
       "technical_owner": "Trading Systems Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2020-12-01"
     },
     {
       "name": "Meridian Web & App",
@@ -355,7 +373,8 @@
       "technical_owner": "Digital Team",
       "description": "Customer website and mobile app for sign-up, bills, payments and meter readings.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2021-01-01"
     },
     {
       "name": "Tariff Pricing Engine",
@@ -370,7 +389,8 @@
       "business_owner": "Chief Customer Officer",
       "technical_owner": "Pricing Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2018-06-01"
     },
     {
       "name": "Proposition Catalogue",
@@ -385,7 +405,8 @@
       "business_owner": "Chief Customer Officer",
       "technical_owner": "Pricing Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2020-05-01"
     },
     {
       "name": "Smart Tariff Platform",
@@ -400,7 +421,8 @@
       "business_owner": "Chief Customer Officer",
       "technical_owner": "Digital Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2027-06-01"
     },
     {
       "name": "EV Proposition Portal",
@@ -415,7 +437,8 @@
       "business_owner": "Chief Customer Officer",
       "technical_owner": "Digital Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2011-03-01"
     },
     {
       "name": "Flexibility Orchestrator",
@@ -430,7 +453,8 @@
       "business_owner": "Chief Customer Officer",
       "technical_owner": "Digital Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2027-07-01"
     },
     {
       "name": "Identity & Credit Service",
@@ -446,7 +470,8 @@
       "business_owner": "Chief Customer Officer",
       "technical_owner": "Digital Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2020-10-01"
     },
     {
       "name": "Switching Gateway",
@@ -462,7 +487,8 @@
       "technical_owner": "Industry Systems Team",
       "description": "Handles registrations, change of supplier and objections via the industry switching processes.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2015-03-01"
     },
     {
       "name": "Aggregator Feed Manager",
@@ -477,7 +503,8 @@
       "business_owner": "Chief Customer Officer",
       "technical_owner": "Pricing Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2017-08-01"
     },
     {
       "name": "Contact Centre Telephony",
@@ -493,7 +520,8 @@
       "business_owner": "Chief Customer Officer",
       "technical_owner": "Customer Platforms Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2022-03-01"
     },
     {
       "name": "Regulatory Reporting Hub",
@@ -508,7 +536,8 @@
       "business_owner": "Head of Regulation",
       "technical_owner": "Industry Systems Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2018-08-01"
     },
     {
       "name": "Price Cap Calculator",
@@ -523,7 +552,8 @@
       "business_owner": "Head of Regulation",
       "description": "Spreadsheet-based price cap monitoring. No technical owner and no planned replacement.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2022-07-01"
     },
     {
       "name": "Social Obligations Tracker",
@@ -538,7 +568,8 @@
       "business_owner": "Head of Regulation",
       "technical_owner": "Industry Systems Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2010-03-01"
     },
     {
       "name": "Industry Codes Compliance Register",
@@ -553,7 +584,8 @@
       "business_owner": "Head of Regulation",
       "technical_owner": "Industry Systems Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2017-09-01"
     },
     {
       "name": "SAP S/4HANA Finance",
@@ -569,7 +601,8 @@
       "business_owner": "Finance Director",
       "technical_owner": "Finance Systems Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2018-06-01"
     },
     {
       "name": "Treasury Management System",
@@ -585,7 +618,8 @@
       "business_owner": "Finance Director",
       "technical_owner": "Finance Systems Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2013-11-01"
     },
     {
       "name": "Workday",
@@ -601,7 +635,8 @@
       "business_owner": "Chief People Officer",
       "technical_owner": "People Systems Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2020-09-01"
     },
     {
       "name": "Snowflake Data Platform",
@@ -617,7 +652,8 @@
       "business_owner": "Head of Data",
       "technical_owner": "Data Engineering Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2020-10-01"
     },
     {
       "name": "Power BI",
@@ -633,7 +669,8 @@
       "business_owner": "Head of Data",
       "technical_owner": "Data Engineering Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2022-09-01"
     },
     {
       "name": "ServiceNow",
@@ -649,7 +686,8 @@
       "business_owner": "Chief Digital Officer",
       "technical_owner": "Digital Workplace Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2014-06-01"
     },
     {
       "name": "Privacy Management Tool",
@@ -665,7 +703,8 @@
       "business_owner": "Data Protection Officer",
       "technical_owner": "Digital Workplace Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2021-10-01"
     },
     {
       "name": "Enterprise Risk Register",
@@ -680,7 +719,8 @@
       "business_owner": "Head of Risk",
       "technical_owner": "Digital Workplace Team",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2018-02-01"
     },
     {
       "name": "MHHS Data Integration Platform",
@@ -693,7 +733,8 @@
       "hosting_model": "saas",
       "description": "Central DIP for market-wide half-hourly settlement.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2009-02-01"
     },
     {
       "name": "DCC (Smart Metering)",
@@ -706,7 +747,8 @@
       "hosting_model": "saas",
       "description": "Smart metering communications network and data service.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2018-04-01"
     },
     {
       "name": "Data Transfer Network",
@@ -719,7 +761,8 @@
       "hosting_model": "saas",
       "description": "Industry data flows (D-flows) between suppliers and networks.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2017-04-01"
     },
     {
       "name": "ECOES",
@@ -732,7 +775,8 @@
       "hosting_model": "saas",
       "description": "Industry registration look-up service.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2011-05-01"
     },
     {
       "name": "Elexon BSC Central Services",
@@ -745,7 +789,8 @@
       "hosting_model": "saas",
       "description": "Settlement and Balancing and Settlement Code central systems.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2015-08-01"
     },
     {
       "name": "Ofgem Portal",
@@ -758,7 +803,8 @@
       "hosting_model": "saas",
       "description": "Regulatory data submissions and price cap reporting.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2015-09-01"
     },
     {
       "name": "Xoserve (Gas CDSP)",
@@ -771,7 +817,8 @@
       "hosting_model": "saas",
       "description": "Central data service for gas metering and switching.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2019-11-01"
     },
     {
       "name": "Distribution Network Operator Portals",
@@ -784,7 +831,8 @@
       "hosting_model": "saas",
       "description": "DNO registration and metering point data services.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2015-09-01"
     },
     {
       "name": "Price Comparison Websites",
@@ -797,7 +845,8 @@
       "hosting_model": "saas",
       "description": "Uswitch, MoneySuperMarket and other comparison channels.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2014-12-01"
     },
     {
       "name": "MuleSoft Anypoint",
@@ -813,7 +862,8 @@
       "technical_owner": "Integration Team",
       "description": "Enterprise integration platform for customer, billing, metering and industry interfaces.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2017-11-01"
     },
     {
       "name": "Customer Account API",

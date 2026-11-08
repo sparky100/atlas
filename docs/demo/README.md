@@ -24,3 +24,7 @@ Both are fictional. Vendor names are real products used for realism; the archite
 The importer is idempotent by name: re-importing updates rather than duplicates.
 
 The tests in `src/capture/demoImports.test.ts` check each file parses cleanly and names only capabilities that exist in its map.
+
+## Roadmap dates
+
+Both files carry `introduced`, `planned_end` and `support_ends_at` (ISO `YYYY-MM-DD`) on top-level systems, so the Roadmap has bars to show: active systems have an introduced year, retiring systems end in 2027–2028 (some lose vendor support earlier), planned systems start in 2027–2028 and retired systems ended in 2025. Dates are illustrative. To add them to an org you already loaded, import the file again into the same model: matched systems are updated by name and the dates are the only changes. `support_ends_at` is for systems only; a module row that sets it is rejected.
