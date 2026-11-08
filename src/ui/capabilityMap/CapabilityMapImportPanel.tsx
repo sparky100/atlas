@@ -43,6 +43,7 @@ export interface CapabilityMapImportPanelProps {
 export function CapabilityMapImportPanel({ modelId, userId, onImported }: CapabilityMapImportPanelProps) {
   const { status, maps, error, importMap } = useCapabilityImport({ modelId, userId, onImported });
   const [query, setQuery] = useState('');
+  const [importingId, setImportingId] = useState<UUID | null>(null);
   const searchId = useId();
 
   const filteredMaps = filterCapabilityMaps(maps, query);
@@ -89,7 +90,8 @@ export function CapabilityMapImportPanel({ modelId, userId, onImported }: Capabi
               key={map.id}
               map={map}
               importDisabled={status === 'seeding'}
-              onImport={(mapId) => { void importMap(mapId); }}
+              importing={status === 'seeding' && importingId === map.id}
+              onImport={(mapId) => { setImportingId(mapId); void importMap(mapId); }}
             />
           ))}
         </ul>

@@ -13,6 +13,8 @@ export interface CapabilityMapPickerCardProps {
   map: CapabilityMapRow;
   /** `true` while *any* map is importing (`useCapabilityImport`'s own single `status`, not per-card) — every card's own Import disables together, since only one import can be in flight for this model at a time. */
   importDisabled: boolean;
+  /** `true` only on the card whose own Import was clicked — the label changes there alone; the others stay disabled but keep saying "Import". */
+  importing: boolean;
   onImport: (mapId: UUID) => void;
 }
 
@@ -57,7 +59,7 @@ function PreviewNodeView({ node }: { node: CapabilityMapPreviewNode }) {
  * yet. Import stays a plain, always-visible primary action, never behind
  * either disclosure.
  */
-export function CapabilityMapPickerCard({ map, importDisabled, onImport }: CapabilityMapPickerCardProps) {
+export function CapabilityMapPickerCard({ map, importDisabled, importing, onImport }: CapabilityMapPickerCardProps) {
   const [preview, setPreview] = useState<PreviewState>({ status: 'closed' });
   // Picker-grid fix: "consistent height regardless of description length
   // (truncate with 'more' rather than growing/shrinking the card)" — a
@@ -133,7 +135,7 @@ export function CapabilityMapPickerCard({ map, importDisabled, onImport }: Capab
 
       <div className={styles.actions}>
         <Button variant="secondary" disabled={importDisabled} onClick={() => { onImport(map.id); }}>
-          {importDisabled ? 'Importing…' : 'Import'}
+          {importing ? 'Importing…' : 'Import'}
         </Button>
       </div>
 
