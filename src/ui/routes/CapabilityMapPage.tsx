@@ -264,7 +264,7 @@ export function CapabilityMapPage() {
                 build={() => {
                   const stamp = { modelName: model.name, refLabel: stampRefLabel(ref, branchLabel), date: exportDate() };
                   return {
-                    plan: capabilityMapExportPlan({ tree: state.data.tree, mode: colourBy, supportsEdges: state.data.supportsEdges, systemsById: state.data.systemsById, stamp }),
+                    plan: capabilityMapExportPlan({ tree: state.data.tree, mode: colourBy, supportsEdges: state.data.supportsEdges, systemsById: state.data.systemsById, replacedIds: state.data.replacedIds, stamp }),
                     stamp: { ...stamp, viewLabel: capabilityMapViewLabel(colourBy) },
                   };
                 }}
@@ -342,6 +342,7 @@ export function CapabilityMapPage() {
               <CapabilityMapView
                 tree={state.data.tree}
                 supportsEdges={state.data.supportsEdges}
+                replacedIds={state.data.replacedIds}
                 enablesEdges={state.data.enablesEdges}
                 systemsById={state.data.systemsById}
                 capabilities={state.data.capabilities}

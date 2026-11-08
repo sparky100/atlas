@@ -41,6 +41,7 @@ export interface CapabilityMapEditContext {
 export interface CapabilityMapViewProps {
   tree: CapabilityMapTree;
   supportsEdges: RelationshipsHeadRow[];
+  replacedIds: ReadonlySet<UUID>;
   /** F6 Step 6: every live `enables` edge at this ref — "enables N stages" beside a domain/card's own supporting-system count (silent at zero, rule 7). */
   enablesEdges: RelationshipsHeadRow[];
   systemsById: Map<UUID, ElementsHeadRow>;
@@ -161,6 +162,7 @@ export interface CapabilityMapViewProps {
 export function CapabilityMapView({
   tree,
   supportsEdges,
+  replacedIds,
   enablesEdges,
   systemsById,
   capabilities,
@@ -211,6 +213,7 @@ export function CapabilityMapView({
               column={column}
               colourBy={colourBy}
               supportsEdges={supportsEdges}
+              replacedIds={replacedIds}
               systemsById={systemsById}
               capabilities={capabilities}
               capabilitiesById={capabilitiesById}
@@ -347,6 +350,7 @@ function DomainSection({
   column,
   colourBy,
   supportsEdges,
+  replacedIds,
   systemsById,
   capabilities,
   capabilitiesById,
@@ -370,6 +374,7 @@ function DomainSection({
   column: L1Column;
   colourBy: ColourByMode;
   supportsEdges: RelationshipsHeadRow[];
+  replacedIds: ReadonlySet<UUID>;
   systemsById: Map<UUID, ElementsHeadRow>;
   capabilities: ElementsHeadRow[];
   capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>;
@@ -398,7 +403,7 @@ function DomainSection({
   // L2/L3 descendant), deduped by system.
   const rollup = computeCapabilityRollup(column.capability, capabilities, capabilitiesById, supportsEdges, selfOwnedIds);
   const count = rollup.supportingSystemIds.length;
-  const aggregateColour = aggregateTileColourFor(colourBy, rollup.subtreeCapabilityIds, supportsEdges, systemsById);
+  const aggregateColour = aggregateTileColourFor(colourBy, rollup.subtreeCapabilityIds, supportsEdges, systemsById, replacedIds);
   const segments = domainCoverageSegments(rollup.subtreeCapabilityIds, rollup.subtreeSupportsEdges);
 
   return (
@@ -469,6 +474,7 @@ function DomainSection({
                 card={card}
                 colourBy={colourBy}
                 supportsEdges={supportsEdges}
+                replacedIds={replacedIds}
                 systemsById={systemsById}
                 orgSlug={orgSlug}
                 modelSlug={modelSlug}
@@ -517,6 +523,7 @@ function CapabilityRow({
   card,
   colourBy,
   supportsEdges,
+  replacedIds,
   systemsById,
   orgSlug,
   modelSlug,
@@ -536,6 +543,7 @@ function CapabilityRow({
   card: L2Card;
   colourBy: ColourByMode;
   supportsEdges: RelationshipsHeadRow[];
+  replacedIds: ReadonlySet<UUID>;
   systemsById: Map<UUID, ElementsHeadRow>;
   orgSlug: string;
   modelSlug: string;
@@ -554,7 +562,7 @@ function CapabilityRow({
   /** `true` for an L3 row rendered inside its own L2 parent's expanded list — indented, no expand toggle of its own (L3 has no further children). */
   nested?: boolean;
 }) {
-  const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById);
+  const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById, replacedIds);
   const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
   const marker = commentMarkerFor(threadCounts, card.capability.element_id);
 
@@ -589,6 +597,7 @@ function CapabilityRow({
               card={{ capability: leaf, l3: [] }}
               colourBy={colourBy}
               supportsEdges={supportsEdges}
+              replacedIds={replacedIds}
               systemsById={systemsById}
               orgSlug={orgSlug}
               modelSlug={modelSlug}

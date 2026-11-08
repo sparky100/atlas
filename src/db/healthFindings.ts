@@ -45,6 +45,17 @@ export async function listAllOwnsEdges(supabase: Client, commitId: string): Prom
   return selectAll<RelationshipsHeadRow>(query);
 }
 
+/** All `replaces` edges at `commitId` — ADR-001 amendment: `from_element_id` is the replacement, `to_element_id` the retiring element. Same fixed-type fetch as `listAllOwnsEdges` above (no caller-supplied id list, so no `.in()` hazard, CLAUDE.md rule 8). */
+export async function listAllReplacesEdges(supabase: Client, commitId: string): Promise<RelationshipsHeadRow[]> {
+  const query = supabase
+    .from('relationships_head')
+    .select('relationship_id, relationship_type, from_element_id, to_element_id, attributes, exists_delta_id', { count: 'exact' })
+    .eq('commit_id', commitId)
+    .eq('relationship_type', 'replaces')
+    .order('relationship_id');
+  return selectAll<RelationshipsHeadRow>(query);
+}
+
 /** All `uses`/`flows_to` edges at `commitId` — Sprint U4-1 B5's "missing a label" finding. `.in(relationship_type, ['uses', 'flows_to'])` is a small fixed enum, not a caller-supplied list that grows with the model (CLAUDE.md rule 8) — same shape `src/db/landscape.ts`'s own `.in('relationship_type', ['uses', 'flows_to'])` already uses. */
 export async function listAllUsesAndFlowsToEdges(supabase: Client, commitId: string): Promise<RelationshipsHeadRow[]> {
   const query = supabase
@@ -605,15 +616,18 @@ export function findCriticalSystemsWithoutBusinessOwner(elements: readonly Eleme
  * planned replacement" — a system-level analogue of
  * `src/ui/capabilityMap/metrics.ts`'s own `lifecycleExposure` (a
  * capability-level rollup over its supporting systems); this reads a
- * system's own `plannedEnd` directly, no rollup needed. Same "no planned
- * replacement" simplification that file's module comment documents:
- * nothing today can record a planned replacement (UI-principles §10
- * decision 4's review-queue machinery doesn't exist yet), so that half of
- * the condition is vacuously true — this narrows correctly once it does,
- * not silently wrong now.
+ * system's own `plannedEnd` directly, no rollup needed. "No planned
+ * replacement" (ADR-001 amendment) reads a real fact: a critical system in
+ * `replacedIds` (the retiring side of a live `replaces` edge,
+ * `replacedElementIds`) never counts as exposed, however near or past its
+ * own `plannedEnd`. Existence-only, same as `lifecycleExposure`'s own
+ * version of this check — the replacement's own lifecycle is
+ * `findReplacementsWithoutDeparturePlan`'s separate finding. A caller that
+ * passes no `replacedIds` gets the plain `plannedEnd` read.
  */
-export function findCriticalExposedSystems(systems: readonly ElementsHeadRow[], now: Date = new Date()): ElementsHeadRow[] {
+export function findCriticalExposedSystems(systems: readonly ElementsHeadRow[], now: Date = new Date(), replacedIds?: ReadonlySet<UUID>): ElementsHeadRow[] {
   return systems.filter((system) => {
+    if (replacedIds?.has(system.element_id)) return false;
     const attrs = attributesRecord(system.attributes);
     if (attrs.criticality !== 'critical') return false;
     const plannedEndValue = attrs.plannedEnd;
@@ -622,6 +636,33 @@ export function findCriticalExposedSystems(systems: readonly ElementsHeadRow[], 
     if (Number.isNaN(plannedEnd.getTime())) return false;
     return monthsUntil(plannedEnd, now) <= STALE_AFTER_MONTHS;
   });
+}
+
+/**
+ * ADR-001 amendment's own finding: a `replaces` edge whose *replacement*
+ * (`fromElementId`, never the retiring `toElementId`) is `active` with no
+ * `plannedEnd` recorded — today's fix silently becoming tomorrow's
+ * forgotten legacy system. Returns the replacement elements (what the
+ * Elements list can display), one per replacement however many elements it
+ * replaces. A replacement that is itself `planned`/`retiring`/`retired`, or
+ * has a `plannedEnd`, is not flagged; an edge whose replacement isn't in
+ * `elements` (retracted, or not a system/module) is skipped. Deliberately
+ * independent of `findCriticalExposedSystems`: this checks the replacement's
+ * own lifecycle, not whether the retiring system still reads exposed.
+ */
+export function findReplacementsWithoutDeparturePlan(elements: readonly ElementsHeadRow[], replacesEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
+  const byId = new Map(elements.map((e) => [e.element_id, e]));
+  const flagged = new Map<UUID, ElementsHeadRow>();
+  for (const edge of replacesEdges) {
+    if (edge.relationship_type !== 'replaces') continue;
+    const replacement = byId.get(edge.from_element_id);
+    if (!replacement || flagged.has(replacement.element_id)) continue;
+    const attrs = attributesRecord(replacement.attributes);
+    if (attrs.lifecycleStatus !== 'active') continue;
+    if (typeof attrs.plannedEnd === 'string' && attrs.plannedEnd.trim() !== '') continue;
+    flagged.set(replacement.element_id, replacement);
+  }
+  return [...flagged.values()];
 }
 
 /**

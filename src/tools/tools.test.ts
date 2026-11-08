@@ -191,7 +191,7 @@ describe('list_health_findings', () => {
   it('counts every check, and lists the elements one flagged, by the product\'s own definitions', async () => {
     const ctx = estateContext();
     const all = data(await callTool(ctx, 'list_health_findings', {})) as { findings: { finding: string; label: string; count: number }[] };
-    expect(all.findings).toHaveLength(13);
+    expect(all.findings).toHaveLength(14);
     const count = (key: string) => all.findings.find((f) => f.finding === key)?.count;
     expect(count('unlinked-systems')).toBe(1); // Data Warehouse supports nothing
     expect(count('no-technical-owner')).toBeGreaterThan(0);

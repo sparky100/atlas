@@ -34,13 +34,13 @@
  *   a supporting system whose `plannedEnd` falls within
  *   `STALE_AFTER_MONTHS` (reusing the one global threshold, not a second
  *   one invented for this) and has no planned replacement. "No planned
- *   replacement" is UI-principles §10 decision 4's own definition — a
- *   retract delta in the same approved change — which needs the review
- *   queue/decision machinery Sprint U2 doesn't build; until that exists,
- *   nothing can ever record a planned replacement, so that half of the
- *   condition is vacuously true today. This is a documented, honest
- *   simplification (the condition narrows correctly once replacement
- *   tracking exists), not a silently wrong implementation.
+ *   replacement" (ADR-001 amendment) reads a real fact: a supporting
+ *   system with a live `replaces` edge into it (`replacedIds`, from
+ *   `replacedElementIds` — the retiring side) never counts as exposed,
+ *   however near or past its own `plannedEnd`. Existence-only: the
+ *   replacement's own lifecycle is a separate concern
+ *   (`findReplacementsWithoutDeparturePlan`, `src/db/healthFindings.ts`).
+ *   A caller that passes no `replacedIds` gets the plain `plannedEnd` read.
  * - **Criticality** (`criticality`): the most-severe `criticality` value
  *   (`low` < `medium` < `high` < `critical`) among a capability's
  *   supporting systems — worst-of, the same shape as oldest-lifecycle-
@@ -85,9 +85,9 @@ import { FIT_FOR_PURPOSE_ORDER, FIT_FOR_PURPOSE_TONE } from '../elements/fitForP
 import { LIFECYCLE_ORDER, LIFECYCLE_TONE } from '../elements/lifecycleTone';
 import { dispositionLabel, dispositionOf, dispositionTone, worstDisposition } from '../elements/disposition';
 import { domainOf } from '../elements/systemDomain';
-import { fitForPurposeOf, hasLifecycleExposureData, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../../engine/elementRead/fitAndExposure';
+import { fitForPurposeOf, hasLifecycleExposureData, replacedElementIds, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../../engine/elementRead/fitAndExposure';
 
-export { fitForPurposeOf, hasLifecycleExposureData, systemsExposedByLifecycle, worstFitForPurposeOfSupporter };
+export { fitForPurposeOf, hasLifecycleExposureData, replacedElementIds, systemsExposedByLifecycle, worstFitForPurposeOfSupporter };
 
 // The mode identifiers themselves are canonical in src/contracts/userPreferences.ts
 // (Sprint U4-1 C4: they're now persisted, `user_preferences.capability_map_colour_by`)
@@ -268,17 +268,17 @@ export function otShareOf(capabilityId: UUID, supportsEdges: readonly Relationsh
   return { ot, total: ids.length };
 }
 
-export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): boolean {
+export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date(), replacedIds?: ReadonlySet<UUID>): boolean {
   const systems: ElementsHeadRow[] = [];
   for (const systemId of supportingSystemIds(capabilityId, supportsEdges)) {
     const system = systemsById.get(systemId);
     if (system) systems.push(system);
   }
-  return systemsExposedByLifecycle(systems, now);
+  return systemsExposedByLifecycle(systems, now, replacedIds);
 }
 
 /** The tone+label a tile should show for the selected colour-by mode — `mode: 'none'` always returns no tone and no label. */
-export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): TileColour {
+export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, replacedIds?: ReadonlySet<UUID>): TileColour {
   switch (mode) {
     case 'none':
       return { tone: undefined, label: undefined };
@@ -297,7 +297,7 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
       return stage === null ? { tone: undefined, label: undefined } : { tone: LIFECYCLE_TONE[stage], label: stage };
     }
     case 'metric:lifecycleExposure': {
-      const exposed = lifecycleExposure(capabilityId, supportsEdges, systemsById);
+      const exposed = lifecycleExposure(capabilityId, supportsEdges, systemsById, new Date(), replacedIds);
       return exposed ? { tone: 'danger', label: 'exposed' } : { tone: undefined, label: undefined };
     }
     case 'metric:criticality': {
@@ -352,7 +352,7 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
  * plain id list rather than this file taking a dependency on `layout.ts`'s
  * tree shape.
  */
-export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityIds: readonly UUID[], supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): TileColour {
+export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityIds: readonly UUID[], supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, replacedIds?: ReadonlySet<UUID>): TileColour {
   if (descendantCapabilityIds.length === 0) return { tone: undefined, label: undefined };
   switch (mode) {
     case 'none':
@@ -370,7 +370,7 @@ export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityI
       return worst === null ? { tone: undefined, label: undefined } : { tone: LIFECYCLE_TONE[worst], label: worst };
     }
     case 'metric:lifecycleExposure': {
-      const exposed = descendantCapabilityIds.some((id) => lifecycleExposure(id, supportsEdges, systemsById));
+      const exposed = descendantCapabilityIds.some((id) => lifecycleExposure(id, supportsEdges, systemsById, new Date(), replacedIds));
       return exposed ? { tone: 'danger', label: 'exposed' } : { tone: undefined, label: undefined };
     }
     case 'metric:criticality': {

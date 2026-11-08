@@ -43,16 +43,37 @@ export function plannedEndOf(system: ElementsHeadRow): Date | null {
 }
 
 /**
+ * The ids of every element with a live `replaces` edge pointing at it —
+ * `to_element_id`, the retiring side ("B replaces A" is `from: B, to: A`,
+ * ADR-001 amendment). Non-`replaces` edges in `edges` are ignored, so a
+ * caller can pass a mixed list. Pure.
+ */
+export function replacedElementIds(edges: readonly RelationshipsHeadRow[]): Set<UUID> {
+  const ids = new Set<UUID>();
+  for (const edge of edges) {
+    if (edge.relationship_type === 'replaces') ids.add(edge.to_element_id);
+  }
+  return ids;
+}
+
+/**
  * `true` when any of `systems` has a `plannedEnd` falling within
  * `STALE_AFTER_MONTHS` of `now` — including one already overdue, which is
- * more exposed still, not less. The reusable core `lifecycleExposure`
- * delegates to (and that the decision page's "Trigger resolved" row,
- * `whatChangesRows.ts`, also calls directly against a system/container
- * concern's own singleton system list) — see the module comment for why
- * "no planned replacement" isn't (yet) a separate check.
+ * more exposed still, not less — **and** has no recorded replacement.
+ * "No planned replacement" (ADR-001 amendment, `replaces`) reads a real
+ * fact: a system in `replacedIds` (the retiring side of a live `replaces`
+ * edge, `replacedElementIds`) never counts as exposed, however near or
+ * past its own `plannedEnd`. Existence-only — the replacement's own
+ * lifecycle is `findReplacementsWithoutDeparturePlan`'s concern, not this
+ * check's. `replacedIds` is optional so a caller that hasn't loaded
+ * `replaces` edges keeps the plain `plannedEnd` reading. The reusable core
+ * `lifecycleExposure` delegates to (and that the decision page's "Trigger
+ * resolved" row, `whatChangesRows.ts`, also calls directly against a
+ * system/container concern's own singleton system list).
  */
-export function systemsExposedByLifecycle(systems: readonly ElementsHeadRow[], now: Date = new Date()): boolean {
+export function systemsExposedByLifecycle(systems: readonly ElementsHeadRow[], now: Date = new Date(), replacedIds?: ReadonlySet<UUID>): boolean {
   for (const system of systems) {
+    if (replacedIds?.has(system.element_id)) continue;
     const plannedEnd = plannedEndOf(system);
     if (plannedEnd !== null && monthsUntil(plannedEnd, now) <= STALE_AFTER_MONTHS) return true;
   }

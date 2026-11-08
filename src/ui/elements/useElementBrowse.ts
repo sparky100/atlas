@@ -18,6 +18,7 @@ import {
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
+  findReplacementsWithoutDeparturePlan,
   findPlatformSupportsThatShouldMoveToModule,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
@@ -25,9 +26,11 @@ import {
   findUnusedIntegrationInterfaces,
   findUnusedIntegrationPlatforms,
   listAllOwnsEdges,
+  listAllReplacesEdges,
   listAllUsesAndFlowsToEdges,
   listFactsForCommit,
 } from '../../db/healthFindings';
+import { replacedElementIds } from '../../engine/elementRead/fitAndExposure';
 import { listAllSupportsEdges } from '../../db/modelHome';
 import { computeCapabilityMapTree } from '../capabilityMap/layout';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
@@ -68,6 +71,8 @@ export type ElementBrowseFilter =
   | 'no-technical-owner'
   | 'critical-no-business-owner'
   | 'critical-exposed'
+  /** ADR-001 amendment: active replacements with no `plannedEnd` of their own (`findReplacementsWithoutDeparturePlan`). */
+  | 'replacement-no-departure-plan'
   | 'unused-integration-platform'
   /** ADR-026: interfaces on an integration platform nothing flows via (`findUnusedIntegrationInterfaces`). */
   | 'unused-integration-interface'
@@ -223,6 +228,7 @@ export function useElementBrowse(
       /** Deferred so the common filter logic below can `await` it only for the two filters that actually need it — a real query for main/tag, an already-in-memory filter for a branch ref (see this hook's own module comment). */
       let getFacts: () => Promise<FactsRow[]>;
       let getUsesAndFlowsToEdges: () => Promise<RelationshipsHeadRow[]>;
+      let getReplacesEdges: () => Promise<RelationshipsHeadRow[]>;
 
       if (ref.kind === 'branch') {
         const branch = await resolveBranchRef(supabase, ref);
@@ -244,6 +250,7 @@ export function useElementBrowse(
         ownersByElementId = ownersByElementIdFromOwnsEdges(ownsEdges, elementsByIdForOwners);
         getFacts = () => Promise.resolve(projection.facts);
         getUsesAndFlowsToEdges = () => Promise.resolve(projection.relationshipsHead.filter((r) => r.relationship_type === 'uses' || r.relationship_type === 'flows_to'));
+        getReplacesEdges = () => Promise.resolve(projection.relationshipsHead.filter((r) => r.relationship_type === 'replaces'));
       } else {
         const commitId = ref.kind === 'main' && mainCommitIdHint ? mainCommitIdHint : await resolveRef(supabase, modelId, ref);
         if (!commitId) {
@@ -267,6 +274,7 @@ export function useElementBrowse(
         ownersByElementId = ownersByElementIdFromOwnsEdges(ownsEdges, elementsByIdForOwners);
         getFacts = () => listFactsForCommit(supabase, commitId);
         getUsesAndFlowsToEdges = () => listAllUsesAndFlowsToEdges(supabase, commitId);
+        getReplacesEdges = () => listAllReplacesEdges(supabase, commitId);
       }
       const elementsById = new Map<UUID, ElementsHeadRow>(elements.map((e) => [e.element_id, e]));
 
@@ -296,7 +304,13 @@ export function useElementBrowse(
         ids = new Set(findCriticalSystemsWithoutBusinessOwner([...systems, ...containers], ownsEdges).map((e) => e.element_id));
       } else if (filter === 'critical-exposed') {
         const systems = elements.filter((e) => e.element_type === 'system');
-        ids = new Set(findCriticalExposedSystems(systems).map((e) => e.element_id));
+        const replacesEdges = await getReplacesEdges();
+        ids = new Set(findCriticalExposedSystems(systems, new Date(), replacedElementIds(replacesEdges)).map((e) => e.element_id));
+      } else if (filter === 'replacement-no-departure-plan') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const containers = elements.filter((e) => e.element_type === 'container');
+        const replacesEdges = await getReplacesEdges();
+        ids = new Set(findReplacementsWithoutDeparturePlan([...systems, ...containers], replacesEdges).map((e) => e.element_id));
       } else if (filter === 'unused-integration-platform') {
         const systems = elements.filter((e) => e.element_type === 'system');
         const usesAndFlowsToEdges = await getUsesAndFlowsToEdges();
