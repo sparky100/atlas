@@ -51,6 +51,8 @@ export interface RoadmapLifecycleBar {
   ownerActorIds: UUID[];
   /** The bar's own level-1 capability id (via its primary `supports` edge), or `undefined` when it has none — the capability *filter facet* matches against this rather than the group key, so it behaves identically under capability and value-stream grouping. */
   capabilityKey?: UUID;
+  /** Every capability this system supports through any `supports` edge (main or also), plus each one's ancestors — so filtering by a sub-capability, or by a capability the system only also supports, still finds it. */
+  supportedCapabilityIds?: UUID[];
 }
 
 export interface RoadmapGroup {
@@ -78,7 +80,21 @@ function ownerActorIdsOf(systemId: UUID, ownsEdges: readonly RelationshipsHeadRo
 }
 
 /** `undefined` when a system carries none of the three lifecycle dates — nothing for a timeline to draw, so it's dropped rather than shown as an empty bar (rule 7). */
-function lifecycleBarOf(system: ElementsHeadRow, ownsEdges: readonly RelationshipsHeadRow[]): RoadmapLifecycleBar | null {
+function supportedCapabilityIdsOf(systemId: UUID, supportsEdges: readonly RelationshipsHeadRow[], capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>): UUID[] {
+  const ids = new Set<UUID>();
+  for (const edge of supportsEdges) {
+    if (edge.from_element_id !== systemId) continue;
+    let current: ElementsHeadRow | undefined = capabilitiesById.get(edge.to_element_id);
+    // Walk up through parents; the visited check also guards against a malformed parent cycle.
+    while (current !== undefined && !ids.has(current.element_id)) {
+      ids.add(current.element_id);
+      current = current.parent_id === null ? undefined : capabilitiesById.get(current.parent_id);
+    }
+  }
+  return [...ids];
+}
+
+function lifecycleBarOf(system: ElementsHeadRow, ownsEdges: readonly RelationshipsHeadRow[], supportsEdges: readonly RelationshipsHeadRow[], capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>): RoadmapLifecycleBar | null {
   const attrs = attributesRecord(system.attributes);
   const introduced = typeof attrs.introduced === 'string' ? attrs.introduced : undefined;
   const plannedEnd = typeof attrs.plannedEnd === 'string' ? attrs.plannedEnd : undefined;
@@ -93,6 +109,7 @@ function lifecycleBarOf(system: ElementsHeadRow, ownsEdges: readonly Relationshi
     criticality: typeof attrs.criticality === 'string' ? attrs.criticality : undefined,
     lifecycleStatus: typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : undefined,
     ownerActorIds: ownerActorIdsOf(system.element_id, ownsEdges),
+    supportedCapabilityIds: supportedCapabilityIdsOf(system.element_id, supportsEdges, capabilitiesById),
   };
 }
 
@@ -130,7 +147,7 @@ export function groupRoadmapLifecycleBars(
   const groups = new Map<string, RoadmapGroup>();
 
   for (const system of systems) {
-    const bar = lifecycleBarOf(system, ownsEdges);
+    const bar = lifecycleBarOf(system, ownsEdges, supportsEdges, capabilitiesById);
     if (!bar) continue;
 
     const primaryCapabilityId = primarySupportsCapabilityId(system.element_id, supportsEdges);
@@ -170,7 +187,7 @@ export function groupBarsByValueStream(
   const groups = new Map<string, RoadmapGroup>();
 
   for (const system of systems) {
-    const bar = lifecycleBarOf(system, ownsEdges);
+    const bar = lifecycleBarOf(system, ownsEdges, supportsEdges, capabilitiesById);
     if (!bar) continue;
 
     const primaryCapabilityId = primarySupportsCapabilityId(system.element_id, supportsEdges);
@@ -247,7 +264,7 @@ export function groupBarsByProject(
 
   const groups = new Map<string, RoadmapGroup>();
   for (const system of systems) {
-    const bar = lifecycleBarOf(system, ownsEdges);
+    const bar = lifecycleBarOf(system, ownsEdges, supportsEdges, capabilitiesById);
     if (!bar) continue;
     const primaryCapabilityId = primarySupportsCapabilityId(system.element_id, supportsEdges);
     const l1 = primaryCapabilityId !== null ? l1AncestorOf(primaryCapabilityId, capabilitiesById) : null;

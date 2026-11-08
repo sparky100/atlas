@@ -47,7 +47,11 @@ function isSupportEndingSoon(bar: RoadmapLifecycleBar, now: Date): boolean {
  * other, unrelated per-bar capability field.
  */
 export function matchesRoadmapFilters(bar: RoadmapLifecycleBar, groupKey: string, filters: RoadmapFilters, now: Date = new Date()): boolean {
-  if (filters.capabilityIds.length > 0 && !filters.capabilityIds.includes(groupKey)) return false;
+  if (filters.capabilityIds.length > 0) {
+    // A capability at any level, via any supports edge (main or also); falls back to the group key for a bar built without the full list.
+    const supported = bar.supportedCapabilityIds ?? [groupKey];
+    if (!filters.capabilityIds.some((id) => supported.includes(id) || id === groupKey)) return false;
+  }
   if (filters.ownerIds.length > 0 && !filters.ownerIds.some((id) => bar.ownerActorIds.includes(id))) return false;
   if (filters.criticalities.length > 0 && (bar.criticality === undefined || !filters.criticalities.includes(bar.criticality as Criticality))) return false;
   if (filters.supportEndingSoon && !isSupportEndingSoon(bar, now)) return false;

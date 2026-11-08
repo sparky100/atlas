@@ -85,7 +85,13 @@ function FacetDisclosure<T extends string>({ title, values, options, onToggle }:
  */
 export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange, groupBy, onGroupByChange, granularity, onGranularityChange, horizon, onHorizonChange, onNudge, onResetToday, capabilitiesById, ownerActorsById }: RoadmapFilterBarProps) {
   const active = hasActiveRoadmapFilters(filters);
-  const capabilityOptions = [...capabilitiesById.values()].map((c) => ({ value: c.element_id, label: c.name })).sort((a, b) => a.label.localeCompare(b.label));
+  // A sub-capability is labelled with its parent ("Billing › Invoicing") so two capabilities with the same name stay distinguishable.
+  const capabilityOptions = [...capabilitiesById.values()]
+    .map((c) => {
+      const parent = c.parent_id !== null ? capabilitiesById.get(c.parent_id) : undefined;
+      return { value: c.element_id, label: parent ? `${parent.name} › ${c.name}` : c.name };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
   const ownerOptions = [...ownerActorsById.values()].map((a) => ({ value: a.element_id, label: a.name })).sort((a, b) => a.label.localeCompare(b.label));
 
   return (
