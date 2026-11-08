@@ -142,6 +142,8 @@ export interface ElementHeaderProps {
    * place a reader might have looked for it).
    */
   contextHref?: string | undefined;
+  /** A capability's own "View on roadmap" — the roadmap already filtered to this capability. */
+  roadmapHref?: string | undefined;
 }
 
 /**
@@ -177,7 +179,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, interfacePlatform, contextHref, startProjectHref }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, interfacePlatform, contextHref, roadmapHref, startProjectHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuId = useId();
@@ -317,6 +319,11 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
         {contextHref && (
           <LinkButton to={contextHref} variant="secondary">
             Context →
+          </LinkButton>
+        )}
+        {roadmapHref && (
+          <LinkButton to={roadmapHref} variant="secondary">
+            View on roadmap →
           </LinkButton>
         )}
         <div className={styles.menuWrapper}>
