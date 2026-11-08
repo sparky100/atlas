@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captureJobStatusLabel, captureJobStatusTone } from './captureJobStatus';
+import { captureInputFormatLabel, captureJobStatusLabel, captureJobStatusTone } from './captureJobStatus';
 
 describe('captureJobStatusTone / captureJobStatusLabel', () => {
   it('maps every non-pending status to a tone and label (never colour-only, branchStatus.ts\'s own sibling rule)', () => {
@@ -22,5 +22,16 @@ describe('captureJobStatusTone / captureJobStatusLabel', () => {
     const error = { code: 'CAPTURE_RUN_FAILED', message: 'boom' };
     expect(captureJobStatusTone({ status: 'pending', error })).toBe('danger');
     expect(captureJobStatusLabel({ status: 'pending', error })).toBe('Failed');
+  });
+});
+
+describe('captureInputFormatLabel', () => {
+  it('names the real format, not the shared "spreadsheet" bucket', () => {
+    expect(captureInputFormatLabel({ inputKind: 'spreadsheet', inputName: 'meridian-retail.import.json' })).toBe('JSON');
+    expect(captureInputFormatLabel({ inputKind: 'spreadsheet', inputName: 'Systems.CSV' })).toBe('CSV');
+    expect(captureInputFormatLabel({ inputKind: 'spreadsheet', inputName: 'register.xlsx' })).toBe('Excel');
+    expect(captureInputFormatLabel({ inputKind: 'spreadsheet', inputName: 'register' })).toBe('Spreadsheet');
+    expect(captureInputFormatLabel({ inputKind: 'pdf', inputName: 'catalogue.pdf' })).toBe('PDF');
+    expect(captureInputFormatLabel({ inputKind: 'text', inputName: 'pasted-text.txt' })).toBe('Text');
   });
 });
