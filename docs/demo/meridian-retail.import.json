@@ -327,7 +327,7 @@
       "introduced": "2013-12-01"
     },
     {
-      "name": "MHHS Settlement Engine",
+      "name": "MHHS Reconciliation Hub",
       "capability": "Market-wide Half-Hourly Settlement (MHHS)",
       "kind": "application",
       "lifecycle": "planned",
@@ -341,7 +341,7 @@
       "description": "Planned market-wide half-hourly settlement capability.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9,
-      "introduced": "2027-12-01"
+      "introduced": "2027-11-01"
     },
     {
       "name": "Position & Imbalance Monitor",
@@ -1239,7 +1239,7 @@
       "confidence": 0.85
     },
     {
-      "from": "MHHS Settlement Engine",
+      "from": "MHHS Reconciliation Hub",
       "type": "flows_to",
       "to": "MHHS Data Integration Platform",
       "description": "exchanges settlement data with",
@@ -1250,7 +1250,7 @@
     {
       "from": "Itron Meter Data Management",
       "type": "flows_to",
-      "to": "MHHS Settlement Engine",
+      "to": "MHHS Reconciliation Hub",
       "description": "provides half-hourly data to",
       "via": "MuleSoft Anypoint \u00b7 Settlement Data Feed",
       "data_classification": "official_sensitive",

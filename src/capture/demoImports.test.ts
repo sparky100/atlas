@@ -8,6 +8,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { IDENTITY_TRIGRAM_THRESHOLD, trigramSimilarity } from '../engine/trigram';
+import { normaliseName } from './normalise';
 import { parseImportJsonText } from './parseImportJson';
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -52,6 +54,18 @@ describe.each(DEMOS)('demo import $file', ({ file, map }) => {
       ...raw.changes.flatMap((c) => [c.name, c.replaced_by].filter((x): x is string => !!x && !resolves(x))),
     ];
     expect(bad).toEqual([]);
+  });
+
+  it('has no two systems (or modules of one platform) so similarly named that the importer treats them as one', () => {
+    // The importer merges near-identical names (trigram identity threshold): "Settlement Engine" and "MHHS Settlement Engine" collapsed into one element, and re-importing then wrote the same ownership edge twice and failed.
+    const similar: string[] = [];
+    raw.systems.forEach((a, i) => {
+      raw.systems.slice(i + 1).forEach((b) => {
+        if ((a.platform ?? '') !== (b.platform ?? '')) return;
+        if (trigramSimilarity(normaliseName(a.name), normaliseName(b.name)) >= IDENTITY_TRIGRAM_THRESHOLD) similar.push(`${a.name} ~ ${b.name}`);
+      });
+    });
+    expect(similar).toEqual([]);
   });
 
   it('never names an external organisation as an owner (an external actor can only own with the service role, C20)', () => {
