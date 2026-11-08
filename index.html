@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Atlas</title>
+    <!-- Open the connection to Supabase while the bundle downloads: a cold load otherwise pays the handshake on its first read. -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
     <!--
       Runs before any stylesheet or the app bundle, synchronously, so
       data-theme/data-density are on <html> before first paint — UI-

@@ -98,6 +98,18 @@ export function useStructureView(
       let children;
       let relationships;
       let elementsById;
+      let earlyView: ReturnType<typeof getOrCreateScopedView> | undefined;
+      const createView = (parentRow: { name: string }) =>
+        getOrCreateScopedView(supabase, {
+          id: crypto.randomUUID(),
+          orgId,
+          modelId,
+          kind: config.viewKind,
+          name: `${config.viewNamePrefix}: ${parentRow.name}`,
+          scopeElementId: parentId,
+          createdBy: currentUserId,
+          branchId,
+        });
 
       if (ref.kind === 'branch') {
         const branch = await resolveBranchRef(supabase, ref);
@@ -130,28 +142,24 @@ export function useStructureView(
           return;
         }
         commitId = resolvedCommitId;
-        parent = await getElementHead(supabase, commitId, parentId);
+        // Parent and children don't depend on each other — one round trip, not two.
+        const [loadedParent, loadedChildren] = await Promise.all([getElementHead(supabase, commitId, parentId), listChildrenOf(supabase, commitId, parentId)]);
+        parent = loadedParent;
         if (parent?.element_type !== config.parentType) {
           if (!cancelled) setState({ status: 'notPresentAtRef' });
           return;
         }
-        children = await listChildrenOf(supabase, commitId, parentId);
+        children = loadedChildren;
+        // The saved-view lookup only needs the parent: start it now, alongside the relationship reads below, instead of after them.
+        earlyView = createView(parent);
+        earlyView.catch(() => undefined);
         const childIds = children.map((c) => c.element_id);
         relationships = await listRelationshipsTouchingAny(supabase, commitId, childIds, config.relationshipTypes);
         const externalIds = [...new Set(relationships.flatMap((r) => [r.from_element_id, r.to_element_id]).filter((id) => !childIds.includes(id)))];
         elementsById = await getElementsByIds(supabase, commitId, externalIds);
       }
 
-      const view = await getOrCreateScopedView(supabase, {
-        id: crypto.randomUUID(),
-        orgId,
-        modelId,
-        kind: config.viewKind,
-        name: `${config.viewNamePrefix}: ${parent.name}`,
-        scopeElementId: parentId,
-        createdBy: currentUserId,
-        branchId,
-      });
+      const view = await (earlyView ?? createView(parent));
       const group = computeStructureGroup(parent, children, relationships, elementsById);
 
       if (!cancelled) setState({ status: 'ready', data: { commitId, view, group, diff } });
