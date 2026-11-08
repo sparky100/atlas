@@ -17,7 +17,7 @@ import { promises as fs } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { goToModelHome, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
-test('choose the MuleSoft source, read its guide, upload an export and review the converted platform', async ({ page }, testInfo) => {
+test('choose the MuleSoft source card, read its guide, upload an export and review the converted platform', async ({ page }, testInfo) => {
   const exportPath = testInfo.outputPath('mulesoft-export.json');
   await fs.writeFile(
     exportPath,
@@ -51,7 +51,7 @@ test('choose the MuleSoft source, read its guide, upload an export and review th
   const dialog = page.getByRole('dialog', { name: 'Start a capture run' });
   await expect(dialog).toBeVisible();
 
-  await dialog.getByRole('button', { name: 'MuleSoft Anypoint' }).click();
+  await dialog.getByRole('radio', { name: /MuleSoft Anypoint/ }).click();
   await expect(dialog.getByText('Check the file for anything confidential', { exact: false })).toBeVisible();
 
   const [download] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', { name: 'Download the export script' }).click()]);
