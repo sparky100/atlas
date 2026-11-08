@@ -34,6 +34,14 @@ To keep a hostname for every later import, open the backend system's element pag
 
 Mapped APIs produce `flows_to` the backend via the interface (shown on the platform's Context view); unmapped ones leave the consumer linked to the interface only, and the platform page shows that interface with no flows.
 
+## If the export script reports a problem
+
+The script retries a failed CLI call twice, gives each call two minutes, and turns the common failures into plain steps (CLI not installed, not logged in, no API Manager access, unknown environment name). Anything it cannot read is written into the file as a warning, and Atlas lists those warnings when you upload it (prefixed "Export script:"). Treat a warning as "this export is incomplete":
+
+- **Contracts for an API could not be read:** that API's client applications are missing from the import. Fix the cause and export again.
+- **The CLI listed no APIs:** check the environment name and that your login can see API Manager there.
+- **The CLI listed exactly 20, 50 or 100 APIs:** that may be a page limit in the CLI, which is not confirmed. Compare with the count in API Manager before relying on the export.
+
 ## Importing again later
 
 Export again and upload the new file through the same dialog; when it has the same file name, the dialog offers it as a replacement for the earlier run. The converter gives the same rows for the same export whatever order the CLI lists things in, so:
