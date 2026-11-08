@@ -10,8 +10,8 @@ import {
   projectionSupportsEdgesForSystems,
   projectionSystemsForLandscape,
 } from '../../db/branchProjection';
-import { getElementsByIds } from '../../db/elements';
-import { listActorsForLandscape, listContainersForLandscape, listLandscapeEdges, listOwnsEdgesForSystems, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
+import { listCapabilitiesForMap } from '../../db/capabilityMap';
+import { filterLandscapeEdges, filterOwnsEdgesForSystems, filterSupportsEdgesForSystems, listActorsForLandscape, listAllLandscapeEdgeRows, listAllOwnsEdgeRows, listAllSupportsEdgeRows, listContainersForLandscape, listSystemsForLandscape } from '../../db/landscape';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import { getOrCreateModelView } from '../../db/views';
 import type { ViewMode } from '../../db/viewMode';
@@ -182,6 +182,30 @@ export function useLandscape(
       let allContainers: ElementsHeadRow[];
       let branchId: UUID | null = null;
       let diff: VersionDiff | null = null;
+      // Populated only for `main`/a tag: everything that needs just the
+      // commit id, fetched in ONE parallel round (it used to be three
+      // dependent rounds — lists, then edges, then capability ancestors —
+      // plus the saved-view lookup after all of those). Edge rows are
+      // fetched whole and narrowed in memory below (CLAUDE.md rule 8's
+      // shape); the capability list gives every level-1 ancestor without
+      // the old per-level lookups.
+      let commitScope:
+        | { edgeRows: RelationshipsHeadRow[]; supportsRows: RelationshipsHeadRow[]; ownsRows: RelationshipsHeadRow[]; capabilities: ElementsHeadRow[]; view: ViewRow }
+        | undefined;
+      const loadCommitScope = async (commit: UUID): Promise<[ElementsHeadRow[], ElementsHeadRow[], ElementsHeadRow[]]> => {
+        const [systems, actors, containers, edgeRows, supportsRows, ownsRows, capabilities, view] = await Promise.all([
+          listSystemsForLandscape(supabase, commit),
+          listActorsForLandscape(supabase, commit),
+          listContainersForLandscape(supabase, commit),
+          listAllLandscapeEdgeRows(supabase, commit),
+          listAllSupportsEdgeRows(supabase, commit),
+          listAllOwnsEdgeRows(supabase, commit),
+          listCapabilitiesForMap(supabase, commit),
+          getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId: currentOrgId, modelId: currentModelId, kind: 'landscape', name: 'Landscape', createdBy: currentUserId, branchId: null }),
+        ]);
+        commitScope = { edgeRows, supportsRows, ownsRows, capabilities, view };
+        return [systems, actors, containers];
+      };
       // Populated only for a branch ref, closed over below so every
       // downstream query (edges, supports, capability lookups) reads the
       // same folded state instead of re-resolving it per call.
@@ -219,11 +243,7 @@ export function useLandscape(
         // itself (systems/actors) is unique to this hook, same as the
         // fallback branch below.
         commitId = mainCommitIdHint;
-        [allSystems, allActors, allContainers] = await Promise.all([
-          listSystemsForLandscape(supabase, commitId),
-          listActorsForLandscape(supabase, commitId),
-          listContainersForLandscape(supabase, commitId),
-        ]);
+        [allSystems, allActors, allContainers] = await loadCommitScope(commitId);
       } else {
         const resolvedCommitId = await resolveRef(supabase, currentModelId, ref);
         if (!resolvedCommitId) {
@@ -231,11 +251,7 @@ export function useLandscape(
           return;
         }
         commitId = resolvedCommitId;
-        [allSystems, allActors, allContainers] = await Promise.all([
-          listSystemsForLandscape(supabase, commitId),
-          listActorsForLandscape(supabase, commitId),
-          listContainersForLandscape(supabase, commitId),
-        ]);
+        [allSystems, allActors, allContainers] = await loadCommitScope(commitId);
       }
 
       // "Platforms and modules": a platform's own module (Container)
@@ -262,20 +278,35 @@ export function useLandscape(
       // actor's id in this fetch's own endpoint set too, or it's silently
       // dropped the way a systems-only fetch always used to.
       const actorIds = allActors.map((a) => a.element_id);
-      const [edges, supportsEdges, ownsEdges] = systemsSource
-        ? [systemsSource.edges(systemIds, actorIds), systemsSource.supports(systemIds), systemsSource.owns(systemIds)]
-        : await Promise.all([
-            listLandscapeEdges(supabase, commitId, systemIds, actorIds),
-            listSupportsEdgesForSystems(supabase, commitId, systemIds),
-            listOwnsEdgesForSystems(supabase, commitId, systemIds),
-          ]);
-      const byIds: (ids: readonly UUID[]) => Promise<Map<UUID, ElementsHeadRow>> = systemsSource ? (ids) => Promise.resolve(systemsSource.byIds([...ids])) : (ids) => getElementsByIds(supabase, commitId, ids);
-      const l1AncestorByCapabilityId = await loadL1AncestorByCapabilityId(byIds, supportsEdges);
-
-      // Still recorded (ADR-011: "a view is a saved query") — just never
-      // consulted for layout any more (item 6). `getOrCreateScopedView`'s
-      // own module comment names capability_map's identical stance.
-      const view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId: currentOrgId, modelId: currentModelId, kind: 'landscape', name: 'Landscape', createdBy: currentUserId, branchId });
+      let edges: RelationshipsHeadRow[];
+      let supportsEdges: RelationshipsHeadRow[];
+      let ownsEdges: RelationshipsHeadRow[];
+      let l1AncestorByCapabilityId: Map<UUID, ElementsHeadRow>;
+      let view: ViewRow;
+      if (systemsSource) {
+        edges = systemsSource.edges(systemIds, actorIds);
+        supportsEdges = systemsSource.supports(systemIds);
+        ownsEdges = systemsSource.owns(systemIds);
+        const projectionByIds = systemsSource.byIds;
+        l1AncestorByCapabilityId = await loadL1AncestorByCapabilityId((ids) => Promise.resolve(projectionByIds([...ids])), supportsEdges);
+        // Still recorded (ADR-011: "a view is a saved query") — just never
+        // consulted for layout any more (item 6). `getOrCreateScopedView`'s
+        // own module comment names capability_map's identical stance.
+        view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId: currentOrgId, modelId: currentModelId, kind: 'landscape', name: 'Landscape', createdBy: currentUserId, branchId });
+      } else if (commitScope) {
+        edges = filterLandscapeEdges(commitScope.edgeRows, systemIds, actorIds);
+        supportsEdges = filterSupportsEdgesForSystems(commitScope.supportsRows, systemIds);
+        ownsEdges = filterOwnsEdgesForSystems(commitScope.ownsRows, systemIds);
+        const capabilitiesById = new Map(commitScope.capabilities.map((c) => [c.element_id, c]));
+        l1AncestorByCapabilityId = new Map();
+        for (const id of new Set(supportsEdges.map((edge) => edge.to_element_id))) {
+          const l1 = l1AncestorOf(id, capabilitiesById);
+          if (l1) l1AncestorByCapabilityId.set(id, l1);
+        }
+        view = commitScope.view;
+      } else {
+        throw new Error('useLandscape: no data source resolved');
+      }
 
       const systemsById = new Map(allSystems.map((s) => [s.element_id, s]));
       const actorsById = new Map(allActors.map((a) => [a.element_id, a]));

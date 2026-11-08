@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import { projectionElementsByIds } from '../../db/branchProjection';
-import { hasAnySystem, listSupportsEdgesForCapabilities, listCapabilitiesForMap } from '../../db/capabilityMap';
+import { hasAnySystem, listSupportsEdgesForAllCapabilities, listCapabilitiesForMap } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
 import { listOwnsEdges } from '../../db/elementBrowse';
 import { computeSelfOwnedCapabilityIds } from '../../db/healthFindings';
@@ -100,6 +100,7 @@ export function useCapabilityMap(
       let ownsEdges: RelationshipsHeadRow[];
       let actorsById: Map<UUID, ElementsHeadRow>;
       let enablesEdges: RelationshipsHeadRow[];
+      let preloadedView: ViewRow | null = null;
 
       if (ref.kind === 'branch') {
         const branch = await resolveBranchRef(supabase, ref);
@@ -150,13 +151,28 @@ export function useCapabilityMap(
         }
         commitId = resolvedCommitId;
 
-        const [caps, hasSys] = await Promise.all([listCapabilitiesForMap(supabase, commitId), hasAnySystem(supabase, commitId)]);
+        // Round 1: every read that needs only the commit id, together —
+        // this used to be eight requests one after another. The saved-view
+        // lookup is independent of the data entirely, so it rides along.
+        const [caps, hasSys, loadedSupportsEdges, loadedOwnsEdges, loadedEnablesEdges, loadedView] = await Promise.all([
+          listCapabilitiesForMap(supabase, commitId),
+          hasAnySystem(supabase, commitId),
+          listSupportsEdgesForAllCapabilities(supabase, commitId),
+          listOwnsEdges(supabase, commitId),
+          listAllEnablesEdges(supabase, commitId),
+          getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'capability_map', name: 'Capability map', createdBy: currentUserId }),
+        ]);
         capabilities = caps;
         hasSystems = hasSys;
-        const capabilityIds = capabilities.map((c) => c.element_id);
-        supportsEdges = await listSupportsEdgesForCapabilities(supabase, commitId, capabilityIds);
+        const capabilityIdSet = new Set(capabilities.map((c) => c.element_id));
+        supportsEdges = loadedSupportsEdges.filter((r) => capabilityIdSet.has(r.to_element_id));
+        ownsEdges = loadedOwnsEdges;
+        enablesEdges = loadedEnablesEdges;
+        preloadedView = loadedView;
+        // Round 2: the supporting systems and the owning actors don't depend on each other.
         const systemIds = [...new Set(supportsEdges.map((edge) => edge.from_element_id))];
-        systemsById = await getElementsByIds(supabase, commitId, systemIds);
+        const ownerActorIds = [...new Set(ownsEdges.map((edge) => edge.from_element_id))];
+        [systemsById, actorsById] = await Promise.all([getElementsByIds(supabase, commitId, systemIds), getElementsByIds(supabase, commitId, ownerActorIds)]);
 
         // "Platforms and modules": a module (Container) supporting a
         // capability may inherit its own unset lifecycle/criticality/hosting/
@@ -184,14 +200,9 @@ export function useCapabilityMap(
           const platform = systemsById.get(row.parent_id);
           if (platform) systemsById.set(id, effectiveModuleAttributes(row, platform));
         }
-
-        ownsEdges = await listOwnsEdges(supabase, commitId);
-        enablesEdges = await listAllEnablesEdges(supabase, commitId);
-        const ownerActorIds = [...new Set(ownsEdges.map((edge) => edge.from_element_id))];
-        actorsById = ownerActorIds.length > 0 ? await getElementsByIds(supabase, commitId, ownerActorIds) : new Map<UUID, ElementsHeadRow>();
       }
 
-      const view = await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'capability_map', name: 'Capability map', createdBy: currentUserId });
+      const view = preloadedView ?? (await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'capability_map', name: 'Capability map', createdBy: currentUserId }));
       const tree = computeCapabilityMapTree(capabilities);
       const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsEdges, ownsEdges);
 

@@ -99,20 +99,35 @@ export async function listActorsForLandscape(supabase: Client, commitId: UUID): 
  */
 export async function listLandscapeEdges(supabase: Client, commitId: UUID, systemIds: readonly UUID[], actorIds: readonly UUID[] = []): Promise<RelationshipsHeadRow[]> {
   if (systemIds.length === 0) return [];
-  // S1 item 11a: an actor can now be a `uses` edge's own `from` endpoint
-  // ("Ofgem uses the reporting system") — `actorIds` widens the endpoint
-  // set this filters against so that edge isn't silently dropped the way
-  // a systems-only set would drop it. Still gated on `systemIds` being
-  // non-empty above: with no systems on this landscape at all, there is
-  // nothing an actor's edge could connect to that this view would ever draw.
-  const ids = new Set([...systemIds, ...actorIds]);
+  return filterLandscapeEdges(await listAllLandscapeEdgeRows(supabase, commitId), systemIds, actorIds);
+}
+
+/**
+ * Every `uses`/`flows_to` row at this commit, unfiltered — fetched in
+ * parallel with the systems/actors lists (so before their ids are known)
+ * and narrowed afterwards by `filterLandscapeEdges`. Same fetch-the-commit
+ * scope-and-filter shape as `listLandscapeEdges`, split in two so the
+ * request no longer has to wait for the lists it filters against.
+ */
+export async function listAllLandscapeEdgeRows(supabase: Client, commitId: UUID): Promise<RelationshipsHeadRow[]> {
   const query = supabase
     .from('relationships_head')
     .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
     .eq('commit_id', commitId)
     .in('relationship_type', ['uses', 'flows_to'])
     .order('relationship_id');
-  const rows = await selectAll<RelationshipsHeadRow>(query);
+  return selectAll<RelationshipsHeadRow>(query);
+}
+
+/**
+ * S1 item 11a: an actor can be a `uses` edge's own `from` endpoint
+ * ("Ofgem uses the reporting system") — `actorIds` widens the endpoint set
+ * so that edge isn't silently dropped. Still empty with no systems at all:
+ * there is nothing an actor's edge could connect to that this view would draw.
+ */
+export function filterLandscapeEdges(rows: readonly RelationshipsHeadRow[], systemIds: readonly UUID[], actorIds: readonly UUID[] = []): RelationshipsHeadRow[] {
+  if (systemIds.length === 0) return [];
+  const ids = new Set([...systemIds, ...actorIds]);
   return rows.filter((r) => ids.has(r.from_element_id) && ids.has(r.to_element_id));
 }
 
@@ -132,14 +147,23 @@ export async function listLandscapeEdges(supabase: Client, commitId: UUID, syste
  */
 export async function listSupportsEdgesForSystems(supabase: Client, commitId: UUID, systemIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
   if (systemIds.length === 0) return [];
-  const ids = new Set(systemIds);
+  return filterSupportsEdgesForSystems(await listAllSupportsEdgeRows(supabase, commitId), systemIds);
+}
+
+/** Every `supports` row at this commit, unfiltered — see `listAllLandscapeEdgeRows`. */
+export async function listAllSupportsEdgeRows(supabase: Client, commitId: UUID): Promise<RelationshipsHeadRow[]> {
   const query = supabase
     .from('relationships_head')
     .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
     .eq('commit_id', commitId)
     .eq('relationship_type', 'supports')
     .order('relationship_id');
-  const rows = await selectAll<RelationshipsHeadRow>(query);
+  return selectAll<RelationshipsHeadRow>(query);
+}
+
+export function filterSupportsEdgesForSystems(rows: readonly RelationshipsHeadRow[], systemIds: readonly UUID[]): RelationshipsHeadRow[] {
+  if (systemIds.length === 0) return [];
+  const ids = new Set(systemIds);
   return rows.filter((r) => ids.has(r.from_element_id));
 }
 
@@ -155,13 +179,22 @@ export async function listSupportsEdgesForSystems(supabase: Client, commitId: UU
  */
 export async function listOwnsEdgesForSystems(supabase: Client, commitId: UUID, systemIds: readonly UUID[]): Promise<RelationshipsHeadRow[]> {
   if (systemIds.length === 0) return [];
-  const ids = new Set(systemIds);
+  return filterOwnsEdgesForSystems(await listAllOwnsEdgeRows(supabase, commitId), systemIds);
+}
+
+/** Every `owns` row at this commit, unfiltered — see `listAllLandscapeEdgeRows`. */
+export async function listAllOwnsEdgeRows(supabase: Client, commitId: UUID): Promise<RelationshipsHeadRow[]> {
   const query = supabase
     .from('relationships_head')
     .select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' })
     .eq('commit_id', commitId)
     .eq('relationship_type', 'owns')
     .order('relationship_id');
-  const rows = await selectAll<RelationshipsHeadRow>(query);
+  return selectAll<RelationshipsHeadRow>(query);
+}
+
+export function filterOwnsEdgesForSystems(rows: readonly RelationshipsHeadRow[], systemIds: readonly UUID[]): RelationshipsHeadRow[] {
+  if (systemIds.length === 0) return [];
+  const ids = new Set(systemIds);
   return rows.filter((r) => ids.has(r.to_element_id));
 }
