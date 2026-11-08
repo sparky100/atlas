@@ -98,7 +98,7 @@ export function RetractionConflictCard({ data, canResolve, choice, onChoose, com
                 choose('keep-retraction');
               }}
             >
-              Keep retraction
+              Keep it retired
             </Button>
             <Button
               variant={choice?.action === 'keep-element' ? 'primary' : 'secondary'}
@@ -112,7 +112,7 @@ export function RetractionConflictCard({ data, canResolve, choice, onChoose, com
           {choice?.action === 'keep-element' && preExistingRelationships.length > 0 && (
             <div className={styles.checklist}>
               <Text as="p" tone="muted" size="sm">
-                Pre-existing relationships main retracted alongside this element — restored by default:
+                Pre-existing relationships removed from main along with this element — restored by default:
               </Text>
               {preExistingRelationships.map((rel) => (
                 <label key={rel.relationshipId} className={styles.checklistRow}>

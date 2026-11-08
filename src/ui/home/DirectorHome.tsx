@@ -162,10 +162,10 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
       </section>
 
       <div className={styles.lowerRow}>
-        <section className={styles.changesColumn} aria-label="What we're doing">
+        <section className={styles.changesColumn} aria-label="Work in progress">
           <div className={styles.sectionHeader}>
             <Text as="h2" size="xl" className={styles.sectionTitle}>
-              What we're doing
+              Work in progress
             </Text>
             <Text as="span" tone="muted" size="sm">
               {plural(whatWeAreDoing.projects.length, 'project', 'projects')} in hand · {plural(openDecisionCount, 'open decision', 'open decisions')}

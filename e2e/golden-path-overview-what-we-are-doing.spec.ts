@@ -14,7 +14,7 @@ async function showOverview(page: Page): Promise<void> {
   const overview = page.getByRole('button', { name: 'Overview', exact: true });
   await overview.click();
   await expect(overview).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('heading', { name: "What we're doing" })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Work in progress' })).toBeVisible();
 }
 
 test("Overview's \"What we're doing\" shows a project and a decision outside any project, started from its own buttons — never a change", async ({ page }) => {
@@ -63,7 +63,7 @@ test("Overview's \"What we're doing\" shows a project and a decision outside any
   await expect(page.getByRole('list', { name: 'Decisions outside a project' }).getByRole('link', { name: decisionTitle })).toBeVisible();
   // (The page's own "Editing in change" banner still names it — that's the
   // session's selected change, not Overview content.)
-  const whatWeAreDoing = page.getByRole('region', { name: "What we're doing" });
+  const whatWeAreDoing = page.getByRole('region', { name: 'Work in progress' });
   await expect(whatWeAreDoing.getByText(projectTitle)).toBeVisible();
   await expect(whatWeAreDoing.getByText(changeName)).toHaveCount(0);
 
@@ -123,7 +123,7 @@ test("What's recent lists a project closed since the last version, and it leaves
   const row = recent.getByRole('listitem').filter({ hasText: projectTitle });
   await expect(row.getByRole('link', { name: projectTitle })).toBeVisible();
   await expect(row.getByText(/^Project closed /)).toBeVisible();
-  await expect(page.getByRole('region', { name: "What we're doing" }).getByText(projectTitle)).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Work in progress' }).getByText(projectTitle)).toHaveCount(0);
 
   await row.getByRole('link', { name: projectTitle }).click();
   await expect(page.getByRole('heading', { name: projectTitle, level: 1 })).toBeVisible();

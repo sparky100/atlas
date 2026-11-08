@@ -416,7 +416,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
           <Panel>
             <CollapsibleSection title="Not in file" meta={`(${String(notInFile.length)})`} defaultOpen={false}>
               <Text as="p" tone="muted" size="sm">
-                Main's own systems and modules this document never mentioned — a question, not a retraction.
+                Main's own systems and modules this document never mentioned — a question, not a removal.
               </Text>
               <ul className={styles.list}>
                 {notInFile.map((element) => (

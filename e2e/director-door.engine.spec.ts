@@ -227,7 +227,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
   // What we're doing: the project (owner, target date, progress, its
   // overdue decision flagged in words), then the decision outside any
   // project — and no raw change at all.
-  await expect(page.getByRole('heading', { name: "What we're doing" })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Work in progress' })).toBeVisible();
   const projects = page.getByRole('list', { name: 'Projects in hand' });
   const projectRow = projects.getByRole('listitem').filter({ hasText: 'Revenues replacement' });
   await expect(projectRow.getByRole('link', { name: 'Revenues replacement' })).toBeVisible();
