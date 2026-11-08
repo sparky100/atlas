@@ -26,6 +26,8 @@ export interface CapabilityMapExportInput {
   mode: ColourByMode;
   supportsEdges: readonly RelationshipsHeadRow[];
   systemsById: ReadonlyMap<UUID, ElementsHeadRow>;
+  /** Optional so existing callers keep the plain `plannedEnd` exposure read; `CapabilityMapPage` passes the live `replaces` set so the export matches the screen. */
+  replacedIds?: ReadonlySet<UUID>;
   stamp: Omit<ExportStamp, 'viewLabel'>;
 }
 
@@ -43,7 +45,7 @@ function cardHeight(l3Count: number): number {
   return CARD_HEADER + (l3Count > 0 ? l3Count * (TILE_HEIGHT + TILE_GAP) + INNER - TILE_GAP : 0);
 }
 
-export function capabilityMapExportPlan({ tree, mode, supportsEdges, systemsById, stamp }: CapabilityMapExportInput): ExportPlan {
+export function capabilityMapExportPlan({ tree, mode, supportsEdges, systemsById, replacedIds, stamp }: CapabilityMapExportInput): ExportPlan {
   const columns = Math.max(1, Math.min(MAX_COLUMNS, tree.l1.length));
   const width = Math.max(MIN_EXPORT_WIDTH, 2 * EXPORT_PADDING + columns * COLUMN_WIDTH + (columns - 1) * COLUMN_GAP);
   const shapes: ExportShape[] = [...stampShapes({ ...stamp, viewLabel: capabilityMapViewLabel(mode) }, width)];
@@ -55,7 +57,7 @@ export function capabilityMapExportPlan({ tree, mode, supportsEdges, systemsById
     rowColumns.forEach((column, i) => {
       const x = EXPORT_PADDING + i * (COLUMN_WIDTH + COLUMN_GAP);
       const descendantIds = column.l2.flatMap((card) => [card.capability.element_id, ...card.l3.map((l3) => l3.element_id)]);
-      const aggregate = aggregateTileColourFor(mode, descendantIds, supportsEdges, systemsById);
+      const aggregate = aggregateTileColourFor(mode, descendantIds, supportsEdges, systemsById, replacedIds);
       shapes.push({ kind: 'rect', x, y: rowTop, w: COLUMN_WIDTH, h: HEADER_HEIGHT, fill: EXPORT_PALETTE.surface, stroke: aggregate.tone ? TONE_COLOURS[aggregate.tone].edge : EXPORT_PALETTE.border, radius: 6 });
       shapes.push({ kind: 'text', x: x + INNER, y: rowTop + 15, text: truncate(column.capability.name, 30), size: 13, bold: true, color: EXPORT_PALETTE.text, maxWidth: COLUMN_WIDTH - 2 * INNER });
       if (aggregate.label) shapes.push({ kind: 'text', x: x + INNER, y: rowTop + 32, text: truncate(aggregate.label, 34), size: 11, color: EXPORT_PALETTE.textMuted, maxWidth: COLUMN_WIDTH - 2 * INNER });
@@ -63,14 +65,14 @@ export function capabilityMapExportPlan({ tree, mode, supportsEdges, systemsById
       let y = rowTop + HEADER_HEIGHT + CARD_GAP;
       for (const card of column.l2) {
         const h = cardHeight(card.l3.length);
-        const colour = tileColourFor(mode, card.capability.element_id, supportsEdges, systemsById);
+        const colour = tileColourFor(mode, card.capability.element_id, supportsEdges, systemsById, replacedIds);
         const { fill, edge } = fillFor(colour);
         shapes.push({ kind: 'rect', x, y, w: COLUMN_WIDTH, h, fill, stroke: edge, radius: 6 });
         shapes.push({ kind: 'text', x: x + INNER, y: y + 12, text: truncate(card.capability.name, 30), size: 12, bold: true, color: EXPORT_PALETTE.text, maxWidth: COLUMN_WIDTH - 2 * INNER });
         if (colour.label) shapes.push({ kind: 'text', x: x + INNER, y: y + 26, text: truncate(colour.label, 34), size: 10, color: EXPORT_PALETTE.textMuted, maxWidth: COLUMN_WIDTH - 2 * INNER });
         let tileY = y + CARD_HEADER;
         for (const l3 of card.l3) {
-          const tileColour = tileColourFor(mode, l3.element_id, supportsEdges, systemsById);
+          const tileColour = tileColourFor(mode, l3.element_id, supportsEdges, systemsById, replacedIds);
           const tile = fillFor(tileColour);
           shapes.push({ kind: 'rect', x: x + INNER, y: tileY, w: COLUMN_WIDTH - 2 * INNER, h: TILE_HEIGHT, fill: tile.fill === EXPORT_PALETTE.bg ? EXPORT_PALETTE.surface : tile.fill, stroke: tile.edge, radius: 4 });
           const text = tileColour.label ? `${truncate(l3.name, 22)} · ${truncate(tileColour.label, 12)}` : truncate(l3.name, 34);

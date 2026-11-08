@@ -139,6 +139,7 @@ export const FINDING_FILTER_OPTIONS: readonly { value: string; label: string }[]
   { value: 'no-technical-owner', label: 'Systems with no technical owner' },
   { value: 'critical-no-business-owner', label: 'Critical systems with no business owner' },
   { value: 'critical-exposed', label: 'Critical systems exposed with no replacement' },
+  { value: 'replacement-no-departure-plan', label: 'Replacements with no departure plan' },
   { value: 'unused-integration-platform', label: 'Unused integration platforms' },
   { value: 'unused-integration-interface', label: 'Unused integration interfaces' },
   { value: 'essential-no-technical-owner', label: 'Essential systems with no technical owner' },

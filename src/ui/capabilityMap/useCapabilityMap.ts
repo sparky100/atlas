@@ -5,7 +5,8 @@ import { projectionElementsByIds } from '../../db/branchProjection';
 import { hasAnySystem, listSupportsEdgesForAllCapabilities, listCapabilitiesForMap } from '../../db/capabilityMap';
 import { getElementsByIds } from '../../db/elements';
 import { listOwnsEdges } from '../../db/elementBrowse';
-import { computeSelfOwnedCapabilityIds } from '../../db/healthFindings';
+import { computeSelfOwnedCapabilityIds, listAllReplacesEdges } from '../../db/healthFindings';
+import { replacedElementIds } from '../../engine/elementRead/fitAndExposure';
 import { listAllEnablesEdges } from '../../db/valueStreams';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import type { ViewMode } from '../../db/viewMode';
@@ -35,6 +36,8 @@ export interface CapabilityMapData {
   actorsById: Map<UUID, ElementsHeadRow>;
   /** F6 Step 6: every live `enables` edge at this ref (capability → stage) — "enables N stages" on a domain/card, and the capability page's own outbound "Enables" group. */
   enablesEdges: RelationshipsHeadRow[];
+  /** ADR-001 amendment: every element with a live `replaces` edge pointing at it (`replacedElementIds`) — `metrics.ts`'s `lifecycleExposure` reads a recorded replacement as "not exposed". */
+  replacedIds: ReadonlySet<UUID>;
 }
 
 export type CapabilityMapState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: CapabilityMapData };
@@ -100,6 +103,7 @@ export function useCapabilityMap(
       let ownsEdges: RelationshipsHeadRow[];
       let actorsById: Map<UUID, ElementsHeadRow>;
       let enablesEdges: RelationshipsHeadRow[];
+      let replacedIds: Set<UUID>;
       let preloadedView: ViewRow | null = null;
 
       if (ref.kind === 'branch') {
@@ -117,6 +121,7 @@ export function useCapabilityMap(
         commitId = resolved.commitId;
         capabilities = projection.elementsHead.filter((e) => e.element_type === 'capability');
         hasSystems = projection.elementsHead.some((e) => e.element_type === 'system');
+        replacedIds = replacedElementIds(projection.relationshipsHead);
         const capabilityIdSet = new Set(capabilities.map((c) => c.element_id));
         supportsEdges = projection.relationshipsHead.filter((r) => r.relationship_type === 'supports' && capabilityIdSet.has(r.to_element_id));
         const systemIds = [...new Set(supportsEdges.map((edge) => edge.from_element_id))];
@@ -154,12 +159,13 @@ export function useCapabilityMap(
         // Round 1: every read that needs only the commit id, together —
         // this used to be eight requests one after another. The saved-view
         // lookup is independent of the data entirely, so it rides along.
-        const [caps, hasSys, loadedSupportsEdges, loadedOwnsEdges, loadedEnablesEdges, loadedView] = await Promise.all([
+        const [caps, hasSys, loadedSupportsEdges, loadedOwnsEdges, loadedEnablesEdges, loadedReplacesEdges, loadedView] = await Promise.all([
           listCapabilitiesForMap(supabase, commitId),
           hasAnySystem(supabase, commitId),
           listSupportsEdgesForAllCapabilities(supabase, commitId),
           listOwnsEdges(supabase, commitId),
           listAllEnablesEdges(supabase, commitId),
+          listAllReplacesEdges(supabase, commitId),
           getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'capability_map', name: 'Capability map', createdBy: currentUserId }),
         ]);
         capabilities = caps;
@@ -168,6 +174,7 @@ export function useCapabilityMap(
         supportsEdges = loadedSupportsEdges.filter((r) => capabilityIdSet.has(r.to_element_id));
         ownsEdges = loadedOwnsEdges;
         enablesEdges = loadedEnablesEdges;
+        replacedIds = replacedElementIds(loadedReplacesEdges);
         preloadedView = loadedView;
         // Round 2: the supporting systems and the owning actors don't depend on each other.
         const systemIds = [...new Set(supportsEdges.map((edge) => edge.from_element_id))];
@@ -206,7 +213,7 @@ export function useCapabilityMap(
       const tree = computeCapabilityMapTree(capabilities);
       const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsEdges, ownsEdges);
 
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById, enablesEdges } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById, enablesEdges, replacedIds } });
     }
 
     load().catch((e: unknown) => {

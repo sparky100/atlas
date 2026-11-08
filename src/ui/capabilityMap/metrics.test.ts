@@ -5,6 +5,7 @@ import {
   lifecycleExposure,
   oldestLifecycleStage,
   otShareOf,
+  replacedElementIds,
   weakFitSupportsEdges,
   resolveDefaultColourBy,
   supportingSystemIds,
@@ -83,6 +84,43 @@ describe('lifecycleExposure', () => {
 
   it('is false for a capability with no supporting systems', () => {
     expect(lifecycleExposure('cap-1', [], new Map(), NOW)).toBe(false);
+  });
+
+  it('is false when the near-end supporter has a recorded replacement (ADR-001 amendment), and unchanged when none is passed', () => {
+    const systemsById = new Map([['sys-1', system('sys-1', 'retiring', '2026-01-01')]]);
+    const edges = [supports('sys-1', 'cap-1')];
+    expect(lifecycleExposure('cap-1', edges, systemsById, NOW, new Set(['sys-1']))).toBe(false);
+    expect(lifecycleExposure('cap-1', edges, systemsById, NOW, new Set(['sys-other']))).toBe(true);
+    expect(lifecycleExposure('cap-1', edges, systemsById, NOW)).toBe(true);
+  });
+
+  it('a second, un-replaced near-end supporter still exposes the capability', () => {
+    const systemsById = new Map([['sys-1', system('sys-1', 'retiring', '2026-01-01')], ['sys-2', system('sys-2', 'retiring', '2026-02-01')]]);
+    const edges = [supports('sys-1', 'cap-1'), supports('sys-2', 'cap-1')];
+    expect(lifecycleExposure('cap-1', edges, systemsById, NOW, new Set(['sys-1']))).toBe(true);
+  });
+});
+
+describe('lifecycle-exposure colouring with replacedIds (ADR-001 amendment)', () => {
+  // `tileColourFor`/`aggregateTileColourFor` read `lifecycleExposure` against the real clock — a long-overdue plannedEnd stays exposed whatever "now" is.
+  const systemsById = new Map([['sys-1', system('sys-1', 'retired', '2000-01-01')]]);
+  const edges = [supports('sys-1', 'cap-1')];
+
+  it('tileColourFor reads exposed without a replacement and clears with one', () => {
+    expect(tileColourFor('metric:lifecycleExposure', 'cap-1', edges, systemsById)).toEqual({ tone: 'danger', label: 'exposed' });
+    expect(tileColourFor('metric:lifecycleExposure', 'cap-1', edges, systemsById, new Set(['sys-1']))).toEqual({ tone: undefined, label: undefined });
+  });
+
+  it('aggregateTileColourFor clears the roll-up the same way', () => {
+    expect(aggregateTileColourFor('metric:lifecycleExposure', ['cap-1'], edges, systemsById)).toEqual({ tone: 'danger', label: 'exposed' });
+    expect(aggregateTileColourFor('metric:lifecycleExposure', ['cap-1'], edges, systemsById, new Set(['sys-1']))).toEqual({ tone: undefined, label: undefined });
+  });
+});
+
+describe('replacedElementIds (ADR-001 amendment)', () => {
+  it('collects the retiring side (to_element_id) of every replaces edge and ignores other edge types', () => {
+    const replaces = (from: string, to: string): RelationshipsHeadRow => ({ ...supports(from, to), relationship_type: 'replaces' });
+    expect([...replacedElementIds([replaces('new', 'old'), supports('sys', 'cap')])]).toEqual(['old']);
   });
 });
 

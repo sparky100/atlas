@@ -45,6 +45,7 @@ const VALID_FILTERS: readonly ElementBrowseFilter[] = [
   'no-technical-owner',
   'critical-no-business-owner',
   'critical-exposed',
+  'replacement-no-departure-plan',
   'unused-integration-platform',
   'unused-integration-interface',
   // Bug fix (per-item-actions prompt): these two were reachable already

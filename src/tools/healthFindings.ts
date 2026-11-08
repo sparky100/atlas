@@ -14,6 +14,7 @@ import {
   findCapabilitiesWithNoSupporters,
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
+  findReplacementsWithoutDeparturePlan,
   findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
   findOutgoingWithoutRetiringChange,
@@ -25,6 +26,7 @@ import {
   findUnusedIntegrationPlatforms,
 } from '../db/healthFindings';
 import { computeCapabilityMapTree } from '../engine/elementRead/capabilityTree';
+import { replacedElementIds } from '../engine/elementRead/fitAndExposure';
 import { DEFAULT_TOOL_ROWS, MAX_TOOL_ROWS } from './limits';
 import { defineTool, elementRef, indexSnapshot, okResult } from './toolKit';
 import type { ModelSnapshot } from './types';
@@ -48,6 +50,7 @@ export function computeFindings({ snapshot, facts, retiredByOpenChanges, now }: 
   const systemsAndModules = [...systems, ...containers];
   const supports = snapshot.relationships.filter((r) => r.relationship_type === 'supports');
   const owns = snapshot.relationships.filter((r) => r.relationship_type === 'owns');
+  const replaces = snapshot.relationships.filter((r) => r.relationship_type === 'replaces');
   const usesAndFlows = snapshot.relationships.filter((r) => r.relationship_type === 'uses' || r.relationship_type === 'flows_to');
   const byId = new Map(elements.map((e) => [e.element_id, e]));
   const level1 = computeCapabilityMapTree(capabilities).l1.map((column) => column.capability);
@@ -58,7 +61,8 @@ export function computeFindings({ snapshot, facts, retiredByOpenChanges, now }: 
   out.set('stale-attributes', computeStaleAttributesFinding(facts, systems, now).staleSystems);
   out.set('no-technical-owner', findSystemsWithoutTechnicalOwner(systemsAndModules, owns));
   out.set('critical-no-business-owner', findCriticalSystemsWithoutBusinessOwner(systemsAndModules, owns));
-  out.set('critical-exposed', findCriticalExposedSystems(systems, now));
+  out.set('critical-exposed', findCriticalExposedSystems(systems, now, replacedElementIds(replaces)));
+  out.set('replacement-no-departure-plan', findReplacementsWithoutDeparturePlan(systemsAndModules, replaces));
   out.set('unused-integration-platform', findUnusedIntegrationPlatforms(systems, usesAndFlows, containers));
   out.set('unused-integration-interface', findUnusedIntegrationInterfaces(systems, containers, usesAndFlows));
   out.set('essential-no-technical-owner', findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systemsAndModules, capabilities, supports, owns));

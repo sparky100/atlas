@@ -388,7 +388,8 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // architect-door layout prompt's `capability-no-supporters` and the
   // `poor-fit-no-replacement` check both left (their one home is Overview's
   // weak-capability grid, UI-principles §3); ADR-026's unused-interface
-  // check makes it 13 — all zero here.
+  // check makes it 13, and the `replaces` amendment's own
+  // `replacement-no-departure-plan` check makes it 14 — all zero here.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // `exact: true`: this model's own title, "Health Findings Clean Test
   // Model", contains "Health Findings" as a substring, so a non-exact
@@ -399,7 +400,7 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // match into a reliable strict-mode violation.
   await expect(page.getByRole('heading', { name: 'Health findings', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
-  const healthClear = page.getByRole('button', { name: '13 checks clear' });
+  const healthClear = page.getByRole('button', { name: '14 checks clear' });
   const assuranceClear = page.getByRole('button', { name: '5 checks clear' });
   await expect(healthClear).toBeVisible();
   await expect(assuranceClear).toBeVisible();
@@ -417,6 +418,7 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   await healthClear.click();
   await expect(page.getByText('0 systems not linked to a capability', { exact: true })).toBeVisible();
   await expect(page.getByText('0 capabilities with no owner', { exact: true })).toBeVisible();
+  await expect(page.getByText('0 replacements with no departure plan', { exact: true })).toBeVisible();
   await expect(page.getByText('0 systems marked Migrate or Eliminate with no open change retiring them', { exact: true })).toBeVisible();
   // Assurance's own line is still collapsed — expanding one group doesn't
   // expand the other.
