@@ -37,7 +37,8 @@ export interface UseElementSearchAddResult {
 
 /**
  * Drives the search-first "Add" control (Blocking: element creation):
- * loads `elementType`'s search pool once for `commitId` (src/db/
+ * loads `elementType`'s search pool once for `commitId` (only while `enabled`
+ * — the control passes `open`, so a closed button costs no requests) (src/db/
  * elementSearch.ts), matches it against `query` on every keystroke (cheap —
  * an in-memory pass over an already-loaded pool, not a request), then
  * enriches only the shown matches (never the whole pool) with a
@@ -45,13 +46,18 @@ export interface UseElementSearchAddResult {
  * per-row batching shape `getElementsByIds` exists for elsewhere, sized to
  * the typeahead's own small result list rather than the model.
  */
-export function useElementSearchAdd(commitId: UUID, modelId: UUID, elementType: ElementType): UseElementSearchAddResult {
+export function useElementSearchAdd(commitId: UUID, modelId: UUID, elementType: ElementType, enabled = true): UseElementSearchAddResult {
   const [pool, setPool] = useState<SearchPoolElement[] | null>(null);
   const [poolError, setPoolError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [enriched, setEnriched] = useState<Map<UUID, MatchEnrichment>>(new Map());
 
   useEffect(() => {
+    // Performance: the pool is the whole model's systems/actors plus every
+    // alias — only worth downloading once the control is actually opened,
+    // not on every page that merely shows a closed "+ Add" button (the
+    // landscape renders two, a live HAR showed the aliases read four times).
+    if (!enabled) return undefined;
     let cancelled = false;
     setPool(null);
     setPoolError(null);
@@ -70,7 +76,7 @@ export function useElementSearchAdd(commitId: UUID, modelId: UUID, elementType: 
     return () => {
       cancelled = true;
     };
-  }, [commitId, modelId, elementType]);
+  }, [commitId, modelId, elementType, enabled]);
 
   const matches = pool ? matchElements(pool, query) : [];
 

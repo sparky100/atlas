@@ -63,7 +63,7 @@ export function ElementSearchAdd({
 }: ElementSearchAddProps) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const search = useElementSearchAdd(searchCommitId, modelId, elementType);
+  const search = useElementSearchAdd(searchCommitId, modelId, elementType, open);
   const elementHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}?ref=${refParam}`;
 
   const { status: createStatus, error: createError, create } = useElementCreate({
