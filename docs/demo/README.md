@@ -28,3 +28,7 @@ The tests in `src/capture/demoImports.test.ts` check each file parses cleanly an
 ## Roadmap dates
 
 Both files carry `introduced`, `planned_end` and `support_ends_at` (ISO `YYYY-MM-DD`) on top-level systems, so the Roadmap has bars to show: active systems have an introduced year, retiring systems end in 2027–2028 (some lose vendor support earlier), planned systems start in 2027–2028 and retired systems ended in 2025. Dates are illustrative. To add them to an org you already loaded, import the file again into the same model: matched systems are updated by name and the dates are the only changes. `support_ends_at` is for systems only; a module row that sets it is rejected.
+
+## Network planning, connections and OT (Northbridge)
+
+Northbridge also carries network planning and design tools (PowerFactory, scenario forecasting, investment planning), customer connections tools (quotation engine, public capacity map, generation connections register) and an OT layer (protection settings, substation automation, operational telecoms, historian, OT security monitoring). Re-import the file into the same model to add them; existing systems are matched by name and left as they are apart from their dates.
