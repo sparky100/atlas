@@ -16,7 +16,7 @@ import type { ValueStreamStageRollup, ValueStreamTone } from './valueStreamRollu
 import styles from './ValueStreamInspectorContent.module.css';
 
 const TONE_LABEL: Record<ValueStreamTone, string> = {
-  ok: 'no known exposure',
+  ok: '', // nothing to say when there is no known exposure — the green dot is enough
   warn: 'lifecycle exposure',
   info: 'replacement planned',
   neutral: 'nothing recorded',
@@ -62,7 +62,7 @@ export function ValueStreamInspectorContent({ selectedStage, valueStreamsById, t
             <Text as="span" size="sm" tone="muted">
               Status
             </Text>
-            <Chip tone={TONE_CHIP[selectedStage.tone]}>{TONE_LABEL[selectedStage.tone]}</Chip>
+            {TONE_LABEL[selectedStage.tone] !== '' && <Chip tone={TONE_CHIP[selectedStage.tone]}>{TONE_LABEL[selectedStage.tone]}</Chip>}
           </div>
           {selectedStage.fitForPurpose !== null && (
             <div className={styles.attributeRow}>
@@ -87,7 +87,7 @@ export function ValueStreamInspectorContent({ selectedStage, valueStreamsById, t
                   <li key={tile.capability.element_id}>
                     <div className={styles.attributeRow}>
                       <Link to={elementHref(tile.capability.element_id)}>{tile.capability.name}</Link>
-                      <Chip tone={TONE_CHIP[tile.tone]}>{TONE_LABEL[tile.tone]}</Chip>
+                      {TONE_LABEL[tile.tone] !== '' && <Chip tone={TONE_CHIP[tile.tone]}>{TONE_LABEL[tile.tone]}</Chip>}
                     </div>
                     {tile.supportingSystems.length > 0 && (
                       <ul className={styles.systemList}>

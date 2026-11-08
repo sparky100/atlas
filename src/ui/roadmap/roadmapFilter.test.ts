@@ -39,6 +39,12 @@ describe('matchesRoadmapFilters', () => {
     expect(matchesRoadmapFilters(bar(), 'cap-2', filters, NOW)).toBe(false);
   });
 
+  it('capability facet also matches a sub-capability or a capability the system only also supports', () => {
+    const filters: RoadmapFilters = { ...EMPTY_ROADMAP_FILTERS, capabilityIds: ['cap-sub'] };
+    expect(matchesRoadmapFilters(bar({ supportedCapabilityIds: ['cap-1', 'cap-sub'] }), 'cap-1', filters, NOW)).toBe(true);
+    expect(matchesRoadmapFilters(bar({ supportedCapabilityIds: ['cap-1'] }), 'cap-1', filters, NOW)).toBe(false);
+  });
+
   it('owner facet matches any of the bar\'s own owner actor ids', () => {
     const filters: RoadmapFilters = { ...EMPTY_ROADMAP_FILTERS, ownerIds: ['actor-1'] };
     expect(matchesRoadmapFilters(bar({ ownerActorIds: ['actor-1', 'actor-2'] }), 'cap-1', filters, NOW)).toBe(true);

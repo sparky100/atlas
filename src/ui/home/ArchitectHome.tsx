@@ -48,7 +48,7 @@ function plural(count: number, singular: string, pluralForm: string): string {
 
 /** `ElementsHeadRow[]` → `HealthFindingItem[]` — every element-shaped finding's items are just names (the browse-table/decision link is the actionable part, per-item actions having moved to the browse table's own rows). */
 function elementItems(elements: readonly ElementsHeadRow[]): HealthFindingItem[] {
-  return elements.map((el) => ({ id: el.element_id, label: el.name }));
+  return elements.map((el) => ({ id: el.element_id, label: el.name, elementId: el.element_id }));
 }
 
 /** Sprint U4-1 B5's own finding is relationship pairs, not elements — its own `HealthFindingItem[]` builder. */
@@ -443,7 +443,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
     return (
       <div className={styles.findingGrid}>
         {checks.map((check) => (
-          <FindingCard key={check.key} count={check.count} summary={check.summary} items={check.items} severity={check.severity} action={resolveCardAction(check)} />
+          <FindingCard key={check.key} count={check.count} summary={check.summary} items={check.items} severity={check.severity} action={resolveCardAction(check)} elementHref={(id) => `/o/${orgSlug}/m/${modelSlug}/e/${id}`} />
         ))}
       </div>
     );

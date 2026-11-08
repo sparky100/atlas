@@ -138,7 +138,7 @@ test('reject everything by tap and finish the review with no change; discard a d
 
   // The queue offers to keep only the newest draft of a repeated file.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/review`);
-  await expect(page.getByRole('heading', { name: 'Capture drafts' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Import drafts' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Review →' })).toHaveCount(2);
   await page.getByRole('button', { name: 'Discard 1 older copy' }).click();
   await page.getByRole('button', { name: 'Confirm discard' }).click();
@@ -161,7 +161,7 @@ test('reject everything by tap and finish the review with no change; discard a d
   await page.getByRole('button', { name: 'Finish review' }).click();
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review$`));
   await expect(page.getByText('No open merge requests.', { exact: false })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Capture drafts' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Import drafts' })).toHaveCount(0);
 
   const { data: newerJob } = await client.from('capture_jobs').select('status, target_branch_id').eq('id', newerJobId).single();
   expect(newerJob).toMatchObject({ status: 'reviewed', target_branch_id: null });

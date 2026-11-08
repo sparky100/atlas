@@ -246,20 +246,19 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
       setError('This job has no draft to promote from.');
       return null;
     }
-    if (!targetBranchId) {
-      setError('Choose a target change first.');
-      return null;
-    }
     if (!userId) {
       setError('You must be signed in to apply review decisions.');
       return null;
     }
+    // No change picked: the review needs somewhere to land, so make one named after the file rather than making the reviewer stop and create it first. Picking an existing change in the selector is still available.
+    const target = targetBranchId ?? (await createTargetBranch(`Import: ${job.inputName}`));
+    if (!target) return null;
     setStatus('applying');
     setError(null);
     try {
       const toPromote = candidates.filter((c) => c.decision !== null && c.promotedSubjectId === null);
       const draftHead = await loadCaptureDraftHead(supabase, modelId, job.resultingBranchId);
-      const { head: targetHead, headCommitId } = await loadTargetBranchHead(supabase, modelId, targetBranchId);
+      const { head: targetHead, headCommitId } = await loadTargetBranchHead(supabase, modelId, target);
       const reviewerSource = await getOrCreateManualSource(supabase, { id: crypto.randomUUID(), orgId, modelId, userId });
       const { deltas, promotedSubjectIdBySeq, aliasRows, resolvedConflicts } = buildPromotionEnvelope({
         candidates: toPromote,
@@ -270,7 +269,7 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
       });
       const commitId = crypto.randomUUID();
       const commitTitle = `Capture review: ${job.inputName}`;
-      const deltaRows = envelopeToDeltaRows({ id: commitId, branchId: targetBranchId, parentCommitId: headCommitId, mergedBranchHeadCommitId: null, kind: 'manual', title: commitTitle, body: null, deltas }, { orgId, modelId, createdBy: userId });
+      const deltaRows = envelopeToDeltaRows({ id: commitId, branchId: target, parentCommitId: headCommitId, mergedBranchHeadCommitId: null, kind: 'manual', title: commitTitle, body: null, deltas }, { orgId, modelId, createdBy: userId });
       const candidateOutcomes: { candidateId: UUID; promotedSubjectId: UUID }[] = [];
       for (const c of toPromote) {
         const promotedSubjectId = promotedSubjectIdBySeq.get(c.seq);
@@ -279,7 +278,7 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
 
       await applyCaptureDecisions(supabase, {
         jobId: job.id,
-        targetBranchId,
+        targetBranchId: target,
         commitId,
         commitTitle,
         commitBody: null,
@@ -298,7 +297,7 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
       // real, separate reviewer set regardless of who's applying.
       // Best-effort: the promotion commit above has already landed
       // either way, so a failure here never undoes it.
-      const mergeResult = await autoMergeCaptureChange(supabase, modelId, role, targetBranchId);
+      const mergeResult = await autoMergeCaptureChange(supabase, modelId, role, target);
       setStatus('idle');
       reload();
       return { appliedCount: toPromote.length, merged: mergeResult.merged, ...(mergeResult.merged ? {} : { mergeSkippedReason: mergeResult.reason }) };
@@ -313,7 +312,7 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
       reportError("Couldn't apply capture review decisions.", e);
       return null;
     }
-  }, [job, targetBranchId, userId, candidates, modelId, orgId, role, reload, mainElementById, draftElementById]);
+  }, [job, targetBranchId, createTargetBranch, userId, candidates, modelId, orgId, role, reload, mainElementById, draftElementById]);
 
   const closeWith = useCallback(
     async (close: () => Promise<void>, failure: string): Promise<boolean> => {
@@ -337,7 +336,7 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
   );
 
   const finish = useCallback(() => closeWith(() => finishCaptureReview(supabase, jobId), "Couldn't finish this capture review."), [closeWith, jobId]);
-  const discard = useCallback(() => closeWith(() => discardCaptureJob(supabase, jobId), "Couldn't discard this capture draft."), [closeWith, jobId]);
+  const discard = useCallback(() => closeWith(() => discardCaptureJob(supabase, jobId), "Couldn't discard this import draft."), [closeWith, jobId]);
 
   const searchTargetElements = useCallback(
     async (elementType: ElementType, query: string): Promise<{ elementId: UUID; name: string; parentName: string | null }[] | null> => {

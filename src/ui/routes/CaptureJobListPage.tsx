@@ -58,7 +58,7 @@ export function CaptureJobListPage() {
           <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabelOf(ref, branchLabel)} />
           <div className={styles.header}>
             <Text as="h1" size="2xl">
-              Capture
+              Import
             </Text>
           </div>
           <CaptureJobListView modelId={model.id} orgId={organisation?.id ?? ''} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} />

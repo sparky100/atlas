@@ -46,9 +46,9 @@ test('choose the MuleSoft source card, read its guide, upload an export and revi
   await signUpCreateOrgAndModel(page, 'capturemulesoft');
 
   await goToModelHome(page);
-  await clickNavItem(page, 'Capture');
-  await page.getByRole('button', { name: 'New capture run' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Start a capture run' });
+  await clickNavItem(page, 'Import');
+  await page.getByRole('button', { name: 'New import' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Start an import' });
   await expect(dialog).toBeVisible();
 
   await dialog.getByRole('radio', { name: /MuleSoft Anypoint/ }).click();
@@ -59,11 +59,11 @@ test('choose the MuleSoft source card, read its guide, upload an export and revi
 
   await dialog.getByLabel('Choose the MuleSoft export file').setInputFiles(exportPath);
   await expect(dialog.getByText('2 API interfaces, 2 client applications and 2 relationships on one MuleSoft platform.')).toBeVisible();
-  const startButton = dialog.getByRole('button', { name: 'Start capture run' });
+  const startButton = dialog.getByRole('button', { name: 'Start import' });
   await expect(startButton).toBeEnabled();
   await startButton.click();
 
-  await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByRole('dialog', { name: 'Start an import' })).toHaveCount(0, { timeout: 30_000 });
   await expect(page.getByText('Parsed', { exact: true })).toBeVisible({ timeout: 120_000 });
 
   await page.getByRole('link', { name: 'Review →' }).click();

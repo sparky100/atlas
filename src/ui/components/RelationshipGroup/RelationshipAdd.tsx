@@ -307,17 +307,17 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
     return (
       <div className={styles.panel}>
         <Text as="p" size="sm">
-          Make {pendingTarget.name} the primary capability for this system?
+          Is {pendingTarget.name} the main capability for this system?
         </Text>
         <Text as="p" tone="muted" size="sm">
-          The primary capability decides which landscape lane this system's tile appears in.
+          The main capability decides which lane this system sits in on the landscape. Any others are shown as “also supports”.
         </Text>
         <div className={styles.actions}>
           <Button variant="secondary" onClick={() => { answerPrimary(true); }} disabled={status === 'creating'}>
-            {status === 'creating' ? 'Adding…' : 'Yes, primary'}
+            {status === 'creating' ? 'Adding…' : 'Yes, it is the main one'}
           </Button>
           <Button variant="ghost" onClick={() => { answerPrimary(false); }} disabled={status === 'creating'}>
-            No
+            No, it also supports it
           </Button>
           <Button variant="ghost" onClick={cancelPending} disabled={status === 'creating'}>
             Back

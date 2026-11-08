@@ -67,7 +67,7 @@ export function ReviewQueueView({ modelId, orgId, orgSlug, modelSlug }: ReviewQu
       {captureDrafts.length > 0 && (
         <>
           <Text as="h2" size="lg">
-            Capture drafts
+            Import drafts
           </Text>
           {duplicateGroups.map((group) => (
             <div key={group.inputName} className={styles.duplicateGroup}>
@@ -97,7 +97,7 @@ export function ReviewQueueView({ modelId, orgId, orgSlug, modelSlug }: ReviewQu
                     Review →
                   </LinkButton>
                   {canDiscardCaptureJob(role, job, userId) && (
-                    <DiscardCaptureButton label="Discard" confirmText="Discard this capture draft? Nothing from it reaches the model." onConfirm={() => discardJobs([job.id])} />
+                    <DiscardCaptureButton label="Discard" confirmText="Discard this import draft? Nothing from it reaches the model." onConfirm={() => discardJobs([job.id])} />
                   )}
                 </div>
               </li>

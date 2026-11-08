@@ -123,14 +123,14 @@ export function RelationshipRemove({ relationship, direction, elementName, other
           {isPrimarySupports && otherCandidates.length > 0 && (
             <>
               <Text as="p" tone="muted" size="sm">
-                {elementName} will have no primary supports edge unless you choose one below.
+                {elementName} will have no main capability unless you choose one below.
               </Text>
               <div className={styles.actions}>
                 {otherCandidates.map((candidate) => {
                   const capability = endpoints.get(candidate.to_element_id);
                   return (
                     <Button key={candidate.relationship_id} variant="destructive" onClick={() => { removeWithPromotion(candidate); }} disabled={status === 'removing'}>
-                      {status === 'removing' ? 'Removing…' : `Remove and make ${capability?.name ?? UNKNOWN_NAME} primary`}
+                      {status === 'removing' ? 'Removing…' : `Remove and make ${capability?.name ?? UNKNOWN_NAME} the main capability`}
                     </Button>
                   );
                 })}

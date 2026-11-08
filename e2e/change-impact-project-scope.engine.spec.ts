@@ -326,7 +326,7 @@ test('change page at 390px: capture drafts are grouped apart from changes, and a
   expect(openBox.x + openBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
   expect(rowBox.x + rowBox.width).toBeLessThanOrEqual(390);
 
-  const drafts = others.getByRole('button', { name: /Unreviewed capture drafts touching these elements/ });
+  const drafts = others.getByRole('button', { name: /Unreviewed import drafts touching these elements/ });
   await expect(drafts).toContainText('(1)');
   await drafts.click();
   const draftRow = others.getByRole('listitem').filter({ hasText: 'SPDJune2026ActionPlan.pdf' });

@@ -51,10 +51,8 @@ test('rate a primary supporter a poor fit; the Director door flags the capabilit
   await goToModelHome(page);
   await switchToDirectorView(page);
 
-  // The Finance tile: exposure tone stays "no known exposure" (the system
-  // is active, not retiring), but the fit pill flags it independently —
-  // and visibly distinct from the tone/owner chip beside it.
-  await expect(page.getByText('no known exposure', { exact: false })).toBeVisible();
+  // The Finance tile: no exposure (the system is active, not retiring) so no exposure chip at all, but the fit pill flags it independently.
+  await expect(page.getByText('no known exposure', { exact: false })).toHaveCount(0);
   const fitPill = page.getByText('poor fit: 1 capability', { exact: true });
   await expect(fitPill).toBeVisible();
 

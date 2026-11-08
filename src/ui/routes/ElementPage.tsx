@@ -374,6 +374,11 @@ export function ElementPage() {
                   ? `/o/${orgSlug ?? ''}/m/${model.slug}/context/${state.data.element.element_id}?${refQueryParam(ref, viewing)}`
                   : undefined
               }
+              roadmapHref={
+                state.data.element.element_type === 'capability'
+                  ? `/o/${orgSlug ?? ''}/m/${model.slug}/roadmap?${new URLSearchParams({ ...(refQueryParam(ref, viewing) ? Object.fromEntries(new URLSearchParams(refQueryParam(ref, viewing))) : {}), capabilities: state.data.element.element_id }).toString()}`
+                  : undefined
+              }
               startProjectHref={
                 canStartProject(role) && (state.data.element.element_type === 'capability' || state.data.element.element_type === 'system' || state.data.element.element_type === 'container')
                   ? startProjectFromElementHref(`/o/${orgSlug ?? ''}/m/${model.slug}/projects`, { id: state.data.element.element_id, name: state.data.element.name })

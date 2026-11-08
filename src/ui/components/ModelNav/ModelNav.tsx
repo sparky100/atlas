@@ -42,10 +42,10 @@ const SECTION_LABELS: Record<RealSection, string> = {
   portfolio: 'Portfolio',
   integrations: 'Integrations',
   changes: 'Changes',
-  capture: 'Capture',
+  capture: 'Import',
   projects: 'Projects',
   decisions: 'Decisions',
-  versions: 'Versions',
+  versions: 'History',
 };
 
 /**

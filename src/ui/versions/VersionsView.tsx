@@ -116,7 +116,7 @@ export function VersionsView({ modelId, orgId, userId, orgSlug, modelSlug, canTa
       )}
 
       <Text as="h2" size="lg">
-        Versions
+        Tagged versions
       </Text>
       {status === 'loading' && <Text tone="muted">Loading…</Text>}
       {tags.length === 0 && status !== 'loading' && <EmptyState>No versions tagged yet.</EmptyState>}

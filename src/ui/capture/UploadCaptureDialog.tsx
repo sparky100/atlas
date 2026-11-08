@@ -276,12 +276,12 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="Start a capture run">
+      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="Start an import">
         <Panel raised>
           <div className={styles.panel}>
             <div className={styles.header}>
               <Text as="h2" size="lg">
-                Start a capture run
+                Start an import
               </Text>
               <Button variant="ghost" aria-label="Close" onClick={handleClose}>
                 ✕
@@ -494,7 +494,7 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
 
               <div className={styles.actions}>
                 <Button variant="primary" disabled={!canSubmit} onClick={onSubmit}>
-                  {status === 'uploading' ? 'Uploading…' : status === 'saving' ? 'Saving…' : 'Start capture run'}
+                  {status === 'uploading' ? 'Uploading…' : status === 'saving' ? 'Saving…' : 'Start import'}
                 </Button>
                 <Button variant="ghost" disabled={isCreatingJob(status)} onClick={handleClose}>
                   Cancel

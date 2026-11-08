@@ -637,7 +637,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           </ul>
         )}
         {summaryState.status === 'ready' && summaryState.summary.captureDraftOverlaps.length > 0 && (
-          <CollapsibleSection title="Unreviewed capture drafts touching these elements" meta={`(${String(summaryState.summary.captureDraftOverlaps.length)})`} defaultOpen={false}>
+          <CollapsibleSection title="Unreviewed import drafts touching these elements" meta={`(${String(summaryState.summary.captureDraftOverlaps.length)})`} defaultOpen={false}>
             <ul className={styles.branchList}>
               {summaryState.summary.captureDraftOverlaps.map(({ title, draftCount, latestJobId, sharedElementNames }) => (
                 <li key={title} className={styles.branchRow}>

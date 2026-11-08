@@ -101,8 +101,8 @@ test('the capability-scoped landscape lists Primary and Also-supports systems, n
   // Primary vs. Also supports sectioning.
   // A row is sectioned by its own edge's role — Invoicing Service's edge to
   // the child is `primary`, so it's Primary here (named "via Invoicing").
-  await expect(page.getByRole('heading', { name: 'Primary (2)' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Also supports (1)' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Main systems (2)' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Other systems (1)' })).toBeVisible();
 
   // The child-capability rollup names its own capability, on a row that
   // has no direct edge to Billing itself.

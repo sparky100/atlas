@@ -8,7 +8,7 @@ import type { ValueStreamStageRollup, ValueStreamTone } from './valueStreamRollu
 import styles from './ValueStreamsMobileList.module.css';
 
 const TONE_LABEL: Record<ValueStreamTone, string> = {
-  ok: 'no known exposure',
+  ok: '', // nothing to say when there is no known exposure — the green dot is enough
   warn: 'lifecycle exposure',
   info: 'replacement planned',
   neutral: 'nothing recorded',
@@ -50,9 +50,9 @@ export function ValueStreamsMobileList({ rows, selectedStageId, onSelectStage, r
         meta={
           <span className={styles.factIndicator}>
             <span className={styles.factDot} data-tone={row.rollup.tone} aria-hidden="true" />
-            <Text as="span" size="xs" tone="muted">
-              {TONE_LABEL[row.rollup.tone]}
-            </Text>
+            {TONE_LABEL[row.rollup.tone] !== '' && (
+              <Text as="span" size="xs" tone="muted">{TONE_LABEL[row.rollup.tone]}</Text>
+            )}
           </span>
         }
         open={expandedStreamId === row.stream.element_id}
@@ -81,9 +81,9 @@ export function ValueStreamsMobileList({ rows, selectedStageId, onSelectStage, r
                 <Text as="span" size="sm">
                   {stage.stage.name}
                 </Text>
-                <Text as="span" size="xs" tone="muted">
-                  {TONE_LABEL[stage.tone]}
-                </Text>
+                {TONE_LABEL[stage.tone] !== '' && (
+                  <Text as="span" size="xs" tone="muted">{TONE_LABEL[stage.tone]}</Text>
+                )}
               </button>
               {selectedStageId === stage.stage.element_id && <div className={styles.detail}>{renderStageDetail(stage)}</div>}
             </li>

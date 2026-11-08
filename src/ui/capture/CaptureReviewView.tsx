@@ -84,13 +84,12 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
   const { role } = useMembership(orgId, userId);
   const canReview = canRunCapture(role);
   const queue = useCaptureReviewQueue(modelId, orgId, jobId, userId, role);
-  const { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, finish, discard, searchTargetElements, notInFile } = queue;
+  const { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, decide, decideMany, apply, finish, discard, searchTargetElements, notInFile } = queue;
 
   const [selectedId, setSelectedId] = useState<UUID | null>(null);
   const [openPanel, setOpenPanel] = useState<{ candidateId: UUID; type: 'edit' | 'split' | 'merge' } | null>(null);
   const [multiSelected, setMultiSelected] = useState<Set<UUID>>(new Set());
   const [pendingAmbiguousTargets, setPendingAmbiguousTargets] = useState<Map<UUID, PendingAmbiguousTarget>>(new Map());
-  const [newBranchName, setNewBranchName] = useState('');
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
   /** Class groups the reviewer has collapsed — toggled by the group header; a collapsed group hides its candidates but keeps its count. */
   const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<CandidateClass>>(new Set());
@@ -140,7 +139,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
   const runFinish = useCallback(() => {
     void finish().then((done) => {
       if (!done) return;
-      reportToast('Capture review finished — nothing was applied.');
+      reportToast('Import review finished — nothing was applied.');
       void navigate(reviewQueueHref);
     });
   }, [finish, navigate, reviewQueueHref]);
@@ -149,7 +148,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
     () =>
       discard().then((done) => {
         if (!done) return;
-        reportToast('Capture draft discarded.');
+        reportToast('Import draft discarded.');
         void navigate(reviewQueueHref);
       }),
     [discard, navigate, reviewQueueHref],
@@ -294,7 +293,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
   }, []);
 
   if (status === 'loading') return <Text tone="muted">Loading…</Text>;
-  if (status === 'error' || !job) return <Text as="p">{error ?? "Couldn't load this capture review."}</Text>;
+  if (status === 'error' || !job) return <Text as="p">{error ?? "Couldn't load this import review."}</Text>;
 
   // A reviewed or discarded job is closed: its decisions are history, not a queue to act on.
   if (job.status !== 'parsed') {
@@ -311,7 +310,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
   }
 
   const busy = status === 'applying' || status === 'closing';
-  const applyDisabledReason = finishable ? (busy ? 'Working…' : null) : !targetBranchId ? 'Choose a target change first.' : busy ? 'Applying…' : null;
+  const applyDisabledReason = finishable ? (busy ? 'Working…' : null) : busy ? 'Applying…' : null;
   const canDiscard = canDiscardCaptureJob(role, job, userId);
 
   return (
@@ -320,7 +319,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
         <Panel>
           <div className={styles.headerRow}>
             <Text as="p" size="sm" tone="muted">
-              {candidates.length} candidate(s) · {decidedCount} decided
+              {candidates.length} items · {decidedCount} decided
             </Text>
           </div>
           <div className={styles.filterRow} role="group" aria-label="Filter by review status">
@@ -339,7 +338,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
           </div>
           <div className={styles.targetRow}>
             <Text as="label" size="sm" tone="muted">
-              Target change
+              Add to
             </Text>
             <select
               id="capture-review-target-branch"
@@ -349,32 +348,13 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
                 setTargetBranchId(e.target.value || null);
               }}
             >
-              <option value="">— choose —</option>
+              <option value="">A new change for this import</option>
               {changeBranches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.title ?? b.name}
                 </option>
               ))}
             </select>
-            <input
-              className={styles.input}
-              placeholder="or name a new change…"
-              value={newBranchName}
-              onChange={(e) => {
-                setNewBranchName(e.target.value);
-              }}
-            />
-            <Button
-              variant="ghost"
-              disabled={newBranchName.trim().length === 0}
-              onClick={() => {
-                void createTargetBranch(newBranchName).then((id) => {
-                  if (id) setNewBranchName('');
-                });
-              }}
-            >
-              Create
-            </Button>
             {finishable ? (
               <Button variant="primary" disabled={!!applyDisabledReason} onClick={runFinish}>
                 {status === 'closing' ? 'Finishing…' : 'Finish review'}
@@ -405,10 +385,10 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
               {error}
             </Text>
           )}
-          {canDiscard && <DiscardCaptureButton label="Discard this draft…" confirmText="Discard the whole capture? Nothing from it reaches the model; decisions so far stay on record." onConfirm={runDiscard} />}
+          {canDiscard && <DiscardCaptureButton label="Discard this draft…" confirmText="Discard the whole import? Nothing from it reaches the model; decisions so far stay on record." onConfirm={runDiscard} />}
           {canReview && (
             <Text as="p" tone="faint" size="xs" className={styles.shortcuts}>
-              j/k select · a accept · r reject · u undo · e edit · s split · m merge into… · 1-5/n pick (ambiguous) · x select (confirm/new, then a/r bulk-acts) · t target · ⌘/Ctrl+Enter apply / finish
+              j/k select · a accept · r reject · u undo · e edit · s split · m merge into… · 1-5/n pick (ambiguous) · x select (confirm/new, then a/r bulk-acts) · t change · ⌘/Ctrl+Enter apply / finish
             </Text>
           )}
         </Panel>
