@@ -65,3 +65,12 @@ export function selectRecentActivity(commits: readonly RecentCommitRow[], limit:
   const rest = groups.filter((g) => !selected.has(g.key));
   return { shown, rest };
 }
+
+/** How many named subjects a "Recent activity" row shows before collapsing the rest behind a "+N more" toggle. */
+export const ACTIVITY_SUBJECTS_COLLAPSED = 3;
+
+/** Splits a commit's subjects into the always-visible head and the hidden remainder. A list only one past the limit isn't worth a toggle, so it's shown whole. */
+export function splitActivitySubjects<T>(subjects: readonly T[], limit = ACTIVITY_SUBJECTS_COLLAPSED): { visible: T[]; hidden: T[] } {
+  if (subjects.length <= limit + 1) return { visible: [...subjects], hidden: [] };
+  return { visible: subjects.slice(0, limit), hidden: subjects.slice(limit) };
+}
