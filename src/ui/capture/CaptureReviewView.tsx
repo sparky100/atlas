@@ -139,7 +139,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
   const runFinish = useCallback(() => {
     void finish().then((done) => {
       if (!done) return;
-      reportToast('Capture review finished — nothing was applied.');
+      reportToast('Import review finished — nothing was applied.');
       void navigate(reviewQueueHref);
     });
   }, [finish, navigate, reviewQueueHref]);
@@ -148,7 +148,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
     () =>
       discard().then((done) => {
         if (!done) return;
-        reportToast('Capture draft discarded.');
+        reportToast('Import draft discarded.');
         void navigate(reviewQueueHref);
       }),
     [discard, navigate, reviewQueueHref],
@@ -293,7 +293,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
   }, []);
 
   if (status === 'loading') return <Text tone="muted">Loading…</Text>;
-  if (status === 'error' || !job) return <Text as="p">{error ?? "Couldn't load this capture review."}</Text>;
+  if (status === 'error' || !job) return <Text as="p">{error ?? "Couldn't load this import review."}</Text>;
 
   // A reviewed or discarded job is closed: its decisions are history, not a queue to act on.
   if (job.status !== 'parsed') {
@@ -319,7 +319,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
         <Panel>
           <div className={styles.headerRow}>
             <Text as="p" size="sm" tone="muted">
-              {candidates.length} candidate(s) · {decidedCount} decided
+              {candidates.length} items · {decidedCount} decided
             </Text>
           </div>
           <div className={styles.filterRow} role="group" aria-label="Filter by review status">
@@ -385,7 +385,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
               {error}
             </Text>
           )}
-          {canDiscard && <DiscardCaptureButton label="Discard this draft…" confirmText="Discard the whole capture? Nothing from it reaches the model; decisions so far stay on record." onConfirm={runDiscard} />}
+          {canDiscard && <DiscardCaptureButton label="Discard this draft…" confirmText="Discard the whole import? Nothing from it reaches the model; decisions so far stay on record." onConfirm={runDiscard} />}
           {canReview && (
             <Text as="p" tone="faint" size="xs" className={styles.shortcuts}>
               j/k select · a accept · r reject · u undo · e edit · s split · m merge into… · 1-5/n pick (ambiguous) · x select (confirm/new, then a/r bulk-acts) · t change · ⌘/Ctrl+Enter apply / finish

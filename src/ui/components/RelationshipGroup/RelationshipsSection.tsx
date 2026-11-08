@@ -21,6 +21,7 @@ import { RelationshipAdd } from './RelationshipAdd';
 import { isSlotApplicable } from './slotApplicability';
 import { RelationshipRemove, type RelationshipsSectionRemoveConfig } from './RelationshipRemove';
 import { Text } from '../Text/Text';
+import { supportsRoleLabel } from '../../landscape/supportsRoleLabel';
 import styles from './RelationshipsSection.module.css';
 
 // Fixed display order (UI-principles §4.4) — distinct from RELATIONSHIP_TYPES'
@@ -364,7 +365,7 @@ function RelationshipDirectionGroup({
                   “{description}”
                 </Text>
               )}
-              {supportsRole !== null && <Chip tone={supportsRole === 'primary' ? 'info' : 'neutral'}>{supportsRole}</Chip>}
+              {supportsRole !== null && <Chip tone={supportsRole === 'primary' ? 'info' : 'neutral'}>{supportsRoleLabel(supportsRole)}</Chip>}
               {fitForPurpose !== null && <Chip tone={fitForPurposeToneFor(fitForPurpose)}>{fitForPurpose}</Chip>}
               {fitNotRated && <Chip tone="neutral">fit not rated</Chip>}
               {ownsRole !== null && <Chip tone="neutral">{ownsRole} owner</Chip>}
@@ -493,7 +494,7 @@ function RelationshipAttributesPanel({ relationship, facts, sources, via, orgSlu
                         {field.label}
                       </Text>
                       <Text as="span" size="sm">
-                        primary — promote a different {relationship.relationship_type} edge to change this
+                        main — make a different {relationship.relationship_type} link the main one to change this
                       </Text>
                     </div>
                   );

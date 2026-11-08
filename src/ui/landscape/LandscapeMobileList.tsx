@@ -12,6 +12,7 @@ import { Text } from '../components/Text/Text';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import type { LandscapeGroupMember, LandscapeGroups } from './landscapeGroups';
+import { supportsRoleLabel } from './supportsRoleLabel';
 import styles from './LandscapeMobileList.module.css';
 
 export interface LandscapeMobileListProps {
@@ -246,7 +247,7 @@ function SystemRow({
             `undefined` for the four non-capability lanes (Unassigned/
             External/OT/Platforms, `landscapeGroups.ts`'s own doc comment),
             which have no single `supports` edge to name a role from. */}
-        {role !== undefined && <Chip tone={role === 'primary' ? 'info' : 'neutral'}>{role}</Chip>}
+        {role !== undefined && <Chip tone={role === 'primary' ? 'info' : 'neutral'}>{supportsRoleLabel(role)}</Chip>}
         {extraLaneCount !== undefined && <Chip tone="neutral">+{extraLaneCount}</Chip>}
       </Link>
       <div className={styles.rowSecondary}>

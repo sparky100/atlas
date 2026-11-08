@@ -15,7 +15,7 @@ test('tag main before and after a change, then diff the two tags by name', async
   await addSystemFromHome(page, { name: 'System A', description: 'Exists before the tag.' });
   await goToModelHome(page);
 
-  await clickNavItem(page, 'Versions');
+  await clickNavItem(page, 'History');
   const versionList = page.getByRole('list');
   await page.getByPlaceholder('Version name (e.g. v2026-Q2)').fill('v1');
   await page.getByPlaceholder('Note (optional)').fill('Before');
@@ -27,7 +27,7 @@ test('tag main before and after a change, then diff the two tags by name', async
   await addSystemFromHome(page, { name: 'System B', description: 'Added after the first tag.' });
   await goToModelHome(page);
 
-  await clickNavItem(page, 'Versions');
+  await clickNavItem(page, 'History');
   await page.getByPlaceholder('Version name (e.g. v2026-Q2)').fill('v2');
   await page.getByPlaceholder('Note (optional)').fill('After');
   await page.getByRole('button', { name: 'Tag main now' }).click();

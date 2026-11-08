@@ -56,7 +56,7 @@ export function VersionsPage() {
           <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel="main" />
           <div className={styles.header}>
             <Text as="h1" size="2xl">
-              Versions
+              History
             </Text>
           </div>
           <VersionsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canTag={canTag} />

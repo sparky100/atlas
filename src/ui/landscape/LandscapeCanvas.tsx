@@ -1265,7 +1265,7 @@ export function LandscapeCanvas({
           "⇢ {name}" label re-shown. */}
       {hoveredReferenceSystem && hoverReference && (
         <div className={styles.tooltip} style={{ left: hoverReference.screenX, top: hoverReference.screenY }}>
-          {hoveredReferenceSystem.name} also supports this capability (secondary)
+          {hoveredReferenceSystem.name} also supports this capability (not its main one)
         </div>
       )}
       {extraLanesPopover && (

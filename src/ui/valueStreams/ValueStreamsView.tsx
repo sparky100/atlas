@@ -7,7 +7,7 @@ import type { ValueStreamTone } from './valueStreamRollup';
 import styles from './ValueStreamsView.module.css';
 
 const TONE_LABEL: Record<ValueStreamTone, string> = {
-  ok: 'no known exposure',
+  ok: '', // nothing to say when there is no known exposure — the green dot is enough
   warn: 'lifecycle exposure',
   info: 'replacement planned',
   neutral: 'nothing recorded',
@@ -77,9 +77,9 @@ function StreamRow({ row, selectedStageId, onInspectStage, compact, elementHref 
         </Text>
         <span className={styles.factIndicator}>
           <span className={styles.factDot} data-tone={row.rollup.tone} aria-hidden="true" />
-          <Text as="span" size="sm" tone="muted">
-            {TONE_LABEL[row.rollup.tone]}
-          </Text>
+          {TONE_LABEL[row.rollup.tone] !== '' && (
+            <Text as="span" size="sm" tone="muted">{TONE_LABEL[row.rollup.tone]}</Text>
+          )}
         </span>
       </div>
       <div className={styles.stages}>
@@ -95,9 +95,9 @@ function StreamRow({ row, selectedStageId, onInspectStage, compact, elementHref 
                 <Text as="span" size="sm" className={styles.stageName}>
                   {stage.stage.name}
                 </Text>
-                <Text as="span" size="xs" tone="muted">
-                  {TONE_LABEL[stage.tone]}
-                </Text>
+                {TONE_LABEL[stage.tone] !== '' && (
+                  <Text as="span" size="xs" tone="muted">{TONE_LABEL[stage.tone]}</Text>
+                )}
               </>
             );
             if (compact && elementHref) {

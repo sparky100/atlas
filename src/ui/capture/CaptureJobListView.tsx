@@ -55,7 +55,7 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
     <div>
       <div className={styles.header}>
         <Text as="h2" size="lg">
-          Capture runs
+          Imports
         </Text>
         {canCreate && (
           <Button
@@ -64,7 +64,7 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
               setUploadOpen(true);
             }}
           >
-            New capture run
+            New import
           </Button>
         )}
       </div>
@@ -72,7 +72,7 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
       {!canCreate && (
         <Panel>
           <Text as="p" size="sm">
-            A capture run reads a spreadsheet, PDF, or pasted text with AI extraction, matches what it finds against this model, and produces a draft a reviewer accepts or rejects candidate by candidate — nothing changes on main until then.
+            An import reads a spreadsheet, PDF, or pasted text with AI extraction, matches what it finds against this model, and produces a draft a reviewer accepts or rejects candidate by candidate — nothing changes on main until then.
           </Text>
         </Panel>
       )}
@@ -83,7 +83,7 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
           {error}
         </Text>
       )}
-      {jobs.length === 0 && status !== 'loading' && <EmptyState>No capture runs yet. {canCreate ? 'Start one above.' : 'Nobody has started one.'}</EmptyState>}
+      {jobs.length === 0 && status !== 'loading' && <EmptyState>No imports yet. {canCreate ? 'Start one above.' : 'Nobody has started one.'}</EmptyState>}
 
       <ul className={styles.list}>
         {visibleJobs.map((job) => (
@@ -162,7 +162,7 @@ function CaptureJobRow({ job, orgSlug, modelSlug, canDiscard, onRetry, onDiscard
           <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/capture/${job.id}`} variant="secondary">
             Review →
           </LinkButton>
-          {canDiscard && <DiscardCaptureButton label="Discard" confirmText="Discard this capture draft? Nothing from it reaches the model." onConfirm={onDiscard} />}
+          {canDiscard && <DiscardCaptureButton label="Discard" confirmText="Discard this import draft? Nothing from it reaches the model." onConfirm={onDiscard} />}
         </div>
       )}
     </li>

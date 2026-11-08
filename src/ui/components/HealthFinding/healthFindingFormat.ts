@@ -7,6 +7,8 @@
 export interface HealthFindingItem {
   id: string;
   label: string;
+  /** Set when the item is an element, so the name can link to its own page. */
+  elementId?: string;
 }
 
 /**

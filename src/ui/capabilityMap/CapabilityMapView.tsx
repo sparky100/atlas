@@ -297,8 +297,9 @@ function EnablesStagesCount({ count }: { count: number }) {
  */
 function InspectButton({ name, onClick }: { name: string; onClick: () => void }) {
   return (
-    <button type="button" className={styles.inspectButton} aria-label={`Inspect ${name}`} title="Inspect" onClick={onClick}>
+    <button type="button" className={styles.inspectButton} aria-label={`Inspect ${name}`} title="Show details" onClick={onClick}>
       <Info size={14} aria-hidden="true" />
+      <span>Details</span>
     </button>
   );
 }

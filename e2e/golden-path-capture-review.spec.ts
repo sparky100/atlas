@@ -63,20 +63,20 @@ test('upload a spreadsheet, accept and reject candidates by keyboard, and see th
   await signUpCreateOrgAndModel(page, 'capturegolden');
 
   await goToModelHome(page);
-  await clickNavItem(page, 'Capture');
-  await expect(page.getByRole('heading', { name: 'Capture', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'New capture run' }).click();
+  await clickNavItem(page, 'Import');
+  await expect(page.getByRole('heading', { name: 'Import', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'New import' }).click();
 
-  await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Start an import' })).toBeVisible();
   await page.getByLabel('Choose a CSV, XLSX, JSON, or PDF file').setInputFiles(path.join(FIXTURES_DIR, '01-clean-register', 'input.csv'));
-  const startButton = page.getByRole('button', { name: 'Start capture run' });
+  const startButton = page.getByRole('button', { name: 'Start import' });
   await expect(startButton).toBeEnabled();
   await startButton.click();
 
   // The dialog closes the moment the job row exists — uploading the file
   // and inserting the row are both real network calls, so this can take a
   // moment longer than the default assertion timeout.
-  await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByRole('dialog', { name: 'Start an import' })).toHaveCount(0, { timeout: 30_000 });
   // One `capture-run` invocation runs the whole pipeline (K-12's own
   // job-level-retry-only narrowing) — this list polls for the result
   // rather than the browser waiting on the invocation's own promise, so
@@ -97,7 +97,7 @@ test('upload a spreadsheet, accept and reject candidates by keyboard, and see th
 
 
   await page.keyboard.press('Control+Enter');
-  await expect(page.getByText(/^Applied \d+ candidate/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/^Applied \d+ item/)).toBeVisible({ timeout: 15_000 });
 
   // Billing is rejected instead — `atlas.stage_capture_decisions` persists
   // one action at a time (SPEC §8.2), never behind a batch "save" the
@@ -121,14 +121,14 @@ test('a scanned PDF with no text layer fails with a plain explanation', async ({
   await signUpCreateOrgAndModel(page, 'capturescanned');
 
   await goToModelHome(page);
-  await clickNavItem(page, 'Capture');
-  await page.getByRole('button', { name: 'New capture run' }).click();
-  await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toBeVisible();
+  await clickNavItem(page, 'Import');
+  await page.getByRole('button', { name: 'New import' }).click();
+  await expect(page.getByRole('dialog', { name: 'Start an import' })).toBeVisible();
   await page.getByLabel('Choose a CSV, XLSX, JSON, or PDF file').setInputFiles(path.join(FIXTURES_DIR, '09-scanned', 'input.pdf'));
-  const startButton = page.getByRole('button', { name: 'Start capture run' });
+  const startButton = page.getByRole('button', { name: 'Start import' });
   await expect(startButton).toBeEnabled();
   await startButton.click();
-  await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByRole('dialog', { name: 'Start an import' })).toHaveCount(0, { timeout: 30_000 });
 
   // `runCapture.ts`'s own `NO_TEXT_LAYER` message ("This PDF is scanned...")
   // — this fails before any LLM call at all, so it needs no live model
@@ -158,14 +158,14 @@ test('upload a JSON file, bulk-accept every new candidate by keyboard, and apply
   await signUpCreateOrgAndModel(page, 'capturejson');
 
   await goToModelHome(page);
-  await clickNavItem(page, 'Capture');
-  await page.getByRole('button', { name: 'New capture run' }).click();
-  await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toBeVisible();
+  await clickNavItem(page, 'Import');
+  await page.getByRole('button', { name: 'New import' }).click();
+  await expect(page.getByRole('dialog', { name: 'Start an import' })).toBeVisible();
   await page.getByLabel('Choose a CSV, XLSX, JSON, or PDF file').setInputFiles(inputPath);
-  const startButton = page.getByRole('button', { name: 'Start capture run' });
+  const startButton = page.getByRole('button', { name: 'Start import' });
   await expect(startButton).toBeEnabled();
   await startButton.click();
-  await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByRole('dialog', { name: 'Start an import' })).toHaveCount(0, { timeout: 30_000 });
   await expect(page.getByText('Parsed', { exact: true })).toBeVisible({ timeout: 120_000 });
 
   await page.getByRole('link', { name: 'Review →' }).click();
@@ -180,7 +180,7 @@ test('upload a JSON file, bulk-accept every new candidate by keyboard, and apply
 
 
   await page.keyboard.press('Control+Enter');
-  await expect(page.getByText(/^Applied \d+ candidate/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/^Applied \d+ item/)).toBeVisible({ timeout: 15_000 });
 
   await goToModelHome(page);
   await page.getByRole('link', { name: 'Changes' }).click();
@@ -194,7 +194,7 @@ test('reject everything by tap, finish the review with no change, and discard a 
   // A finished review must be able to leave the queue without inventing a
   // change: "Select all" → "Reject selected" → "Finish review", all by tap
   // (no keyboard at 390px), then a second run of the same file discarded
-  // straight from the review queue's "Capture drafts" list.
+  // straight from the review queue's "Import drafts" list.
   // Two real capture runs — each can take most of the 120s wait below.
   test.setTimeout(300_000);
   const inputPath = testInfo.outputPath('reject-me.json');
@@ -212,14 +212,14 @@ test('reject everything by tap, finish the review with no change, and discard a 
 
   async function runCapture(): Promise<void> {
     await goToModelHome(page);
-    await clickNavItem(page, 'Capture');
-    await page.getByRole('button', { name: 'New capture run' }).click();
-    await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toBeVisible();
+    await clickNavItem(page, 'Import');
+    await page.getByRole('button', { name: 'New import' }).click();
+    await expect(page.getByRole('dialog', { name: 'Start an import' })).toBeVisible();
     await page.getByLabel('Choose a CSV, XLSX, JSON, or PDF file').setInputFiles(inputPath);
-    const startButton = page.getByRole('button', { name: 'Start capture run' });
+    const startButton = page.getByRole('button', { name: 'Start import' });
     await expect(startButton).toBeEnabled();
     await startButton.click();
-    await expect(page.getByRole('dialog', { name: 'Start a capture run' })).toHaveCount(0, { timeout: 30_000 });
+    await expect(page.getByRole('dialog', { name: 'Start an import' })).toHaveCount(0, { timeout: 30_000 });
     await expect(page.getByText('Parsed', { exact: true }).first()).toBeVisible({ timeout: 120_000 });
   }
 
@@ -236,15 +236,15 @@ test('reject everything by tap, finish the review with no change, and discard a 
   await expect(page.getByRole('button', { name: 'Apply decisions' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Finish review' }).click();
   await expect(page.getByRole('heading', { name: 'Changes' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Capture drafts' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Import drafts' })).toHaveCount(0);
 
   // A second run of the same file, thrown away from the queue itself.
   await runCapture();
   await goToModelHome(page);
   await clickNavItem(page, 'Changes');
   await page.getByRole('link', { name: /Review queue/ }).click();
-  await expect(page.getByRole('heading', { name: 'Capture drafts' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Import drafts' })).toBeVisible();
   await page.getByRole('button', { name: 'Discard', exact: true }).click();
   await page.getByRole('button', { name: 'Confirm discard' }).click();
-  await expect(page.getByRole('heading', { name: 'Capture drafts' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Import drafts' })).toHaveCount(0);
 });

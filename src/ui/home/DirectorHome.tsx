@@ -117,7 +117,7 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
             By capability
           </Button>
           <Button variant={weaknessView === 'outcome' ? 'primary' : 'ghost'} onClick={() => { setWeaknessView('outcome'); }} aria-pressed={weaknessView === 'outcome'}>
-            By outcome
+            By value stream
           </Button>
         </div>
         {weaknessView === 'capability' && (
@@ -452,23 +452,6 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
       <Text as="p" size="lg" className={styles.tileName}>
         {tile.capability.name}
       </Text>
-      {tile.exposedSystems.length > 0 && (
-        <ul className={styles.exposingSystems}>
-          {tile.exposedSystems.map((system) => {
-            const lifecycleStatus = attributesRecord(system.attributes).lifecycleStatus;
-            return (
-              <li key={system.element_id}>
-                <Text as="span" size="sm">
-                  {system.name}
-                </Text>{' '}
-                <Text as="span" tone="muted" size="sm">
-                  {typeof lifecycleStatus === 'string' ? lifecycleStatus : ''}
-                </Text>
-              </li>
-            );
-          })}
-        </ul>
-      )}
       <Text as="p" tone="muted" size="xs" className={styles.tileFooter}>
         {tile.supportingSystems.length === 0
           ? 'no known supporters'
@@ -497,9 +480,9 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
           pill — two pills read as two equally urgent problems, which
           "no owner" next to "nothing recorded"/"lifecycle exposure" never
           was. */}
-      {emphasised && (
-        <Chip tone={TONE_CHIP[tile.tone]} glyph={<span className={styles.dot} />}>
-          {TONE_LABEL[tile.tone]} · {tile.isOwned ? 'owned' : 'no owner'}
+      {emphasised && (tile.tone !== 'ok' || !tile.isOwned) && (
+        <Chip tone={tile.tone === 'ok' ? 'warn' : TONE_CHIP[tile.tone]} glyph={<span className={styles.dot} />}>
+          {tile.tone === 'ok' ? 'no owner' : `${TONE_LABEL[tile.tone]} · ${tile.isOwned ? 'owned' : 'no owner'}`}
         </Chip>
       )}
       {/* F6.1: a second, visually distinct pill — its own glyph shape (a
@@ -530,6 +513,26 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
           primary link (never nested inside it, same reasoning as
           `StartDecisionLink` below — an `<a>` cannot legally contain
           another `<a>`). */}
+      {/* Each exposed system is a real link to its own page (siblings of the tile link, never nested in it) so a flagged tile can be followed through to the thing that needs reviewing. */}
+      {tile.exposedSystems.length > 0 && (
+        <ul className={styles.exposingSystems}>
+          {tile.exposedSystems.map((system) => {
+            const lifecycleStatus = attributesRecord(system.attributes).lifecycleStatus;
+            return (
+              <li key={system.element_id}>
+                <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${system.element_id}`}>
+                  <Text as="span" size="sm">
+                    {system.name}
+                  </Text>
+                </Link>{' '}
+                <Text as="span" tone="muted" size="sm">
+                  {typeof lifecycleStatus === 'string' ? lifecycleStatus : ''}
+                </Text>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {tile.weakFitCapabilities.length > 0 && (
         <ul className={styles.fitCapabilityList}>
           {tile.weakFitCapabilities.map((capability) => (

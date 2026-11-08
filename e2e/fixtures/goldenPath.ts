@@ -267,7 +267,7 @@ export async function addSupportsRelationship(page: Page, capabilityNameMatch: s
   await page.getByRole('button', { name: new RegExp(capabilityNameMatch) }).click();
   if (answerPrimary !== undefined) {
     await expect(page.getByText(`Make ${capabilityNameMatch} the primary capability for this system?`, { exact: false })).toBeVisible();
-    await page.getByRole('button', { name: answerPrimary ? 'Yes, primary' : 'No', exact: true }).click();
+    await page.getByRole('button', { name: answerPrimary ? 'Yes, it is the main one' : 'No, it also supports it', exact: true }).click();
   }
 }
 

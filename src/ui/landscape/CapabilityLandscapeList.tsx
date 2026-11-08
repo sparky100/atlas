@@ -9,6 +9,7 @@ import { Text } from '../components/Text/Text';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import type { CapabilityLandscapeRow, CapabilityLandscapeRows } from './capabilityLandscapeRows';
+import { supportsRoleLabel } from './supportsRoleLabel';
 import styles from './CapabilityLandscapeList.module.css';
 
 export interface CapabilityLandscapeListProps {
@@ -37,8 +38,8 @@ export function CapabilityLandscapeList({ rows, elementHref, contextHref, thread
   }
   return (
     <div className={styles.list}>
-      <Section title="Primary" rows={rows.primary} elementHref={elementHref} contextHref={contextHref} threadCounts={threadCounts} onCommentMarkerClick={onCommentMarkerClick} />
-      <Section title="Also supports" rows={rows.secondary} elementHref={elementHref} contextHref={contextHref} threadCounts={threadCounts} onCommentMarkerClick={onCommentMarkerClick} />
+      <Section title="Main systems" rows={rows.primary} elementHref={elementHref} contextHref={contextHref} threadCounts={threadCounts} onCommentMarkerClick={onCommentMarkerClick} />
+      <Section title="Other systems" rows={rows.secondary} elementHref={elementHref} contextHref={contextHref} threadCounts={threadCounts} onCommentMarkerClick={onCommentMarkerClick} />
     </div>
   );
 }
@@ -111,7 +112,7 @@ function Row({
           {system.name}
         </Text>
         {lifecycleTone !== undefined && lifecycleStatus !== null && <span className={styles.lifecycleDot} data-tone={lifecycleTone} role="img" aria-label={lifecycleStatus} title={lifecycleStatus} />}
-        <Chip tone={role === 'primary' ? 'info' : 'neutral'}>{role}</Chip>
+        <Chip tone={role === 'primary' ? 'info' : 'neutral'}>{supportsRoleLabel(role)}</Chip>
         {/* "Child capabilities' systems included with the child named" — only ever set when this row's own edge targets a descendant of the root, never the root itself (`capabilityLandscapeRows.ts`'s own `viaCapability` doc comment). */}
         {viaCapability && <Chip tone="neutral">via {viaCapability.name}</Chip>}
       </Link>

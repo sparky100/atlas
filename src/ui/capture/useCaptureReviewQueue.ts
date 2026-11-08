@@ -336,7 +336,7 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
   );
 
   const finish = useCallback(() => closeWith(() => finishCaptureReview(supabase, jobId), "Couldn't finish this capture review."), [closeWith, jobId]);
-  const discard = useCallback(() => closeWith(() => discardCaptureJob(supabase, jobId), "Couldn't discard this capture draft."), [closeWith, jobId]);
+  const discard = useCallback(() => closeWith(() => discardCaptureJob(supabase, jobId), "Couldn't discard this import draft."), [closeWith, jobId]);
 
   const searchTargetElements = useCallback(
     async (elementType: ElementType, query: string): Promise<{ elementId: UUID; name: string; parentName: string | null }[] | null> => {

@@ -138,8 +138,8 @@ test('model nav: five-item bottom bar with a More sheet; every model route withi
     { name: 'Roadmap', heading: /Roadmap/ },
     { name: 'Reports', heading: 'Reports' },
     { name: 'Decisions', heading: 'Decisions' },
-    { name: 'Capture', heading: /Capture/ },
-    { name: 'Versions', heading: 'Versions' },
+    { name: 'Import', heading: 'Import' },
+    { name: 'History', heading: 'History' },
   ];
   for (const section of moreSections) {
     await more.click();
@@ -197,7 +197,7 @@ test('model nav: five-item bottom bar with a More sheet; every model route withi
   await expect(page.getByRole('navigation', { name: 'Model navigation' })).toBeVisible();
   await page.getByRole('navigation', { name: 'Model navigation' }).getByRole('button', { name: /^More/ }).click();
   await page.getByRole('navigation', { name: 'Model navigation' }).getByRole('region', { name: 'More sections' }).getByRole('link', { name: 'Versions' }).click();
-  await expect(page.getByRole('heading', { name: 'Versions', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'History', level: 1 })).toBeVisible();
 });
 
 /**

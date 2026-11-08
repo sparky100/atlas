@@ -17,6 +17,8 @@ export interface FindingCardProps {
   items: readonly HealthFindingItem[];
   severity: HealthFindingSeverity;
   action: FindingCardAction | null;
+  /** Where a named element item links to — every named system in a finding is a way into the problem itself. */
+  elementHref?: (elementId: string) => string;
 }
 
 /**
@@ -37,7 +39,7 @@ export interface FindingCardProps {
  * bold count and the title are split out of the one string rather than
  * carried as two separately-formatted fields.
  */
-export function FindingCard({ count, summary, items, severity, action }: FindingCardProps) {
+export function FindingCard({ count, summary, items, severity, action, elementHref }: FindingCardProps) {
   const countText = String(count);
   const title = summary.startsWith(countText) ? summary.slice(countText.length).replace(/^\s+/, '') : summary;
   const severityClass = severity === 'high' ? styles.high : severity === 'medium' ? styles.medium : '';
@@ -71,7 +73,15 @@ export function FindingCard({ count, summary, items, severity, action }: Finding
       </Text>
       {items.length > 0 && (
         <Text as="p" tone="muted" size="sm" className={styles.namesLine}>
-          {joinWithMore(items)}
+          {elementHref
+            ? items.slice(0, 3).map((item, index) => (
+                <span key={item.id}>
+                  {index > 0 && ', '}
+                  {item.elementId !== undefined ? <Link to={elementHref(item.elementId)}>{item.label}</Link> : item.label}
+                </span>
+              ))
+            : joinWithMore(items)}
+          {elementHref && items.length > 3 && `, and ${String(items.length - 3)} more`}
           {action && (
             <>
               {' · '}
