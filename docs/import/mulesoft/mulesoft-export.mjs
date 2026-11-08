@@ -66,6 +66,54 @@ export function sanitiseContract(contract) {
   return out;
 }
 
+/** Page sizes a CLI list is likely to stop at; a list of exactly this length may have been cut short (a guess — the CLI's own limit is unconfirmed). */
+const SUSPICIOUS_LIST_SIZES = new Set([20, 50, 100]);
+
+/** Retries one CLI call a couple of times: a dropped connection or a busy API Manager usually clears. `sleep` is injected so tests don't wait. */
+export async function withRetry(call, { attempts = 3, delayMs = 2000, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await call();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts && !isPermanentCliFailure(error)) await sleep(delayMs * attempt);
+      else break;
+    }
+  }
+  throw lastError;
+}
+
+function failureText(error) {
+  if (error === null || typeof error !== 'object') return String(error);
+  const parts = [error.message, error.stderr, error.stdout].filter((part) => typeof part === 'string');
+  return parts.join('\n');
+}
+
+/** A failure retrying cannot fix: the CLI is missing, or the login or access is wrong. */
+function isPermanentCliFailure(error) {
+  return explainCliFailure(error) !== null;
+}
+
+/** Plain next steps for the failures people hit most, or null for anything else (the raw message is then shown as it is). */
+export function explainCliFailure(error) {
+  const code = error !== null && typeof error === 'object' ? error.code : undefined;
+  const text = failureText(error);
+  if (code === 'ENOENT' || /anypoint-cli-v4.*(not recognized|not found)/i.test(text)) {
+    return 'The Anypoint CLI was not found. Install it with "npm install -g anypoint-cli-v4", then run this again.';
+  }
+  if (/\b(401|unauthori[sz]ed|invalid_grant|bad credentials|not logged in|please log in|no credentials)\b/i.test(text)) {
+    return 'The Anypoint CLI is not logged in, or its login was refused. Run "anypoint-cli-v4 conf username <you>" and "anypoint-cli-v4 conf password <password>" (or use your usual login), then run this again.';
+  }
+  if (/\b(403|forbidden|permission|not authori[sz]ed to)\b/i.test(text)) {
+    return 'Your Anypoint login can see this organisation but not API Manager in this environment. Ask an organisation admin for API Manager access to it, or choose another environment with --env.';
+  }
+  if (/\b(environment).*(not found|does not exist|unknown)|no environment named/i.test(text)) {
+    return 'The CLI does not know that environment name. Check the spelling against the environment names in Anypoint (for example Sandbox or Production).';
+  }
+  return null;
+}
+
 export function parseArgs(argv) {
   const envs = [];
   let out = 'mulesoft-export.json';
@@ -98,6 +146,8 @@ export async function exportEnvironments({ envs, run, now }) {
   for (const name of envs) {
     const apiList = parseCliJson(await run(['api-mgr', 'api', 'list', '--output', 'json'], name), `API list for ${name}`);
     if (!Array.isArray(apiList)) throw new Error(`API list for ${name}: expected a list.`);
+    if (apiList.length === 0) warnings.push(`${name}: the CLI listed no APIs. Check the environment name and that this login can see API Manager in it.`);
+    if (SUSPICIOUS_LIST_SIZES.has(apiList.length)) warnings.push(`${name}: the CLI listed exactly ${String(apiList.length)} APIs, which may be a page limit. Compare with the count in API Manager before trusting the export.`);
     const apis = apiList.map(sanitiseApi);
     const contracts = {};
     for (const api of apis) {
@@ -107,7 +157,7 @@ export async function exportEnvironments({ envs, run, now }) {
         contracts[String(api.id)] = Array.isArray(list) ? list.map(sanitiseContract) : [];
       } catch (error) {
         contracts[String(api.id)] = [];
-        warnings.push(error instanceof Error ? error.message : String(error));
+        warnings.push(`Contracts for API ${String(api.id)} in ${name} could not be read, so its client applications are missing: ${explainCliFailure(error) ?? (error instanceof Error ? error.message : String(error))}`);
       }
     }
     environments.push({ name, apis, contracts });
@@ -116,12 +166,20 @@ export async function exportEnvironments({ envs, run, now }) {
 }
 
 async function runCli(args, environmentName) {
-  const { stdout } = await execFileAsync('anypoint-cli-v4', args, {
-    env: { ...process.env, ANYPOINT_ENV: environmentName },
-    shell: process.platform === 'win32',
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  return stdout;
+  try {
+    return await withRetry(async () => {
+      const { stdout } = await execFileAsync('anypoint-cli-v4', args, {
+        env: { ...process.env, ANYPOINT_ENV: environmentName },
+        shell: process.platform === 'win32',
+        maxBuffer: 64 * 1024 * 1024,
+        timeout: 120_000,
+      });
+      return stdout;
+    });
+  } catch (error) {
+    // The plain explanation replaces the CLI's raw output; anything unrecognised is passed on untouched.
+    throw new Error(explainCliFailure(error) ?? (error instanceof Error ? error.message : String(error)));
+  }
 }
 
 async function main() {
@@ -129,8 +187,10 @@ async function main() {
   const result = await exportEnvironments({ envs, run: runCli, now: new Date().toISOString() });
   await writeFile(out, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
   const apiCount = result.environments.reduce((total, environment) => total + environment.apis.length, 0);
-  console.log(`Wrote ${out}: ${String(apiCount)} API(s) across ${String(result.environments.length)} environment(s).`);
+  const contractCount = result.environments.reduce((total, environment) => total + Object.values(environment.contracts).reduce((sum, list) => sum + list.length, 0), 0);
+  console.log(`Wrote ${out}: ${String(apiCount)} API(s) and ${String(contractCount)} contract(s) across ${String(result.environments.length)} environment(s).`);
   for (const warning of result.warnings) console.warn(`Warning: ${warning}`);
+  if (result.warnings.length > 0) console.warn(`${String(result.warnings.length)} warning(s): the export is incomplete or needs a check. Atlas shows them when you upload the file.`);
   console.log('Check the file for anything confidential before uploading it to Atlas.');
 }
 

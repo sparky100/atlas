@@ -59,6 +59,8 @@ const exportSchema = z.object({
   format: z.literal('atlas-mulesoft-export'),
   version: z.literal(1),
   organizationId: nullableString,
+  /** What the export script itself reported (a contract list it could not read, an empty environment): shown in the dialog, never dropped. */
+  warnings: z.array(z.string()).optional(),
   environments: z.array(
     z.object({
       name: z.string().min(1),
@@ -139,7 +141,7 @@ export function convertMulesoftExport(file: MulesoftExportFile, options: Mulesof
   const platformName = options.platformName ?? DEFAULT_MULESOFT_PLATFORM_NAME;
   const aliases = new Map(Object.entries(options.aliases ?? {}).map(([host, target]) => [host.toLowerCase(), target]));
   const multipleEnvironments = file.environments.length > 1;
-  const report: MulesoftConversionReport = { counts: { interfaces: 0, consumers: 0, relationships: 0, flowsToProducer: 0 }, skippedContracts: [], unmappedHosts: [], nameCollisions: [], warnings: [] };
+  const report: MulesoftConversionReport = { counts: { interfaces: 0, consumers: 0, relationships: 0, flowsToProducer: 0 }, skippedContracts: [], unmappedHosts: [], nameCollisions: [], warnings: (file.warnings ?? []).map((warning) => `Export script: ${warning}`) };
 
   const systems: Record<string, unknown>[] = [
     {

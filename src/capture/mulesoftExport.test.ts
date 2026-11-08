@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { exportEnvironments, parseArgs, parseCliJson, sanitiseApi, sanitiseContract } from '../../docs/import/mulesoft/mulesoft-export.mjs';
+import { explainCliFailure, exportEnvironments, parseArgs, parseCliJson, sanitiseApi, sanitiseContract, withRetry } from '../../docs/import/mulesoft/mulesoft-export.mjs';
 
 const FIXTURE_DIR = new URL('./fixtures/mulesoft/', import.meta.url);
 const readFixture = (name: string): string => readFileSync(new URL(name, FIXTURE_DIR), 'utf8');
@@ -58,7 +58,9 @@ describe('mulesoft-export script', () => {
     const result = await exportEnvironments({ envs: ['Sandbox'], run, now: 'T' });
     expect(result.environments[0]?.contracts['21241997']).toEqual([]);
     expect(result.environments[0]?.contracts['21241998']).toHaveLength(1);
-    expect(result.warnings).toEqual(['boom']);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('Contracts for API 21241997 in Sandbox could not be read, so its client applications are missing');
+    expect(result.warnings[0]).toContain('boom');
   });
 
   it('records unreadable contract output as a warning too', async () => {
@@ -77,6 +79,72 @@ describe('mulesoft-export script', () => {
     const result = await exportEnvironments({ envs: ['Sandbox', 'Production'], run, now: 'T' });
     expect(result.environments.map((environment) => environment.name)).toEqual(['Sandbox', 'Production']);
     expect(calls.filter((call) => call.args[2] === 'list' && call.args[1] === 'api').map((call) => call.env)).toEqual(['Sandbox', 'Production']);
+  });
+});
+
+describe('mulesoft-export script — warnings about an incomplete export', () => {
+  const listOf = (count: number): string => JSON.stringify(Array.from({ length: count }, (_, i) => ({ id: i + 1, assetId: `api-${String(i + 1)}` })));
+  const runWith = (list: string) => (args: string[]): Promise<string> => Promise.resolve(args[1] === 'api' ? list : '[]');
+
+  it('warns when an environment lists no APIs, rather than writing a quietly empty export', async () => {
+    const result = await exportEnvironments({ envs: ['Production'], run: runWith('[]'), now: 'T' });
+    expect(result.environments[0]?.apis).toEqual([]);
+    expect(result.warnings).toEqual([expect.stringContaining('Production: the CLI listed no APIs')]);
+  });
+
+  it('warns when the list is exactly a likely page size', async () => {
+    const result = await exportEnvironments({ envs: ['Production'], run: runWith(listOf(20)), now: 'T' });
+    expect(result.warnings).toEqual([expect.stringContaining('exactly 20 APIs, which may be a page limit')]);
+  });
+
+  it('does not warn for an ordinary count', async () => {
+    const result = await exportEnvironments({ envs: ['Production'], run: runWith(listOf(7)), now: 'T' });
+    expect(result.warnings).toEqual([]);
+  });
+});
+
+describe('withRetry', () => {
+  const noWait = { sleep: () => Promise.resolve(), delayMs: 0 };
+
+  it('retries a transient failure and returns the eventual result', async () => {
+    let calls = 0;
+    const result = await withRetry(() => (++calls < 3 ? Promise.reject(new Error('socket hang up')) : Promise.resolve('ok')), noWait);
+    expect(result).toBe('ok');
+    expect(calls).toBe(3);
+  });
+
+  it('gives up after the attempts and throws the last error', async () => {
+    let calls = 0;
+    await expect(withRetry(() => Promise.reject(new Error(`try ${String(++calls)}`)), { ...noWait, attempts: 3 })).rejects.toThrow('try 3');
+    expect(calls).toBe(3);
+  });
+
+  it('does not retry a failure that retrying cannot fix', async () => {
+    let calls = 0;
+    await expect(withRetry(() => Promise.reject(Object.assign(new Error('401 Unauthorized'), { stderr: '' })), noWait)).rejects.toThrow('401');
+    expect(calls).toBe(0);
+    await withRetry(() => Promise.resolve(++calls), noWait);
+    expect(calls).toBe(1);
+  });
+});
+
+describe('explainCliFailure', () => {
+  it('explains a missing CLI', () => {
+    expect(explainCliFailure(Object.assign(new Error('spawn anypoint-cli-v4 ENOENT'), { code: 'ENOENT' }))).toContain('npm install -g anypoint-cli-v4');
+  });
+
+  it('explains a refused or missing login', () => {
+    expect(explainCliFailure(new Error('Error: 401 Unauthorized'))).toContain('not logged in');
+    expect(explainCliFailure(Object.assign(new Error('Command failed'), { stderr: 'Error: Invalid credentials: not logged in' }))).toContain('not logged in');
+  });
+
+  it('explains a missing permission and an unknown environment', () => {
+    expect(explainCliFailure(new Error('403 Forbidden'))).toContain('API Manager access');
+    expect(explainCliFailure(new Error('Environment Staging not found'))).toContain('environment name');
+  });
+
+  it('leaves anything else to be shown as it is', () => {
+    expect(explainCliFailure(new Error('socket hang up'))).toBeNull();
   });
 });
 

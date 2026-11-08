@@ -197,3 +197,26 @@ describe('readableName', () => {
     expect(readableName('customer_orders-api')).toBe('Customer Orders Api');
   });
 });
+
+describe('convertMulesoftExport — what the export script itself reported', () => {
+  it('carries the script’s warnings into the report, so an incomplete export is never silent', () => {
+    const file = { ...loadFixture(), warnings: ['Contracts for API 21241997 in Sandbox could not be read, so its client applications are missing: boom'] };
+    const { report } = convertMulesoftExport(file);
+    expect(report.warnings).toContain('Export script: Contracts for API 21241997 in Sandbox could not be read, so its client applications are missing: boom');
+  });
+
+  it('reads an export file from before the script wrote warnings', () => {
+    const withoutWarnings = JSON.parse(readFileSync(new URL('../fixtures/mulesoft/export.sandbox.json', import.meta.url), 'utf8')) as Record<string, unknown>;
+    delete withoutWarnings.warnings;
+    const parsed = parseMulesoftExport(JSON.stringify(withoutWarnings));
+    expect(parsed.ok).toBe(true);
+  });
+
+  it('still converts an environment with no APIs, with the platform and no interfaces', () => {
+    const file = { ...loadFixture(), environments: [{ name: 'Production', apis: [], contracts: {} }], warnings: ['Production: the CLI listed no APIs. Check the environment name and that this login can see API Manager in it.'] };
+    const { importJson, report } = convertMulesoftExport(file);
+    expect(importJson.systems.map((row) => row.name)).toEqual(['MuleSoft Anypoint']);
+    expect(report.counts.interfaces).toBe(0);
+    expect(report.warnings[0]).toContain('listed no APIs');
+  });
+});
