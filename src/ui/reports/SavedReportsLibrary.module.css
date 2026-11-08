@@ -30,3 +30,121 @@
   min-height: 2rem;
   padding: 0 var(--space-2);
 }
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sortLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-width) solid var(--border);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover {
+  background: var(--surface-subtle, rgb(16 24 40 / 3%));
+}
+
+.summary {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.actions {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.menuWrap {
+  position: relative;
+  display: inline-block;
+}
+
+.menuButton {
+  min-width: 2rem;
+  min-height: 2rem;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-md, 6px);
+  background: transparent;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.menuButton:hover,
+.menuButton[aria-expanded="true"] {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 10;
+  min-width: 9rem;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  box-shadow: 0 4px 12px rgb(16 24 40 / 12%);
+}
+
+.menuItem {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.menuItem:hover,
+.menuItem:focus-visible {
+  background: rgb(16 24 40 / 6%);
+}
+
+@media (max-width: 700px) {
+  .wide {
+    display: none;
+  }
+}
