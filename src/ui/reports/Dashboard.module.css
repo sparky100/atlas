@@ -22,7 +22,8 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-4);
-  align-items: stretch;
+  /* Tiles take the height their content needs: stretching a short bar chart to match a tall neighbour left it half empty. */
+  align-items: start;
 }
 
 .contents {

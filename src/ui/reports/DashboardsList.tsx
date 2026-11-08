@@ -1,16 +1,17 @@
 /** ADR-027 (F14 step 6b): the model's dashboards on the Reports hub, and a "New dashboard" form (contributors and above). */
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import type { UUID } from '../../contracts/delta';
-import { createDashboard, listDashboards } from '../../db/reports';
-import type { DashboardRow, MemberRole } from '../../db/types';
-import { Button } from '../components/Button/Button';
-import { Text } from '../components/Text/Text';
-import { reportError } from '../errors/errorBannerStore';
-import { canCreateChangeBranch } from '../orgs/roleGates';
-import { supabase } from '../supabaseClient';
-import { StandardDashboardsOffer } from './StandardDashboardsOffer';
-import styles from './SavedReportsLibrary.module.css';
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router";
+import type { UUID } from "../../contracts/delta";
+import { createDashboard, listDashboards } from "../../db/reports";
+import type { DashboardRow, MemberRole } from "../../db/types";
+import { Button } from "../components/Button/Button";
+import { Chip } from "../components/Chip/Chip";
+import { Text } from "../components/Text/Text";
+import { reportError } from "../errors/errorBannerStore";
+import { canCreateChangeBranch } from "../orgs/roleGates";
+import { supabase } from "../supabaseClient";
+import { StandardDashboardsOffer } from "./StandardDashboardsOffer";
+import styles from "./SavedReportsLibrary.module.css";
 
 export interface DashboardsListProps {
   modelId: UUID;
@@ -20,11 +21,17 @@ export interface DashboardsListProps {
   basePath: string;
 }
 
-export function DashboardsList({ modelId, orgId, userId, role, basePath }: DashboardsListProps) {
+export function DashboardsList({
+  modelId,
+  orgId,
+  userId,
+  role,
+  basePath,
+}: DashboardsListProps) {
   const navigate = useNavigate();
   const [dashboards, setDashboards] = useState<DashboardRow[]>([]);
   const [creating, setCreating] = useState(false);
-  const [name, setName] = useState('');
+  const [name, setName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const canCreate = userId !== null && canCreateChangeBranch(role);
 
@@ -46,59 +53,86 @@ export function DashboardsList({ modelId, orgId, userId, role, basePath }: Dashb
 
   return (
     <section className={styles.section}>
-      <Text as="h2" size="lg">
-        Dashboards
-      </Text>
+      <div className={styles.sectionHeader}>
+        <Text as="h2" size="lg">
+          Dashboards
+        </Text>
+        {canCreate && (
+          <div className={styles.row}>
+            {!creating && (
+              <Button
+                onClick={() => {
+                  setCreating(true);
+                }}
+              >
+                New dashboard…
+              </Button>
+            )}
+            <StandardDashboardsOffer
+              modelId={modelId}
+              orgId={orgId}
+              userId={userId}
+              role={role}
+              existing={dashboards}
+              onAdded={(id) => {
+                void navigate(`${basePath}/reports/dashboards/${id}`);
+              }}
+            />
+          </div>
+        )}
+      </div>
       {dashboards.length === 0 && (
         <Text as="p" tone="muted">
-          No dashboards yet. A dashboard shows several saved reports together, live. Start from a standard one below, or build your own.
+          No dashboards yet. A dashboard shows several saved reports together,
+          live. Start from a standard one, or build your own.
         </Text>
       )}
-      <ul className={styles.list}>
+      <ul className={styles.cards}>
         {dashboards.map((d) => (
-          <li key={d.id} className={styles.item}>
-            <Link to={`${basePath}/reports/dashboards/${d.id}`}>{d.name}</Link>{' '}
-            <Text size="sm" tone="muted">
-              {d.visibility === 'organisation' ? 'shared' : 'private'}
-            </Text>
+          <li key={d.id} className={styles.cardItem}>
+            <Link
+              to={`${basePath}/reports/dashboards/${d.id}`}
+              className={styles.card}
+            >
+              <Text as="h3" size="md">
+                {d.name}
+              </Text>
+              <span className={styles.cardMeta}>
+                <Chip
+                  tone={d.visibility === "organisation" ? "info" : "neutral"}
+                >
+                  {d.visibility === "organisation" ? "Shared" : "Private"}
+                </Chip>
+                <Text size="sm" tone="muted">
+                  Updated {d.updated_at.slice(0, 10)}
+                </Text>
+              </span>
+            </Link>
           </li>
         ))}
       </ul>
-      {canCreate && !creating && (
-        <div className={styles.row}>
-          <Button
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
-            New dashboard…
-          </Button>
-        </div>
-      )}
-      {canCreate && (
-        <StandardDashboardsOffer
-          modelId={modelId}
-          orgId={orgId}
-          userId={userId}
-          role={role}
-          existing={dashboards}
-          onAdded={(id) => {
-            void navigate(`${basePath}/reports/dashboards/${id}`);
-          }}
-        />
-      )}
       {canCreate && creating && (
         <form
           className={styles.row}
           onSubmit={(e) => {
             e.preventDefault();
-            if (name.trim() === '') return;
+            if (name.trim() === "") return;
             const id = crypto.randomUUID();
-            createDashboard(supabase, { id, orgId, modelId, name: name.trim(), createdBy: userId })
+            createDashboard(supabase, {
+              id,
+              orgId,
+              modelId,
+              name: name.trim(),
+              createdBy: userId,
+            })
               .then(() => navigate(`${basePath}/reports/dashboards/${id}`))
               .catch((err: unknown) => {
                 reportError("Couldn't create the dashboard.", err);
-                setMessage(err instanceof Error ? err.message : "Couldn't create the dashboard.");
+                setMessage(
+                  err instanceof Error
+                    ? err.message
+                    : "Couldn't create the dashboard.",
+                );
               });
           }}
         >
@@ -111,7 +145,7 @@ export function DashboardsList({ modelId, orgId, userId, role, basePath }: Dashb
               setName(e.target.value);
             }}
           />
-          <Button type="submit" variant="primary" disabled={name.trim() === ''}>
+          <Button type="submit" variant="primary" disabled={name.trim() === ""}>
             Create
           </Button>
           <Button

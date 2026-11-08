@@ -67,7 +67,9 @@ export function ResultTable({ result, compact = false }: { result: ReportResult;
           {result.rows.map((row, i) => (
             <tr key={i}>
               {row.map((cell, j) => (
-                <td key={j}>{reportValueLabel(result.columns[j] ?? '', cell)}</td>
+                <td key={j} title={compact ? reportValueLabel(result.columns[j] ?? '', cell) : undefined}>
+                  {reportValueLabel(result.columns[j] ?? '', cell)}
+                </td>
               ))}
             </tr>
           ))}
