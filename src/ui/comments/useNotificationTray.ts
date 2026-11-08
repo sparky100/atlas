@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useAfterFirstPaint } from '../perf/useAfterFirstPaint';
 import type { UUID } from '../../contracts/delta';
 import { getMainBranch, getBranch } from '../../db/branches';
 import { listCommentsByIds } from '../../db/comments';
@@ -53,15 +54,17 @@ export function useNotificationTray(userId: UUID | null) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<NotificationTrayState>({ status: 'loading' });
+  const afterFirstPaint = useAfterFirstPaint();
 
   const reloadCount = useCallback(() => {
     if (!userId) return;
     void getUnreadNotificationCount(supabase, userId).then(setUnreadCount);
   }, [userId]);
 
+  // Performance: the unread badge isn't needed to draw the page — it waits until after first paint.
   useEffect(() => {
-    reloadCount();
-  }, [reloadCount]);
+    if (afterFirstPaint) reloadCount();
+  }, [reloadCount, afterFirstPaint]);
 
   const loadRows = useCallback(() => {
     if (!userId) return;
