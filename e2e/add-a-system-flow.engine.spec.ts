@@ -121,7 +121,7 @@ test('add a system: search finds nothing, the create sheet asks description and 
   // Since Prompt 7k: after the verb phrase, a second stage asks whether the
   // link goes via an integration platform — a direct edge here.
   await page.getByRole('button', { name: 'Next' }).click();
-  await page.getByRole('button', { name: 'Skip — direct edge' }).click();
+  await page.getByRole('button', { name: 'Skip — link directly' }).click();
 
   // Step 7: the relationship shows its phrase and a just-added chip.
   await expect(page.getByText('“shares address data with”')).toBeVisible();

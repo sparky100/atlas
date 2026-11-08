@@ -48,7 +48,7 @@ export function CommentsSection({ orgId, modelId, userId, role, anchorType, anch
   return (
     <div className={styles.section}>
       {state.data.anchorRetracted && (
-        <Chip tone="neutral">subject retracted</Chip>
+        <Chip tone="neutral">item retired</Chip>
       )}
 
       {state.data.threads.length === 0 && (

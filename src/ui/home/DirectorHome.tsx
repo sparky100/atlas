@@ -259,7 +259,7 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
                     </Text>
                     <Text as="p" tone="muted" size="sm">
                       tagged {formatDate(version.tag.created_at)} by {version.authorDisplay}
-                      {version.commitsSincePrevious !== null ? ` · ${version.commitsSincePrevious.toString()} commits since previous tag` : ''}
+                      {version.commitsSincePrevious !== null ? ` · ${version.commitsSincePrevious.toString()} changes since previous version` : ''}
                     </Text>
                   </>
                 );
@@ -302,7 +302,11 @@ function ProjectWorkRow({ summary, modelHref }: { summary: ProjectSummary; model
           </Text>
         </Link>
         {project.status !== 'active' && <Chip tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status)}</Chip>}
-        {overdueDecisions > 0 && <Chip tone="warn">{plural(overdueDecisions, 'decision overdue', 'decisions overdue')}</Chip>}
+        {overdueDecisions > 0 && (
+          <Link to={`${modelHref}/projects/${project.id}`}>
+            <Chip tone="warn">{plural(overdueDecisions, 'decision overdue', 'decisions overdue')}</Chip>
+          </Link>
+        )}
       </div>
       <Text as="p" tone="muted" size="sm">
         {ownerDisplay}

@@ -160,7 +160,7 @@ test('reject everything by tap and finish the review with no change; discard a d
   await expect(page.getByRole('button', { name: 'Apply decisions' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Finish review' }).click();
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review$`));
-  await expect(page.getByText('No open merge requests.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Nothing is waiting for review.', { exact: false })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Import drafts' })).toHaveCount(0);
 
   const { data: newerJob } = await client.from('capture_jobs').select('status, target_branch_id').eq('id', newerJobId).single();

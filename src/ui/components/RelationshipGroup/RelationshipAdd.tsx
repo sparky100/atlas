@@ -444,7 +444,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
         )}
         <div className={styles.actions}>
           <Button variant="secondary" onClick={() => { finalizeWithVia(undefined); }} disabled={status === 'creating'}>
-            {status === 'creating' ? 'Adding…' : 'Skip — direct edge'}
+            {status === 'creating' ? 'Adding…' : 'Skip — link directly'}
           </Button>
           <Button variant="ghost" onClick={backToLabelStage} disabled={status === 'creating'}>
             Back

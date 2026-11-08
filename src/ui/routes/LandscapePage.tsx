@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -496,7 +496,13 @@ export function LandscapePage() {
               <Chip tone={capabilityLandscapeState.data.rollup.supportedCapabilityCount === 0 ? 'warn' : 'neutral'}>
                 {capabilityLandscapeState.data.rollup.supportedCapabilityCount}/{capabilityLandscapeState.data.rollup.totalCapabilityCount} capabilities supported
               </Chip>
-              <Chip tone={capabilityLandscapeState.data.rollup.isOwned ? 'ok' : 'warn'}>{capabilityLandscapeState.data.rollup.isOwned ? 'owned' : 'no owner recorded'}</Chip>
+              {capabilityLandscapeState.data.rollup.isOwned ? (
+                <Chip tone="ok">owned</Chip>
+              ) : (
+                <Link to={`/o/${orgSlug ?? ''}/m/${model.slug}/e/${capability.element_id}`}>
+                  <Chip tone="warn">no owner recorded</Chip>
+                </Link>
+              )}
               {capabilityLandscapeState.data.rollup.fitForPurpose !== null && (
                 <Chip tone={fitForPurposeToneFor(capabilityLandscapeState.data.rollup.fitForPurpose)}>
                   fit · {capabilityLandscapeState.data.rollup.fitForPurpose}

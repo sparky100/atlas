@@ -148,7 +148,7 @@ test("SAP PM's own Context page (a container, one of SAP's modules) renders its 
   // one that checks the geometry itself: no shared port, both verbs in one
   // label, arrowheads at both ends).
   await expect(canvasWrapper).toHaveAttribute('data-edge-count', '11');
-  const labelsToggle = page.getByRole('button', { name: 'Show edge labels' });
+  const labelsToggle = page.getByRole('button', { name: 'Show line labels' });
   await expect(labelsToggle).toHaveAttribute('aria-pressed', 'true');
 
   // The toggle is a real override: off hides every label (hover/tap reveals one at a time), on brings them back.

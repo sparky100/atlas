@@ -238,8 +238,8 @@ export function RetireAction({
           {previewCounts && (
             <Text as="p" tone="faint" size="xs">
               This will create <strong>{newReplacementName.trim()}</strong>
-              {previewCounts.supportsCount > 0 ? `, transfer ${String(previewCounts.supportsCount)} supports edge${previewCounts.supportsCount === 1 ? '' : 's'}` : ''}
-              {previewCounts.otherCount > 0 ? `, ${String(previewCounts.otherCount)} uses/flows_to edge${previewCounts.otherCount === 1 ? '' : 's'}` : ''}, and retire &ldquo;{element.name}&rdquo;.
+              {previewCounts.supportsCount > 0 ? `, transfer ${String(previewCounts.supportsCount)} supports ${previewCounts.supportsCount === 1 ? 'link' : 'links'}` : ''}
+              {previewCounts.otherCount > 0 ? `, ${String(previewCounts.otherCount)} other ${previewCounts.otherCount === 1 ? 'connection' : 'connections'}` : ''}, and retire &ldquo;{element.name}&rdquo;.
             </Text>
           )}
           <div className={styles.actions}>

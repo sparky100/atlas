@@ -106,7 +106,7 @@ test('flows_to requires a label; cancelling the label step returns to search; ad
   await expect(addLabelButton).toBeDisabled();
   await page.getByPlaceholder('e.g. reads customer records from').fill('sends interval reads to');
   await addLabelButton.click();
-  await page.getByRole('button', { name: 'Skip — direct edge' }).click();
+  await page.getByRole('button', { name: 'Skip — link directly' }).click();
 
   await expect(page.getByRole('link', { name: /Billing Platform/ })).toBeVisible();
   await expect(page.getByText('“sends interval reads to”')).toBeVisible();

@@ -76,7 +76,7 @@ export function RetractionConflictCard({ data, canResolve, choice, onChoose, com
   return (
     <li className={styles.card}>
       <div className={styles.cardTitle}>
-        <Chip tone="danger">retraction</Chip>
+        <Chip tone="danger">retired</Chip>
         <Text as="span" size="lg">
           {elementName}
         </Text>
@@ -132,7 +132,7 @@ export function RetractionConflictCard({ data, canResolve, choice, onChoose, com
           )}
           {choice && (
             <Text as="p" tone="muted" size="sm">
-              Staged: {choice.action === 'keep-retraction' ? 'keep retraction' : 'keep element'} — applies on the next refresh.
+              Staged: {choice.action === 'keep-retraction' ? 'keep it retired' : 'keep element'} — applies on the next refresh.
             </Text>
           )}
         </>

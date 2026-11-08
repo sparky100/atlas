@@ -53,7 +53,7 @@ test('removing a uses relationship clears it from Relationships/Context and keep
   // 3. Present in History, both the creation and the retraction.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=main`);
   await expect(page.getByText('created — uses System B')).toBeVisible();
-  await expect(page.getByText('retracted — uses System B')).toBeVisible();
+  await expect(page.getByText('removed — uses System B')).toBeVisible();
 
   // 4. Remove the primary `supports` edge — System A's only one, so no
   // "make <other> primary" candidates render, just the plain confirm.
