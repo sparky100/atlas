@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { createDedupingFetch } from './dedupeFetch';
 import { loadBrowserEnv } from './env';
 
 /**
@@ -8,4 +9,7 @@ import { loadBrowserEnv } from './env';
  * repository call in src/ui shares this instance so there's exactly one
  * auth session and one realtime connection for the whole app.
  */
-export const supabase = createClient(loadBrowserEnv().VITE_SUPABASE_URL, loadBrowserEnv().VITE_SUPABASE_ANON_KEY);
+export const supabase = createClient(loadBrowserEnv().VITE_SUPABASE_URL, loadBrowserEnv().VITE_SUPABASE_ANON_KEY, {
+  // Identical in-flight reads share one request — see dedupeFetch.ts.
+  global: { fetch: createDedupingFetch((input, init) => fetch(input, init)) },
+});
