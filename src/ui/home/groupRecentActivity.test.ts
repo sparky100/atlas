@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CommitRow } from '../../contracts/rows';
 import type { RecentCommitRow } from './useArchitectHomeInsights';
-import { selectRecentActivity } from './groupRecentActivity';
+import { selectRecentActivity, splitActivitySubjects } from './groupRecentActivity';
 
 function commit(id: string, title: string, authorId: string): CommitRow {
   return {
@@ -105,5 +105,22 @@ describe('selectRecentActivity', () => {
     ];
     const { shown } = selectRecentActivity(rows, 5);
     expect(shown.map((g) => g.latest.commit.id)).toEqual(['c3', 'c2', 'c1']);
+  });
+});
+
+describe('splitActivitySubjects', () => {
+  it('shows a short list whole', () => {
+    expect(splitActivitySubjects(['a', 'b', 'c'])).toEqual({ visible: ['a', 'b', 'c'], hidden: [] });
+  });
+
+  it('does not hide a single leftover name behind a "+1 more"', () => {
+    expect(splitActivitySubjects(['a', 'b', 'c', 'd']).hidden).toEqual([]);
+  });
+
+  it('keeps the first three and hides the rest', () => {
+    const names = Array.from({ length: 150 }, (_, i) => `n${String(i)}`);
+    const { visible, hidden } = splitActivitySubjects(names);
+    expect(visible).toEqual(['n0', 'n1', 'n2']);
+    expect(hidden).toHaveLength(147);
   });
 });

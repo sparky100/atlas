@@ -137,3 +137,16 @@
   gap: var(--space-2);
   flex-shrink: 0;
 }
+
+/* "+N more" toggle on a Recent activity row's subject list. */
+.moreToggle {
+  all: unset;
+  cursor: pointer;
+  text-decoration: underline;
+  color: var(--color-link, inherit);
+}
+
+.moreToggle:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}

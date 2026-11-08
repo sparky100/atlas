@@ -1,5 +1,5 @@
 import { HomeViewLink } from './HomeViewLink';
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { Link } from 'react-router';
 import { Chip } from '../components/Chip/Chip';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
@@ -24,11 +24,36 @@ import {
 import { canStartDecision } from '../orgs/useMembership';
 import { attributesRecord } from '../elements/attributesRecord';
 import { canStartProject } from '../orgs/roleGates';
-import { selectRecentActivity, type GroupedActivityItem } from './groupRecentActivity';
+import { selectRecentActivity, splitActivitySubjects, type GroupedActivityItem } from './groupRecentActivity';
 import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
 import type { ArchitectHomeData } from './useArchitectHome';
 import type { ArchitectHomeInsightsState, RecentCommitRow } from './useArchitectHomeInsights';
 import styles from './DoorHome.module.css';
+
+/** A commit's named subjects: the first few as links, the rest behind a "+N more" toggle so a bulk import doesn't dump hundreds of names into Home. */
+function ActivitySubjects({ subjects, elementHref }: { subjects: { elementId: string; name: string }[]; elementHref: (elementId: string) => string }) {
+  const [expanded, setExpanded] = useState(false);
+  const { visible, hidden } = splitActivitySubjects(subjects);
+  const shown = expanded ? subjects : visible;
+  return (
+    <Text as="p" tone="faint" size="xs">
+      {shown.map((s, index) => (
+        <Fragment key={s.elementId}>
+          {index > 0 && ', '}
+          <Link to={elementHref(s.elementId)}>{s.name}</Link>
+        </Fragment>
+      ))}
+      {hidden.length > 0 && (
+        <>
+          {' '}
+          <button type="button" aria-expanded={expanded} onClick={() => { setExpanded((v) => !v); }} className={styles.moreToggle}>
+            {expanded ? 'Show fewer' : `+${String(hidden.length)} more`}
+          </button>
+        </>
+      )}
+    </Text>
+  );
+}
 
 export interface ArchitectHomeProps {
   data: ArchitectHomeData;
@@ -521,14 +546,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
             </Text>
           )}
           {count === 1 && latest.subjects.length > 0 && (
-            <Text as="p" tone="faint" size="xs">
-              {latest.subjects.map((s, index) => (
-                <Fragment key={s.elementId}>
-                  {index > 0 && ', '}
-                  <Link to={elementHref(s.elementId)}>{s.name}</Link>
-                </Fragment>
-              ))}
-            </Text>
+            <ActivitySubjects subjects={latest.subjects} elementHref={elementHref} />
           )}
           {count > 1 && subject && (
             <Text as="p" tone="faint" size="xs">
