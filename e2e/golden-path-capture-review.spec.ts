@@ -95,9 +95,6 @@ test('upload a spreadsheet, accept and reject candidates by keyboard, and see th
   await page.keyboard.press('a');
   await expect(page.getByText('accepted', { exact: true }).first()).toBeVisible();
 
-  await page.getByPlaceholder('or name a new change…').fill('Promote captured systems');
-  await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page.locator('#capture-review-target-branch')).toHaveValue(/.+/);
 
   await page.keyboard.press('Control+Enter');
   await expect(page.getByText(/^Applied \d+ candidate/)).toBeVisible({ timeout: 15_000 });
@@ -181,9 +178,6 @@ test('upload a JSON file, bulk-accept every new candidate by keyboard, and apply
   await page.keyboard.press('a');
   await expect(page.getByText('accepted', { exact: true }).first()).toBeVisible();
 
-  await page.getByPlaceholder('or name a new change…').fill('Add Billing Platform and Fleet Tracker');
-  await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page.locator('#capture-review-target-branch')).toHaveValue(/.+/);
 
   await page.keyboard.press('Control+Enter');
   await expect(page.getByText(/^Applied \d+ candidate/)).toBeVisible({ timeout: 15_000 });

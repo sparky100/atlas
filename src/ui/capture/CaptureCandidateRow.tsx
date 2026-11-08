@@ -344,7 +344,7 @@ export function CaptureCandidateRow({
             </Button>
           )}
           {(candidate.class === 'new' || candidate.class === 'ambiguous') && (
-            <Button variant="ghost" disabled={!targetChosen} title={targetChosen ? undefined : 'Choose a target change first'} onClick={mergeOpen ? onCloseMerge : onOpenMerge}>
+            <Button variant="ghost" disabled={!targetChosen} title={targetChosen ? undefined : 'Pick an existing change in “Add to” to merge into something already proposed there'} onClick={mergeOpen ? onCloseMerge : onOpenMerge}>
               Merge into…
             </Button>
           )}
