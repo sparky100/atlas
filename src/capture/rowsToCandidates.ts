@@ -58,6 +58,8 @@ export interface RowCandidate {
   ungrounded?: boolean;
   /** Sprint F2b, SPEC-capture.md §5.6: a JSON `changes`-section entry names an *existing* element only — it never creates one. When set, `resolveElementCandidate` (`runCapture.ts`) returns `invalid` on a `match.level === 'none'` instead of the ordinary `new`/`duplicate_in_target` branch. Element candidates only; never set by `rowsToCandidates.ts`/`relationshipSheetToCandidates.ts` themselves. */
   mustMatchExisting?: boolean;
+  /** A `supports` candidate from a row that named exactly one capability, so it may be that capability's primary. It is proposed `secondary` when the capability already has a live primary — which, on a re-import, is usually this same system's own link; `resolveRelationshipCandidate` (`runCapture.ts`) restores `primary` when the existing edge it matches is that primary one, so re-importing the same data is not a conflict. */
+  primaryEligible?: boolean;
 }
 
 export interface RowsToCandidatesInput {
