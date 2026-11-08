@@ -12,6 +12,8 @@ export type CapabilityImportStatus = 'loadingMaps' | 'idle' | 'seeding';
 
 export interface UseCapabilityImportResult {
   status: CapabilityImportStatus;
+  /** `true` once the model's main is known to be past its genesis commit — a map can only seed an untouched model (`atlas.seed_from_map` refuses otherwise), so the panel explains that instead of offering a button that can only be refused. `false` while unknown. */
+  modelHasContent: boolean;
   maps: CapabilityMapRow[];
   error: string | null;
   /** Seeds `modelId`'s (empty) main branch from `mapId` — the tailoring flow's "import" action. */
@@ -40,6 +42,7 @@ export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabil
   const [status, setStatus] = useState<CapabilityImportStatus>('loadingMaps');
   const [maps, setMaps] = useState<CapabilityMapRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [modelHasContent, setModelHasContent] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -66,6 +69,25 @@ export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabil
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const live = { cancelled: false };
+    void (async () => {
+      try {
+        const main = await getMainBranch(supabase, modelId);
+        if (!main) return;
+        const { data, error: commitError } = await supabase.from('commits').select('kind').eq('id', main.head_commit_id).maybeSingle();
+        if (commitError) return;
+        const kind: string | undefined = (data as { kind?: string } | null)?.kind;
+        if (!live.cancelled && kind !== undefined && kind !== 'genesis') setModelHasContent(true);
+      } catch {
+        // Best effort only: if this check can't run, the panel is offered as before and the server still refuses a non-empty model.
+      }
+    })();
+    return () => {
+      live.cancelled = true;
+    };
+  }, [modelId]);
 
   const importMap = useCallback(
     async (mapId: UUID) => {
@@ -111,5 +133,5 @@ export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabil
     [modelId, userId, onImported, queryClient],
   );
 
-  return { status, maps, error, importMap };
+  return { status, modelHasContent, maps, error, importMap };
 }
