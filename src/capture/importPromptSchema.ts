@@ -45,6 +45,7 @@ Fields (only what's actually known has to be filled in): \`${IMPORT_COLUMNS.join
 - \`capability\` names one or more capabilities from the list below, separated by \`|\` if there's more than one — the first one listed becomes the primary link, any others are secondary. Leave it out if nothing fits; never invent a capability name.
 - \`interface_type\` is one of: ${INTERFACE_TYPE_OPTIONS.join(', ')} — only for a module of an integration platform (an *interface*: an API, file drop, topic or job the platform exposes or consumes). Leave it out everywhere else.
 - \`transformation\` is free text: what the platform does to the data on this interface (maps, enriches, combines, converts a file to an API…). Only for an interface.
+- \`introduced\`, \`planned_end\` and \`support_ends_at\` are ISO dates (YYYY-MM-DD): when the system went live, when it is planned to be retired, and when vendor support ends (top-level systems only). They put the system on the Roadmap. Leave them out if the source doesn't state them; never guess.
 - \`business_owner\`/\`technical_owner\` each name one person, team, or organisation. A plain name ("Jane Doe") creates or matches an ordinary owner. "Name (External: Org)" (e.g. "Ofgem (External: Energy regulator)") creates or matches an external organisation instead.
 
 An entry that matches an existing system or module by name updates it; a name that doesn't match anything creates a new one.

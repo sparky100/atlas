@@ -182,4 +182,21 @@ describe('validateImportRow', () => {
       if (result.ok) expect(result.row.name).toBe('SAP · PM');
     });
   });
+
+  it('accepts the roadmap date columns as ISO dates', () => {
+    const result = validateImportRow({ name: 'SAP', introduced: '2014-04-01', planned_end: '2028-03-31', support_ends_at: '2027-12-31' }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.row.attributes).toMatchObject({ introduced: '2014-04-01', plannedEnd: '2028-03-31', supportEndsAt: '2027-12-31' });
+  });
+
+  it('rejects a date that is not a real ISO calendar date', () => {
+    const result = validateImportRow({ name: 'SAP', planned_end: '2028-02-30' }, 2);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('"planned_end"');
+  });
+
+  it('rejects support_ends_at on a module row', () => {
+    const result = validateImportRow({ name: 'PM', platform: 'SAP', support_ends_at: '2027-12-31' }, 2);
+    expect(result.ok).toBe(false);
+  });
 });

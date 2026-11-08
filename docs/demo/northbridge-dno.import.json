@@ -14,7 +14,8 @@
       "technical_owner": "Enterprise Applications Team",
       "description": "Core ERP platform: finance, procurement, plant maintenance, HR and utilities billing.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2014-02-01"
     },
     {
       "name": "Finance (FI/CO)",
@@ -96,7 +97,8 @@
       "technical_owner": "Customer Platforms Team",
       "description": "CRM, workflow and field-force platform.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2009-11-01"
     },
     {
       "name": "Service Cloud",
@@ -167,7 +169,8 @@
       "technical_owner": "GIS Team",
       "description": "Geographic information platform holding the network model.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2022-02-01"
     },
     {
       "name": "Utility Network",
@@ -227,7 +230,8 @@
       "technical_owner": "Engineering Systems Team",
       "description": "BIM and design platform for substation and cable projects.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2022-04-01"
     },
     {
       "name": "AutoCAD",
@@ -310,7 +314,9 @@
       "technical_owner": "Enterprise Applications Team",
       "description": "Legacy DUoS charging and invoicing engine; being replaced by SAP IS-U.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2010-04-01",
+      "planned_end": "2027-03-28"
     },
     {
       "name": "MPRS Registration System",
@@ -327,7 +333,9 @@
       "technical_owner": "Industry Systems Team",
       "description": "Meter Point Registration (MPRS/MPAS interface): MPAN registration, change of supplier and metering point data.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2009-03-01",
+      "support_ends_at": "2031-06-30"
     },
     {
       "name": "UoS Charging Statement Manager",
@@ -343,7 +351,9 @@
       "technical_owner": "Industry Systems Team",
       "description": "Calculates and publishes Use of System charge statements and tariffs.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2021-08-01",
+      "support_ends_at": "2029-06-30"
     },
     {
       "name": "DTN Gateway",
@@ -360,7 +370,8 @@
       "technical_owner": "Industry Systems Team",
       "description": "Connection to the Data Transfer Network for industry (D-flow) messages.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2020-10-01"
     },
     {
       "name": "MHHS Settlement Gateway",
@@ -376,7 +387,8 @@
       "technical_owner": "Industry Systems Team",
       "description": "Adapter for the MHHS Data Integration Platform (DIP) for market-wide half-hourly settlement.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2028-03-01"
     },
     {
       "name": "Regulatory Reporting Pack",
@@ -392,7 +404,8 @@
       "technical_owner": "Enterprise Applications Team",
       "description": "RIGs and annual regulatory reporting submissions.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2020-02-01"
     },
     {
       "name": "RIIO Business Plan Model",
@@ -408,7 +421,8 @@
       "technical_owner": "Enterprise Applications Team",
       "description": "Cost and output modelling for the price-control plan.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2011-03-01"
     },
     {
       "name": "Interruptions Reporting Tool",
@@ -424,7 +438,8 @@
       "technical_owner": "Network Operations IT",
       "description": "CI/CML calculation and reporting.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2020-04-01"
     },
     {
       "name": "Meter Data Management",
@@ -441,7 +456,8 @@
       "technical_owner": "Metering Systems Team",
       "description": "MDM: validates, stores and serves half-hourly smart meter consumption and voltage data.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2010-02-01"
     },
     {
       "name": "DCC Integration Service",
@@ -457,7 +473,8 @@
       "technical_owner": "Metering Systems Team",
       "description": "Network-operator integration to the DCC for smart meter alerts, voltage and outage data (SMETS2).",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2020-06-01"
     },
     {
       "name": "ADMS",
@@ -474,7 +491,8 @@
       "technical_owner": "OT Systems Team",
       "description": "Advanced Distribution Management System: SCADA, outage management and network control.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2011-08-01"
     },
     {
       "name": "SCADA Front End",
@@ -491,7 +509,8 @@
       "technical_owner": "OT Systems Team",
       "description": "Real-time telemetry and control of primary substations.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2009-10-01"
     },
     {
       "name": "Legacy Outage Management System",
@@ -507,7 +526,9 @@
       "technical_owner": "OT Systems Team",
       "description": "Pre-ADMS outage management, retired in the ADMS programme.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2010-05-01",
+      "planned_end": "2025-05-28"
     },
     {
       "name": "Flexibility Marketplace",
@@ -524,7 +545,8 @@
       "technical_owner": "DSO Systems Team",
       "description": "Procures flexibility services from connected providers.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2022-08-01"
     },
     {
       "name": "DERMS",
@@ -540,7 +562,8 @@
       "technical_owner": "DSO Systems Team",
       "description": "Distributed energy resource management for active network management.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2028-09-01"
     },
     {
       "name": "Asset Health Index Model",
@@ -556,7 +579,8 @@
       "technical_owner": "Asset Management Systems Team",
       "description": "Calculates asset health and criticality indices for RIIO reporting.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2016-12-01"
     },
     {
       "name": "Condition Monitoring Platform",
@@ -572,7 +596,8 @@
       "technical_owner": "Asset Management Systems Team",
       "description": "Online monitoring of transformers and switchgear.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2022-06-01"
     },
     {
       "name": "Smallworld GIS",
@@ -588,7 +613,9 @@
       "technical_owner": "GIS Team",
       "description": "Legacy GIS being migrated to Esri Utility Network. No business owner is recorded.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2006-12-01",
+      "planned_end": "2027-09-28"
     },
     {
       "name": "Streetworks Permit Tracker",
@@ -603,7 +630,8 @@
       "business_owner": "Head of Field Operations",
       "technical_owner": "Field Systems Team",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2013-01-01"
     },
     {
       "name": "Wayleave Register",
@@ -618,7 +646,8 @@
       "business_owner": "Head of Field Operations",
       "description": "Access database of wayleaves and consents. No technical owner is recorded.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2011-02-01"
     },
     {
       "name": "Vegetation Management Tool",
@@ -633,7 +662,8 @@
       "business_owner": "Head of Field Operations",
       "technical_owner": "Field Systems Team",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2013-06-01"
     },
     {
       "name": "Complaints Access Database",
@@ -648,7 +678,9 @@
       "business_owner": "Customer Operations Director",
       "technical_owner": "Customer Platforms Team",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2010-04-01",
+      "planned_end": "2025-04-28"
     },
     {
       "name": "Microsoft 365",
@@ -664,7 +696,8 @@
       "business_owner": "Chief Digital Officer",
       "technical_owner": "Digital Workplace Team",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2022-11-01"
     },
     {
       "name": "ServiceNow",
@@ -680,7 +713,8 @@
       "business_owner": "Chief Digital Officer",
       "technical_owner": "Digital Workplace Team",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2014-06-01"
     },
     {
       "name": "Azure Data Platform",
@@ -696,7 +730,8 @@
       "business_owner": "Head of Data",
       "technical_owner": "Data Engineering Team",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2020-04-01"
     },
     {
       "name": "Power BI",
@@ -712,7 +747,8 @@
       "business_owner": "Head of Data",
       "technical_owner": "Data Engineering Team",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2022-09-01"
     },
     {
       "name": "Enterprise Risk Register",
@@ -727,7 +763,8 @@
       "business_owner": "Head of Risk",
       "technical_owner": "Enterprise Applications Team",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2018-02-01"
     },
     {
       "name": "Safety Management System",
@@ -742,7 +779,8 @@
       "business_owner": "Head of Health & Safety",
       "technical_owner": "Enterprise Applications Team",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2017-12-01"
     },
     {
       "name": "Legacy Safety Reporting Spreadsheet",
@@ -757,7 +795,10 @@
       "business_owner": "Head of Health & Safety",
       "description": "Critical capability support with no planned replacement and no technical owner.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2007-09-01",
+      "planned_end": "2028-03-28",
+      "support_ends_at": "2027-12-30"
     },
     {
       "name": "Document Management",
@@ -773,7 +814,8 @@
       "business_owner": "Head of Information",
       "technical_owner": "Enterprise Applications Team",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2009-02-01"
     },
     {
       "name": "MHHS Data Integration Platform",
@@ -786,7 +828,8 @@
       "hosting_model": "saas",
       "description": "Central DIP for market-wide half-hourly settlement.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2009-02-01"
     },
     {
       "name": "DCC (Smart Metering)",
@@ -799,7 +842,8 @@
       "hosting_model": "saas",
       "description": "Smart metering communications network and data service.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2018-04-01"
     },
     {
       "name": "Data Transfer Network",
@@ -812,7 +856,8 @@
       "hosting_model": "saas",
       "description": "Industry data flows (D-flows) between network operators and suppliers.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2017-04-01"
     },
     {
       "name": "ECOES",
@@ -825,7 +870,8 @@
       "hosting_model": "saas",
       "description": "Industry registration look-up service.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2011-05-01"
     },
     {
       "name": "Ofgem Portal",
@@ -838,7 +884,8 @@
       "hosting_model": "saas",
       "description": "Regulatory data submissions and licence reporting.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2015-09-01"
     },
     {
       "name": "NESO Portal",
@@ -851,7 +898,8 @@
       "hosting_model": "saas",
       "description": "Transmission-distribution coordination and outage planning data.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2015-10-01"
     },
     {
       "name": "MuleSoft Anypoint",
@@ -867,7 +915,8 @@
       "technical_owner": "Integration Team",
       "description": "Enterprise integration platform; all internal system-to-system interfaces route through it.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "introduced": "2017-11-01"
     },
     {
       "name": "Customer Case API",
