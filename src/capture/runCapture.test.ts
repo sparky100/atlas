@@ -1,7 +1,7 @@
 import { PDFDocument } from 'pdf-lib';
 import * as XLSX from 'xlsx';
 import { describe, expect, it } from 'vitest';
-import { emptyHead } from '../engine/deltas';
+import { emptyHead, type Head } from '../engine/deltas';
 import { hashLlmRequest, RecordedLlmClient, type LlmClient, type LlmRequest, type LlmResponse } from './llm/client';
 import { buildMatchIndex } from './matchIndex';
 import { buildPromptBUserMessage, PROMPT_B_SCHEMA, PROMPT_B_SYSTEM, type PromptBChunkLocation } from './prompts/b';
@@ -607,6 +607,28 @@ describe('runCapture — JSON input (Sprint F2b, SPEC-capture.md §5.6)', () => 
     const supports = result.candidates.find((c) => c.relationshipType === 'supports');
     expect(supports?.class).toBe('new');
     expect(supports?.proposal.kind === 'relationship' && supports.proposal.to).toEqual({ kind: 'existing', elementId: 'cap-1' });
+  });
+
+  it("re-importing a system that already is a capability's primary keeps the link primary, not a primary-to-secondary conflict", async () => {
+    const system = { element_id: 'sys-1', element_type: 'system' as const, name: 'CRM', parent_id: null, attributes: {}, exists_delta_id: 'd-1' };
+    const capability = { element_id: 'cap-1', element_type: 'capability' as const, name: 'Customer Service', parent_id: null, attributes: {}, exists_delta_id: 'd-2' };
+    const mainHead: Head = emptyHead();
+    mainHead.relationships.set('rel-1', { relationshipType: 'supports', fromElementId: 'sys-1', toElementId: 'cap-1', attributes: { role: 'primary' }, existsDeltaId: 'd-3' });
+    const result = await expectSuccess(
+      runCapture({
+        inputName: 'import.json',
+        source: { format: 'json', text: JSON.stringify({ systems: [{ name: 'CRM', capability: 'Customer Service' }] }) },
+        documentDate: '2026-01-01',
+        llmClient: NEVER_CALLED_LLM,
+        matchIndex: buildMatchIndex([system, capability], []),
+        mainHead,
+        mintId: mintIdFrom('el'),
+      }),
+    );
+    const supports = result.candidates.find((c) => c.relationshipType === 'supports');
+    expect(supports?.draftSubjectId).toBe('rel-1');
+    expect(supports?.class).not.toBe('conflict');
+    expect(supports?.proposal.kind === 'relationship' && (supports.proposal.attributes as Record<string, unknown>).role).toBe('primary');
   });
 
   it('caps an unstated confidence at 0.90, never defaulting to 1.0', async () => {

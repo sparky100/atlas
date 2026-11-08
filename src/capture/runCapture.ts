@@ -626,6 +626,11 @@ function resolveRelationshipCandidate(
     return { class: 'new', match: NO_MATCH_OUTCOME, draftSubjectId: mintId(), fromElementId: from.elementId, toElementId: to.elementId, attributes, extraWarnings };
   }
 
+  // Re-import: the capability's live primary is this same system's own edge, so keep it primary rather than proposing a downgrade (see `RowCandidate.primaryEligible`).
+  if (candidate.primaryEligible === true && proposal.relationshipType === 'supports' && attributes.role === 'secondary' && mainHead.relationships.get(existingRelationshipId)?.attributes.role === 'primary') {
+    attributes = { ...attributes, role: 'primary' };
+  }
+
   const comparisons = attributeComparisons(attributes, candidate.evidence.attributeConfidence, existingRelationshipId, mainHead, sourceCapturedAt);
   const cls = classifyRelationship({ existingRelationship: { attributes: [...comparisons.values()] } });
   const outcomes = new Map<string, AttributeOutcome>([...comparisons].map(([key, input]) => [key, classifyAttribute(input)]));
