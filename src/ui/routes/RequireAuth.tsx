@@ -1,6 +1,6 @@
+import { Loading } from '../components/Loading/Loading';
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../auth/useAuth';
-import { Text } from '../components/Text/Text';
 
 /**
  * Gates every route under it on a real session — redirects to /sign-in,
@@ -22,7 +22,7 @@ export function RequireAuth() {
   if (status === 'loading') {
     return (
       <div style={{ padding: 'var(--space-8)' }}>
-        <Text tone="muted">Loading…</Text>
+        <Loading />
       </div>
     );
   }

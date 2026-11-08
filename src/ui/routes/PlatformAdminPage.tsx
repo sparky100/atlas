@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { PlatformAdminView } from '../admin/PlatformAdminView';
 import { usePlatformAdmin } from '../admin/usePlatformAdmin';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -31,7 +32,7 @@ export function PlatformAdminPage() {
         <Text as="h1" size="2xl">
           Platform admin
         </Text>
-        {loading && <Text tone="muted">Loading…</Text>}
+        {loading && <Loading />}
         {!loading && !isPlatformAdmin && <EmptyState>You don&apos;t have access to this page.</EmptyState>}
         {!loading && isPlatformAdmin && <PlatformAdminView />}
       </main>

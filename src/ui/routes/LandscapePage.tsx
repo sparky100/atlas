@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { ModelEmptyState } from '../components/EmptyState/ModelEmptyState';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -377,7 +378,7 @@ export function LandscapePage() {
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
-            <Text tone="muted">Loading…</Text>
+            <Loading />
           </main>
         </div>
       </div>
@@ -641,7 +642,7 @@ export function LandscapePage() {
         {/* Sprint U4-2c item 2: while a capability filter is active, `CapabilityLandscapeList` (desktop and mobile alike — no lanes, no cross-lane chips, so no viewport split either) replaces every bit of the lane-based rendering below it, which `useLandscape` itself no longer even loads (its own `enabled` doc comment). Branches on `capabilityId` (the URL param `useCapabilityLandscape` actually reads), not `capability` (the breadcrumb element, which can still be loading) — see the title above for the one place that distinction matters. */}
         {capabilityId !== null ? (
           <>
-            {capabilityLandscapeState.status === 'loading' && <Text tone="muted">Loading…</Text>}
+            {capabilityLandscapeState.status === 'loading' && <Loading />}
             {capabilityLandscapeState.status === 'error' && <Text as="p">{capabilityLandscapeState.message}</Text>}
             {capabilityLandscapeState.status === 'refNotFound' && <ModelEmptyState orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />}
             {capabilityLandscapeState.status === 'ready' && (
@@ -679,11 +680,11 @@ export function LandscapePage() {
           </>
         ) : (
           <>
-            {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+            {state.status === 'loading' && <Loading />}
             {state.status === 'error' && <Text as="p">{state.message}</Text>}
             {state.status === 'refNotFound' && <ModelEmptyState orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />}
             {/* V2: the raw fetch (`state`) can be ready while layout/grouping is still computing in the worker (`useLandscapeDisplay`) — a brief gap this hook's own split introduces that the old single-effect version never had. */}
-            {state.status === 'ready' && displayState.status === 'loading' && <Text tone="muted">Loading…</Text>}
+            {state.status === 'ready' && displayState.status === 'loading' && <Loading />}
             {displayState.status === 'error' && <Text as="p">{displayState.message}</Text>}
             {state.status === 'ready' && displayState.status === 'ready' && displayState.display.layout.nodes.length === 0 && displayState.display.layout.actorNodes.length === 0 && (
               <div>

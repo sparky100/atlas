@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { Link, useParams } from 'react-router';
 import { useAuth } from '../auth/useAuth';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -34,7 +35,7 @@ export function OrgHome() {
       <div>
         <AppHeader orgId={organisation?.id ?? null} />
         <main className={styles.main}>
-          <Text tone="muted">Loading…</Text>
+          <Loading />
         </main>
       </div>
     );

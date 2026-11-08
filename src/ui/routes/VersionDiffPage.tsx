@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
@@ -39,7 +40,7 @@ export function VersionDiffPage() {
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
-            <Text tone="muted">Loading…</Text>
+            <Loading />
           </main>
         </div>
       </div>
@@ -73,7 +74,7 @@ export function VersionDiffPage() {
             );
           })()}
 
-          {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+          {state.status === 'loading' && <Loading />}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
           {state.status === 'refNotFound' && <Text as="p">One of these versions could not be found.</Text>}
           {state.status === 'ready' && <VersionDiffView diff={state.data.diff} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} toBeRefParam={refParamOf(toBe)} asIsRefParam={refParamOf(asIs)} />}

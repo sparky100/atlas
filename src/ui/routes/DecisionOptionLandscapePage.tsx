@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -82,7 +83,7 @@ export function DecisionOptionLandscapePage() {
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
-            <Text tone="muted">Loading…</Text>
+            <Loading />
           </main>
         </div>
       </div>
@@ -123,7 +124,7 @@ export function DecisionOptionLandscapePage() {
           </div>
           <DiffLegend />
 
-          {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+          {state.status === 'loading' && <Loading />}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
           {state.status === 'refNotFound' && <Text as="p">This option no longer exists.</Text>}
           {state.status === 'ready' && displayState.status === 'ready' && (

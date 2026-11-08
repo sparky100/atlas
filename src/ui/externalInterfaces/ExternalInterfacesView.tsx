@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { Link } from 'react-router';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
@@ -24,7 +25,7 @@ export interface ExternalInterfacesViewProps {
 export function ExternalInterfacesView({ modelId, orgSlug, modelSlug }: ExternalInterfacesViewProps) {
   const state = useExternalInterfaces(modelId);
 
-  if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
+  if (state.status === 'loading') return <Loading />;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 
   return (

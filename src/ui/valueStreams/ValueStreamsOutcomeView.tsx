@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import type { UUID } from '../../contracts/delta';
 import { Text } from '../components/Text/Text';
 import { useValueStreams } from './useValueStreams';
@@ -23,7 +24,7 @@ export interface ValueStreamsOutcomeViewProps {
  */
 export function ValueStreamsOutcomeView({ modelId, orgSlug, modelSlug, mainCommitIdHint }: ValueStreamsOutcomeViewProps) {
   const state = useValueStreams(modelId, { kind: 'main' }, mainCommitIdHint);
-  if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
+  if (state.status === 'loading') return <Loading />;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
   if (state.status === 'refNotFound') return <Text as="p">Nothing here yet.</Text>;
   return <ValueStreamsView rows={state.data.rows} compact elementHref={(id) => `/o/${orgSlug}/m/${modelSlug}/e/${id}`} />;

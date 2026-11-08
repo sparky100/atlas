@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -82,7 +83,7 @@ export function ContainerPage() {
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
-            <Text tone="muted">Loading…</Text>
+            <Loading />
           </main>
         </div>
       </div>
@@ -132,7 +133,7 @@ export function ContainerPage() {
           />
         )}
 
-        {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+        {state.status === 'loading' && <Loading />}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
         {state.status === 'notPresentAtRef' && <Text tone="muted">Going back…</Text>}

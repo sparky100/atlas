@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
@@ -169,7 +170,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
         </Panel>
       )}
 
-      {status === 'loading' && <Text tone="muted">Loading…</Text>}
+      {status === 'loading' && <Loading />}
       {projects.length === 0 && status !== 'loading' && <EmptyState>No projects yet. {canCreate ? 'Start one above.' : 'Nobody has started one.'}</EmptyState>}
       {groups.map((group) => (
         <section key={group.status} className={styles.group} aria-label={`${projectStatusLabel(group.status)} projects`}>

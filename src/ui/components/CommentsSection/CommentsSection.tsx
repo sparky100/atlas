@@ -1,3 +1,4 @@
+import { Loading } from '../Loading/Loading';
 import { useState } from 'react';
 import type { UUID } from '../../../contracts/delta';
 import type { AnchorType, MemberRole, ViewKind } from '../../../db/types';
@@ -39,7 +40,7 @@ export function CommentsSection({ orgId, modelId, userId, role, anchorType, anch
   const actions = useCommentActions({ orgId, modelId, userId, anchorType, anchorId, branchId, viewKind, onChanged: reload });
   const canPost = canPostComment(role);
 
-  if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
+  if (state.status === 'loading') return <Loading />;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 
   const openThreads = state.data.threads.filter((t) => t.root.status === 'open');

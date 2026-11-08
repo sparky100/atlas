@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
@@ -27,7 +28,7 @@ export function ProfilePage() {
         <Text as="h1" size="2xl">
           Profile
         </Text>
-        {loading && <Text tone="muted">Loading…</Text>}
+        {loading && <Loading />}
         {!loading && !profile && (
           <EmptyState>Your profile is created the moment you join or create your first organisation.</EmptyState>
         )}

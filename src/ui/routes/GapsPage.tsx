@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
@@ -94,7 +95,7 @@ export function GapsPage() {
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
-            <Text tone="muted">Loading…</Text>
+            <Loading />
           </main>
         </div>
       </div>
@@ -137,7 +138,7 @@ export function GapsPage() {
             />
           ) : (
             <>
-              {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+              {state.status === 'loading' && <Loading />}
               {state.status === 'error' && <Text as="p">{state.message}</Text>}
               {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
               {state.status === 'ready' && <GapsOverview rows={state.data.rows} walkHref={walkHref} canFill={canFill} />}

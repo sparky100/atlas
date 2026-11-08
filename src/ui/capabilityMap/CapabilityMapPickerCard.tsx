@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { listCapabilityMapItems, type CapabilityMapItemRow, type CapabilityMapRow } from '../../db/capabilityMapTemplates';
@@ -148,7 +149,7 @@ export function CapabilityMapPickerCard({ map, importDisabled, importing, onImpo
           else setPreview({ status: 'closed' });
         }}
       >
-        {preview.status === 'loading' && <Text tone="muted">Loading…</Text>}
+        {preview.status === 'loading' && <Loading />}
         {preview.status === 'error' && <Text as="p">{preview.message}</Text>}
         {preview.status === 'ready' && (
           <ul className={styles.previewList}>

@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import type { ReportSnapshotRow, SavedReportRow } from '../../db/types';
@@ -83,18 +84,18 @@ export function SavedReportPage({ kind }: { kind: 'report' | 'copy' }) {
     </div>
   );
 
-  if (orgLoading || modelsLoading || mainLoading || !model || !mainBranch || !organisation) return chrome('Report', <Text tone="muted">Loading…</Text>);
+  if (orgLoading || modelsLoading || mainLoading || !model || !mainBranch || !organisation) return chrome('Report', <Loading />);
   const basePath = `/o/${orgSlug ?? ''}/m/${model.slug}`;
 
   if (kind === 'report') {
-    if (report.status === 'loading') return chrome('Report', <Text tone="muted">Loading…</Text>);
+    if (report.status === 'loading') return chrome('Report', <Loading />);
     if (report.status === 'missing') return chrome('Report', <Text as="p">This report doesn't exist, or you can't see it.</Text>);
     return chrome(
       report.value.name,
       <SavedReportView report={report.value} modelName={model.name} orgId={organisation.id} modelId={model.id} userId={userId} role={role} main={{ branchId: mainBranch.id, headCommitId: mainBranch.head_commit_id }} basePath={basePath} onReportChanged={(next) => { setReport({ status: 'ready', value: next }); }} />,
     );
   }
-  if (copy.status === 'loading') return chrome('Saved copy', <Text tone="muted">Loading…</Text>);
+  if (copy.status === 'loading') return chrome('Saved copy', <Loading />);
   if (copy.status === 'missing') return chrome('Saved copy', <Text as="p">This copy doesn't exist, or you can't see it.</Text>);
   return chrome(`${copy.value.name} (${copyLabel(copy.value.generated_at, copy.value.commit_id)})`, <SavedCopyView copy={copy.value} modelName={model.name} userId={userId} role={role} basePath={basePath} />);
 }

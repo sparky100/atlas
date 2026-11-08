@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
@@ -42,7 +43,7 @@ export function ProjectPage() {
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
-            <Text tone="muted">Loading…</Text>
+            <Loading />
           </main>
         </div>
       </div>
@@ -62,7 +63,7 @@ export function ProjectPage() {
               {title}
             </Text>
           </div>
-          {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+          {state.status === 'loading' && <Loading />}
           {state.status === 'not_found' && <Text as="p">This project doesn't exist in this model, or you can't see it.</Text>}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
           {state.status === 'ready' && (

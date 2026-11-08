@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { ModelEmptyState } from '../components/EmptyState/ModelEmptyState';
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -54,7 +55,7 @@ export function PortfolioPage() {
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
-            <Text tone="muted">Loading…</Text>
+            <Loading />
           </main>
         </div>
       </div>
@@ -78,7 +79,7 @@ export function PortfolioPage() {
             </Text>
           </div>
 
-          {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+          {state.status === 'loading' && <Loading />}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
           {state.status === 'refNotFound' && <ModelEmptyState orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />}
           {state.status === 'ready' && <PortfolioView data={state.data} elementHref={elementHref} savedReports={organisation ? { modelId: model.id, orgId: organisation.id, userId, role } : undefined} exportStamp={{ modelName: model.name, refLabel: stampRefLabel(ref, branchLabel), date: exportDate() }} />}

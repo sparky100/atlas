@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useId } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { Panel } from '../components/Panel/Panel';
@@ -28,7 +29,7 @@ export function NotificationPreferencesPanel({ userId }: NotificationPreferences
         Notifications
       </Text>
       {loading ? (
-        <Text tone="muted">Loading…</Text>
+        <Loading />
       ) : (
         <>
           <label htmlFor={mentionId}>

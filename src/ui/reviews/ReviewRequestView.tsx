@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { refQueryParam } from '../../db/ref';
@@ -72,7 +73,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
     : [];
   const threadCountsState = useThreadCounts(modelId, cardSubjectIds);
 
-  if (rr.state.status === 'loading') return <Text tone="muted">Loading…</Text>;
+  if (rr.state.status === 'loading') return <Loading />;
   if (rr.state.status === 'error') return <Text as="p">{rr.state.message}</Text>;
 
   const { request, branch, review, mainHeadCommitId, requesterProfile, verdicts, reviewerProfiles } = rr.state;

@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import type { AttributeDefinitionKind } from '../../contracts/attributeSchema';
@@ -207,7 +208,7 @@ export function ElementsPage() {
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
-            <Text tone="muted">Loading…</Text>
+            <Loading />
           </main>
         </div>
       </div>

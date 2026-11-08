@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { Link } from 'react-router';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
@@ -24,7 +25,7 @@ export interface BoundaryCrossingsViewProps {
 export function BoundaryCrossingsView({ modelId, orgSlug, modelSlug }: BoundaryCrossingsViewProps) {
   const state = useBoundaryCrossings(modelId);
 
-  if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
+  if (state.status === 'loading') return <Loading />;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
   if (state.crossings.length === 0) {
     return <EmptyState>No IT/OT boundary crossings — no system on one side is connected to a system on the other.</EmptyState>;

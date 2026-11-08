@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
@@ -115,7 +116,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   const [pickingReviewers, setPickingReviewers] = useState(false);
   const [visibleSubjectCount, setVisibleSubjectCount] = useState(EDITED_SUBJECTS_PAGE_SIZE);
 
-  if (status === 'loading') return <Text tone="muted">Loading…</Text>;
+  if (status === 'loading') return <Loading />;
   if (status === 'not_found' || !branch) return <Text as="p">No change found for this id.</Text>;
 
   // Prompt pack F0: `branch.intent` is only ever `null` for a change branch
@@ -491,7 +492,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           <Text as="h2" size="lg">
             Import summary
           </Text>
-          {importSummary.state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+          {importSummary.state.status === 'loading' && <Loading />}
           {importSummary.state.status === 'error' && <Text as="p">{importSummary.state.message}</Text>}
           {importSummary.state.status === 'ready' && (
             <>
@@ -531,7 +532,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         <Text as="h2" size="lg">
           Edits on this change
         </Text>
-        {summaryState.status === 'loading' && <Text tone="muted">Loading…</Text>}
+        {summaryState.status === 'loading' && <Loading />}
         {summaryState.status === 'error' && <Text as="p">{summaryState.message}</Text>}
         {summaryState.status === 'ready' && summaryState.summary.subjects.length === 0 && <EmptyState>No edits yet — this change hasn't diverged from main.</EmptyState>}
         {summaryState.status === 'ready' && summaryState.summary.subjects.length > 0 && (

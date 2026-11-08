@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
@@ -33,7 +34,7 @@ export function AskAtlasPage() {
             </Text>
           </div>
           {orgLoading || modelsLoading || !organisation ? (
-            <Text tone="muted">Loading…</Text>
+            <Loading />
           ) : !model ? (
             <Text as="p">This model doesn't exist, or you can't see it.</Text>
           ) : (

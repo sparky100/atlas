@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -117,7 +118,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     if (decisionStatus !== null) void queryClient.invalidateQueries({ queryKey: queryKeys.proposedDecisionCount(modelId) });
   }, [decisionStatus, modelId, queryClient]);
 
-  if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
+  if (state.status === 'loading') return <Loading />;
   if (state.status === 'not_found') return <Text as="p">No decision found for this id.</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 

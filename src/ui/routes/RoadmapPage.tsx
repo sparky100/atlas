@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { ModelEmptyState } from '../components/EmptyState/ModelEmptyState';
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -118,7 +119,7 @@ export function RoadmapPage() {
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
-            <Text tone="muted">Loading…</Text>
+            <Loading />
           </main>
         </div>
       </div>
@@ -150,7 +151,7 @@ export function RoadmapPage() {
           </div>
           {roadmapExport.error !== null && <Text as="p">{roadmapExport.error}</Text>}
 
-          {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+          {state.status === 'loading' && <Loading />}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
           {state.status === 'refNotFound' && <ModelEmptyState orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />}
           {state.status === 'ready' && (

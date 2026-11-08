@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -84,7 +85,7 @@ export function SearchDialog({ orgSlug, modelSlug, modelId, activeRef, onClose }
         <SearchBody orgSlug={orgSlug} modelSlug={modelSlug} modelId={modelId} activeRef={activeRef} mainHeadCommitId={mainBranch.head_commit_id} branchCommitId={editingBranch?.kind === 'change' ? editingBranch.head_commit_id : null} onClose={onClose} />
       ) : (
         <div className={styles.body}>
-          <Text tone="muted">Loading…</Text>
+          <Loading />
         </div>
       )}
     </dialog>

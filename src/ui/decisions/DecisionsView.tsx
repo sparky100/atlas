@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
@@ -162,7 +163,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
       <Text as="h2" size="lg">
         Decisions
       </Text>
-      {status === 'loading' && <Text tone="muted">Loading…</Text>}
+      {status === 'loading' && <Loading />}
       {decisions.length === 0 && status !== 'loading' && <EmptyState>No decisions yet. {canCreate ? 'Start one above.' : 'Nobody has started one.'}</EmptyState>}
       {decisions.length > 0 && (
         <ul className={styles.list}>
