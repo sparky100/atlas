@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import type { AttributeDefinitionKind } from '../../contracts/attributeSchema';
 import type { Json } from '../../contracts/rows';
@@ -7,6 +7,7 @@ import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ElementBrowseTable } from '../components/ElementBrowseTable/ElementBrowseTable';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
@@ -113,6 +114,7 @@ export function ElementsPage() {
   // second, bespoke one.
   const { branch: editingBranch } = useEditingBranch(model?.id ?? null, ref);
   const canShowSearch = canCreateChangeBranch(role);
+  const [adding, setAdding] = useState(false);
   // F1 ("custom attributes") PR4: read-only here, same reuse as
   // ElementPage.tsx's own PR3 wiring — any member can see these
   // (attribute_definitions_select's RLS), and this page only ever filters/
@@ -268,19 +270,46 @@ export function ElementsPage() {
             Elements
           </Text>
           {canShowSearch && mainBranch && (
-            <Panel>
-              <HomeSearch
-                modelId={model.id}
-                orgId={organisation?.id ?? ''}
-                userId={userId}
-                role={role}
-                searchCommitId={mainBranch.head_commit_id}
-                activeRef={ref}
-                editingBranch={editingBranch}
-                orgSlug={organisation?.slug ?? ''}
-                modelSlug={model.slug}
-              />
-            </Panel>
+            // One search box by default (the table's own filter below): the
+            // search-or-create control — a multi-type pool download plus its
+            // description/capability/platform create flow — opens on demand
+            // instead of sitting above the table as a second search box.
+            adding ? (
+              <Panel>
+                <HomeSearch
+                  // eslint-disable-next-line jsx-a11y/no-autofocus -- the user just asked to add an element by opening this; HomeSearch's own input carries the real disable comment.
+                  autoFocus
+                  modelId={model.id}
+                  orgId={organisation?.id ?? ''}
+                  userId={userId}
+                  role={role}
+                  searchCommitId={mainBranch.head_commit_id}
+                  activeRef={ref}
+                  editingBranch={editingBranch}
+                  orgSlug={organisation?.slug ?? ''}
+                  modelSlug={model.slug}
+                />
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setAdding(false);
+                  }}
+                >
+                  Close
+                </Button>
+              </Panel>
+            ) : (
+              <div>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setAdding(true);
+                  }}
+                >
+                  + Add element
+                </Button>
+              </div>
+            )
           )}
           {state.status === 'ready' && organisation && (
             <SavedReportBar
