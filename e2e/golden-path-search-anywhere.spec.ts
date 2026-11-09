@@ -47,7 +47,7 @@ test('search anywhere: find a system, a change and a decision from any page, by 
   // From the decision page (not Home): one query finds all three kinds, grouped.
   await openSearch(page);
   const dialog = page.getByRole('dialog', { name: 'Search' });
-  const input = dialog.getByRole('combobox', { name: 'Search elements, changes and decisions' });
+  const input = dialog.getByRole('combobox', { name: 'Search elements, changes, decisions and projects' });
   await expect(input).toBeFocused();
   await input.fill('meter');
   const results = dialog.getByRole('listbox', { name: 'Results' });
