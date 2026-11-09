@@ -103,7 +103,7 @@ Open any element to see its **attributes**, **relationships**, **structure** (mo
 - Each value has a small **provenance badge**: where it came from, its confidence (dots) and its age — anything over 12 months old shows in the warning colour. Hover or tap for the full source.
 - **✎ Edit** changes its attributes; **+ Add …** under each relationship group adds a link.
 - **✓ Still accurate** confirms that everything on it is still right — see below.
-- The **⋯ menu** holds **Rename**, **Retire…** (a planned end date, and optionally what replaces it — its capabilities move to the replacement), **Remove from model…**, **Merge into…** (when two elements are really the same thing; the old name stays findable by search), **Convert to a module of…** (move a system inside a platform), and **Start a project…**.
+- To **rename** an element, click its name (a pencil appears beside it). The **⋯ menu** holds **Start a project…**, then **Retire…** (a planned end date, and optionally what replaces it — its capabilities move to the replacement), **Merge into…** (when two elements are really the same thing; the old name stays findable by search), **Convert to a module of…** (move a system inside a platform), and **Remove from model…** last.
 
 What you can do depends on your role and on whether you're looking at main or a change (see below). On main, a contributor sees **Propose a change** instead of Edit.
 

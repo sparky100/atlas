@@ -271,15 +271,12 @@ export async function addSupportsRelationship(page: Page, capabilityNameMatch: s
   }
 }
 
-/** Rename the element on the currently-open element page, via the header's "⋯" menu — `element-rename.spec.ts`'s own locator convention (a bare `getByRole('textbox')` also matches the Comments composer, so this is scoped to `<header>`). */
+/** Rename the element on the currently-open element page by clicking its title — `element-rename.spec.ts`'s own locator convention (a bare `getByRole('textbox')` also matches the Comments composer, so this is scoped to `<header>`). */
 export async function renameElement(page: Page, newName: string): Promise<void> {
-  // Right after landing on a page (a merge or conversion's result), the
-  // page can still be settling and re-render once, closing a menu opened
-  // in that instant — reopen until Rename actually takes.
   const renameInput = page.locator('header').getByRole('textbox');
+  // Right after landing on a page the header can re-render once and drop the input — click the title until the input takes.
   await expect(async () => {
-    if (!(await page.getByRole('button', { name: 'Rename', exact: true }).isVisible())) await page.getByRole('button', { name: 'Element actions' }).click();
-    await page.getByRole('button', { name: 'Rename', exact: true }).click({ timeout: 2_000 });
+    await page.locator('header h1 button').click({ timeout: 2_000 });
     await expect(renameInput).toBeVisible({ timeout: 2_000 });
   }).toPass({ timeout: 15_000 });
   await renameInput.fill(newName);

@@ -84,12 +84,8 @@ test('element header: raw id is hidden behind the header menu, an alias renders 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}`);
   await expect(page.getByRole('heading', { name: 'Housing Portal' })).toBeVisible();
 
-  // The raw id is not shown in the header by default — it's in the DOM
-  // (the collapsed menu, CSS-hidden, same show/hide shape UserMenu.tsx's
-  // own `.menu`/`.open` already uses), just not visible until the menu
-  // opens, so this checks visibility, not DOM presence.
-  const rawIdText = page.getByText(new RegExp(`^${systemId.slice(0, 8)}…$`));
-  await expect(rawIdText).not.toBeVisible();
+  // The raw id is not shown anywhere in the header.
+  await expect(page.getByText(new RegExp(`^${systemId.slice(0, 8)}…$`))).toHaveCount(0);
 
   // The alias moved to Attributes, labelled by its real type — not "aka"
   // in the header any more.
@@ -97,15 +93,13 @@ test('element header: raw id is hidden behind the header menu, an alias renders 
   await expect(page.getByText('Code', { exact: true })).toBeVisible();
   await expect(page.getByText('HP-01')).toBeVisible();
 
-  // The header menu reveals the copy action (and, with it, the raw id),
-  // hidden until then.
+  // The header menu's actions stay hidden until it is opened.
   const menuToggle = page.getByRole('button', { name: 'Element actions' });
   await expect(menuToggle).toBeVisible();
-  const copyButton = page.getByRole('button', { name: 'Copy element ID' });
+  const copyButton = page.getByRole('button', { name: 'Remove from model…' });
   await expect(copyButton).not.toBeVisible();
   await menuToggle.click();
   await expect(copyButton).toBeVisible();
-  await expect(rawIdText).toBeVisible();
 
   // Sprint U4-1 E2: the app header's own mobile menu, a separate
   // component from the element header's own one above, still collapses

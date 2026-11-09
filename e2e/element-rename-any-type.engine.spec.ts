@@ -86,12 +86,10 @@ test('renaming a System from the header menu: new name in the Context breadcrumb
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}`);
   await expect(page.getByRole('heading', { name: oldName })).toBeVisible();
 
-  // The bug itself: before this fix, a non-capability element's "⋯" menu
-  // had only "Copy element ID" — no "Rename" at all.
-  await page.getByRole('button', { name: 'Element actions' }).click();
-  const renameMenuItem = page.getByRole('button', { name: 'Rename', exact: true });
-  await expect(renameMenuItem).toBeVisible();
-  await renameMenuItem.click();
+  // Clicking the title (the pencil beside it marks it as editable) opens
+  // the inline rename for every element type; the "⋯" menu no longer
+  // duplicates it.
+  await page.getByRole('heading', { name: oldName }).getByRole('button').click();
 
   const renameInput = page.locator('header').getByRole('textbox');
   await expect(renameInput).toHaveValue(oldName);
