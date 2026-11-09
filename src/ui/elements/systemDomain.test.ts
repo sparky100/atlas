@@ -22,10 +22,10 @@ describe('domainOf (Prompt 7k item 3)', () => {
 });
 
 describe('domainToneFor', () => {
-  it('is neutral for it, warn for ot, info for hybrid', () => {
+  it('is neutral for every domain (a domain is a fact, not a risk)', () => {
     expect(domainToneFor('it')).toBe('neutral');
-    expect(domainToneFor('ot')).toBe('warn');
-    expect(domainToneFor('hybrid')).toBe('info');
+    expect(domainToneFor('ot')).toBe('neutral');
+    expect(domainToneFor('hybrid')).toBe('neutral');
   });
 
   it('is undefined for an unrecognised value', () => {

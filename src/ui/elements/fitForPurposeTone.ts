@@ -11,7 +11,7 @@ import type { ChipTone } from '../components/Chip/Chip';
  * rating naturally reads as: `excellent` = clean green, `good` = nothing to
  * flag, `adequate` = borderline worth attention, `poor` = failing.
  */
-export const FIT_FOR_PURPOSE_TONE: Record<FitForPurpose, ChipTone> = { excellent: 'ok', good: 'neutral', adequate: 'warn', poor: 'danger' };
+export const FIT_FOR_PURPOSE_TONE: Record<FitForPurpose, ChipTone> = { excellent: 'ok', good: 'ok', adequate: 'warn', poor: 'warn' };
 
 /**
  * `excellent → good → adequate → poor`, as a sortable order where a higher

@@ -20,7 +20,7 @@ import { attributesRecord } from './attributesRecord';
  * attention" reading `metric:supportingSystemCount`'s own zero-count
  * `warn` already uses for a different fact.
  */
-export const DOMAIN_TONE: Record<SystemDomain, ChipTone> = { it: 'neutral', ot: 'warn', hybrid: 'info' };
+export const DOMAIN_TONE: Record<SystemDomain, ChipTone> = { it: 'neutral', ot: 'neutral', hybrid: 'neutral' };
 
 export function domainToneFor(value: string): ChipTone | undefined {
   return value in DOMAIN_TONE ? DOMAIN_TONE[value as SystemDomain] : undefined;

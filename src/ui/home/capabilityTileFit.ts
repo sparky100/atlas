@@ -1,5 +1,6 @@
 import type { ChipTone } from '../components/Chip/Chip';
 import type { CapabilityTileData } from '../../db/modelHome';
+import { attributesRecord } from '../elements/attributesRecord';
 import { IMPORTANCE_ORDER } from './capabilityImportance';
 
 /**
@@ -17,19 +18,28 @@ export function isCapabilityTileWeak(tile: Pick<CapabilityTileData, 'tone' | 'we
 }
 
 /**
- * Tone's own severity among *weak* tiles specifically (a weak tile's tone
- * can be `'ok'` — flagged only by a poor-fit capability, per
- * `isCapabilityTileWeak` above — so this ranks all four, not just the
- * three a tile-by-tone-alone view would ever show): an unresolved
- * lifecycle exposure (`warn`) is the most urgent; "nothing recorded"
- * (`neutral`, no known supporters at all) the next; a replacement already
- * planned (`info`) reads calmer, since it's already being handled; `ok`
- * (weak purely via fit, tone itself is fine) least urgent of the four.
- * This ranking is this file's own judgement call — there's no existing
- * order for the derived `tone` union to mirror the way `Importance`/
- * `Criticality`/`FitForPurpose` each have one.
+ * One colour and one word per weak tile, on the app-wide scale (red: a
+ * problem now; amber: needs attention soon; blue: already being handled;
+ * grey: nothing recorded). Retired-and-unreplaced is red, retiring-and-
+ * unreplaced amber, a planned replacement blue, "no system supports this"
+ * grey, and a tile weak only through fit (tone `ok`) amber.
  */
-const WEAK_TONE_SEVERITY: Record<CapabilityTileData['tone'], number> = { warn: 0, neutral: 1, info: 2, ok: 3 };
+export function tileSeverity(tile: Pick<CapabilityTileData, 'tone' | 'exposedSystems'>): { tone: ChipTone; label: string } {
+  switch (tile.tone) {
+    case 'neutral':
+      return { tone: 'neutral', label: 'No system recorded' };
+    case 'info':
+      return { tone: 'info', label: 'Replacement planned' };
+    case 'warn': {
+      const anyRetired = tile.exposedSystems.some((system) => attributesRecord(system.attributes).lifecycleStatus === 'retired');
+      return anyRetired ? { tone: 'danger', label: 'System retired' } : { tone: 'warn', label: 'System retiring' };
+    }
+    case 'ok':
+      return { tone: 'warn', label: 'Weak fit' };
+  }
+}
+
+const SEVERITY_RANK: Record<ChipTone, number> = { danger: 0, warn: 1, neutral: 2, info: 3, ok: 4 };
 
 /** `importance` treated as least-important (ranks after `'low'`) when unset — "not assessed" is never mistaken for "assessed as low," it's simply the last thing Director home surfaces among weak tiles. */
 function importanceRank(importance: CapabilityTileData['importance']): number {
@@ -37,14 +47,13 @@ function importanceRank(importance: CapabilityTileData['importance']): number {
 }
 
 /**
- * Director home's own weak-tile order (the task's own rule): importance
- * high → low, unset last; ties broken by fit/exposure severity
- * (`WEAK_TONE_SEVERITY` above); remaining ties broken by name. Pure and
- * unit-tested — `DirectorHome.tsx` only ever calls `weakTiles.sort(...)`
- * with this, never re-derives the rule inline.
+ * Director home's own weak-tile order: most severe first (red, amber,
+ * grey, blue — `tileSeverity`), then importance high → low with unset
+ * last, then name. Pure and unit-tested — `DirectorHome.tsx` only ever
+ * calls `weakTiles.sort(...)` with this.
  */
 export function compareWeakTiles(a: CapabilityTileData, b: CapabilityTileData): number {
-  return importanceRank(a.importance) - importanceRank(b.importance) || WEAK_TONE_SEVERITY[a.tone] - WEAK_TONE_SEVERITY[b.tone] || a.capability.name.localeCompare(b.capability.name);
+  return SEVERITY_RANK[tileSeverity(a).tone] - SEVERITY_RANK[tileSeverity(b).tone] || importanceRank(a.importance) - importanceRank(b.importance) || a.capability.name.localeCompare(b.capability.name);
 }
 
 /**
@@ -63,8 +72,7 @@ export function formatWeakFitPillLabel(poorFitCount: number, adequateFitCount: n
   return allReplacementPlanned ? `${base} · replacement planned` : base;
 }
 
-/** The fit pill's own tone — `info` (the same word/colour the exposure tone already uses for "replacement planned") once every weak-fit edge has one; otherwise `danger` while anything is rated poor, and the calmer `warn` when the weakest rating is only adequate. Deliberately its own function, not reused from `fitForPurposeTone.ts` verbatim, since "replacement planned" is a genuinely calmer state than a still-unaddressed rating. */
-export function weakFitPillTone(allReplacementPlanned: boolean, poorFitCount: number): ChipTone {
-  if (allReplacementPlanned) return 'info';
-  return poorFitCount > 0 ? 'danger' : 'warn';
+/** The fit pill's own tone — `info` (the same word/colour the exposure tone already uses for "replacement planned") once every weak-fit edge has one; otherwise `warn` (amber: needs attention soon), whether the weakest rating is poor or adequate — the pill's own label says which. */
+export function weakFitPillTone(allReplacementPlanned: boolean): ChipTone {
+  return allReplacementPlanned ? 'info' : 'warn';
 }

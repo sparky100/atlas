@@ -66,7 +66,8 @@ export function landscapeTileColourFor(mode: LandscapeColourByMode, system: Elem
     }
     case 'metric:domain': {
       const domain = domainOf(system);
-      return { tone: domainToneFor(domain), label: domain };
+      // Domain is a fact, not a risk, so chips show it neutral everywhere — but this colour-by mode exists to tell IT from OT apart, so non-IT tiles read blue (informational), never amber/red.
+      return { tone: domain === 'it' ? domainToneFor(domain) : 'info', label: domain };
     }
   }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Importance } from '../../contracts/delta';
 import type { CapabilityTileData } from '../../db/modelHome';
-import { compareWeakTiles, formatWeakFitPillLabel, isCapabilityTileWeak, weakFitPillTone } from './capabilityTileFit';
+import { compareWeakTiles, formatWeakFitPillLabel, isCapabilityTileWeak, tileSeverity, weakFitPillTone } from './capabilityTileFit';
 import type { ElementsHeadRow } from '../../contracts/rows';
 
 function capability(id: string, name = `Capability ${id}`): ElementsHeadRow {
@@ -66,51 +66,32 @@ describe('formatWeakFitPillLabel', () => {
 });
 
 describe('weakFitPillTone', () => {
-  it('is danger while anything rated poor still needs a decision', () => {
-    expect(weakFitPillTone(false, 1)).toBe('danger');
-  });
-
-  it('is the calmer warn when the weakest rating is only adequate', () => {
-    expect(weakFitPillTone(false, 0)).toBe('warn');
+  it('is warn (amber) while a weak fit still needs a decision', () => {
+    expect(weakFitPillTone(false)).toBe('warn');
   });
 
   it('is info once every weak-fit edge already has a planned replacement', () => {
-    expect(weakFitPillTone(true, 1)).toBe('info');
-    expect(weakFitPillTone(true, 0)).toBe('info');
+    expect(weakFitPillTone(true)).toBe('info');
   });
 });
 
-describe('compareWeakTiles (Director home: importance high→low, unset last, then fit/exposure severity, then name)', () => {
-  it('sorts mixed importance high, then medium, then low', () => {
-    const low = tile('a', 'Low one', 'low');
-    const high = tile('b', 'High one', 'high');
-    const medium = tile('c', 'Medium one', 'medium');
-    expect([low, high, medium].sort(compareWeakTiles)).toEqual([high, medium, low]);
+describe('tileSeverity and the weak-tile order', () => {
+  const sys = (status: string): ElementsHeadRow => ({ element_id: `s-${status}`, element_type: 'system', name: status, parent_id: null, attributes: { lifecycleStatus: status }, exists_delta_id: `d-${status}` });
+  const withExposed = (t: CapabilityTileData, status: string): CapabilityTileData => ({ ...t, exposedSystems: [sys(status)] });
+
+  it('maps a tile to one colour and one word on the app-wide scale', () => {
+    expect(tileSeverity(withExposed(tile('a', 'A', null, 'warn'), 'retired'))).toEqual({ tone: 'danger', label: 'System retired' });
+    expect(tileSeverity(withExposed(tile('a', 'A', null, 'warn'), 'retiring'))).toEqual({ tone: 'warn', label: 'System retiring' });
+    expect(tileSeverity(tile('a', 'A', null, 'neutral'))).toEqual({ tone: 'neutral', label: 'No system recorded' });
+    expect(tileSeverity(withExposed(tile('a', 'A', null, 'info'), 'retiring'))).toEqual({ tone: 'info', label: 'Replacement planned' });
+    expect(tileSeverity(tile('a', 'A', null, 'ok'))).toEqual({ tone: 'warn', label: 'Weak fit' });
   });
 
-  it('sorts an unset importance after every rated level, never as low', () => {
-    const low = tile('a', 'Low one', 'low');
-    const unset = tile('b', 'Unset one', null);
-    expect([unset, low].sort(compareWeakTiles)).toEqual([low, unset]);
-  });
-
-  it('breaks an importance tie by fit/exposure severity: warn, then neutral, then info, then ok', () => {
-    const warnTile = tile('a', 'Warn', 'high', 'warn');
-    const neutralTile = tile('b', 'Neutral', 'high', 'neutral');
-    const infoTile = tile('c', 'Info', 'high', 'info');
-    const okTile = tile('d', 'Ok', 'high', 'ok');
-    expect([okTile, infoTile, neutralTile, warnTile].sort(compareWeakTiles)).toEqual([warnTile, neutralTile, infoTile, okTile]);
-  });
-
-  it('breaks an importance-and-tone tie by name', () => {
-    const zebra = tile('a', 'Zebra', 'high', 'warn');
-    const apple = tile('b', 'Apple', 'high', 'warn');
-    expect([zebra, apple].sort(compareWeakTiles)).toEqual([apple, zebra]);
-  });
-
-  it('two unset, tone-tied tiles still resolve by name — unset never collapses every tie', () => {
-    const zebra = tile('a', 'Zebra', null, 'warn');
-    const apple = tile('b', 'Apple', null, 'warn');
-    expect([zebra, apple].sort(compareWeakTiles)).toEqual([apple, zebra]);
+  it('sorts red, then amber, then grey, then blue; importance and name only break ties', () => {
+    const red = withExposed(tile('r', 'Red', 'low', 'warn'), 'retired');
+    const amber = withExposed(tile('m', 'Amber', 'high', 'warn'), 'retiring');
+    const grey = tile('g', 'Grey', 'high', 'neutral');
+    const blue = withExposed(tile('b', 'Blue', 'high', 'info'), 'retiring');
+    expect([blue, grey, amber, red].sort(compareWeakTiles).map((t) => t.capability.name)).toEqual(['Red', 'Amber', 'Grey', 'Blue']);
   });
 });

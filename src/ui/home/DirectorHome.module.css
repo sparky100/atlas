@@ -162,14 +162,6 @@
   min-height: var(--tile-min-height-emphasised);
 }
 
-/* Visual pass item 1: "no known supporters" specifically (DirectorHome.tsx's
-   own `isWeak`) — on the tile's wrapper, so it fills the whole card behind
-   BlueprintFrame (whose `.frame` sets no background of its own), never an
-   inner rectangle inside the frame's padding. */
-.tileWeak {
-  background: var(--status-weak-bg);
-}
-
 .statusBar {
   display: block;
   height: var(--status-bar-height);
@@ -180,6 +172,10 @@
 
 .statusBar[data-tone='ok'] {
   background: var(--status-ok);
+}
+
+.statusBar[data-tone='danger'] {
+  background: var(--status-danger);
 }
 
 .statusBar[data-tone='warn'] {

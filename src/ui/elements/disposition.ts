@@ -14,9 +14,9 @@ export function dispositionTone(value: Disposition | null): ChipTone {
     case 'tolerate':
       return 'info';
     case 'migrate':
-      return 'warn';
     case 'eliminate':
-      return 'danger';
+      // A plan, not a fault: blue (in progress / informational), never a risk colour.
+      return 'info';
     case null:
       return 'neutral';
   }
