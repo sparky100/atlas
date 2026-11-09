@@ -851,11 +851,12 @@ const PLACEHOLDER_BRANCH: BranchRow = {
 };
 
 /** Sprint U4-1 D1: "alias moves into attributes" — each alias renders as its own read-only row, same shape as any other attribute (`aliasAsFact` gives `AttributeRow` a `FactsRow` to work with), labelled by its real `alias_type` (`ALIAS_TYPE_LABELS`) rather than the header's old single undifferentiated "aka" bucket. Appended after the schema-driven fields — an alias is always additional identifying information, never a substitute for one of them. */
-function AliasRows({ elementId, aliases, aliasSources }: { elementId: UUID; aliases: AliasRow[]; aliasSources: Map<UUID, SourceRow> }) {
+function AliasRows({ elementId, elementName, aliases, aliasSources }: { elementId: UUID; elementName: string; aliases: AliasRow[]; aliasSources: Map<UUID, SourceRow> }) {
   return (
     <>
       {/* A template code is how Atlas matches a tailored capability back to its starter map — bookkeeping, not something a reader needs (it stays on the alias for matching). */}
-      {aliases.filter((alias) => alias.alias_type !== 'template_code').map((alias) => {
+      {/* An alternate name equal to the page title adds nothing (an import records the name as its own alias). */}
+      {aliases.filter((alias) => alias.alias_type !== 'template_code' && !(alias.alias_type === 'name' && alias.alias_value.trim().toLowerCase() === elementName.trim().toLowerCase())).map((alias) => {
         const fact = aliasAsFact(alias, elementId);
         return <AttributeRow key={alias.id} label={ALIAS_TYPE_LABELS[alias.alias_type]} required={false} fact={fact} source={aliasSources.get(alias.source_id)} />;
       })}
@@ -888,20 +889,45 @@ function AttributesTable({
   // (ProvenanceCard.tsx's `seededFrom`).
   // `order` (capability and value stream) is the map's sibling position, written only by the reorder control — never useful to read as an attribute row.
   const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type].filter((field) => field.hidden !== true && field.key !== 'order');
+  const [showEmpty, setShowEmpty] = useState(false);
+  const rows = [...schema, ...customFields].flatMap((field) => {
+    const fact = facts.get(field.key);
+    // ADR-020: `hideWhenEmpty` (Capability.code/"Reference") omits the
+    // row entirely rather than rendering AttributeRow's own bare "—"
+    // — distinct from `hidden` above, which excludes it regardless of
+    // whether a fact exists.
+    if (field.hideWhenEmpty === true && !fact && !(isInterface && (field.key === 'interfaceType' || field.key === 'transformation'))) return [];
+    return [{ field, fact, collapsible: isCollapsibleWhenEmpty(field, fact) }];
+  });
+  const emptyCount = rows.filter((row) => row.collapsible).length;
   return (
     <div>
-      {[...schema, ...customFields].map((field) => {
-        const fact = facts.get(field.key);
-        // ADR-020: `hideWhenEmpty` (Capability.code/"Reference") omits the
-        // row entirely rather than rendering AttributeRow's own bare "—"
-        // — distinct from `hidden` above, which excludes it regardless of
-        // whether a fact exists.
-        if (field.hideWhenEmpty === true && !fact && !(isInterface && (field.key === 'interfaceType' || field.key === 'transformation'))) return null;
-        return <AttributeRow key={field.key} label={field.label} required={field.required} fact={fact} source={fact ? sources.get(fact.source_id) : undefined} field={field} />;
-      })}
-      <AliasRows elementId={element.element_id} aliases={aliases} aliasSources={aliasSources} />
+      {rows
+        .filter((row) => !row.collapsible || showEmpty)
+        .map(({ field, fact }) => (
+          <AttributeRow key={field.key} label={field.label} required={field.required} fact={fact} source={fact ? sources.get(fact.source_id) : undefined} field={field} />
+        ))}
+      {emptyCount > 0 && (
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setShowEmpty((v) => !v);
+          }}
+        >
+          {showEmpty ? 'Hide empty fields' : `Show ${String(emptyCount)} empty ${emptyCount === 1 ? 'field' : 'fields'}`}
+        </Button>
+      )}
+      <AliasRows elementId={element.element_id} elementName={element.name} aliases={aliases} aliasSources={aliasSources} />
     </div>
   );
+}
+
+/** Dates people plan around stay on the page even when unset; every other optional, unset field with no "Not assessed"-style label folds behind "Show N empty fields" so the page leads with what is known. */
+const ALWAYS_SHOWN_WHEN_EMPTY = new Set(['plannedEnd', 'supportEndsAt']);
+function isCollapsibleWhenEmpty(field: AttributeFieldSchema, fact: FactsRow | undefined): boolean {
+  if (fact && fact.value !== null) return false;
+  if (field.required || field.emptyLabel !== undefined || ALWAYS_SHOWN_WHEN_EMPTY.has(field.key)) return false;
+  return true;
 }
 
 function AttributesEditor({
@@ -935,7 +961,7 @@ function AttributesEditor({
       {/* Not editable here (this hook only ever writes attributes.*, never
           the separate aliases table) — still shown, read-only, so an
           alias doesn't visibly disappear the moment someone clicks Edit. */}
-      <AliasRows elementId={element.element_id} aliases={aliases} aliasSources={aliasSources} />
+      <AliasRows elementId={element.element_id} elementName={element.name} aliases={aliases} aliasSources={aliasSources} />
       {editor.submitError !== null && (
         <Text as="p" tone="default">
           {editor.submitError}

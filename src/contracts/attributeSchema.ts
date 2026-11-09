@@ -170,6 +170,10 @@ const HOSTING_MODEL_OPTIONS = ['on_premises', 'private_cloud', 'public_cloud', '
 const DOMAIN_OPTIONS = ['it', 'ot', 'hybrid'] as const;
 /** Prompt 7k item 4 (plus "platforms and modules"'s own `'platform'` addition) — see `SystemKind`'s own doc comment (`delta.ts`) for why absent reads as `'application'`. */
 const KIND_OPTIONS = ['application', 'integration_platform', 'data_platform', 'infrastructure', 'platform'] as const;
+/** Display labels for the three plain-key enums above, so a page shows "On premises" / "IT" / "Integration platform" rather than the stored key. */
+const HOSTING_MODEL_LABELS: Readonly<Record<string, string>> = { on_premises: 'On premises', private_cloud: 'Private cloud', public_cloud: 'Public cloud', saas: 'SaaS', hybrid: 'Hybrid' };
+const DOMAIN_LABELS: Readonly<Record<string, string>> = { it: 'IT', ot: 'OT', hybrid: 'Hybrid' };
+const KIND_LABELS: Readonly<Record<string, string>> = { application: 'Application', integration_platform: 'Integration platform', data_platform: 'Data platform', infrastructure: 'Infrastructure', platform: 'Platform' };
 
 /**
  * Run cost's six bands, cheapest → most expensive — the single declaration
@@ -236,10 +240,10 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   // "Not entered" empty state all via the meta members added for it.
   annualRunCost: { label: 'Run cost', required: false, kind: 'enum', options: ANNUAL_RUN_COST_OPTIONS, optionLabels: ANNUAL_RUN_COST_LABELS, help: ANNUAL_RUN_COST_HELP, emptyLabel: 'Not entered' },
   disposition: { label: 'Planned action', required: false, kind: 'enum', options: DISPOSITION_OPTIONS, optionLabels: DISPOSITION_LABELS, help: DISPOSITION_HELP, emptyLabel: 'Not assessed' },
-  hostingModel: { label: 'Hosting model', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
+  hostingModel: { label: 'Hosting model', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS, optionLabels: HOSTING_MODEL_LABELS },
   hostingProvider: { label: 'Hosting provider', required: false, kind: 'text' },
-  domain: { label: 'Domain', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
-  kind: { label: 'Kind', required: false, kind: 'enum', options: KIND_OPTIONS },
+  domain: { label: 'Domain', required: false, kind: 'enum', options: DOMAIN_OPTIONS, optionLabels: DOMAIN_LABELS },
+  kind: { label: 'Kind', required: false, kind: 'enum', options: KIND_OPTIONS, optionLabels: KIND_LABELS },
   // Prompt 7k item 5 — see `SystemAttributes.supportEndsAt`'s own doc
   // comment (delta.ts) for why this is distinct from `plannedEnd`.
   supportEndsAt: { label: 'Vendor support ends', required: false, kind: 'date' },
@@ -298,9 +302,9 @@ const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   // F11: a module's own disposition, never inherited from its platform —
   // so, like run cost, not labelled "(module override)" of an inherited value.
   disposition: { label: 'Planned action', required: false, kind: 'enum', options: DISPOSITION_OPTIONS, optionLabels: DISPOSITION_LABELS, help: DISPOSITION_HELP, emptyLabel: 'Not assessed' },
-  hostingModel: { label: 'Hosting model (module override)', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
+  hostingModel: { label: 'Hosting model (module override)', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS, optionLabels: HOSTING_MODEL_LABELS },
   hostingProvider: { label: 'Hosting provider (module override)', required: false, kind: 'text' },
-  domain: { label: 'Domain (module override)', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
+  domain: { label: 'Domain (module override)', required: false, kind: 'enum', options: DOMAIN_OPTIONS, optionLabels: DOMAIN_LABELS },
   // S1 item 11: a container's own version — never part of the platform-
   // module inheritance set above (see ContainerAttributes.version's own
   // doc comment, delta.ts).
