@@ -2,8 +2,12 @@ import { OPEN_CHANGE_STATUSES } from '../../db/branches';
 import type { BranchIntent, BranchRow } from '../../db/types';
 import { INTENT_OPTIONS } from './branchIntent';
 
+const REVIEW_STATUSES: readonly BranchRow['status'][] = ['proposed', 'in_review', 'approved'];
+
 export interface ChangesListGroups {
-  /** Open changes (`OPEN_CHANGE_STATUSES`) by intent, in `INTENT_OPTIONS` order — the same set the Changes nav badge counts. */
+  /** Changes submitted and waiting for a reviewer (proposed, in review, approved) — the same set the review queue counts. */
+  waitingForReview: BranchRow[];
+  /** Draft changes (the open ones not yet submitted) by intent, in `INTENT_OPTIONS` order. With `waitingForReview` they make up the Changes nav badge. */
   openByIntent: { intent: BranchIntent; branches: BranchRow[] }[];
   merged: BranchRow[];
   cancelled: BranchRow[];
@@ -18,8 +22,9 @@ export interface ChangesListGroups {
  * split is unit-tested on its own.
  */
 export function groupChangesList(branches: readonly BranchRow[]): ChangesListGroups {
-  const open = branches.filter((b) => OPEN_CHANGE_STATUSES.includes(b.status));
+  const open = branches.filter((b) => OPEN_CHANGE_STATUSES.includes(b.status) && !REVIEW_STATUSES.includes(b.status));
   return {
+    waitingForReview: branches.filter((b) => REVIEW_STATUSES.includes(b.status)),
     // `?? 'propose'` covers only a pre-F0 change branch — the same fallback `ChangeView.tsx` uses.
     openByIntent: INTENT_OPTIONS.map((option) => ({ intent: option.value, branches: open.filter((b) => (b.intent ?? 'propose') === option.value) })),
     merged: branches.filter((b) => b.status === 'merged'),

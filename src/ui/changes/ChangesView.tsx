@@ -80,8 +80,8 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   // active/collapsed split `OrgHome.tsx` uses for archived models. An intent
   // group shows only when it has an open change, rather than four sections
   // where most read "nothing here" on a small model.
-  const { openByIntent, merged, cancelled, closed } = groupChangesList(branches);
-  const hasOpen = openByIntent.some((g) => g.branches.length > 0);
+  const { waitingForReview, openByIntent, merged, cancelled, closed } = groupChangesList(branches);
+  const hasOpen = waitingForReview.length > 0 || openByIntent.some((g) => g.branches.length > 0);
   const endedSections = [
     { title: 'Merged', branches: merged },
     { title: 'Cancelled', branches: cancelled },
@@ -245,6 +245,22 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
       )}
       {branches.length === 0 && status !== 'loading' && <EmptyState>No changes yet. {canCreate ? 'Create one above.' : 'Nobody has proposed one.'}</EmptyState>}
       {branches.length > 0 && !hasOpen && status !== 'loading' && <EmptyState>No open changes.{canCreate ? ' Create one above.' : ''}</EmptyState>}
+      {waitingForReview.length > 0 && (
+        <CollapsibleSection title="Waiting for review" meta={`(${String(waitingForReview.length)})`}>
+          <ul className={styles.list}>
+            {waitingForReview.map((branch) => (
+              <ChangeRow
+                key={branch.id}
+                branch={branch}
+                orgSlug={orgSlug}
+                modelSlug={modelSlug}
+                unresolvedCount={threadCounts?.get(branch.id)?.open}
+                summary={summaries?.get(branch.id)}
+              />
+            ))}
+          </ul>
+        </CollapsibleSection>
+      )}
       {openByIntent.map(
         ({ intent, branches: group }) =>
           group.length > 0 && (
