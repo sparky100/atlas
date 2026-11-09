@@ -5,7 +5,7 @@ import { useCanvasWidth } from '../landscape/useCanvasWidth';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import type { RoadmapFilters } from './roadmapFilter';
 import { isRoadmapEligibleBranch, type RoadmapMode } from './roadmapEligibility';
-import { type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
+import { roadmapBarCaption, type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
 import { computeRoadmapAxisTicks, computeRoadmapTimelineRange, computeRoadmapWindow, percentAtIso, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { changeDescription, computeRoadmapVisibleData, eventsForSystem, recentRoadmapChanges } from './roadmapVisibleData';
 import styles from './RoadmapView.module.css';
@@ -64,6 +64,9 @@ function RoadmapRow({ bar, events, range, todayPct, orgSlug, modelSlug }: { bar:
       <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${bar.systemId}`} className={styles.rowName} title={bar.name}>
         <Text as="span" size="sm">
           {bar.name}
+        </Text>
+        <Text as="span" size="xs" tone="muted" className={styles.rowCaption}>
+          {roadmapBarCaption(bar)}
         </Text>
       </Link>
       <div className={styles.track}>

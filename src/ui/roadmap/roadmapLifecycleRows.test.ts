@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
-import { groupBarsByProject, groupBarsByValueStream, groupRoadmapLifecycleBars, NO_PROJECT_LABEL, UNASSIGNED_GROUP_KEY } from './roadmapLifecycleRows';
+import { groupBarsByProject, groupBarsByValueStream, groupRoadmapLifecycleBars,
+  roadmapBarCaption, NO_PROJECT_LABEL, UNASSIGNED_GROUP_KEY } from './roadmapLifecycleRows';
 
 const href = (id: string): string => `/e/${id}`;
 
@@ -55,15 +56,27 @@ describe('groupRoadmapLifecycleBars', () => {
     expect(groups[0]?.href).toBe('/e/cap-l1');
   });
 
-  it('falls into the unassigned group when no supports edge is marked primary', () => {
+  it('groups under an Also capability when no supports edge is marked Main', () => {
     const capsById = new Map([['cap-1', capability('cap-1', 'Digital Services')]]);
     const sys = system('sys-1', 'Housing Portal', { introduced: '2020-01-01' });
-    // A secondary-only edge, deliberately not marked primary.
     const groups = groupRoadmapLifecycleBars([sys], [supports('sys-1', 'cap-1', 'secondary')], [], capsById, href);
     expect(groups).toHaveLength(1);
+    expect(groups[0]?.key).toBe('cap-1');
+    expect(groups[0]?.bars[0]?.capabilityKey).toBe('cap-1');
+  });
+
+  it('falls into the not-linked group only when the system supports no capability', () => {
+    const sys = system('sys-1', 'Housing Portal', { introduced: '2020-01-01' });
+    const groups = groupRoadmapLifecycleBars([sys], [], [], new Map(), href);
+    expect(groups).toHaveLength(1);
     expect(groups[0]?.key).toBe(UNASSIGNED_GROUP_KEY);
-    expect(groups[0]?.label).toBe('Unassigned');
+    expect(groups[0]?.label).toBe('Not linked to a capability');
     expect(groups[0]?.href).toBeNull();
+  });
+
+  it('captions a bar with what its ends mean', () => {
+    expect(roadmapBarCaption({ introduced: '2016-12-01', plannedEnd: undefined, supportEndsAt: undefined })).toBe('From 2016-12-01, no end date planned');
+    expect(roadmapBarCaption({ introduced: undefined, plannedEnd: '2028-01-01', supportEndsAt: '2026-06-01' })).toBe('Start date not recorded, to 2028-01-01 · vendor support ends 2026-06-01');
   });
 
   it('sorts the unassigned group last, real groups alphabetically by capability name', () => {
@@ -126,7 +139,7 @@ describe('groupBarsByValueStream', () => {
     const groups = groupBarsByValueStream([sys], [supports('sys-1', 'cap-1', 'primary')], [], capsById, new Map(), [], href);
     expect(groups).toHaveLength(1);
     expect(groups[0]?.key).toBe(UNASSIGNED_GROUP_KEY);
-    expect(groups[0]?.label).toBe('Unassigned');
+    expect(groups[0]?.label).toBe('Not in a value stream');
     expect(groups[0]?.href).toBeNull();
   });
 });

@@ -10,14 +10,10 @@
  * Grouping reuses `l1AncestorOf` (src/ui/elements/capabilityDepth.ts),
  * walking a system's own primary `supports` edge to its level-1 capability
  * — the same rollup target every other level-1 surface in this app already
- * uses (capabilityRollup.ts, metrics.ts's aggregate colour-by). Unlike
- * Landscape's own `groupSystemsByLane`, this doesn't fall back to
- * "most-recently-added" when no edge is marked primary — a system with
- * several supports edges and none marked primary groups under
- * `UNASSIGNED_GROUP_KEY` here, a deliberately simpler rule for a first
- * pass (Landscape's own fallback exists for canvas placement, where every
- * system needs *some* lane; a roadmap row has no such placement
- * requirement).
+ * uses (capabilityRollup.ts, metrics.ts's aggregate colour-by). When no edge is
+ * marked primary it falls back to the system's other supports links
+ * (`groupingCapabilityId`), so `UNASSIGNED_GROUP_KEY` holds only systems
+ * that support no level-1-reachable capability at all.
  *
  * F6 Step 6 (ADR-023) adds a second grouping mode, `groupBarsByValueStream`:
  * the same bars, grouped by the value stream(s) a system's primary
@@ -58,7 +54,7 @@ export interface RoadmapLifecycleBar {
 export interface RoadmapGroup {
   /** A capability id, a value-stream id, or `UNASSIGNED_GROUP_KEY`. */
   key: string;
-  /** The group's display name — the capability/stream's own name, or `'Unassigned'` for `UNASSIGNED_GROUP_KEY`. */
+  /** The group's display name — the capability/stream's own name, or a plain "not linked" label for `UNASSIGNED_GROUP_KEY`. */
   label: string;
   /** The group header's element-page link, or `null` for `UNASSIGNED_GROUP_KEY` (which has no page). */
   href: string | null;
@@ -73,6 +69,31 @@ function primarySupportsCapabilityId(systemId: UUID, supportsEdges: readonly Rel
     if (attributesRecord(edge.attributes).role === 'primary') return edge.to_element_id;
   }
   return null;
+}
+
+/**
+ * The capability a system is grouped under: its Main (`primary`) supports
+ * link, else — so a system that only *also* supports a capability is not
+ * called "unassigned" — the first other supports link that reaches a
+ * level-1 capability (ordered by relationship id, so the choice is stable).
+ */
+function groupingCapabilityId(systemId: UUID, supportsEdges: readonly RelationshipsHeadRow[], capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>): UUID | null {
+  const primary = primarySupportsCapabilityId(systemId, supportsEdges);
+  if (primary !== null) return primary;
+  const others = supportsEdges.filter((edge) => edge.from_element_id === systemId).sort((a, b) => a.relationship_id.localeCompare(b.relationship_id));
+  for (const edge of others) {
+    if (l1AncestorOf(edge.to_element_id, capabilitiesById) !== null) return edge.to_element_id;
+  }
+  return null;
+}
+
+/** One plain line under a bar's name saying what its ends mean, so a bar with a single date doesn't read as an unexplained stripe. */
+export function roadmapBarCaption(bar: Pick<RoadmapLifecycleBar, 'introduced' | 'plannedEnd' | 'supportEndsAt'>): string {
+  const parts: string[] = [];
+  parts.push(bar.introduced !== undefined ? `From ${bar.introduced}` : 'Start date not recorded');
+  parts.push(bar.plannedEnd !== undefined ? `to ${bar.plannedEnd}` : 'no end date planned');
+  const range = `${parts[0] ?? ''}, ${parts[1] ?? ''}`;
+  return bar.supportEndsAt !== undefined ? `${range} · vendor support ends ${bar.supportEndsAt}` : range;
 }
 
 function ownerActorIdsOf(systemId: UUID, ownsEdges: readonly RelationshipsHeadRow[]): UUID[] {
@@ -150,11 +171,11 @@ export function groupRoadmapLifecycleBars(
     const bar = lifecycleBarOf(system, ownsEdges, supportsEdges, capabilitiesById);
     if (!bar) continue;
 
-    const primaryCapabilityId = primarySupportsCapabilityId(system.element_id, supportsEdges);
+    const primaryCapabilityId = groupingCapabilityId(system.element_id, supportsEdges, capabilitiesById);
     const l1 = primaryCapabilityId !== null ? l1AncestorOf(primaryCapabilityId, capabilitiesById) : null;
     if (l1 !== null) bar.capabilityKey = l1.element_id;
     const key = l1?.element_id ?? UNASSIGNED_GROUP_KEY;
-    pushBar(groups, key, l1?.name ?? 'Unassigned', l1 ? elementHref(l1.element_id) : null, bar);
+    pushBar(groups, key, l1?.name ?? 'Not linked to a capability', l1 ? elementHref(l1.element_id) : null, bar);
   }
 
   return finishGroups(groups);
@@ -190,7 +211,7 @@ export function groupBarsByValueStream(
     const bar = lifecycleBarOf(system, ownsEdges, supportsEdges, capabilitiesById);
     if (!bar) continue;
 
-    const primaryCapabilityId = primarySupportsCapabilityId(system.element_id, supportsEdges);
+    const primaryCapabilityId = groupingCapabilityId(system.element_id, supportsEdges, capabilitiesById);
     const l1 = primaryCapabilityId !== null ? l1AncestorOf(primaryCapabilityId, capabilitiesById) : null;
     if (l1 !== null) bar.capabilityKey = l1.element_id;
 
@@ -204,12 +225,12 @@ export function groupBarsByValueStream(
     }
 
     if (streamIds.size === 0) {
-      pushBar(groups, UNASSIGNED_GROUP_KEY, 'Unassigned', null, bar);
+      pushBar(groups, UNASSIGNED_GROUP_KEY, 'Not in a value stream', null, bar);
       continue;
     }
     for (const streamId of streamIds) {
       const stream = valueStreamsById.get(streamId);
-      pushBar(groups, streamId, stream?.name ?? 'Unassigned', stream ? elementHref(streamId) : null, bar);
+      pushBar(groups, streamId, stream?.name ?? 'Not in a value stream', stream ? elementHref(streamId) : null, bar);
     }
   }
 
@@ -266,7 +287,7 @@ export function groupBarsByProject(
   for (const system of systems) {
     const bar = lifecycleBarOf(system, ownsEdges, supportsEdges, capabilitiesById);
     if (!bar) continue;
-    const primaryCapabilityId = primarySupportsCapabilityId(system.element_id, supportsEdges);
+    const primaryCapabilityId = groupingCapabilityId(system.element_id, supportsEdges, capabilitiesById);
     const l1 = primaryCapabilityId !== null ? l1AncestorOf(primaryCapabilityId, capabilitiesById) : null;
     if (l1 !== null) bar.capabilityKey = l1.element_id;
 
