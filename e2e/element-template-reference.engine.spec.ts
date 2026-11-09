@@ -88,13 +88,8 @@ test('element page: templateRef is hidden from Attributes, and its own "seeded f
   await expect(page.getByText('Template reference', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Reference', { exact: true })).toHaveCount(0);
 
-  // Its information still surfaces — reworded — on the provenance card
-  // of a fact seeded alongside it (the same template source, per
-  // capability-map-seed-description.spec.ts's own comment on this) — here,
-  // Order (attributes.order, always set at seed time, ADR-020 doesn't
-  // touch it), since Reference/Code no longer carries a seeded value to
-  // hang this on.
-  const orderValue = page.getByText('Order', { exact: true }).locator('xpath=following-sibling::*[1]');
-  await orderValue.locator('button').focus();
-  await expect(page.getByText(`Seeded from ${sector} v${String(version)}`)).toBeVisible();
+  // Order (the map's sibling position) and the template-code alias are
+  // bookkeeping too — neither shows as a row a reader has to wade past.
+  await expect(page.getByText('Order', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Template code', { exact: true })).toHaveCount(0);
 });

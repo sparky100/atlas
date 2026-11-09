@@ -854,7 +854,8 @@ const PLACEHOLDER_BRANCH: BranchRow = {
 function AliasRows({ elementId, aliases, aliasSources }: { elementId: UUID; aliases: AliasRow[]; aliasSources: Map<UUID, SourceRow> }) {
   return (
     <>
-      {aliases.map((alias) => {
+      {/* A template code is how Atlas matches a tailored capability back to its starter map — bookkeeping, not something a reader needs (it stays on the alias for matching). */}
+      {aliases.filter((alias) => alias.alias_type !== 'template_code').map((alias) => {
         const fact = aliasAsFact(alias, elementId);
         return <AttributeRow key={alias.id} label={ALIAS_TYPE_LABELS[alias.alias_type]} required={false} fact={fact} source={aliasSources.get(alias.source_id)} />;
       })}
@@ -885,7 +886,8 @@ function AttributesTable({
   // in the read-only list either — its own information still surfaces,
   // reworded, on a seeded fact's provenance card instead
   // (ProvenanceCard.tsx's `seededFrom`).
-  const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type].filter((field) => field.hidden !== true);
+  // `order` (capability and value stream) is the map's sibling position, written only by the reorder control — never useful to read as an attribute row.
+  const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type].filter((field) => field.hidden !== true && field.key !== 'order');
   return (
     <div>
       {[...schema, ...customFields].map((field) => {
