@@ -32,6 +32,9 @@ import { useEditingBranch } from '../branches/useEditingBranch';
 import { hintedModelId, useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
+import { AsAtControl } from '../landscape/AsAtControl';
+import { AS_AT_COMPARE_PARAM, AS_AT_PARAM, parseAsAtParam, todayIsoDate } from '../landscape/asAt';
+import { FutureSummary } from '../landscape/FutureSummary';
 import { CapabilityLandscapeList } from '../landscape/CapabilityLandscapeList';
 import { Inspector } from '../components/Inspector/Inspector';
 import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
@@ -135,6 +138,10 @@ export function LandscapePage() {
   const mode = parseViewMode(searchParams.get('mode'));
   const capabilityId = parseCapabilityParam(searchParams.get('capability'));
   const { userId } = useAuth();
+  // "View as at": a future date for the landscape on main — `?asat=`. Today (the default) is no param at all. Not for a change's own ref (it has As-is/To-be/Diff) or the capability-scoped list.
+  const [todayIso] = useState(() => todayIsoDate());
+  const asAt = ref.kind === 'main' && capabilityId === null ? parseAsAtParam(searchParams.get(AS_AT_PARAM), todayIso) : null;
+  const highlightChanges = searchParams.get(AS_AT_COMPARE_PARAM) !== 'off';
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
@@ -151,7 +158,7 @@ export function LandscapePage() {
   // hint (that hook's own parameter comment) rather than letting it run a
   // second, redundant `resolveRef` for the common `ref.kind === 'main'` case.
   const capability = useBreadcrumbElement(hintedModelId(model?.id, ref, mainBranchLoading), ref, capabilityId, mainBranch?.head_commit_id ?? null);
-  const canEdit = !viewing && editingBranch !== null && canEditBranch(role, editingBranch);
+  const canEdit = !viewing && asAt === null && editingBranch !== null && canEditBranch(role, editingBranch);
   // ADR-018 guarantees both are never null in practice (every branch always
   // has a real head, from genesis onward) — `BranchRow`'s own type hasn't
   // been narrowed to match yet (a separate, wider cleanup touching every
@@ -179,7 +186,7 @@ export function LandscapePage() {
   // loading anything, and this page renders `CapabilityLandscapeList`
   // instead of the canvas/mobile list either one of the other two hooks
   // feeds.
-  const { state } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId === null, searchCommitId);
+  const { state } = useLandscape(model?.id ?? null, organisation?.id ?? null, userId, ref, mode, capabilityId === null, searchCommitId, asAt, highlightChanges);
   const { state: capabilityLandscapeState } = useCapabilityLandscape(model?.id ?? null, ref, mode, capabilityId, searchCommitId);
   // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment. Either hook's own `ready` covers this route (plain vs. capability-scoped), whichever is actually active.
   useRouteTiming('landscape', capabilityId === null ? state.status === 'ready' : capabilityLandscapeState.status === 'ready');
@@ -630,6 +637,31 @@ export function LandscapePage() {
           )}
         </div>
 
+        {ref.kind === 'main' && capabilityId === null && (
+          <AsAtControl
+            asAt={asAt}
+            todayIso={todayIso}
+            highlightChanges={highlightChanges}
+            onChange={(next) => {
+              setSearchParams((prev) => {
+                const updated = new URLSearchParams(prev);
+                if (next === null) updated.delete(AS_AT_PARAM);
+                else updated.set(AS_AT_PARAM, next);
+                return updated;
+              });
+            }}
+            onHighlightChange={(next) => {
+              setSearchParams((prev) => {
+                const updated = new URLSearchParams(prev);
+                if (next) updated.delete(AS_AT_COMPARE_PARAM);
+                else updated.set(AS_AT_COMPARE_PARAM, 'off');
+                return updated;
+              });
+            }}
+          />
+        )}
+        {asAt !== null && state.status === 'ready' && state.data.future !== null && <FutureSummary future={state.data.future} asAt={asAt} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />}
+        {asAt !== null && highlightChanges && state.status === 'ready' && <DiffLegend />}
         {ref.kind === 'branch' && (
           <BranchViewModeControl
             mode={mode}

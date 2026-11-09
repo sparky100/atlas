@@ -15,9 +15,13 @@ import { filterLandscapeEdges, filterOwnsEdgesForSystems, filterSupportsEdgesFor
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import { getOrCreateModelView } from '../../db/views';
 import type { ViewMode } from '../../db/viewMode';
-import type { VersionDiff } from '../../engine/versionDiff';
+import { loadPlannedFuture, type PlannedFuture } from '../../db/plannedFuture';
+import { cloneHead } from '../../engine/deltas';
+import { serializeHeadProjection, type HeadProjection } from '../../engine/projection';
+import { computeVersionDiff, type VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
-import { resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
+import { loadHeadAtCommitCached, resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
+import { todayIsoDate } from './asAt';
 import { l1AncestorOf, loadCapabilityAncestry } from '../elements/capabilityDepth';
 import { moduleDisplayName } from '../elements/moduleDisplayName';
 import { isIntegrationPlatform, isPlatform } from '../elements/systemKind';
@@ -50,6 +54,8 @@ export interface LandscapeData {
   l1AncestorByCapabilityId: Map<UUID, ElementsHeadRow>;
   /** Populated only when `ref` is a branch and `mode === 'diff'` (UI-principles §6.2/§6.3) — `null` for `main`/`tag`, and for `asIs`/`toBe`, where there's nothing to highlight against. */
   diff: VersionDiff | null;
+  /** Populated only for a view "as at" a future date (`asAt`): what was laid on, what was left out, and what the date leaves without a system. `null` for today. */
+  future: PlannedFuture | null;
 }
 
 export type LandscapeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: LandscapeData };
@@ -144,6 +150,10 @@ export function useLandscape(
    * in play) — `null` there is the only ever value and never blocks them.
    */
   mainCommitIdHint: UUID | null = null,
+  /** "View as at": a future ISO date (`asat.ts`'s `parseAsAtParam`), main only — `null` is today. A change-branch ref has its own As-is/To-be/Diff control, so this is ignored for one. */
+  asAt: string | null = null,
+  /** With `asAt`: mark what differs from today (added/removed/changed), using the same diff styling as a change's Diff mode. */
+  highlightChanges = true,
 ): UseLandscapeResult {
   const [state, setState] = useState<LandscapeState>({ status: 'loading' });
   const refParam = refParamOf(ref);
@@ -169,6 +179,7 @@ export function useLandscape(
     // was meant to fix. Waiting means this effect runs exactly once for a
     // `main` ref, using the caller's already-resolved commit id.
     if (ref.kind === 'main' && !mainCommitIdHint) return undefined;
+    const futureAsAt = ref.kind === 'main' ? asAt : null;
     const currentModelId = modelId;
     const currentOrgId = orgId;
     const currentUserId = userId;
@@ -182,6 +193,7 @@ export function useLandscape(
       let allContainers: ElementsHeadRow[];
       let branchId: UUID | null = null;
       let diff: VersionDiff | null = null;
+      let future: PlannedFuture | null = null;
       // Populated only for `main`/a tag: everything that needs just the
       // commit id, fetched in ONE parallel round (it used to be three
       // dependent rounds — lists, then edges, then capability ancestors —
@@ -213,6 +225,19 @@ export function useLandscape(
         | { edges: (systemIds: UUID[], actorIds: UUID[]) => RelationshipsHeadRow[]; supports: (systemIds: UUID[]) => RelationshipsHeadRow[]; owns: (systemIds: UUID[]) => RelationshipsHeadRow[]; byIds: (ids: UUID[]) => Map<UUID, ElementsHeadRow> }
         | undefined;
 
+      // A folded projection (a change branch's, or the planned future) stands in for the head tables: every query below reads it in memory.
+      const projectionLists = (projection: HeadProjection): [ElementsHeadRow[], ElementsHeadRow[], ElementsHeadRow[]] => [
+        projectionSystemsForLandscape(projection),
+        projectionActorsForLandscape(projection),
+        projectionContainersForLandscape(projection),
+      ];
+      const projectionSource = (projection: HeadProjection): NonNullable<typeof systemsSource> => ({
+        edges: (systemIds, actorIds) => projectionLandscapeEdges(projection, systemIds, actorIds),
+        supports: (systemIds) => projectionSupportsEdgesForSystems(projection, systemIds),
+        owns: (systemIds) => projectionOwnsEdgesForSystems(projection, systemIds),
+        byIds: (ids) => projectionElementsByIds(projection, ids),
+      });
+
       if (ref.kind === 'branch') {
         const branch = await resolveBranchRef(supabase, ref);
         if (!branch) {
@@ -227,15 +252,23 @@ export function useLandscape(
         commitId = resolved.commitId;
         branchId = branch.id;
         diff = resolved.diff;
-        allSystems = projectionSystemsForLandscape(resolved.projection);
-        allActors = projectionActorsForLandscape(resolved.projection);
-        allContainers = projectionContainersForLandscape(resolved.projection);
-        systemsSource = {
-          edges: (systemIds, actorIds) => projectionLandscapeEdges(resolved.projection, systemIds, actorIds),
-          supports: (systemIds) => projectionSupportsEdgesForSystems(resolved.projection, systemIds),
-          owns: (systemIds) => projectionOwnsEdgesForSystems(resolved.projection, systemIds),
-          byIds: (ids) => projectionElementsByIds(resolved.projection, ids),
-        };
+        [allSystems, allActors, allContainers] = projectionLists(resolved.projection);
+        systemsSource = projectionSource(resolved.projection);
+      } else if (ref.kind === 'main' && mainCommitIdHint && futureAsAt !== null && futureAsAt > todayIsoDate()) {
+        // View as at a future date: today's head with the planned changes that land by then laid on top (`engine/plannedFuture.ts`). Read-only — nothing is stored.
+        commitId = mainCommitIdHint;
+        future = await loadPlannedFuture(supabase, currentModelId, mainCommitIdHint, futureAsAt, todayIsoDate(), (c) => loadHeadAtCommitCached(supabase, currentModelId, c));
+        let renderHead = future.head;
+        if (highlightChanges) {
+          // Same as a change's Diff mode: what the date removes stays on the canvas, ghosted; what it adds or changes is marked.
+          diff = computeVersionDiff(future.today, future.head);
+          renderHead = cloneHead(future.head);
+          for (const e of diff.elements) if (e.state === 'removed' && e.asIs) renderHead.elements.set(e.elementId, e.asIs);
+          for (const r of diff.relationships) if (r.state === 'removed' && r.asIs) renderHead.relationships.set(r.relationshipId, r.asIs);
+        }
+        const futureProjection = serializeHeadProjection(renderHead);
+        [allSystems, allActors, allContainers] = projectionLists(futureProjection);
+        systemsSource = projectionSource(futureProjection);
       } else if (ref.kind === 'main' && mainCommitIdHint) {
         // Shared lookup: the caller already resolved `main`, so skip this
         // hook's own `resolveRef` round trip entirely — see this
@@ -310,7 +343,7 @@ export function useLandscape(
 
       const systemsById = new Map(allSystems.map((s) => [s.element_id, s]));
       const actorsById = new Map(allActors.map((a) => [a.element_id, a]));
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, platformIdByInterfaceId, actorsById, edges, supportsEdges, ownsEdges, l1AncestorByCapabilityId, diff } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, platformIdByInterfaceId, actorsById, edges, supportsEdges, ownsEdges, l1AncestorByCapabilityId, diff, future } });
     }
 
     load().catch((e: unknown) => {
@@ -324,7 +357,7 @@ export function useLandscape(
     // `ref`'s string form (`refParam`) is the real dependency, same pitfall
     // and same fix as useElementPage.ts — `ref` itself is read from the
     // closure, always the latest one.
-  }, [modelId, orgId, userId, refParam, mode, enabled, mainCommitIdHint]);
+  }, [modelId, orgId, userId, refParam, mode, enabled, mainCommitIdHint, asAt, highlightChanges]);
 
   return { state };
 }
